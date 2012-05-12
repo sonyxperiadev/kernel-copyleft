@@ -1797,6 +1797,11 @@ struct msm_calib_wb {
 	uint16_t gr_over_gb;
 };
 
+struct msm_calib_wb_light_info {
+	uint8_t lightidx[10];
+	struct msm_calib_wb wb_light_info[3];
+};
+
 struct msm_calib_af {
 	uint16_t macro_dac;
 	uint16_t inf_dac;
@@ -1808,6 +1813,11 @@ struct msm_calib_lsc {
 	uint16_t b_gain[221];
 	uint16_t gr_gain[221];
 	uint16_t gb_gain[221];
+};
+
+struct msm_calib_lsc_light_info {
+	uint8_t lightidx[10];
+	struct msm_calib_lsc lsc_light_info[3];
 };
 
 struct pixel_t {

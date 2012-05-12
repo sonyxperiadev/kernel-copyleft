@@ -53,7 +53,7 @@ static struct msm_camera_i2c_reg_conf ov9726_recommend_settings[] = {
 	{0x3620, 0x66},
 	{0x3621, 0xc0},
 	{0x0340, 0x03}, /* FRAME_LENGTH_LINES_HI */
-	{0x0341, 0xC1}, /* FRAME_LENGTH_LINES_LO */
+	{0x0341, 0xD0}, /* FRAME_LENGTH_LINES_LO */
 	{0x0342, 0x06}, /* LINE_LENGTH_PCK_HI */
 	{0x0343, 0x80}, /* LINE_LENGTH_PCK_LO */
 	{0x0202, 0x03}, /* COARSE_INTEGRATION_TIME_HI */
@@ -82,7 +82,7 @@ static struct msm_camera_i2c_reg_conf ov9726_recommend_settings[] = {
 	{0x034e, 0x03}, /* Y_OUTPUT_SIZE_HI */
 	{0x034f, 0x28}, /* Y_OUTPUT_SIZE_LO */
 	{0x0340, 0x03}, /* FRAME_LENGTH_LINES_HI */
-	{0x0341, 0xC1}, /* FRAME_LENGTH_LINES_LO */
+	{0x0341, 0xD0}, /* FRAME_LENGTH_LINES_LO */
 	{0x0342, 0x06}, /* LINE_LENGTH_PCK_HI */
 	{0x0343, 0x80}, /* LINE_LENGTH_PCK_LO */
 	{0x0202, 0x03}, /* COARSE_INTEGRATION_TIME_HI */
@@ -148,9 +148,9 @@ static struct msm_sensor_output_info_t ov9726_dimensions[] = {
 		.x_output = 0x510, /* 1296 */
 		.y_output = 0x328, /* 808 */
 		.line_length_pclk = 0x680, /* 1664 */
-		.frame_length_lines = 0x3C1, /* 961 */
-		.vt_pixel_clk = 320000000,
-		.op_pixel_clk = 320000000,
+		.frame_length_lines = 0x3D0, /* 976 */
+		.vt_pixel_clk = 48000000,
+		.op_pixel_clk = 60000000,
 		.binning_factor = 1,
 	},
 };
@@ -176,6 +176,13 @@ static struct msm_sensor_exp_gain_info_t ov9726_exp_gain_info = {
 static const struct i2c_device_id ov9726_i2c_id[] = {
 	{SENSOR_NAME, (kernel_ulong_t)&ov9726_s_ctrl},
 	{ }
+};
+
+static enum msm_camera_vreg_name_t ov9726_veg_seq[] = {
+	CAM_VIO,
+	CAM_VANA,
+	CAM_VDIG,
+	CAM_VAF,
 };
 
 static struct i2c_driver ov9726_i2c_driver = {
@@ -218,12 +225,15 @@ static struct msm_sensor_fn_t ov9726_func_tbl = {
 	.sensor_write_exp_gain = msm_sensor_write_exp_gain1,
 	.sensor_write_snapshot_exp_gain = msm_sensor_write_exp_gain1,
 	.sensor_csi_setting = msm_sensor_setting1,
+	.sensor_setting = msm_sensor_setting,
 	.sensor_set_sensor_mode = msm_sensor_set_sensor_mode,
 	.sensor_mode_init = msm_sensor_mode_init,
 	.sensor_get_output_info = msm_sensor_get_output_info,
 	.sensor_config = msm_sensor_config,
 	.sensor_power_up = msm_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
+	.sensor_adjust_frame_lines = msm_sensor_adjust_frame_lines1,
+	.sensor_get_csi_params = msm_sensor_get_csi_params,
 };
 
 static struct msm_sensor_reg_t ov9726_regs = {
@@ -248,6 +258,8 @@ static struct msm_sensor_ctrl_t ov9726_s_ctrl = {
 	.msm_sensor_reg = &ov9726_regs,
 	.sensor_i2c_client = &ov9726_sensor_i2c_client,
 	.sensor_i2c_addr = 0x20,
+	.vreg_seq = ov9726_veg_seq,
+	.num_vreg_seq = ARRAY_SIZE(ov9726_veg_seq),
 	.sensor_output_reg_addr = &ov9726_reg_addr,
 	.sensor_id_info = &ov9726_id_info,
 	.sensor_exp_gain_info = &ov9726_exp_gain_info,
@@ -264,5 +276,3 @@ static struct msm_sensor_ctrl_t ov9726_s_ctrl = {
 module_init(msm_sensor_init_module);
 MODULE_DESCRIPTION("Omnivision WXGA Bayer sensor driver");
 MODULE_LICENSE("GPL v2");
-
-

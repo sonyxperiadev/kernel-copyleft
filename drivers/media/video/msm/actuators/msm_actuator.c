@@ -58,7 +58,10 @@ static int32_t msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 	uint32_t size = a_ctrl->reg_tbl_size, i = 0;
 	int32_t rc = 0;
 	struct msm_camera_i2c_reg_tbl *i2c_tbl = a_ctrl->i2c_reg_tbl;
+	uint8_t hw_reg_write = 1;
 	CDBG("%s: IN\n", __func__);
+	if (a_ctrl->curr_hwparams == hw_params)
+		hw_reg_write = 0;
 	for (i = 0; i < size; i++) {
 		if (write_arr[i].reg_write_type == MSM_ACTUATOR_WRITE_DAC) {
 			value = (next_lens_position <<
@@ -88,19 +91,29 @@ static int32_t msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 				i2c_byte1 = (value & 0xFF00) >> 8;
 				i2c_byte2 = value & 0xFF;
 			}
+			CDBG("%s: i2c_byte1:0x%x, i2c_byte2:0x%x\n", __func__,
+				i2c_byte1, i2c_byte2);
+			i2c_tbl[a_ctrl->i2c_tbl_index].reg_addr = i2c_byte1;
+			i2c_tbl[a_ctrl->i2c_tbl_index].reg_data = i2c_byte2;
+			i2c_tbl[a_ctrl->i2c_tbl_index].delay = delay;
+			a_ctrl->i2c_tbl_index++;
 		} else {
-			i2c_byte1 = write_arr[i].reg_addr;
-			i2c_byte2 = (hw_dword & write_arr[i].hw_mask) >>
-				write_arr[i].hw_shift;
+			if (hw_reg_write) {
+				i2c_byte1 = write_arr[i].reg_addr;
+				i2c_byte2 = (hw_dword & write_arr[i].hw_mask) >>
+					write_arr[i].hw_shift;
+				CDBG("%s: i2c_byte1:0x%x, i2c_byte2:0x%x\n", __func__,
+					i2c_byte1, i2c_byte2);
+				i2c_tbl[a_ctrl->i2c_tbl_index].reg_addr = i2c_byte1;
+				i2c_tbl[a_ctrl->i2c_tbl_index].reg_data = i2c_byte2;
+				i2c_tbl[a_ctrl->i2c_tbl_index].delay = delay;
+				a_ctrl->i2c_tbl_index++;
+			}
 		}
-		CDBG("%s: i2c_byte1:0x%x, i2c_byte2:0x%x\n", __func__,
-			i2c_byte1, i2c_byte2);
-		i2c_tbl[a_ctrl->i2c_tbl_index].reg_addr = i2c_byte1;
-		i2c_tbl[a_ctrl->i2c_tbl_index].reg_data = i2c_byte2;
-		i2c_tbl[a_ctrl->i2c_tbl_index].delay = delay;
-		a_ctrl->i2c_tbl_index++;
 	}
-		CDBG("%s: OUT\n", __func__);
+	CDBG("%s: OUT\n", __func__);
+	if (rc == 0)
+		a_ctrl->curr_hwparams = hw_params;
 	return rc;
 }
 
@@ -314,6 +327,7 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 	uint16_t step_boundary = 0;
 	uint32_t max_code_size = 1;
 	uint16_t data_size = set_info->actuator_params.data_size;
+	uint16_t i=0;
 	CDBG("%s called\n", __func__);
 
 	for (; data_size > 0; data_size--)
@@ -360,6 +374,10 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 		}
 	}
 
+	for (i=0; i<set_info->af_tuning_params.total_steps; i++) {
+		printk("%s: Step_Pos_Table[%d]:%d\n", __func__, i,
+			a_ctrl->step_position_table[i]);
+	}
 	return rc;
 }
 

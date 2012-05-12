@@ -213,6 +213,7 @@ int32_t msm_sensor_write_exp_gain1(struct msm_sensor_ctrl_t *s_ctrl,
 	offset = s_ctrl->sensor_exp_gain_info->vert_offset;
 	if (line > (fl_lines - offset))
 		fl_lines = line + offset;
+	fl_lines += (fl_lines & 0x01);
 
 	s_ctrl->func_tbl->sensor_group_hold_on(s_ctrl);
 	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
