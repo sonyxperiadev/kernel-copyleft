@@ -54,7 +54,7 @@ uint32_t msm_jpeg_platform_v2p(int fd, uint32_t len, struct file **file_p,
 		return 0;
 
 	rc = ion_map_iommu(jpeg_client, *ionhandle, domain_num, 0,
-			 SZ_4K, 0, &paddr, (unsigned long *)&size, UNCACHED, 0);
+			 SZ_4K, 0, &paddr, (unsigned long *)&size, 0, 0);
 	JPEG_DBG("%s:%d] addr 0x%x size %ld", __func__, __LINE__,
 							(uint32_t)paddr, size);
 
