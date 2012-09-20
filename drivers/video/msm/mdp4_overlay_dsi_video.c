@@ -563,6 +563,9 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
 		mdp4_dsi_video_wait4vsync(0, &vtime);
 		mipi_dsi_controller_cfg(0);
+		/* Clks are enabled in probe.
+		   Disabling clocks now */
+		mdp_clk_ctrl(0);
 	}
 
 	pipe->src_height = fbi->var.yres;

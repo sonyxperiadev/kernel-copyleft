@@ -2,7 +2,7 @@
  *
  * MSM MDP Interface (used by framebuffer core)
  *
- * Copyright (c) 2007-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2007-2013, The Linux Foundation. All rights reserved.
  * Copyright (C) 2007 Google Incorporated
  *
  * This software is licensed under the terms of the GNU General Public
@@ -2580,7 +2580,9 @@ static int mdp_probe(struct platform_device *pdev)
 #ifdef CONFIG_FB_MSM_OVERLAY
 		mdp_hw_cursor_init();
 #endif
-		mdp_clk_ctrl(0);
+
+		if (!(mdp_pdata->cont_splash_enabled))
+			mdp_clk_ctrl(0);
 
 		mdp_resource_initialized = 1;
 		return 0;
