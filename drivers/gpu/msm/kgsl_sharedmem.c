@@ -520,14 +520,11 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	si_meminfo(&si);
 
 	/*
-	 * Limit the size of the allocation to the amount of free memory minus
-	 * 32MB. Why 32MB?  Because thats the buffer that page_alloc uses and
-	 * it just seems like a reasonable limit that won't make the OOM killer
-	 * go all serial on us.  Of course, if we are down this low all bets
-	 * are off but above all do no harm.
+	 * Don't let the user allocate more free memory then is available on the
+	 * system
 	 */
 
-	if (size >= ((si.freeram << PAGE_SHIFT) - SZ_32M))
+	if (size >= (si.freeram << PAGE_SHIFT))
 		return -ENOMEM;
 
 	/*
