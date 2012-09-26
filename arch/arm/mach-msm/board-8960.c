@@ -2798,10 +2798,20 @@ static struct platform_device *cdp_devices[] __initdata = {
 	&msm_bus_cpss_fpb,
 };
 
+#define MSM_GSBI4_PHYS		0x16300000
+#define GSBI_DUAL_MODE_CODE	0x60
+
 static void __init msm8960_i2c_init(void)
 {
-	if (socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE)
+	if (socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE) {
+		/* Setting protocol code to 0x60 for dual UART/I2C in GSBI4 */
+		void *gsbi_mem = ioremap_nocache(MSM_GSBI4_PHYS, 4);
+		writel_relaxed(GSBI_DUAL_MODE_CODE, gsbi_mem);
+		mb();
+		iounmap(gsbi_mem);
+		msm8960_i2c_qup_gsbi4_pdata.use_gsbi_shared_mode = 1;
 		msm8960_i2c_qup_gsbi4_pdata.keep_ahb_clk_on = 1;
+	}
 
 	msm8960_device_qup_i2c_gsbi4.dev.platform_data =
 					&msm8960_i2c_qup_gsbi4_pdata;
