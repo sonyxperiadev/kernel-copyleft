@@ -315,7 +315,9 @@ void mdp4_dsi_video_wait4vsync(int cndx, long long *vtime)
 	vctrl->wait_vsync_cnt++;
 	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 
-	wait_for_completion(&vctrl->vsync_comp);
+	if (!wait_for_completion_timeout(
+			&vctrl->vsync_comp, msecs_to_jiffies(100)))
+		pr_err("%s %d  TIMEOUT_\n", __func__, __LINE__);
 	mdp4_stat.wait4vsync0++;
 
 	*vtime = ktime_to_ns(vctrl->vsync_time);
@@ -335,7 +337,9 @@ static void mdp4_dsi_video_wait4dmap(int cndx)
 	if (atomic_read(&vctrl->suspend) > 0)
 		return;
 
-	wait_for_completion(&vctrl->dmap_comp);
+	if (!wait_for_completion_timeout(
+			&vctrl->dmap_comp, msecs_to_jiffies(100)))
+		pr_err("%s %d  TIMEOUT_\n", __func__, __LINE__);
 }
 
 
@@ -373,7 +377,9 @@ static void mdp4_dsi_video_wait4ov(int cndx)
 	if (atomic_read(&vctrl->suspend) > 0)
 		return;
 
-	wait_for_completion(&vctrl->ov_comp);
+	if (!wait_for_completion_timeout(
+			&vctrl->ov_comp, msecs_to_jiffies(100)))
+		pr_err("%s %d  TIMEOUT_\n", __func__, __LINE__);
 }
 
 static ssize_t vsync_show_event(struct device *dev,
