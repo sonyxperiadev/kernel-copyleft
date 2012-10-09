@@ -818,7 +818,7 @@ struct vfe32_output_ch {
 #define VFE32_IMASK_STATS_IHIST_BUS_OVFL      (0x00000001<<20)
 #define VFE32_IMASK_STATS_SKIN_BHIST_BUS_OVFL (0x00000001<<21)
 #define VFE32_IMASK_AXI_ERROR                 (0x00000001<<22)
-
+#define VFE32_IMASK_BUS_OVFL_ERROR		0x005FFF00
 #define VFE_COM_STATUS 0x000FE000
 
 struct vfe32_output_path {
