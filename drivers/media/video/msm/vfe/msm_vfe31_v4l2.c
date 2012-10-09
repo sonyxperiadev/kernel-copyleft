@@ -2676,7 +2676,7 @@ static void vfe31_process_error_irq(uint32_t errStatus)
 		reg_value = msm_camera_io_r(
 				vfe31_ctrl->vfebase + VFE_CAMIF_STATUS);
 		pr_err("camifStatus  = 0x%x\n", reg_value);
-		vfe31_send_isp_msg(vfe31_ctrl, MSG_ID_CAMIF_ERROR);
+		vfe31_send_isp_msg(vfe31_ctrl, MSG_ID_VFE_ERROR);
 	}
 
 	if (errStatus & VFE31_IMASK_STATS_CS_OVWR)

@@ -3963,10 +3963,10 @@ static void vfe32_process_error_irq(
 		reg_value = msm_camera_io_r(
 			axi_ctrl->share_ctrl->vfebase + VFE_CAMIF_STATUS);
 		v4l2_subdev_notify(&axi_ctrl->subdev,
-			NOTIFY_VFE_CAMIF_ERROR, (void *)NULL);
+			NOTIFY_VFE_ERROR, (void *)NULL);
 		pr_err("camifStatus  = 0x%x\n", reg_value);
 		vfe32_send_isp_msg(&axi_ctrl->subdev,
-			axi_ctrl->share_ctrl->vfeFrameId, MSG_ID_CAMIF_ERROR);
+			axi_ctrl->share_ctrl->vfeFrameId, MSG_ID_VFE_ERROR);
 	}
 
 	if (errStatus & VFE32_IMASK_BHIST_OVWR)
@@ -4007,6 +4007,13 @@ static void vfe32_process_error_irq(
 
 	if (errStatus & VFE32_IMASK_STATS_SKIN_BHIST_BUS_OVFL)
 		pr_err("vfe32_irq: skin/bhist stats bus overflow\n");
+
+	if (errStatus & VFE32_IMASK_BUS_OVFL_ERROR) {
+		v4l2_subdev_notify(&axi_ctrl->subdev,
+			NOTIFY_VFE_ERROR, (void *)NULL);
+		vfe32_send_isp_msg(&axi_ctrl->subdev,
+			axi_ctrl->share_ctrl->vfeFrameId, MSG_ID_VFE_ERROR);
+	}
 }
 
 static void vfe32_process_common_error_irq(

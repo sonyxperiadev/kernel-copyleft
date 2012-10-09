@@ -1687,7 +1687,7 @@ static uint32_t msm_camera_server_find_mctl(
 		break;
 	case NOTIFY_VFE_MSG_STATS:
 	case NOTIFY_VFE_MSG_COMP_STATS:
-	case NOTIFY_VFE_CAMIF_ERROR:
+	case NOTIFY_VFE_ERROR:
 	default:
 		interface = PIX_0;
 		break;
@@ -1768,7 +1768,7 @@ static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 		rc = v4l2_subdev_call(g_server_dev.gesture_device,
 			core, ioctl, VIDIOC_MSM_GESTURE_CAM_EVT, arg);
 		break;
-	case NOTIFY_VFE_CAMIF_ERROR: {
+	case NOTIFY_VFE_ERROR: {
 		p_mctl = msm_cam_server_get_mctl(mctl_handle);
 		msm_cam_server_send_error_evt(p_mctl, V4L2_EVENT_PRIVATE_START
 			+ MSM_CAM_APP_NOTIFY_ERROR_EVENT);
