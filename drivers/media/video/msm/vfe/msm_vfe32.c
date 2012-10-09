@@ -4009,6 +4009,7 @@ static void vfe32_process_error_irq(
 		pr_err("vfe32_irq: skin/bhist stats bus overflow\n");
 
 	if (errStatus & VFE32_IMASK_BUS_OVFL_ERROR) {
+		pr_err("%s Bus Overflow. Notify error ", __func__);
 		v4l2_subdev_notify(&axi_ctrl->subdev,
 			NOTIFY_VFE_ERROR, (void *)NULL);
 		vfe32_send_isp_msg(&axi_ctrl->subdev,
@@ -4043,6 +4044,11 @@ static void vfe32_process_common_error_irq(
 
 	if (errStatus & VFE32_IMASK_AXI_ERROR)
 		pr_err("vfe32_irq: axi error\n");
+
+	v4l2_subdev_notify(&axi_ctrl->subdev, NOTIFY_VFE_ERROR,
+		(void *)NULL);
+	vfe32_send_isp_msg(&axi_ctrl->subdev,
+		axi_ctrl->share_ctrl->vfeFrameId, MSG_ID_VFE_ERROR);
 }
 
 
