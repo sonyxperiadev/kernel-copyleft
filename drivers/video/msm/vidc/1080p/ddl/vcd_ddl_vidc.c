@@ -111,6 +111,7 @@ void ddl_vidc_channel_set(struct ddl_client_context *ddl)
 		enc_pix_cache = VIDC_1080P_ENCODE_PCACHE_ENABLE;
 	u32 pix_cache_ctrl, ctxt_mem_offset, ctxt_mem_size, arg1 = 0;
 	u8 *hw_ctxt = NULL;
+	struct ion_handle *alloc_handle;
 
 	if (ddl->decoding) {
 		ddl_set_core_start_time(__func__, DEC_OP_TIME);
@@ -119,21 +120,28 @@ void ddl_vidc_channel_set(struct ddl_client_context *ddl)
 		ctxt_mem_offset = DDL_ADDR_OFFSET(ddl_context->dram_base_a,
 		ddl->codec_data.decoder.hw_bufs.context) >> 11;
 		hw_ctxt =
-		ddl->codec_data.decoder.hw_bufs.context.virtual_base_addr;
+		ddl->codec_data.decoder.hw_bufs.context.align_virtual_addr;
 		ctxt_mem_size =
 			ddl->codec_data.decoder.hw_bufs.context.buffer_size;
+		alloc_handle =
+			ddl->codec_data.decoder.hw_bufs.context.alloc_handle;
 	} else {
 		vcd_codec = &(ddl->codec_data.encoder.codec.codec);
 		pix_cache_ctrl = (u32)enc_pix_cache;
 		ctxt_mem_offset = DDL_ADDR_OFFSET(ddl_context->dram_base_a,
 			ddl->codec_data.encoder.hw_bufs.context) >> 11;
 		hw_ctxt =
-		ddl->codec_data.encoder.hw_bufs.context.virtual_base_addr;
+		ddl->codec_data.encoder.hw_bufs.context.align_virtual_addr;
 		ctxt_mem_size =
 			ddl->codec_data.encoder.hw_bufs.context.buffer_size;
+		alloc_handle =
+			ddl->codec_data.encoder.hw_bufs.context.alloc_handle;
 	}
 	if (!res_trk_check_for_sec_session() && hw_ctxt) {
 		memset(hw_ctxt, 0, ctxt_mem_size);
+		msm_ion_do_cache_op(ddl_context->video_ion_client,
+		alloc_handle, hw_ctxt, ctxt_mem_size,
+		ION_IOC_CLEAN_INV_CACHES);
 		arg1 = 1 << 29;
 	}
 	switch (*vcd_codec) {
