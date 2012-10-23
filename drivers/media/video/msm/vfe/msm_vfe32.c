@@ -632,24 +632,6 @@ static void axi_disable_irq(struct vfe_share_ctrl_t *share_ctrl,
 		msm_camera_io_w(irq_mask, share_ctrl->vfebase +
 			VFE_IRQ_MASK_0);
 	}
-	/*Dont Disable for concurrent*/
-	if (share_ctrl->axi_ref_cnt == 1) {
-		atomic_set(&share_ctrl->handle_common_irq, 0);
-		msm_camera_io_w(VFE_DISABLE_ALL_IRQS,
-			share_ctrl->vfebase + VFE_IRQ_MASK_0);
-		msm_camera_io_w(VFE_DISABLE_ALL_IRQS,
-			share_ctrl->vfebase + VFE_IRQ_MASK_1);
-
-		/* clear all pending interrupts*/
-		msm_camera_io_w(VFE_CLEAR_ALL_IRQS,
-			share_ctrl->vfebase + VFE_IRQ_CLEAR_0);
-		msm_camera_io_w(VFE_CLEAR_ALL_IRQS,
-			share_ctrl->vfebase + VFE_IRQ_CLEAR_1);
-		/* Ensure the write order while writing
-		*to the command register using the barrier */
-		msm_camera_io_w_mb(1,
-			share_ctrl->vfebase + VFE_IRQ_CMD);
-	}
 }
 
 static void vfe32_stop(struct vfe32_ctrl_type *vfe32_ctrl)
