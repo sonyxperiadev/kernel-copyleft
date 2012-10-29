@@ -93,7 +93,6 @@ static struct gpiomux_setting cam_settings[] = {
 		.drv = GPIOMUX_DRV_2MA,
 		.pull = GPIOMUX_PULL_KEEPER,
 	},
-
 };
 
 static struct msm_gpiomux_config msm8960_cdp_flash_configs[] = {
@@ -149,6 +148,20 @@ static struct msm_gpiomux_config msm8960_cam_common_configs[] = {
 			[GPIOMUX_SUSPENDED] = &cam_settings[0],
 		},
 	},
+	{
+		.gpio = 54,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_settings[2],
+			[GPIOMUX_SUSPENDED] = &cam_settings[0],
+		},
+	},
+{
+		.gpio = 75,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_settings[2],
+			[GPIOMUX_SUSPENDED] = &cam_settings[0],
+		},
+	}
 };
 
 static struct msm_gpiomux_config msm8960_cam_2d_configs[] = {
@@ -505,18 +518,22 @@ static struct gpio msm8960_common_cam_gpio[] = {
 
 static struct gpio msm8960_front_cam_gpio[] = {
 	{76, GPIOF_DIR_OUT, "CAM_RESET"},
+	{75, GPIOF_DIR_OUT, "CAM_PWDN"},
 };
 
 static struct gpio msm8960_back_cam_gpio[] = {
+	{54, GPIOF_DIR_OUT, "CAM_STANDBY"},
 	{107, GPIOF_DIR_OUT, "CAM_RESET"},
 };
 
 static struct msm_gpio_set_tbl msm8960_front_cam_gpio_set_tbl[] = {
+	{75, GPIOF_OUT_INIT_LOW, 1000},
 	{76, GPIOF_OUT_INIT_LOW, 1000},
 	{76, GPIOF_OUT_INIT_HIGH, 4000},
 };
 
 static struct msm_gpio_set_tbl msm8960_back_cam_gpio_set_tbl[] = {
+	{54, GPIOF_OUT_INIT_HIGH, 1000},
 	{107, GPIOF_OUT_INIT_LOW, 1000},
 	{107, GPIOF_OUT_INIT_HIGH, 4000},
 };
@@ -587,15 +604,6 @@ static struct msm_camera_sensor_platform_info sensor_board_info_imx074 = {
 	.csi_lane_params = &imx074_csi_lane_params,
 };
 
-static struct i2c_board_info imx074_eeprom_i2c_info = {
-	I2C_BOARD_INFO("imx074_eeprom", 0x34 << 1),
-};
-
-static struct msm_eeprom_info imx074_eeprom_info = {
-	.board_info     = &imx074_eeprom_i2c_info,
-	.bus_id         = MSM_8960_GSBI4_QUP_I2C_BUS_ID,
-};
-
 static struct msm_camera_sensor_info msm_camera_sensor_imx074_data = {
 	.sensor_name	= "imx074",
 	.pdata	= &msm_camera_csi_device_data[0],
@@ -606,7 +614,6 @@ static struct msm_camera_sensor_info msm_camera_sensor_imx074_data = {
 	.camera_type = BACK_CAMERA_2D,
 	.sensor_type = BAYER_SENSOR,
 	.actuator_info = &msm_act_main_cam_0_info,
-	.eeprom_info = &imx074_eeprom_info,
 };
 
 static struct msm_camera_sensor_flash_data flash_mt9m114 = {
@@ -664,6 +671,33 @@ static struct msm_camera_sensor_info msm_camera_sensor_ov2720_data = {
 	.pdata	= &msm_camera_csi_device_data[1],
 	.flash_data	= &flash_ov2720,
 	.sensor_platform_info = &sensor_board_info_ov2720,
+	.csi_if	= 1,
+	.camera_type = FRONT_CAMERA_2D,
+	.sensor_type = BAYER_SENSOR,
+};
+
+static struct msm_camera_sensor_flash_data flash_ov9726 = {
+	.flash_type	= MSM_CAMERA_FLASH_NONE,
+};
+
+static struct msm_camera_csi_lane_params ov9726_csi_lane_params = {
+	.csi_lane_assign = 0xE4,
+	.csi_lane_mask = 0x1,
+};
+
+static struct msm_camera_sensor_platform_info sensor_board_info_ov9726 = {
+	.mount_angle	= 0,
+	.cam_vreg = msm_8960_cam_vreg,
+	.num_vreg = ARRAY_SIZE(msm_8960_cam_vreg),
+	.gpio_conf = &msm_8960_front_cam_gpio_conf,
+	.csi_lane_params = &ov9726_csi_lane_params,
+};
+
+static struct msm_camera_sensor_info msm_camera_sensor_ov9726_data = {
+	.sensor_name	= "ov9726",
+	.pdata	= &msm_camera_csi_device_data[1],
+	.flash_data	= &flash_ov9726,
+	.sensor_platform_info = &sensor_board_info_ov9726,
 	.csi_if	= 1,
 	.camera_type = FRONT_CAMERA_2D,
 	.sensor_type = BAYER_SENSOR,
@@ -747,6 +781,44 @@ static struct msm_camera_sensor_info msm_camera_sensor_imx091_data = {
 	.sensor_type = BAYER_SENSOR,
 	.actuator_info = &msm_act_main_cam_1_info,
 	.eeprom_info = &imx091_eeprom_info,
+};
+
+static struct msm_camera_sensor_flash_data flash_ov8830 = {
+	.flash_type = MSM_CAMERA_FLASH_NONE,
+};
+
+static struct msm_camera_csi_lane_params ov8830_csi_lane_params = {
+	.csi_lane_assign = 0x9C,
+	.csi_lane_mask = 0x9,
+};
+
+static struct msm_camera_sensor_platform_info sensor_board_info_ov8830 = {
+	.mount_angle = 90,
+	.cam_vreg = msm_8960_cam_vreg,
+	.num_vreg = ARRAY_SIZE(msm_8960_cam_vreg),
+	.gpio_conf = &msm_8960_back_cam_gpio_conf,
+	.csi_lane_params = &ov8830_csi_lane_params,
+};
+
+static struct i2c_board_info ov8830_eeprom_i2c_info = {
+	I2C_BOARD_INFO("ov8830_eeprom", 0x6C >> 3),
+};
+
+static struct msm_eeprom_info ov8830_eeprom_info = {
+	.board_info     = &ov8830_eeprom_i2c_info,
+	.bus_id         = MSM_8960_GSBI4_QUP_I2C_BUS_ID,
+};
+
+static struct msm_camera_sensor_info msm_camera_sensor_ov8830_data = {
+	.sensor_name = "ov8830",
+	.pdata = &msm_camera_csi_device_data[0],
+	.flash_data = &flash_ov8830,
+	.sensor_platform_info = &sensor_board_info_ov8830,
+	.csi_if = 1,
+	.camera_type = BACK_CAMERA_2D,
+	.sensor_type = BAYER_SENSOR,
+	.actuator_info = &msm_act_main_cam_1_info,
+	.eeprom_info = &ov8830_eeprom_info,
 };
 
 static struct pm8xxx_mpp_config_data privacy_light_on_config = {
@@ -833,6 +905,14 @@ static struct i2c_board_info msm8960_camera_i2c_boardinfo[] = {
 	{
 	I2C_BOARD_INFO("ov2720", 0x6C),
 	.platform_data = &msm_camera_sensor_ov2720_data,
+	},
+	{
+	I2C_BOARD_INFO("ov8830", 0x6C >> 1),
+	.platform_data = &msm_camera_sensor_ov8830_data,
+	},
+	{
+		I2C_BOARD_INFO("ov9726", 0x10),
+		.platform_data = &msm_camera_sensor_ov9726_data,
 	},
 	{
 	I2C_BOARD_INFO("mt9m114", 0x48),

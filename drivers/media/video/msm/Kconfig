@@ -74,7 +74,7 @@ config WEBCAM_OV7692
 	  Omni Vision VGA YUV Sensor.
 config WEBCAM_OV9726
 	bool "Sensor OV9726 (VGA Bayer)"
-	depends on MSM_CAMERA && (ARCH_MSM8X60 || ARCH_MSM7X30 || ARCH_MSM7X27A)
+	depends on MSM_CAMERA && (ARCH_MSM8X60 || ARCH_MSM7X30 || ARCH_MSM7X27A || ARCH_MSM8960)
 	default n
 	---help---
 	  Omni Vision VGA Bayer Sensor.
@@ -208,6 +208,13 @@ config OV8825
 	  two mipi lanes, required for msm8625 platform.
 	  Say Y here if this is msm8625 variant platform.
 
+config OV8830
+	bool "Sensor ov8830 (Omnivision 8MP)"
+	depends on MSM_CAMERA
+	---help---
+	Support for OV8830 sensor driver.
+	Omnivision 8MP Bayer Sensor.
+
 config VB6801
 	bool "Sensor vb6801"
 	depends on MSM_CAMERA && !ARCH_MSM8X60 && !MSM_CAMERA_V4L2
@@ -239,6 +246,10 @@ config IMX074_EEPROM
 
 config IMX091_EEPROM
 	bool "IMX091 EEPROM support"
+	depends on MSM_CAMERA
+
+config OV8830_EEPROM
+	bool "OV8830 EEPROM support"
 	depends on MSM_CAMERA
 
 config MSM_GEMINI

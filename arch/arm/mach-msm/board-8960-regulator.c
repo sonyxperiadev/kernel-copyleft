@@ -78,6 +78,8 @@ VREG_CONSUMERS(L11) = {
 	REGULATOR_SUPPLY("cam_vana",		"4-0048"),
 	REGULATOR_SUPPLY("cam_vana",		"4-0020"),
 	REGULATOR_SUPPLY("cam_vana",		"4-0034"),
+	REGULATOR_SUPPLY("cam_vana",		"4-0036"),
+	REGULATOR_SUPPLY("cam_vana",		"4-0010"),
 };
 VREG_CONSUMERS(L12) = {
 	REGULATOR_SUPPLY("8921_l12",		NULL),
@@ -86,6 +88,8 @@ VREG_CONSUMERS(L12) = {
 	REGULATOR_SUPPLY("cam_vdig",		"4-0048"),
 	REGULATOR_SUPPLY("cam_vdig",		"4-0020"),
 	REGULATOR_SUPPLY("cam_vdig",		"4-0034"),
+	REGULATOR_SUPPLY("cam_vdig",		"4-0036"),
+	REGULATOR_SUPPLY("cam_vdig",		"4-0010"),
 };
 VREG_CONSUMERS(L14) = {
 	REGULATOR_SUPPLY("8921_l14",		NULL),
@@ -101,6 +105,8 @@ VREG_CONSUMERS(L16) = {
 	REGULATOR_SUPPLY("cam_vaf",		"4-0048"),
 	REGULATOR_SUPPLY("cam_vaf",		"4-0020"),
 	REGULATOR_SUPPLY("cam_vaf",		"4-0034"),
+	REGULATOR_SUPPLY("cam_vaf",		"4-0036"),
+	REGULATOR_SUPPLY("cam_vaf",		"4-0010"),
 };
 VREG_CONSUMERS(L17) = {
 	REGULATOR_SUPPLY("8921_l17",		NULL),
@@ -221,6 +227,8 @@ VREG_CONSUMERS(LVS5) = {
 	REGULATOR_SUPPLY("cam_vio",		"4-0048"),
 	REGULATOR_SUPPLY("cam_vio",		"4-0020"),
 	REGULATOR_SUPPLY("cam_vio",		"4-0034"),
+	REGULATOR_SUPPLY("cam_vio",		"4-0036"),
+	REGULATOR_SUPPLY("cam_vio",		"4-0010"),
 };
 /* This mapping is used for CDP only. */
 VREG_CONSUMERS(CDP_LVS6) = {
