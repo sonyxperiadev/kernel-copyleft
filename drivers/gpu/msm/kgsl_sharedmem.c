@@ -510,22 +510,7 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	struct page **pages = NULL;
 	pgprot_t page_prot = pgprot_writecombine(PAGE_KERNEL);
 	void *ptr;
-	struct sysinfo si;
 
-	/*
-	 * Get the current memory information to be used in deciding if we
-	 * should go ahead with this allocation
-	 */
-
-	si_meminfo(&si);
-
-	/*
-	 * Don't let the user allocate more free memory then is available on the
-	 * system
-	 */
-
-	if (size >= (si.freeram << PAGE_SHIFT))
-		return -ENOMEM;
 
 	/*
 	 * Add guard page to the end of the allocation when the
@@ -580,8 +565,8 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 		pages[i] = alloc_page(GFP_KERNEL | __GFP_HIGHMEM);
 		if (pages[i] == NULL) {
 			ret = -ENOMEM;
-			memdesc->sglen = i;
-			goto done;
+          		memdesc->sglen = i;
+                   goto done;
 		}
 
 		sg_set_page(&memdesc->sg[i], pages[i], PAGE_SIZE, 0);
