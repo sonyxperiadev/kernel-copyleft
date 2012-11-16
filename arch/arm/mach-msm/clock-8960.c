@@ -4477,6 +4477,7 @@ static struct clk_freq_tbl clk_tbl_aif_osr_492[] = {
 	F_AIF_OSR( 8192000, pll4, 4, 1,  15),
 	F_AIF_OSR(12288000, pll4, 4, 1,  10),
 	F_AIF_OSR(24576000, pll4, 4, 1,   5),
+	F_AIF_OSR(27000000, pxo,  1, 0,   0),
 	F_END
 };
 
@@ -4493,6 +4494,7 @@ static struct clk_freq_tbl clk_tbl_aif_osr_393[] = {
 	F_AIF_OSR( 8192000, pll4, 4, 1,  12),
 	F_AIF_OSR(12288000, pll4, 4, 1,   8),
 	F_AIF_OSR(24576000, pll4, 4, 1,   4),
+	F_AIF_OSR(27000000, pxo,  1, 0,   0),
 	F_END
 };
 
@@ -4518,7 +4520,7 @@ static struct clk_freq_tbl clk_tbl_aif_osr_393[] = {
 		.c = { \
 			.dbg_name = #i "_clk", \
 			.ops = &clk_ops_rcg, \
-			VDD_DIG_FMAX_MAP1(LOW, 24576000), \
+			VDD_DIG_FMAX_MAP1(LOW, 27000000), \
 			CLK_INIT(i##_clk.c), \
 		}, \
 	}
@@ -4544,7 +4546,7 @@ static struct clk_freq_tbl clk_tbl_aif_osr_393[] = {
 		.c = { \
 			.dbg_name = #i "_clk", \
 			.ops = &clk_ops_rcg, \
-			VDD_DIG_FMAX_MAP1(LOW, 24576000), \
+			VDD_DIG_FMAX_MAP1(LOW, 27000000), \
 			CLK_INIT(i##_clk.c), \
 		}, \
 	}
@@ -4634,6 +4636,7 @@ static struct clk_freq_tbl clk_tbl_pcm_492[] = {
 	F_PCM( 8192000, pll4, 4, 1,  15),
 	F_PCM(12288000, pll4, 4, 1,  10),
 	F_PCM(24576000, pll4, 4, 1,   5),
+	F_PCM(27000000, pxo,  1, 0,   0),
 	F_END
 };
 
@@ -4651,6 +4654,7 @@ static struct clk_freq_tbl clk_tbl_pcm_393[] = {
 	F_PCM( 8192000, pll4, 4, 1,  12),
 	F_PCM(12288000, pll4, 4, 1,   8),
 	F_PCM(24576000, pll4, 4, 1,   4),
+	F_PCM(27000000, pxo,  1, 0,   0),
 	F_END
 };
 
@@ -4675,7 +4679,7 @@ static struct rcg_clk pcm_clk = {
 	.c = {
 		.dbg_name = "pcm_clk",
 		.ops = &clk_ops_rcg,
-		VDD_DIG_FMAX_MAP1(LOW, 24576000),
+		VDD_DIG_FMAX_MAP1(LOW, 27000000),
 		CLK_INIT(pcm_clk.c),
 		.rate = ULONG_MAX,
 	},
@@ -4702,7 +4706,7 @@ static struct rcg_clk audio_slimbus_clk = {
 	.c = {
 		.dbg_name = "audio_slimbus_clk",
 		.ops = &clk_ops_rcg,
-		VDD_DIG_FMAX_MAP1(LOW, 24576000),
+		VDD_DIG_FMAX_MAP1(LOW, 27000000),
 		CLK_INIT(audio_slimbus_clk.c),
 	},
 };
