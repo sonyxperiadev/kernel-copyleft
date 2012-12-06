@@ -1693,7 +1693,7 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 		.reg_base_addr = MSM_SAW0_BASE,
 		.reg_init_values[MSM_SPM_REG_SAW2_CFG] = 0x1F,
 #if defined(CONFIG_MSM_AVS_HW)
-		.reg_init_values[MSM_SPM_REG_SAW2_AVS_CTL] = 0x50589464,
+		.reg_init_values[MSM_SPM_REG_SAW2_AVS_CTL] = 0x58589464,
 		.reg_init_values[MSM_SPM_REG_SAW2_AVS_HYSTERESIS] = 0x00020000,
 #endif
 		.reg_init_values[MSM_SPM_REG_SAW2_SPM_CTL] = 0x01,
@@ -1708,7 +1708,7 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 		.reg_base_addr = MSM_SAW1_BASE,
 		.reg_init_values[MSM_SPM_REG_SAW2_CFG] = 0x1F,
 #if defined(CONFIG_MSM_AVS_HW)
-		.reg_init_values[MSM_SPM_REG_SAW2_AVS_CTL] = 0x50589464,
+		.reg_init_values[MSM_SPM_REG_SAW2_AVS_CTL] = 0x58589464,
 		.reg_init_values[MSM_SPM_REG_SAW2_AVS_HYSTERESIS] = 0x00020000,
 #endif
 		.reg_init_values[MSM_SPM_REG_SAW2_SPM_CTL] = 0x01,
@@ -3313,7 +3313,13 @@ static void __init msm8960_cdp_init(void)
 	msm_spm_init(msm_spm_data, ARRAY_SIZE(msm_spm_data));
 	msm_spm_l2_init(msm_spm_l2_data);
 	msm8960_init_buses();
-	platform_add_devices(msm8960_footswitch, msm8960_num_footswitch);
+	if (cpu_is_msm8960ab()) {
+		platform_add_devices(msm8960ab_footswitch,
+				     msm8960ab_num_footswitch);
+	} else {
+		platform_add_devices(msm8960_footswitch,
+				     msm8960_num_footswitch);
+	}
 	if (machine_is_msm8960_liquid())
 		platform_device_register(&msm8960_device_ext_3p3v_vreg);
 	if (machine_is_msm8960_cdp())
