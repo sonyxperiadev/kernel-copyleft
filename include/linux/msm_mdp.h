@@ -565,7 +565,7 @@ struct mdp_buf_sync {
 	int *rel_fen_fd;
 };
 
-#define MDP_DISPLAY_COMMIT_FLAG_COMMIT_ONLY	1
+#define MDP_DISPLAY_COMMIT_OVERLAY	1
 
 struct mdp_display_commit {
 	uint32_t flags;

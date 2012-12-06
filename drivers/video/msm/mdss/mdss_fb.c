@@ -1177,7 +1177,7 @@ static void mdss_fb_commit_wq_handler(struct work_struct *work)
 	fb_backup = (struct msm_fb_backup_type *)mfd->msm_fb_backup;
 	info = &fb_backup->info;
 	if (fb_backup->disp_commit.flags &
-		MDP_DISPLAY_COMMIT_FLAG_COMMIT_ONLY) {
+		MDP_DISPLAY_COMMIT_OVERLAY) {
 		mdss_fb_wait_for_fence(mfd);
 		mdss_mdp_overlay_kickoff(mfd->ctl);
 		mdss_fb_signal_timeline(mfd);
