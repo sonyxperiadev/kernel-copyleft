@@ -2929,8 +2929,6 @@ static int get_img(struct msmfb_data *img, struct fb_info *info,
 				DISPLAY_SUBSYSTEM_ID)) {
 				ret = -1;
 			} else {
-				pr_warn("%s: mdp4_overlay play with FB memory\n",
-							 __func__);
 				*srcp_file = file;
 				*p_need = put_needed;
 			}
