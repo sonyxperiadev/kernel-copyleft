@@ -612,6 +612,7 @@ static int mdss_fb_blank(int blank_mode, struct fb_info *info)
 			mfd->suspend.panel_power_on = true;
 		else
 			mfd->suspend.panel_power_on = false;
+		return 0;
 	}
 	return mdss_fb_blank_sub(blank_mode, info, mfd->op_enable);
 }
