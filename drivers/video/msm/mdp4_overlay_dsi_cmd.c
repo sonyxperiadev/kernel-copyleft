@@ -675,9 +675,11 @@ ssize_t mdp4_dsi_cmd_show_event(struct device *dev,
 	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 
 	ret = wait_for_completion_interruptible_timeout(&vctrl->vsync_comp,
-		msecs_to_jiffies(VSYNC_PERIOD * 2));
-	if (ret <= 0)
+		msecs_to_jiffies(VSYNC_PERIOD * 4));
+	if (ret <= 0) {
+		vctrl->wait_vsync_cnt = 0;
 		return -EBUSY;
+	}
 
 	spin_lock_irqsave(&vctrl->spin_lock, flags);
 	vsync_tick = ktime_to_ns(vctrl->vsync_time);
