@@ -24,7 +24,7 @@ struct ion_heap *ion_heap_create(struct ion_platform_heap *heap_data)
 {
 	struct ion_heap *heap = NULL;
 
-	switch ((int) heap_data->type) {
+	switch (heap_data->type) {
 	case ION_HEAP_TYPE_SYSTEM_CONTIG:
 		heap = ion_system_contig_heap_create(heap_data);
 		break;
@@ -63,7 +63,7 @@ void ion_heap_destroy(struct ion_heap *heap)
 	if (!heap)
 		return;
 
-	switch ((int) heap->type) {
+	switch (heap->type) {
 	case ION_HEAP_TYPE_SYSTEM_CONTIG:
 		ion_system_contig_heap_destroy(heap);
 		break;
