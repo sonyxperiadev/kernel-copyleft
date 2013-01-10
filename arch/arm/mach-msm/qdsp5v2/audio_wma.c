@@ -1099,7 +1099,8 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				}
 
 				audio->map_v_read = ion_map_kernel(
-					audio->client, handle);
+					audio->client,
+					handle, ionflag);
 				if (IS_ERR(audio->map_v_read)) {
 					MM_ERR("map of read buf failed\n");
 					ion_free(audio->client, handle);
@@ -1721,7 +1722,7 @@ static int audio_open(struct inode *inode, struct file *file)
 		goto output_buff_get_flags_error;
 	}
 
-	audio->map_v_write = ion_map_kernel(client, handle);
+	audio->map_v_write = ion_map_kernel(client, handle, ionflag);
 	if (IS_ERR(audio->map_v_write)) {
 		MM_ERR("could not map write buffers\n");
 		rc = -ENOMEM;

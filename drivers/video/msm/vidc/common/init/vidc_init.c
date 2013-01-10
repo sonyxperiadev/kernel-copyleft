@@ -647,7 +647,8 @@ u32 vidc_insert_addr_table(struct video_client_ctx *client_ctx,
 			*kernel_vaddr = (unsigned long)
 				ion_map_kernel(
 				client_ctx->user_ion_client,
-				buff_ion_handle);
+				buff_ion_handle,
+				ionflag);
 			if (IS_ERR_OR_NULL((void *)*kernel_vaddr)) {
 				ERR("%s():ION virtual addr fail\n",
 				 __func__);
