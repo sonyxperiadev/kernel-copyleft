@@ -84,7 +84,6 @@ struct ion_buffer;
  * @memory_type:Memory type used for the heap
  * @has_outer_cache:    set to 1 if outer cache is used, 0 otherwise.
  * @extra_data:	Extra data specific to each heap type
- * @priv:	heap private data
  */
 struct ion_platform_heap {
 	enum ion_heap_type type;
@@ -95,7 +94,6 @@ struct ion_platform_heap {
 	enum ion_memory_types memory_type;
 	unsigned int has_outer_cache;
 	void *extra_data;
-	void *priv;
 };
 
 /**
