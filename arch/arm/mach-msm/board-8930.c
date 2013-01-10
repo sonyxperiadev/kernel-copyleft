@@ -376,7 +376,9 @@ static struct ion_co_heap_pdata fw_co_msm8930_ion_pdata = {
  * to each other.
  * Don't swap the order unless you know what you are doing!
  */
-struct ion_platform_heap msm8930_heaps[] = {
+static struct ion_platform_data msm8930_ion_pdata = {
+	.nr = MSM_ION_HEAP_NUM,
+	.heaps = {
 		{
 			.id	= ION_SYSTEM_HEAP_ID,
 			.type	= ION_HEAP_TYPE_SYSTEM,
@@ -439,12 +441,7 @@ struct ion_platform_heap msm8930_heaps[] = {
 			.extra_data = (void *) &co_msm8930_ion_pdata,
 		},
 #endif
-};
-
-static struct ion_platform_data msm8930_ion_pdata = {
-	.nr = MSM_ION_HEAP_NUM,
-	.heaps = msm8930_heaps,
-
+	}
 };
 
 static struct platform_device msm8930_ion_dev = {

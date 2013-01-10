@@ -328,7 +328,9 @@ static struct ion_co_heap_pdata fw_co_apq8064_ion_pdata = {
  * to each other.
  * Don't swap the order unless you know what you are doing!
  */
-struct ion_platform_heap apq8064_heaps[] = {
+static struct ion_platform_data apq8064_ion_pdata = {
+	.nr = MSM_ION_HEAP_NUM,
+	.heaps = {
 		{
 			.id	= ION_SYSTEM_HEAP_ID,
 			.type	= ION_HEAP_TYPE_SYSTEM,
@@ -391,11 +393,7 @@ struct ion_platform_heap apq8064_heaps[] = {
 			.extra_data = (void *) &co_apq8064_ion_pdata,
 		},
 #endif
-};
-
-static struct ion_platform_data apq8064_ion_pdata = {
-	.nr = MSM_ION_HEAP_NUM,
-	.heaps = apq8064_heaps,
+	}
 };
 
 static struct platform_device apq8064_ion_dev = {
