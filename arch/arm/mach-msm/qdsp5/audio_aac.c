@@ -1716,7 +1716,7 @@ static int audio_open(struct inode *inode, struct file *file)
 
 	MM_DBG("allocating mem sz = %d\n", mem_sz);
 	handle = ion_alloc(client, mem_sz, SZ_4K,
-		ION_HEAP(ION_AUDIO_HEAP_ID), 0);
+		ION_HEAP(ION_AUDIO_HEAP_ID));
 	if (IS_ERR_OR_NULL(handle)) {
 		MM_ERR("Unable to create allocate O/P buffers\n");
 		rc = -ENOMEM;
@@ -1758,7 +1758,7 @@ static int audio_open(struct inode *inode, struct file *file)
 	mem_sz = (PCM_BUFSZ_MIN * PCM_BUF_MAX_COUNT);
 	MM_DBG("allocating mem sz = %d\n", mem_sz);
 	handle = ion_alloc(client, mem_sz,
-			SZ_4K, ION_HEAP(ION_AUDIO_HEAP_ID), 0);
+			SZ_4K, ION_HEAP(ION_AUDIO_HEAP_ID));
 	if (IS_ERR_OR_NULL(handle)) {
 		MM_ERR("Unable to create allocate I/P buffers\n");
 		rc = -ENOMEM;
