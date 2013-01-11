@@ -45,6 +45,7 @@ void *ddl_pmem_alloc(struct ddl_buf_addr *addr, size_t sz, u32 alignment)
 	unsigned long iova = 0;
 	unsigned long buffer_size = 0;
 	unsigned long *kernel_vaddr = NULL;
+	unsigned long ionflag = 0;
 	unsigned long flags = 0;
 	int ret = 0;
 	ion_phys_addr_t phyaddr = 0;
@@ -76,6 +77,11 @@ void *ddl_pmem_alloc(struct ddl_buf_addr *addr, size_t sz, u32 alignment)
 						 __func__);
 			goto bail_out;
 		}
+		if (res_trk_check_for_sec_session() ||
+			addr->mem_type == DDL_FW_MEM)
+			ionflag = UNCACHED;
+		else
+			ionflag = CACHED;
 		kernel_vaddr = (unsigned long *) ion_map_kernel(
 					ddl_context->video_ion_client,
 					addr->alloc_handle);
@@ -105,7 +111,7 @@ void *ddl_pmem_alloc(struct ddl_buf_addr *addr, size_t sz, u32 alignment)
 					0,
 					&iova,
 					&buffer_size,
-					0, 0);
+					UNCACHED, 0);
 			if (ret || !iova) {
 				DDL_MSG_ERROR(
 				"%s():DDL ION ion map iommu failed, ret = %d iova = 0x%lx\n",
