@@ -4061,7 +4061,7 @@ static void voice_allocate_shared_memory(void)
 
 	common.ion_handle = ion_alloc(common.ion_client,
 				TOTAL_VOICE_CAL_SIZE,
-				SZ_4K, ION_HEAP(ION_AUDIO_HEAP_ID), 0);
+				SZ_4K, ION_HEAP(ION_AUDIO_HEAP_ID));
 	if (IS_ERR_OR_NULL((void *) common.ion_handle)) {
 		pr_err("%s: ION memory allocation failed\n",
 			__func__);

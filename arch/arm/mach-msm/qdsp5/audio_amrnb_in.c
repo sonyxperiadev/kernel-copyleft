@@ -1336,7 +1336,7 @@ static int audamrnb_in_open(struct inode *inode, struct file *file)
 	if (audio->mode == MSM_AUD_ENC_MODE_NONTUNNEL) {
 		MM_DBG("allocating BUFFER_SIZE  %d\n", BUFFER_SIZE);
 		handle = ion_alloc(client, BUFFER_SIZE,
-				SZ_4K, ION_HEAP(ION_AUDIO_HEAP_ID), 0);
+				SZ_4K, ION_HEAP(ION_AUDIO_HEAP_ID));
 		if (IS_ERR_OR_NULL(handle)) {
 			MM_ERR("Unable to create allocate write buffers\n");
 			rc = -ENOMEM;
