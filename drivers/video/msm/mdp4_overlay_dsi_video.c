@@ -307,9 +307,6 @@ void mdp4_dsi_video_wait4vsync(int cndx, long long *vtime)
 		return;
 	}
 
-	/* start timing generator & mmu if they are not started yet */
-	mdp4_overlay_dsi_video_start();
-
 	spin_lock_irqsave(&vctrl->spin_lock, flags);
 	if (vctrl->wait_vsync_cnt == 0)
 		INIT_COMPLETION(vctrl->vsync_comp);
@@ -552,9 +549,11 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 	}
 
 	if (!(mfd->cont_splash_done)) {
+		long long vtime;
+
 		mfd->cont_splash_done = 1;
-		mdp4_dsi_video_wait4dmap_done(0);
 		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
+		mdp4_dsi_video_wait4vsync(0, &vtime);
 		mipi_dsi_controller_cfg(0);
 	}
 
