@@ -156,15 +156,13 @@ static int wfd_allocate_ion_buffer(struct ion_client *client,
 	void *kvaddr = NULL, *phys_addr = NULL;
 	unsigned long size;
 	unsigned int alloc_regions = 0;
-	unsigned int ion_flags = 0;
 	int rc;
 
 	alloc_regions = ION_HEAP(ION_CP_MM_HEAP_ID);
-	alloc_regions |= secure ? 0 :
+	alloc_regions |= secure ? ION_SECURE :
 				ION_HEAP(ION_IOMMU_HEAP_ID);
-	ion_flags |= secure ? ION_SECURE : 0;
 	handle = ion_alloc(client,
-			mregion->size, SZ_4K, alloc_regions, ion_flags);
+			mregion->size, SZ_4K, alloc_regions, 0);
 
 	if (IS_ERR_OR_NULL(handle)) {
 		WFD_MSG_ERR("Failed to allocate input buffer\n");
