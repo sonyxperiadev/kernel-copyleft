@@ -20,6 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/wcnss_wlan.h>
 #include <linux/err.h>
+#include <linux/mfd/pm8xxx/misc.h>
 #include <mach/irqs.h>
 #include <mach/scm.h>
 #include <mach/subsystem_restart.h>
@@ -40,6 +41,20 @@ static int ss_restart_inprogress;
 static int enable_riva_ssr;
 static struct subsys_device *riva_8960_dev;
 
+struct wcnss_pmic_dump {
+	char reg_name[10];
+	u16 reg_addr;
+};
+
+static struct wcnss_pmic_dump pmic_reg_dump[] = {
+	{"S2", 0x1D8}, /* S2 */
+	{"L4", 0xB4},  /* L4 */
+	{"L10", 0xC0},  /* L10 */
+	{"LVS2", 0x62},   /* LVS2 */
+	{"S4", 0x1E8}, /*S4*/
+	{"LVS7", 0x06C}, /*LVS7*/
+};
+
 static void smsm_state_cb_hdlr(void *data, uint32_t old_state,
 					uint32_t new_state)
 {
@@ -47,10 +62,23 @@ static void smsm_state_cb_hdlr(void *data, uint32_t old_state,
 	char buffer[MAX_BUF_SIZE];
 	unsigned smem_reset_size;
 	unsigned size;
+	int i, rc;
+	u8 val;
 
 	riva_crash = true;
 
 	pr_err("%s: smsm state changed\n", MODULE_NAME);
+
+	for (i = 0; i < ARRAY_SIZE(pmic_reg_dump); i++) {
+		val = 0;
+		rc = pm8xxx_read_register(pmic_reg_dump[i].reg_addr, &val);
+		if (rc)
+			pr_err("PMIC READ: Failed to read addr = %d\n",
+						pmic_reg_dump[i].reg_addr);
+		else
+			pr_err("PMIC READ: addr = %x, value = %x\n",
+					pmic_reg_dump[i].reg_addr, val);
+	}
 
 	if (!(new_state & SMSM_RESET))
 		return;
