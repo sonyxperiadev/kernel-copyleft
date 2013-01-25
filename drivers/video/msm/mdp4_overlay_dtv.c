@@ -611,10 +611,7 @@ int mdp4_dtv_off(struct platform_device *pdev)
 			msleep(20);     /* >= 17 ms */
 	}
 
-	if (vctrl->wait_vsync_cnt) {
-		complete_all(&vctrl->vsync_comp);
-		vctrl->wait_vsync_cnt = 0;
-	}
+	complete_all(&vctrl->vsync_comp);
 
 	pipe = vctrl->base_pipe;
 	if (pipe != NULL) {
