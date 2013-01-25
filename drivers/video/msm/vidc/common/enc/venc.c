@@ -547,7 +547,7 @@ static int vid_enc_open(struct inode *inode, struct file *file)
 
 	client_index = vid_enc_get_empty_client_index();
 
-	if (client_index == -1) {
+	if (client_index < 0) {
 		ERR("%s() : No free clients client_index == -1\n",
 			__func__);
 		return -ENODEV;

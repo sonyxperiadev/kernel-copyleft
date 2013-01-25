@@ -23,6 +23,8 @@
 
 #define VID_ENC_MAX_ENCODER_CLIENTS 1
 #define MAX_NUM_CTRLS 20
+#define V4L2_FRAME_FLAGS (V4L2_BUF_FLAG_KEYFRAME | V4L2_BUF_FLAG_PFRAME | \
+		V4L2_BUF_FLAG_BFRAME | V4L2_QCOM_BUF_FLAG_CODECCONFIG)
 
 static long venc_fill_outbuf(struct v4l2_subdev *sd, void *arg);
 
@@ -179,6 +181,7 @@ static void venc_cb(u32 event, u32 status, void *info, u32 size, void *handle,
 		vbuf->v4l2_planes[0].bytesused =
 			frame_data->data_len;
 
+		vbuf->v4l2_buf.flags &= ~(V4L2_FRAME_FLAGS);
 		switch (frame_data->frame) {
 		case VCD_FRAME_I:
 		case VCD_FRAME_IDR:
@@ -1353,6 +1356,48 @@ static long venc_set_max_perf_level(struct video_client_ctx *client_ctx,
 err_set_perf_level:
 	return rc;
 }
+
+static long venc_set_avc_delimiter(struct video_client_ctx *client_ctx,
+			__s32 flag)
+{
+	struct vcd_property_hdr vcd_property_hdr;
+	struct vcd_property_avc_delimiter_enable delimiter_flag;
+	if (!client_ctx)
+		return -EINVAL;
+
+	vcd_property_hdr.prop_id = VCD_I_ENABLE_DELIMITER_FLAG;
+	vcd_property_hdr.sz =
+			sizeof(struct vcd_property_avc_delimiter_enable);
+	delimiter_flag.avc_delimiter_enable_flag = flag;
+	return vcd_set_property(client_ctx->vcd_handle,
+				&vcd_property_hdr, &delimiter_flag);
+}
+
+static long venc_get_avc_delimiter(struct video_client_ctx *client_ctx,
+			__s32 *flag)
+{
+	struct vcd_property_hdr vcd_property_hdr;
+	struct vcd_property_avc_delimiter_enable delimiter_flag;
+	int rc = 0;
+
+	if (!client_ctx || !flag)
+		return -EINVAL;
+
+	vcd_property_hdr.prop_id = VCD_I_ENABLE_DELIMITER_FLAG;
+	vcd_property_hdr.sz =
+			sizeof(struct vcd_property_avc_delimiter_enable);
+	rc = vcd_get_property(client_ctx->vcd_handle,
+				&vcd_property_hdr, &delimiter_flag);
+
+	if (rc < 0) {
+		WFD_MSG_ERR("Failed getting property for delimiter");
+		return rc;
+	}
+
+	*flag = delimiter_flag.avc_delimiter_enable_flag;
+	return rc;
+}
+
 static long venc_set_header_mode(struct video_client_ctx *client_ctx,
 		__s32 mode)
 {
@@ -2233,6 +2278,9 @@ static long venc_set_property(struct v4l2_subdev *sd, void *arg)
 	case V4L2_CID_MPEG_QCOM_SET_PERF_LEVEL:
 		rc = venc_set_max_perf_level(client_ctx, ctrl->value);
 		break;
+	case V4L2_CID_MPEG_VIDC_VIDEO_H264_AU_DELIMITER:
+		rc = venc_set_avc_delimiter(client_ctx, ctrl->value);
+		break;
 	case V4L2_CID_MPEG_VIDEO_H264_ENTROPY_MODE:
 		rc = venc_set_entropy_mode(client_ctx, ctrl->value);
 		break;
@@ -2303,6 +2351,9 @@ static long venc_get_property(struct v4l2_subdev *sd, void *arg)
 		break;
 	case V4L2_CID_MPEG_VIDEO_CYCLIC_INTRA_REFRESH_MB:
 		rc = venc_get_cyclic_intra_refresh_mb(client_ctx, &ctrl->value);
+		break;
+	case V4L2_CID_MPEG_VIDC_VIDEO_H264_AU_DELIMITER:
+		rc = venc_get_avc_delimiter(client_ctx, &ctrl->value);
 		break;
 	default:
 		WFD_MSG_ERR("Get property not suported: %d\n", ctrl->id);
