@@ -2017,8 +2017,11 @@ u32 vcd_handle_input_done(
 		return VCD_ERR_FAIL;
 	}
 
-	if (orig_frame != transc->ip_buf_entry)
+	if (orig_frame != transc->ip_buf_entry) {
+		VCD_MSG_HIGH("%s: free duplicate buffer", __func__);
 		kfree(transc->ip_buf_entry);
+		transc->ip_buf_entry = NULL;
+	}
 	transc->ip_buf_entry = NULL;
 	transc->input_done = true;
 
@@ -2787,6 +2790,7 @@ u32 vcd_handle_input_frame(
 	struct vcd_frame_data *frm_entry;
 	u32 rc = VCD_S_SUCCESS;
 	u32 eos_handled = false;
+	u32 duplicate_buffer = false;
 
 	VCD_MSG_LOW("vcd_handle_input_frame:");
 
@@ -2870,6 +2874,8 @@ u32 vcd_handle_input_frame(
 		buf_entry->allocated = orig_frame->allocated;
 		buf_entry->in_use = 1; /* meaningless for the dupe buffers */
 		buf_entry->frame = orig_frame->frame;
+		duplicate_buffer = true;
+		VCD_MSG_HIGH("%s: duplicate buffer", __func__);
 	} else
 		buf_entry = orig_frame;
 
@@ -2893,6 +2899,10 @@ u32 vcd_handle_input_frame(
 	if (VCD_FAILED(rc) || eos_handled) {
 		VCD_MSG_HIGH("rc = 0x%x, eos_handled = %d", rc,
 				 eos_handled);
+		if ((duplicate_buffer) && (buf_entry)) {
+			kfree(buf_entry);
+			buf_entry = NULL;
+		}
 
 		return rc;
 	}
