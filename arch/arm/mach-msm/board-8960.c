@@ -1311,6 +1311,8 @@ static struct platform_device qcedev_device = {
 static struct mdm_platform_data sglte_platform_data = {
 	.mdm_version = "4.0",
 	.ramdump_delay_ms = 1000,
+	/* delay between two PS_HOLDs */
+	.ps_hold_delay_ms = 500,
 	.soft_reset_inverted = 1,
 	.peripheral_platform_device = NULL,
 	.ramdump_timeout_ms = 600000,
@@ -3340,7 +3342,8 @@ static void __init msm8960_cdp_init(void)
 
 	msm8960_init_pmic();
 	if (machine_is_msm8960_liquid() || (machine_is_msm8960_mtp() &&
-		(socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE)))
+		(socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE ||
+			cpu_is_msm8960ab())))
 		msm_isa1200_board_info[0].platform_data = &isa1200_1_pdata;
 	msm8960_i2c_init();
 	msm8960_gfx_init();

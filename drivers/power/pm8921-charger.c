@@ -1311,20 +1311,6 @@ static int pm_power_get_property_mains(struct power_supply *psy,
 			return 0;
 		}
 
-		if (charging_disabled)
-			return 0;
-
-		/* check external charger first before the dc path */
-		if (is_ext_charging(the_chip)) {
-			val->intval = 1;
-			return 0;
-		}
-
-		if (pm_is_chg_charge_dis(the_chip)) {
-			val->intval = 0;
-			return 0;
-		}
-
 		if (the_chip->dc_present) {
 			val->intval = 1;
 			return 0;
@@ -1797,6 +1783,12 @@ static void __pm8921_charger_vbus_draw(unsigned int mA)
 	if (!the_chip) {
 		pr_err("called before init\n");
 		return;
+	}
+
+	if (usb_max_current && mA > usb_max_current) {
+		pr_debug("restricting usb current to %d instead of %d\n",
+					usb_max_current, mA);
+		mA = usb_max_current;
 	}
 
 	if (mA <= 2) {
@@ -4479,6 +4471,8 @@ static int __devinit pm8921_charger_probe(struct platform_device *pdev)
 
 	chip->temp_check_period = pdata->temp_check_period;
 	chip->max_bat_chg_current = pdata->max_bat_chg_current;
+	/* Assign to corresponding module parameter */
+	usb_max_current = pdata->usb_max_current;
 	chip->cool_bat_chg_current = pdata->cool_bat_chg_current;
 	chip->warm_bat_chg_current = pdata->warm_bat_chg_current;
 	chip->cool_bat_voltage = pdata->cool_bat_voltage;
