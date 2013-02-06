@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2013, Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1954,6 +1954,8 @@ static void msm_chg_block_on(struct msm_otg *motg)
 		udelay(20);
 		break;
 	case SNPS_28NM_INTEGRATED_PHY:
+		/* disable DP and DM pull down resistors */
+		ulpi_write(phy, 0x6, 0xC);
 		/* Clear charger detecting control bits */
 		ulpi_write(phy, 0x1F, 0x86);
 		/* Clear alt interrupt latch and enable bits */
@@ -2011,8 +2013,8 @@ static const char *chg_to_string(enum usb_chg_type chg_type)
 	}
 }
 
-#define MSM_CHG_DCD_POLL_TIME		(100 * HZ/1000) /* 100 msec */
-#define MSM_CHG_DCD_MAX_RETRIES		6 /* Tdcd_tmout = 6 * 100 msec */
+#define MSM_CHG_DCD_TIMEOUT		(750 * HZ/1000) /* 750 msec */
+#define MSM_CHG_DCD_POLL_TIME		(50 * HZ/1000) /* 50 msec */
 #define MSM_CHG_PRIMARY_DET_TIME	(50 * HZ/1000) /* TVDPSRC_ON */
 #define MSM_CHG_SECONDARY_DET_TIME	(50 * HZ/1000) /* TVDMSRC_ON */
 static void msm_chg_detect_work(struct work_struct *w)
@@ -2033,11 +2035,10 @@ static void msm_chg_detect_work(struct work_struct *w)
 	switch (motg->chg_state) {
 	case USB_CHG_STATE_UNDEFINED:
 		msm_chg_block_on(motg);
-		if (motg->pdata->enable_dcd)
-			msm_chg_enable_dcd(motg);
+		msm_chg_enable_dcd(motg);
 		msm_chg_enable_aca_det(motg);
 		motg->chg_state = USB_CHG_STATE_WAIT_FOR_DCD;
-		motg->dcd_retries = 0;
+		motg->dcd_time = 0;
 		delay = MSM_CHG_DCD_POLL_TIME;
 		break;
 	case USB_CHG_STATE_WAIT_FOR_DCD:
@@ -2061,12 +2062,11 @@ static void msm_chg_detect_work(struct work_struct *w)
 				break;
 			}
 		}
-		if (motg->pdata->enable_dcd)
-			is_dcd = msm_chg_check_dcd(motg);
-		tmout = ++motg->dcd_retries == MSM_CHG_DCD_MAX_RETRIES;
+		is_dcd = msm_chg_check_dcd(motg);
+		motg->dcd_time += MSM_CHG_DCD_POLL_TIME;
+		tmout = motg->dcd_time >= MSM_CHG_DCD_TIMEOUT;
 		if (is_dcd || tmout) {
-			if (motg->pdata->enable_dcd)
-				msm_chg_disable_dcd(motg);
+			msm_chg_disable_dcd(motg);
 			msm_chg_enable_primary_det(motg);
 			delay = MSM_CHG_PRIMARY_DET_TIME;
 			motg->chg_state = USB_CHG_STATE_DCD_DONE;

@@ -390,12 +390,17 @@ static int set_powered(struct sock *sk, u16 index, unsigned char *data, u16 len)
 		goto failed;
 	}
 
+	hci_dev_unlock_bh(hdev);
+
 	if (cp->val)
 		queue_work(hdev->workqueue, &hdev->power_on);
 	else
 		queue_work(hdev->workqueue, &hdev->power_off);
 
 	err = 0;
+	hci_dev_put(hdev);
+
+	return err;
 
 failed:
 	hci_dev_unlock_bh(hdev);
@@ -1753,7 +1758,7 @@ static void pairing_connect_complete_cb(struct hci_conn *conn, u8 status)
 		return;
 	}
 
-	if (status)
+	if (status || conn->pending_sec_level < BT_SECURITY_MEDIUM)
 		pairing_complete(cmd, status);
 
 	hci_conn_put(conn);

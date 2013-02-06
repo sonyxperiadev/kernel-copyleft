@@ -675,7 +675,6 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
 	mdp_histogram_ctrl_all(TRUE);
-	mdp4_overlay_dsi_video_start();
 
 	return ret;
 }
@@ -700,10 +699,7 @@ int mdp4_dsi_video_off(struct platform_device *pdev)
 
 	msleep(20);	/* >= 17 ms */
 
-	if (vctrl->wait_vsync_cnt) {
-		complete_all(&vctrl->vsync_comp);
-		vctrl->wait_vsync_cnt = 0;
-	}
+	complete_all(&vctrl->vsync_comp);
 
 	if (pipe->ov_blt_addr) {
 		spin_lock_irqsave(&vctrl->spin_lock, flags);
