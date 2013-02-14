@@ -480,6 +480,20 @@ void mdp4_dsi_video_base_swap(int cndx, struct mdp4_overlay_pipe *pipe)
 	vctrl->base_pipe = pipe;
 }
 
+/* timing generator off */
+static void mdp4_dsi_video_tg_off(struct vsycn_ctrl *vctrl)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&vctrl->spin_lock, flags);
+	INIT_COMPLETION(vctrl->vsync_comp);
+	vctrl->wait_vsync_cnt++;
+	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0); /* turn off timing generator */
+	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
+
+	mdp4_dsi_video_wait4vsync(0);
+}
+
 int mdp4_dsi_video_on(struct platform_device *pdev)
 {
 	int dsi_width;
@@ -579,8 +593,7 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 
 	if (!(mfd->cont_splash_done)) {
 		mfd->cont_splash_done = 1;
-		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
-		mdp4_dsi_video_wait4vsync(0);
+		mdp4_dsi_video_tg_off(vctrl);
 		mipi_dsi_controller_cfg(0);
 		/* Clks are enabled in probe.
 		   Disabling clocks now */
@@ -714,10 +727,9 @@ int mdp4_dsi_video_off(struct platform_device *pdev)
 	vctrl = &vsync_ctrl_db[cndx];
 	pipe = vctrl->base_pipe;
 
-	atomic_set(&vctrl->suspend, 1);
-	atomic_set(&vctrl->vsync_resume, 0);
-
 	mdp4_dsi_video_wait4vsync(cndx);
+
+	atomic_set(&vctrl->vsync_resume, 0);
 
 	complete_all(&vctrl->vsync_comp);
 
@@ -731,8 +743,6 @@ int mdp4_dsi_video_off(struct platform_device *pdev)
 	}
 
 	mdp_histogram_ctrl_all(FALSE);
-
-	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
 
 	dsi_video_enabled = 0;
 
@@ -766,6 +776,10 @@ int mdp4_dsi_video_off(struct platform_device *pdev)
 				vctrl->base_pipe->pipe_ndx, 1);
 		}
 	}
+
+	mdp4_dsi_video_tg_off(vctrl);
+
+	atomic_set(&vctrl->suspend, 1);
 
 	/* mdp clock off */
 	mdp_clk_ctrl(0);
