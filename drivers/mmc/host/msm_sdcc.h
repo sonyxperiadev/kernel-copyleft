@@ -421,6 +421,7 @@ struct msmsdcc_host {
 	struct device_attribute idle_timeout;
 	struct device_attribute auto_cmd19_attr;
 	struct device_attribute auto_cmd21_attr;
+	int saved_tuning_phase;
 };
 
 #define MSMSDCC_VERSION_STEP_MASK	0x0000FFFF
