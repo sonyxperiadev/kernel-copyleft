@@ -1,7 +1,7 @@
 /*
  *  Video for Linux Two header file
  *
- *  Copyright (C) 1999-2007 the contributors
+ *  Copyright (C) 1999-2007,2013 the contributors
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -1803,6 +1803,19 @@ enum v4l2_mpeg_vidc_video_h264_au_delimiter {
 	V4L2_MPEG_VIDC_VIDEO_H264_AU_DELIMITER_DISABLED = 0,
 	V4L2_MPEG_VIDC_VIDEO_H264_AU_DELIMITER_ENABLED = 1
 };
+#define V4L2_CID_MPEG_VIDC_VIDEO_SYNC_FRAME_DECODE \
+		(V4L2_CID_MPEG_MSM_VIDC_BASE + 23)
+enum v4l2_mpeg_vidc_video_sync_frame_decode {
+	V4L2_MPEG_VIDC_VIDEO_SYNC_FRAME_DECODE_DISABLE = 0,
+	V4L2_MPEG_VIDC_VIDEO_SYNC_FRAME_DECODE_ENABLE = 1
+};
+#define V4L2_CID_MPEG_VIDC_VIDEO_H264_VUI_TIMING_INFO \
+		(V4L2_CID_MPEG_MSM_VIDC_BASE + 24)
+enum v4l2_mpeg_vidc_video_h264_vui_timing_info {
+	V4L2_MPEG_VIDC_VIDEO_H264_VUI_TIMING_INFO_DISABLED = 0,
+	V4L2_MPEG_VIDC_VIDEO_H264_VUI_TIMING_INFO_ENABLED = 1
+};
+
 /*  Camera class control IDs */
 #define V4L2_CID_CAMERA_CLASS_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x900)
 #define V4L2_CID_CAMERA_CLASS 		(V4L2_CTRL_CLASS_CAMERA | 1)
