@@ -1874,6 +1874,12 @@ static void __pm8921_charger_vbus_draw(unsigned int mA)
 		mA = usb_max_current;
 	}
 
+	if (usb_max_current && mA > usb_max_current) {
+		pr_debug("restricting usb current to %d instead of %d\n",
+					usb_max_current, mA);
+		mA = usb_max_current;
+	}
+
 	if (mA <= 2) {
 		usb_chg_current = 0;
 		rc = pm_chg_iusbmax_set(the_chip, 0);
