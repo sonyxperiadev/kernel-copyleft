@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1077,7 +1077,8 @@ static int wfdioc_s_parm(struct file *filp, void *fh,
 	struct v4l2_qcom_frameskip frameskip;
 	int64_t frame_interval, max_frame_interval;
 	void *extendedmode = NULL;
-	enum vsg_modes mode = VSG_MODE_VFR;
+	enum vsg_modes vsg_mode = VSG_MODE_VFR;
+	enum venc_framerate_modes venc_mode = VENC_MODE_VFR;
 
 
 	if (a->type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
@@ -1099,6 +1100,7 @@ static int wfdioc_s_parm(struct file *filp, void *fh,
 			rc = -EINVAL;
 			goto set_parm_fail;
 		}
+		venc_mode = VENC_MODE_CFR;
 		frame_interval =
 			a->parm.capture.timeperframe.numerator * NSEC_PER_SEC /
 			a->parm.capture.timeperframe.denominator;
@@ -1127,7 +1129,7 @@ static int wfdioc_s_parm(struct file *filp, void *fh,
 			goto set_parm_fail;
 
 		max_frame_interval = (int64_t)frameskip.maxframeinterval;
-		mode = VSG_MODE_VFR;
+		vsg_mode = VSG_MODE_VFR;
 
 		rc = v4l2_subdev_call(&wfd_dev->vsg_sdev, core,
 				ioctl, VSG_SET_MAX_FRAME_INTERVAL,
@@ -1137,18 +1139,22 @@ static int wfdioc_s_parm(struct file *filp, void *fh,
 			goto set_parm_fail;
 
 		rc = v4l2_subdev_call(&wfd_dev->vsg_sdev, core,
-				ioctl, VSG_SET_MODE, &mode);
+				ioctl, VSG_SET_MODE, &vsg_mode);
 
 		if (rc)
 			goto set_parm_fail;
 	} else {
-		mode = VSG_MODE_CFR;
+		vsg_mode = VSG_MODE_CFR;
 		rc = v4l2_subdev_call(&wfd_dev->vsg_sdev, core,
-				ioctl, VSG_SET_MODE, &mode);
+				ioctl, VSG_SET_MODE, &vsg_mode);
 
 		if (rc)
 			goto set_parm_fail;
 	}
+
+	rc = v4l2_subdev_call(&wfd_dev->enc_sdev, core,
+			ioctl, SET_FRAMERATE_MODE,
+			&venc_mode);
 
 set_parm_fail:
 	return rc;

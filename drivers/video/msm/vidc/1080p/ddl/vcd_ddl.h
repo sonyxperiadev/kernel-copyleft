@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -293,6 +293,7 @@ struct ddl_encoder_data{
 	struct vcd_property_slice_delivery_info slice_delivery_info;
 	struct ddl_batch_frame_data batch_frame;
 	u32 avc_delimiter_enable;
+	u32 vui_timinginfo_enable;
 };
 struct ddl_decoder_data {
 	struct ddl_codec_data_hdr  hdr;
