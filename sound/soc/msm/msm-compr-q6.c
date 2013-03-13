@@ -568,6 +568,7 @@ static int msm_compr_trigger(struct snd_pcm_substream *substream, int cmd)
 				break;
 			}
 		}
+		atomic_set(&prtd->pending_buffer, 1);
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		pr_debug("%s: Trigger start\n", __func__);
