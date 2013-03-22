@@ -558,6 +558,7 @@ a2xx_getchipid(struct kgsl_device *device)
 {
 	unsigned int chipid = 0;
 	unsigned int coreid, majorid, minorid, patchid, revid;
+	uint32_t soc_platform_version = socinfo_get_version();
 	struct kgsl_device_platform_data *pdata =
 		kgsl_device_get_drvdata(device);
 
@@ -587,10 +588,14 @@ a2xx_getchipid(struct kgsl_device *device)
 
 	/* 8x50 returns 0 for patch release, but it should be 1 */
 	/* 8x25 returns 0 for minor id, but it should be 1 */
+	/* 8960v3 returns 5 for patch release, but it should be 6 */
 	if (cpu_is_qsd8x50())
 		patchid = 1;
 	else if (cpu_is_msm8625() && minorid == 0)
 		minorid = 1;
+	else if (cpu_is_msm8960() &&
+			SOCINFO_VERSION_MAJOR(soc_platform_version) >= 3)
+		patchid = 6;
 
 	chipid |= (minorid << 8) | patchid;
 
