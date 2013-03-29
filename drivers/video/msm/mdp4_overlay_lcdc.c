@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -961,6 +961,7 @@ void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd)
 
 		mdp4_lcdc_pipe_queue(0, pipe);
 	}
+	mdp_update_pm(mfd, vsync_ctrl_db[0].vsync_time);
 
 	mdp4_overlay_mdp_perf_upd(mfd, 1);
 
