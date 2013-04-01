@@ -69,6 +69,7 @@ static struct vsycn_ctrl {
 	struct vsync_update vlist[2];
 	int vsync_enabled;
 	int clk_enabled;
+	int new_update;
 	int clk_control;
 	ktime_t vsync_time;
 	struct work_struct clk_work;
@@ -422,6 +423,7 @@ void mdp4_dsi_cmd_vsync_ctrl(struct fb_info *info, int enable)
 			mipi_dsi_clk_cfg(1);
 			mdp_clk_ctrl(1);
 			vctrl->clk_enabled = 1;
+			vctrl->new_update = 1;
 			clk_set_on = 1;
 		}
 		if (clk_set_on) {
@@ -522,6 +524,12 @@ static void primary_rdptr_isr(int cndx)
 
 	spin_lock(&vctrl->spin_lock);
 	vctrl->vsync_time = ktime_get();
+
+	if (vctrl->new_update) {
+		vctrl->new_update = 0;
+		spin_unlock(&vctrl->spin_lock);
+		return;
+	}
 
 	complete_all(&vctrl->vsync_comp);
 	vctrl->wait_vsync_cnt = 0;
