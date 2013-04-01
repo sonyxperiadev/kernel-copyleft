@@ -1,6 +1,6 @@
 /*
    BlueZ - Bluetooth protocol stack for Linux
-   Copyright (c) 2000-2001, 2010-2012 The Linux Foundation.  All rights reserved.
+   Copyright (c) 2000-2001, 2010-2013 The Linux Foundation.  All rights reserved.
 
    Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>
 
@@ -651,10 +651,10 @@ static int hci_dev_do_close(struct hci_dev *hdev, u8 is_process)
 	tasklet_kill(&hdev->rx_task);
 	tasklet_kill(&hdev->tx_task);
 
-	hci_dev_lock_bh(hdev);
+	hci_dev_lock(hdev);
 	inquiry_cache_flush(hdev);
 	hci_conn_hash_flush(hdev, is_process);
-	hci_dev_unlock_bh(hdev);
+	hci_dev_unlock(hdev);
 
 	hci_notify(hdev, HCI_DEV_DOWN);
 
@@ -1569,7 +1569,8 @@ int hci_unregister_dev(struct hci_dev *hdev)
 	list_del(&hdev->list);
 	write_unlock_bh(&hci_dev_list_lock);
 
-	hci_dev_do_close(hdev, hdev->bus == HCI_SMD);
+	/* hci_unregister_dev is always called from process context. */
+	hci_dev_do_close(hdev, 1);
 
 	for (i = 0; i < NUM_REASSEMBLY; i++)
 		kfree_skb(hdev->reassembly[i]);
