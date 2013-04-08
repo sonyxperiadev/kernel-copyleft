@@ -31,6 +31,7 @@ static char *descriptions =
 	"10 Perf: Fix counts across power collapse\n"
 	"12 Perf: Make per-process counters configurable\n"
 	"13 msm: perf: Add L2 support for tracecounters\n"
+	"14 Perf: keep events across hotplug\n"
 ;
 
 static ssize_t desc_read(struct file *fp, char __user *buf,
