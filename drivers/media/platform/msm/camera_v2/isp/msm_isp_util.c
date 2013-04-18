@@ -12,6 +12,7 @@
 #include <linux/mutex.h>
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
+#include <linux/ratelimit.h>
 
 #include "msm.h"
 #include "msm_isp_util.h"
@@ -686,6 +687,11 @@ void msm_isp_process_error_info(struct vfe_device *vfe_dev)
 {
 	int i;
 	struct msm_vfe_error_info *error_info = &vfe_dev->error_info;
+	static DEFINE_RATELIMIT_STATE(rs,
+		DEFAULT_RATELIMIT_INTERVAL, DEFAULT_RATELIMIT_BURST);
+	static DEFINE_RATELIMIT_STATE(rs_stats,
+		DEFAULT_RATELIMIT_INTERVAL, DEFAULT_RATELIMIT_BURST);
+
 	if (error_info->error_count == 1 ||
 		!(error_info->info_dump_frame_count % 100)) {
 		vfe_dev->hw_info->vfe_ops.core_ops.
@@ -695,7 +701,8 @@ void msm_isp_process_error_info(struct vfe_device *vfe_dev)
 		error_info->camif_status = 0;
 		error_info->violation_status = 0;
 		for (i = 0; i < MAX_NUM_STREAM; i++) {
-			if (error_info->stream_framedrop_count[i] != 0) {
+			if (error_info->stream_framedrop_count[i] != 0 &&
+				__ratelimit(&rs)) {
 				pr_err("%s: Stream[%d]: dropped %d frames\n",
 					__func__, i,
 					error_info->stream_framedrop_count[i]);
@@ -703,7 +710,8 @@ void msm_isp_process_error_info(struct vfe_device *vfe_dev)
 			}
 		}
 		for (i = 0; i < MSM_ISP_STATS_MAX; i++) {
-			if (error_info->stats_framedrop_count[i] != 0) {
+			if (error_info->stats_framedrop_count[i] != 0 &&
+				__ratelimit(&rs_stats)) {
 				pr_err("%s: Stats stream[%d]: dropped %d frames\n",
 					__func__, i,
 					error_info->stats_framedrop_count[i]);
@@ -750,7 +758,7 @@ irqreturn_t msm_isp_process_irq(int irq_num, void *data)
 	spin_lock_irqsave(&vfe_dev->tasklet_lock, flags);
 	queue_cmd = &vfe_dev->tasklet_queue_cmd[vfe_dev->taskletq_idx];
 	if (queue_cmd->cmd_used) {
-		pr_err("%s: Tasklet queue overflow\n", __func__);
+		pr_err_ratelimited("%s: Tasklet queue overflow\n", __func__);
 		list_del(&queue_cmd->list);
 	} else {
 		atomic_add(1, &vfe_dev->irq_cnt);
