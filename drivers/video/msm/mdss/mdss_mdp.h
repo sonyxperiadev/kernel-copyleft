@@ -289,6 +289,7 @@ struct mdss_mdp_pipe {
 	u32 params_changed;
 
 	unsigned long smp[MAX_PLANES];
+	unsigned long smp_reserved[MAX_PLANES];
 
 	struct mdss_mdp_data back_buf;
 	struct mdss_mdp_data front_buf;
@@ -451,6 +452,9 @@ struct mdss_mdp_pipe *mdss_mdp_pipe_get(struct mdss_data_type *mdata, u32 ndx);
 int mdss_mdp_pipe_map(struct mdss_mdp_pipe *pipe);
 void mdss_mdp_pipe_unmap(struct mdss_mdp_pipe *pipe);
 struct mdss_mdp_pipe *mdss_mdp_pipe_alloc_dma(struct mdss_mdp_mixer *mixer);
+
+int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe);
+void mdss_mdp_smp_unreserve(struct mdss_mdp_pipe *pipe);
 
 int mdss_mdp_pipe_addr_setup(struct mdss_data_type *mdata, u32 *offsets,
 		u32 *ftch_y_id, u32 type, u32 num_base, u32 len);
