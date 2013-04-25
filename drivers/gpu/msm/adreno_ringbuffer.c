@@ -1123,6 +1123,7 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 		ret = 0;
 
 done:
+	device->pwrctrl.irq_last = 0;
 	trace_kgsl_issueibcmds(device, context->id, ibdesc, numibs,
 		*timestamp, flags, ret, drawctxt->type);
 
