@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,13 +14,21 @@
 #define __ARCH_ARM_MACH_MSM_MACH_CPUFREQ_H
 
 #define MSM_CPUFREQ_NO_LIMIT 0xFFFFFFFF
+#define TURBO_LIMIT 1958400
+
+enum cpufreq_limits_enum {
+	THERMAL_LIMIT,
+	HOTPLUG_LIMIT,
+	NR_LIMITS,
+};
 
 #ifdef CONFIG_CPU_FREQ_MSM
 
 /**
  * msm_cpufreq_set_freq_limit() - Set max/min freq limits on cpu
  *
- * @cpu: The cpu core for which the limits apply
+ * @le: The enum for which this limits are being set
+ * @cpu_mask: The cpu cores for which the limits apply
  * @max: The max frequency allowed
  * @min: The min frequency allowed
  *
@@ -29,11 +37,11 @@
  *
  * returns 0 on success, errno on failure
  */
-extern int msm_cpufreq_set_freq_limits(
-		uint32_t cpu, uint32_t min, uint32_t max);
+extern int msm_cpufreq_set_freq_limits(enum cpufreq_limits_enum le,
+		uint32_t cpu_mask, uint32_t min, uint32_t max);
 #else
-static inline int msm_cpufreq_set_freq_limits(
-		uint32_t cpu, uint32_t min, uint32_t max)
+static inline int msm_cpufreq_set_freq_limits(enum cpufreq_limits_enum le,
+		uint32_t cpu_mask, uint32_t min, uint32_t max)
 {
 	return -ENOSYS;
 }
