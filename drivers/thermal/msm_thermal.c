@@ -163,12 +163,18 @@ static int update_cpu_min_freq_all(uint32_t min)
 			min > table[limit_idx_high].frequency)
 		min = table[limit_idx_high].frequency;
 
-	ret = msm_cpufreq_set_freq_limits(THERMAL_LIMIT, 0xFFFF,
-					min, limited_max_freq);
-	if (ret) {
-		pr_err("%s:Fail to set limits for cpu%d\n",
+	for_each_possible_cpu(cpu) {
+		ret = msm_cpufreq_set_freq_limits(cpu, min, limited_max_freq);
+
+		if (ret) {
+			pr_err("%s:Fail to set limits for cpu%d\n",
 					__func__, cpu);
-		return ret;
+			return ret;
+		}
+
+		if (cpufreq_update_policy(cpu))
+			pr_debug("%s: Cannot update policy for cpu%d\n",
+					__func__, cpu);
 	}
 
 	return ret;
@@ -481,21 +487,23 @@ fail:
 	return ret;
 }
 
-static int update_cpu_max_freq(uint32_t max_freq)
+static int update_cpu_max_freq(int cpu, uint32_t max_freq)
 {
 	int ret = 0;
 
-	ret = msm_cpufreq_set_freq_limits(THERMAL_LIMIT, 0xFFFF,
-					MSM_CPUFREQ_NO_LIMIT, max_freq);
+	ret = msm_cpufreq_set_freq_limits(cpu, MSM_CPUFREQ_NO_LIMIT, max_freq);
 	if (ret)
 		return ret;
 
 	limited_max_freq = max_freq;
 	if (max_freq != MSM_CPUFREQ_NO_LIMIT)
-		pr_info("%s: Limiting max frequency to %d\n",
-				KBUILD_MODNAME, max_freq);
+		pr_info("%s: Limiting cpu%d max frequency to %d\n",
+				KBUILD_MODNAME, cpu, max_freq);
 	else
-		pr_info("%s: Max frequency reset\n", KBUILD_MODNAME);
+		pr_info("%s: Max frequency reset for cpu%d\n",
+				KBUILD_MODNAME, cpu);
+
+	ret = cpufreq_update_policy(cpu);
 
 	return ret;
 }
@@ -654,6 +662,7 @@ static void __cpuinit check_temp(struct work_struct *work)
 	struct tsens_device tsens_dev;
 	long temp = 0;
 	uint32_t max_freq = limited_max_freq;
+	int cpu = 0;
 	int ret = 0;
 	tsens_dev.sensor_num = msm_thermal_info.sensor_id;
 	ret = tsens_get_temp(&tsens_dev, &temp);
@@ -699,10 +708,13 @@ static void __cpuinit check_temp(struct work_struct *work)
 		goto reschedule;
 
 	/* Update new limits */
-	ret = update_cpu_max_freq(max_freq);
-	if (ret)
-		pr_debug("%s: Unable to limit max freq to %d\n",
-					KBUILD_MODNAME, max_freq);
+	for_each_possible_cpu(cpu) {
+		ret = update_cpu_max_freq(cpu, max_freq);
+		if (ret)
+			pr_debug(
+			"%s: Unable to limit cpu%d max freq to %d\n",
+					KBUILD_MODNAME, cpu, max_freq);
+	}
 
 reschedule:
 	if (enabled)
@@ -741,6 +753,8 @@ static struct notifier_block __refdata msm_thermal_cpu_notifier = {
  */
 static void __cpuinit disable_msm_thermal(void)
 {
+	int cpu = 0;
+
 	/* make sure check_temp is no longer running */
 	cancel_delayed_work(&check_temp_work);
 	flush_scheduled_work();
@@ -748,7 +762,9 @@ static void __cpuinit disable_msm_thermal(void)
 	if (limited_max_freq == MSM_CPUFREQ_NO_LIMIT)
 		return;
 
-	update_cpu_max_freq(MSM_CPUFREQ_NO_LIMIT);
+	for_each_possible_cpu(cpu) {
+		update_cpu_max_freq(cpu, MSM_CPUFREQ_NO_LIMIT);
+	}
 }
 
 static int __cpuinit set_enabled(const char *val, const struct kernel_param *kp)
