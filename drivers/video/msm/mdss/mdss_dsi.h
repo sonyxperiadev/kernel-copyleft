@@ -89,11 +89,6 @@ enum dsi_ctrl_state {
 	DSI_HS_MODE,
 };
 
-enum dsi_panel_state {
-	UNKNOWN_STATE = 0x00,
-	PANEL_ON = BIT(0),
-};
-
 #define DSI_NON_BURST_SYNCH_PULSE	0
 #define DSI_NON_BURST_SYNCH_EVENT	1
 #define DSI_BURST_MODE			2
@@ -288,7 +283,6 @@ struct mdss_dsi_ctrl_pdata {
 	struct clk *byte_clk;
 	struct clk *esc_clk;
 	struct clk *pixel_clk;
-	u8 panel_state;
 	int irq_cnt;
 	int mdss_dsi_clk_on;
 	int rst_gpio;
