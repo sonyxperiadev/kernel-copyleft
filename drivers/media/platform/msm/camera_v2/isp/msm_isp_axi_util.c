@@ -987,7 +987,6 @@ static int msm_isp_stop_axi_stream(struct vfe_device *vfe_dev,
 	rc = msm_isp_axi_wait_for_cfg_done(vfe_dev, camif_update);
 	if (rc < 0) {
 		pr_err("%s: wait for config done failed\n", __func__);
-		return rc;
 	}
 	msm_isp_update_stream_bandwidth(vfe_dev);
 	if (camif_update == DISABLE_CAMIF)
@@ -1000,7 +999,7 @@ static int msm_isp_stop_axi_stream(struct vfe_device *vfe_dev,
 			HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])];
 		msm_isp_deinit_stream_ping_pong_reg(vfe_dev, stream_info);
 	}
-	return rc;
+	return 0;
 }
 
 
