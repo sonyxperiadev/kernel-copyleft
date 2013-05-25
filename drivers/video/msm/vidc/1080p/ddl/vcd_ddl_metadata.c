@@ -551,11 +551,6 @@ void ddl_process_decoder_metadata(struct ddl_client_context *ddl)
 		output_frame->flags &= ~(VCD_FRAME_FLAG_EXTRADATA);
 		return;
 	}
-	if (!decoder->mp2_datadump_status && decoder->codec.codec ==
-		VCD_CODEC_MPEG2 && !decoder->extn_user_data_enable) {
-		output_frame->flags &= ~(VCD_FRAME_FLAG_EXTRADATA);
-		return;
-	}
 	DDL_MSG_LOW("processing metadata for decoder");
 	DDL_MSG_LOW("data_len/metadata_offset : %d/%d",
 		output_frame->data_len, decoder->meta_data_offset);
