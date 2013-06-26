@@ -137,6 +137,15 @@ config OV9724
 		hfr video at 60, 90 and 120 fps. This sensor driver does
 		not support auto focus.
 
+config HI256
+        bool "Hynix hi256 (YUV 2MP)"
+        depends on MSMB_CAMERA
+        ---help---
+                OmniVision 8 MP Bayer Sensor with auto focus.uses
+                2 mipi lanes, preview config = 1632*1224 30 fps,
+                snapshot config = 3264 * 2448 at 18 fps.
+                2 lanes max fps is 18, 4 lanes max fps is 24.
+
 config MT9M114
 	bool "Sensor MT9M114 (YUV 1.26MP)"
 	depends on MSMB_CAMERA
@@ -145,6 +154,15 @@ config MT9M114
 		and snapshot. The preview and snapshot resolution shall be
 		1280 * 270. It does not support auto focus. It supports
 		few special effects like saturation.
+
+config SP1628
+	bool "Sensor SP1628 (YUV 720P)"
+	depends on MSMB_CAMERA
+	---help---
+		SP1628 is SuperPix YUV sensor. It supports 720P preview
+		and snapshot. The preview and snapshot resolution shall be
+		1280 * 270. It does not support auto focus. It supports
+		few special effects like mono.
 
 config OV8825
 	bool "OmniVision OV8825 (BAYER 8MP)"

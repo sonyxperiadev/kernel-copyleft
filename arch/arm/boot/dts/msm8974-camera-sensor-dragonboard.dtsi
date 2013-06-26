@@ -15,7 +15,7 @@
 
 	actuator0: qcom,actuator@18 {
 		cell-index = <0>;
-		reg = <0x18 0x0>;
+		reg = <0x18>;
 		compatible = "qcom,actuator";
 		qcom,cci-master = <0>;
 	};
@@ -29,13 +29,15 @@
 
 	qcom,camera@6e {
 		compatible = "qcom,s5k3l1yx";
-		reg = <0x6e 0x0>;
+		reg = <0x6e>;
 		qcom,slave-id = <0x6e 0x0 0x3121>;
 		qcom,csiphy-sd-index = <0>;
 		qcom,csid-sd-index = <0>;
 		qcom,mount-angle = <0>;
 		qcom,actuator-src = <&actuator0>;
 		qcom,sensor-name = "s5k3l1yx";
+		qcom,vdd-cx-supply = <&pm8841_s2>;
+		qcom,vdd-cx-name = "qcom,vdd-cx";
 		cam_vdig-supply = <&pm8941_l3>;
 		cam_vana-supply = <&pm8941_l17>;
 		cam_vio-supply = <&pm8941_lvs3>;
@@ -73,6 +75,8 @@
 		qcom,csid-sd-index = <0>;
 		qcom,mount-angle = <0>;
 		qcom,sensor-name = "imx135";
+		qcom,vdd-cx-supply = <&pm8841_s2>;
+		qcom,vdd-cx-name = "qcom,vdd-cx";
 		qcom,actuator-src = <&actuator1>;
 		cam_vdig-supply = <&pm8941_l3>;
 		cam_vana-supply = <&pm8941_l17>;
@@ -105,12 +109,14 @@
 
 	qcom,camera@6c {
 		compatible = "qcom,ov2720";
-		reg = <0x6c 0x0>;
+		reg = <0x6c>;
 		qcom,slave-id = <0x6c 0x300A 0x2720>;
 		qcom,csiphy-sd-index = <2>;
 		qcom,csid-sd-index = <0>;
 		qcom,mount-angle = <180>;
 		qcom,sensor-name = "ov2720";
+		qcom,vdd-cx-supply = <&pm8841_s2>;
+		qcom,vdd-cx-name = "qcom,vdd-cx";
 		cam_vdig-supply = <&pm8941_l3>;
 		cam_vana-supply = <&pm8941_l17>;
 		cam_vio-supply = <&pm8941_lvs3>;
@@ -140,12 +146,14 @@
 
 	qcom,camera@90 {
 		compatible = "qcom,mt9m114";
-		reg = <0x90 0x0>;
+		reg = <0x90>;
 		qcom,slave-id = <0x90 0x0 0x2481>;
 		qcom,csiphy-sd-index = <1>;
 		qcom,csid-sd-index = <0>;
 		qcom,mount-angle = <0>;
 		qcom,sensor-name = "mt9m114";
+		qcom,vdd-cx-supply = <&pm8841_s2>;
+		qcom,vdd-cx-name = "qcom,vdd-cx";
 		cam_vdig-supply = <&pm8941_l3>;
 		cam_vana-supply = <&pm8941_l17>;
 		cam_vio-supply = <&pm8941_lvs3>;
