@@ -342,8 +342,6 @@ static int msm_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		prtd->pcm_irq_pos = 0;
-		if (!atomic_cmpxchg(&lpa_audio.audio_ocmem_req, 0, 1))
-			audio_ocmem_process_req(AUDIO, true);
 		atomic_set(&prtd->pending_buffer, 1);
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
@@ -419,6 +417,12 @@ static int msm_pcm_open(struct snd_pcm_substream *substream)
 	atomic_set(&prtd->stop, 1);
 	atomic_set(&lpa_audio.audio_ocmem_req, 0);
 	runtime->private_data = prtd;
+	if (!atomic_cmpxchg(&lpa_audio.audio_ocmem_req, 0, 1))
+		audio_ocmem_process_req(AUDIO, true);
+	else
+		atomic_inc(&lpa_audio.audio_ocmem_req);
+	pr_debug("%s: req: %d\n", __func__,
+		atomic_read(&lpa_audio.audio_ocmem_req));
 	return 0;
 }
 
@@ -469,9 +473,13 @@ static int msm_pcm_playback_close(struct snd_pcm_substream *substream)
 	if (prtd->audio_client) {
 		dir = IN;
 		atomic_set(&prtd->pending_buffer, 0);
-
-		if (atomic_cmpxchg(&lpa_audio.audio_ocmem_req, 1, 0))
+		if (atomic_read(&lpa_audio.audio_ocmem_req) > 1)
+			atomic_dec(&lpa_audio.audio_ocmem_req);
+		else if (atomic_cmpxchg(&lpa_audio.audio_ocmem_req, 1, 0))
 			audio_ocmem_process_req(AUDIO, false);
+		pr_debug("%s: req: %d\n", __func__,
+			atomic_read(&lpa_audio.audio_ocmem_req));
+
 		q6asm_cmd(prtd->audio_client, CMD_CLOSE);
 		q6asm_audio_client_buf_free_contiguous(dir,
 				prtd->audio_client);
@@ -786,6 +794,7 @@ static __devinit int msm_pcm_probe(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "%s: dev name %s\n",
 			__func__, dev_name(&pdev->dev));
+	atomic_set(&lpa_audio.audio_ocmem_req, 0);
 	return snd_soc_register_platform(&pdev->dev,
 				&msm_soc_platform);
 }
