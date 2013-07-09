@@ -136,7 +136,7 @@ err:
 			if (context && context->flags & CTXT_FLAGS_GPU_HANG) {
 				KGSL_CTXT_WARN(rb->device,
 				"Context %p caused a gpu hang. Will not accept commands for context %d\n",
-				context, context->id);
+				context, context->base.id);
 				return -EDEADLK;
 			}
 			wait_time = jiffies + wait_timeout;
@@ -613,7 +613,7 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 	 */
 	if ((context && (context->flags & CTXT_FLAGS_PER_CONTEXT_TS)) &&
 		!(flags & KGSL_CMD_FLAGS_INTERNAL_ISSUE))
-		context_id = context->id;
+		context_id = context->base.id;
 
 	if ((context && (context->flags & CTXT_FLAGS_USER_GENERATED_TS)) &&
 		!(flags & KGSL_CMD_FLAGS_INTERNAL_ISSUE)) {
@@ -1093,12 +1093,9 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 		ret = -EINVAL;
 		goto done;
 	}
-	drawctxt = context->devctxt;
+	drawctxt = ADRENO_CONTEXT(context);
 
 	if (drawctxt->flags & CTXT_FLAGS_GPU_HANG) {
-		KGSL_CTXT_ERR(device, "proc %s failed fault tolerance"
-			" will not accept commands for context %d\n",
-			drawctxt->pid_name, drawctxt->id);
 		ret = -EDEADLK;
 		goto done;
 	}
@@ -1112,10 +1109,6 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 		start_index = 1;
 
 	if (drawctxt->flags & CTXT_FLAGS_SKIP_EOF) {
-		KGSL_CTXT_ERR(device,
-			"proc %s triggered fault tolerance"
-			" skipping commands for context till EOF %d\n",
-			drawctxt->pid_name, drawctxt->id);
 		if (flags & KGSL_CMD_FLAGS_EOF)
 			drawctxt->flags &= ~CTXT_FLAGS_SKIP_EOF;
 		if (start_index)
@@ -1278,7 +1271,7 @@ void adreno_ringbuffer_extract(struct adreno_ringbuffer *rb,
 	k_ctxt = kgsl_context_get(device, ft_data->context_id);
 
 	if (k_ctxt) {
-		a_ctxt = k_ctxt->devctxt;
+		a_ctxt = ADRENO_CONTEXT(k_ctxt);
 		if (a_ctxt->flags & CTXT_FLAGS_PREAMBLE)
 			_turn_preamble_on_for_ib_seq(rb, rb_rptr);
 		kgsl_context_put(k_ctxt);
@@ -1315,7 +1308,7 @@ void adreno_ringbuffer_extract(struct adreno_ringbuffer *rb,
 			k_ctxt = kgsl_context_get(rb->device, val2);
 
 			if (k_ctxt) {
-				a_ctxt = k_ctxt->devctxt;
+				a_ctxt = ADRENO_CONTEXT(k_ctxt);
 
 			/* If we are changing to a good context and were not
 			 * copying commands then copy over commands to the good
