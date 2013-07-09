@@ -273,6 +273,7 @@ struct qpnp_chg_chip {
 	struct qpnp_chg_irq		chg_failed;
 	struct qpnp_chg_irq		chg_vbatdet_lo;
 	struct qpnp_chg_irq		batt_pres;
+	struct qpnp_chg_irq		batt_temp_ok;
 	bool				bat_is_cool;
 	bool				bat_is_warm;
 	bool				chg_done;
@@ -500,6 +501,23 @@ qpnp_chg_is_boost_en_set(struct qpnp_chg_chip *chip)
 }
 
 static int
+qpnp_chg_is_batt_temp_ok(struct qpnp_chg_chip *chip)
+{
+	u8 batt_rt_sts;
+	int rc;
+
+	rc = qpnp_chg_read(chip, &batt_rt_sts,
+				 INT_RT_STS(chip->bat_if_base), 1);
+	if (rc) {
+		pr_err("spmi read failed: addr=%03X, rc=%d\n",
+				INT_RT_STS(chip->bat_if_base), rc);
+		return rc;
+	}
+
+	return (batt_rt_sts & BAT_TEMP_OK_IRQ) ? 1 : 0;
+}
+
+static int
 qpnp_chg_is_batt_present(struct qpnp_chg_chip *chip)
 {
 	u8 batt_pres_rt_sts;
@@ -514,6 +532,23 @@ qpnp_chg_is_batt_present(struct qpnp_chg_chip *chip)
 	}
 
 	return (batt_pres_rt_sts & BATT_PRES_IRQ) ? 1 : 0;
+}
+
+static int
+qpnp_chg_is_batfet_closed(struct qpnp_chg_chip *chip)
+{
+	u8 batfet_closed_rt_sts;
+	int rc;
+
+	rc = qpnp_chg_read(chip, &batfet_closed_rt_sts,
+				 INT_RT_STS(chip->bat_if_base), 1);
+	if (rc) {
+		pr_err("spmi read failed: addr=%03X, rc=%d\n",
+				INT_RT_STS(chip->bat_if_base), rc);
+		return rc;
+	}
+
+	return (batfet_closed_rt_sts & BAT_FET_ON_IRQ) ? 1 : 0;
 }
 
 #define USB_VALID_BIT	BIT(7)
@@ -879,6 +914,19 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 }
 
 static irqreturn_t
+qpnp_chg_bat_if_batt_temp_irq_handler(int irq, void *_chip)
+{
+	struct qpnp_chg_chip *chip = _chip;
+	int batt_temp_good;
+
+	batt_temp_good = qpnp_chg_is_batt_temp_ok(chip);
+	pr_debug("batt-temp triggered: %d\n", batt_temp_good);
+
+	power_supply_changed(&chip->batt_psy);
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t
 qpnp_chg_bat_if_batt_pres_irq_handler(int irq, void *_chip)
 {
 	struct qpnp_chg_chip *chip = _chip;
@@ -1103,6 +1151,7 @@ static enum power_supply_property msm_batt_power_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_TYPE,
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_PRESENT,
+	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
 	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
@@ -1375,6 +1424,11 @@ static int get_prop_cycle_count(struct qpnp_chg_chip *chip)
 	return ret.intval;
 }
 
+static int get_prop_online(struct qpnp_chg_chip *chip)
+{
+	return qpnp_chg_is_batfet_closed(chip);
+}
+
 static void
 qpnp_batt_external_power_changed(struct power_supply *psy)
 {
@@ -1462,6 +1516,9 @@ qpnp_batt_power_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CYCLE_COUNT:
 		val->intval = get_prop_cycle_count(chip);
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = get_prop_online(chip);
 		break;
 	default:
 		return -EINVAL;
@@ -2165,6 +2222,8 @@ qpnp_chg_adc_notification(enum qpnp_tm_state state, void *ctx)
 
 	if (qpnp_adc_tm_channel_measure(&chip->adc_param))
 		pr_err("request ADC error\n");
+
+	power_supply_changed(&chip->batt_psy);
 }
 
 static int
@@ -2361,6 +2420,25 @@ qpnp_chg_request_irqs(struct qpnp_chg_chip *chip)
 			}
 
 			enable_irq_wake(chip->batt_pres.irq);
+
+			chip->batt_temp_ok.irq = spmi_get_irq_byname(spmi,
+						spmi_resource, "bat-temp-ok");
+			if (chip->batt_temp_ok.irq < 0) {
+				pr_err("Unable to get bat-temp-ok irq\n");
+				return rc;
+			}
+			rc = devm_request_irq(chip->dev, chip->batt_temp_ok.irq,
+				qpnp_chg_bat_if_batt_temp_irq_handler,
+				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+				"bat-temp-ok", chip);
+			if (rc < 0) {
+				pr_err("Can't request %d bat-temp-ok irq: %d\n",
+						chip->batt_temp_ok.irq, rc);
+				return rc;
+			}
+
+			enable_irq_wake(chip->batt_temp_ok.irq);
+
 			break;
 		case SMBB_USB_CHGPTH_SUBTYPE:
 		case SMBBP_USB_CHGPTH_SUBTYPE:
