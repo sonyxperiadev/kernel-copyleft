@@ -10,27 +10,10 @@
  * GNU General Public License for more details.
  */
 
-/dts-v1/;
+/*
+ * As a general rule, only version-specific property overrides should be placed
+ * inside this file. However, device definitions should be placed inside the
+ * msm8974.dtsi file.
+ */
 
 /include/ "msm8974-v2.dtsi"
-/include/ "msm8974-liquid.dtsi"
-
-/ {
-	model = "Qualcomm MSM 8974v2 LIQUID";
-	compatible = "qcom,msm8974-liquid", "qcom,msm8974", "qcom,liquid";
-	qcom,msm-id = <126 9 0x20000>,
-		      <185 9 0x20000>,
-		      <186 9 0x20000>;
-};
-
-&usb3 {
-	interrupt-parent = <&usb3>;
-	interrupts = <0 1>;
-	#interrupt-cells = <1>;
-	interrupt-map-mask = <0x0 0xffffffff>;
-	interrupt-map = <0x0 0 &intc 0 133 0
-			 0x0 1 &spmi_bus 0x0 0x0 0x9 0x0>;
-	interrupt-names = "hs_phy_irq", "pmic_id_irq";
-
-	qcom,misc-ref = <&pm8941_misc>;
-};
