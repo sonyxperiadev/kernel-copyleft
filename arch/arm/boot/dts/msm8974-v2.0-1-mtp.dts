@@ -12,11 +12,11 @@
 
 /dts-v1/;
 
-/include/ "msm8974-v2.dtsi"
+/include/ "msm8974-v2.0-1.dtsi"
 /include/ "msm8974-mtp.dtsi"
 
 / {
-	model = "Qualcomm MSM 8974v2 MTP";
+	model = "Qualcomm MSM 8974v2.0/1 MTP";
 	compatible = "qcom,msm8974-mtp", "qcom,msm8974", "qcom,mtp";
 	qcom,msm-id = <126 8 0x20000>,
 		      <185 8 0x20000>,
