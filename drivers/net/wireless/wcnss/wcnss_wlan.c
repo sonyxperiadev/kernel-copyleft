@@ -1706,6 +1706,8 @@ wcnss_trigger_config(struct platform_device *pdev)
 	if (IS_ERR(penv->pil)) {
 		dev_err(&pdev->dev, "Peripheral Loader failed on WCNSS.\n");
 		ret = PTR_ERR(penv->pil);
+		wcnss_pronto_log_debug_regs();
+		panic("WCNSS PIL failed");
 		penv->pil = NULL;
 		goto fail_pil;
 	}
