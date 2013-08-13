@@ -2649,7 +2649,7 @@ __init msm_spi_dt_to_pdata(struct platform_device *pdev)
 			pdata->use_bam = false;
 		}
 
-		if (pdata->bam_producer_pipe_index) {
+		if (!pdata->bam_producer_pipe_index) {
 			dev_warn(&pdev->dev,
 			"missing qcom,bam-producer-pipe-index entry in device-tree\n");
 			pdata->use_bam = false;
