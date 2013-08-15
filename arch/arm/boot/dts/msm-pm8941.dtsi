@@ -1234,8 +1234,8 @@
 			compatible = "qcom,leds-qpnp";
 			reg = <0xd300 0x100>;
 			label = "flash";
-			flash_boost-supply = <&pm8941_chg_boost>;
-			torch_boost-supply = <&pm8941_boost>;
+			flash-boost-supply = <&pm8941_chg_boost>;
+			torch-boost-supply = <&pm8941_boost>;
 		};
 
 		qcom,leds@d400 {
@@ -1423,6 +1423,5 @@
 			reg-names = "qpnp-lpg-channel-base", "qpnp-lpg-lut-base";
 			qcom,channel-id = <11>;
 		};
-
 	};
 };
