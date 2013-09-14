@@ -30,7 +30,7 @@
 #define TIMER_ENTRY_STATIC	((void *) 0x74737461)
 
 /********** mm/debug-pagealloc.c **********/
-#define PAGE_POISON 0xaa
+#define PAGE_POISON 0xdd
 
 /********** mm/slab.c **********/
 /*

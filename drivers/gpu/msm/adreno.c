@@ -805,6 +805,8 @@ static unsigned int _adreno_iommu_setstate_v1(struct kgsl_device *device,
 	int i;
 	unsigned int ttbr0, tlbiall, tlbstatus, tlbsync, mmu_ctrl;
 
+	cmds += adreno_add_idle_cmds(adreno_dev, cmds);
+
 	for (i = 0; i < num_iommu_units; i++) {
 		ttbr0_val = kgsl_mmu_get_default_ttbr0(&device->mmu,
 				i, KGSL_IOMMU_CONTEXT_USER);
@@ -894,6 +896,12 @@ static unsigned int _adreno_iommu_setstate_v1(struct kgsl_device *device,
 					KGSL_IOMMU_CTX_TLBSTATUS_SACTIVE, 0xF);
 		}
 	}
+
+	*cmds++ = cp_type3_packet(CP_WAIT_FOR_ME, 1);
+	*cmds++ = 0;
+
+	cmds += adreno_add_idle_cmds(adreno_dev, cmds);	
+
 	return cmds - cmds_orig;
 }
 
