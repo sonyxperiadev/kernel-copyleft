@@ -892,9 +892,6 @@ static unsigned int _adreno_iommu_setstate_v1(struct kgsl_device *device,
 					KGSL_IOMMU_CTX_TLBSTATUS) >> 2;
 			cmds += adreno_wait_reg_eq(cmds, tlbstatus, 0,
 					KGSL_IOMMU_CTX_TLBSTATUS_SACTIVE, 0xF);
-			/* release all commands with wait_for_me */
-			*cmds++ = cp_type3_packet(CP_WAIT_FOR_ME, 1);
-			*cmds++ = 0;
 		}
 	}
 	return cmds - cmds_orig;
