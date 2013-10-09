@@ -590,11 +590,16 @@ static int msm_pcm_capture_copy(struct snd_pcm_substream *substream,
 			if (prtd->mode == MODE_PCM)
 				ret = copy_to_user(buf,
 						   &buf_node->frame.voc_pkt,
-						   count);
-			else
+						   buf_node->frame.pktlen);
+			} else {
+				size = sizeof(buf_node->frame.frm_hdr) +
+				       sizeof(buf_node->frame.pktlen) +
+				       buf_node->frame.pktlen;
+
 				ret = copy_to_user(buf,
 						   &buf_node->frame,
-						   count);
+						   size);
+			}
 			if (ret) {
 				pr_err("%s: Copy to user retuned %d\n",
 					__func__, ret);
