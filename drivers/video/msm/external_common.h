@@ -111,7 +111,7 @@ const struct msm_hdmi_mode_timing_info *hdmi_mhl_get_supported_mode(
 	uint32 mode);
 void hdmi_common_init_panel_info(struct msm_panel_info *pinfo);
 
-ssize_t video_3d_format_2string(uint32 format, char *buf);
+ssize_t video_3d_format_2string(uint32 format, char *buf, u32 size);
 #endif
 
 int external_common_state_create(struct platform_device *pdev);
