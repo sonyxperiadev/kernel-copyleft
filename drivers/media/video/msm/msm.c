@@ -830,7 +830,7 @@ static long msm_camera_v4l2_private_ioctl(struct file *file, void *fh,
 			mutex_unlock(&pcam->event_lock);
 			break;
 		}
-		if (ioctl_ptr->len > 0) {
+		if (ioctl_ptr->len > 0 && ioctl_ptr->len <= MAX_SERVER_PAYLOAD_LENGTH) {
 			if (copy_to_user(ioctl_ptr->ioctl_ptr, payload,
 				 ioctl_ptr->len)) {
 				pr_err("%s Copy to user failed for cmd %d",
