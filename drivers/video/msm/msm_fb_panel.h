@@ -182,6 +182,8 @@ struct msm_panel_info {
 	struct lcdc_panel_info lcdc;
 	struct mipi_panel_info mipi;
 	struct lvds_panel_info lvds;
+	__u32 xres_aligned;
+	__u32 yres_aligned;
 };
 
 #define MSM_FB_SINGLE_MODE_PANEL(pinfo)		\
