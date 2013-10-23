@@ -12,7 +12,7 @@
  */
 #ifndef __MACH_QDSP6_V2_SNDDEV_H
 #define __MACH_QDSP6_V2_SNDDEV_H
-#include <mach/qdsp5v2/audio_def.h>
+#include <mach/qdsp6v2/audio_def.h>
 #include <sound/q6afe.h>
 
 #define AUDIO_DEV_CTL_MAX_DEV 64
