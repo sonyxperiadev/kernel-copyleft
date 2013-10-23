@@ -77,7 +77,7 @@ static int mhl_sii_reg_enable(void)
 {
 	static struct regulator *reg_8038_l20;
 	static struct regulator *reg_8038_l11;
-	int rc;
+	int rc = -EINVAL;
 
 	pr_debug("Inside %s\n", __func__);
 	if (!reg_8038_l20) {
