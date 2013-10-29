@@ -1,4 +1,4 @@
-/* Copyright (c) 2009,2011, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2009,2011,2013 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,8 +10,8 @@
  * GNU General Public License for more details.
  *
  */
-#ifndef _MACH_QDSP5_V2_AUDIO_DEF_H
-#define _MACH_QDSP5_V2_AUDIO_DEF_H
+#ifndef _MACH_QDSP6_V2_AUDIO_DEF_H
+#define _MACH_QDSP6_V2_AUDIO_DEF_H
 
 /* Define sound device capability */
 #define SNDDEV_CAP_RX 0x1 /* RX direction */
@@ -32,4 +32,4 @@
 
 #define SIDE_TONE_MASK	0x01
 
-#endif /* _MACH_QDSP5_V2_AUDIO_DEF_H */
+#endif /* _MACH_QDSP6_V2_AUDIO_DEF_H */
