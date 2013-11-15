@@ -1650,8 +1650,7 @@ static int adreno_start(struct kgsl_device *device)
 	/* Set up a2xx special case */
 
 	/* Certain targets need the fixup.  You know who you are */
-	if (adreno_is_a305(adreno_dev) ||
-	   (adreno_is_a320(adreno_dev) && !soc_class_is_apq8064()))
+	if (adreno_is_a305(adreno_dev) || adreno_is_a320(adreno_dev))
 		adreno_a3xx_pwron_fixup_init(adreno_dev);
 
 	/* Set the bit to indicate that we've just powered on */
