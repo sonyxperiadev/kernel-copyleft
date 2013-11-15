@@ -1973,7 +1973,8 @@ void msm_hs_request_clock_on(struct uart_port *uport)
 		break;
 	}
 
-	spin_unlock_irqrestore(&uport->lock, flags);
+	if (!ret)
+		spin_unlock_irqrestore(&uport->lock, flags);
 	mutex_unlock(&msm_uport->clk_mutex);
 }
 EXPORT_SYMBOL(msm_hs_request_clock_on);
