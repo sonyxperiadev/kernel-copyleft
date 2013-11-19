@@ -281,7 +281,11 @@ static struct pm8xxx_misc_platform_data apq8064_pm8921_misc_pdata = {
 static struct led_info pm8921_led_info[] = {
 	[0] = {
 		.name			= "led:red",
-		.default_trigger	= "ac-online",
+		.default_trigger	= "battery-charging",
+	},
+	[1] = {
+		.name			= "led:green",
+		.default_trigger	= "battery-full",
 	},
 };
 
@@ -317,6 +321,14 @@ static struct pm8xxx_led_config pm8921_led_configs[] = {
 		.mode = PM8XXX_LED_MODE_PWM2,
 		.max_current = PM8921_LC_LED_MAX_CURRENT,
 		.pwm_channel = 5,
+		.pwm_period_us = PM8XXX_LED_PWM_PERIOD,
+		.pwm_duty_cycles = &pm8921_led0_pwm_duty_cycles,
+	},
+	[1] = {
+		.id = PM8XXX_ID_LED_1,
+		.mode = PM8XXX_LED_MODE_PWM1,
+		.max_current = PM8921_LC_LED_MAX_CURRENT,
+		.pwm_channel = 4,
 		.pwm_period_us = PM8XXX_LED_PWM_PERIOD,
 		.pwm_duty_cycles = &pm8921_led0_pwm_duty_cycles,
 	},
