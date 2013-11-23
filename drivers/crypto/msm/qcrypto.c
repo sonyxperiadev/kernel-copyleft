@@ -2143,7 +2143,7 @@ static int qcrypto_count_sg(struct scatterlist *sg, int nbytes)
 {
 	int i;
 
-	for (i = 0; nbytes > 0; i++, sg = sg_next(sg))
+	for (i = 0; nbytes > 0 && sg != NULL; i++, sg = sg_next(sg))
 		nbytes -= sg->length;
 
 	return i;
