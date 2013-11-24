@@ -1510,7 +1510,7 @@ static int qcedev_vbuf_ablk_cipher_max_xfer(struct qcedev_async_req *areq,
 				areq->cipher_op_req.vbuf.src[0].len))
 		return -EFAULT;
 
-	k_align_src += areq->cipher_op_req.vbuf.src[0].len;
+	k_align_src += byteoffset + areq->cipher_op_req.vbuf.src[0].len;
 
 	for (i = 1; i < areq->cipher_op_req.entries; i++) {
 		user_src =
@@ -1601,12 +1601,37 @@ static int qcedev_vbuf_ablk_cipher(struct qcedev_async_req *areq,
 			return -EFAULT;
 
 	/* Verify Destination Address's */
-	if (areq->cipher_op_req.in_place_op != 1)
-		for (i = 0; i < areq->cipher_op_req.entries; i++)
-			if (!access_ok(VERIFY_READ,
-			(void __user *)areq->cipher_op_req.vbuf.dst[i].vaddr,
-					areq->cipher_op_req.vbuf.dst[i].len))
-				return -EFAULT;
+	if (creq->in_place_op != 1) {
+		for (i = 0, total = 0; i < QCEDEV_MAX_BUFFERS; i++) {
+			if ((areq->cipher_op_req.vbuf.dst[i].vaddr != 0) &&
+						(total < creq->data_len)) {
+				if (!access_ok(VERIFY_WRITE,
+					(void __user *)creq->vbuf.dst[i].vaddr,
+						creq->vbuf.dst[i].len)) {
+					pr_err("%s:DST WR_VERIFY err %d=0x%x\n",
+						__func__, i,
+						(u32)creq->vbuf.dst[i].vaddr);
+					return -EFAULT;
+				}
+				total += creq->vbuf.dst[i].len;
+			}
+		}
+	} else  {
+		for (i = 0, total = 0; i < creq->entries; i++) {
+			if (total < creq->data_len) {
+				if (!access_ok(VERIFY_WRITE,
+					(void __user *)creq->vbuf.src[i].vaddr,
+						creq->vbuf.src[i].len)) {
+					pr_err("%s:SRC WR_VERIFY err %d=0x%x\n",
+						__func__, i,
+						(u32)creq->vbuf.src[i].vaddr);
+					return -EFAULT;
+				}
+				total += creq->vbuf.src[i].len;
+			}
+		}
+	}
+	total = 0;
 
 	if (areq->cipher_op_req.mode == QCEDEV_AES_MODE_CTR)
 		byteoffset = areq->cipher_op_req.byteoffset;
@@ -1794,12 +1819,23 @@ static int qcedev_check_cipher_params(struct qcedev_cipher_op_req *req,
 			if (req->use_pmem)
 				goto error;
 		}
+		if (req->byteoffset >= AES_CE_BLOCK_SIZE) {
+			pr_err("%s: Invalid byte offset\n", __func__);
+			goto error;
+		}
 	}
 	/* if using PMEM with non-zero byteoffset, ensure it is in_place_op */
 	if (req->use_pmem) {
 		if (!req->in_place_op)
 			goto error;
 	}
+
+	if (req->data_len < req->byteoffset) {
+		pr_err("%s: req data length %u is less than byteoffset %u\n",
+				__func__, req->data_len, req->byteoffset);
+		goto error;
+	}
+
 	/* Ensure zer ivlen for ECB  mode  */
 	if (req->ivlen != 0) {
 		if ((req->mode == QCEDEV_AES_MODE_ECB) ||
@@ -2180,21 +2216,21 @@ static int _disp_stats(int id)
 	int len = 0;
 
 	pstat = &_qcedev_stat[id];
-	len = snprintf(_debug_read_buf, DEBUG_MAX_RW_BUF - 1,
+	len = scnprintf(_debug_read_buf, DEBUG_MAX_RW_BUF - 1,
 			"\nQualcomm QCE dev driver %d Statistics:\n",
 				id + 1);
 
-	len += snprintf(_debug_read_buf + len, DEBUG_MAX_RW_BUF - len - 1,
+	len += scnprintf(_debug_read_buf + len, DEBUG_MAX_RW_BUF - len - 1,
 			"   Encryption operation success       : %d\n",
 					pstat->qcedev_enc_success);
-	len += snprintf(_debug_read_buf + len, DEBUG_MAX_RW_BUF - len - 1,
+	len += scnprintf(_debug_read_buf + len, DEBUG_MAX_RW_BUF - len - 1,
 			"   Encryption operation fail   : %d\n",
 					pstat->qcedev_enc_fail);
-	len += snprintf(_debug_read_buf + len, DEBUG_MAX_RW_BUF - len - 1,
+	len += scnprintf(_debug_read_buf + len, DEBUG_MAX_RW_BUF - len - 1,
 			"   Decryption operation success     : %d\n",
 					pstat->qcedev_dec_success);
 
-	len += snprintf(_debug_read_buf + len, DEBUG_MAX_RW_BUF - len - 1,
+	len += scnprintf(_debug_read_buf + len, DEBUG_MAX_RW_BUF - len - 1,
 			"   Encryption operation fail          : %d\n",
 					pstat->qcedev_dec_fail);
 
