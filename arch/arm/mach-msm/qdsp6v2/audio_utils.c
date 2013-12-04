@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2012, 2014 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -395,7 +395,7 @@ ssize_t audio_in_read(struct file *file,
 	uint32_t mfield_size = (audio->buf_cfg.meta_info_enable == 0) ? 0 :
 		(sizeof(unsigned char) +
 		(sizeof(struct meta_out_dsp)*(audio->buf_cfg.frames_per_buf)));
-
+	memset(&meta, 0, sizeof(meta));
 	pr_debug("%s:session id %d: read - %d\n", __func__, audio->ac->session,
 			count);
 	if (!audio->enabled)
