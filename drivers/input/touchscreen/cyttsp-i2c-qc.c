@@ -42,6 +42,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/firmware.h>
 #include <linux/mutex.h>
+#include <linux/debugfs.h>
 #include <linux/regulator/consumer.h>
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
@@ -76,6 +77,7 @@ struct cyttsp {
 	bool cyttsp_fwloader_mode;
 	bool is_suspended;
 	struct regulator **vdd;
+	struct dentry *dir;
 	char fw_fname[FW_FNAME_LEN];
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
@@ -92,6 +94,7 @@ static void cyttsp_early_suspend(struct early_suspend *handler);
 static void cyttsp_late_resume(struct early_suspend *handler);
 #endif /* CONFIG_HAS_EARLYSUSPEND */
 
+#define CYTTSP_DEBUG_DIR_NAME	"ts_debug"
 
 /* ****************************************************************************
  * Prototypes for static functions
@@ -914,7 +917,37 @@ static ssize_t cyttsp_fw_name_store(struct device *dev,
 static DEVICE_ATTR(cyttsp_fw_name, 0664, cyttsp_fw_name_show,
 					cyttsp_fw_name_store);
 
-static void cyttsp_xy_handler(struct cyttsp *ts)
+static int cyttsp_debug_suspend_set(void *_data, u64 val)
+{
+	struct cyttsp *ts = _data;
+
+	mutex_lock(&ts->input->mutex);
+
+	if (val)
+		cyttsp_suspend(&ts->client->dev);
+	else
+		cyttsp_resume(&ts->client->dev);
+
+	mutex_unlock(&ts->input->mutex);
+
+	return 0;
+}
+
+static int cyttsp_debug_suspend_get(void *_data, u64 *val)
+{
+	struct cyttsp *ts = _data;
+
+	mutex_lock(&ts->input->mutex);
+	*val = ts->is_suspended;
+	mutex_unlock(&ts->input->mutex);
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(debug_suspend_fops, cyttsp_debug_suspend_get,
+			cyttsp_debug_suspend_set, "%lld\n");
+
+static void cyttsp_xy_handler(struct cyttsp *ts, bool is_ready_to_suspend)
 {
 	u8 id, tilt, rev_x, rev_y;
 	u8 i, loc;
@@ -1052,6 +1085,9 @@ static void cyttsp_xy_handler(struct cyttsp *ts)
 			    g_xy_data.tt_stat);
 		}
 	}
+
+	if (is_ready_to_suspend)
+		cur_tch = CY_NTCH;
 
 	/* set tool size */
 	curr_tool_width = CY_SMALL_TOOL_WIDTH;
@@ -1858,7 +1894,7 @@ static void cyttsp_timer(unsigned long handle)
 	cyttsp_xdebug("TTSP Device timer event\n");
 
 	/* schedule motion signal handling */
-	cyttsp_xy_handler(ts);
+	cyttsp_xy_handler(ts, false);
 
 	return;
 }
@@ -1875,7 +1911,7 @@ static irqreturn_t cyttsp_irq(int irq, void *handle)
 
 	cyttsp_xdebug("%s: Got IRQ\n", CY_I2C_NAME);
 
-	cyttsp_xy_handler(ts);
+	cyttsp_xy_handler(ts, false);
 
 	return IRQ_HANDLED;
 }
@@ -2447,6 +2483,7 @@ error_vdd:
 static int cyttsp_initialize(struct i2c_client *client, struct cyttsp *ts)
 {
 	struct input_dev *input_device;
+	struct dentry *dir, *temp;
 	int error = 0;
 	int retval = CY_OK;
 	u8 id;
@@ -2693,10 +2730,29 @@ static int cyttsp_initialize(struct i2c_client *client, struct cyttsp *ts)
 		goto error_rm_dev_file_fupdate_fw;
 	}
 
+	dir = debugfs_create_dir(CYTTSP_DEBUG_DIR_NAME, NULL);
+	if (dir == NULL || IS_ERR(dir)) {
+		pr_err("debugfs_create_dir failed: rc=%ld\n", PTR_ERR(dir));
+		error = PTR_ERR(dir);
+		goto error_rm_dev_file_fw_name;
+	}
+
+	temp = debugfs_create_file("suspend", S_IRUSR | S_IWUSR, dir, ts,
+					&debug_suspend_fops);
+	if (temp == NULL || IS_ERR(temp)) {
+		pr_err("debugfs_create_file failed: rc=%ld\n", PTR_ERR(temp));
+		error = PTR_ERR(temp);
+		goto error_rm_debug_dir;
+	}
+
 	cyttsp_info("%s: Successful registration\n", CY_I2C_NAME);
 
 	goto success;
 
+error_rm_debug_dir:
+	debugfs_remove_recursive(ts->dir);
+error_rm_dev_file_fw_name:
+	device_remove_file(&client->dev, &dev_attr_cyttsp_fw_name);
 error_rm_dev_file_fupdate_fw:
 	device_remove_file(&client->dev, &dev_attr_cyttsp_force_update_fw);
 error_rm_dev_file_update_fw:
@@ -2871,21 +2927,6 @@ fail_regulator_hpm:
 	return rc;
 }
 
-static void cyttsp_release_all(struct cyttsp *ts)
-{
-	int id;
-
-	for (id = 0; id < CY_NUM_MT_TCH_ID; id++) {
-		input_mt_slot(ts->input, id);
-		input_mt_report_slot_state(ts->input, MT_TOOL_FINGER, 0);
-	}
-
-	input_report_key(ts->input, BTN_TOUCH, 0);
-	input_report_key(ts->input, BTN_TOOL_FINGER, 0);
-
-	input_sync(ts->input);
-}
-
 /* Function to manage power-on resume */
 static int cyttsp_resume(struct device *dev)
 {
@@ -2991,7 +3032,7 @@ static int cyttsp_suspend(struct device *dev)
 	else
 		disable_irq(ts->client->irq);
 
-	cyttsp_release_all(ts);
+	cyttsp_xy_handler(ts, true);
 
 	if (!(retval < CY_OK)) {
 		if (ts->platform_data->use_sleep &&
@@ -3052,6 +3093,7 @@ static int __devexit cyttsp_remove(struct i2c_client *client)
 	device_remove_file(&client->dev, &dev_attr_cyttsp_update_fw);
 	device_remove_file(&client->dev, &dev_attr_cyttsp_force_update_fw);
 	device_remove_file(&client->dev, &dev_attr_cyttsp_fw_name);
+	debugfs_remove_recursive(ts->dir);
 
 	/* free up timer or irq */
 	if (ts->client->irq == 0) {
