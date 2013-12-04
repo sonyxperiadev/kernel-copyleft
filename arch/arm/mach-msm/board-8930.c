@@ -1322,6 +1322,7 @@ static struct mdm_platform_data sglte_platform_data = {
 	.ramdump_timeout_ms = 600000,
 	.no_powerdown_after_ramdumps = 1,
 	.image_upgrade_supported = 1,
+	.subsys_name = "external_modem",
 };
 
 static struct platform_device *mdm_devices[] __initdata = {

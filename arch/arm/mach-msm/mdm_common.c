@@ -39,6 +39,7 @@
 #include <mach/subsystem_restart.h>
 #include <mach/rpm.h>
 #include <mach/gpiomux.h>
+#include <linux/notifier.h>
 #include "msm_watchdog.h"
 #include "mdm_private.h"
 #include "sysmon.h"
@@ -67,6 +68,10 @@ enum gpio_update_config {
 	GPIO_UPDATE_BOOTING_CONFIG = 1,
 	GPIO_UPDATE_RUNNING_CONFIG,
 };
+
+static LIST_HEAD(mdm_driver_list);
+static DEFINE_MUTEX(mdm_driver_list_lock);
+static DEFINE_MUTEX(mdm_driver_list_add_lock);
 
 struct mdm_device {
 	struct list_head		link;
@@ -228,6 +233,82 @@ static void mdm_ssr_completed(struct mdm_device *mdev)
 	spin_unlock_irqrestore(&ssr_lock, flags);
 }
 
+static struct mdm_driver_notif_info *mdm_notif_find_subsys(const char *name)
+{
+	struct mdm_driver_notif_info *notif;
+	mutex_lock(&mdm_driver_list_lock);
+	list_for_each_entry(notif, &mdm_driver_list, list)
+		if (!strncmp(notif->name, name, ARRAY_SIZE(notif->name))) {
+			mutex_unlock(&mdm_driver_list_lock);
+			return notif;
+		}
+	mutex_unlock(&mdm_driver_list_lock);
+	return NULL;
+}
+
+static void *mdm_notif_add_subsys(const char *name)
+{
+	struct mdm_driver_notif_info *notif = NULL;
+	if (!name)
+		goto done;
+	mutex_lock(&mdm_driver_list_add_lock);
+	notif = mdm_notif_find_subsys(name);
+	if (notif) {
+		mutex_unlock(&mdm_driver_list_add_lock);
+		goto done;
+	}
+	notif = kmalloc(sizeof(struct mdm_driver_notif_info), GFP_KERNEL);
+	if (!notif) {
+		mutex_unlock(&mdm_driver_list_add_lock);
+		return ERR_PTR(-EINVAL);
+	}
+	strlcpy(notif->name, name, ARRAY_SIZE(notif->name));
+	srcu_init_notifier_head(&notif->mdm_driver_notif_rcvr_list);
+	INIT_LIST_HEAD(&notif->list);
+	list_add_tail(&notif->list, &mdm_driver_list);
+	mutex_unlock(&mdm_driver_list_add_lock);
+done:
+	return notif;
+}
+
+struct mdm_driver_notif_info *mdm_driver_register_notifier(
+			const char *name, struct notifier_block *nb)
+{
+	int ret;
+	struct mdm_driver_notif_info *notif;
+
+	notif = mdm_notif_find_subsys(name);
+	if (!notif) {
+		notif = (struct mdm_driver_notif_info *)
+				mdm_notif_add_subsys(name);
+		if (!notif)
+			return NULL;
+		pr_debug("%s : Created notifier node for %s\n", __func__, name);
+	}
+	ret = srcu_notifier_chain_register(
+		&notif->mdm_driver_notif_rcvr_list, nb);
+	if (ret < 0)
+		return NULL;
+	return notif;
+}
+
+static int mdm_driver_queue_notification(char *name,
+					enum subsys_notif_type notif_type)
+{
+	int ret = 0;
+	struct mdm_driver_notif_info *notif;
+	if (!name)
+		return -EINVAL;
+	notif = mdm_notif_find_subsys(name);
+	if (!notif) {
+		pr_err("%s: Couldn't find notif for dev %s\n", __func__, name);
+		return -EINVAL;
+	}
+	ret = srcu_notifier_call_chain(
+			&notif->mdm_driver_notif_rcvr_list, notif_type,
+			(void *)notif);
+	return ret;
+}
 static irqreturn_t mdm_vddmin_change(int irq, void *dev_id)
 {
 	struct mdm_device *mdev = (struct mdm_device *)dev_id;
@@ -516,15 +597,20 @@ static long mdm_modem_ioctl(struct file *filp, unsigned int cmd,
 
 static void mdm_status_fn(struct work_struct *work)
 {
+	enum subsys_notif_type powerup_notify = SUBSYS_AFTER_POWERUP;
 	struct mdm_device *mdev =
 		container_of(work, struct mdm_device, mdm_status_work);
 	struct mdm_modem_drv *mdm_drv = &mdev->mdm_data;
 	int value = gpio_get_value(mdm_drv->mdm2ap_status_gpio);
 
 	pr_debug("%s: status:%d\n", __func__, value);
-	if (atomic_read(&mdm_drv->mdm_ready) && mdm_ops->status_cb)
+	if (atomic_read(&mdm_drv->mdm_ready) && mdm_ops->status_cb) {
 		mdm_ops->status_cb(mdm_drv, value);
-
+		pr_debug("%s: sending powerup notification for %s\n",
+			__func__, mdm_drv->pdata->subsys_name);
+		mdm_driver_queue_notification(mdm_drv->pdata->subsys_name,
+						 powerup_notify);
+	}
 	/* Update gpio configuration to "running" config. */
 	mdm_update_gpio_configs(mdev, GPIO_UPDATE_RUNNING_CONFIG);
 }
