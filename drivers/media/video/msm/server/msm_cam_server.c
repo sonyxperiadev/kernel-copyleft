@@ -1390,6 +1390,15 @@ static long msm_ioctl_server(struct file *file, void *fh,
 		}
 
 		mutex_lock(&g_server_dev.server_queue_lock);
+
+		if(u_isp_event.isp_data.ctrl.queue_idx < 0 ||
+		u_isp_event.isp_data.ctrl.queue_idx >= MAX_NUM_ACTIVE_CAMERA) {
+			pr_err("%s: Invalid index %d\n", __func__,
+				u_isp_event.isp_data.ctrl.queue_idx);
+			rc = -EINVAL;
+			return rc;
+		}
+
 		if (!g_server_dev.server_queue
 			[u_isp_event.isp_data.ctrl.queue_idx].queue_active) {
 			pr_err("%s: Invalid queue\n", __func__);
