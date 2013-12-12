@@ -1049,7 +1049,8 @@ void mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
 
 	/* TILE frame size */
 	if (pipe->frame_format != MDP4_FRAME_FORMAT_LINEAR) {
-		if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD)
+		if ((ctrl->panel_mode & MDP4_PANEL_DSI_CMD && pipe->mixer_num == 0) ||
+			(ctrl->panel_mode & MDP4_PANEL_WRITEBACK && pipe->mixer_num == 2))
 			outpdw(vg_base + 0x0048, frame_size);
 		else
 			pipe->frame_size = frame_size;
