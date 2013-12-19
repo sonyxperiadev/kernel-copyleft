@@ -173,6 +173,7 @@ int mdp4_dsi_video_pipe_commit(int cndx, int wait)
 	struct mdp4_overlay_pipe *pipe;
 	struct mdp4_overlay_pipe *real_pipe;
 	unsigned long flags;
+	unsigned int dmap_flag = 0;
 	int cnt = 0;
 
 	vctrl = &vsync_ctrl_db[cndx];
@@ -230,18 +231,21 @@ int mdp4_dsi_video_pipe_commit(int cndx, int wait)
 				mdp4_overlay_vsync_commit(pipe);
 				if (pipe->frame_format !=
 						MDP4_FRAME_FORMAT_LINEAR) {
-					spin_lock_irqsave(&vctrl->spin_lock,
-									flags);
-					INIT_COMPLETION(vctrl->dmap_comp);
-					vsync_irq_enable(INTR_DMA_P_DONE,
-								MDP_DMAP_TERM);
-				       spin_unlock_irqrestore(&vctrl->spin_lock,
-								flags);
+					dmap_flag = 1;
 				}
 			}
 		}
 	}
-
+	if(dmap_flag) {
+		spin_lock_irqsave(&vctrl->spin_lock,
+				flags);
+		INIT_COMPLETION(vctrl->dmap_comp);
+		vsync_irq_enable(INTR_DMA_P_DONE,
+				MDP_DMAP_TERM);
+		dmap_flag = 0;
+		spin_unlock_irqrestore(&vctrl->spin_lock,
+				flags);
+	}
 	mdp4_mixer_stage_commit(mixer);
 
 	/* start timing generator & mmu if they are not started yet */
