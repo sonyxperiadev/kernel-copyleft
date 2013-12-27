@@ -2292,6 +2292,7 @@ static int sitar_hph_pa_event(struct snd_soc_dapm_widget *w,
 	struct snd_soc_codec *codec = w->codec;
 	struct sitar_priv *sitar = snd_soc_codec_get_drvdata(codec);
 	u8 mbhc_micb_ctl_val;
+	static int hphlr_count;
 	pr_debug("%s: event = %d\n", __func__, event);
 
 	switch (event) {
@@ -2323,6 +2324,7 @@ static int sitar_hph_pa_event(struct snd_soc_dapm_widget *w,
 				 &sitar->hph_pa_dac_state);
 			clear_bit(SITAR_HPHL_DAC_OFF_ACK,
 				 &sitar->hph_pa_dac_state);
+			hphlr_count++;
 			if (sitar->hph_status & SND_JACK_OC_HPHL)
 				schedule_work(&sitar->hphlocp_work);
 		} else if (w->shift == 4) {
@@ -2330,17 +2332,19 @@ static int sitar_hph_pa_event(struct snd_soc_dapm_widget *w,
 				 &sitar->hph_pa_dac_state);
 			clear_bit(SITAR_HPHR_DAC_OFF_ACK,
 				 &sitar->hph_pa_dac_state);
+			hphlr_count++;
 			if (sitar->hph_status & SND_JACK_OC_HPHR)
 				schedule_work(&sitar->hphrocp_work);
 		}
-
-		SITAR_ACQUIRE_LOCK(sitar->codec_resource_lock);
-		sitar_codec_switch_micbias(codec, 0);
-		SITAR_RELEASE_LOCK(sitar->codec_resource_lock);
-
-		pr_debug("%s: sleep 10 ms after %s PA disable.\n", __func__,
-				w->name);
-		usleep_range(10000, 10000);
+		if (hphlr_count >= 2) {
+			SITAR_ACQUIRE_LOCK(sitar->codec_resource_lock);
+			sitar_codec_switch_micbias(codec, 0);
+			SITAR_RELEASE_LOCK(sitar->codec_resource_lock);
+			pr_debug("%s: sleep 10 ms after %s PA disable.\n",
+					__func__, w->name);
+			usleep_range(10000, 10000);
+			hphlr_count = 0;
+		}
 
 		if (sitar_is_line_pa_on(codec))
 			sitar_enable_classg(codec, true);
