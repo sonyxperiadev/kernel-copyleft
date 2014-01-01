@@ -1195,11 +1195,6 @@ static int __radio_hci_request(struct radio_hci_dev *hdev,
 	case HCI_REQ_STATUS:
 		err = radio_hci_err(hdev->req_result);
 		break;
-
-	case HCI_REQ_CANCELED:
-		err = -hdev->req_result;
-		break;
-
 	default:
 		err = -ETIMEDOUT;
 		break;
@@ -1626,9 +1621,6 @@ static void hci_cc_rsp(struct radio_hci_dev *hdev, struct sk_buff *skb)
 {
 	__u8 status = *((__u8 *) skb->data);
 
-	if (status)
-		return;
-
 	radio_hci_req_complete(hdev, status);
 }
 
@@ -1647,6 +1639,8 @@ static void hci_cc_fm_disable_rsp(struct radio_hci_dev *hdev,
 	} else if ((radio->mode == FM_RECV) || (radio->mode == FM_TRANS)) {
 		iris_q_event(radio, IRIS_EVT_RADIO_DISABLED);
 		radio->mode = FM_OFF;
+	} else if ((radio->mode == FM_TURNING_OFF) && (status != 0)) {
+		radio_hci_req_complete(hdev, status);
 	}
 }
 
@@ -1655,10 +1649,8 @@ static void hci_cc_conf_rsp(struct radio_hci_dev *hdev, struct sk_buff *skb)
 	struct hci_fm_conf_rsp  *rsp = (void *)skb->data;
 	struct iris_device *radio = video_get_drvdata(video_get_dev());
 
-	if (rsp->status)
-		return;
-
-	radio->recv_conf = rsp->recv_conf_rsp;
+	if (!rsp->status)
+		radio->recv_conf = rsp->recv_conf_rsp;
 	radio_hci_req_complete(hdev, rsp->status);
 }
 
@@ -1668,10 +1660,11 @@ static void hci_cc_fm_trans_get_conf_rsp(struct radio_hci_dev *hdev,
 	struct hci_fm_get_trans_conf_rsp  *rsp = (void *)skb->data;
 	struct iris_device *radio = video_get_drvdata(video_get_dev());
 
-	if (rsp->status)
-		return;
-	memcpy((void *)&radio->trans_conf,  (void*)&rsp->trans_conf_rsp,
+	if (!rsp->status)
+		memcpy((void *)&radio->trans_conf,
+			(void *)&rsp->trans_conf_rsp,
 			sizeof(rsp->trans_conf_rsp));
+
 	radio_hci_req_complete(hdev, rsp->status);
 }
 
@@ -1703,10 +1696,8 @@ static void hci_cc_fm_trans_set_conf_rsp(struct radio_hci_dev *hdev,
 	struct hci_fm_conf_rsp  *rsp = (void *)skb->data;
 	struct iris_device *radio = video_get_drvdata(video_get_dev());
 
-	if (rsp->status)
-		return;
-
-	iris_q_event(radio, HCI_EV_CMD_COMPLETE);
+	if (!rsp->status)
+		iris_q_event(radio, HCI_EV_CMD_COMPLETE);
 
 	radio_hci_req_complete(hdev, rsp->status);
 }
@@ -1718,10 +1709,9 @@ static void hci_cc_sig_threshold_rsp(struct radio_hci_dev *hdev,
 	struct hci_fm_sig_threshold_rsp  *rsp = (void *)skb->data;
 	struct iris_device *radio = video_get_drvdata(video_get_dev());
 
-	if (rsp->status)
-		return;
-
-	memcpy(&radio->sig_th, rsp, sizeof(struct hci_fm_sig_threshold_rsp));
+	if (!rsp->status)
+		memcpy(&radio->sig_th, rsp,
+			sizeof(struct hci_fm_sig_threshold_rsp));
 	radio_hci_req_complete(hdev, rsp->status);
 }
 
@@ -1739,9 +1729,6 @@ static void hci_cc_prg_srv_rsp(struct radio_hci_dev *hdev, struct sk_buff *skb)
 {
 	struct hci_fm_prgm_srv_rsp  *rsp = (void *)skb->data;
 
-	if (rsp->status)
-		return;
-
 	radio_hci_req_complete(hdev, rsp->status);
 }
 
@@ -1749,18 +1736,12 @@ static void hci_cc_rd_txt_rsp(struct radio_hci_dev *hdev, struct sk_buff *skb)
 {
 	struct hci_fm_radio_txt_rsp  *rsp = (void *)skb->data;
 
-	if (rsp->status)
-		return;
-
 	radio_hci_req_complete(hdev, rsp->status);
 }
 
 static void hci_cc_af_list_rsp(struct radio_hci_dev *hdev, struct sk_buff *skb)
 {
 	struct hci_fm_af_list_rsp  *rsp = (void *)skb->data;
-
-	if (rsp->status)
-		return;
 
 	radio_hci_req_complete(hdev, rsp->status);
 }
@@ -1772,10 +1753,9 @@ static void hci_cc_feature_list_rsp(struct radio_hci_dev *hdev,
 	struct iris_device *radio = video_get_drvdata(video_get_dev());
 	struct v4l2_capability *v4l_cap = radio->g_cap;
 
-	if (rsp->status)
-		return;
-	v4l_cap->capabilities = (rsp->feature_mask & 0x000002) |
-		(rsp->feature_mask & 0x000001);
+	if (!rsp->status)
+		v4l_cap->capabilities = (rsp->feature_mask & 0x000002) |
+						(rsp->feature_mask & 0x000001);
 
 	radio_hci_req_complete(hdev, rsp->status);
 }
@@ -1786,9 +1766,6 @@ static void hci_cc_dbg_param_rsp(struct radio_hci_dev *hdev,
 	struct iris_device *radio = video_get_drvdata(video_get_dev());
 	struct hci_fm_dbg_param_rsp *rsp = (void *)skb->data;
 	radio->st_dbg_param = *(rsp);
-
-	if (radio->st_dbg_param.status)
-		return;
 
 	radio_hci_req_complete(hdev, radio->st_dbg_param.status);
 }
@@ -1809,21 +1786,21 @@ static void hci_cc_riva_peek_rsp(struct radio_hci_dev *hdev,
 	int len;
 	char *data;
 
-	if (status)
-		return;
-	len = skb->data[RIVA_PEEK_LEN_OFSET] + RIVA_PEEK_PARAM;
-	data = kmalloc(len, GFP_ATOMIC);
+	if (!status) {
+		len = skb->data[RIVA_PEEK_LEN_OFSET] + RIVA_PEEK_PARAM;
+		data = kmalloc(len, GFP_ATOMIC);
 
-	if (!data) {
-		FMDERR("Memory allocation failed");
-		return;
+		if (data != NULL) {
+			memcpy(data, &skb->data[PEEK_DATA_OFSET], len);
+			iris_q_evt_data(radio, data, len, IRIS_BUF_PEEK);
+			kfree(data);
+		} else {
+			FMDERR("Memory allocation failed");
+		}
+
 	}
 
-	memcpy(data, &skb->data[PEEK_DATA_OFSET], len);
-	iris_q_evt_data(radio, data, len, IRIS_BUF_PEEK);
 	radio_hci_req_complete(hdev, status);
-	kfree(data);
-
 }
 
 static void hci_cc_riva_read_default_rsp(struct radio_hci_dev *hdev,
@@ -1833,13 +1810,14 @@ static void hci_cc_riva_read_default_rsp(struct radio_hci_dev *hdev,
 	__u8 status = *((__u8 *) skb->data);
 	__u8 len;
 
-	if (status)
-		return;
-	len = skb->data[1];
-
-	memset(&radio->default_data, 0 , sizeof(struct hci_fm_data_rd_rsp));
-	memcpy(&radio->default_data, &skb->data[0], len+2);
-	iris_q_evt_data(radio, &skb->data[0], len+2, IRIS_BUF_RD_DEFAULT);
+	if (!status) {
+		len = skb->data[1];
+		memset(&radio->default_data, 0,
+			sizeof(struct hci_fm_data_rd_rsp));
+		memcpy(&radio->default_data, &skb->data[0], len+2);
+		iris_q_evt_data(radio, &skb->data[0], len+2,
+				IRIS_BUF_RD_DEFAULT);
+	}
 	radio_hci_req_complete(hdev, status);
 }
 
@@ -1850,18 +1828,19 @@ static void hci_cc_ssbi_peek_rsp(struct radio_hci_dev *hdev,
 	__u8 status = *((__u8 *) skb->data);
 	char *data;
 
-	if (status)
-		return;
-	data = kmalloc(SSBI_PEEK_LEN, GFP_ATOMIC);
-	if (!data) {
-		FMDERR("Memory allocation failed");
-		return;
+	if (!status) {
+		data = kmalloc(SSBI_PEEK_LEN, GFP_ATOMIC);
+		if (data != NULL) {
+			data[0] = skb->data[PEEK_DATA_OFSET];
+			iris_q_evt_data(radio, data, SSBI_PEEK_LEN,
+					IRIS_BUF_SSBI_PEEK);
+			kfree(data);
+		} else {
+			FMDERR("Memory allocation failed");
+		}
 	}
 
-	data[0] = skb->data[PEEK_DATA_OFSET];
-	iris_q_evt_data(radio, data, SSBI_PEEK_LEN, IRIS_BUF_SSBI_PEEK);
 	radio_hci_req_complete(hdev, status);
-	kfree(data);
 }
 
 static void hci_cc_rds_grp_cntrs_rsp(struct radio_hci_dev *hdev,
@@ -1870,18 +1849,18 @@ static void hci_cc_rds_grp_cntrs_rsp(struct radio_hci_dev *hdev,
 	struct iris_device *radio = video_get_drvdata(video_get_dev());
 	__u8 status = *((__u8 *) skb->data);
 	char *data;
-	if (status)
-		return;
-	data = kmalloc(RDS_GRP_CNTR_LEN, GFP_ATOMIC);
-	if (!data) {
-		FMDERR("memory allocation failed");
-		return;
+	if (!status) {
+		data = kmalloc(RDS_GRP_CNTR_LEN, GFP_ATOMIC);
+		if (data != NULL) {
+			memcpy(data, &skb->data[1], RDS_GRP_CNTR_LEN);
+			iris_q_evt_data(radio, data, RDS_GRP_CNTR_LEN,
+						IRIS_BUF_RDS_CNTRS);
+			kfree(data);
+		} else {
+			FMDERR("memory allocation failed");
+		}
 	}
-	memcpy(data, &skb->data[1], RDS_GRP_CNTR_LEN);
-	iris_q_evt_data(radio, data, RDS_GRP_CNTR_LEN, IRIS_BUF_RDS_CNTRS);
 	radio_hci_req_complete(hdev, status);
-	kfree(data);
-
 }
 
 static void hci_cc_do_calibration_rsp(struct radio_hci_dev *hdev,
@@ -1892,19 +1871,14 @@ static void hci_cc_do_calibration_rsp(struct radio_hci_dev *hdev,
 	rsp.status = skb->data[0];
 	rsp.mode = skb->data[CALIB_MODE_OFSET];
 
-	if (rsp.status) {
-		FMDERR("status = %d", rsp.status);
-		return;
-	}
-	if (rsp.mode == PROCS_CALIB_MODE) {
-		memcpy(&rsp.data[0], &skb->data[CALIB_DATA_OFSET],
+	if (!rsp.status) {
+		if (rsp.mode == PROCS_CALIB_MODE) {
+			memcpy(&rsp.data[0], &skb->data[CALIB_DATA_OFSET],
 				PROCS_CALIB_SIZE);
-	iris_q_evt_data(radio, rsp.data, PROCS_CALIB_SIZE,
+			iris_q_evt_data(radio, rsp.data, PROCS_CALIB_SIZE,
 					IRIS_BUF_CAL_DATA);
-	} else {
-		return;
+		}
 	}
-
 	radio_hci_req_complete(hdev, rsp.status);
 }
 
@@ -1913,12 +1887,11 @@ static void hci_cc_get_ch_det_threshold_rsp(struct radio_hci_dev *hdev,
 {
 	struct iris_device *radio = video_get_drvdata(video_get_dev());
 	u8  status = skb->data[0];
-	if (status) {
-		FMDERR("status = %d", status);
-		return;
-	}
-	memcpy(&radio->ch_det_threshold, &skb->data[1],
-		sizeof(struct hci_fm_ch_det_threshold));
+
+	if (!status)
+		memcpy(&radio->ch_det_threshold, &skb->data[1],
+			sizeof(struct hci_fm_ch_det_threshold));
+
 	radio_hci_req_complete(hdev, status);
 }
 
