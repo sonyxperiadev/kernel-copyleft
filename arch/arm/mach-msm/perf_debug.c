@@ -40,6 +40,7 @@ static char *descriptions =
 	"20 Perf: Fix PID for tracepoints\n"
 	"21 Perf: preserve registers across hotplug\n"
 	"22 msm: perf: fix formatting of trace entry\n"
+	"23 msm: perf: Fix cpu id logic in tracectr notifier\n"
 ;
 
 static ssize_t desc_read(struct file *fp, char __user *buf,
