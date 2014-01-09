@@ -375,6 +375,7 @@ void __init msm8960_init_mmc(void)
 					       MMC_CAP_UHS_DDR50);
 	/* SDC1 : eMMC card connected */
 	msm_add_sdcc(1, &msm8960_sdc1_data);
+	msm_add_uio();
 #endif
 #ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
 	/* SDC2: SDIO slot for WLAN*/
