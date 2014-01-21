@@ -1396,6 +1396,7 @@ static long msm_ioctl_server(struct file *file, void *fh,
 			pr_err("%s: Invalid index %d\n", __func__,
 				u_isp_event.isp_data.ctrl.queue_idx);
 			rc = -EINVAL;
+			mutex_unlock(&g_server_dev.server_queue_lock);
 			return rc;
 		}
 
