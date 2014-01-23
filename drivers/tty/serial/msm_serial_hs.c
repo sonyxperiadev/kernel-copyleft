@@ -1973,6 +1973,12 @@ void msm_hs_request_clock_off(struct uart_port *uport) {
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 
 	spin_lock_irqsave(&uport->lock, flags);
+	if (msm_uport->is_shutdown) {
+		pr_err("%s:Clock OFF fail.UART port is closed\n", __func__);
+		spin_unlock_irqrestore(&uport->lock, flags);
+		return;
+	}
+
 	if (msm_uport->clk_state == MSM_HS_CLK_ON) {
 		msm_uport->clk_state = MSM_HS_CLK_REQUEST_OFF;
 		msm_uport->clk_req_off_state = CLK_REQ_OFF_START;
@@ -1997,6 +2003,13 @@ void msm_hs_request_clock_on(struct uart_port *uport)
 
 	mutex_lock(&msm_uport->clk_mutex);
 	spin_lock_irqsave(&uport->lock, flags);
+
+	if (msm_uport->is_shutdown) {
+		pr_err("%s:Clock ON fail.UART port is closed\n", __func__);
+		spin_unlock_irqrestore(&uport->lock, flags);
+		mutex_unlock(&msm_uport->clk_mutex);
+		return;
+	}
 
 	switch (msm_uport->clk_state) {
 	case MSM_HS_CLK_OFF:
@@ -2491,6 +2504,7 @@ static int __devinit msm_hs_probe(struct platform_device *pdev)
 	uport->flags = UPF_BOOT_AUTOCONF;
 	uport->uartclk = 7372800;
 	msm_uport->imr_reg = 0x0;
+	msm_uport->is_shutdown = true;
 
 	msm_uport->clk = clk_get(&pdev->dev, "core_clk");
 	if (IS_ERR(msm_uport->clk))
