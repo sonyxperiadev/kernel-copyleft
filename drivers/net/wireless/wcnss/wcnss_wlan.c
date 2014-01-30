@@ -97,6 +97,8 @@ static DEFINE_SPINLOCK(reg_spinlock);
 #define	WCNSS_CALDATA_DNLD_REQ        (WCNSS_CTRL_MSG_START + 6)
 #define	WCNSS_CALDATA_DNLD_RSP        (WCNSS_CTRL_MSG_START + 7)
 
+/* max 20mhz channel count */
+#define WCNSS_MAX_CH_NUM			45
 
 #define VALID_VERSION(version) \
 	((strncmp(version, "INVALID", WCNSS_VERSION_LEN)) ? 1 : 0)
@@ -268,6 +270,8 @@ static struct {
 	struct mutex dev_lock;
 	struct mutex ctrl_lock;
 	wait_queue_head_t read_wait;
+	u16 unsafe_ch_count;
+	u16 unsafe_ch_list[WCNSS_MAX_CH_NUM];
 } *penv = NULL;
 
 static ssize_t wcnss_wlan_macaddr_store(struct device *dev,
@@ -860,6 +864,35 @@ int fw_cal_data_available(void)
 	else
 		return -ENODEV;
 }
+
+int wcnss_set_wlan_unsafe_channel(u16 *unsafe_ch_list, u16 ch_count)
+{
+	if (penv && unsafe_ch_list &&
+		(ch_count <= WCNSS_MAX_CH_NUM)) {
+		memcpy((char *)penv->unsafe_ch_list,
+			(char *)unsafe_ch_list, ch_count * sizeof(u16));
+		penv->unsafe_ch_count = ch_count;
+		return 0;
+	} else
+		return -ENODEV;
+}
+EXPORT_SYMBOL(wcnss_set_wlan_unsafe_channel);
+
+int wcnss_get_wlan_unsafe_channel(u16 *unsafe_ch_list, u16 buffer_size,
+					u16 *ch_count)
+{
+	if (penv) {
+		if (buffer_size < penv->unsafe_ch_count * sizeof(u16))
+			return -ENODEV;
+		memcpy((char *)unsafe_ch_list,
+			(char *)penv->unsafe_ch_list,
+			penv->unsafe_ch_count * sizeof(u16));
+		*ch_count = penv->unsafe_ch_count;
+		return 0;
+	} else
+		return -ENODEV;
+}
+EXPORT_SYMBOL(wcnss_get_wlan_unsafe_channel);
 
 static int wcnss_smd_tx(void *data, int len)
 {
