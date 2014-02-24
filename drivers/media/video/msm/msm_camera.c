@@ -1102,6 +1102,7 @@ static int msm_divert_frame(struct msm_sync *sync,
 		return rc;
 	}
 
+        memset(&(buf.fmain), 0, sizeof(struct msm_frame));
 	buf.fmain.buffer = (unsigned long)pinfo.vaddr;
 	buf.fmain.planar0_off = pinfo.planar0_off;
 	buf.fmain.planar1_off = pinfo.planar1_off;
