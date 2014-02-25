@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -199,8 +199,6 @@ void ddl_set_default_decoder_metadata_buffer_size(struct ddl_decoder_data
 	u32 flag = decoder->meta_data_enable_flag;
 	u32 suffix = 0, size = 0;
 	if (!flag) {
-		output_buf_req->meta_buffer_size =
-			DDL_SECURE_METADATA_DEFAULT_SIZE;
 		decoder->suffix = 0;
 		return;
 	}
