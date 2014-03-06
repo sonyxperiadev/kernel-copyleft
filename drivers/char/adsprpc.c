@@ -162,8 +162,8 @@ static void free_mem(struct fastrpc_buf *buf)
 {
 	struct fastrpc_apps *me = &gfa;
 
-	if (buf->handle) {
-		if (buf->virt) {
+	if (!IS_ERR_OR_NULL(buf->handle)) {
+		if (!IS_ERR_OR_NULL(buf->virt)) {
 			ion_unmap_kernel(me->iclient, buf->handle);
 			buf->virt = 0;
 		}
@@ -183,8 +183,8 @@ static int alloc_mem(struct fastrpc_buf *buf)
 	VERIFY(err, 0 == IS_ERR_OR_NULL(buf->handle));
 	if (err)
 		goto bail;
-	buf->virt = 0;
-	VERIFY(err, 0 != (buf->virt = ion_map_kernel(clnt, buf->handle)));
+	buf->virt = ion_map_kernel(clnt, buf->handle);
+	VERIFY(err, 0 == IS_ERR_OR_NULL(buf->virt));
 	if (err)
 		goto bail;
 	VERIFY(err, 0 != (sg = ion_sg_table(clnt, buf->handle)));
@@ -296,6 +296,9 @@ static int get_page_list(uint32_t kernel, uint32_t sc, remote_arg_t *pra,
 		list[i].num = 0;
 		list[i].pgidx = 0;
 		len = pra[i].buf.len;
+		VERIFY(err, len >= 0);
+		if (err)
+			goto bail;
 		if (!len)
 			continue;
 		buf = pra[i].buf.pv;
