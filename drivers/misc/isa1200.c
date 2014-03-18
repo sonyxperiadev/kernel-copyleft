@@ -44,6 +44,7 @@ struct isa1200_chip {
 	struct timed_output_dev dev;
 	struct work_struct work;
 	struct mutex lock;
+	struct mutex lock_clk;
 	unsigned int enable;
 	unsigned int period_ns;
 	bool is_len_gpio_valid;
@@ -120,16 +121,19 @@ static void isa1200_vib_set(struct isa1200_chip *haptic, int enable)
 				}
 			}
 
+			mutex_lock(&haptic->lock_clk);
 			/* vote for clock */
 			if (haptic->pdata->need_pwm_clk && !haptic->clk_on) {
 				rc = clk_prepare_enable(haptic->pwm_clk);
 				if (rc < 0) {
 					pr_err("%s: clk enable failed\n",
 								__func__);
+					mutex_unlock(&haptic->lock_clk);
 					goto dis_clk_cb;
 				}
 				haptic->clk_on = true;
 			}
+			mutex_unlock(&haptic->lock_clk);
 
 			rc = isa1200_write_reg(haptic->client,
 						ISA1200_HCTRL5,
@@ -162,11 +166,13 @@ static void isa1200_vib_set(struct isa1200_chip *haptic, int enable)
 			if (rc < 0)
 				pr_err("%s: stop vibartion fail\n", __func__);
 
+			mutex_lock(&haptic->lock_clk);
 			/* de-vote clock */
 			if (haptic->pdata->need_pwm_clk && haptic->clk_on) {
 				clk_disable_unprepare(haptic->pwm_clk);
 				haptic->clk_on = false;
 			}
+			mutex_unlock(&haptic->lock_clk);
 			/* check for board specific clk callback */
 			if (haptic->pdata->clk_enable) {
 				rc = haptic->pdata->clk_enable(false);
@@ -180,10 +186,12 @@ static void isa1200_vib_set(struct isa1200_chip *haptic, int enable)
 	return;
 
 dis_clk:
+	mutex_lock(&haptic->lock_clk);
 	if (haptic->pdata->need_pwm_clk && haptic->clk_on) {
 		clk_disable_unprepare(haptic->pwm_clk);
 		haptic->clk_on = false;
 	}
+	mutex_unlock(&haptic->lock_clk);
 
 dis_clk_cb:
 	if (haptic->pdata->clk_enable) {
@@ -571,7 +579,7 @@ static int isa1200_parse_dt(struct device *dev,
 #endif
 
 
-static int __devinit isa1200_probe(struct i2c_client *client,
+static int isa1200_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
 	struct isa1200_chip *haptic;
@@ -649,6 +657,7 @@ static int __devinit isa1200_probe(struct i2c_client *client,
 	}
 
 	mutex_init(&haptic->lock);
+	mutex_init(&haptic->lock_clk);
 	INIT_WORK(&haptic->work, isa1200_chip_work);
 	haptic->clk_on = false;
 
@@ -755,7 +764,7 @@ mem_alloc_fail:
 	return ret;
 }
 
-static int __devexit isa1200_remove(struct i2c_client *client)
+static int isa1200_remove(struct i2c_client *client)
 {
 	struct isa1200_chip *haptic = i2c_get_clientdata(client);
 
@@ -787,6 +796,7 @@ static int __devexit isa1200_remove(struct i2c_client *client)
 
 	/* destroy mutex */
 	mutex_destroy(&haptic->lock);
+	mutex_destroy(&haptic->lock_clk);
 
 	/* power-off the chip */
 	if (haptic->pdata->regulator_info) {
@@ -877,7 +887,7 @@ static struct i2c_driver isa1200_driver = {
 		.of_match_table = isa1200_match_table,
 	},
 	.probe		= isa1200_probe,
-	.remove		= __devexit_p(isa1200_remove),
+	.remove		= isa1200_remove,
 	.suspend	= isa1200_suspend,
 	.resume		= isa1200_resume,
 	.id_table	= isa1200_id,
