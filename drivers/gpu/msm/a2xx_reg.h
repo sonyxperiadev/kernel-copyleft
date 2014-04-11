@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2012,2014 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -405,6 +405,7 @@ union reg_cp_rb_cntl {
 #define REG_A225_GRAS_UCP0X              0x2340
 #define REG_A225_GRAS_UCP5W              0x2357
 #define REG_A225_GRAS_UCP_ENABLED        0x2360
+#define REG_VSC_BINNING_ENABLE           0x0C00
 
 /* Debug registers used by snapshot */
 #define REG_PA_SU_DEBUG_CNTL            0x0C80
