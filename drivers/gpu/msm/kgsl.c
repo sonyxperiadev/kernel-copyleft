@@ -857,11 +857,11 @@ static void kgsl_destroy_process_private(struct kref *kref)
 	if (private->debug_root)
 		debugfs_remove_recursive(private->debug_root);
 
-	kgsl_mmu_putpagetable(private->pagetable);
-	idr_destroy(&private->mem_idr);
-
 	list_del(&private->list);
 	mutex_unlock(&kgsl_driver.process_mutex);
+
+	kgsl_mmu_putpagetable(private->pagetable);
+	idr_destroy(&private->mem_idr);
 
 	kfree(private);
 	return;
