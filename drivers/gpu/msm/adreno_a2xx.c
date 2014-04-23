@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1580,7 +1580,9 @@ static void a2xx_drawctxt_restore(struct adreno_device *adreno_dev,
 			struct adreno_context *context)
 {
 	struct kgsl_device *device = &adreno_dev->dev;
-	unsigned int cmds[5];
+	unsigned int link[10];
+	unsigned int *cmds = &link[0];
+	unsigned int sizedwords = 0;
 
 	if (context == NULL) {
 		/* No context - set the default apgetable and thats it */
@@ -1591,14 +1593,22 @@ static void a2xx_drawctxt_restore(struct adreno_device *adreno_dev,
 
 	KGSL_CTXT_INFO(device, "context flags %08x\n", context->flags);
 
-	cmds[0] = cp_nop_packet(1);
-	cmds[1] = KGSL_CONTEXT_TO_MEM_IDENTIFIER;
-	cmds[2] = cp_type3_packet(CP_MEM_WRITE, 2);
-	cmds[3] = device->memstore.gpuaddr +
+	/* Reset VSC Binning cntrol Regiseter */
+	if (adreno_is_a225(adreno_dev)) {
+		*cmds++ = cp_type0_packet(REG_VSC_BINNING_ENABLE, 1);
+		*cmds++ = 0;
+	}
+
+	*cmds++ = cp_nop_packet(1);
+	*cmds++ = KGSL_CONTEXT_TO_MEM_IDENTIFIER;
+	*cmds++ = cp_type3_packet(CP_MEM_WRITE, 2);
+	*cmds++ = device->memstore.gpuaddr +
 		KGSL_MEMSTORE_OFFSET(KGSL_MEMSTORE_GLOBAL, current_context);
-	cmds[4] = context->id;
+	*cmds++ = context->id;
+	sizedwords = (cmds - &link[0]);
+
 	adreno_ringbuffer_issuecmds(device, context, KGSL_CMD_FLAGS_NONE,
-					cmds, 5);
+					&link[0], sizedwords);
 	kgsl_mmu_setstate(&device->mmu, context->pagetable, context->id);
 
 	/* restore gmem.
