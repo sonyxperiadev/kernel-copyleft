@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -303,8 +303,25 @@ static int ngd_xfer_msg(struct slim_controller *ctrl, struct slim_msg_txn *txn)
 			 * Messages related to data channel management can't
 			 * wait since they are holding reconfiguration lock.
 			 * clk_pause in resume (which can change state back to
-			 * MSM_CTRL_AWAKE), will need that lock
+			 * MSM_CTRL_AWAKE), will need that lock.
+			 * Port disconnection, channel removal calls should pass
+			 * through since there is no activity on the bus and
+			 * those calls are triggered by clients due to
+			 * device_down callback in that situation.
+			 * Returning 0 on the disconnections and
+			 * removals will ensure consistent state of channels,
+			 * ports with the HW
 			 */
+			if ((txn->mt == SLIM_MSG_MT_DEST_REFERRED_USER) &&
+				((mc == SLIM_USR_MC_CHAN_CTRL ||
+				mc == SLIM_USR_MC_DISCONNECT_PORT ||
+				mc == SLIM_USR_MC_RECONFIG_NOW)))
+				return 0;
+			if ((txn->mt == SLIM_MSG_MT_CORE) &&
+				((mc == SLIM_MSG_MC_DISCONNECT_PORT ||
+				mc == SLIM_MSG_MC_NEXT_REMOVE_CHANNEL ||
+				mc == SLIM_USR_MC_RECONFIG_NOW)))
+				return 0;
 			if ((txn->mt == SLIM_MSG_MT_CORE) &&
 				((mc >= SLIM_MSG_MC_CONNECT_SOURCE &&
 				mc <= SLIM_MSG_MC_CHANGE_CONTENT) ||
@@ -313,7 +330,7 @@ static int ngd_xfer_msg(struct slim_controller *ctrl, struct slim_msg_txn *txn)
 				return -EREMOTEIO;
 			if ((txn->mt == SLIM_MSG_MT_DEST_REFERRED_USER) &&
 				((mc >= SLIM_USR_MC_DEFINE_CHAN &&
-				mc <= SLIM_USR_MC_DISCONNECT_PORT)))
+				mc < SLIM_USR_MC_DISCONNECT_PORT)))
 				return -EREMOTEIO;
 			timeout = wait_for_completion_timeout(&dev->ctrl_up,
 							HZ);
@@ -1051,6 +1068,7 @@ static int ngd_notify_slaves(void *data)
 		wait_for_completion(&dev->qmi.slave_notify);
 		/* Probe devices for first notification */
 		if (!i) {
+			i++;
 			dev->err = 0;
 			if (dev->dev->of_node)
 				of_register_slim_devices(&dev->ctrl);
@@ -1063,12 +1081,12 @@ static int ngd_notify_slaves(void *data)
 		} else {
 			slim_framer_booted(ctrl);
 		}
-		i++;
 		mutex_lock(&ctrl->m_ctrl);
 		list_for_each_safe(pos, next, &ctrl->devs) {
+			int j;
 			sbdev = list_entry(pos, struct slim_device, dev_list);
 			mutex_unlock(&ctrl->m_ctrl);
-			for (i = 0; i < LADDR_RETRY; i++) {
+			for (j = 0; j < LADDR_RETRY; j++) {
 				ret = slim_get_logical_addr(sbdev,
 						sbdev->e_addr,
 						6, &sbdev->laddr);
