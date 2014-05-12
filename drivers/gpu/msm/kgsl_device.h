@@ -578,6 +578,9 @@ static inline int kgsl_process_private_get(struct kgsl_process_private *process)
 
 void kgsl_process_private_put(struct kgsl_process_private *private);
 
+
+struct kgsl_process_private *kgsl_process_private_find(pid_t pid);
+
 /**
  * kgsl_sysfs_store() - parse a string from a sysfs store function
  * @buf: Incoming string to parse
