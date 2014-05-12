@@ -2,7 +2,7 @@
  *
  * MSM MDP Interface (used by framebuffer core)
  *
- * Copyright (c) 2007-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2007-2014, The Linux Foundation. All rights reserved.
  * Copyright (C) 2007 Google Incorporated
  *
  * This software is licensed under the terms of the GNU General Public
@@ -3240,6 +3240,8 @@ static int mdp_probe(struct platform_device *pdev)
 			pdata->off = mdp4_overlay_writeback_off;
 			mfd->dma_fnc = mdp4_writeback_overlay;
 			mfd->dma = &dma_wb_data;
+			mutex_init(&mfd->writeback_mutex);
+			mutex_init(&mfd->unregister_mutex);
 			mdp4_display_intf_sel(EXTERNAL_INTF_SEL, DTV_INTF);
 		}
 		break;
