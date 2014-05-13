@@ -421,7 +421,6 @@ static int snd_usb_audio_create(struct usb_device *dev, int idx,
 	}
 
 	snd_usb_audio_create_proc(chip);
-	switch_set_state(usbaudiosdev, 1);
 
 	*rchip = chip;
 	return 0;
@@ -527,6 +526,7 @@ snd_usb_audio_probe(struct usb_device *dev,
 		goto __error;
 	}
 
+	switch_set_state(usbaudiosdev, 1);
 	usb_chip[chip->index] = chip;
 	chip->num_interfaces++;
 	chip->probing = 0;
