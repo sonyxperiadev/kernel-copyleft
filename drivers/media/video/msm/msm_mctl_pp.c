@@ -650,6 +650,7 @@ int msm_mctl_pp_done(
 		image_mode = buf_handle.image_mode;
 	}
 	if (image_mode < 0 || image_mode >= MSM_MAX_IMG_MODE) {
+		spin_unlock_irqrestore(&p_mctl->pp_info.lock, flags);
 		pr_err("%s Invalid image mode\n", __func__);
 		return image_mode;
 	}
