@@ -876,7 +876,7 @@ int mdss_dsi_cmds_rx(struct mdss_dsi_ctrl_pdata *ctrl,
 		MIPI_OUTP((ctrl->ctrl_base) + 0x0004, data);
 	}
 
-	if (rlen == 0) {
+	if (rlen <= 2) {
 		short_response = 1;
 		rx_byte = 4;
 	} else {
@@ -1477,7 +1477,9 @@ irqreturn_t mdss_dsi_isr(int irq, void *ptr)
 			u32 isr0;
 			isr0 = MIPI_INP(left_ctrl_pdata->ctrl_base
 						+ 0x0110);/* DSI_INTR_CTRL */
-			MIPI_OUTP(left_ctrl_pdata->ctrl_base + 0x0110, isr0);
+			if (isr0 & DSI_INTR_CMD_DMA_DONE)
+				MIPI_OUTP(left_ctrl_pdata->ctrl_base + 0x0110,
+					DSI_INTR_CMD_DMA_DONE);
 		}
 
 	pr_debug("%s: ndx=%d isr=%x\n", __func__, ctrl->ndx, isr);
