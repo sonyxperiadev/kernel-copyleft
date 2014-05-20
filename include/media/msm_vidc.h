@@ -161,6 +161,11 @@ struct msm_vidc_s3d_frame_packing_payload {
 	unsigned int fpa_extension_flag;
 };
 
+struct msm_vidc_stream_userdata_payload {
+	unsigned int type;
+	unsigned int data[1];
+};
+
 enum msm_vidc_extradata_type {
 	EXTRADATA_NONE = 0x00000000,
 	EXTRADATA_MB_QUANTIZATION = 0x00000001,
@@ -173,6 +178,7 @@ enum msm_vidc_extradata_type {
 	EXTRADATA_PANSCAN_WINDOW = 0x00000008,
 	EXTRADATA_RECOVERY_POINT_SEI = 0x00000009,
 	EXTRADATA_MPEG2_SEQDISP = 0x0000000D,
+	EXTRADATA_STREAM_USERDATA = 0x0000000E,
 	EXTRADATA_MULTISLICE_INFO = 0x7F100000,
 	EXTRADATA_NUM_CONCEALED_MB = 0x7F100001,
 	EXTRADATA_INDEX = 0x7F100002,
@@ -192,4 +198,9 @@ enum msm_vidc_recovery_sei {
 	FRAME_RECONSTRUCTION_APPROXIMATELY_CORRECT = 0x02,
 };
 
+enum msm_vidc_userdata_type {
+	MSM_VIDC_USERDATA_TYPE_FRAME = 0x1,
+	MSM_VIDC_USERDATA_TYPE_TOP_FIELD = 0x2,
+	MSM_VIDC_USERDATA_TYPE_BOTTOM_FIELD = 0x3,
+};
 #endif
