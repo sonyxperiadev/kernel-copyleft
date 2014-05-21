@@ -66,6 +66,7 @@ void wcnss_riva_dump_pmic_regs(void);
 void *wcnss_prealloc_get(unsigned int size);
 int wcnss_prealloc_put(void *ptr);
 int wcnss_device_ready(void);
+int wcnss_device_is_shutdown(void);
 int wcnss_wlan_iris_xo_mode(void);
 int wcnss_set_wlan_unsafe_channel(
 				u16 *unsafe_ch_list, u16 ch_count);
