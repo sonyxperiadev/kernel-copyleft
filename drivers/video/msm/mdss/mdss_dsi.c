@@ -689,6 +689,16 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 
 	if (mipi->init_delay)
 		usleep(mipi->init_delay);
+	if (pdata->panel_info.mipi.lp11_init) {
+		ret = mdss_dsi_panel_reset(pdata, 1);
+		if (ret) {
+			pr_err("%s: Panel reset failed. rc=%d\n",
+					__func__, ret);
+			return ret;
+		}
+	}
+	if (pdata->panel_info.mipi.init_delay)
+		usleep(pdata->panel_info.mipi.init_delay);
 
 	if (mipi->force_clk_lane_hs) {
 		u32 tmp;
