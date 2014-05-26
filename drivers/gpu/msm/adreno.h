@@ -19,6 +19,8 @@
 #include "kgsl_iommu.h"
 #include <mach/ocmem.h>
 
+#include "a3xx_reg.h"
+
 #define DEVICE_3D_NAME "kgsl-3d"
 #define DEVICE_3D0_NAME "kgsl-3d0"
 
@@ -482,6 +484,11 @@ static inline int adreno_add_read_cmds(struct kgsl_device *device,
 	*cmds++ = val;
 	*cmds++ = 0xFFFFFFFF;
 	*cmds++ = 0xFFFFFFFF;
+
+	/* WAIT_REG_MEM turns back on protected mode - push it off */
+	*cmds++ = cp_type3_packet(CP_SET_PROTECTED_MODE, 1);
+	*cmds++ = 0;
+
 	cmds += __adreno_add_idle_indirect_cmds(cmds, nop_gpuaddr);
 	return cmds - start;
 }
@@ -514,4 +521,49 @@ void adreno_debugfs_init(struct kgsl_device *device);
 static inline void adreno_debugfs_init(struct kgsl_device *device) { }
 #endif
 
+/**
+ * adreno_set_protected_registers() - Protect the specified range of registers
+ * from being accessed by the GPU
+ * @device: pointer to the KGSL device
+ * @index: Pointer to the index of the protect mode register to write to
+ * @reg: Starting dword register to write
+ * @mask: Size of the mask to protect (A3xx# of registers = 2 ** mask,
+ * A2xx# Contains the address mask used to mask the protect base address)
+ *
+ * Add the range of registers to the list of protected mode registers that will
+ * cause an exception if the GPU accesses them.  There are 16 available
+ * protected mode registers.  Index is used to specify which register to write
+ * to - the intent is to call this function multiple times with the same index
+ * pointer for each range and the registers will be magically programmed in
+ * incremental fashion
+ */
+static inline void adreno_set_protected_registers(struct kgsl_device *device,
+	unsigned int *index, unsigned int reg, int mask)
+{
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	unsigned int val;
+	unsigned int protect_reg_offset;
+
+	/* There are only 16 registers available */
+	BUG_ON(*index >= 16);
+
+	if (adreno_is_a3xx(adreno_dev)) {
+		val = 0x60000000 | ((mask & 0x1F) << 24) |
+			((reg << 2) & 0x1FFFF);
+		protect_reg_offset = A3XX_CP_PROTECT_REG_0;
+	} else  if (adreno_is_a2xx(adreno_dev)) {
+		val = 0xc0000000 | ((reg << 2) << 16) | (mask & 0xffff);
+		protect_reg_offset = REG_RBBM_PROTECT_0;
+	} else {
+		return;
+	}
+
+	/*
+	 * Write the protection range to the next available protection
+	 * register
+	 */
+
+	kgsl_regwrite(device, protect_reg_offset + *index, val);
+	*index = *index + 1;
+}
 #endif /*__ADRENO_H */
