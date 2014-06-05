@@ -446,7 +446,7 @@ static struct device_attribute panel_attributes[] = {
 					mdss_dsi_panel_interval_array_ms, NULL),
 	__ATTR(cabc, S_IRUGO|S_IWUSR|S_IWGRP, mdss_dsi_panel_cabc_show,
 						mdss_dsi_panel_cabc_store),
-	__ATTR(panel_id, S_IRUGO, mdss_dsi_panel_id_show, NULL),
+	__ATTR(panel_id, S_IRUSR, mdss_dsi_panel_id_show, NULL),
 	__ATTR(cc, S_IRUGO, mdss_dsi_panel_pcc_show, NULL),
 };
 
