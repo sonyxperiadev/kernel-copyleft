@@ -1635,8 +1635,13 @@ void *def_taiko_mbhc_cal(void)
 	S(t_ins_retry, 200);
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_PLUG_TYPE_PTR(taiko_cal)->X) = (Y))
+#ifdef CONFIG_NOISE_DUMPING_JACK
+	S(v_no_mic, 900);
+	S(v_hs_max, 2500);
+#else
 	S(v_no_mic, 50);
 	S(v_hs_max, 2450);
+#endif
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_BTN_DET_PTR(taiko_cal)->X) = (Y))
 	S(c[0], 62);
@@ -1655,6 +1660,15 @@ void *def_taiko_mbhc_cal(void)
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
 	btn_low[0] = -30;
+#ifdef CONFIG_NOISE_DUMPING_JACK
+	btn_high[0] = 887;
+	btn_low[1] = 888;
+	btn_high[1] = 1009;
+	btn_low[2] = 1010;
+	btn_high[2] = 1189;
+	btn_low[3] = 1190;
+	btn_high[3] = 1411;
+#else
 	btn_high[0] = 50;
 	btn_low[1] = 51;
 	btn_high[1] = 336;
@@ -1662,6 +1676,7 @@ void *def_taiko_mbhc_cal(void)
 	btn_high[2] = 680;
 	btn_low[3] = 681;
 	btn_high[3] = 1207;
+#endif
 	n_ready = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_N_READY);
 	n_ready[0] = 80;
 	n_ready[1] = 68;
