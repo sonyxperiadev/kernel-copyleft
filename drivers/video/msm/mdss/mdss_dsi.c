@@ -1226,12 +1226,23 @@ int dsi_panel_device_register(struct platform_device *pdev,
 
 	ctrl_pdata->cabc_early_on_cmds = panel_data->cabc_early_on_cmds;
 	ctrl_pdata->cabc_on_cmds = panel_data->cabc_on_cmds;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	ctrl_pdata->cabc_off_cmds = panel_data->cabc_off_cmds[DEFAULT_CMDS];
+	ctrl_pdata->cabc_late_off_cmds =
+				panel_data->cabc_late_off_cmds[DEFAULT_CMDS];
+#else
 	ctrl_pdata->cabc_off_cmds = panel_data->cabc_off_cmds;
-	ctrl_pdata->cabc_late_off_cmds = panel_data->cabc_late_off_cmds;
+	ctrl_pdata->cabc_late_off_cmds =
+				panel_data->cabc_late_off_cmds;
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	ctrl_pdata->spec_pdata->cabc_enabled = panel_data->cabc_enabled;
 
 	ctrl_pdata->on_cmds = panel_data->on_cmds;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	ctrl_pdata->off_cmds = panel_data->off_cmds[DEFAULT_CMDS];
+#else
 	ctrl_pdata->off_cmds = panel_data->off_cmds;
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	ctrl_pdata->id_read_cmds = panel_data->id_read_cmds;
 
 	ctrl_pdata->spec_pdata->wait_time_before_on_cmd =

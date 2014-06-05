@@ -47,6 +47,12 @@ endif
 
 # MSM8974
    zreladdr-$(CONFIG_ARCH_MSM8974)	:= 0x00008000
+   dtb-$(CONFIG_MACH_SONY_HONAMI_DCM)	+= msm8974-v1-rhine_honami_dcm.dtb
+   dtb-$(CONFIG_MACH_SONY_HONAMI_DCM)	+= msm8974-v2-rhine_honami_dcm.dtb
+   dtb-$(CONFIG_MACH_SONY_HONAMI_DCM)	+= msm8974-v2-2-rhine_honami_dcm.dtb
+   dtb-$(CONFIG_MACH_SONY_HONAMI_KDDI)	+= msm8974-v1-rhine_honami_kddi.dtb
+   dtb-$(CONFIG_MACH_SONY_HONAMI_KDDI)	+= msm8974-v2-rhine_honami_kddi.dtb
+   dtb-$(CONFIG_MACH_SONY_HONAMI_KDDI)	+= msm8974-v2-2-rhine_honami_kddi.dtb
    dtb-$(CONFIG_MACH_SONY_HONAMI_ROW)	+= msm8974-v1-rhine_honami_row.dtb
    dtb-$(CONFIG_MACH_SONY_HONAMI_ROW)	+= msm8974-v2-rhine_honami_row.dtb
    dtb-$(CONFIG_MACH_SONY_HONAMI_ROW)	+= msm8974-v2-2-rhine_honami_row.dtb
@@ -78,6 +84,7 @@ endif
 # MSM8226
    zreladdr-$(CONFIG_ARCH_MSM8226)	:= 0x00008000
         dtb-$(CONFIG_ARCH_MSM8226)	+= msm8226-sim.dtb
+        dtb-$(CONFIG_ARCH_MSM8226)	+= msm8226-fluid.dtb
         dtb-$(CONFIG_ARCH_MSM8226)	+= msm8226-v1-cdp.dtb
         dtb-$(CONFIG_ARCH_MSM8226)	+= msm8226-v1-mtp.dtb
         dtb-$(CONFIG_ARCH_MSM8226)	+= msm8226-v1-qrd.dtb
@@ -105,6 +112,8 @@ initrd_phys-$(CONFIG_ARCH_FSM9XXX)	:= 0x12000000
 
 # MSM8610
    zreladdr-$(CONFIG_ARCH_MSM8610)	:= 0x00008000
+        dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-cdp.dtb
+        dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-mtp.dtb
         dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-rumi.dtb
         dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-sim.dtb
 

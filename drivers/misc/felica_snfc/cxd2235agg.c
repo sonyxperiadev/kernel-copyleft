@@ -235,6 +235,7 @@ static void felica_pon_write(int val, void *user)
 				}
 			}
 			my_data->is_enable = true;
+			usleep_range(500, 550);
 			ret = felica_snfc_irq_start(&my_data->pdev->dev);
 			if (ret) {
 				dev_err(&my_data->pdev->dev,

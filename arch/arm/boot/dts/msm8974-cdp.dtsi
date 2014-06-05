@@ -227,6 +227,7 @@
 		hsic,ignore-cal-pad-config;
 		hsic,strobe-pad-offset = <0x2050>;
 		hsic,data-pad-offset = <0x2054>;
+		qcom,phy-susp-sof-workaround;
 
 		qcom,msm-bus,name = "hsic";
 		qcom,msm-bus,num-cases = <2>;
@@ -264,11 +265,11 @@
 				qcom,default-state = "on";
 				qcom,max-current = <25>;
 				qcom,ctrl-delay-us = <0>;
-				qcom,boost-curr-lim = <3>;
+				qcom,boost-curr-lim = <5>;
 				qcom,cp-sel = <0>;
 				qcom,switch-freq = <2>;
 				qcom,ovp-val = <2>;
-				qcom,num-strings = <1>;
+				qcom,num-strings = <3>;
 				qcom,id = <0>;
 			};
 		};

@@ -751,49 +751,34 @@ static struct device_attribute sony_camera_info_attributes[] = {
 	__ATTR(info, S_IRUSR | S_IRGRP, sony_camera_info_read, NULL),
 };
 
-static int sony_camera_info_init(void)
+static int sony_camera_info_init(int id)
 {
 	int rc = 0;
-	int id = 0;
-	int reg_cnt = 0;
-	int create_cnt = 0;
 
-	for (id = 0; id < sensor_num; id++) {
-		rc = dev_set_name(&camera_data[id].info_dev,
-			CAMERA_DEV_NAME, id);
-		if (rc < 0) {
-			LOGE("%s failed %d\n", __func__, __LINE__);
-			goto fail;
-		}
-		rc = device_register(&camera_data[id].info_dev);
-		if (rc < 0) {
-			LOGE("%s failed %d\n", __func__, __LINE__);
-			goto fail;
-		}
+	rc = dev_set_name(&camera_data[id].info_dev,
+		CAMERA_DEV_NAME, id);
+	if (rc < 0) {
+		LOGE("%s failed %d\n", __func__, __LINE__);
+		goto reg_fail;
+	}
+	rc = device_register(&camera_data[id].info_dev);
+	if (rc < 0) {
+		LOGE("%s failed %d\n", __func__, __LINE__);
+		goto reg_fail;
+	}
 
-		reg_cnt++;
-		rc = device_create_file(&camera_data[id].info_dev,
-			&sony_camera_info_attributes[id]);
-		if (rc < 0) {
-			LOGE("%s failed %d\n", __func__, __LINE__);
-			rc = -ENODEV;
-			goto fail;
-		}
-		create_cnt++;
+	rc = device_create_file(&camera_data[id].info_dev,
+		&sony_camera_info_attributes[id]);
+	if (rc < 0) {
+		LOGE("%s failed %d\n", __func__, __LINE__);
+		rc = -ENODEV;
+		goto create_fail;
 	}
 	return 0;
 
-fail:
-	while (create_cnt > 0) {
-		device_remove_file(&camera_data[id].info_dev,
-			&sony_camera_info_attributes[id]);
-		create_cnt--;
-	}
-
-	while (reg_cnt > 0) {
-		device_unregister(&camera_data[id].info_dev);
-		reg_cnt--;
-	}
+create_fail:
+	device_unregister(&camera_data[id].info_dev);
+reg_fail:
 	return rc;
 }
 
@@ -1186,6 +1171,7 @@ static int __init msm_sensor_init_module(void)
 {
 	int rc = 0;
 	uint16_t i;
+	uint16_t probe_count = 0;
 
 	sensor_num = ARRAY_SIZE(sony_sensor_platform_driver);
 
@@ -1203,22 +1189,28 @@ static int __init msm_sensor_init_module(void)
 		if (rc < 0) {
 			LOGE("%s platform_driver_probe (%u) %d\n",
 				__func__, i, __LINE__);
-			goto fail_probe;
+			break;
+		} else {
+			rc = sony_camera_info_init(i);
+			if (rc < 0) {
+				LOGE("%s sony_camera_info_init (%u) %d\n",
+					__func__, i, __LINE__);
+				platform_driver_unregister(
+					&sony_sensor_platform_driver[i]);
+			} else {
+				probe_count++;
+			}
 		}
 	}
 
-	rc = sony_camera_info_init();
-	if (rc < 0) {
-		LOGE("%s sony_camera_info_init %d\n",
-			__func__, __LINE__);
+	if (!probe_count) {
+		LOGE("%s platform_driver_probe (%u) %d\n",
+			__func__, probe_count, __LINE__);
 		goto fail_probe;
 	}
 
 	return 0;
 fail_probe:
-	sensor_num = i;
-	for (i = 0; i < sensor_num; i++)
-		platform_driver_unregister(&sony_sensor_platform_driver[i]);
 	kfree(camera_info);
 	camera_info = NULL;
 fail_alloc:

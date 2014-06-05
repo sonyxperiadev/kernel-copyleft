@@ -94,7 +94,7 @@ struct kgsl_functable {
 		struct kgsl_pagetable *pagetable);
 	void (*power_stats)(struct kgsl_device *device,
 		struct kgsl_power_stats *stats);
-	void (*irqctrl)(struct kgsl_device *device, int state);
+	void (*irqctrl)(struct kgsl_device *device, unsigned int mask);
 	unsigned int (*gpuid)(struct kgsl_device *device, unsigned int *chipid);
 	void * (*snapshot)(struct kgsl_device *device, void *snapshot,
 		int *remain, int hang);
@@ -173,6 +173,7 @@ struct kgsl_device {
 	const struct kgsl_functable *ftbl;
 	struct work_struct idle_check_ws;
 	struct work_struct hang_check_ws;
+	struct work_struct hang_intr_ws;
 	struct timer_list idle_timer;
 	struct timer_list hang_timer;
 	struct kgsl_pwrctrl pwrctrl;
@@ -242,6 +243,8 @@ void kgsl_process_events(struct work_struct *work);
 			kgsl_idle_check),\
 	.hang_check_ws = __WORK_INITIALIZER((_dev).hang_check_ws,\
 			kgsl_hang_check),\
+	.hang_intr_ws = __WORK_INITIALIZER((_dev).hang_intr_ws,\
+			kgsl_hang_intr_work),\
 	.ts_expired_ws  = __WORK_INITIALIZER((_dev).ts_expired_ws,\
 			kgsl_process_events),\
 	.context_idr = IDR_INIT((_dev).context_idr),\
@@ -275,6 +278,7 @@ void kgsl_process_events(struct work_struct *work);
  * @events: list head of pending events for this context
  * @events_list: list node for the list of all contexts that have pending events
  * @pid: process that owns this context.
+ * @tid: task that created this context.
  * @pagefault: flag set if this context caused a pagefault.
  * @pagefault_ts: global timestamp of the pagefault, if KGSL_CONTEXT_PAGEFAULT
  * is set.
@@ -283,6 +287,8 @@ struct kgsl_context {
 	struct kref refcount;
 	uint32_t id;
 	pid_t pid;
+	pid_t tid;
+	struct kgsl_device_private *dev_priv;
 	unsigned long priv;
 	struct kgsl_device *device;
 	struct kgsl_pagetable *pagetable;

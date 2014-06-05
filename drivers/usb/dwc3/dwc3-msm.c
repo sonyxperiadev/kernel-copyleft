@@ -1641,8 +1641,8 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	}
 
 	dcp = ((mdwc->charger.chg_type == DWC3_DCP_CHARGER) ||
-	      (mdwc->charger.chg_type == DWC3_FLOATED_CHARGER) ||
-	      (mdwc->charger.chg_type == DWC3_PROPRIETARY_CHARGER));
+	      (mdwc->charger.chg_type == DWC3_PROPRIETARY_CHARGER) ||
+	      (mdwc->charger.chg_type == DWC3_FLOATED_CHARGER));
 	host_bus_suspend = mdwc->host_mode == 1;
 
 	/* Sequence to put SSPHY in low power state:
@@ -1765,8 +1765,8 @@ static int dwc3_msm_resume(struct dwc3_msm *mdwc)
 	}
 
 	dcp = ((mdwc->charger.chg_type == DWC3_DCP_CHARGER) ||
-	      (mdwc->charger.chg_type == DWC3_FLOATED_CHARGER) ||
-	      (mdwc->charger.chg_type == DWC3_PROPRIETARY_CHARGER));
+	      (mdwc->charger.chg_type == DWC3_PROPRIETARY_CHARGER) ||
+	      (mdwc->charger.chg_type == DWC3_FLOATED_CHARGER));
 	host_bus_suspend = mdwc->host_mode == 1;
 
 	if (mdwc->lpm_flags & MDWC3_TCXO_SHUTDOWN) {
@@ -2208,8 +2208,11 @@ static void dwc3_id_work(struct work_struct *w)
 			__func__, ret);
 
 		if (mdwc->pmic_id_irq) {
+			unsigned long flags;
+			local_irq_save(flags);
 			/* ID may have changed while IRQ disabled; update it */
 			mdwc->id_state = !!irq_read_line(mdwc->pmic_id_irq);
+			local_irq_restore(flags);
 			enable_irq(mdwc->pmic_id_irq);
 		}
 

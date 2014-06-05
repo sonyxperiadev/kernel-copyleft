@@ -72,34 +72,6 @@ void mdss_dsi_ctrl_init(struct mdss_dsi_ctrl_pdata *ctrl)
 	mdss_dsi_buf_alloc(&ctrl->rx_buf, SZ_4K);
 }
 
-/*
- * acquire ctrl->mutex first
- */
-void mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, int enable)
-{
-	mutex_lock(&ctrl->mutex);
-	if (enable) {
-		if (ctrl->clk_cnt == 0) {
-			mdss_dsi_enable_bus_clocks(ctrl);
-			mdss_dsi_prepare_clocks(ctrl);
-			mdss_dsi_clk_enable(ctrl);
-		}
-		ctrl->clk_cnt++;
-	} else {
-		if (ctrl->clk_cnt) {
-			ctrl->clk_cnt--;
-			if (ctrl->clk_cnt == 0) {
-				mdss_dsi_clk_disable(ctrl);
-				mdss_dsi_unprepare_clocks(ctrl);
-				mdss_dsi_disable_bus_clocks(ctrl);
-			}
-		}
-	}
-	pr_debug("%s: ctrl ndx=%d enabled=%d clk_cnt=%d\n",
-			__func__, ctrl->ndx, enable, ctrl->clk_cnt);
-	mutex_unlock(&ctrl->mutex);
-}
-
 void mdss_dsi_clk_req(struct mdss_dsi_ctrl_pdata *ctrl, int enable)
 {
 	if (enable == 0) {
@@ -1536,6 +1508,14 @@ void mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 	if (req == NULL)
 		goto need_lock;
 
+	/*
+	 * mdss interrupt is generated in mdp core clock domain
+	 * mdp clock need to be enabled to receive dsi interrupt
+	 * also, axi bus bandwidth need since dsi controller will
+	 * fetch dcs commands from axi bus
+	 */
+	mdss_bus_bandwidth_ctrl(1);
+
 	pr_debug("%s:  from_mdp=%d pid=%d\n", __func__, from_mdp, current->pid);
 	mdss_dsi_clk_ctrl(ctrl, 1);
 
@@ -1559,6 +1539,7 @@ void mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 		mdss_dsi_cmdlist_tx(ctrl, req);
 
 	mdss_dsi_clk_ctrl(ctrl, 0);
+	mdss_bus_bandwidth_ctrl(0);
 
 need_lock:
 

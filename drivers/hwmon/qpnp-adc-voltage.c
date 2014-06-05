@@ -108,9 +108,10 @@
 #define QPNP_VADC_CONV_TIME_MIN					2000
 #define QPNP_VADC_CONV_TIME_MAX					2100
 #define QPNP_ADC_COMPLETION_TIMEOUT				HZ
-#define QPNP_VADC_ERR_COUNT					5
+#define QPNP_VADC_ERR_COUNT					1000
 
 struct qpnp_vadc_drv {
+	struct device			*dev;
 	struct qpnp_adc_drv		*adc;
 	struct dentry			*dent;
 	struct device			*vadc_hwmon;
@@ -119,6 +120,7 @@ struct qpnp_vadc_drv {
 	int				max_channels_available;
 	bool				vadc_iadc_sync_lock;
 	u8				id;
+	bool				vadc_poll_eoc;
 	struct sensor_device_attribute	sens_attr[0];
 };
 
@@ -358,7 +360,8 @@ static int32_t qpnp_vadc_configure(
 		}
 	}
 
-	INIT_COMPLETION(vadc->adc->adc_rslt_completion);
+	if (!vadc->vadc_poll_eoc)
+		INIT_COMPLETION(vadc->adc->adc_rslt_completion);
 
 	rc = qpnp_vadc_enable(true);
 	if (rc)
@@ -782,12 +785,18 @@ int32_t qpnp_vadc_conv_seq_request(enum qpnp_vadc_trigger trigger_channel,
 {
 	struct qpnp_vadc_drv *vadc = qpnp_vadc;
 	int rc = 0, scale_type, amux_prescaling, dt_index = 0;
-	uint32_t ref_channel;
+	uint32_t ref_channel, count = 0;
+	u8 status1 = 0;
 
 	if (!vadc || !vadc->vadc_initialized)
 		return -EPROBE_DEFER;
 
 	mutex_lock(&vadc->adc->adc_lock);
+
+	if (vadc->vadc_poll_eoc) {
+		pr_debug("requesting vadc eoc stay awake\n");
+		pm_stay_awake(vadc->dev);
+	}
 
 	if (!vadc->vadc_init_calib) {
 		rc = qpnp_vadc_version_check();
@@ -845,22 +854,42 @@ int32_t qpnp_vadc_conv_seq_request(enum qpnp_vadc_trigger trigger_channel,
 		goto fail_unlock;
 	}
 
-	rc = wait_for_completion_timeout(&vadc->adc->adc_rslt_completion,
-					QPNP_ADC_COMPLETION_TIMEOUT);
-	if (!rc) {
-		u8 status1 = 0;
-		rc = qpnp_vadc_read_reg(QPNP_VADC_STATUS1, &status1);
-		if (rc < 0)
-			goto fail_unlock;
-		status1 &= (QPNP_VADC_STATUS1_REQ_STS | QPNP_VADC_STATUS1_EOC);
-		if (status1 == QPNP_VADC_STATUS1_EOC)
-			pr_debug("End of conversion status set\n");
-		else {
-			rc = qpnp_vadc_status_debug();
+	if (vadc->vadc_poll_eoc) {
+		while (status1 != QPNP_VADC_STATUS1_EOC) {
+			rc = qpnp_vadc_read_reg(QPNP_VADC_STATUS1, &status1);
 			if (rc < 0)
-				pr_err("VADC disable failed\n");
-			rc = -EINVAL;
-			goto fail_unlock;
+				goto fail_unlock;
+			status1 &= QPNP_VADC_STATUS1_REQ_STS_EOC_MASK;
+			usleep_range(QPNP_VADC_CONV_TIME_MIN,
+					QPNP_VADC_CONV_TIME_MAX);
+			count++;
+			if (count > QPNP_VADC_ERR_COUNT) {
+				pr_err("retry error exceeded\n");
+				rc = qpnp_vadc_status_debug();
+				if (rc < 0)
+					pr_err("VADC disable failed\n");
+				rc = -EINVAL;
+				goto fail_unlock;
+			}
+		}
+	} else {
+		rc = wait_for_completion_timeout(
+					&vadc->adc->adc_rslt_completion,
+					QPNP_ADC_COMPLETION_TIMEOUT);
+		if (!rc) {
+			rc = qpnp_vadc_read_reg(QPNP_VADC_STATUS1, &status1);
+			if (rc < 0)
+				goto fail_unlock;
+			status1 &= QPNP_VADC_STATUS1_REQ_STS_EOC_MASK;
+			if (status1 == QPNP_VADC_STATUS1_EOC)
+				pr_debug("End of conversion status set\n");
+			else {
+				rc = qpnp_vadc_status_debug();
+				if (rc < 0)
+					pr_err("VADC disable failed\n");
+				rc = -EINVAL;
+				goto fail_unlock;
+			}
 		}
 	}
 
@@ -879,6 +908,11 @@ int32_t qpnp_vadc_conv_seq_request(enum qpnp_vadc_trigger trigger_channel,
 	amux_prescaling =
 		vadc->adc->adc_channels[dt_index].chan_path_prescaling;
 
+	if (amux_prescaling >= PATH_SCALING_NONE) {
+		rc = -EINVAL;
+		goto fail_unlock;
+	}
+
 	vadc->adc->amux_prop->chan_prop->offset_gain_numerator =
 		qpnp_vadc_amux_scaling_ratio[amux_prescaling].num;
 	vadc->adc->amux_prop->chan_prop->offset_gain_denominator =
@@ -894,6 +928,11 @@ int32_t qpnp_vadc_conv_seq_request(enum qpnp_vadc_trigger trigger_channel,
 		vadc->adc->adc_prop, vadc->adc->amux_prop->chan_prop, result);
 
 fail_unlock:
+	if (vadc->vadc_poll_eoc) {
+		pr_debug("requesting vadc eoc stay awake\n");
+		pm_relax(vadc->dev);
+	}
+
 	mutex_unlock(&vadc->adc->adc_lock);
 
 	return rc;
@@ -1029,6 +1068,11 @@ int32_t qpnp_vadc_iadc_sync_complete_request(enum qpnp_vadc_channels channel,
 	amux_prescaling =
 		vadc->adc->adc_channels[dt_index].chan_path_prescaling;
 
+	if (amux_prescaling >= PATH_SCALING_NONE) {
+		rc = -EINVAL;
+		goto fail;
+	}
+
 	vadc->adc->amux_prop->chan_prop->offset_gain_numerator =
 		qpnp_vadc_amux_scaling_ratio[amux_prescaling].num;
 	vadc->adc->amux_prop->chan_prop->offset_gain_denominator =
@@ -1150,6 +1194,7 @@ static int __devinit qpnp_vadc_probe(struct spmi_device *spmi)
 		goto fail;
 	}
 
+	vadc->dev = &(spmi->dev);
 	vadc->adc = adc_qpnp;
 
 	rc = qpnp_adc_get_devicetree_data(spmi, vadc->adc);
@@ -1162,15 +1207,19 @@ static int __devinit qpnp_vadc_probe(struct spmi_device *spmi)
 	qpnp_adc_therm_table_sel(of_property_read_bool(node,
 				"qcom,use-old-batt-therm-table"));
 
-	rc = devm_request_irq(&spmi->dev, vadc->adc->adc_irq_eoc,
+	vadc->vadc_poll_eoc = of_property_read_bool(node,
+						"qcom,vadc-poll-eoc");
+	if (!vadc->vadc_poll_eoc) {
+		rc = devm_request_irq(&spmi->dev, vadc->adc->adc_irq_eoc,
 				qpnp_vadc_isr, IRQF_TRIGGER_RISING,
 				"qpnp_vadc_interrupt", vadc);
-	if (rc) {
-		dev_err(&spmi->dev,
+		if (rc) {
+			dev_err(&spmi->dev,
 			"failed to request adc irq with error %d\n", rc);
-		goto fail;
-	} else {
-		enable_irq_wake(vadc->adc->adc_irq_eoc);
+			return rc;
+		} else {
+			enable_irq_wake(vadc->adc->adc_irq_eoc);
+		}
 	}
 
 	qpnp_vadc = vadc;
@@ -1197,17 +1246,20 @@ static int __devinit qpnp_vadc_probe(struct spmi_device *spmi)
 	rc = qpnp_vadc_read_reg(QPNP_INT_TEST_VAL, &fab_id);
 	if (rc < 0) {
 		pr_err("qpnp adc comp id failed with %d\n", rc);
-		return rc;
+		goto fail;
 	}
 	vadc->id = fab_id;
 
 	rc = qpnp_vadc_warm_rst_configure();
 	if (rc < 0) {
 		pr_err("Setting perp reset on warm reset failed %d\n", rc);
-		return rc;
+		goto fail;
 	}
 
 	vadc->vadc_initialized = true;
+	if (vadc->vadc_poll_eoc)
+		device_init_wakeup(vadc->dev, 1);
+
 	vadc->vadc_iadc_sync_lock = false;
 
 	return 0;
@@ -1229,6 +1281,8 @@ static int __devexit qpnp_vadc_remove(struct spmi_device *spmi)
 		i++;
 	}
 	vadc->vadc_initialized = false;
+	if (vadc->vadc_poll_eoc)
+		pm_relax(vadc->dev);
 	dev_set_drvdata(&spmi->dev, NULL);
 
 	return 0;

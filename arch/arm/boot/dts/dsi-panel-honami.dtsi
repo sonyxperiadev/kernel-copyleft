@@ -27,7 +27,7 @@
 		somc,panel-id-read-cmds = [06 01 00 01 05 00 02 A1 00];
 
 		renesas_default_panel {
-			label = "renesas default video mode dsi panel";
+			label = "default renesas 1080p video";
 			somc,panel-id = [ff];
 			qcom,mdss-pan-res = <1080 1920>;
 			somc,mdss-phy-size-mm = <62 110>;
@@ -101,7 +101,7 @@
 		};
 
 		renesas_sharp_1080p_panel {
-			label = "renesas sharp 1080p video mode dsi panel";
+			label = "sharp renesas 1080p video";
 			somc,panel-id = [ff ff ff 63];
 			qcom,mdss-pan-res = <1080 1920>;
 			somc,mdss-phy-size-mm = <62 110>;
@@ -257,7 +257,7 @@
 		};
 
 		renesas_jdc_1080p_panel {
-			label = "renesas jdc 1080p video mode dsi panel";
+			label = "jdc renesas 1080p video";
 			somc,panel-id = [ff ff ff 62];
 			qcom,mdss-pan-res = <1080 1920>;
 			somc,mdss-phy-size-mm = <62 110>;
@@ -414,7 +414,7 @@
 		};
 
 		novatek_default_panel {
-			label = "novatek default video mode dsi panel";
+			label = "default novatek 1080p video";
 			somc,panel-id = [ff];
 			qcom,mdss-pan-res = <1080 1920>;
 			somc,mdss-phy-size-mm = <62 110>;
@@ -863,7 +863,7 @@
 		};
 
 		novatek_jdc_1080p_panel {
-			label = "novatek jdc 1080p video mode dsi panel";
+			label = "jdc novatek 1080p video";
 			somc,panel-id = [12 72 08 62];
 			qcom,mdss-pan-res = <1080 1920>;
 			somc,mdss-phy-size-mm = <62 110>;

@@ -108,7 +108,7 @@ static void send_reset(struct net *net, struct sk_buff *oldskb)
 	if (IS_ERR(dst))
 		return;
 
-	hh_len = LL_RESERVED_SPACE(dst->dev);
+	hh_len = (dst->dev->hard_header_len + 15)&~15;
 	nskb = alloc_skb(hh_len + 15 + dst->header_len + sizeof(struct ipv6hdr)
 			 + sizeof(struct tcphdr) + dst->trailer_len,
 			 GFP_ATOMIC);

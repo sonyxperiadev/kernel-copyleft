@@ -253,6 +253,8 @@ struct mdss_panel_info {
 	struct fbc_panel_info fbc;
 	struct mipi_panel_info mipi;
 	struct lvds_panel_info lvds;
+
+	const char *panel_id_name;
 };
 
 struct mdss_panel_data {

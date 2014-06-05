@@ -611,6 +611,8 @@ static void handle_sys_error(enum command_response cmd, void *data)
 				if (inst->core)
 					hdev = inst->core->device;
 				if (hdev && inst->session) {
+					dprintk(VIDC_DBG,
+					"cleaning up inst: 0x%p", inst);
 					rc = call_hfi_op(hdev, session_clean,
 						(void *) inst->session);
 					if (rc)
@@ -677,10 +679,24 @@ static void handle_session_close(enum command_response cmd, void *data)
 {
 	struct msm_vidc_cb_cmd_done *response = data;
 	struct msm_vidc_inst *inst;
+	struct hfi_device *hdev = NULL;
+
 	if (response) {
 		inst = (struct msm_vidc_inst *)response->session_id;
-		signal_session_msg_receipt(cmd, inst);
+		if (!inst || !inst->core || !inst->core->device) {
+			dprintk(VIDC_ERR, "%s invalid params\n", __func__);
+			return;
+		}
+		hdev = inst->core->device;
+		mutex_lock(&inst->lock);
+		if (inst->session) {
+			dprintk(VIDC_DBG, "cleaning up inst: 0x%p", inst);
+			call_hfi_op(hdev, session_clean,
+				(void *) inst->session);
+		}
 		inst->session = NULL;
+		mutex_unlock(&inst->lock);
+		signal_session_msg_receipt(cmd, inst);
 		show_stats(inst);
 	} else {
 		dprintk(VIDC_ERR,
@@ -2378,6 +2394,7 @@ int msm_comm_flush(struct msm_vidc_inst *inst, u32 flags)
 					lock = &inst->bufq[CAPTURE_PORT].lock;
 				else
 					lock = &inst->bufq[OUTPUT_PORT].lock;
+				temp->vb->v4l2_planes[0].bytesused = 0;
 				mutex_lock(lock);
 				vb2_buffer_done(temp->vb, VB2_BUF_STATE_DONE);
 				mutex_unlock(lock);

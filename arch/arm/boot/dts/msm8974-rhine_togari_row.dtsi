@@ -54,15 +54,16 @@
 			touch_vdd-supply_name = "touch_vdd";
 			gpio_tirq = <61>;
 			gpio_pwr_en = <85>;
-			num_fw_mappings = <4>;
-			config_id = <0x0460 0x0010 0x0011 0x0012>;
-			chip_id = <0x74 0x75 0x74 0x75>;
+			num_fw_mappings = <5>;
+			config_id = <0x0460 0x0010 0x0011 0x0012 0x0013>;
+			chip_id = <0x74 0x75 0x74 0x75 0x75>;
 			filename = "touch_chip_id_0x74_config_id_0x0460.bin",
 				   "touch_chip_id_0x75_config_id_0x0010.bin",
 				   "touch_chip_id_0x74_config_id_0x0011.bin",
-				   "touch_chip_id_0x75_config_id_0x0012.bin";
-			filesize = <0xC000 0xC000 0xC000 0xC000>;
-			file_codesize = <0xC000 0xC000 0xC000 0xC000>;
+				   "touch_chip_id_0x75_config_id_0x0012.bin",
+				   "touch_chip_id_0x75_config_id_0x0013.bin";
+			filesize = <0xC000 0xC000 0xC000 0xC000 0xC000>;
+			file_codesize = <0xC000 0xC000 0xC000 0xC000 0xC000>;
 			defaults_allow = <0>;
 			default_config_id = <0>;
 			default_chip_id = <0>;
@@ -213,8 +214,15 @@
 	};
 
 	qcom,cci@fda0C000 {
-		qcom,hw-thigh = <22>;
-		qcom,hw-tlow = <33>;
+		qcom,cci-master0 {
+			qcom,hw-thigh = <22>;
+			qcom,hw-tlow = <33>;
+		};
+
+		qcom,cci-master1 {
+			qcom,hw-thigh = <22>;
+			qcom,hw-tlow = <33>;
+		};
 
 		qcom,camera@20 {
 			compatible = "qcom,sony_camera_0";
@@ -656,6 +664,14 @@
 	};
 };
 
+&mdss_hdmi_tx {
+	/* rhine doesn't use hpd-5v */
+	qcom,hdmi-tx-supply-names = "hpd-gdsc", "core-vdda", "core-vcc";
+	qcom,hdmi-tx-min-voltage-level = <0 1800000 1800000>;
+	qcom,hdmi-tx-max-voltage-level = <0 1800000 1800000>;
+	qcom,hdmi-tx-peak-current = <0 1800000 0>;
+};
+
 &pm8941_chg {
 	qcom,vddmax-mv = <4350>;
 	qcom,vddsafe-mv = <4400>;
@@ -664,7 +680,7 @@
 	qcom,ibatsafe-ma = <2000>;
 	qcom,maxinput-dc-ma = <1800>;
 	qcom,maxinput-usb-ma = <1500>;
-	qcom,cool-bat-mv = <4200>;
+	qcom,cool-bat-mv = <4350>;
 	qcom,ibatmax-warm-ma = <900>;
 	qcom,warm-bat-mv = <4200>;
 	qcom,ibatmax-cool-ma = <900>;
@@ -686,6 +702,11 @@
 	qcom,batt-type = <3>;
 	qcom,shutdown-soc-valid-limit = <40>;
 	qcom,clamp-soc-max-count = <2>;
+	qcom,enable-fcc-learning;
+	qcom,min-fcc-learning-soc = <20>;
+	qcom,min-fcc-ocv-pc = <30>;
+	qcom,min-fcc-learning-samples = <5>;
+	qcom,fcc-resolution = <10>;
 };
 
 &pm8941_gpios {
@@ -1184,6 +1205,7 @@
 	regulator-min-microvolt = <1200000>;
 	regulator-max-microvolt = <1200000>;
 	qcom,init-voltage = <1200000>;
+	qcom,init-ldo-mode = <1>;
 	status = "ok";
 };
 
@@ -1243,6 +1265,7 @@
 	regulator-min-microvolt = <2700000>;
 	regulator-max-microvolt = <2700000>;
 	qcom,init-voltage = <2700000>;
+	qcom,init-ldo-mode = <1>;
 	status = "ok";
 };
 
@@ -1285,6 +1308,7 @@
 	regulator-min-microvolt = <2600000>;
 	regulator-max-microvolt = <2600000>;
 	qcom,init-voltage = <2600000>;
+	qcom,init-ldo-mode = <1>;
 	status = "ok";
 };
 
@@ -1381,6 +1405,14 @@
 	qcom,pm8941@0 {
 		qcom,vadc@3400 {
 			chan@30 {
+				qcom,hw-settle-time = <15>;
+			};
+
+			chan@8 {
+				qcom,hw-settle-time = <15>;
+			};
+
+			chan@6 {
 				qcom,hw-settle-time = <15>;
 			};
 		};

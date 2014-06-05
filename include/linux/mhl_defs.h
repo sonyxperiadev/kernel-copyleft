@@ -133,6 +133,7 @@ enum DevCapOffset_e {
 #define		MHL_SCRATCHPAD_SIZE			16
 #define		MAX_SCRATCHPAD_TRANSFER_SIZE		64
 #define		ADOPTER_ID_SIZE				2
+#define		MHL_DEVCAP_ALL		0xffff
 
 #define		MHL_DEVCAP_ALL		0xffff
 /* manually define highest number */

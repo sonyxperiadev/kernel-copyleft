@@ -99,6 +99,8 @@ static struct vregs_info iris_vregs_pronto[] = {
 		1300000, 100000, NULL},
 	{"qcom,iris-vddpa",  VREG_NULL_CONFIG, 3300000, 0,
 		3400000, 515000, NULL},
+	{"qcom,iris-vdddig", VREG_NULL_CONFIG, 1225000, 0,
+		1800000, 10000,  NULL},
 };
 
 /* WCNSS regulators for Pronto hardware */

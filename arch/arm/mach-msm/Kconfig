@@ -1070,6 +1070,24 @@ config MACH_SONY_HONAMI_ROW
 	  If you enable this config,
 	  Please use SONY Mobile source tree.
 
+config MACH_SONY_HONAMI_DCM
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Docomo"
+	help
+	  Support for the SONY Mobile Honami Docomo device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_KDDI
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Kddi"
+	help
+	  Support for the SONY Mobile Honami Kddi device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
 config MSM_USE_TSIF1
 	depends on ARCH_MSM8X60
 	bool "MSM8x60 use TSIF1"
@@ -2395,6 +2413,15 @@ config MSM_RPM_RBCPR_STATS_LOG
           memory location. These messages provide statistical information about
           RBCPR (Rapid Bridge Core Power Reduction) information . The drivers
           outputs the message via a debugfs node.
+
+config MSM_RPM_RBCPR_STATS_V2_LOG
+        tristate "MSM Resource Power Manager RPBCPR Stat Driver"
+        depends on DEBUG_FS
+          help
+          This option enables v2 of the rpmrbcpr_stats driver which reads RPM
+          memory for statistics pertaining to RPM's RBCPR(Rapid Bridge Core
+          Power Reduction) driver. The drivers outputs the message via a
+          debugfs node.
 
 config MSM_DIRECT_SCLK_ACCESS
 	bool "Direct access to the SCLK timer"

@@ -282,6 +282,10 @@ typedef void (*fxn)(u32 data);
 #define CMD_CLK_CTRL    0x0004
 #define CMD_REQ_NO_MAX_PKT_SIZE 0x0008
 
+#define DEFAULT_CMDS	0
+#define DETECTED_CMDS	1
+#define MAX_CMDS	2
+
 struct dcs_cmd_req {
 	struct dsi_cmd_desc *cmds;
 	int cmds_cnt;
@@ -338,14 +342,23 @@ struct mdss_panel_common_pdata {
 	int cabc_enabled;
 	struct dsi_panel_cmds cabc_early_on_cmds;
 	struct dsi_panel_cmds cabc_on_cmds;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct dsi_panel_cmds cabc_off_cmds[MAX_CMDS];
+	struct dsi_panel_cmds cabc_late_off_cmds[MAX_CMDS];
+#else
 	struct dsi_panel_cmds cabc_off_cmds;
 	struct dsi_panel_cmds cabc_late_off_cmds;
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	struct dsi_panel_cmds cabc_deferred_on_cmds;
 
 	struct dsi_panel_cmds einit_cmds;
 	struct dsi_panel_cmds init_cmds;
 	struct dsi_panel_cmds on_cmds;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct dsi_panel_cmds off_cmds[MAX_CMDS];
+#else
 	struct dsi_panel_cmds off_cmds;
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	struct dsi_panel_cmds id_read_cmds;
 	int (*panel_power_on) (struct mdss_panel_data *pdata, int enable);
 	int (*disp_on) (struct mdss_panel_data *pdata);
@@ -385,6 +398,7 @@ struct mdss_dsi_ctrl_pdata {
 	unsigned char *ctrl_base;
 	int reg_size;
 	u32 clk_cnt;
+	struct clk *mdp_core_clk;
 	struct clk *ahb_clk;
 	struct clk *axi_clk;
 	struct clk *byte_clk;
@@ -462,9 +476,7 @@ void mdp4_dsi_cmd_trigger(void);
 void mdss_dsi_cmd_mdp_start(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_cmd_bta_sw_trigger(struct mdss_panel_data *pdata);
 void mdss_dsi_ack_err_status(unsigned char *dsi_base);
-void mdss_dsi_clk_enable(struct mdss_dsi_ctrl_pdata *ctrl);
-void mdss_dsi_clk_disable(struct mdss_dsi_ctrl_pdata *ctrl);
-void mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, int enable);
+int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, int enable);
 void mdss_dsi_clk_req(struct mdss_dsi_ctrl_pdata *ctrl,
 				int enable);
 void mdss_dsi_controller_cfg(int enable,
@@ -480,8 +492,6 @@ int mdss_dsi_clk_div_config(u8 bpp, u8 lanes,
 int mdss_dsi_clk_init(struct platform_device *pdev,
 		      struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 void mdss_dsi_clk_deinit(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
-void mdss_dsi_prepare_clocks(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
-void mdss_dsi_unprepare_clocks(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 int mdss_dsi_enable_bus_clocks(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 void mdss_dsi_disable_bus_clocks(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 void mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable);

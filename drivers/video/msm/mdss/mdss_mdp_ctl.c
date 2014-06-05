@@ -25,7 +25,10 @@
 #define MDSS_MDP_BUS_FACTOR_SHIFT 10
 /* 1.5 bus fudge factor */
 #define MDSS_MDP_BUS_FUDGE_FACTOR_IB(val) (((val) * 11) / 4)
+#define MDSS_MDP_BUS_FUDGE_FACTOR_HIGH_IB(val) (((val) * 11) / 4)
 #define MDSS_MDP_BUS_FUDGE_FACTOR_AB(val) (val << 1)
+#define MDSS_MDP_BUS_FLOOR_BW (3200000000ULL >> MDSS_MDP_BUS_FACTOR_SHIFT)
+
 /* 1.25 clock fudge factor */
 #define MDSS_MDP_CLK_FUDGE_FACTOR(val) (((val) * 5) / 4)
 
@@ -58,6 +61,61 @@ static inline u32 mdss_mdp_get_pclk_rate(struct mdss_mdp_ctl *ctl)
 		pinfo->clk_rate;
 }
 
+static u32 __mdss_mdp_ctrl_perf_ovrd_helper(struct mdss_mdp_mixer *mixer,
+		u32 *npipe)
+{
+	struct mdss_panel_info *pinfo;
+	struct mdss_mdp_pipe *pipe;
+	u32 mnum, ovrd = 0;
+
+	if(!mixer || !mixer->ctl->panel_data)
+		return 0;
+
+	pinfo = &mixer->ctl->panel_data->panel_info;
+	for (mnum = 0; mnum < MDSS_MDP_MAX_STAGE; mnum++) {
+		pipe = mixer->stage_pipe[mnum];
+		if (pipe && pinfo) {
+			*npipe = *npipe + 1;
+			if ((pipe->src.w >= pipe->src.h) &&
+					(pipe->src.w >= pinfo->xres))
+				ovrd = 1;
+		}
+	}
+
+	return ovrd;
+}
+
+static void __mdss_mdp_ctrl_perf_ovrd(struct mdss_data_type *mdata,
+	u64 *ab_quota, u64 *ib_quota)
+{
+	struct mdss_mdp_ctl *ctl;
+	u32 i, npipe = 0, ovrd = 0;
+
+	for (i = 0; i < mdata->nctl; i++) {
+		ctl = mdata->ctl_off + i;
+		if (!ctl->power_on)
+			continue;
+		ovrd |= __mdss_mdp_ctrl_perf_ovrd_helper(
+				ctl->mixer_left, &npipe);
+		ovrd |= __mdss_mdp_ctrl_perf_ovrd_helper(
+				ctl->mixer_right, &npipe);
+	}
+
+	*ab_quota = MDSS_MDP_BUS_FUDGE_FACTOR_AB(*ab_quota);
+	if (npipe > 1)
+		*ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_HIGH_IB(*ib_quota);
+	else
+		*ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_IB(*ib_quota);
+
+	if (ovrd && (*ib_quota < MDSS_MDP_BUS_FLOOR_BW)) {
+		*ib_quota = MDSS_MDP_BUS_FLOOR_BW;
+		pr_debug("forcing the BIMC clock to 200 MHz : %llu",
+			*ib_quota);
+	} else {
+		pr_debug("ib quota : %llu", *ib_quota);
+	}
+}
+
 static int mdss_mdp_ctl_perf_commit(struct mdss_data_type *mdata, u32 flags)
 {
 	struct mdss_mdp_ctl *ctl;
@@ -82,11 +140,10 @@ static int mdss_mdp_ctl_perf_commit(struct mdss_data_type *mdata, u32 flags)
 		}
 	}
 	if (flags & MDSS_MDP_PERF_UPDATE_BUS) {
-		bus_ab_quota = bus_ib_quota << MDSS_MDP_BUS_FACTOR_SHIFT;
-		bus_ab_quota = MDSS_MDP_BUS_FUDGE_FACTOR_AB(bus_ab_quota);
-		bus_ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_IB(bus_ib_quota);
+		bus_ab_quota = bus_ib_quota;
+		__mdss_mdp_ctrl_perf_ovrd(mdata, &bus_ab_quota, &bus_ib_quota);
 		bus_ib_quota <<= MDSS_MDP_BUS_FACTOR_SHIFT;
-
+		bus_ab_quota <<= MDSS_MDP_BUS_FACTOR_SHIFT;
 		mdss_mdp_bus_scale_set_quota(bus_ab_quota, bus_ib_quota);
 	}
 	if (flags & MDSS_MDP_PERF_UPDATE_CLK) {
@@ -597,6 +654,7 @@ int mdss_mdp_ctl_setup(struct mdss_mdp_ctl *ctl)
 {
 	struct mdss_mdp_ctl *split_ctl;
 	u32 width, height;
+	int split_fb;
 
 	if (!ctl || !ctl->panel_data) {
 		pr_err("invalid ctl handle\n");
@@ -607,6 +665,13 @@ int mdss_mdp_ctl_setup(struct mdss_mdp_ctl *ctl)
 
 	width = ctl->panel_data->panel_info.xres;
 	height = ctl->panel_data->panel_info.yres;
+
+	split_fb = (ctl->mfd->split_fb_left &&
+		    ctl->mfd->split_fb_right &&
+		    (ctl->mfd->split_fb_left <= MAX_MIXER_WIDTH) &&
+		    (ctl->mfd->split_fb_right <= MAX_MIXER_WIDTH)) ? 1 : 0;
+	pr_debug("max=%d xres=%d left=%d right=%d\n", MAX_MIXER_WIDTH,
+		 width, ctl->mfd->split_fb_left, ctl->mfd->split_fb_right);
 
 	if ((split_ctl && (width > MAX_MIXER_WIDTH)) ||
 			(width > (2 * MAX_MIXER_WIDTH))) {
@@ -620,14 +685,16 @@ int mdss_mdp_ctl_setup(struct mdss_mdp_ctl *ctl)
 	if (!ctl->mixer_left) {
 		ctl->mixer_left =
 			mdss_mdp_mixer_alloc(ctl, MDSS_MDP_MIXER_TYPE_INTF,
-					(width > MAX_MIXER_WIDTH));
+			 ((width > MAX_MIXER_WIDTH) || split_fb));
 		if (!ctl->mixer_left) {
 			pr_err("unable to allocate layer mixer\n");
 			return -ENOMEM;
 		}
 	}
 
-	if (width > MAX_MIXER_WIDTH)
+	if (split_fb)
+		width = ctl->mfd->split_fb_left;
+	else if (width > MAX_MIXER_WIDTH)
 		width /= 2;
 
 	ctl->mixer_left->width = width;
@@ -637,6 +704,9 @@ int mdss_mdp_ctl_setup(struct mdss_mdp_ctl *ctl)
 		pr_debug("split display detected\n");
 		return 0;
 	}
+
+	if (split_fb)
+		width = ctl->mfd->split_fb_right;
 
 	if (width < ctl->width) {
 		if (ctl->mixer_right == NULL) {

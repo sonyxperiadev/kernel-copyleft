@@ -403,6 +403,7 @@ void msm_delete_command_ack_q(unsigned int session_id, unsigned int stream_id)
 		list, __msm_queue_find_session, &session_id);
 	if (!session)
 		return;
+	mutex_lock(&session->lock);
 
 	cmd_ack = msm_queue_find(&session->command_ack_q,
 		struct msm_command_ack,	list, __msm_queue_find_command_ack_q,
@@ -417,6 +418,7 @@ void msm_delete_command_ack_q(unsigned int session_id, unsigned int stream_id)
 	kzfree(cmd_ack);
 	session->command_ack_q.len--;
 	spin_unlock_irqrestore(&(session->command_ack_q.lock), flags);
+	mutex_unlock(&session->lock);
 }
 
 static inline int __msm_sd_close_subdevs(struct msm_sd_subdev *msm_sd,
@@ -469,6 +471,7 @@ static void msm_remove_session_cmd_ack_q(struct msm_session *session)
 	if ((!session) || !(&session->command_ack_q))
 		return;
 
+	mutex_lock(&session->lock);
 	/* to ensure error handling purpose, it needs to detach all subdevs
 	 * which are being connected to streams */
 	msm_queue_traverse_action(&session->command_ack_q,
@@ -476,6 +479,8 @@ static void msm_remove_session_cmd_ack_q(struct msm_session *session)
 		__msm_remove_session_cmd_ack_q, NULL);
 
 	msm_queue_drain(&session->command_ack_q, struct msm_command_ack, list);
+
+	mutex_unlock(&session->lock);
 }
 
 int msm_destroy_session(unsigned int session_id)
@@ -520,6 +525,7 @@ static long msm_private_ioctl(struct file *file, void *fh,
 	struct msm_session *session;
 	unsigned int session_id;
 	unsigned int stream_id;
+	unsigned long spin_flags = 0;
 
 	event_data = (struct msm_v4l2_event_data *)
 		((struct v4l2_event *)arg)->u.data;
@@ -565,9 +571,13 @@ static long msm_private_ioctl(struct file *file, void *fh,
 			break;
 		}
 
+		spin_lock_irqsave(&(session->command_ack_q.lock),
+		   spin_flags);
 		ret_cmd->event = *(struct v4l2_event *)arg;
 		msm_enqueue(&cmd_ack->command_q, &ret_cmd->list);
 		wake_up(&cmd_ack->wait);
+		spin_unlock_irqrestore(&(session->command_ack_q.lock),
+		   spin_flags);
 	}
 		break;
 
@@ -635,7 +645,7 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 	int session_id, stream_id;
 	unsigned long flags = 0;
 #if defined(CONFIG_SONY_CAM_V4L2)
-	uint8_t retry_count = 0;
+	uint32_t retry_count = 0;
 #endif
 
 	session_id = event_data->session_id;
@@ -673,7 +683,7 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 
 	/* should wait on session based condition */
 #if defined(CONFIG_SONY_CAM_V4L2)
-	retry_count = 20;
+	retry_count = 5000;
 	do {
 		rc = wait_event_interruptible_timeout(cmd_ack->wait,
 			!list_empty_careful(&cmd_ack->command_q.list),
@@ -685,6 +695,11 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 				__func__, retry_count);
 		msleep(20);
 	} while (retry_count > 0);
+
+	if (rc == -ERESTARTSYS) {
+		pr_err("%s: rc = %d\n", __func__, rc);
+		rc = -EINVAL;
+	}
 #else
 	rc = wait_event_interruptible_timeout(cmd_ack->wait,
 		!list_empty_careful(&cmd_ack->command_q.list),

@@ -199,11 +199,23 @@ static int prepare_for_reg_access(struct msm_fb_data_type *mfd)
 {
 	struct mdss_panel_data *pdata;
 	int ret = 0;
+	struct mdss_mdp_ctl *ctl;
+
+	ctl = mfd_to_ctl(mfd);
+	if (!ctl)
+		return -ENODEV;
 
 	pdata = dev_get_platdata(&mfd->pdev->dev);
 	if (!pdata) {
 		pr_err("no panel connected\n");
 		return -ENODEV;
+	}
+
+	if (pdata->panel_info.type == MIPI_CMD_PANEL) {
+		if (ctl->display_fnc)
+			ret = ctl->display_fnc(ctl, NULL);
+		if (ret)
+			pr_warn("error displaying frame\n");
 	}
 
 	mdss_dsi_op_mode_config(DSI_CMD_MODE, pdata);
@@ -222,7 +234,7 @@ static int post_reg_access(struct msm_fb_data_type *mfd)
 		return -ENODEV;
 	}
 
-	mdss_dsi_op_mode_config(DSI_VIDEO_MODE, pdata);
+	mdss_dsi_op_mode_config(pdata->panel_info.mipi.mode, pdata);
 
 	return ret;
 }

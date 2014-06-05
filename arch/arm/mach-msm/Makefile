@@ -320,6 +320,10 @@ ifdef CONFIG_MACH_SONY_TOGARI_ROW
 	obj-$(CONFIG_MACH_SONY_TOGARI_ROW) += board-sony_togari_row-gpiomux.o board-sony_togari-usb.o bms-batterydata-burton.o
 else ifdef CONFIG_MACH_SONY_HONAMI_ROW
 	obj-$(CONFIG_MACH_SONY_HONAMI_ROW) += board-sony_honami_row-gpiomux.o board-sony_rhine-usb.o bms-batterydata-salomon.o
+else ifdef CONFIG_MACH_SONY_HONAMI_DCM
+	obj-$(CONFIG_MACH_SONY_HONAMI_DCM) += board-sony_honami_dcm-gpiomux.o board-sony_rhine-usb.o bms-batterydata-salomon.o
+else ifdef CONFIG_MACH_SONY_HONAMI_KDDI
+	obj-$(CONFIG_MACH_SONY_HONAMI_KDDI) += board-sony_honami_kddi-gpiomux.o board-sony_rhine-usb.o bms-batterydata-salomon.o
 else
 	obj-$(CONFIG_ARCH_MSM8974) += board-8974-gpiomux.o board-sony_rhine-usb.o bms-batterydata-oem.o
 endif
@@ -342,6 +346,7 @@ obj-$(CONFIG_MSM_MPM_OF) += mpm-of.o
 obj-$(CONFIG_MSM_MPM) += mpm.o
 obj-$(CONFIG_MSM_RPM_STATS_LOG) += rpm_stats.o rpm_master_stat.o
 obj-$(CONFIG_MSM_RPM_RBCPR_STATS_LOG) += rpm_rbcpr_stats.o
+obj-$(CONFIG_MSM_RPM_RBCPR_STATS_V2_LOG) += rpm_rbcpr_stats_v2.o
 obj-$(CONFIG_MSM_RPM_LOG) += rpm_log.o
 obj-$(CONFIG_MSM_TZ_LOG) += tz_log.o
 obj-$(CONFIG_MSM_XO) += msm_xo.o

@@ -13,6 +13,7 @@
 
 #include <linux/delay.h>
 #include <linux/sched.h>
+#include <linux/ratelimit.h>
 #include <mach/socinfo.h>
 
 #include "kgsl.h"
@@ -2510,6 +2511,481 @@ static void a3xx_drawctxt_restore(struct adreno_device *adreno_dev,
 	}
 }
 
+static const unsigned int _a3xx_pwron_fixup_fs_instructions[] = {
+	0x00000000, 0x302CC300, 0x00000000, 0x302CC304,
+	0x00000000, 0x302CC308, 0x00000000, 0x302CC30C,
+	0x00000000, 0x302CC310, 0x00000000, 0x302CC314,
+	0x00000000, 0x302CC318, 0x00000000, 0x302CC31C,
+	0x00000000, 0x302CC320, 0x00000000, 0x302CC324,
+	0x00000000, 0x302CC328, 0x00000000, 0x302CC32C,
+	0x00000000, 0x302CC330, 0x00000000, 0x302CC334,
+	0x00000000, 0x302CC338, 0x00000000, 0x302CC33C,
+	0x00000000, 0x00000400, 0x00020000, 0x63808003,
+	0x00060004, 0x63828007, 0x000A0008, 0x6384800B,
+	0x000E000C, 0x6386800F, 0x00120010, 0x63888013,
+	0x00160014, 0x638A8017, 0x001A0018, 0x638C801B,
+	0x001E001C, 0x638E801F, 0x00220020, 0x63908023,
+	0x00260024, 0x63928027, 0x002A0028, 0x6394802B,
+	0x002E002C, 0x6396802F, 0x00320030, 0x63988033,
+	0x00360034, 0x639A8037, 0x003A0038, 0x639C803B,
+	0x003E003C, 0x639E803F, 0x00000000, 0x00000400,
+	0x00000003, 0x80D60003, 0x00000007, 0x80D60007,
+	0x0000000B, 0x80D6000B, 0x0000000F, 0x80D6000F,
+	0x00000013, 0x80D60013, 0x00000017, 0x80D60017,
+	0x0000001B, 0x80D6001B, 0x0000001F, 0x80D6001F,
+	0x00000023, 0x80D60023, 0x00000027, 0x80D60027,
+	0x0000002B, 0x80D6002B, 0x0000002F, 0x80D6002F,
+	0x00000033, 0x80D60033, 0x00000037, 0x80D60037,
+	0x0000003B, 0x80D6003B, 0x0000003F, 0x80D6003F,
+	0x00000000, 0x03000000, 0x00000000, 0x00000000,
+};
+
+/**
+ * adreno_a3xx_pwron_fixup_init() - Initalize a special command buffer to run a
+ * post-power collapse shader workaround
+ * @adreno_dev: Pointer to a adreno_device struct
+ *
+ * Some targets require a special workaround shader to be executed after
+ * power-collapse.  Construct the IB once at init time and keep it
+ * handy
+ *
+ * Returns: 0 on success or negative on error
+ */
+int adreno_a3xx_pwron_fixup_init(struct adreno_device *adreno_dev)
+{
+	unsigned int *cmds;
+	int count = ARRAY_SIZE(_a3xx_pwron_fixup_fs_instructions);
+	int ret;
+
+	 /* Return if the fixup is already in place */
+	if (test_bit(ADRENO_DEVICE_PWRON_FIXUP, &adreno_dev->priv))
+		return 0;
+
+
+	ret = kgsl_allocate_contiguous(&adreno_dev->pwron_fixup,
+		PAGE_SIZE);
+
+	if (ret)
+		return ret;
+
+	adreno_dev->pwron_fixup.flags |= KGSL_MEMFLAGS_GPUREADONLY;
+
+	cmds = adreno_dev->pwron_fixup.hostptr;
+
+	*cmds++ = cp_type0_packet(A3XX_UCHE_CACHE_INVALIDATE0_REG, 2);
+	*cmds++ = 0x00000000;
+	*cmds++ = 0x90000000;
+	*cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_REG_RMW, 3);
+	*cmds++ = A3XX_RBBM_CLOCK_CTL;
+	*cmds++ = 0xFFFCFFFF;
+	*cmds++ = 0x00010000;
+	*cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CONTROL_0_REG, 1);
+	*cmds++ = 0x1E000150;
+	*cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_SET_CONSTANT, 2);
+	*cmds++ = CP_REG(A3XX_HLSQ_CONTROL_0_REG);
+	*cmds++ = 0x1E000150;
+	*cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CONTROL_0_REG, 1);
+	*cmds++ = 0x1E000150;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CONTROL_1_REG, 1);
+	*cmds++ = 0x00000040;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CONTROL_2_REG, 1);
+	*cmds++ = 0x80000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CONTROL_3_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_VS_CONTROL_REG, 1);
+	*cmds++ = 0x00000001;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_FS_CONTROL_REG, 1);
+	*cmds++ = 0x0D001002;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CONST_VSPRESV_RANGE_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CONST_FSPRESV_RANGE_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_NDRANGE_0_REG, 1);
+	*cmds++ = 0x00401101;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_NDRANGE_1_REG, 1);
+	*cmds++ = 0x00000400;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_NDRANGE_2_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_NDRANGE_3_REG, 1);
+	*cmds++ = 0x00000001;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_NDRANGE_4_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_NDRANGE_5_REG, 1);
+	*cmds++ = 0x00000001;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_NDRANGE_6_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_CONTROL_0_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_CONTROL_1_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_KERNEL_CONST_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_KERNEL_GROUP_X_REG, 1);
+	*cmds++ = 0x00000010;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_KERNEL_GROUP_Y_REG, 1);
+	*cmds++ = 0x00000001;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_KERNEL_GROUP_Z_REG, 1);
+	*cmds++ = 0x00000001;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_WG_OFFSET_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_SP_CTRL_REG, 1);
+	*cmds++ = 0x00040000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_CTRL_REG0, 1);
+	*cmds++ = 0x0000000A;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_CTRL_REG1, 1);
+	*cmds++ = 0x00000001;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_PARAM_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_OUT_REG_0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_OUT_REG_1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_OUT_REG_2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_OUT_REG_3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_OUT_REG_4, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_OUT_REG_5, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_OUT_REG_6, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_OUT_REG_7, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_VPC_DST_REG_0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_VPC_DST_REG_1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_VPC_DST_REG_2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_VPC_DST_REG_3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_OBJ_OFFSET_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_OBJ_START_REG, 1);
+	*cmds++ = 0x00000004;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_PVT_MEM_PARAM_REG, 1);
+	*cmds++ = 0x04008001;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_PVT_MEM_ADDR_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_PVT_MEM_SIZE_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_VS_LENGTH_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_CTRL_REG0, 1);
+	*cmds++ = 0x0DB0400A;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_CTRL_REG1, 1);
+	*cmds++ = 0x00300402;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_OBJ_OFFSET_REG, 1);
+	*cmds++ = 0x00010000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_OBJ_START_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_PVT_MEM_PARAM_REG, 1);
+	*cmds++ = 0x04008001;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_PVT_MEM_ADDR_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_PVT_MEM_SIZE_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_FLAT_SHAD_MODE_REG_0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_FLAT_SHAD_MODE_REG_1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_OUTPUT_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_MRT_REG_0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_MRT_REG_1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_MRT_REG_2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_MRT_REG_3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_IMAGE_OUTPUT_REG_0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_IMAGE_OUTPUT_REG_1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_IMAGE_OUTPUT_REG_2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_IMAGE_OUTPUT_REG_3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_SP_FS_LENGTH_REG, 1);
+	*cmds++ = 0x0000000D;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_CLIP_CNTL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_GB_CLIP_ADJ, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_VPORT_XOFFSET, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_VPORT_XSCALE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_VPORT_YOFFSET, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_VPORT_YSCALE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_VPORT_ZOFFSET, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_VPORT_ZSCALE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_X0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Y0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Z0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_W0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_X1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Y1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Z1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_W1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_X2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Y2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Z2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_W2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_X3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Y3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Z3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_W3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_X4, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Y4, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Z4, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_W4, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_X5, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Y5, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_Z5, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_CL_USER_PLANE_W5, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_SU_POINT_MINMAX, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_SU_POINT_SIZE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_SU_POLY_OFFSET_OFFSET, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_SU_POLY_OFFSET_SCALE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_SU_MODE_CONTROL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_SC_CONTROL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_SC_SCREEN_SCISSOR_TL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_SC_SCREEN_SCISSOR_BR, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_SC_WINDOW_SCISSOR_BR, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_SC_WINDOW_SCISSOR_TL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_TSE_DEBUG_ECO, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_PERFCOUNTER0_SELECT, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_PERFCOUNTER1_SELECT, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_PERFCOUNTER2_SELECT, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_GRAS_PERFCOUNTER3_SELECT, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MODE_CONTROL, 1);
+	*cmds++ = 0x00008000;
+	*cmds++ = cp_type0_packet(A3XX_RB_RENDER_CONTROL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MSAA_CONTROL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_ALPHA_REFERENCE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_CONTROL0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_CONTROL1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_CONTROL2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_CONTROL3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BUF_INFO0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BUF_INFO1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BUF_INFO2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BUF_INFO3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BUF_BASE0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BUF_BASE1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BUF_BASE2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BUF_BASE3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BLEND_CONTROL0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BLEND_CONTROL1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BLEND_CONTROL2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_MRT_BLEND_CONTROL3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_BLEND_RED, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_BLEND_GREEN, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_BLEND_BLUE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_BLEND_ALPHA, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_CLEAR_COLOR_DW0, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_CLEAR_COLOR_DW1, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_CLEAR_COLOR_DW2, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_CLEAR_COLOR_DW3, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_COPY_CONTROL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_COPY_DEST_BASE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_COPY_DEST_PITCH, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_COPY_DEST_INFO, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_DEPTH_CONTROL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_DEPTH_CLEAR, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_DEPTH_BUF_INFO, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_DEPTH_BUF_PITCH, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_STENCIL_CONTROL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_STENCIL_CLEAR, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_STENCIL_BUF_INFO, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_STENCIL_BUF_PITCH, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_STENCIL_REF_MASK, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_STENCIL_REF_MASK_BF, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_LRZ_VSC_CONTROL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_WINDOW_OFFSET, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_SAMPLE_COUNT_CONTROL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_SAMPLE_COUNT_ADDR, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_Z_CLAMP_MIN, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_Z_CLAMP_MAX, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_GMEM_BASE_ADDR, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_DEBUG_ECO_CONTROLS_ADDR, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_PERFCOUNTER0_SELECT, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_PERFCOUNTER1_SELECT, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_RB_FRAME_BUFFER_DIMENSION, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_LOAD_STATE, 4);
+	*cmds++ = (1 << CP_LOADSTATE_DSTOFFSET_SHIFT) |
+		(0 << CP_LOADSTATE_STATESRC_SHIFT) |
+		(6 << CP_LOADSTATE_STATEBLOCKID_SHIFT) |
+		(1 << CP_LOADSTATE_NUMOFUNITS_SHIFT);
+	*cmds++ = (1 << CP_LOADSTATE_STATETYPE_SHIFT) |
+		(0 << CP_LOADSTATE_EXTSRCADDR_SHIFT);
+	*cmds++ = 0x00400000;
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_LOAD_STATE, 4);
+	*cmds++ = (2 << CP_LOADSTATE_DSTOFFSET_SHIFT) |
+		(6 << CP_LOADSTATE_STATEBLOCKID_SHIFT) |
+		(1 << CP_LOADSTATE_NUMOFUNITS_SHIFT);
+	*cmds++ = (1 << CP_LOADSTATE_STATETYPE_SHIFT);
+	*cmds++ = 0x00400220;
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_LOAD_STATE, 4);
+	*cmds++ = (6 << CP_LOADSTATE_STATEBLOCKID_SHIFT) |
+		(1 << CP_LOADSTATE_NUMOFUNITS_SHIFT);
+	*cmds++ = (1 << CP_LOADSTATE_STATETYPE_SHIFT);
+	*cmds++ = 0x00000000;
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_LOAD_STATE, 2 + count);
+	*cmds++ = (6 << CP_LOADSTATE_STATEBLOCKID_SHIFT) |
+		(13 << CP_LOADSTATE_NUMOFUNITS_SHIFT);
+	*cmds++ = 0x00000000;
+
+	memcpy(cmds, _a3xx_pwron_fixup_fs_instructions, count << 2);
+
+	cmds += count;
+
+	*cmds++ = cp_type3_packet(CP_EXEC_CL, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CL_CONTROL_0_REG, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type0_packet(A3XX_HLSQ_CONTROL_0_REG, 1);
+	*cmds++ = 0x1E000150;
+	*cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_SET_CONSTANT, 2);
+	*cmds++ = CP_REG(A3XX_HLSQ_CONTROL_0_REG);
+	*cmds++ = 0x1E000050;
+	*cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_REG_RMW, 3);
+	*cmds++ = A3XX_RBBM_CLOCK_CTL;
+	*cmds++ = 0xFFFCFFFF;
+	*cmds++ = 0x00000000;
+	*cmds++ = cp_type3_packet(CP_WAIT_FOR_IDLE, 1);
+	*cmds++ = 0x00000000;
+
+	/*
+	 * Remember the number of dwords in the command buffer for when we
+	 * program the indirect buffer call in the ringbuffer
+	 */
+	adreno_dev->pwron_fixup_dwords =
+		(cmds - (unsigned int *) adreno_dev->pwron_fixup.hostptr);
+
+	/* Mark the flag in ->priv to show that we have the fix */
+	set_bit(ADRENO_DEVICE_PWRON_FIXUP, &adreno_dev->priv);
+
+	return 0;
+}
+
 static int a3xx_rb_init(struct adreno_device *adreno_dev,
 			 struct adreno_ringbuffer *rb)
 {
@@ -2550,6 +3026,8 @@ static void a3xx_err_callback(struct adreno_device *adreno_dev, int bit)
 {
 	struct kgsl_device *device = &adreno_dev->dev;
 	const char *err = "";
+	/* Limit to 10 messages every 5 seconds */
+	static DEFINE_RATELIMIT_STATE(ratelimit_state, 5 * HZ, 10);
 
 	switch (bit) {
 	case A3XX_INT_RBBM_AHB_ERROR: {
@@ -2561,8 +3039,8 @@ static void a3xx_err_callback(struct adreno_device *adreno_dev, int bit)
 		 * Return the word address of the erroring register so that it
 		 * matches the register specification
 		 */
-
-		KGSL_DRV_CRIT(device,
+		if (!__ratelimit(&ratelimit_state))
+			KGSL_DRV_CRIT(device,
 			"RBBM | AHB bus error | %s | addr=%x | ports=%x:%x\n",
 			reg & (1 << 28) ? "WRITE" : "READ",
 			(reg & 0xFFFFF) >> 2, (reg >> 20) & 0x3,
@@ -2587,34 +3065,17 @@ static void a3xx_err_callback(struct adreno_device *adreno_dev, int bit)
 	case A3XX_INT_VFD_ERROR:
 		err = "VFD: Out of bounds access";
 		break;
-	case A3XX_INT_CP_T0_PACKET_IN_IB:
-		err = "ringbuffer TO packet in IB interrupt";
-		break;
-	case A3XX_INT_CP_OPCODE_ERROR:
-		err = "ringbuffer opcode error interrupt";
-		break;
-	case A3XX_INT_CP_RESERVED_BIT_ERROR:
-		err = "ringbuffer reserved bit error interrupt";
-		break;
-	case A3XX_INT_CP_HW_FAULT:
-		err = "ringbuffer hardware fault";
-		break;
-	case A3XX_INT_CP_REG_PROTECT_FAULT:
-		err = "ringbuffer protected mode error interrupt";
-		break;
-	case A3XX_INT_CP_AHB_ERROR_HALT:
-		err = "ringbuffer AHB error interrupt";
-		break;
-	case A3XX_INT_MISC_HANG_DETECT:
-		err = "MISC: GPU hang detected";
-		break;
 	case A3XX_INT_UCHE_OOB_ACCESS:
 		err = "UCHE:  Out of bounds access";
 		break;
 	}
 
-	KGSL_DRV_CRIT(device, "%s\n", err);
-	kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_OFF);
+	/*
+	 * Limit error interrupt reporting to prevent
+	 * kernel logs causing watchdog timeout
+	 */
+	if (!__ratelimit(&ratelimit_state))
+		KGSL_DRV_CRIT(device, "%s\n", err);
 }
 
 static void a3xx_cp_callback(struct adreno_device *adreno_dev, int irq)
@@ -2626,6 +3087,48 @@ static void a3xx_cp_callback(struct adreno_device *adreno_dev, int irq)
 
 	/* Schedule work to free mem and issue ibs */
 	queue_work(device->work_queue, &device->ts_expired_ws);
+}
+
+/**
+ * a3xx_fatal_err_callback -  Routine for GPU fatal interrupts
+ * @adreno_dev: adreno device ptr
+ * @bit: interrupt bit
+ */
+static void a3xx_fatal_err_callback(struct adreno_device *adreno_dev, int bit)
+{
+	struct kgsl_device *device = &adreno_dev->dev;
+	const char *err = "";
+
+	switch (bit) {
+	case A3XX_INT_CP_OPCODE_ERROR:
+		err = "ringbuffer opcode error interrupt";
+		break;
+	case A3XX_INT_CP_RESERVED_BIT_ERROR:
+		err = "ringbuffer reserved bit error interrupt";
+		break;
+	case A3XX_INT_CP_T0_PACKET_IN_IB:
+		err = "ringbuffer TO packet in IB interrupt";
+		break;
+	case A3XX_INT_CP_HW_FAULT:
+		err = "ringbuffer hardware fault";
+		break;
+	case A3XX_INT_CP_REG_PROTECT_FAULT:
+		err = "ringbuffer protected mode error interrupt";
+		break;
+	case A3XX_INT_CP_AHB_ERROR_HALT:
+		err = "ringbuffer AHB error interrupt";
+		break;
+	case A3XX_INT_MISC_HANG_DETECT:
+		if (!adreno_dev->hang_intr_en)
+			return;
+		err = "stall interrupt";
+		break;
+	}
+
+	KGSL_DRV_CRIT(device, "%s\n", err);
+	if ((!device->mmu.fault) &&
+		(adreno_dev->ft_pf_policy & KGSL_FT_PAGEFAULT_GPUHALT_ENABLE))
+		adreno_fatal_err_work(adreno_dev);
 }
 
 /**
@@ -2927,23 +3430,25 @@ static struct {
 	A3XX_IRQ_CALLBACK(a3xx_err_callback),  /* 5 - RBBM_ATB_BUS_OVERFLOW */
 	A3XX_IRQ_CALLBACK(a3xx_err_callback),  /* 6 - RBBM_VFD_ERROR */
 	A3XX_IRQ_CALLBACK(NULL),	       /* 7 - CP_SW */
-	A3XX_IRQ_CALLBACK(a3xx_err_callback),  /* 8 - CP_T0_PACKET_IN_IB */
-	A3XX_IRQ_CALLBACK(a3xx_err_callback),  /* 9 - CP_OPCODE_ERROR */
-	A3XX_IRQ_CALLBACK(a3xx_err_callback),  /* 10 - CP_RESERVED_BIT_ERROR */
+	A3XX_IRQ_CALLBACK(a3xx_fatal_err_callback),/* 8 - CP_T0_PACKET_IN_IB */
+	A3XX_IRQ_CALLBACK(a3xx_fatal_err_callback),/* 9 - CP_OPCODE_ERROR */
+	/* 10 - CP_RESERVED_BIT_ERROR */
+	A3XX_IRQ_CALLBACK(a3xx_fatal_err_callback),
 	A3XX_IRQ_CALLBACK(a3xx_err_callback),  /* 11 - CP_HW_FAULT */
 	A3XX_IRQ_CALLBACK(NULL),	       /* 12 - CP_DMA */
 	A3XX_IRQ_CALLBACK(a3xx_cp_callback),   /* 13 - CP_IB2_INT */
 	A3XX_IRQ_CALLBACK(a3xx_cp_callback),   /* 14 - CP_IB1_INT */
 	A3XX_IRQ_CALLBACK(a3xx_cp_callback),   /* 15 - CP_RB_INT */
-	A3XX_IRQ_CALLBACK(a3xx_err_callback),  /* 16 - CP_REG_PROTECT_FAULT */
+	/* 16 - CP_REG_PROTECT_FAULT */
+	A3XX_IRQ_CALLBACK(a3xx_fatal_err_callback),
 	A3XX_IRQ_CALLBACK(NULL),	       /* 17 - CP_RB_DONE_TS */
 	A3XX_IRQ_CALLBACK(NULL),	       /* 18 - CP_VS_DONE_TS */
 	A3XX_IRQ_CALLBACK(NULL),	       /* 19 - CP_PS_DONE_TS */
 	A3XX_IRQ_CALLBACK(NULL),	       /* 20 - CP_CACHE_FLUSH_TS */
-	A3XX_IRQ_CALLBACK(a3xx_err_callback),  /* 21 - CP_AHB_ERROR_FAULT */
+	A3XX_IRQ_CALLBACK(a3xx_fatal_err_callback),/* 21 - CP_AHB_ERROR_FAULT */
 	A3XX_IRQ_CALLBACK(NULL),	       /* 22 - Unused */
 	A3XX_IRQ_CALLBACK(NULL),	       /* 23 - Unused */
-	A3XX_IRQ_CALLBACK(NULL),	       /* 24 - MISC_HANG_DETECT */
+	A3XX_IRQ_CALLBACK(a3xx_fatal_err_callback),/* 24 - MISC_HANG_DETECT */
 	A3XX_IRQ_CALLBACK(a3xx_err_callback),  /* 25 - UCHE_OOB_ACCESS */
 	/* 26 to 31 - Unused */
 };
@@ -2979,14 +3484,27 @@ static irqreturn_t a3xx_irq_handler(struct adreno_device *adreno_dev)
 	return ret;
 }
 
-static void a3xx_irq_control(struct adreno_device *adreno_dev, int state)
+/**
+ * a3xx_irq_init() -  Routine to init a3xx irq
+ * @adreno_dev: adreno device ptr
+ */
+static void a3xx_irq_init(struct adreno_device *adreno_dev)
+{
+	if (adreno_hang_intr_supported(adreno_dev)) {
+		adreno_dev->intr_mask = (A3XX_INT_MASK |
+			(1 << A3XX_INT_MISC_HANG_DETECT));
+		adreno_dev->hang_intr_en = 1;
+	} else
+		adreno_dev->intr_mask = A3XX_INT_MASK;
+
+}
+
+static void a3xx_irq_control(struct adreno_device *adreno_dev,
+							 unsigned int mask)
 {
 	struct kgsl_device *device = &adreno_dev->dev;
 
-	if (state)
-		adreno_regwrite(device, A3XX_RBBM_INT_0_MASK, A3XX_INT_MASK);
-	else
-		adreno_regwrite(device, A3XX_RBBM_INT_0_MASK, 0);
+	kgsl_regwrite(device, A3XX_RBBM_INT_0_MASK, mask);
 }
 
 static unsigned int a3xx_irq_pending(struct adreno_device *adreno_dev)
@@ -3146,6 +3664,131 @@ static struct {
 	{ adreno_is_a305b, a305b_vbif },
 };
 
+/*
+ * Define the available perfcounter groups - these get used by
+ * adreno_perfcounter_get and adreno_perfcounter_put
+ */
+
+static struct adreno_perfcount_register a3xx_perfcounters_cp[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_CP_0_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_rbbm[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_RBBM_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_RBBM_1_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_pc[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_PC_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_PC_1_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_PC_2_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_PC_3_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_vfd[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_VFD_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_VFD_1_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_hlsq[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_HLSQ_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_HLSQ_1_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_HLSQ_2_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_HLSQ_3_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_HLSQ_4_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_HLSQ_5_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_vpc[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_VPC_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_VPC_1_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_tse[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_TSE_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_TSE_1_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_ras[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_RAS_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_RAS_1_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_uche[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_UCHE_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_UCHE_1_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_UCHE_2_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_UCHE_3_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_UCHE_4_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_UCHE_5_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_tp[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_TP_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_TP_1_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_TP_2_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_TP_3_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_TP_4_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_TP_5_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_sp[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_SP_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_SP_1_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_SP_2_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_SP_3_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_SP_4_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_SP_5_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_SP_6_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_SP_7_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_rb[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_RB_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_RB_1_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_pwr[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_PWR_0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_RBBM_PERFCTR_PWR_1_LO },
+};
+
+static struct adreno_perfcount_register a3xx_perfcounters_vbif[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_VBIF_PERF_CNT0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_VBIF_PERF_CNT1_LO },
+};
+static struct adreno_perfcount_register a3xx_perfcounters_vbif_pwr[] = {
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_VBIF_PERF_PWR_CNT0_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_VBIF_PERF_PWR_CNT1_LO },
+	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A3XX_VBIF_PERF_PWR_CNT2_LO },
+};
+
+#define A3XX_PERFCOUNTER_GROUP(name) { a3xx_perfcounters_##name, \
+	ARRAY_SIZE(a3xx_perfcounters_##name), __stringify(name) }
+
+static struct adreno_perfcount_group a3xx_perfcounter_groups[] = {
+	A3XX_PERFCOUNTER_GROUP(cp),
+	A3XX_PERFCOUNTER_GROUP(rbbm),
+	A3XX_PERFCOUNTER_GROUP(pc),
+	A3XX_PERFCOUNTER_GROUP(vfd),
+	A3XX_PERFCOUNTER_GROUP(hlsq),
+	A3XX_PERFCOUNTER_GROUP(vpc),
+	A3XX_PERFCOUNTER_GROUP(tse),
+	A3XX_PERFCOUNTER_GROUP(ras),
+	A3XX_PERFCOUNTER_GROUP(uche),
+	A3XX_PERFCOUNTER_GROUP(tp),
+	A3XX_PERFCOUNTER_GROUP(sp),
+	A3XX_PERFCOUNTER_GROUP(rb),
+	A3XX_PERFCOUNTER_GROUP(pwr),
+	A3XX_PERFCOUNTER_GROUP(vbif),
+	A3XX_PERFCOUNTER_GROUP(vbif_pwr),
+};
+
+static struct adreno_perfcounters a3xx_perfcounters = {
+	a3xx_perfcounter_groups,
+	ARRAY_SIZE(a3xx_perfcounter_groups),
+};
+
 static void a3xx_perfcounter_init(struct adreno_device *adreno_dev)
 {
 	/*
@@ -3178,6 +3821,9 @@ static void a3xx_perfcounter_init(struct adreno_device *adreno_dev)
 	/* Reserve and start countable 1 in the PWR perfcounter group */
 	adreno_perfcounter_get(adreno_dev, KGSL_PERFCOUNTER_GROUP_PWR, 1,
 			NULL, PERFCOUNTER_FLAG_KERNEL);
+
+	/* Default performance counter profiling to false */
+	adreno_dev->profile.enabled = false;
 }
 
 static void a3xx_start(struct adreno_device *adreno_dev)
@@ -3220,8 +3866,11 @@ static void a3xx_start(struct adreno_device *adreno_dev)
 
 	/* Turn on hang detection - this spews a lot of useful information
 	 * into the RBBM registers on a hang */
-
-	adreno_regwrite(device, A3XX_RBBM_INTERFACE_HANG_INT_CTL,
+	if (adreno_is_a330v2(adreno_dev))
+		kgsl_regwrite(device, A3XX_RBBM_INTERFACE_HANG_INT_CTL,
+			(1 << 31) | 0xFFFF);
+	else
+		kgsl_regwrite(device, A3XX_RBBM_INTERFACE_HANG_INT_CTL,
 			(1 << 16) | 0xFFF);
 
 	/* Enable 64-byte cacheline size. HW Default is 32-byte (0x000000E0). */
@@ -3356,128 +4005,6 @@ void a3xx_coresight_config_debug_reg(struct kgsl_device *device,
 }
 
 /*
- * Define the available perfcounter groups - these get used by
- * adreno_perfcounter_get and adreno_perfcounter_put
- */
-
-static struct adreno_perfcount_register a3xx_perfcounters_cp[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_CP_0_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_rbbm[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_RBBM_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_RBBM_1_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_pc[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_PC_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_PC_1_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_PC_2_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_PC_3_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_vfd[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_VFD_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_VFD_1_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_hlsq[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_HLSQ_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_HLSQ_1_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_HLSQ_2_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_HLSQ_3_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_HLSQ_4_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_HLSQ_5_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_vpc[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_VPC_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_VPC_1_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_tse[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_TSE_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_TSE_1_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_ras[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_RAS_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_RAS_1_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_uche[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_UCHE_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_UCHE_1_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_UCHE_2_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_UCHE_3_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_UCHE_4_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_UCHE_5_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_tp[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_TP_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_TP_1_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_TP_2_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_TP_3_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_TP_4_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_TP_5_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_sp[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_SP_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_SP_1_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_SP_2_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_SP_3_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_SP_4_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_SP_5_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_SP_6_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_SP_7_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_rb[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_RB_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_RB_1_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_pwr[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_PWR_0_LO, 0 },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_RBBM_PERFCTR_PWR_1_LO, 0 },
-};
-
-static struct adreno_perfcount_register a3xx_perfcounters_vbif[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_VBIF_PERF_CNT0_LO },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_VBIF_PERF_CNT1_LO },
-};
-static struct adreno_perfcount_register a3xx_perfcounters_vbif_pwr[] = {
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_VBIF_PERF_PWR_CNT0_LO },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_VBIF_PERF_PWR_CNT1_LO },
-	{ KGSL_PERFCOUNTER_NOT_USED, 0, A3XX_VBIF_PERF_PWR_CNT2_LO },
-};
-
-static struct adreno_perfcount_group a3xx_perfcounter_groups[] = {
-	{ a3xx_perfcounters_cp, ARRAY_SIZE(a3xx_perfcounters_cp) },
-	{ a3xx_perfcounters_rbbm, ARRAY_SIZE(a3xx_perfcounters_rbbm) },
-	{ a3xx_perfcounters_pc, ARRAY_SIZE(a3xx_perfcounters_pc) },
-	{ a3xx_perfcounters_vfd, ARRAY_SIZE(a3xx_perfcounters_vfd) },
-	{ a3xx_perfcounters_hlsq, ARRAY_SIZE(a3xx_perfcounters_hlsq) },
-	{ a3xx_perfcounters_vpc, ARRAY_SIZE(a3xx_perfcounters_vpc) },
-	{ a3xx_perfcounters_tse, ARRAY_SIZE(a3xx_perfcounters_tse) },
-	{ a3xx_perfcounters_ras, ARRAY_SIZE(a3xx_perfcounters_ras) },
-	{ a3xx_perfcounters_uche, ARRAY_SIZE(a3xx_perfcounters_uche) },
-	{ a3xx_perfcounters_tp, ARRAY_SIZE(a3xx_perfcounters_tp) },
-	{ a3xx_perfcounters_sp, ARRAY_SIZE(a3xx_perfcounters_sp) },
-	{ a3xx_perfcounters_rb, ARRAY_SIZE(a3xx_perfcounters_rb) },
-	{ a3xx_perfcounters_pwr, ARRAY_SIZE(a3xx_perfcounters_pwr) },
-	{ a3xx_perfcounters_vbif, ARRAY_SIZE(a3xx_perfcounters_vbif) },
-	{ a3xx_perfcounters_vbif_pwr, ARRAY_SIZE(a3xx_perfcounters_vbif_pwr) },
-};
-
-static struct adreno_perfcounters a3xx_perfcounters = {
-	a3xx_perfcounter_groups,
-	ARRAY_SIZE(a3xx_perfcounter_groups),
-};
-
-/*
  * a3xx_soft_reset() - Soft reset GPU
  * @adreno_dev: Pointer to adreno device
  *
@@ -3520,6 +4047,7 @@ struct adreno_gpudev adreno_a3xx_gpudev = {
 	.irq_control = a3xx_irq_control,
 	.irq_handler = a3xx_irq_handler,
 	.irq_pending = a3xx_irq_pending,
+	.irq_init = a3xx_irq_init,
 	.busy_cycles = a3xx_busy_cycles,
 	.start = a3xx_start,
 	.snapshot = a3xx_snapshot,

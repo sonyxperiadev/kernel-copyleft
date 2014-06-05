@@ -56,8 +56,8 @@ static int __init xpu_protect_init(void)
 		unsigned int start;
 		unsigned int size;
 	} cmd;
-	cmd.start = __pa(swapper_pg_dir);
-	cmd.size = PAGE_ALIGN((u32)_etext - (u32)swapper_pg_dir);
+	cmd.start = __pa(_stext);
+	cmd.size = PAGE_ALIGN((u32)_etext - (u32)_stext);
 
 	ret = scm_call(SCM_SVC_OEM, XPU_PROTECT_AREA, &cmd, sizeof(cmd),
 			&response, sizeof(response));

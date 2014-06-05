@@ -32,7 +32,7 @@
 #include <media/msmb_camera.h>
 
 #if defined(CONFIG_SONY_CAM_V4L2)
-#define MSM_POST_EVT_TIMEOUT 2000
+#define MSM_POST_EVT_TIMEOUT 4000
 #else
 #define MSM_POST_EVT_TIMEOUT 5000
 #endif

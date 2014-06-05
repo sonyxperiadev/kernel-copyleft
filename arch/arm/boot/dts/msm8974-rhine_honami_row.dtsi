@@ -188,8 +188,15 @@
 	};
 
 	qcom,cci@fda0C000 {
-		qcom,hw-thigh = <22>;
-		qcom,hw-tlow = <33>;
+		qcom,cci-master0 {
+			qcom,hw-thigh = <22>;
+			qcom,hw-tlow = <33>;
+		};
+
+		qcom,cci-master1 {
+			qcom,hw-thigh = <22>;
+			qcom,hw-tlow = <33>;
+		};
 
 		qcom,camera@20 {
 			compatible = "qcom,sony_camera_0";
@@ -796,6 +803,14 @@
 	};
 };
 
+&mdss_hdmi_tx {
+	/* rhine doesn't use hpd-5v */
+	qcom,hdmi-tx-supply-names = "hpd-gdsc", "core-vdda", "core-vcc";
+	qcom,hdmi-tx-min-voltage-level = <0 1800000 1800000>;
+	qcom,hdmi-tx-max-voltage-level = <0 1800000 1800000>;
+	qcom,hdmi-tx-peak-current = <0 1800000 0>;
+};
+
 &pm8941_chg {
 	qcom,vddmax-mv = <4350>;
 	qcom,vddsafe-mv = <4400>;
@@ -804,7 +819,7 @@
 	qcom,ibatsafe-ma = <1500>;
 	qcom,maxinput-dc-ma = <1800>;
 	qcom,maxinput-usb-ma = <1500>;
-	qcom,cool-bat-mv = <4200>;
+	qcom,cool-bat-mv = <4350>;
 	qcom,ibatmax-warm-ma = <900>;
 	qcom,warm-bat-mv = <4200>;
 	qcom,ibatmax-cool-ma = <900>;
@@ -826,6 +841,11 @@
 	qcom,batt-type = <3>;
 	qcom,shutdown-soc-valid-limit = <40>;
 	qcom,clamp-soc-max-count = <2>;
+	qcom,enable-fcc-learning;
+	qcom,min-fcc-learning-soc = <20>;
+	qcom,min-fcc-ocv-pc = <30>;
+	qcom,min-fcc-learning-samples = <5>;
+	qcom,fcc-resolution = <10>;
 };
 
 &pm8941_gpios {
@@ -1348,6 +1368,7 @@
 	regulator-min-microvolt = <1200000>;
 	regulator-max-microvolt = <1200000>;
 	qcom,init-voltage = <1200000>;
+	qcom,init-ldo-mode = <1>;
 	status = "ok";
 };
 
@@ -1407,6 +1428,7 @@
 	regulator-min-microvolt = <2700000>;
 	regulator-max-microvolt = <2700000>;
 	qcom,init-voltage = <2700000>;
+	qcom,init-ldo-mode = <1>;
 	status = "ok";
 };
 
@@ -1449,6 +1471,7 @@
 	regulator-min-microvolt = <2800000>;
 	regulator-max-microvolt = <2800000>;
 	qcom,init-voltage = <2800000>;
+	qcom,init-ldo-mode = <1>;
 	status = "ok";
 };
 
@@ -1537,6 +1560,14 @@
 	qcom,pm8941@0 {
 		qcom,vadc@3400 {
 			chan@30 {
+				qcom,hw-settle-time = <15>;
+			};
+
+			chan@8 {
+				qcom,hw-settle-time = <15>;
+			};
+
+			chan@6 {
 				qcom,hw-settle-time = <15>;
 			};
 		};

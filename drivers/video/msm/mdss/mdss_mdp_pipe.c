@@ -167,7 +167,7 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 	} else if (mdata->has_decimation && pipe->src_fmt->is_yuv) {
 		ps.num_planes = 2;
 		ps.ystride[0] = pipe->src.w >> pipe->horz_deci;
-		ps.ystride[1] = pipe->src.h >> pipe->vert_deci;
+		ps.ystride[1] = ps.ystride[0];
 	} else {
 		rc = mdss_mdp_get_plane_sizes(pipe->src_fmt->format,
 			pipe->src.w, pipe->src.h, &ps, 0);
@@ -724,4 +724,9 @@ done:
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 
 	return ret;
+}
+
+int mdss_mdp_pipe_is_staged(struct mdss_mdp_pipe *pipe)
+{
+	return (pipe == pipe->mixer->stage_pipe[pipe->mixer_stage]);
 }

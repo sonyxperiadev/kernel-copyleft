@@ -2554,6 +2554,17 @@ exit:
 static int synaptics_clearpad_process_F12_2D(struct synaptics_clearpad *this)
 {
 	int rc;
+	u8 status;
+
+	rc = synaptics_read(this, SYNF(F01_RMI, DATA, 0x00), &status, 1);
+	LOG_CHECK(this, "rc=%d F01_RMI_DATA00=0x%x\n", rc, status);
+	if (rc)
+		goto exit;
+
+	if (DEVICE_STATUS_DEVICE_FAILURE == status) {
+		synaptics_clearpad_reset_power(this);
+		goto exit;
+	}
 
 	rc = synaptics_clearpad_read_fingers_f12(this);
 	if (rc)

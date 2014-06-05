@@ -830,6 +830,7 @@ static void switch_mode(struct mhl_tx_ctrl *mhl_ctrl, enum mhl_st_type to_mode)
 void mhl_tmds_ctrl(struct mhl_tx_ctrl *mhl_ctrl, uint8_t on)
 {
 	struct i2c_client *client = mhl_ctrl->i2c_handle;
+
 	if (on) {
 		MHL_SII_REG_NAME_MOD(REG_TMDS_CCTRL, BIT4, BIT4);
 		mhl_ctrl->tmds_en_state = true;
@@ -1928,6 +1929,13 @@ static int mhl_i2c_probe(struct i2c_client *client,
 	init_completion(&mhl_ctrl->rgnd_done);
 	INIT_WORK(&mhl_ctrl->timer_work, mhl_discovery_timeout_work);
 
+	init_timer(&mhl_ctrl->discovery_timer);
+	mhl_ctrl->discovery_timer.function =
+		mhl_discovery_timer;
+	mhl_ctrl->discovery_timer.data = (unsigned long)mhl_ctrl;
+	mhl_ctrl->discovery_timer.expires = 0xffffffffL;
+	add_timer(&mhl_ctrl->discovery_timer);
+
 	pr_debug("%s: IRQ from GPIO INTR = %d\n",
 		__func__, mhl_ctrl->i2c_handle->irq);
 	pr_debug("%s: Driver name = [%s]\n", __func__,
@@ -2016,18 +2024,12 @@ static int mhl_i2c_probe(struct i2c_client *client,
 	mhl_ctrl->mhl_info = mhl_info;
 	mhl_register_msc(mhl_ctrl);
 
-	init_timer(&mhl_ctrl->discovery_timer);
-	mhl_ctrl->discovery_timer.function =
-		mhl_discovery_timer;
-	mhl_ctrl->discovery_timer.data = (unsigned long)mhl_ctrl;
-	mhl_ctrl->discovery_timer.expires = 0xffffffffL;
-	add_timer(&mhl_ctrl->discovery_timer);
-
 	return 0;
 
 failed_probe_pwr:
 	power_supply_unregister(&mhl_ctrl->mhl_psy);
 failed_probe:
+	del_timer(&mhl_ctrl->discovery_timer);
 	free_irq(mhl_ctrl->i2c_handle->irq, mhl_ctrl);
 	mhl_gpio_config(mhl_ctrl, 0);
 	mhl_vreg_config(mhl_ctrl, 0);

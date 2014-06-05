@@ -38,6 +38,16 @@
 
 uint8_t *adm_get_param_buffer;
 
+
+enum {
+	ADM_RX_AUDPROC_CAL,
+	ADM_TX_AUDPROC_CAL,
+	ADM_RX_AUDVOL_CAL,
+	ADM_TX_AUDVOL_CAL,
+	ADM_CUSTOM_TOP_CAL,
+	ADM_MAX_CAL_TYPES
+};
+
 struct adm_ctl {
 	void *apr;
 	atomic_t copp_id[AFE_MAX_PORTS];
@@ -51,10 +61,7 @@ struct adm_ctl {
 	struct acdb_cal_block mem_addr_audproc[MAX_AUDPROC_TYPES];
 	struct acdb_cal_block mem_addr_audvol[MAX_AUDPROC_TYPES];
 
-/* 0 - (MAX_AUDPROC_TYPES -1):				audproc handles */
-/* (MAX_AUDPROC_TYPES -1) - (2 * MAX_AUDPROC_TYPES -1):	audvol handles */
-/* + 1 for custom ADM topology */
-	atomic_t mem_map_cal_handles[(2 * MAX_AUDPROC_TYPES) + 1];
+	atomic_t mem_map_cal_handles[ADM_MAX_CAL_TYPES];
 	atomic_t mem_map_cal_index;
 
 	int set_custom_topology;
@@ -689,7 +696,8 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 				if (payload[1] != 0) {
 					pr_err("%s: ADM map error, resuming\n",
 						__func__);
-					atomic_set(&this_adm.copp_stat[0], 1);
+					atomic_set(&this_adm.copp_stat[index],
+							1);
 					wake_up(&this_adm.wait[index]);
 				}
 				break;
@@ -771,7 +779,7 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 			atomic_set(&this_adm.mem_map_cal_handles[
 				atomic_read(&this_adm.mem_map_cal_index)],
 				*payload);
-			atomic_set(&this_adm.copp_stat[0], 1);
+			atomic_set(&this_adm.copp_stat[index], 1);
 			wake_up(&this_adm.wait[index]);
 			break;
 		default:
@@ -807,13 +815,13 @@ void send_adm_custom_topology(int port_id)
 
 	if (this_adm.set_custom_topology) {
 		/* specific index 4 for adm topology memory */
-		atomic_set(&this_adm.mem_map_cal_index, 4);
+		atomic_set(&this_adm.mem_map_cal_index, ADM_CUSTOM_TOP_CAL);
 
 		/* Only call this once */
 		this_adm.set_custom_topology = 0;
 
-		result = adm_memory_map_regions(port_id, &cal_block.cal_paddr,
-					0, &size, 1);
+		result = adm_memory_map_regions(port_id,
+				&cal_block.cal_paddr, 0, &size, 1);
 		if (result < 0) {
 			pr_err("%s: mmap did not work! addr = 0x%x, size = %d\n",
 				__func__, cal_block.cal_paddr,
@@ -837,7 +845,8 @@ void send_adm_custom_topology(int port_id)
 	adm_top.hdr.opcode = ADM_CMD_ADD_TOPOLOGIES;
 	adm_top.payload_addr_lsw = cal_block.cal_paddr;
 	adm_top.payload_addr_msw = 0;
-	adm_top.mem_map_handle = atomic_read(&this_adm.mem_map_cal_handles[4]);
+	adm_top.mem_map_handle =
+		atomic_read(&this_adm.mem_map_cal_handles[ADM_CUSTOM_TOP_CAL]);
 	adm_top.payload_size = cal_block.cal_size;
 
 	atomic_set(&this_adm.copp_stat[index], 0);
@@ -951,9 +960,7 @@ static void send_adm_cal(int port_id, int path)
 		this_adm.mem_addr_audproc[acdb_path].cal_size)) {
 
 		if (this_adm.mem_addr_audproc[acdb_path].cal_paddr != 0)
-			adm_memory_unmap_regions(port_id,
-				&this_adm.mem_addr_audproc[acdb_path].
-				cal_paddr, &size, 1);
+			adm_memory_unmap_regions(port_id);
 
 		result = adm_memory_map_regions(port_id, &aud_cal.cal_paddr,
 						0, &size, 1);
@@ -987,9 +994,7 @@ static void send_adm_cal(int port_id, int path)
 		this_adm.mem_addr_audvol[acdb_path].cal_size)) {
 
 		if (this_adm.mem_addr_audvol[acdb_path].cal_paddr != 0)
-			adm_memory_unmap_regions(port_id,
-				&this_adm.mem_addr_audvol[acdb_path].cal_paddr,
-				&size, 1);
+			adm_memory_unmap_regions(port_id);
 
 		result = adm_memory_map_regions(port_id, &aud_cal.cal_paddr,
 						0, &size, 1);
@@ -1010,6 +1015,45 @@ static void send_adm_cal(int port_id, int path)
 	else
 		pr_debug("%s: Audvol cal not sent for port id: %#x, path %d\n",
 			__func__, port_id, acdb_path);
+}
+
+int adm_unmap_cal_blocks(void)
+{
+	int	i;
+	int	result = 0;
+	int	result2 = 0;
+
+	for (i = 0; i < ADM_MAX_CAL_TYPES; i++) {
+		if (atomic_read(&this_adm.mem_map_cal_handles[i]) != 0) {
+
+			if (i <= ADM_TX_AUDPROC_CAL) {
+				this_adm.mem_addr_audproc[i].cal_paddr = 0;
+				this_adm.mem_addr_audproc[i].cal_size = 0;
+			} else if (i <= ADM_TX_AUDVOL_CAL) {
+				this_adm.mem_addr_audvol
+					[(i - ADM_RX_AUDVOL_CAL)].cal_paddr
+					= 0;
+				this_adm.mem_addr_audvol
+					[(i - ADM_RX_AUDVOL_CAL)].cal_size
+					= 0;
+			} else if (i == ADM_CUSTOM_TOP_CAL) {
+				this_adm.set_custom_topology = 1;
+			}
+
+			/* valid port ID needed for callback use primary I2S */
+			atomic_set(&this_adm.mem_map_cal_index, i);
+			result2 = adm_memory_unmap_regions(PRIMARY_I2S_RX);
+			if (result2 < 0) {
+				pr_err("%s: adm_memory_unmap_regions failed, err %d\n",
+						__func__, result2);
+				result = result2;
+			} else {
+				atomic_set(&this_adm.mem_map_cal_handles[i],
+					0);
+			}
+		}
+	}
+	return result;
 }
 
 int adm_connect_afe_port(int mode, int session_id, int port_id)
@@ -1470,7 +1514,7 @@ int adm_memory_map_regions(int port_id,
 		++mregions;
 	}
 
-	atomic_set(&this_adm.copp_stat[0], 0);
+	atomic_set(&this_adm.copp_stat[index], 0);
 	ret = apr_send_pkt(this_adm.apr, (uint32_t *) mmap_region_cmd);
 	if (ret < 0) {
 		pr_err("%s: mmap_regions op[0x%x]rc[%d]\n", __func__,
@@ -1480,7 +1524,7 @@ int adm_memory_map_regions(int port_id,
 	}
 
 	ret = wait_event_timeout(this_adm.wait[index],
-			atomic_read(&this_adm.copp_stat[0]), 5 * HZ);
+			atomic_read(&this_adm.copp_stat[index]), 5 * HZ);
 	if (!ret) {
 		pr_err("%s: timeout. waited for memory_map\n", __func__);
 		ret = -EINVAL;
@@ -1491,8 +1535,7 @@ fail_cmd:
 	return ret;
 }
 
-int adm_memory_unmap_regions(int32_t port_id, uint32_t *buf_add,
-			uint32_t *bufsz, uint32_t bufcnt)
+int adm_memory_unmap_regions(int32_t port_id)
 {
 	struct  avs_cmd_shared_mem_unmap_regions unmap_regions;
 	int     ret = 0;

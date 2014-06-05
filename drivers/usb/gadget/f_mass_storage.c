@@ -1782,6 +1782,7 @@ static int do_start_stop(struct fsg_common *common)
 		: 0;
 }
 
+#if !defined(CONFIG_USB_G_ANDROID)
 static int do_prevent_allow(struct fsg_common *common)
 {
 	struct fsg_lun	*curlun = common->curlun;
@@ -1804,6 +1805,7 @@ static int do_prevent_allow(struct fsg_common *common)
 	curlun->prevent_medium_removal = prevent;
 	return 0;
 }
+#endif
 
 static int do_read_format_capacities(struct fsg_common *common,
 			struct fsg_buffhd *bh)
@@ -2326,6 +2328,7 @@ static int do_scsi_command(struct fsg_common *common)
 			reply = do_mode_sense(common, bh);
 		break;
 
+#if !defined(CONFIG_USB_G_ANDROID)
 	case ALLOW_MEDIUM_REMOVAL:
 		common->data_size_from_cmnd = 0;
 		reply = check_command(common, 6, DATA_DIR_NONE,
@@ -2334,6 +2337,7 @@ static int do_scsi_command(struct fsg_common *common)
 		if (reply == 0)
 			reply = do_prevent_allow(common);
 		break;
+#endif
 
 	case READ_6:
 		i = common->cmnd[4];

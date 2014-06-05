@@ -102,7 +102,7 @@ struct mhl_msm_state_t {
 	int mhl_mode;
 	struct completion rgnd_done;
 	struct completion msc_cmd_done;
-	uint8_t devcap_state;
+	uint16_t devcap_state;
 	uint8_t path_en_state;
 	struct work_struct mhl_msc_send_work;
 	struct list_head list_cmd;

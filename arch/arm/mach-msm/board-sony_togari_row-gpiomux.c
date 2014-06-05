@@ -1606,19 +1606,19 @@ static struct msm_gpiomux_config rhine_all_configs[] __initdata = {
 	},
 	{ /* NC(UIM2_DATA) */
 		.gpio = 49,
-		.settings = { [GPIOMUX_SUSPENDED] = &unused_gpio, },
+		.settings = { [GPIOMUX_SUSPENDED] = &gpio_2ma_pull_down_in, },
 	},
 	{ /* NC(UIM2_CLK) */
 		.gpio = 50,
-		.settings = { [GPIOMUX_SUSPENDED] = &unused_gpio, },
+		.settings = { [GPIOMUX_SUSPENDED] = &gpio_2ma_pull_down_in, },
 	},
 	{ /* NC(UIM2_RST) */
 		.gpio = 51,
-		.settings = { [GPIOMUX_SUSPENDED] = &unused_gpio, },
+		.settings = { [GPIOMUX_SUSPENDED] = &gpio_2ma_pull_down_in, },
 	},
 	{ /* NC(UIM2_DETECT) */
 		.gpio = 52,
-		.settings = { [GPIOMUX_SUSPENDED] = &unused_gpio, },
+		.settings = { [GPIOMUX_SUSPENDED] = &gpio_2ma_pull_down_in, },
 	},
 	{ /* NC(UART_TX_IR) */
 		.gpio = 53,
@@ -2299,7 +2299,8 @@ static void __init gpiomux_arrange_all_qct_configs(void)
 		gpiomux_set_qct_configs(msm_mhl_configs,
 				    ARRAY_SIZE(msm_mhl_configs));
 
-	if (of_board_is_liquid())
+	if (of_board_is_liquid() ||
+	   (of_board_is_dragonboard() && machine_is_apq8074()))
 		gpiomux_set_qct_configs(msm8974_pri_ter_auxpcm_configs,
 				 ARRAY_SIZE(msm8974_pri_ter_auxpcm_configs));
 	else

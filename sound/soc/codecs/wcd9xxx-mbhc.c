@@ -33,6 +33,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/kernel.h>
 #include <linux/gpio.h>
+#include <linux/input.h>
 #include "wcd9320.h"
 #include "wcd9306.h"
 #include "wcd9xxx-mbhc.h"
@@ -1855,6 +1856,8 @@ static void wcd9xxx_hs_remove_irq_noswch(struct wcd9xxx_mbhc *mbhc)
 	struct snd_soc_codec *codec = mbhc->codec;
 	const struct wcd9xxx_mbhc_general_cfg *generic =
 		WCD9XXX_MBHC_CAL_GENERAL_PTR(mbhc->mbhc_cfg->calibration);
+	const struct wcd9xxx_mbhc_plug_type_cfg *plug_type =
+		WCD9XXX_MBHC_CAL_PLUG_TYPE_PTR(mbhc->mbhc_cfg->calibration);
 
 	pr_debug("%s: enter\n", __func__);
 	if (mbhc->current_plug != PLUG_TYPE_HEADSET) {
@@ -1873,8 +1876,8 @@ static void wcd9xxx_hs_remove_irq_noswch(struct wcd9xxx_mbhc *mbhc)
 		dce = wcd9xxx_codec_sta_dce(mbhc, 1,  true);
 		pr_debug("%s: DCE 0x%x,%d\n", __func__, dce,
 			 wcd9xxx_codec_sta_dce_v(mbhc, 1, dce));
-		if (dce <
-		    wcd9xxx_get_current_v(mbhc, WCD9XXX_CURRENT_V_INS_H)) {
+		if (wcd9xxx_codec_sta_dce_v(mbhc, 1, dce) <
+		    plug_type->v_hs_max) {
 			removed = false;
 			break;
 		}
@@ -3705,6 +3708,15 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 			return ret;
 		}
 
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_0,
+				       KEY_MEDIA);
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-0\n",
+				__func__);
+			return ret;
+		}
+
 		INIT_DELAYED_WORK(&mbhc->mbhc_firmware_dwork,
 				  wcd9xxx_mbhc_fw_read);
 		INIT_DELAYED_WORK(&mbhc->mbhc_btn_dwork, wcd9xxx_btn_lpress_fn);
@@ -3780,6 +3792,9 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 	}
 	wcd9xxx_disable_irq(codec->control_data, WCD9XXX_IRQ_HPH_PA_OCPR_FAULT);
 
+	wcd9xxx_regmgr_cond_register(resmgr, 1 << WCD9XXX_COND_HPH_MIC |
+					     1 << WCD9XXX_COND_HPH);
+
 	pr_debug("%s: leave ret %d\n", __func__, ret);
 	return ret;
 
@@ -3804,6 +3819,9 @@ EXPORT_SYMBOL_GPL(wcd9xxx_mbhc_init);
 void wcd9xxx_mbhc_deinit(struct wcd9xxx_mbhc *mbhc)
 {
 	void *cdata = mbhc->codec->control_data;
+
+	wcd9xxx_regmgr_cond_deregister(mbhc->resmgr, 1 << WCD9XXX_COND_HPH_MIC |
+						     1 << WCD9XXX_COND_HPH);
 
 	wcd9xxx_free_irq(cdata, WCD9XXX_IRQ_MBHC_RELEASE, mbhc);
 	wcd9xxx_free_irq(cdata, WCD9XXX_IRQ_MBHC_POTENTIAL, mbhc);

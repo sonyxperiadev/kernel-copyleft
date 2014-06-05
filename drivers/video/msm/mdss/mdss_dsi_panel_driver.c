@@ -514,6 +514,16 @@ exit:
 	return ret;
 }
 
+static ssize_t mdss_dsi_panel_id_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl = dev_get_drvdata(dev);
+	char const *id = ctrl->panel_data.panel_info.panel_id_name ?
+		ctrl->panel_data.panel_info.panel_id_name : "default";
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", id);
+}
+
 static struct device_attribute panel_attributes[] = {
 	__ATTR(frame_counter, S_IRUGO, mdss_dsi_panel_frame_counter, NULL),
 	__ATTR(frames_per_ksecs, S_IRUGO,
@@ -526,6 +536,7 @@ static struct device_attribute panel_attributes[] = {
 					mdss_dsi_panel_interval_array_ms, NULL),
 	__ATTR(cabc, S_IRUGO|S_IWUSR|S_IWGRP, mdss_dsi_panel_cabc_show,
 						mdss_dsi_panel_cabc_store),
+	__ATTR(panel_id, S_IRUGO, mdss_dsi_panel_id_show, NULL),
 };
 
 static int register_attributes(struct device *dev)
@@ -810,8 +821,7 @@ static int mdss_dsi_panel_update_panel_info(struct mdss_panel_data *pdata)
 	else
 		bpp = 3;		/* Default format set to RGB888 */
 
-	if (panel_data->panel_info.type == MIPI_VIDEO_PANEL &&
-		!panel_data->panel_info.clk_rate) {
+	if (!panel_data->panel_info.clk_rate) {
 		h_period += panel_data->panel_info.lcdc.xres_pad;
 		v_period += panel_data->panel_info.lcdc.yres_pad;
 
@@ -846,13 +856,14 @@ static int mdss_dsi_panel_update_panel_info(struct mdss_panel_data *pdata)
 	ctrl_pdata->einit_cmds = panel_data->einit_cmds;
 	ctrl_pdata->init_cmds = panel_data->init_cmds;
 	ctrl_pdata->on_cmds = panel_data->on_cmds;
-	ctrl_pdata->off_cmds = panel_data->off_cmds;
+	ctrl_pdata->off_cmds = panel_data->off_cmds[DETECTED_CMDS];
 	ctrl_pdata->id_read_cmds = panel_data->id_read_cmds;
 
 	ctrl_pdata->cabc_early_on_cmds = panel_data->cabc_early_on_cmds;
 	ctrl_pdata->cabc_on_cmds = panel_data->cabc_on_cmds;
-	ctrl_pdata->cabc_off_cmds = panel_data->cabc_off_cmds;
-	ctrl_pdata->cabc_late_off_cmds = panel_data->cabc_late_off_cmds;
+	ctrl_pdata->cabc_off_cmds = panel_data->cabc_off_cmds[DETECTED_CMDS];
+	ctrl_pdata->cabc_late_off_cmds =
+				panel_data->cabc_late_off_cmds[DETECTED_CMDS];
 	ctrl_pdata->cabc_deferred_on_cmds = panel_data->cabc_deferred_on_cmds;
 	if (ctrl_pdata->cabc_deferred_on_cmds.cmd_cnt)
 		INIT_WORK(&ctrl_pdata->cabc_work, cabc_work_fn);
@@ -1572,8 +1583,10 @@ static int mdss_panel_parse_panel_dt(struct device_node *np,
 		if (!panel_name)
 			pr_info("%s:%d, panel name not specified\n",
 							__func__, __LINE__);
-		else
+		else {
+			panel_info->panel_id_name = panel_name;
 			pr_info("%s: Panel Name = %s\n", __func__, panel_name);
+		}
 
 		rc = of_property_read_u32_array(next,
 			"qcom,mdss-pan-res", res, 2);
@@ -1813,8 +1826,16 @@ static int mdss_panel_parse_panel_dt(struct device_node *np,
 		mdss_dsi_parse_dcs_cmds(next, &panel_data->on_cmds,
 			"qcom,panel-on-cmds", "qcom,on-cmds-dsi-state");
 
-		mdss_dsi_parse_dcs_cmds(next, &panel_data->off_cmds,
-			"qcom,panel-off-cmds", "qcom,off-cmds-dsi-state");
+		if (id_data)
+			mdss_dsi_parse_dcs_cmds(next,
+				&panel_data->off_cmds[DETECTED_CMDS],
+				"qcom,panel-off-cmds",
+				"qcom,off-cmds-dsi-state");
+		else
+			mdss_dsi_parse_dcs_cmds(next,
+				&panel_data->off_cmds[DEFAULT_CMDS],
+				"qcom,panel-off-cmds",
+				"qcom,off-cmds-dsi-state");
 
 		rc = of_property_read_u32(next, "somc,wait-time-before-on-cmd",
 			&tmp);
@@ -1874,12 +1895,22 @@ static int mdss_panel_parse_panel_dt(struct device_node *np,
 				&panel_data->cabc_on_cmds,
 					"somc,panel-cabc-on-cmds", NULL);
 
-		mdss_dsi_parse_dcs_cmds(next,
-				&panel_data->cabc_off_cmds,
+		if (id_data)
+			mdss_dsi_parse_dcs_cmds(next,
+				&panel_data->cabc_off_cmds[DETECTED_CMDS],
+					"somc,panel-cabc-off-cmds", NULL);
+		else
+			mdss_dsi_parse_dcs_cmds(next,
+				&panel_data->cabc_off_cmds[DEFAULT_CMDS],
 					"somc,panel-cabc-off-cmds", NULL);
 
-		mdss_dsi_parse_dcs_cmds(next,
-				&panel_data->cabc_late_off_cmds,
+		if (id_data)
+			mdss_dsi_parse_dcs_cmds(next,
+				&panel_data->cabc_late_off_cmds[DETECTED_CMDS],
+				"somc,panel-cabc-late-off-cmds", NULL);
+		else
+			mdss_dsi_parse_dcs_cmds(next,
+				&panel_data->cabc_late_off_cmds[DEFAULT_CMDS],
 				"somc,panel-cabc-late-off-cmds", NULL);
 
 		mdss_dsi_parse_dcs_cmds(next,

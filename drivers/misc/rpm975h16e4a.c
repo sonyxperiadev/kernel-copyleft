@@ -1,6 +1,6 @@
 /* drivers/misc/rpm975h16e4a.c
  *
- * Copyright (C) 2012 Sony Mobile Communications AB.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * Author: Manabu Yoshida <Manabu.X.Yoshida@sonymobile.com>
  *
@@ -25,15 +25,12 @@
 #define PM_QOS_IRDA_TIMEOUT (1200 * USEC_PER_SEC)
 #define PM_QOS_IRDA_LAT_VALUE 0
 
-#define PWDOWN_GPIO_RSRC "pwdown_gpio"
-
 static char const * const gpio_rsrcs[] = {
 	"tx-gpio",
 	"rx-gpio",
 };
 
 struct rpm975h16e4a_drvdata {
-	int pwdown_gpio;
 	int gpios[ARRAY_SIZE(gpio_rsrcs)];
 	struct platform_device *pdev;
 	struct device sysfs_dev;
@@ -69,21 +66,6 @@ static struct gpiomux_setting gpio_setting[][ARRAY_SIZE(gpio_rsrcs)] = {
 		},
 	},
 };
-
-static int pwdown_high(struct device *dev, bool high)
-{
-	int value = high ? 1 : 0;
-	struct rpm975h16e4a_drvdata *ddata = dev_get_drvdata(dev);
-
-	gpio_set_value_cansleep(ddata->pwdown_gpio, value);
-
-	return 0;
-};
-
-static int rpm975h16e4a_power(struct device *dev, bool enable)
-{
-	return pwdown_high(dev, !enable);
-}
 
 static int rpm975h16e4a_gpio_set_active(struct device *dev, bool active)
 {
@@ -186,9 +168,11 @@ static int rpm975h16e4a_setup_regulator(struct device *dev, bool enable)
 	static struct regulator *vcc;
 	static struct regulator *vio;
 	int ret = 0;
+	struct rpm975h16e4a_drvdata *ddata = dev_get_drvdata(dev);
 
 	if (enable && !vreg_is_enable) {
-		ret = rpm975h16e4a_reg_power(true, dev, &vcc, &vio,
+		ret = rpm975h16e4a_reg_power(true, &ddata->pdev->dev,
+					&vcc, &vio,
 					"rpm975h16e4a_vcc", "rpm975h16e4a_vio");
 		if (ret) {
 			dev_err(dev, "%s: regulator_enable failed\n", __func__);
@@ -197,7 +181,8 @@ static int rpm975h16e4a_setup_regulator(struct device *dev, bool enable)
 		vreg_is_enable = true;
 	} else if (!enable && vreg_is_enable) {
 		vreg_is_enable = false;
-		ret = rpm975h16e4a_reg_power(false, dev, &vcc, &vio,
+		ret = rpm975h16e4a_reg_power(false, &ddata->pdev->dev,
+					&vcc, &vio,
 					"rpm975h16e4a_vcc", "rpm975h16e4a_vio");
 		if (ret)
 			dev_err(dev,
@@ -241,11 +226,6 @@ static int rpm975h16e4a_disable(struct device *dev)
 {
 	int ret;
 
-	ret = pwdown_high(dev, false);
-	if (ret) {
-		dev_err(dev, "%s: rpm975h16e4a power low failed\n", __func__);
-		goto error_pwdown_high;
-	}
 	ret = rpm975h16e4a_gpios_request(dev, false);
 	if (ret) {
 		dev_err(dev, "%s: rpm975h16e4a_gpios_request failed\n",
@@ -263,40 +243,6 @@ static int rpm975h16e4a_disable(struct device *dev)
 error_setup_regulator:
 	rpm975h16e4a_gpios_request(dev, true);
 error_gpio_request:
-	pwdown_high(dev, true);
-error_pwdown_high:
-	return ret;
-}
-
-static int rpm975h16e4a_enable(struct device *dev)
-{
-	int ret;
-
-	ret = rpm975h16e4a_setup_regulator(dev, true);
-	if (ret) {
-		dev_err(dev, "%s: rpm975h16e4a_setup_regulator failed\n",
-			__func__);
-		goto error_setup_regulator;
-	}
-	ret = rpm975h16e4a_gpios_request(dev, true);
-	if (ret) {
-		dev_err(dev, "%s: rpm975h16e4a_gpios_request failed\n",
-			__func__);
-		goto error_setup_gpio;
-	}
-	ret = pwdown_high(dev, true);
-	if (ret) {
-		dev_err(dev, "%s: rpm975h16e4a power high failed\n", __func__);
-		goto error_pwdown_high;
-	}
-
-	return 0;
-
-error_pwdown_high:
-	rpm975h16e4a_gpios_request(dev, false);
-error_setup_gpio:
-	rpm975h16e4a_setup_regulator(dev, false);
-error_setup_regulator:
 	return ret;
 }
 
@@ -313,7 +259,7 @@ static ssize_t rpm975h16e4a_store(struct device *dev,
 		goto err_out;
 	}
 	if (value) {
-		ret = rpm975h16e4a_power(dev, true);
+		ret = rpm975h16e4a_setup_regulator(dev, true);
 		if (!ret) {
 			ret = rpm975h16e4a_gpio_set_active(dev, true);
 			if (!ret)
@@ -321,11 +267,11 @@ static ssize_t rpm975h16e4a_store(struct device *dev,
 							PM_QOS_IRDA_LAT_VALUE,
 							PM_QOS_IRDA_TIMEOUT);
 			else
-				rpm975h16e4a_power(dev, false);
+				rpm975h16e4a_setup_regulator(dev, false);
 		}
 	} else {
 		rpm975h16e4a_gpio_set_active(dev, false);
-		rpm975h16e4a_power(dev, false);
+		rpm975h16e4a_setup_regulator(dev, false);
 		pm_qos_update_request(&qos_req, PM_QOS_DEFAULT_VALUE);
 	}
 	if (ret) {
@@ -372,20 +318,6 @@ static int __devinit rpm975h16e4a_probe(struct platform_device *pdev)
 		}
 		ddata->gpios[i] = gpio;
 	}
-	gpio = of_get_named_gpio_flags(of_node, PWDOWN_GPIO_RSRC, 0, &flags);
-	if (!gpio_is_valid(gpio)) {
-		dev_err(&pdev->dev, "%s: invalid gpio #%s: %d\n",
-			__func__, PWDOWN_GPIO_RSRC, gpio);
-		ret = -EINVAL;
-		goto error_gpio;
-	}
-	ddata->pwdown_gpio = gpio;
-	ret = gpio_request(gpio, PWDOWN_GPIO_RSRC);
-	if (ret) {
-		dev_err(&pdev->dev, "%s: GPIO %d: gpio_request failed %d\n",
-			__func__, gpio, ret);
-		goto error_gpio;
-	}
 	ddata->pdev = pdev;
 	platform_set_drvdata(pdev, ddata);
 	ddata->sysfs_dev.init_name = "irda";
@@ -394,7 +326,7 @@ static int __devinit rpm975h16e4a_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "%s: device_register failed %d\n",
 			__func__, ret);
-		goto error_device_register;
+		goto error_gpio;
 	}
 	ret = device_create_file(&ddata->sysfs_dev, &rpm975h16e4a_attr);
 	if (ret) {
@@ -402,21 +334,19 @@ static int __devinit rpm975h16e4a_probe(struct platform_device *pdev)
 			__func__, ret);
 		goto error_device_create_file;
 	}
-	ret = rpm975h16e4a_enable(&pdev->dev);
+	ret = rpm975h16e4a_gpios_request(&pdev->dev, true);
 	if (ret) {
-		dev_err(&pdev->dev, "%s: rpm975h16e4a_enable failed %d\n",
-			__func__, ret);
-		goto error_rpm975h16e4a_enable;
+		dev_err(&pdev->dev, "%s: rpm975h16e4a_gpios_request failed\n",
+			__func__);
+		goto error_request_gpio;
 	}
 
 	return 0;
 
-error_rpm975h16e4a_enable:
+error_request_gpio:
 	device_remove_file(&ddata->sysfs_dev, &rpm975h16e4a_attr);
 error_device_create_file:
 	device_unregister(&ddata->sysfs_dev);
-error_device_register:
-	gpio_free(ddata->pwdown_gpio);
 error_gpio:
 	kfree(ddata);
 error_init:
@@ -430,7 +360,6 @@ static int __devexit rpm975h16e4a_remove(struct platform_device *pdev)
 	rpm975h16e4a_disable(&pdev->dev);
 	device_remove_file(&ddata->sysfs_dev, &rpm975h16e4a_attr);
 	device_unregister(&ddata->sysfs_dev);
-	gpio_free(ddata->pwdown_gpio);
 	kfree(ddata);
 
 	return 0;
