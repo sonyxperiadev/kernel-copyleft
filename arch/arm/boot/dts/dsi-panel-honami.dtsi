@@ -176,6 +176,7 @@
 			somc,disp-on-in-hs = <1>;
 			somc,wait-time-before-on-cmd = <150>;
 
+			somc,panel-pre-uv-cmds = [29 01 00 00 00 00 02 B0 04];
 			somc,panel-uv-cmds = [04 01 00 00 00 00 01 EF];
 			somc,panel-pcc-table = <0x08000 0x06D00 0x08000		/* CLR01_GRN */
 					0x07A00 0x07100 0x08000		/* CLR02_GRN */
@@ -332,6 +333,7 @@
 			somc,disp-on-in-hs = <1>;
 			somc,wait-time-before-on-cmd = <120>;
 
+			somc,panel-pre-uv-cmds = [29 01 00 00 00 00 02 B0 04];
 			somc,panel-uv-cmds = [04 01 00 00 00 00 01 EF];
 			somc,panel-pcc-table = <0x08000 0x06D00 0x08000		/* CLR01_GRN */
 					0x07A00 0x07100 0x08000		/* CLR02_GRN */

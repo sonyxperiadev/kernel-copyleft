@@ -1376,6 +1376,9 @@ int mdss_dsi_panel_pcc_setup(struct msm_fb_data_type *mfd)
 				panel_data);
 
 	mdss_dsi_op_mode_config(DSI_CMD_MODE, pdata);
+	if (vendor_pdata->pre_uv_read_cmds.cmds)
+		mdss_dsi_panel_cmds_send
+			(ctrl_pdata, &vendor_pdata->pre_uv_read_cmds);
 	if (vendor_pdata->uv_read_cmds.cmds)
 		get_uv_data(ctrl_pdata, vendor_pdata, &u_data, &v_data);
 	if (u_data == 0 && v_data == 0)
@@ -1822,6 +1825,9 @@ static int mdss_panel_parse_panel_dt(struct device_node *np,
 
 		rc = of_property_read_u32(next, "somc,init-from-begin", &tmp);
 		panel_data->init_from_begin = (!rc ? tmp : 0);
+
+		mdss_dsi_parse_dcs_cmds(next, &panel_data->pre_uv_read_cmds,
+			"somc,panel-pre-uv-cmds", NULL);
 
 		mdss_dsi_parse_dcs_cmds(next, &panel_data->uv_read_cmds,
 			"somc,panel-uv-cmds", NULL);
