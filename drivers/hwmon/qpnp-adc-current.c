@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,6 +32,7 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/qpnp/qpnp-adc.h>
 #include <linux/platform_device.h>
+#include <linux/qpnp/power-on.h>
 
 /* QPNP IADC register definition */
 #define QPNP_IADC_REVISION1				0x0
@@ -264,6 +266,9 @@ static int32_t qpnp_iadc_status_debug(void)
 
 	pr_debug("EOC not set with status:%x, dig:%x, ch:%x, mode:%x, en:%x\n",
 			status1, dig, chan, mode, en);
+
+	/* somc workaround for adc lock-up issue */
+	qpnp_pon_dvdd_reset();
 
 	rc = qpnp_iadc_enable(false);
 	if (rc < 0) {
@@ -526,6 +531,14 @@ int32_t qpnp_iadc_calibrate_for_trim(void)
 	uint32_t mode_sel = 0;
 
 	mutex_lock(&iadc->adc->adc_lock);
+
+	/* Exported symbol may be called from outside this driver.
+	 * Ensure this driver is ready (probed) before supporting
+	 * calibration.
+	 */
+	rc = qpnp_iadc_is_ready();
+	if (rc < 0)
+		goto fail;
 
 	rc = qpnp_iadc_configure(GAIN_CALIBRATION_17P857MV,
 						&raw_data, mode_sel);
@@ -910,6 +923,12 @@ static int __devinit qpnp_iadc_probe(struct spmi_device *spmi)
 	if (qpnp_iadc) {
 		pr_err("IADC already in use\n");
 		return -EBUSY;
+	}
+
+	if (!qpnp_pon_is_initialized()) {
+		/* pon reset is needed for iadc queries */
+		pr_err("qpnp-adc-current requests probe deferral\n");
+		return -EPROBE_DEFER;
 	}
 
 	for_each_child_of_node(node, child)

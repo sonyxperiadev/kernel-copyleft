@@ -98,6 +98,17 @@ enum msm_sensor_resolution_t {
 	MSM_SENSOR_RES_5,
 	MSM_SENSOR_RES_6,
 	MSM_SENSOR_RES_7,
+/* extension begin */
+	MSM_SENSOR_RES_8,
+	MSM_SENSOR_RES_9,
+	MSM_SENSOR_RES_10,
+	MSM_SENSOR_RES_11,
+	MSM_SENSOR_RES_12,
+	MSM_SENSOR_RES_13,
+	MSM_SENSOR_RES_14,
+	MSM_SENSOR_RES_15,
+	MSM_SENSOR_RES_16,
+/* extension end */
 	MSM_SENSOR_INVALID_RES,
 };
 
@@ -169,6 +180,9 @@ struct msm_camera_i2c_reg_setting {
 	enum msm_camera_i2c_reg_addr_type addr_type;
 	enum msm_camera_i2c_data_type data_type;
 	uint16_t delay;
+/* extension begin */
+	uint16_t slave_addr;
+/* extension end */
 };
 
 struct msm_camera_i2c_seq_reg_array {
@@ -272,6 +286,9 @@ struct msm_sensor_init_params {
 	enum camb_position_t position;
 	/* sensor mount angle */
 	uint32_t            sensor_mount_angle;
+/* extension begin */
+	uint32_t private_sensor_mount_angle;
+/* extension end */
 };
 
 struct sensorb_cfg_data {
@@ -335,6 +352,9 @@ enum msm_sensor_cfg_type_t {
 	CFG_SLAVE_READ_I2C,
 	CFG_WRITE_I2C_ARRAY,
 	CFG_SLAVE_WRITE_I2C_ARRAY,
+/* extension begin */
+	CFG_WRITE_I2C_ARRAY_WITH_SID,
+/* extension end */
 	CFG_WRITE_I2C_SEQ_ARRAY,
 	CFG_POWER_UP,
 	CFG_POWER_DOWN,

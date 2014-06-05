@@ -1,4 +1,5 @@
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -745,7 +746,11 @@ static void msm_isp_update_camif_output_count(
 			&axi_data->stream_info[
 			HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])];
 		if (stream_info->stream_src >= RDI_INTF_0)
+#if defined(CONFIG_SONY_CAM_V4L2)
+			continue;
+#else
 			return;
+#endif
 		if (stream_info->stream_src == PIX_ENCODER ||
 			stream_info->stream_src == PIX_VIEWFINDER ||
 			stream_info->stream_src == IDEAL_RAW) {

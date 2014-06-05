@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,6 +20,7 @@
 
 #include "mdss_panel.h"
 #include "mdss_io_util.h"
+#include "mdss_fb.h"
 
 #define MMSS_SERDES_BASE_PHY 0x04f01000 /* mmss (De)Serializer CFG */
 
@@ -256,6 +258,13 @@ struct dsi_cmd_desc {
 	char *payload;
 };
 
+/* panel DriverIC type */
+enum {
+	PANEL_DRIVER_IC_RENESAS,
+	PANEL_DRIVER_IC_NOVATEK,
+	PANEL_DRIVER_IC_NONE,
+};
+
 struct dsi_panel_cmds {
 	char *buf;
 	int blen;
@@ -294,14 +303,54 @@ struct dsi_kickoff_action {
 	void *data;
 };
 
+struct mdss_pcc_cfg_rgb {
+	uint32_t r;
+	uint32_t g;
+	uint32_t b;
+} __packed;
+
+struct mdss_panel_specific_pdata {
+	int (*panel_power_on) (struct mdss_panel_data *pdata, int enable);
+	int (*disp_on) (struct mdss_panel_data *pdata);
+	int (*update_fps) (struct msm_fb_data_type *mfd);
+	struct mdss_dsi_drv_pdata *dsi_drv;
+	int driver_ic;
+	int disp_on_in_hs;
+	bool detected;
+};
+
+struct dsi_panel_cmds_list {
+	struct dsi_cmd_desc *buf;
+	u32 size;
+	char ctrl_state;
+};
+
 struct mdss_panel_common_pdata {
 	struct mdss_panel_info panel_info;
 	int (*on) (struct mdss_panel_data *pdata);
 	int (*off) (struct mdss_panel_data *pdata);
+	int (*reset) (struct mdss_panel_data *pdata, int enable);
 	void (*bl_fnc) (struct mdss_panel_data *pdata, u32 bl_level);
 
+	struct dsi_panel_cmds einit_cmds;
+	struct dsi_panel_cmds init_cmds;
 	struct dsi_panel_cmds on_cmds;
 	struct dsi_panel_cmds off_cmds;
+	struct dsi_panel_cmds id_read_cmds;
+	int (*panel_power_on) (struct mdss_panel_data *pdata, int enable);
+	int (*disp_on) (struct mdss_panel_data *pdata);
+	int (*detect) (struct mdss_panel_data *pdata);
+	int (*update_panel) (struct mdss_panel_data *pdata);
+	int (*update_fps) (struct msm_fb_data_type *mfd);
+	int driver_ic;
+	int disp_on_in_hs;
+	int panel_detect;
+	char id[MDSS_DSI_LEN];
+	u8 id_num;
+	int (*pcc_setup) (struct msm_fb_data_type *mfd);
+	struct dsi_panel_cmds uv_read_cmds;
+	struct mdss_pcc_cfg_rgb *wide_tbl;
+	struct mdss_pcc_cfg_rgb *sub_tbl;
 };
 
 struct dsi_drv_cm_data {
@@ -346,11 +395,15 @@ struct mdss_dsi_ctrl_pdata {
 	u32 pclk_rate;
 	u32 byte_clk_rate;
 	struct dss_module_power power_data;
+	struct mdss_panel_specific_pdata *spec_pdata;
 	u32 dsi_irq_mask;
 	struct mdss_hw *dsi_hw;
 
+	struct dsi_panel_cmds einit_cmds;
+	struct dsi_panel_cmds init_cmds;
 	struct dsi_panel_cmds on_cmds;
 	struct dsi_panel_cmds off_cmds;
+	struct dsi_panel_cmds id_read_cmds;
 
 	struct dcs_cmd_list cmdlist;
 	struct completion dma_comp;
@@ -368,6 +421,7 @@ struct mdss_dsi_ctrl_pdata {
 
 int dsi_panel_device_register(struct platform_device *pdev,
 			      struct mdss_panel_common_pdata *panel_data);
+int mdss_dsi_panel_power_detect(struct platform_device *pdev, int enable);
 
 char *mdss_dsi_buf_reserve_hdr(struct dsi_buf *dp, int hlen);
 char *mdss_dsi_buf_init(struct dsi_buf *dp);
@@ -401,7 +455,7 @@ void mdss_dsi_sw_reset(struct mdss_panel_data *pdata);
 irqreturn_t mdss_dsi_isr(int irq, void *ptr);
 void mdss_dsi_irq_handler_config(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 
-void mipi_set_tx_power_mode(int mode, struct mdss_panel_data *pdata);
+void mdss_set_tx_power_mode(int mode, struct mdss_panel_data *pdata);
 int mdss_dsi_clk_div_config(u8 bpp, u8 lanes,
 			    u32 *expected_dsi_pclk);
 int mdss_dsi_clk_init(struct platform_device *pdev,
@@ -426,5 +480,7 @@ int mdss_dsi_cmdlist_put(struct mdss_dsi_ctrl_pdata *ctrl,
 				struct dcs_cmd_req *cmdreq);
 struct dcs_cmd_req *mdss_dsi_cmdlist_get(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_cmdlist_kickoff(int intf);
+
+int mdss_dsi_panel_fps_data_update(struct msm_fb_data_type *mfd);
 
 #endif /* MDSS_DSI_H */

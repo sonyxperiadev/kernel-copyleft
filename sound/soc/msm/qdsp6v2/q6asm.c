@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -62,6 +63,34 @@ struct asm_buffer_node {
 	uint32_t  buf_addr_lsw;
 	uint32_t  mmap_hdl;
 };
+
+/* SOMC effect control start */
+#if defined(CONFIG_MACH_SONY_TOGARI_ROW)
+	static int use_sony_popp_topology = 1;
+#else
+	static int use_sony_popp_topology;
+#endif
+
+#define INVALID_SESSION -1
+struct sony_volume_control {
+	uint32_t module;
+	unsigned volume;
+};
+
+struct sony_volume_control volume_control[] = {
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+};
+
+/* SOMC effect control end */
+
 static int32_t q6asm_mmapcallback(struct apr_client_data *data, void *priv);
 static int32_t q6asm_callback(struct apr_client_data *data, void *priv);
 static void q6asm_add_hdr(struct audio_client *ac, struct apr_hdr *hdr,
@@ -306,6 +335,151 @@ static void config_debug_fs_init(void)
 }
 #endif
 
+
+/* SOMC effect control start */
+int sony_popp_effect_set(void *client, void *params,
+				uint32_t param_size, uint32_t module_id)
+{
+	struct sony_popp_effect_set_params_command *cmd = NULL;
+	uint32_t cmd_size =
+		sizeof(struct sony_popp_effect_set_params_command);
+	uint32_t data_size = sizeof(struct asm_stream_param_data_v2);
+	struct audio_client *ac = NULL;
+	void *param_ptr = NULL;
+	int rc = 0, sz = 0;
+
+	pr_debug("%s\n", __func__);
+	if (client == NULL) {
+		pr_err("%s: audio client is NULL\n", __func__);
+		return -EINVAL;
+	}
+	ac = (struct audio_client *)client;
+
+	if (params == NULL) {
+		pr_err("%s: effect param pointer is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	sz = cmd_size + param_size;
+	cmd = kzalloc(sz, GFP_KERNEL);
+	if (cmd == NULL) {
+		pr_err("%s: allocate cmd failed\n", __func__);
+		return -ENOMEM;
+	}
+
+	cmd->params.data_payload_addr_lsw = 0;
+	cmd->params.data_payload_addr_msw = 0;
+	cmd->params.mem_map_handle = 0;
+	cmd->params.data_payload_size = data_size + param_size;
+
+	cmd->data.reserved = 0;
+	cmd->data.module_id = module_id;
+	cmd->data.param_id = PARAM_ID_SONY_EFFECT;
+	cmd->data.param_size = param_size;
+
+	param_ptr = (void *)((u8 *)cmd + cmd_size);
+	memcpy(param_ptr, params, param_size);
+
+	q6asm_add_hdr_async(ac, &cmd->hdr, sz, TRUE);
+	cmd->hdr.opcode = ASM_STREAM_CMD_SET_PP_PARAMS_V2;
+	atomic_set(&ac->cmd_state, 1);
+
+	pr_info("%s: send effect param(0x%08x) to APR, param size %d\n",
+				__func__, module_id, param_size);
+	rc = apr_send_pkt(ac->apr, (uint32_t *) cmd);
+	if (rc < 0) {
+		pr_err("%s: Send popp effect param failed\n",
+				__func__);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	rc = wait_event_timeout(ac->cmd_wait,
+			(atomic_read(&ac->cmd_state) == 0), 5*HZ);
+	if (!rc) {
+		pr_err("%s: Setting popp effect param(0x%08x) failed\n",
+			__func__, module_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	rc = 0;
+
+fail_cmd:
+	kfree(cmd);
+	return rc;
+}
+
+void sony_vol_module_update(void *client, uint32_t module)
+{
+	int rc = 0;
+	struct audio_client *ac = NULL;
+	int left_vol = 0;
+	int right_vol = 0;
+
+	pr_debug("%s\n", __func__);
+	if (client == NULL) {
+		pr_err("%s: audio client is NULL\n", __func__);
+		return;
+	}
+	ac = (struct audio_client *)client;
+	if (ac->session != INVALID_SESSION &&
+		volume_control[ac->session].module != module) {
+		volume_control[ac->session].module = module;
+		left_vol = ((volume_control[ac->session].volume >> 16) & 0xFFFF);
+		right_vol = (volume_control[ac->session].volume & 0xFFFF);
+		rc = q6asm_set_lrgain(ac, left_vol, right_vol);
+		if (rc < 0) {
+			pr_err("%s: Send Volume command failed rc=%d\n",
+						__func__, rc);
+		}
+	}
+}
+
+void sony_send_max_vol(void *client)
+{
+	struct audio_client *ac = NULL;
+	struct asm_volume_ctrl_lr_chan_gain lrgain;
+	int sz = 0;
+	int rc  = 0;
+
+	pr_debug("%s\n", __func__);
+	if (client == NULL) {
+		pr_err("%s: audio client is NULL\n", __func__);
+		return;
+	}
+	ac = (struct audio_client *)client;
+
+	sz = sizeof(struct asm_volume_ctrl_lr_chan_gain);
+	q6asm_add_hdr_async(ac, &lrgain.hdr, sz, TRUE);
+	lrgain.hdr.opcode = ASM_STREAM_CMD_SET_PP_PARAMS_V2;
+	lrgain.param.data_payload_addr_lsw = 0;
+	lrgain.param.data_payload_addr_msw = 0;
+	lrgain.param.mem_map_handle = 0;
+	lrgain.param.data_payload_size = sizeof(lrgain) -
+				sizeof(lrgain.hdr) - sizeof(lrgain.param);
+	lrgain.data.module_id = ASM_MODULE_ID_VOL_CTRL;
+	lrgain.data.param_id = ASM_PARAM_ID_VOL_CTRL_LR_CHANNEL_GAIN;
+	lrgain.data.param_size = lrgain.param.data_payload_size -
+				sizeof(lrgain.data);
+	lrgain.data.reserved = 0;
+	lrgain.l_chan_gain = 0x2000;
+	lrgain.r_chan_gain = 0x2000;
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &lrgain);
+	if (rc < 0) {
+		pr_err("%s: set-params send failed paramid[0x%x]\n",
+			__func__, lrgain.data.param_id);
+		return;
+	}
+
+	rc = wait_event_timeout(ac->cmd_wait,
+			(atomic_read(&ac->cmd_state) == 0), 5*HZ);
+	if (!rc) {
+		pr_err("%s: timeout, set-params paramid[0x%x]\n",
+			__func__, lrgain.data.param_id);
+	}
+}
+
+/* SOMC effect control end */
 
 static int q6asm_session_alloc(struct audio_client *ac)
 {
@@ -690,7 +864,7 @@ int q6asm_audio_client_buf_alloc(unsigned int dir,
 	pr_debug("%s: session[%d]bufsz[%d]bufcnt[%d]\n", __func__, ac->session,
 		bufsz, bufcnt);
 
-	if (ac->session <= 0 || ac->session > 8)
+	if (ac->session <= 0 || ac->session > 8 || bufsz <= 0)
 		goto fail;
 
 	if (ac->io_mode & SYNC_IO_MODE) {
@@ -1487,7 +1661,11 @@ static int __q6asm_open_write(struct audio_client *ac, uint32_t format,
 	open.sink_endpointype = ASM_END_POINT_DEVICE_MATRIX;
 	open.bits_per_sample = bits_per_sample;
 
-	open.postprocopo_id = get_asm_topology();
+	if (use_sony_popp_topology)
+		open.postprocopo_id = ASM_STREAM_POSTPROC_TOPO_ID_SONY;
+	else
+		open.postprocopo_id = get_asm_topology();
+
 	if (open.postprocopo_id == 0)
 		open.postprocopo_id = ASM_STREAM_POSTPROC_TOPO_ID_DEFAULT;
 
@@ -2875,6 +3053,18 @@ int q6asm_set_lrgain(struct audio_client *ac, int left_gain, int right_gain)
 	int sz = 0;
 	int rc  = 0;
 
+	volume_control[ac->session].volume = ((left_gain << 16) | right_gain);
+	if (volume_control[ac->session].module == ASM_MODULE_ID_CA_VPT) {
+		/* Send average volume to ClearAudioVPT module */
+		rc = q6asm_set_volume(ac, (left_gain + right_gain) / 2);
+		if (rc < 0) {
+			pr_err("%s: Send volume failed for CA\n",
+					__func__);
+			rc = -EINVAL;
+		}
+		return rc;
+	}
+
 	sz = sizeof(struct asm_volume_ctrl_lr_chan_gain);
 	q6asm_add_hdr_async(ac, &lrgain.hdr, sz, TRUE);
 	lrgain.hdr.opcode = ASM_STREAM_CMD_SET_PP_PARAMS_V2;
@@ -2968,7 +3158,7 @@ int q6asm_set_volume(struct audio_client *ac, int volume)
 	vol.param.mem_map_handle = 0;
 	vol.param.data_payload_size = sizeof(vol) -
 				sizeof(vol.hdr) - sizeof(vol.param);
-	vol.data.module_id = ASM_MODULE_ID_VOL_CTRL;
+	vol.data.module_id = volume_control[ac->session].module;
 	vol.data.param_id = ASM_PARAM_ID_VOL_CTRL_MASTER_GAIN;
 	vol.data.param_size = vol.param.data_payload_size - sizeof(vol.data);
 	vol.data.reserved = 0;
@@ -2991,9 +3181,11 @@ int q6asm_set_volume(struct audio_client *ac, int volume)
 		goto fail_cmd;
 	}
 	rc = 0;
+
 fail_cmd:
 	return rc;
 }
+
 int q6asm_set_softpause(struct audio_client *ac,
 			struct asm_softpause_params *pause_param)
 {

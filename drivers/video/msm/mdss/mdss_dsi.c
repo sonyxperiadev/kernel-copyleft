@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -59,6 +60,7 @@ static int mdss_dsi_regulator_init(struct platform_device *pdev)
 			return PTR_ERR(dsi_drv->vdd_vreg);
 		}
 
+#ifndef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
 		ret = regulator_set_voltage(dsi_drv->vdd_vreg, 3000000,
 				3000000);
 		if (ret) {
@@ -66,6 +68,9 @@ static int mdss_dsi_regulator_init(struct platform_device *pdev)
 				__func__, ret);
 			return ret;
 		}
+#else
+	/* FIXME: Must set lvs3 voltage min/max */
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 		dsi_drv->vdd_io_vreg = devm_regulator_get(&pdev->dev, "vddio");
 		if (IS_ERR(dsi_drv->vdd_io_vreg)) {
@@ -101,6 +106,7 @@ static int mdss_dsi_regulator_init(struct platform_device *pdev)
 	return 0;
 }
 
+#ifndef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
 static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 {
 	int ret;
@@ -250,6 +256,7 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata, int enable)
 	}
 	return 0;
 }
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 static void mdss_dsi_put_dt_vreg_data(struct device *dev,
 	struct dss_module_power *module_power)
@@ -385,6 +392,23 @@ error:
 	return rc;
 }
 
+static int mdss_dsi_intf_ready(struct mdss_panel_data *pdata)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata;
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+	if (!ctrl_pdata) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	if (ctrl_pdata->spec_pdata->disp_on_in_hs)
+		ctrl_pdata->spec_pdata->disp_on(pdata);
+
+	return 0;
+}
+
 static int mdss_dsi_off(struct mdss_panel_data *pdata)
 {
 	int ret = 0;
@@ -409,7 +433,7 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata)
 				ctrl_pdata, ctrl_pdata->ndx);
 
 	if (pdata->panel_info.type == MIPI_CMD_PANEL)
-		mdss_dsi_clk_ctrl(ctrl_pdata, 1);
+		mdss_dsi_clk_ctrl(ctrl_pdata, 0);
 
 	/* disable DSI controller */
 	mdss_dsi_controller_cfg(0, pdata);
@@ -421,7 +445,11 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata)
 
 	mdss_dsi_disable_bus_clocks(ctrl_pdata);
 
+#ifndef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
 	ret = mdss_dsi_panel_power_on(pdata, 0);
+#else
+	ret = ctrl_pdata->spec_pdata->panel_power_on(pdata, 0);
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	if (ret) {
 		pr_err("%s: Panel power off failed\n", __func__);
 		return ret;
@@ -461,7 +489,11 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 
 	pinfo = &pdata->panel_info;
 
+#ifndef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
 	ret = mdss_dsi_panel_power_on(pdata, 1);
+#else
+	ret = ctrl_pdata->spec_pdata->panel_power_on(pdata, 1);
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	if (ret) {
 		pr_err("%s: Panel power on failed\n", __func__);
 		return ret;
@@ -473,7 +505,11 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	if (ret) {
 		pr_err("%s: failed to enable bus clocks. rc=%d\n", __func__,
 			ret);
+#ifndef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
 		mdss_dsi_panel_power_on(pdata, 0);
+#else
+		ret = ctrl_pdata->spec_pdata->panel_power_on(pdata, 0);
+#endif  /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 		return ret;
 	}
 
@@ -559,7 +595,7 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	}
 
 	if (pdata->panel_info.type == MIPI_CMD_PANEL)
-		mdss_dsi_clk_ctrl(ctrl_pdata, 0);
+		mdss_dsi_clk_ctrl(ctrl_pdata, 1);
 
 	pr_debug("%s-:\n", __func__);
 	return 0;
@@ -753,6 +789,15 @@ static int __devinit mdss_dsi_ctrl_probe(struct platform_device *pdev)
 				rc = -ENOMEM;
 				goto error_no_mem;
 			}
+			ctrl_pdata->spec_pdata = devm_kzalloc(&pdev->dev,
+				sizeof(struct mdss_panel_specific_pdata),
+				GFP_KERNEL);
+			if (!ctrl_pdata->spec_pdata) {
+				pr_err("%s: FAILED: cannot alloc spec pdata\n",
+					__func__);
+				rc = -ENOMEM;
+				goto error_no_mem;
+			}
 			platform_set_drvdata(pdev, ctrl_pdata);
 		}
 
@@ -822,6 +867,7 @@ static int __devinit mdss_dsi_ctrl_probe(struct platform_device *pdev)
 error_ioremap:
 	iounmap(mdss_dsi_base);
 error_no_mem:
+	devm_kfree(&pdev->dev, ctrl_pdata->spec_pdata);
 	devm_kfree(&pdev->dev, ctrl_pdata);
 error_vreg:
 	mdss_dsi_put_dt_vreg_data(&pdev->dev, &ctrl_pdata->power_data);
@@ -848,6 +894,71 @@ static int __devexit mdss_dsi_ctrl_remove(struct platform_device *pdev)
 	iounmap(mdss_dsi_base);
 	return 0;
 }
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+int mdss_dsi_panel_power_detect(struct platform_device *pdev, int enable)
+{
+	int ret;
+	struct device_node *dsi_ctrl_np = NULL;
+	struct platform_device *ctrl_pdev = NULL;
+	static struct regulator *vdd_vreg;
+
+	pr_debug("%s: enable=%d\n", __func__, enable);
+	if (!vdd_vreg) {
+		dsi_ctrl_np = of_parse_phandle(pdev->dev.of_node,
+					       "qcom,dsi-ctrl-phandle", 0);
+		if (!dsi_ctrl_np) {
+			pr_err("%s: Dsi controller node not initialized\n",
+					__func__);
+			return -ENODEV;
+		}
+
+		ctrl_pdev = of_find_device_by_node(dsi_ctrl_np);
+
+		vdd_vreg = devm_regulator_get(&ctrl_pdev->dev, "vdd");
+		if (IS_ERR(vdd_vreg)) {
+			pr_err("could not get 8941_lvs3, rc = %ld\n",
+					PTR_ERR(vdd_vreg));
+			return -ENODEV;
+		}
+	}
+
+	if (enable) {
+		ret = regulator_set_optimum_mode(vdd_vreg, 100000);
+		if (ret < 0) {
+			pr_err("%s: vdd_vreg set regulator mode failed.\n",
+						       __func__);
+			return ret;
+		}
+
+		ret = regulator_enable(vdd_vreg);
+		if (ret) {
+			pr_err("%s: Failed to enable regulator.\n", __func__);
+			return ret;
+		}
+
+		msleep(50);
+		wmb();
+	} else {
+		ret = regulator_disable(vdd_vreg);
+		if (ret) {
+			pr_err("%s: Failed to disable regulator.\n", __func__);
+			return ret;
+		}
+
+		ret = regulator_set_optimum_mode(vdd_vreg, 100);
+		if (ret < 0) {
+			pr_err("%s: vdd_vreg set regulator mode failed.\n",
+						       __func__);
+			return ret;
+		}
+
+		msleep(10);
+		devm_regulator_put(vdd_vreg);
+	}
+	return 0;
+}
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 struct device dsi_dev;
 
@@ -980,8 +1091,10 @@ int dsi_panel_device_register(struct platform_device *pdev,
 		return rc;
 	}
 
-	if ((dsi_pclk_rate < 3300000) || (dsi_pclk_rate > 250000000))
+	if ((dsi_pclk_rate < 3300000) || (dsi_pclk_rate > 223000000)) {
+		pr_err("%s: Pixel clock not supported\n", __func__);
 		dsi_pclk_rate = 35000000;
+	}
 	mipi->dsi_pclk_rate = dsi_pclk_rate;
 
 	dsi_ctrl_np = of_parse_phandle(pdev->dev.of_node,
@@ -1094,25 +1207,38 @@ int dsi_panel_device_register(struct platform_device *pdev,
 		return -EPERM;
 	}
 
+	(ctrl_pdata->panel_data).intf_ready = mdss_dsi_intf_ready;
 	ctrl_pdata->panel_data.event_handler = mdss_dsi_event_handler;
 
+	ctrl_pdata->einit_cmds = panel_data->einit_cmds;
+	ctrl_pdata->init_cmds = panel_data->init_cmds;
 	ctrl_pdata->on_cmds = panel_data->on_cmds;
 	ctrl_pdata->off_cmds = panel_data->off_cmds;
+	ctrl_pdata->id_read_cmds = panel_data->id_read_cmds;
 
 	memcpy(&((ctrl_pdata->panel_data).panel_info),
 				&(panel_data->panel_info),
 				       sizeof(struct mdss_panel_info));
 
+	(ctrl_pdata->panel_data).detect = panel_data->detect;
+	(ctrl_pdata->panel_data).update_panel = panel_data->update_panel;
+	(ctrl_pdata->panel_data).panel_pdev = pdev;
 	ctrl_pdata->panel_data.set_backlight = panel_data->bl_fnc;
 	ctrl_pdata->bklt_ctrl = panel_data->panel_info.bklt_ctrl;
 	ctrl_pdata->pwm_pmic_gpio = panel_data->panel_info.pwm_pmic_gpio;
 	ctrl_pdata->pwm_period = panel_data->panel_info.pwm_period;
 	ctrl_pdata->pwm_lpg_chan = panel_data->panel_info.pwm_lpg_chan;
 	ctrl_pdata->bklt_max = panel_data->panel_info.bl_max;
+	ctrl_pdata->spec_pdata->panel_power_on =
+				panel_data->panel_power_on;
+	ctrl_pdata->spec_pdata->disp_on = panel_data->disp_on;
+	ctrl_pdata->spec_pdata->update_fps = panel_data->update_fps;
+	ctrl_pdata->spec_pdata->driver_ic = panel_data->driver_ic;
+	ctrl_pdata->spec_pdata->disp_on_in_hs = panel_data->disp_on_in_hs;
+	ctrl_pdata->spec_pdata->detected = false;
 
 	if (ctrl_pdata->bklt_ctrl == BL_PWM)
 		mdss_dsi_panel_pwm_cfg(ctrl_pdata);
-
 	mdss_dsi_ctrl_init(ctrl_pdata);
 	/*
 	 * register in mdp driver
@@ -1137,7 +1263,12 @@ int dsi_panel_device_register(struct platform_device *pdev,
 
 		ctrl_pdata->panel_data.panel_info.cont_splash_enabled = 1;
 		ctrl_pdata->panel_data.panel_info.panel_power_on = 1;
+#ifndef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
 		rc = mdss_dsi_panel_power_on(&(ctrl_pdata->panel_data), 1);
+#else
+		rc = ctrl_pdata->spec_pdata->panel_power_on(
+			&(ctrl_pdata->panel_data), 1);
+#endif
 		if (rc) {
 			pr_err("%s: Panel power on failed\n", __func__);
 			return rc;
@@ -1147,8 +1278,13 @@ int dsi_panel_device_register(struct platform_device *pdev,
 		if (rc) {
 			pr_err("%s: failed to enable bus clocks. rc=%d\n",
 				__func__, rc);
+#ifndef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
 			rc = mdss_dsi_panel_power_on(
 				&(ctrl_pdata->panel_data), 0);
+#else
+			rc = ctrl_pdata->spec_pdata->panel_power_on(
+				&(ctrl_pdata->panel_data), 0);
+#endif
 			return rc;
 		}
 

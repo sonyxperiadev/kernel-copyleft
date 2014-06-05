@@ -1,4 +1,5 @@
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -819,6 +820,9 @@ static void msm_vfe40_axi_cfg_wm_reg(
 	uint32_t wm_base = VFE40_WM_BASE(stream_info->wm[plane_idx]);
 
 	if (!stream_info->frame_based) {
+#if defined(CONFIG_SONY_CAM_V4L2)
+		msm_camera_io_w(0x0, vfe_dev->vfe_base + wm_base);
+#endif
 		/*WR_IMAGE_SIZE*/
 		val =
 			((msm_isp_cal_word_per_line(

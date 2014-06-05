@@ -68,7 +68,7 @@ static void *dload_mode_addr;
 
 /* Download mode master kill-switch */
 static int dload_set(const char *val, struct kernel_param *kp);
-static int download_mode = 1;
+static int download_mode;
 module_param_call(download_mode, dload_set, param_get_int,
 			&download_mode, 0644);
 
@@ -225,7 +225,11 @@ static void msm_restart_prepare(const char *cmd)
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}
+	} else {
+		__raw_writel(0x776655AA, restart_reason);
 	}
+	if (in_panic)
+		__raw_writel(0xC0DEDEAD, restart_reason);
 
 	flush_cache_all();
 	outer_flush_all();
@@ -284,6 +288,19 @@ static int __init msm_pmic_restart_init(void)
 
 late_initcall(msm_pmic_restart_init);
 
+static int msm_reboot_call(struct notifier_block *this,
+			   unsigned long code, void *_cmd)
+{
+	if (code == SYS_DOWN)
+		disable_nonboot_cpus();
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block msm_reboot_notifier = {
+	.notifier_call = msm_reboot_call,
+};
+
 static int __init msm_restart_init(void)
 {
 #ifdef CONFIG_MSM_DLOAD_MODE
@@ -291,6 +308,7 @@ static int __init msm_restart_init(void)
 	dload_mode_addr = MSM_IMEM_BASE + DLOAD_MODE_ADDR;
 	set_dload_mode(download_mode);
 #endif
+	register_reboot_notifier(&msm_reboot_notifier);
 	msm_tmr0_base = msm_timer_get_timer0_base();
 	restart_reason = MSM_IMEM_BASE + RESTART_REASON_ADDR;
 	pm_power_off = msm_power_off;

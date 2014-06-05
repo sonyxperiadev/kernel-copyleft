@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,12 +9,17 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/io.h>
 #include <linux/types.h>
 #include <mach/board.h>
 #include "mdss_hdmi_edid.h"
+
+#define EDID_DUMP
 
 #define DBC_START_OFFSET 4
 #define HDMI_VSDB_3D_EVF_DATA_OFFSET(vsd) \
@@ -361,6 +367,24 @@ static struct attribute_group hdmi_edid_fs_attrs_group = {
 	.attrs = hdmi_edid_fs_attrs,
 };
 
+#ifdef EDID_DUMP
+static void hdmi_edid_block_dump(int block, u8 *buf)
+{
+	int ndx;
+	char tmp_buff[16];
+
+	DEV_INFO("EDID BLK=%d\n", block);
+	for (ndx = 0; ndx < 0x80; ndx += 16) {
+		memset(tmp_buff, '\0', sizeof(tmp_buff));
+		snprintf(tmp_buff, 16, "%02X | ", ndx);
+		print_hex_dump(KERN_INFO, tmp_buff, DUMP_PREFIX_NONE, 16, 1,
+				(void *)&buf[ndx], 0x10, false);
+	}
+}
+#else
+static inline void hdmi_edid_block_dump(int block, u8 *buf) {}
+#endif
+
 static int hdmi_edid_read_block(struct hdmi_edid_ctrl *edid_ctrl, int block,
 	u8 *edid_buf)
 {
@@ -408,6 +432,8 @@ static int hdmi_edid_read_block(struct hdmi_edid_ctrl *edid_ctrl, int block,
 
 	if (status)
 		goto error;
+
+	hdmi_edid_block_dump(block, edid_buf);
 
 	/* Calculate checksum */
 	check_sum = 0;
@@ -551,6 +577,13 @@ static void hdmi_edid_extract_3d_present(struct hdmi_edid_ctrl *edid_ctrl,
 	edid_ctrl->present_3d = 0;
 	if (vsd == NULL || len < 9) {
 		DEV_DBG("%s: blk-id 3 not found or not long enough\n",
+			__func__);
+		return;
+	}
+
+	/* Check HDMI_Video_present. */
+	if (!(vsd[8] & BIT(5))) {
+		DEV_DBG("%s:additional video format capabilities aren't found\n",
 			__func__);
 		return;
 	}
@@ -854,7 +887,8 @@ static void hdmi_edid_add_sink_video_format(
 static void hdmi_edid_get_display_vsd_3d_mode(const u8 *data_buf,
 	struct hdmi_edid_sink_data *sink_data, u32 num_of_cea_blocks)
 {
-	u8 len, offset, present_multi_3d, hdmi_vic_len, hdmi_3d_len;
+	u8 len, offset, present_multi_3d, hdmi_vic_len;
+	int hdmi_3d_len;
 	u16 structure_all, structure_mask;
 	const u8 *vsd = num_of_cea_blocks ?
 		hdmi_edid_find_block(data_buf+0x80, DBC_START_OFFSET,

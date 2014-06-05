@@ -5,6 +5,7 @@
  *            (C)  2003 Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>.
  *                      Jun Nakajima <jun.nakajima@intel.com>
  *            (c)  2013 The Linux Foundation. All rights reserved.
+ *  Copyright (C)  2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -142,6 +143,7 @@ static struct dbs_tuners {
 	unsigned int optimal_freq;
 	unsigned int up_threshold_any_cpu_load;
 	unsigned int sync_freq;
+	unsigned int freq_input_boost;
 	unsigned int ignore_nice;
 	unsigned int sampling_down_factor;
 	int          powersave_bias;
@@ -156,6 +158,7 @@ static struct dbs_tuners {
 	.ignore_nice = 0,
 	.powersave_bias = 0,
 	.sync_freq = 0,
+	.freq_input_boost = INT_MAX,
 	.optimal_freq = 0,
 };
 
@@ -321,6 +324,7 @@ show_one(ignore_nice_load, ignore_nice);
 show_one(optimal_freq, optimal_freq);
 show_one(up_threshold_any_cpu_load, up_threshold_any_cpu_load);
 show_one(sync_freq, sync_freq);
+show_one(freq_input_boost, freq_input_boost);
 
 static ssize_t show_powersave_bias
 (struct kobject *kobj, struct attribute *attr, char *buf)
@@ -406,6 +410,19 @@ static ssize_t store_sync_freq(struct kobject *a, struct attribute *b,
 	if (ret != 1)
 		return -EINVAL;
 	dbs_tuners_ins.sync_freq = input;
+	return count;
+}
+
+static ssize_t store_freq_input_boost(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	dbs_tuners_ins.freq_input_boost = input;
 	return count;
 }
 
@@ -673,6 +690,7 @@ define_one_global_rw(up_threshold_multi_core);
 define_one_global_rw(optimal_freq);
 define_one_global_rw(up_threshold_any_cpu_load);
 define_one_global_rw(sync_freq);
+define_one_global_rw(freq_input_boost);
 
 static struct attribute *dbs_attributes[] = {
 	&sampling_rate_min.attr,
@@ -687,6 +705,7 @@ static struct attribute *dbs_attributes[] = {
 	&optimal_freq.attr,
 	&up_threshold_any_cpu_load.attr,
 	&sync_freq.attr,
+	&freq_input_boost.attr,
 	NULL
 };
 
@@ -1020,9 +1039,18 @@ static void dbs_refresh_callback(struct work_struct *work)
 		 * Arch specific cpufreq driver may fail.
 		 * Don't update governor frequency upon failure.
 		 */
-		if (__cpufreq_driver_target(policy, policy->max,
+
+		if (policy->max >= dbs_tuners_ins.freq_input_boost) {
+			if (__cpufreq_driver_target(policy,
+					dbs_tuners_ins.freq_input_boost,
 					CPUFREQ_RELATION_L) >= 0)
-			policy->cur = policy->max;
+				policy->cur = dbs_tuners_ins.freq_input_boost;
+		} else {
+			if (__cpufreq_driver_target(policy, policy->max,
+					CPUFREQ_RELATION_L) >= 0)
+				policy->cur = policy->max;
+		}
+
 
 		this_dbs_info->prev_cpu_idle = get_cpu_idle_time(cpu,
 				&this_dbs_info->prev_cpu_wall);
@@ -1150,6 +1178,8 @@ static int dbs_input_connect(struct input_handler *handler,
 	handle->dev = dev;
 	handle->handler = handler;
 	handle->name = "cpufreq";
+	printk(KERN_INFO "cpufreq_ondemand: registering %s handle for %s\n",
+			  handle->name, dev->name);
 
 	error = input_register_handle(handle);
 	if (error)
@@ -1175,7 +1205,20 @@ static void dbs_input_disconnect(struct input_handle *handle)
 }
 
 static const struct input_device_id dbs_ids[] = {
-	{ .driver_info = 1 },
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
+				INPUT_DEVICE_ID_MATCH_ABSBIT,
+		.evbit = { BIT_MASK(EV_ABS) },
+		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
+				BIT_MASK(ABS_MT_POSITION_X) |
+				BIT_MASK(ABS_MT_POSITION_Y) |
+				BIT_MASK(ABS_MT_PRESSURE) },
+	},
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
+				INPUT_DEVICE_ID_MATCH_KEYBIT,
+		.evbit = { BIT_MASK(EV_KEY) },
+	},
 	{ },
 };
 

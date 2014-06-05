@@ -1567,8 +1567,7 @@ static inline int mdss_mdp_suspend_sub(struct mdss_data_type *mdata)
 
 static inline int mdss_mdp_resume_sub(struct mdss_data_type *mdata)
 {
-	if (mdata->suspend_fs_ena)
-		mdss_mdp_footswitch_ctrl(mdata, true);
+	mdss_mdp_footswitch_ctrl(mdata, true);
 
 	pr_debug("resume done fs=%d\n", mdata->suspend_fs_ena);
 
@@ -1641,7 +1640,7 @@ static int mdss_mdp_runtime_resume(struct device *dev)
 
 	dev_dbg(dev, "pm_runtime: resuming...\n");
 
-	mdss_mdp_footswitch_ctrl(mdata, true);
+	/* mdss_mdp_footswitch_ctrl(mdata, true); */
 
 	return 0;
 }
@@ -1668,7 +1667,7 @@ static int mdss_mdp_runtime_suspend(struct device *dev)
 		pr_err("MDP suspend failed\n");
 		return -EBUSY;
 	}
-	mdss_mdp_footswitch_ctrl(mdata, false);
+	/* mdss_mdp_footswitch_ctrl(mdata, false); */
 
 	return 0;
 }

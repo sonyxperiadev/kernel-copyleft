@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -462,7 +463,11 @@ static int camera_v4l2_fh_open(struct file *filep)
 	filep->private_data = &sp->fh;
 
 	/* stream_id = open id */
+#if defined(CONFIG_SONY_CAM_V4L2)
+	sp->stream_id = atomic_read(&pvdev->stream_cnt);
+#else
 	sp->stream_id = atomic_read(&pvdev->opened);
+#endif
 
 	v4l2_fh_init(&sp->fh, pvdev->vdev);
 	v4l2_fh_add(&sp->fh);
@@ -552,13 +557,21 @@ static int camera_v4l2_open(struct file *filep)
 		if (rc < 0)
 			goto post_fail;
 	} else {
+#if defined(CONFIG_SONY_CAM_V4L2)
+		rc = msm_create_command_ack_q(pvdev->vdev->num,
+			atomic_read(&pvdev->stream_cnt));
+#else
 		rc = msm_create_command_ack_q(pvdev->vdev->num,
 			atomic_read(&pvdev->opened));
+#endif
 		if (rc < 0)
 			goto session_fail;
 	}
 
 	atomic_add(1, &pvdev->opened);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	atomic_add(1, &pvdev->stream_cnt);
+#endif
 	return rc;
 
 post_fail:
@@ -615,6 +628,9 @@ static int camera_v4l2_close(struct file *filep)
 		/* This should take care of both normal close
 		 * and application crashes */
 		msm_destroy_session(pvdev->vdev->num);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		atomic_set(&pvdev->stream_cnt, 0);
+#endif
 
 	} else {
 		camera_pack_event(filep, MSM_CAMERA_SET_PARM,
@@ -714,6 +730,9 @@ int camera_init_v4l2(struct device *dev, unsigned int *session)
 
 	*session = pvdev->vdev->num;
 	atomic_set(&pvdev->opened, 0);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	atomic_set(&pvdev->stream_cnt, 0);
+#endif
 	video_set_drvdata(pvdev->vdev, pvdev);
 	goto init_end;
 

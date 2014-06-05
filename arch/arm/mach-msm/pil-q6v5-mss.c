@@ -446,7 +446,7 @@ static struct pil_reset_ops pil_mba_ops = {
 
 #define subsys_to_drv(d) container_of(d, struct mba_data, subsys_desc)
 
-static void log_modem_sfr(void)
+static void log_modem_sfr(struct mba_data *drv)
 {
 	u32 size;
 	char *smem_reason, reason[MAX_SSR_REASON_LEN];
@@ -462,6 +462,7 @@ static void log_modem_sfr(void)
 	}
 
 	strlcpy(reason, smem_reason, min(size, sizeof(reason)));
+	update_crash_reason(drv->subsys, smem_reason, size);
 	pr_err("modem subsystem failure reason: %s.\n", reason);
 
 	smem_reason[0] = '\0';
@@ -470,7 +471,7 @@ static void log_modem_sfr(void)
 
 static void restart_modem(struct mba_data *drv)
 {
-	log_modem_sfr();
+	log_modem_sfr(drv);
 	drv->ignore_errors = true;
 	subsystem_restart_dev(drv->subsys);
 }

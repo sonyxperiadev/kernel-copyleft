@@ -2,6 +2,7 @@
  * dwc3_otg.h - DesignWare USB3 DRD Controller OTG
  *
  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,6 +19,7 @@
 
 #include <linux/workqueue.h>
 #include <linux/power_supply.h>
+#include <linux/regulator/consumer.h>
 
 #include <linux/usb/otg.h>
 #include "power.h"
@@ -46,10 +48,13 @@ struct dwc3_otg {
 	struct dwc3_ext_xceiv	*ext_xceiv;
 #define ID		0
 #define B_SESS_VLD	1
+#define A_VBUS_DROP_DET	2
 	unsigned long inputs;
 	struct power_supply	*psy;
+	struct power_supply	*dc_psy;
 	struct completion	dwc3_xcvr_vbus_init;
 	int			host_bus_suspend;
+	int			chgdet_retry_count;
 };
 
 /**
@@ -61,8 +66,7 @@ struct dwc3_otg {
  * DWC3_DCP_CHARGER	Dedicated charger port (AC charger/ Wall charger).
  * DWC3_CDP_CHARGER	Charging downstream port. Enumeration can happen and
  *                      IDEV_CHG_MAX can be drawn irrespective of USB state.
- * DWC3_PROPRIETARY_CHARGER A proprietary charger pull DP and DM to specific
- *                     voltages between 2.0-3.3v for identification.
+ * DWC3_UNSUPPORTED_CHARGER Unsupported charger.
  */
 enum dwc3_chg_type {
 	DWC3_INVALID_CHARGER = 0,
@@ -70,6 +74,7 @@ enum dwc3_chg_type {
 	DWC3_DCP_CHARGER,
 	DWC3_CDP_CHARGER,
 	DWC3_PROPRIETARY_CHARGER,
+	DWC3_UNSUPPORTED_CHARGER,
 };
 
 struct dwc3_charger {
@@ -105,6 +110,7 @@ enum dwc3_id_state {
 struct dwc3_ext_xceiv {
 	enum dwc3_id_state	id;
 	bool			bsv;
+	bool			ocp;
 	bool			otg_capability;
 
 	/* to notify OTG about LPM exit event, provided by OTG */
@@ -112,6 +118,9 @@ struct dwc3_ext_xceiv {
 					enum dwc3_ext_events ext_event);
 	/* for block reset USB core */
 	void	(*ext_block_reset)(bool core_reset);
+
+	/* to register ocp_notification */
+	struct regulator_ocp_notification ext_ocp_notification;
 };
 
 /* for external transceiver driver */

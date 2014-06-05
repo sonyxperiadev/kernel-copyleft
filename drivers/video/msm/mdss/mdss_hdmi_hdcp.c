@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2013 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/io.h>
@@ -139,6 +143,29 @@ static void reset_hdcp_ddc_failures(struct hdmi_hdcp_ctrl *hdcp_ctrl)
 	DEV_DBG("%s: %s: On Exit: HDCP_DDC_STATUS=0x%x, FAIL=%d, NACK0=%d\n",
 		__func__, HDCP_STATE_NAME, hdcp_ddc_status, failure, nack0);
 } /* reset_hdcp_ddc_failures */
+
+void hdmi_hdcp_aksv(u8 aksv[5], void *input)
+{
+	struct hdmi_hdcp_ctrl *hdcp_ctrl = (struct hdmi_hdcp_ctrl *)input;
+	u32 qfprom_aksv_lsb, qfprom_aksv_msb;
+
+	if (!hdcp_ctrl) {
+		DEV_ERR("%s: invalid input\n", __func__);
+		return;
+	}
+
+	/* Fetch aksv from QFPROM, this info should be public. */
+	qfprom_aksv_lsb = DSS_REG_R(hdcp_ctrl->init_data.qfprom_io,
+		HDCP_KSV_LSB);
+	qfprom_aksv_msb = DSS_REG_R(hdcp_ctrl->init_data.qfprom_io,
+		HDCP_KSV_MSB);
+
+	aksv[0] =  qfprom_aksv_lsb        & 0xFF;
+	aksv[1] = (qfprom_aksv_lsb >> 8)  & 0xFF;
+	aksv[2] = (qfprom_aksv_lsb >> 16) & 0xFF;
+	aksv[3] = (qfprom_aksv_lsb >> 24) & 0xFF;
+	aksv[4] =  qfprom_aksv_msb        & 0xFF;
+} /* hdmi_hdcp_aksv */
 
 static int hdmi_hdcp_authentication_part1(struct hdmi_hdcp_ctrl *hdcp_ctrl)
 {
@@ -968,6 +995,13 @@ int hdmi_hdcp_reauthenticate(void *input)
 	DSS_REG_W(io, HDMI_HDCP_INT_CTRL, 0);
 
 	DSS_REG_W(io, HDMI_HDCP_RESET, BIT(0));
+
+	/*
+	 * The DDC transaction for HDCP should be cleared before
+	 * shutdowining on the DDC for HDCP hw engin otherwise it goes into
+	 * bad state. So before clearing HDCP_CTRL register, wait some time.
+	 */
+	msleep(500);
 
 	/* Disable encryption and disable the HDCP block */
 	DSS_REG_W(io, HDMI_HDCP_CTRL, 0);

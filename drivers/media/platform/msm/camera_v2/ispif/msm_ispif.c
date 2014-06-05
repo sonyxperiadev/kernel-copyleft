@@ -1,4 +1,5 @@
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -488,7 +489,11 @@ static void msm_ispif_intf_cmd(struct ispif_device *ispif, uint32_t cmd_bits,
 		vfe_intf = params->entries[i].vfe_intf;
 		for (k = 0; k < params->entries[i].num_cids; k++) {
 			cid = params->entries[i].cids[k];
+#if defined(CONFIG_SONY_CAM_V4L2)
+			vc = cid / 4;
+#else
 			vc = cid % 4;
+#endif
 			if (intf_type == RDI2) {
 				/* zero out two bits */
 				ispif->applied_intf_cmd[vfe_intf].intf_cmd1 &=

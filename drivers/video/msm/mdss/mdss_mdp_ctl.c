@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,7 +24,7 @@
 /* truncate at 1k */
 #define MDSS_MDP_BUS_FACTOR_SHIFT 10
 /* 1.5 bus fudge factor */
-#define MDSS_MDP_BUS_FUDGE_FACTOR(val) (((val) / 2) * 3)
+#define MDSS_MDP_BUS_FUDGE_FACTOR(val) (((val) * 11) / 4)
 /* 1.25 clock fudge factor */
 #define MDSS_MDP_CLK_FUDGE_FACTOR(val) (((val) * 5) / 4)
 
