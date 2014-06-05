@@ -469,10 +469,6 @@ static void log_modem_sfr(struct mba_data *drv)
 	update_crash_reason(drv->subsys, smem_reason, size);
 	pr_err("modem subsystem failure reason: %s.\n", reason);
 
-	if (0 == strncmp("SFR Init: wdog or kernel error suspected.",
-			smem_reason, min(size, sizeof(reason))))
-		panic("subsys-restart: Resetting the SoC - modem crashed.");
-
 	smem_reason[0] = '\0';
 	wmb();
 }

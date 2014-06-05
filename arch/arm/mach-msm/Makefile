@@ -316,11 +316,7 @@ obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-keypad.o board-sapphire-panel.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-mmc.o board-sapphire-wifi.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-rfkill.o msm_vibrator.o
 
-ifdef CONFIG_MACH_SONY_HONAMI_CMCC
-	obj-$(CONFIG_MACH_SONY_HONAMI_CMCC) += board-sony_honami_cmcc-gpiomux.o board-sony_rhine-usb.o bms-batterydata-salomon.o
-else
-	obj-$(CONFIG_ARCH_MSM8974) += board-8974-gpiomux.o board-sony_rhine-usb.o bms-batterydata-oem.o
-endif
+obj-$(CONFIG_MACH_SONY_HONAMI_CMCC) += board-sony_honami_cmcc-gpiomux.o board-sony_rhine-usb.o bms-batterydata-salomon.o
 
 CFLAGS_msm_vibrator.o += -Idrivers/staging/android
 CFLAGS_board-9615.o += -Idrivers/usb/gadget
