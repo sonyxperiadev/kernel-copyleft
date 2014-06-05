@@ -727,3 +727,10 @@ config MMC_USHC
 
 	  Note: These controllers only support SDIO cards and do not
 	  support MMC or SD memory cards.
+
+config MMC_SDHCI_AUTO_CMD23_DISABLE
+	boolean "Workaround of SD Card Nrc timing violation"
+	depends on MMC_SDHCI_MSM
+	default n
+	help
+	  This selects support for workaround of MSM8974/8928 bug.

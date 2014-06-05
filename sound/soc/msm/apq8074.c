@@ -19,18 +19,22 @@
 #include <linux/mfd/pm8xxx/pm8921.h>
 #include <linux/qpnp/clkdiv.h>
 #include <linux/regulator/consumer.h>
+#include <linux/io.h>
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/pcm.h>
 #include <sound/jack.h>
 #include <sound/q6afe-v2.h>
-#include <asm/mach-types.h>
-#include <mach/socinfo.h>
 #include <sound/pcm_params.h>
+#include <asm/mach-types.h>
+#include <mach/subsystem_notif.h>
+#include <mach/socinfo.h>
+
 #include "qdsp6v2/msm-pcm-routing-v2.h"
+#include "qdsp6v2/q6core.h"
+#include "../codecs/wcd9xxx-common.h"
 #include "../codecs/wcd9320.h"
-#include <linux/io.h>
 
 #define DRV_NAME "apq8074-asoc-taiko"
 
@@ -66,7 +70,7 @@ static int apq8074_auxpcm_rate = 8000;
 #define I2S_PCM_SEL_OFFSET 1
 
 
-#define WCD9XXX_MBHC_DEF_BUTTONS 8
+#define WCD9XXX_MBHC_DEF_BUTTONS 4
 #define WCD9XXX_MBHC_DEF_RLOADS 5
 #define TAIKO_EXT_CLK_RATE 9600000
 
@@ -81,6 +85,10 @@ static int apq8074_auxpcm_rate = 8000;
 #define EXT_CLASS_AB_DELAY_DELTA 1000
 
 #define NUM_OF_AUXPCM_GPIOS 4
+
+static void *adsp_state_notifier;
+
+#define ADSP_STATE_READY_TIMEOUT_MS 3000
 
 static inline int param_is_mask(int p)
 {
@@ -618,6 +626,26 @@ static int apq8074_mclk_event(struct snd_soc_dapm_widget *w,
 
 	return 0;
 }
+
+static const struct snd_soc_dapm_widget rhine_apq8074_dapm_widgets[] = {
+
+	SND_SOC_DAPM_SUPPLY("MCLK",  SND_SOC_NOPM, 0, 0,
+	apq8074_mclk_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_SPK("Ext Spk Bottom Pos", msm_ext_spkramp_event),
+	SND_SOC_DAPM_SPK("Ext Spk Bottom Neg", msm_ext_spkramp_event),
+
+	SND_SOC_DAPM_SPK("Ext Spk Top Pos", msm_ext_spkramp_event),
+	SND_SOC_DAPM_SPK("Ext Spk Top Neg", msm_ext_spkramp_event),
+
+	SND_SOC_DAPM_MIC("Handset Mic", NULL),
+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("Secondary Mic", NULL),
+	SND_SOC_DAPM_MIC("Handset FB ANC Mic", NULL),
+	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
+
+};
 
 static const struct snd_soc_dapm_widget apq8074_dapm_widgets[] = {
 
@@ -1230,6 +1258,101 @@ static bool apq8074_swap_gnd_mic(struct snd_soc_codec *codec)
 	return true;
 }
 
+static int msm_afe_set_config(struct snd_soc_codec *codec)
+{
+	int rc;
+	void *config_data;
+
+	pr_debug("%s: enter\n", __func__);
+	config_data = taiko_get_afe_config(codec, AFE_CDC_REGISTERS_CONFIG);
+	rc = afe_set_config(AFE_CDC_REGISTERS_CONFIG, config_data, 0);
+	if (rc) {
+		pr_err("%s: Failed to set codec registers config %d\n",
+		       __func__, rc);
+		return rc;
+	}
+
+	config_data = taiko_get_afe_config(codec, AFE_SLIMBUS_SLAVE_CONFIG);
+	rc = afe_set_config(AFE_SLIMBUS_SLAVE_CONFIG, config_data, 0);
+	if (rc) {
+		pr_err("%s: Failed to set slimbus slave config %d\n", __func__,
+		       rc);
+		return rc;
+	}
+
+	return 0;
+}
+
+static void msm_afe_clear_config(void)
+{
+	afe_clear_config(AFE_CDC_REGISTERS_CONFIG);
+	afe_clear_config(AFE_SLIMBUS_SLAVE_CONFIG);
+}
+
+static int  msm8974_adsp_state_callback(struct notifier_block *nb,
+		unsigned long value, void *priv)
+{
+	if (value == SUBSYS_BEFORE_SHUTDOWN) {
+		pr_debug("%s: ADSP is about to shutdown. Clearing AFE config\n",
+		     __func__);
+		msm_afe_clear_config();
+	} else if (value == SUBSYS_AFTER_POWERUP) {
+		pr_debug("%s: ADSP is up\n", __func__);
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block adsp_state_notifier_block = {
+	.notifier_call = msm8974_adsp_state_callback,
+	.priority = -INT_MAX,
+};
+
+static int msm8974_taiko_codec_up(struct snd_soc_codec *codec)
+{
+	int err;
+	unsigned long timeout;
+	int adsp_ready = 0;
+
+	timeout = jiffies +
+		msecs_to_jiffies(ADSP_STATE_READY_TIMEOUT_MS);
+
+	do {
+		if (!q6core_is_adsp_ready()) {
+			pr_err("%s: ADSP Audio isn't ready\n", __func__);
+		} else {
+			pr_debug("%s: ADSP Audio is ready\n", __func__);
+			adsp_ready = 1;
+			break;
+		}
+	} while (time_after(timeout, jiffies));
+
+	if (!adsp_ready) {
+		pr_err("%s: timed out waiting for ADSP Audio\n", __func__);
+		return -ETIMEDOUT;
+	}
+
+	err = msm_afe_set_config(codec);
+	if (err)
+		pr_err("%s: Failed to set AFE config. err %d\n",
+				__func__, err);
+	return err;
+}
+
+static int apq8074_taiko_event_cb(struct snd_soc_codec *codec,
+		enum wcd9xxx_codec_event codec_event)
+{
+	switch (codec_event) {
+	case WCD9XXX_CODEC_EVENT_CODEC_UP:
+		return msm8974_taiko_codec_up(codec);
+		break;
+	default:
+		pr_err("%s: UnSupported codec event %d\n",
+				__func__, codec_event);
+		return -EINVAL;
+	}
+}
+
 static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int err;
@@ -1274,8 +1397,8 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		return err;
 	}
 
-	snd_soc_dapm_new_controls(dapm, apq8074_dapm_widgets,
-				ARRAY_SIZE(apq8074_dapm_widgets));
+	snd_soc_dapm_new_controls(dapm, rhine_apq8074_dapm_widgets,
+				ARRAY_SIZE(rhine_apq8074_dapm_widgets));
 
 	snd_soc_dapm_enable_pin(dapm, "Lineout_1 amp");
 	snd_soc_dapm_enable_pin(dapm, "Lineout_3 amp");
@@ -1291,19 +1414,9 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 				    tx_ch, ARRAY_SIZE(rx_ch), rx_ch);
 
 
-	config_data = taiko_get_afe_config(codec, AFE_CDC_REGISTERS_CONFIG);
-	err = afe_set_config(AFE_CDC_REGISTERS_CONFIG, config_data, 0);
+	err = msm_afe_set_config(codec);
 	if (err) {
-		pr_err("%s: Failed to set codec registers config %d\n",
-		       __func__, err);
-		goto out;
-	}
-
-	config_data = taiko_get_afe_config(codec, AFE_SLIMBUS_SLAVE_CONFIG);
-	err = afe_set_config(AFE_SLIMBUS_SLAVE_CONFIG, config_data, 0);
-	if (err) {
-		pr_err("%s: Failed to set slimbus slave config %d\n", __func__,
-		       err);
+		pr_err("%s: Failed to set AFE config %d\n", __func__, err);
 		goto out;
 	}
 
@@ -1340,12 +1453,22 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		err = taiko_hs_detect(codec, &mbhc_cfg);
 		if (err)
 			goto out;
-		else
-			return err;
 	} else {
 		err = -ENOMEM;
 		goto out;
 	}
+	adsp_state_notifier =
+		subsys_notif_register_notifier("adsp",
+						&adsp_state_notifier_block);
+	if (!adsp_state_notifier) {
+		pr_err("%s: Failed to register adsp state notifier\n",
+		       __func__);
+		err = -EFAULT;
+		goto out;
+	}
+
+	taiko_event_register(apq8074_taiko_event_cb, rtd->codec);
+	return 0;
 out:
 	clk_put(codec_clk);
 	return err;
@@ -1388,8 +1511,8 @@ static void *def_taiko_mbhc_cal(void)
 	S(t_ins_retry, 200);
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_PLUG_TYPE_PTR(taiko_cal)->X) = (Y))
-	S(v_no_mic, 30);
-	S(v_hs_max, 2400);
+	S(v_no_mic, 50);
+	S(v_hs_max, 2450);
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_BTN_DET_PTR(taiko_cal)->X) = (Y))
 	S(c[0], 62);
@@ -1407,22 +1530,14 @@ static void *def_taiko_mbhc_cal(void)
 	btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_V_BTN_LOW);
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
-	btn_low[0] = -50;
-	btn_high[0] = 20;
-	btn_low[1] = 21;
-	btn_high[1] = 61;
-	btn_low[2] = 62;
-	btn_high[2] = 104;
-	btn_low[3] = 105;
-	btn_high[3] = 148;
-	btn_low[4] = 149;
-	btn_high[4] = 189;
-	btn_low[5] = 190;
-	btn_high[5] = 228;
-	btn_low[6] = 229;
-	btn_high[6] = 269;
-	btn_low[7] = 270;
-	btn_high[7] = 500;
+	btn_low[0] = -30;
+	btn_high[0] = 50;
+	btn_low[1] = 51;
+	btn_high[1] = 336;
+	btn_low[2] = 337;
+	btn_high[2] = 680;
+	btn_low[3] = 681;
+	btn_high[3] = 1207;
 	n_ready = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_N_READY);
 	n_ready[0] = 80;
 	n_ready[1] = 68;
@@ -1823,6 +1938,52 @@ static struct snd_soc_dai_link apq8074_common_dai_links[] = {
 		.codec_name = "snd-soc-dummy",
 		.be_id = MSM_FRONTEND_DAI_LSM1,
 	},
+        /* Multiple Tunnel instances */
+        {
+                .name = "MSM8974 Compr2",
+                .stream_name = "COMPR2",
+                .cpu_dai_name   = "MultiMedia6",
+                .platform_name  = "msm-compr-dsp",
+                .dynamic = 1,
+                .trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                         SND_SOC_DPCM_TRIGGER_POST},
+                .codec_dai_name = "snd-soc-dummy-dai",
+                .codec_name = "snd-soc-dummy",
+                .ignore_suspend = 1,
+                .ignore_pmdown_time = 1,
+                 /* this dainlink has playback support */
+                .be_id = MSM_FRONTEND_DAI_MULTIMEDIA6,
+        },
+        {
+                .name = "MSM8974 Compr3",
+                .stream_name = "COMPR3",
+                .cpu_dai_name   = "MultiMedia7",
+                .platform_name  = "msm-compr-dsp",
+                .dynamic = 1,
+                .trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                         SND_SOC_DPCM_TRIGGER_POST},
+                .codec_dai_name = "snd-soc-dummy-dai",
+                .codec_name = "snd-soc-dummy",
+                .ignore_suspend = 1,
+                .ignore_pmdown_time = 1,
+                 /* this dainlink has playback support */
+                .be_id = MSM_FRONTEND_DAI_MULTIMEDIA7,
+        },
+        {
+                .name = "MSM8974 Compr4",
+                .stream_name = "COMPR4",
+                .cpu_dai_name   = "MultiMedia8",
+                .platform_name  = "msm-compr-dsp",
+                .dynamic = 1,
+                .trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                         SND_SOC_DPCM_TRIGGER_POST},
+                .codec_dai_name = "snd-soc-dummy-dai",
+                .codec_name = "snd-soc-dummy",
+                .ignore_suspend = 1,
+                .ignore_pmdown_time = 1,
+                 /* this dainlink has playback support */
+                .be_id = MSM_FRONTEND_DAI_MULTIMEDIA8,
+        },
 	/* Backend BT/FM DAI Links */
 	{
 		.name = LPASS_BE_INT_BT_SCO_RX,

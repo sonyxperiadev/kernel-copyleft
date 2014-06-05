@@ -75,7 +75,6 @@ enum battery_type {
 	BATT_DESAY,
 	BATT_OEM,
 	BATT_QRD_4V35_2000MAH,
-	BATT_QRD_4V2_1300MAH,
 };
 
 /**
@@ -93,8 +92,6 @@ enum battery_type {
  *			compensate for battery capacitance.
  * @rbatt_capacitve_mohm: the resistance to be added to compensate for
  *				battery capacitance
- * @flat_ocv_threshold_uv: the voltage where the battery's discharge curve
- *				starts flattening out.
  */
 
 struct bms_battery_data {
@@ -107,7 +104,6 @@ struct bms_battery_data {
 	int			default_rbatt_mohm;
 	int			delta_rbatt_mohm;
 	int			rbatt_capacitive_mohm;
-	int			flat_ocv_threshold_uv;
 };
 
 #if defined(CONFIG_PM8921_BMS) || \
@@ -117,7 +113,6 @@ extern struct bms_battery_data  palladium_1500_data;
 extern struct bms_battery_data  desay_5200_data;
 extern struct bms_battery_data  oem_batt_data;
 extern struct bms_battery_data QRD_4v35_2000mAh_data;
-extern struct bms_battery_data  qrd_4v2_1300mah_data;
 
 int interpolate_fcc(struct single_row_lut *fcc_temp_lut, int batt_temp);
 int interpolate_scalingfactor(struct sf_lut *sf_lut, int row_entry, int pc);
