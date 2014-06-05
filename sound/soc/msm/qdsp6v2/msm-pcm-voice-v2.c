@@ -442,6 +442,66 @@ static int msm_voice2_mute_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int msm_voice_tx_device_mute_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] =
+		voc_get_tx_device_mute(voc_get_session_id(VOICE_SESSION_NAME));
+	return 0;
+}
+
+static int msm_voice_tx_device_mute_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	int mute = ucontrol->value.integer.value[0];
+
+	pr_debug("%s: mute=%d\n", __func__, mute);
+
+	voc_set_tx_device_mute(voc_get_session_id(VOICE_SESSION_NAME), mute);
+
+	return 0;
+}
+
+static int msm_volte_tx_device_mute_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] =
+		voc_get_tx_device_mute(voc_get_session_id(VOLTE_SESSION_NAME));
+	return 0;
+}
+
+static int msm_volte_tx_device_mute_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	int mute = ucontrol->value.integer.value[0];
+
+	pr_debug("%s: mute=%d\n", __func__, mute);
+
+	voc_set_tx_device_mute(voc_get_session_id(VOLTE_SESSION_NAME), mute);
+
+	return 0;
+}
+
+static int msm_voice2_tx_device_mute_get(struct snd_kcontrol *kcontrol,
+					 struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] =
+		voc_get_tx_device_mute(voc_get_session_id(VOICE2_SESSION_NAME));
+	return 0;
+}
+
+static int msm_voice2_tx_device_mute_put(struct snd_kcontrol *kcontrol,
+					 struct snd_ctl_elem_value *ucontrol)
+{
+	int mute = ucontrol->value.integer.value[0];
+
+	pr_debug("%s: mute=%d\n", __func__, mute);
+
+	voc_set_tx_device_mute(voc_get_session_id(VOICE2_SESSION_NAME), mute);
+
+	return 0;
+}
+
 static int msm_voice_rx_device_mute_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
@@ -579,6 +639,15 @@ static struct snd_kcontrol_new msm_voice_controls[] = {
 		       msm_voice2_mute_get, msm_voice2_mute_put),
 	SOC_SINGLE_EXT("Voice2 Rx Volume", SND_SOC_NOPM, 0, 5, 0,
 		       msm_voice2_volume_get, msm_voice2_volume_put),
+	SOC_SINGLE_EXT("Voice Tx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_tx_device_mute_get,
+				msm_voice_tx_device_mute_put),
+	SOC_SINGLE_EXT("VoLTE Tx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+			msm_volte_tx_device_mute_get,
+			msm_volte_tx_device_mute_put),
+	SOC_SINGLE_EXT("Voice2 Tx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+		       msm_voice2_tx_device_mute_get,
+		       msm_voice2_tx_device_mute_put),
 };
 
 static struct snd_pcm_ops msm_pcm_ops = {

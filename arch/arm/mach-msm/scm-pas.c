@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/clk.h>
+#include <linux/dma-mapping.h>
 
 #include <mach/scm.h>
 #include <mach/socinfo.h>
@@ -136,24 +137,26 @@ int pas_init_image(enum pas_id id, const u8 *metadata, size_t size)
 	} request;
 	u32 scm_ret = 0;
 	void *mdata_buf;
+	dma_addr_t mdata_phys;
 
 	ret = scm_pas_enable_bw();
 	if (ret)
 		return ret;
 
-	/* Make memory physically contiguous */
-	mdata_buf = kmemdup(metadata, size, GFP_KERNEL);
-
+	/* Make memory physically contiguous, 4K aligned and non-cacheable */
+	mdata_buf = dma_alloc_coherent(NULL, size, &mdata_phys, GFP_KERNEL);
 	if (!mdata_buf)
 		return -ENOMEM;
 
+	memcpy(mdata_buf, metadata, size);
+
 	request.proc = id;
-	request.image_addr = virt_to_phys(mdata_buf);
+	request.image_addr = mdata_phys;
 
 	ret = scm_call(SCM_SVC_PIL, PAS_INIT_IMAGE_CMD, &request,
 			sizeof(request), &scm_ret, sizeof(scm_ret));
 
-	kfree(mdata_buf);
+	dma_free_coherent(NULL, size, mdata_buf, mdata_phys);
 	scm_pas_disable_bw();
 
 	if (ret)
