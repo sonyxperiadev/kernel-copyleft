@@ -1,4 +1,5 @@
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +14,10 @@
 #include <media/v4l2-subdev.h>
 #include "msm_isp_util.h"
 #include "msm_isp_axi_util.h"
+
+#if defined(CONFIG_SONY_CAM_V4L2)
+#include "msm_camera_io_util.h"
+#endif
 
 #define SRC_TO_INTF(src) \
 	((src < RDI_INTF_0) ? VFE_PIX_0 : \
@@ -410,6 +415,9 @@ void msm_isp_sof_notify(struct vfe_device *vfe_dev,
 	sof_event.frame_id = vfe_dev->axi_data.src_info[frame_src].frame_id;
 	sof_event.timestamp = ts->event_time;
 	sof_event.mono_timestamp = ts->buf_time;
+#if defined(CONFIG_SONY_CAM_V4L2)
+	sof_event.u.input_src = frame_src;
+#endif
 	msm_isp_send_event(vfe_dev, ISP_EVENT_SOF, &sof_event);
 }
 
@@ -501,6 +509,15 @@ int msm_isp_request_axi_stream(struct vfe_device *vfe_dev, void *arg)
 		stream_cfg_cmd->stream_src == IDEAL_RAW)
 			vfe_dev->hw_info->vfe_ops.axi_ops.
 				cfg_io_format(vfe_dev, stream_info);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	else {
+		uint32_t io_format_reg;
+		io_format_reg = msm_camera_io_r(vfe_dev->vfe_base + 0x54);
+		io_format_reg &= 0xFFFFCFFF;
+		io_format_reg |= 1 << 12;
+		msm_camera_io_w(io_format_reg, vfe_dev->vfe_base + 0x54);
+	}
+#endif
 
 	msm_isp_calculate_framedrop(&vfe_dev->axi_data, stream_cfg_cmd);
 
@@ -932,11 +949,20 @@ static int msm_isp_axi_wait_for_cfg_done(struct vfe_device *vfe_dev,
 	vfe_dev->axi_data.pipeline_update = camif_update;
 	vfe_dev->axi_data.stream_update = 2;
 	spin_unlock_irqrestore(&vfe_dev->shared_data_lock, flags);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	rc = wait_for_completion_interruptible_timeout(
+		&vfe_dev->stream_config_complete,
+		msecs_to_jiffies(vfe_dev->timeout));
+#else
 	rc = wait_for_completion_interruptible_timeout(
 		&vfe_dev->stream_config_complete,
 		msecs_to_jiffies(VFE_MAX_CFG_TIMEOUT));
+#endif
 	if (rc == 0) {
 		pr_err("%s: wait timeout\n", __func__);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		vfe_dev->timeout = 100;
+#endif
 		rc = -1;
 	} else {
 		rc = 0;

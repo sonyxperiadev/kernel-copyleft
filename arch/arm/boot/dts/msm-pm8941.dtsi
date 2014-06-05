@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -56,7 +57,8 @@
 				qcom,pull-up = <1>;
 				linux,code = <116>;
 			};
-
+			/* Disable RESIN shutdown here, we set it in boot code */
+/*
 			qcom,pon_2 {
 				qcom,pon-type = <1>;
 				qcom,support-reset = <1>;
@@ -66,6 +68,7 @@
 				qcom,s2-type = <1>;
 				linux,code = <114>;
 			};
+*/
 		};
 
 		bif_ctrl: qcom,bsi@1b00 {
@@ -117,9 +120,6 @@
 			qcom,batt-type = <0>;
 			qcom,low-voltage-threshold = <3420000>;
 			qcom,tm-temp-margin = <5000>;
-			qcom,low-ocv-correction-limit-uv = <100>;
-			qcom,high-ocv-correction-limit-uv = <50>;
-			qcom,hold-soc-est = <3>;
 
 			qcom,bms-iadc@3800 {
 				reg = <0x3800 0x100>;
@@ -136,15 +136,14 @@
 						<0x0 0x40 0x6>,
 						<0x0 0x40 0x7>;
 
-				interrupt-names = "cc_thr",
-						  "ocv_for_r",
-						  "good_ocv",
-						  "charge_begin",
-						  "ocv_thr",
-						  "sw_cc_thr",
+				interrupt-names = "vsense_for_r",
 						  "vsense_avg",
-						  "vsense_for_r";
-
+						  "sw_cc_thr",
+						  "ocv_thr",
+						  "charge_begin",
+						  "good_ocv",
+						  "ocv_for_r",
+						  "cc_thr";
 			};
 		};
 
@@ -726,7 +725,7 @@
 				qcom,decimation = <0>;
 				qcom,pre-div-channel-scaling = <0>;
 				qcom,calibration-type = "ratiometric";
-				qcom,scale-function = <2>;
+				qcom,scale-function = <7>;
 				qcom,hw-settle-time = <2>;
 				qcom,fast-avg-setup = <0>;
 			};
@@ -905,7 +904,7 @@
 				qcom,decimation = <0>;
 				qcom,pre-div-channel-scaling = <0>;
 				qcom,calibration-type = "ratiometric";
-				qcom,scale-function = <2>;
+				qcom,scale-function = <4>;
 				qcom,hw-settle-time = <2>;
 				qcom,fast-avg-setup = <3>;
 				qcom,btm-channel-number = <0x90>;
@@ -1205,6 +1204,56 @@
 			status = "disabled";
 		};
 
+/*
+		qcom,vibrator@c000 {
+			compatible = "qcom,qpnp-vibrator";
+			reg = <0xc000 0x100>;
+			label = "vibrator";
+		};
+*/
+
+		qcom,vibrator@c100 {
+			compatible = "qcom,qpnp-vibrator";
+			reg = <0xc100 0x100>;
+			label = "vibrator";
+		};
+
+		qcom,vibrator@c200 {
+			compatible = "qcom,qpnp-vibrator";
+			reg = <0xc200 0x100>;
+			label = "vibrator";
+		};
+
+		qcom,vibrator@c300 {
+			compatible = "qcom,qpnp-vibrator";
+			reg = <0xc300 0x100>;
+			label = "vibrator";
+		};
+
+		qcom,vibrator@c400 {
+			compatible = "qcom,qpnp-vibrator";
+			reg = <0xc400 0x100>;
+			label = "vibrator";
+		};
+
+		qcom,vibrator@c500 {
+			compatible = "qcom,qpnp-vibrator";
+			reg = <0xc500 0x100>;
+			label = "vibrator";
+		};
+
+		qcom,vibrator@c600 {
+			compatible = "qcom,qpnp-vibrator";
+			reg = <0xc600 0x100>;
+			label = "vibrator";
+		};
+
+		qcom,vibrator@c700 {
+			compatible = "qcom,qpnp-vibrator";
+			reg = <0xc700 0x100>;
+			label = "vibrator";
+		};
+
 		qcom,vibrator@c000 {
 			compatible = "qcom,qpnp-vibrator";
 			reg = <0xc000 0x100>;
@@ -1228,6 +1277,14 @@
 			compatible = "qcom,leds-qpnp";
 			reg = <0xd200 0x100>;
 			label = "rgb";
+		};
+
+		somc,leds@d300 {
+			compatible = "somc,pm8941-flash";
+			reg = <0xd300 0x100>;
+			label = "flash";
+			torch-supply = <&pm8941_boost>;
+			flash-supply = <&pm8941_chg_boost>;
 		};
 
 		qcom,leds@d300 {

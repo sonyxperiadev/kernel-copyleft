@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,6 +30,7 @@
 #include "mdss.h"
 #include "mdss_debug.h"
 #include "mdss_fb.h"
+#include "mdss_dsi.h"
 #include "mdss_mdp.h"
 #include "mdss_mdp_rotator.h"
 
@@ -276,6 +278,9 @@ static int mdss_mdp_overlay_rotator_setup(struct msm_fb_data_type *mfd,
 	if (req->flags & MDP_DEINTERLACE) {
 		rot->flags |= MDP_DEINTERLACE;
 		rot->src_rect.h /= 2;
+		rot->src_rect.y /= 2;
+		if (rot->src_rect.y % 2)
+			rot->src_rect.y++;
 	}
 
 	ret = mdss_mdp_rotator_setup(rot);
@@ -550,6 +555,9 @@ static int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 			pipe->img_width /= 2;
 		} else {
 			pipe->src.h /= 2;
+			pipe->src.y /= 2;
+			if (pipe->src.y % 2)
+				pipe->src.y++;
 		}
 	}
 
@@ -676,6 +684,45 @@ static inline int mdss_mdp_overlay_free_buf(struct mdss_mdp_data *data)
 	return 0;
 }
 
+/**
+ * __mdss_mdp_overlay_free_list_purge() - clear free list of buffers
+ * @mfd:	Msm frame buffer data structure for the associated fb
+ *
+ * Frees memory and clears current list of buffers which are pending free
+ */
+static void __mdss_mdp_overlay_free_list_purge(struct msm_fb_data_type *mfd)
+{
+	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
+	int i;
+
+	pr_debug("purging fb%d free list\n", mfd->index);
+	for (i = 0; i < mdp5_data->free_list_size; i++)
+		mdss_mdp_overlay_free_buf(&mdp5_data->free_list[i]);
+	mdp5_data->free_list_size = 0;
+}
+
+/**
+ * __mdss_mdp_overlay_free_list_add() - add a buffer to free list
+ * @mfd:	Msm frame buffer data structure for the associated fb
+ */
+static void __mdss_mdp_overlay_free_list_add(struct msm_fb_data_type *mfd,
+		struct mdss_mdp_data *buf)
+{
+	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
+	int i;
+
+	/* if holding too many buffers free current list */
+	if (mdp5_data->free_list_size >= MAX_FREE_LIST_SIZE) {
+		pr_warn("max free list size for fb%d, purging\n", mfd->index);
+		__mdss_mdp_overlay_free_list_purge(mfd);
+	}
+
+	BUG_ON(mdp5_data->free_list_size >= MAX_FREE_LIST_SIZE);
+	i = mdp5_data->free_list_size++;
+	mdp5_data->free_list[i] = *buf;
+	memset(buf, 0, sizeof(*buf));
+}
+
 static void mdss_mdp_overlay_cleanup(struct msm_fb_data_type *mfd)
 {
 	struct mdss_mdp_pipe *pipe, *tmp;
@@ -683,18 +730,20 @@ static void mdss_mdp_overlay_cleanup(struct msm_fb_data_type *mfd)
 	LIST_HEAD(destroy_pipes);
 
 	mutex_lock(&mfd->lock);
+	__mdss_mdp_overlay_free_list_purge(mfd);
+
 	list_for_each_entry_safe(pipe, tmp, &mdp5_data->pipes_cleanup,
 				cleanup_list) {
 		list_move(&pipe->cleanup_list, &destroy_pipes);
 		mdss_mdp_overlay_free_buf(&pipe->back_buf);
-		mdss_mdp_overlay_free_buf(&pipe->front_buf);
+		__mdss_mdp_overlay_free_list_add(mfd, &pipe->front_buf);
 		pipe->mfd = NULL;
 	}
 
 	list_for_each_entry(pipe, &mdp5_data->pipes_used, used_list) {
 		if (pipe->back_buf.num_planes) {
 			/* make back buffer active */
-			mdss_mdp_overlay_free_buf(&pipe->front_buf);
+			__mdss_mdp_overlay_free_list_add(mfd, &pipe->front_buf);
 			swap(pipe->back_buf, pipe->front_buf);
 		}
 	}
@@ -1067,7 +1116,7 @@ static int mdss_mdp_overlay_play(struct msm_fb_data_type *mfd,
 
 	ret = mutex_lock_interruptible(&mdp5_data->ov_lock);
 	if (ret)
-		return ret;
+		goto exit;
 
 	if (!mfd->panel_power_on) {
 		ret = -EPERM;
@@ -1087,7 +1136,9 @@ static int mdss_mdp_overlay_play(struct msm_fb_data_type *mfd,
 	} else if (req->id == BORDERFILL_NDX) {
 		pr_debug("borderfill enable\n");
 		mdp5_data->borderfill_enable = true;
+		mutex_unlock(&mdp5_data->ov_lock);
 		ret = mdss_mdp_overlay_free_fb_pipe(mfd);
+		goto exit;
 	} else {
 		ret = mdss_mdp_overlay_queue(mfd, req);
 	}
@@ -1095,6 +1146,7 @@ static int mdss_mdp_overlay_play(struct msm_fb_data_type *mfd,
 done:
 	mutex_unlock(&mdp5_data->ov_lock);
 
+exit:
 	return ret;
 }
 
@@ -1189,15 +1241,30 @@ static int mdss_mdp_overlay_get_fb_pipe(struct msm_fb_data_type *mfd,
 
 static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
 {
+	struct mdss_panel_data *pdata;
 	struct mdss_mdp_data data;
 	struct mdss_mdp_pipe *pipe;
 	struct fb_info *fbi;
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 	u32 offset;
 	int bpp, ret;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 
 	if (!mfd || !mdp5_data->ctl)
 		return;
+
+	pdata = dev_get_platdata(&mfd->pdev->dev);
+	if (!pdata) {
+		pr_err("no panel connected\n");
+		return;
+	}
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+	if (!ctrl_pdata) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return;
+	}
 
 	fbi = mfd->fbi;
 
@@ -1982,6 +2049,8 @@ static int mdss_mdp_overlay_off(struct msm_fb_data_type *mfd)
 
 	rc = mdss_mdp_ctl_stop(mdp5_data->ctl);
 	if (rc == 0) {
+		__mdss_mdp_overlay_free_list_purge(mfd);
+
 		if (!mfd->ref_cnt) {
 			mdp5_data->borderfill_enable = false;
 			mdss_mdp_ctl_destroy(mdp5_data->ctl);
