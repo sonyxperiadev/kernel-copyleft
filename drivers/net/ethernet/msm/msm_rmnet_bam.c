@@ -30,6 +30,7 @@
 #include <linux/msm_rmnet.h>
 #include <linux/platform_device.h>
 #include <net/pkt_sched.h>
+#include <linux/ratelimit.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
@@ -299,6 +300,17 @@ static int _rmnet_xmit(struct sk_buff *skb, struct net_device *dev)
 	spin_unlock_irqrestore(&p->lock, flags);
 
 	if (RMNET_IS_MODE_QOS(opmode)) {
+		/* Check if skb_buff has enough headroom space */
+		if (skb_headroom(skb) < sizeof(struct QMI_QOS_HDR_S)) {
+			struct sk_buff *sk_tmp = skb;
+			pr_warn_ratelimited("%s: lack of headroom, hd=%d\n",
+				__func__, skb_headroom(skb));
+			skb = skb_realloc_headroom(sk_tmp,
+				sizeof(struct QMI_QOS_HDR_S));
+			dev_kfree_skb_any(sk_tmp);
+			if (!skb)
+				return -EPERM;
+		}
 		qmih = (struct QMI_QOS_HDR_S *)
 			skb_push(skb, sizeof(struct QMI_QOS_HDR_S));
 		qmih->version = 1;
