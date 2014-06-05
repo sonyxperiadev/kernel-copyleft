@@ -1,0 +1,5 @@
+Configuration files can be found in arch/arm/configs.
+
+    Xperia Z Ultra    => rhine_togari_row_defconfig
+    Xperia Z1         => rhine_honami_row_defconfig
+    Xperia Z1 SOL23   => rhine_honami_kddi_defconfig
