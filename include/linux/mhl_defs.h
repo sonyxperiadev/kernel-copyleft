@@ -72,6 +72,7 @@ enum DevCapOffset_e {
 #define	MHL_DEV_VID_LINK_SUPPYCBCR422		0x04
 #define	MHL_DEV_VID_LINK_SUPP_PPIXEL		0x08
 #define	MHL_DEV_VID_LINK_SUPP_ISLANDS		0x10
+#define	MHL_DEV_VID_LINK_SUPP_VGA		0x20
 
 /*Audio Link Mode Support*/
 #define	MHL_DEV_AUD_LINK_2CH				0x01
@@ -134,6 +135,7 @@ enum DevCapOffset_e {
 #define		ADOPTER_ID_SIZE				2
 #define		MHL_DEVCAP_ALL		0xffff
 
+#define		MHL_DEVCAP_ALL		0xffff
 /* manually define highest number */
 #define		MHL_MAX_BUFFER_SIZE			MHL_SCRATCHPAD_SIZE
 #define		MHL_BURST_WAIT		(1000)

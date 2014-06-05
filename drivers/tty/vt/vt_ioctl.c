@@ -193,15 +193,25 @@ static int vt_event_wait_ioctl(struct vt_event __user *event)
 int vt_waitactive(int n)
 {
 	struct vt_event_wait vw;
+	unsigned long flags;
+	INIT_LIST_HEAD(&vw.list);
+
 	do {
 		vw.event.event = VT_EVENT_SWITCH;
-		__vt_event_queue(&vw);
-		if (n == fg_console + 1) {
-			__vt_event_dequeue(&vw);
+		vw.done = 0;
+		spin_lock_irqsave(&vt_event_lock, flags);
+		list_add(&vw.list, &vt_events);
+		spin_unlock_irqrestore(&vt_event_lock, flags);
+
+		wait_event_interruptible(vt_event_waitqueue,
+				(n == fg_console + 1) || vw.done);
+
+		spin_lock_irqsave(&vt_event_lock, flags);
+		list_del(&vw.list);
+		spin_unlock_irqrestore(&vt_event_lock, flags);
+
+		if (n == fg_console + 1)
 			break;
-		}
-		__vt_event_wait(&vw);
-		__vt_event_dequeue(&vw);
 		if (vw.done == 0)
 			return -EINTR;
 	} while (vw.event.newev != n);
