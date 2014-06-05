@@ -183,6 +183,9 @@ struct vss_unmap_memory_cmd {
 #define VSS_IMVM_CMD_STOP_VOICE				0x00011192
 /**< No payload. Wait for APRV2_IBASIC_RSP_RESULT response. */
 
+#define VSS_IMVM_CMD_PAUSE_VOICE			0x0001137D
+/* No payload. Wait for APRV2_IBASIC_RSP_RESULT response. */
+
 #define VSS_ISTREAM_CMD_ATTACH_VOCPROC			0x000110F8
 /**< Wait for APRV2_IBASIC_RSP_RESULT response. */
 
@@ -1367,6 +1370,8 @@ int voc_set_route_flag(uint32_t session_id, uint8_t path_dir, uint8_t set);
 uint8_t voc_get_route_flag(uint32_t session_id, uint8_t path_dir);
 int voc_enable_dtmf_rx_detection(uint32_t session_id, uint32_t enable);
 void voc_disable_dtmf_det_on_active_sessions(void);
+
+int voc_unmap_cal_blocks(void);
 
 uint32_t voc_get_session_id(char *name);
 

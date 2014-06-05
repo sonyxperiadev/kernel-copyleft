@@ -789,8 +789,8 @@ int hdmi_cec_isr(void *input)
 	DEV_DBG("%s: cec interrupt status is [0x%x]\n", __func__, cec_intr);
 
 	if (!cec_ctrl->cec_enabled) {
-		DEV_ERR("%s: cec is not enabled. Just clear int and return.\n",
-			__func__);
+		if (cec_intr)
+			DEV_ERR("%s: cec is not enabled.\n", __func__);
 		DSS_REG_W(io, HDMI_CEC_INT, cec_intr);
 		return 0;
 	}
