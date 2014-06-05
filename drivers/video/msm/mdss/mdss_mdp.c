@@ -129,7 +129,6 @@ static DEFINE_SPINLOCK(mdss_lock);
 struct mdss_hw *mdss_irq_handlers[MDSS_MAX_HW_BLK];
 
 static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on);
-static inline int mdss_mdp_suspend_sub(struct mdss_data_type *mdata);
 static int mdss_mdp_parse_dt(struct platform_device *pdev);
 static int mdss_mdp_parse_dt_pipe(struct platform_device *pdev);
 static int mdss_mdp_parse_dt_mixer(struct platform_device *pdev);
@@ -915,18 +914,6 @@ void mdss_mdp_footswitch_ctrl_splash(int on)
 	}
 }
 
-static void mdss_mdp_shutdown(struct platform_device *pdev)
-{
-	struct mdss_data_type *mdata = platform_get_drvdata(pdev);
-
-	if (!mdata)
-		return;
-
-	pr_debug("display shutdown\n");
-
-	mdss_mdp_suspend_sub(mdata);
-}
-
 static int mdss_mdp_probe(struct platform_device *pdev)
 {
 	struct resource *res;
@@ -1586,8 +1573,7 @@ static inline int mdss_mdp_suspend_sub(struct mdss_data_type *mdata)
 
 static inline int mdss_mdp_resume_sub(struct mdss_data_type *mdata)
 {
-	if (mdata->suspend_fs_ena)
-		mdss_mdp_footswitch_ctrl(mdata, true);
+	mdss_mdp_footswitch_ctrl(mdata, true);
 
 	pr_debug("resume done fs=%d\n", mdata->suspend_fs_ena);
 
@@ -1660,7 +1646,7 @@ static int mdss_mdp_runtime_resume(struct device *dev)
 
 	dev_dbg(dev, "pm_runtime: resuming...\n");
 
-	mdss_mdp_footswitch_ctrl(mdata, true);
+	/* mdss_mdp_footswitch_ctrl(mdata, true); */
 
 	return 0;
 }
@@ -1687,7 +1673,7 @@ static int mdss_mdp_runtime_suspend(struct device *dev)
 		pr_err("MDP suspend failed\n");
 		return -EBUSY;
 	}
-	mdss_mdp_footswitch_ctrl(mdata, false);
+	/* mdss_mdp_footswitch_ctrl(mdata, false); */
 
 	return 0;
 }
@@ -1723,7 +1709,7 @@ static struct platform_driver mdss_mdp_driver = {
 	.remove = mdss_mdp_remove,
 	.suspend = mdss_mdp_suspend,
 	.resume = mdss_mdp_resume,
-	.shutdown = mdss_mdp_shutdown,
+	.shutdown = NULL,
 	.driver = {
 		/*
 		 * Driver name must match the device name added in

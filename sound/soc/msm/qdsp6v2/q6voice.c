@@ -1,4 +1,5 @@
 /*  Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2013 Sony Mobile Communications AB. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -86,7 +87,6 @@ static int voice_send_set_pp_enable_cmd(struct voice_data *v,
 					uint32_t module_id, int enable);
 
 static struct voice_data *voice_get_session_by_idx(int idx);
-static int voice_get_idx_for_session(u32 session_id);
 
 static u16 voice_get_mvm_handle(struct voice_data *v)
 {
@@ -231,7 +231,7 @@ static struct voice_data *voice_get_session(u32 session_id)
 	return v;
 }
 
-static int voice_get_idx_for_session(u32 session_id)
+int voice_get_idx_for_session(u32 session_id)
 {
 	int idx = 0;
 
@@ -825,6 +825,23 @@ static int voice_destroy_mvm_cvs_session(struct voice_data *v)
 		}
 	}
 
+	/* Unmap physical memory for calibration */
+	pr_debug("%s: cal_mem_handle %d\n", __func__,
+		 common.cal_mem_handle);
+
+	if (!is_other_session_active(v->session_id) &&
+					(common.cal_mem_handle != 0)) {
+		ret = voice_send_mvm_unmap_memory_physical_cmd(v,
+						common.cal_mem_handle);
+		if (ret < 0) {
+			pr_err("%s Fail at cal mem unmap %d\n",
+				   __func__, ret);
+
+			goto fail;
+		}
+		common.cal_mem_handle = 0;
+	}
+
 	if (is_voip_session(v->session_id) || v->voc_state == VOC_ERROR) {
 		/* Destroy CVS. */
 		pr_debug("%s: CVS destroy session\n", __func__);
@@ -858,23 +875,6 @@ static int voice_destroy_mvm_cvs_session(struct voice_data *v)
 		}
 		cvs_handle = 0;
 		voice_set_cvs_handle(v, cvs_handle);
-
-		/* Unmap physical memory for calibration */
-		pr_debug("%s: cal_mem_handle %d\n", __func__,
-			 common.cal_mem_handle);
-
-		if (!is_other_session_active(v->session_id) &&
-					    (common.cal_mem_handle != 0)) {
-			ret = voice_send_mvm_unmap_memory_physical_cmd(v,
-							common.cal_mem_handle);
-			if (ret < 0) {
-				pr_err("%s Fail at cal mem unmap %d\n",
-				       __func__, ret);
-
-				goto fail;
-			}
-			common.cal_mem_handle = 0;
-		}
 
 		/* Destroy MVM. */
 		pr_debug("MVM destroy session\n");
@@ -4018,11 +4018,11 @@ int voc_standby_voice_call(uint32_t session_id)
 	u16 mvm_handle;
 	int ret = 0;
 
-	pr_debug("%s: voc state=%d", __func__, v->voc_state);
 	if (v == NULL) {
 		pr_err("%s: v is NULL\n", __func__);
 		return -EINVAL;
 	}
+	pr_debug("%s: voc state=%d", __func__, v->voc_state);
 	if (v->voc_state == VOC_RUN) {
 		apr_mvm = common.apr_q6_mvm;
 		if (!apr_mvm) {
