@@ -2,6 +2,7 @@
  *  linux/drivers/mmc/host/sdhci.c - Secure Digital Host Controller Interface driver
  *
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
+ *  Copyright (c) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1377,6 +1378,7 @@ static int sdhci_disable(struct mmc_host *mmc)
 	return 0;
 }
 
+#ifndef CONFIG_MMC_SDHCI_AUTO_CMD23_DISABLE
 static void sdhci_pre_req(struct mmc_host *mmc, struct mmc_request *mrq,
 			  bool is_first_req)
 {
@@ -1405,6 +1407,7 @@ static void sdhci_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
 		data->host_cookie = 0;
 	}
 }
+#endif
 
 static bool sdhci_check_state(struct sdhci_host *host)
 {
@@ -2193,8 +2196,10 @@ static unsigned int sdhci_get_xfer_remain(struct mmc_host *mmc)
 }
 
 static const struct mmc_host_ops sdhci_ops = {
+#ifndef CONFIG_MMC_SDHCI_AUTO_CMD23_DISABLE
 	.pre_req	= sdhci_pre_req,
 	.post_req	= sdhci_post_req,
+#endif
 	.request	= sdhci_request,
 	.set_ios	= sdhci_set_ios,
 	.get_ro		= sdhci_get_ro,
@@ -3124,8 +3129,17 @@ int sdhci_add_host(struct sdhci_host *host)
 	if ((host->version >= SDHCI_SPEC_300) &&
 	    ((host->flags & SDHCI_USE_ADMA) ||
 	     !(host->flags & SDHCI_USE_SDMA))) {
+#ifndef CONFIG_MMC_SDHCI_AUTO_CMD23_DISABLE
 		host->flags |= SDHCI_AUTO_CMD23;
 		DBG("%s: Auto-CMD23 available\n", mmc_hostname(mmc));
+#else
+		if (mmc->caps & MMC_CAP_NONREMOVABLE) {
+			host->flags |= SDHCI_AUTO_CMD23;
+			DBG("%s: Auto-CMD23 available\n", mmc_hostname(mmc));
+		} else {
+			DBG("%s: Auto-CMD23 unavailable\n", mmc_hostname(mmc));
+		}
+#endif
 	} else {
 		DBG("%s: Auto-CMD23 unavailable\n", mmc_hostname(mmc));
 	}
@@ -3154,7 +3168,7 @@ int sdhci_add_host(struct sdhci_host *host)
 
 	/* SDR104 supports also implies SDR50 support */
 	if (caps[1] & SDHCI_SUPPORT_SDR104)
-		mmc->caps |= MMC_CAP_UHS_SDR104 | MMC_CAP_UHS_SDR50;
+		mmc->caps |= MMC_CAP_UHS_SDR50;
 	else if (caps[1] & SDHCI_SUPPORT_SDR50)
 		mmc->caps |= MMC_CAP_UHS_SDR50;
 
