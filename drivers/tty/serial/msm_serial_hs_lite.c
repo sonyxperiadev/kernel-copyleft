@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -47,6 +48,8 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/wakelock.h>
+#include <linux/types.h>
+#include <asm/byteorder.h>
 #include <mach/board.h>
 #include <mach/msm_serial_hs_lite.h>
 #include <mach/msm_bus.h>
@@ -98,6 +101,7 @@ struct msm_hsl_port {
 
 #define UARTDM_VERSION_11_13	0
 #define UARTDM_VERSION_14	1
+#define UARTDM_VERSION_14_IRDA	2
 
 #define UART_TO_MSM(uart_port)	((struct msm_hsl_port *) uart_port)
 #define is_console(port)	((port)->cons && \
@@ -124,6 +128,7 @@ static const unsigned int regmap[][UARTDM_LAST] = {
 		[UARTDM_DMEN] = UARTDM_DMEN_ADDR,
 		[UARTDM_TXFS] = UARTDM_TXFS_ADDR,
 		[UARTDM_RXFS] = UARTDM_RXFS_ADDR,
+		[UARTDM_IRDA] = 0xffff, /* unsupported */
 	},
 	[UARTDM_VERSION_14] = {
 		[UARTDM_MR1] = 0x0,
@@ -145,12 +150,38 @@ static const unsigned int regmap[][UARTDM_LAST] = {
 		[UARTDM_DMEN] = 0x3c,
 		[UARTDM_TXFS] = 0x4c,
 		[UARTDM_RXFS] = 0x50,
+		[UARTDM_IRDA] = 0xffff, /* unsupported */
+	},
+	[UARTDM_VERSION_14_IRDA] = {
+		[UARTDM_MR1] = 0x0,
+		[UARTDM_MR2] = 0x4,
+		[UARTDM_IMR] = 0xb0,
+		[UARTDM_SR] = 0xa4,
+		[UARTDM_CR] = 0xa8,
+		[UARTDM_CSR] = 0xa0,
+		[UARTDM_IPR] = 0x18,
+		[UARTDM_ISR] = 0xb4,
+		[UARTDM_RX_TOTAL_SNAP] = 0xbc,
+		[UARTDM_TFWR] = 0x1c,
+		[UARTDM_RFWR] = 0x20,
+		[UARTDM_RF] = 0x140,
+		[UARTDM_TF] = 0x100,
+		[UARTDM_MISR] = 0xac,
+		[UARTDM_DMRX] = 0x34,
+		[UARTDM_NCF_TX] = 0x40,
+		[UARTDM_DMEN] = 0x3c,
+		[UARTDM_TXFS] = 0x4c,
+		[UARTDM_RXFS] = 0x50,
+		[UARTDM_IRDA] = 0xb8, /* supported */
 	},
 };
 
 static struct of_device_id msm_hsl_match_table[] = {
 	{	.compatible = "qcom,msm-lsuart-v14",
 		.data = (void *)UARTDM_VERSION_14
+	},
+	{	.compatible = "qcom,msm-lsuart-v14-irda",
+		.data = (void *)UARTDM_VERSION_14_IRDA
 	},
 	{}
 };
@@ -166,12 +197,17 @@ static inline void wait_for_xmitr(struct uart_port *port);
 static inline void msm_hsl_write(struct uart_port *port,
 				 unsigned int val, unsigned int off)
 {
-	iowrite32(val, port->membase + off);
+	__iowmb();
+	__raw_writel_no_log((__force __u32)cpu_to_le32(val),
+		port->membase + off);
 }
 static inline unsigned int msm_hsl_read(struct uart_port *port,
 		     unsigned int off)
 {
-	return ioread32(port->membase + off);
+	unsigned int v = le32_to_cpu((__force __le32)__raw_readl_no_log(
+		port->membase + off));
+	__iormb();
+	return v;
 }
 
 static unsigned int msm_serial_hsl_has_gsbi(struct uart_port *port)
@@ -1025,6 +1061,10 @@ static int msm_hsl_startup(struct uart_port *port)
 		msm_hsl_unconfig_uart_gpios(port);
 		goto release_wakelock;
 	}
+	if (regmap[vid][UARTDM_IRDA] != 0xffff)
+		msm_hsl_write(port, (UARTDM_IRDA_INVERT_RX_BMSK |
+					UARTDM_IRDA_EN_BMSK),
+					regmap[vid][UARTDM_IRDA]);
 
 	return ret;
 
@@ -1045,6 +1085,9 @@ static void msm_hsl_shutdown(struct uart_port *port)
 	msm_hsl_port->imr = 0;
 	/* disable interrupts */
 	msm_hsl_write(port, 0, regmap[msm_hsl_port->ver_id][UARTDM_IMR]);
+	if (regmap[msm_hsl_port->ver_id][UARTDM_IRDA] != 0xffff)
+		msm_hsl_write(port, 0,
+				regmap[msm_hsl_port->ver_id][UARTDM_IRDA]);
 
 	free_irq(port->irq, port);
 
