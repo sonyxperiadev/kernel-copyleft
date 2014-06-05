@@ -358,6 +358,7 @@ struct mdss_panel_common_pdata {
 	int wait_time_before_on_cmd;
 	int init_from_begin;
 	int (*pcc_setup) (struct msm_fb_data_type *mfd);
+	struct dsi_panel_cmds pre_uv_read_cmds;
 	struct dsi_panel_cmds uv_read_cmds;
 	struct mdss_pcc_cfg_rgb *wide_tbl;
 	struct mdss_pcc_cfg_rgb *sub_tbl;
