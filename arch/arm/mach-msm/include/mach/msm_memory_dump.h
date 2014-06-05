@@ -56,7 +56,13 @@ static inline int msm_dump_table_register(struct msm_client_dump *entry)
 {
 	return -EIO;
 }
+
+static inline void msm_reserve_last_regs(void)
+{
+	return;
+}
 #else
 int msm_dump_table_register(struct msm_client_dump *client_entry);
+void msm_reserve_last_regs(void);
 #endif
 #endif
