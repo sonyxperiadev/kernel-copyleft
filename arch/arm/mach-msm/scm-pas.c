@@ -142,10 +142,11 @@ int pas_init_image(enum pas_id id, const u8 *metadata, size_t size)
 		return ret;
 
 	/* Make memory physically contiguous */
-	mdata_buf = kmemdup(metadata, size, GFP_KERNEL);
-
+	mdata_buf = (void *)__get_free_pages(GFP_KERNEL, get_order(size));
 	if (!mdata_buf)
 		return -ENOMEM;
+
+	memcpy(mdata_buf, metadata, size);
 
 	request.proc = id;
 	request.image_addr = virt_to_phys(mdata_buf);
@@ -153,7 +154,7 @@ int pas_init_image(enum pas_id id, const u8 *metadata, size_t size)
 	ret = scm_call(SCM_SVC_PIL, PAS_INIT_IMAGE_CMD, &request,
 			sizeof(request), &scm_ret, sizeof(scm_ret));
 
-	kfree(mdata_buf);
+	free_pages((unsigned long)mdata_buf, get_order(size));
 	scm_pas_disable_bw();
 
 	if (ret)

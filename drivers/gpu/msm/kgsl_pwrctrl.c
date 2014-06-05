@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/export.h>
@@ -19,6 +22,8 @@
 #include <mach/msm_bus.h>
 #include <linux/ktime.h>
 #include <linux/delay.h>
+#include <linux/notifier.h>
+#include <linux/fb.h>
 
 #include "kgsl.h"
 #include "kgsl_pwrscale.h"
@@ -43,6 +48,8 @@
  */
 #define INIT_UDELAY		200
 #define MAX_UDELAY		2000
+
+static bool isFbBlank;
 
 struct clk_pair {
 	const char *name;
@@ -102,6 +109,31 @@ static void update_clk_statistics(struct kgsl_device *device,
 	else
 		clkstats->clock_time[pwr->num_pwrlevels - 1] += elapsed_us;
 	clkstats->start = ktime_get();
+}
+
+static int fb_notifier_callback(struct notifier_block *self,
+			unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	struct kgsl_device *device = container_of(self,
+				struct kgsl_device, fb_notif);
+	int *blank;
+
+	if (evdata && evdata->data && event == FB_EVENT_BLANK) {
+		blank = evdata->data;
+		if (*blank == FB_BLANK_UNBLANK)
+			isFbBlank = false;
+		else if (*blank == FB_BLANK_POWERDOWN)
+			isFbBlank = true;
+		else
+			return 0;
+
+		mutex_lock(&device->mutex);
+		kgsl_pwrctrl_wake(device);
+		mutex_unlock(&device->mutex);
+	}
+
+	return 0;
 }
 
 /*
@@ -1122,6 +1154,9 @@ int kgsl_pwrctrl_init(struct kgsl_device *device)
 	pwr->pm_qos_latency = 501;
 
 	pm_runtime_enable(device->parentdev);
+
+	device->fb_notif.notifier_call = fb_notifier_callback;
+	fb_register_client(&device->fb_notif);
 	return result;
 
 clk_err:
@@ -1250,7 +1285,7 @@ void kgsl_timer(unsigned long data)
 
 	KGSL_PWR_INFO(device, "idle timer expired device %d\n", device->id);
 	if (device->requested_state != KGSL_STATE_SUSPEND) {
-		if (device->pwrctrl.strtstp_sleepwake)
+		if (device->pwrctrl.strtstp_sleepwake && isFbBlank)
 			kgsl_pwrctrl_request_state(device, KGSL_STATE_SLUMBER);
 		else
 			kgsl_pwrctrl_request_state(device, KGSL_STATE_SLEEP);

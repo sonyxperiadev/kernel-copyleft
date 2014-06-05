@@ -1,4 +1,5 @@
 /* Copyright (c) 2002,2007-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,12 +10,15 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #ifndef __KGSL_DEVICE_H
 #define __KGSL_DEVICE_H
 
 #include <linux/idr.h>
 #include <linux/pm_qos.h>
+#include <linux/notifier.h>
 
 #include "kgsl.h"
 #include "kgsl_mmu.h"
@@ -226,6 +230,8 @@ struct kgsl_device {
 	int pm_ib_enabled;
 
 	int reset_counter; /* Track how many GPU core resets have occured */
+
+	struct notifier_block fb_notif;
 };
 
 void kgsl_process_events(struct work_struct *work);
