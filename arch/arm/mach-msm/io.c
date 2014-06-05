@@ -299,6 +299,7 @@ void __init msm_map_apq8064_io(void)
 #ifdef CONFIG_ARCH_MSM8974
 static struct map_desc msm_8974_io_desc[] __initdata = {
 	MSM_CHIP_DEVICE(QGIC_DIST, MSM8974),
+	MSM_CHIP_DEVICE(QGIC_CPU, MSM8974),
 	MSM_CHIP_DEVICE(TLMM, MSM8974),
 	MSM_CHIP_DEVICE(MPM2_PSHOLD, MSM8974),
 	{

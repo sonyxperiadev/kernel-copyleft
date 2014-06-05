@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,6 +31,7 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/qpnp/qpnp-adc.h>
 #include <linux/platform_device.h>
+#include <linux/qpnp/power-on.h>
 
 /* QPNP VADC register definition */
 #define QPNP_VADC_REVISION1				0x0
@@ -53,6 +55,13 @@
 #define QPNP_VADC_STATUS2_CONV_SEQ_TIMEOUT_STS			BIT(0)
 #define QPNP_VADC_STATUS2_CONV_SEQ_STATE_SHIFT			4
 #define QPNP_VADC_CONV_TIMEOUT_ERR				2
+
+#define QPNP_VADC_INT_LATCHED_CLR				0x14
+#define QPNP_VADC_LOW_THR_INT_LATCHED_CLR			BIT(4)
+#define QPNP_VADC_HIGH_THR_INT_LATCHED_CLR			BIT(3)
+#define QPNP_VADC_CONV_SEQ_TIMEOUT_INT_LATCHED_CLR		BIT(2)
+#define QPNP_VADC_FIFO_NOT_EMPTY_INT_LATCHED_CLR		BIT(1)
+#define QPNP_VADC_EOC_INT_LATCHED_CLR				BIT(0)
 
 #define QPNP_VADC_MODE_CTL					0x40
 #define QPNP_VADC_OP_MODE_SHIFT					4
@@ -99,7 +108,7 @@
 #define QPNP_VADC_CONV_TIME_MIN					2000
 #define QPNP_VADC_CONV_TIME_MAX					2100
 #define QPNP_ADC_COMPLETION_TIMEOUT				HZ
-#define QPNP_VADC_ERR_COUNT					20
+#define QPNP_VADC_ERR_COUNT					1000
 
 struct qpnp_vadc_drv {
 	struct device			*dev;
@@ -125,6 +134,7 @@ static struct qpnp_vadc_scale_fn vadc_scale_fn[] = {
 	[SCALE_THERM_100K_PULLUP] = {qpnp_adc_scale_therm_pu2},
 	[SCALE_THERM_150K_PULLUP] = {qpnp_adc_scale_therm_pu1},
 	[SCALE_QRD_BATT_THERM] = {qpnp_adc_scale_qrd_batt_therm},
+	[SCALE_EMMC_THERM] = {qpnp_adc_scale_emmc_therm},
 };
 
 static int32_t qpnp_vadc_read_reg(int16_t reg, u8 *data)
@@ -262,6 +272,9 @@ static int32_t qpnp_vadc_status_debug(void)
 
 	pr_err("EOC not set - status1/2:%x/%x, dig:%x, ch:%x, mode:%x, en:%x\n",
 			status1, status2, dig, chan, mode, en);
+
+	/* somc workaround for adc lock-up issue */
+	qpnp_pon_dvdd_reset();
 
 	rc = qpnp_vadc_enable(false);
 	if (rc < 0) {
@@ -1151,6 +1164,12 @@ static int __devinit qpnp_vadc_probe(struct spmi_device *spmi)
 		return -EBUSY;
 	}
 
+	if (!qpnp_pon_is_initialized()) {
+		/* pon reset is needed for vadc queries */
+		pr_err("qpnp-adc-voltage requests probe deferral\n");
+		return -EPROBE_DEFER;
+	}
+
 	for_each_child_of_node(node, child)
 		count_adc_channel_list++;
 
@@ -1185,6 +1204,9 @@ static int __devinit qpnp_vadc_probe(struct spmi_device *spmi)
 	}
 	mutex_init(&vadc->adc->adc_lock);
 
+	qpnp_adc_therm_table_sel(of_property_read_bool(node,
+				"qcom,use-old-batt-therm-table"));
+
 	vadc->vadc_poll_eoc = of_property_read_bool(node,
 						"qcom,vadc-poll-eoc");
 	if (!vadc->vadc_poll_eoc) {
@@ -1201,6 +1223,17 @@ static int __devinit qpnp_vadc_probe(struct spmi_device *spmi)
 	}
 
 	qpnp_vadc = vadc;
+
+	rc = qpnp_vadc_write_reg(QPNP_VADC_INT_LATCHED_CLR,
+			(QPNP_VADC_LOW_THR_INT_LATCHED_CLR |
+			 QPNP_VADC_HIGH_THR_INT_LATCHED_CLR |
+			 QPNP_VADC_CONV_SEQ_TIMEOUT_INT_LATCHED_CLR |
+			 QPNP_VADC_FIFO_NOT_EMPTY_INT_LATCHED_CLR |
+			 QPNP_VADC_EOC_INT_LATCHED_CLR));
+	if (rc)
+		dev_err(&spmi->dev,
+			"faild to clear LATCHED interrupt. rc=%d\n", rc);
+
 	dev_set_drvdata(&spmi->dev, vadc);
 	rc = qpnp_vadc_init_hwmon(spmi);
 	if (rc) {

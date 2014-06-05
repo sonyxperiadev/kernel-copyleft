@@ -1,4 +1,5 @@
-/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/bitops.h>
@@ -81,7 +84,6 @@ struct hdmi_tx_audio_acr_arry {
 	struct hdmi_tx_audio_acr lut[AUDIO_SAMPLE_RATE_MAX];
 };
 
-static int hdmi_tx_set_mhl_hpd(struct platform_device *pdev, uint8_t on);
 static int hdmi_tx_sysfs_enable_hpd(struct hdmi_tx_ctrl *hdmi_ctrl, int on);
 static irqreturn_t hdmi_tx_isr(int irq, void *data);
 static void hdmi_tx_hpd_off(struct hdmi_tx_ctrl *hdmi_ctrl);
@@ -111,6 +113,33 @@ struct dss_gpio core_gpio_config[] = {
 struct dss_gpio cec_gpio_config[] = {
 	{0, 1, COMPATIBLE_NAME "-cec"}
 };
+
+static void hdmi_tx_send_hdcp_state(struct hdmi_tx_ctrl *hdmi_ctrl,
+	enum hdmi_hdcp_state hdcp_state)
+{
+	char *envp[2];
+
+	switch (hdcp_state) {
+	case HDCP_STATE_AUTHENTICATED:
+		envp[0] = "HDCP_STATE=PASS";
+		envp[1] = NULL;
+		break;
+	case HDCP_STATE_AUTH_FAIL:
+		envp[0] = "HDCP_STATE=FAIL";
+		envp[1] = NULL;
+		break;
+	case HDCP_STATE_INACTIVE:
+	case HDCP_STATE_AUTHENTICATING:
+	default:
+		return;
+	}
+
+	DEV_DBG("%s: Sending %s uevent\n", __func__, envp[0]);
+
+	if (hdmi_ctrl->kobj != NULL) {
+		kobject_uevent_env(hdmi_ctrl->kobj, KOBJ_CHANGE, envp);
+	}
+} /* hdmi_tx_send_hdcp_state */
 
 const char *hdmi_pm_name(enum hdmi_tx_power_module_type module)
 {
@@ -465,10 +494,6 @@ static ssize_t hdmi_tx_sysfs_wta_hpd(struct device *dev,
 		return rc;
 	}
 
-	if (hdmi_ctrl->mhl_max_pclk && hpd &&
-	    (!hdmi_ctrl->mhl_hpd_on || hdmi_ctrl->hpd_feature_on))
-		return 0;
-
 	if (0 == hpd && hdmi_ctrl->hpd_feature_on) {
 		rc = hdmi_tx_sysfs_enable_hpd(hdmi_ctrl, false);
 
@@ -507,6 +532,7 @@ static ssize_t hdmi_tx_sysfs_wta_vendor_name(struct device *dev,
 	ssize_t ret;
 	u8 *s = (u8 *) buf;
 	u8 *d = NULL;
+	u32 vender_name_max_size = 0;
 	struct hdmi_tx_ctrl *hdmi_ctrl =
 		hdmi_tx_get_drvdata_from_sysfs_dev(dev);
 
@@ -515,11 +541,12 @@ static ssize_t hdmi_tx_sysfs_wta_vendor_name(struct device *dev,
 		return -EINVAL;
 	}
 
+	vender_name_max_size = sizeof(hdmi_ctrl->spd_vendor_name);
 	d = hdmi_ctrl->spd_vendor_name;
 	ret = strnlen(buf, PAGE_SIZE);
-	ret = (ret > 8) ? 8 : ret;
+	ret = (ret > vender_name_max_size) ? vender_name_max_size : ret;
 
-	memset(hdmi_ctrl->spd_vendor_name, 0, 8);
+	memset(hdmi_ctrl->spd_vendor_name, 0, vender_name_max_size);
 	while (*s) {
 		if (*s & 0x60 && *s ^ 0x7f) {
 			*d = *s;
@@ -528,7 +555,7 @@ static ssize_t hdmi_tx_sysfs_wta_vendor_name(struct device *dev,
 			break;
 		}
 
-		if (++s > (u8 *) (buf + ret))
+		if (++s >= (u8 *) (buf + ret))
 			break;
 
 		d++;
@@ -563,6 +590,7 @@ static ssize_t hdmi_tx_sysfs_wta_product_description(struct device *dev,
 	ssize_t ret;
 	u8 *s = (u8 *) buf;
 	u8 *d = NULL;
+	u32 product_description_max_size = 0;
 	struct hdmi_tx_ctrl *hdmi_ctrl =
 		hdmi_tx_get_drvdata_from_sysfs_dev(dev);
 
@@ -571,11 +599,14 @@ static ssize_t hdmi_tx_sysfs_wta_product_description(struct device *dev,
 		return -EINVAL;
 	}
 
+	product_description_max_size = sizeof(hdmi_ctrl->spd_vendor_name);
 	d = hdmi_ctrl->spd_product_description;
 	ret = strnlen(buf, PAGE_SIZE);
-	ret = (ret > 16) ? 16 : ret;
+	ret = (ret > product_description_max_size) ?
+		product_description_max_size : ret;
 
-	memset(hdmi_ctrl->spd_product_description, 0, 16);
+	memset(hdmi_ctrl->spd_product_description, 0,
+		product_description_max_size);
 	while (*s) {
 		if (*s & 0x60 && *s ^ 0x7f) {
 			*d = *s;
@@ -584,7 +615,7 @@ static ssize_t hdmi_tx_sysfs_wta_product_description(struct device *dev,
 			break;
 		}
 
-		if (++s > (u8 *) (buf + ret))
+		if (++s >= (u8 *) (buf + ret))
 			break;
 
 		d++;
@@ -614,6 +645,70 @@ static ssize_t hdmi_tx_sysfs_rda_product_description(struct device *dev,
 	return ret;
 } /* hdmi_tx_sysfs_rda_product_description */
 
+static ssize_t hdmi_tx_sysfs_rda_aksv(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	ssize_t ret;
+	struct hdmi_tx_ctrl *hdmi_ctrl =
+		hdmi_tx_get_drvdata_from_sysfs_dev(dev);
+
+	if (!hdmi_ctrl) {
+		DEV_ERR("%s: invalid input\n", __func__);
+		return -EINVAL;
+	}
+
+	if (hdcp_feature_on && hdmi_ctrl->present_hdcp) {
+		/* Aksv is notified by (MSB->LSB) order. */
+		ret = snprintf(buf, PAGE_SIZE, "%02X%02X%02X%02X%02X\n",
+			hdmi_ctrl->aksv[4], hdmi_ctrl->aksv[3],
+			hdmi_ctrl->aksv[2], hdmi_ctrl->aksv[1],
+			hdmi_ctrl->aksv[0]);
+		DEV_DBG("%s: '%02X%02X%02X%02X%02X'\n", __func__,
+			hdmi_ctrl->aksv[4], hdmi_ctrl->aksv[3],
+			hdmi_ctrl->aksv[2], hdmi_ctrl->aksv[1],
+			hdmi_ctrl->aksv[0]);
+	} else {
+		ret = snprintf(buf, PAGE_SIZE, "%02X%02X%02X%02X%02X\n",
+			0, 0, 0, 0, 0);
+		DEV_DBG("%s: '%02X%02X%02X%02X%02X'\n", __func__,
+			0, 0, 0, 0, 0);
+	}
+
+	return ret;
+} /* hdmi_tx_sysfs_rda_aksv */
+
+static ssize_t hdmi_tx_sysfs_rda_tmds(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	ssize_t ret;
+	struct hdmi_tx_ctrl *hdmi_ctrl =
+		hdmi_tx_get_drvdata_from_sysfs_dev(dev);
+
+	if (!hdmi_ctrl) {
+		DEV_ERR("%s: invalid input\n", __func__);
+		return -EINVAL;
+	}
+
+	if (hdcp_feature_on && hdmi_ctrl->present_hdcp) {
+		ret = snprintf(buf, PAGE_SIZE, "%s\n",
+			hdmi_ctrl->hdcp_status == HDCP_STATE_AUTHENTICATED
+			? "ON" : "OFF");
+		DEV_DBG("%s: '%s'\n", __func__,
+			hdmi_ctrl->hdcp_status == HDCP_STATE_AUTHENTICATED
+			? "ON" : "OFF");
+	} else {
+		if (hdmi_ctrl->hpd_state) {
+			ret = snprintf(buf, PAGE_SIZE, "%s\n", "ON");
+			DEV_DBG("%s: '%s'\n", __func__, "ON");
+		} else {
+			ret = snprintf(buf, PAGE_SIZE, "%s\n", "OFF");
+			DEV_DBG("%s: '%s'\n", __func__, "OFF");
+		}
+	}
+
+	return ret;
+} /* hdmi_tx_sysfs_rda_tmds */
+
 static DEVICE_ATTR(connected, S_IRUGO, hdmi_tx_sysfs_rda_connected, NULL);
 static DEVICE_ATTR(hpd, S_IRUGO | S_IWUSR, hdmi_tx_sysfs_rda_hpd,
 	hdmi_tx_sysfs_wta_hpd);
@@ -622,12 +717,16 @@ static DEVICE_ATTR(vendor_name, S_IRUGO | S_IWUSR,
 static DEVICE_ATTR(product_description, S_IRUGO | S_IWUSR,
 	hdmi_tx_sysfs_rda_product_description,
 	hdmi_tx_sysfs_wta_product_description);
+static DEVICE_ATTR(aksv, S_IRUGO, hdmi_tx_sysfs_rda_aksv, NULL);
+static DEVICE_ATTR(tmds, S_IRUGO, hdmi_tx_sysfs_rda_tmds, NULL);
 
 static struct attribute *hdmi_tx_fs_attrs[] = {
 	&dev_attr_connected.attr,
 	&dev_attr_hpd.attr,
 	&dev_attr_vendor_name.attr,
 	&dev_attr_product_description.attr,
+	&dev_attr_aksv.attr,
+	&dev_attr_tmds.attr,
 	NULL,
 };
 static struct attribute_group hdmi_tx_fs_attrs_group = {
@@ -711,6 +810,8 @@ void hdmi_tx_hdcp_cb(void *ptr, enum hdmi_hdcp_state status)
 	DEV_DBG("%s: HDCP status=%s hpd_state=%d\n", __func__,
 		hdcp_state_name(status), hdmi_ctrl->hpd_state);
 
+	hdmi_ctrl->hdcp_status = status;
+
 	switch (status) {
 	case HDCP_STATE_AUTHENTICATED:
 		if (hdmi_ctrl->hpd_state) {
@@ -750,6 +851,8 @@ void hdmi_tx_hdcp_cb(void *ptr, enum hdmi_hdcp_state status)
 		break;
 		/* do nothing */
 	}
+	/* send HDCP PASS/FAIL uevent */
+	hdmi_tx_send_hdcp_state(hdmi_ctrl, status);
 }
 
 /* Enable HDMI features */
@@ -800,6 +903,9 @@ static int hdmi_tx_init_features(struct hdmi_tx_ctrl *hdmi_ctrl)
 			hdmi_ctrl->feature_data[HDMI_TX_FEAT_EDID] = NULL;
 			return -EPERM;
 		}
+
+		hdmi_hdcp_aksv(&hdmi_ctrl->aksv[0],
+			hdmi_ctrl->feature_data[HDMI_TX_FEAT_HDCP]);
 
 		DEV_DBG("%s: HDCP feature initialized\n", __func__);
 	}
@@ -912,14 +1018,13 @@ error:
 static void hdmi_tx_hpd_int_work(struct work_struct *work)
 {
 	struct hdmi_tx_ctrl *hdmi_ctrl = NULL;
-	struct dss_io_data *io;
 
 	hdmi_ctrl = container_of(work, struct hdmi_tx_ctrl, hpd_int_work);
 	if (!hdmi_ctrl || !hdmi_ctrl->hpd_initialized) {
 		DEV_DBG("%s: invalid input\n", __func__);
 		return;
 	}
-	io = &hdmi_ctrl->pdata.io[HDMI_TX_CORE_IO];
+
 	DEV_DBG("%s: Got HPD interrupt\n", __func__);
 
 	if (hdmi_ctrl->hpd_state) {
@@ -927,9 +1032,6 @@ static void hdmi_tx_hpd_int_work(struct work_struct *work)
 			DEV_ERR("%s: Failed to enable ddc power\n", __func__);
 			return;
 		}
-		/* Enable SW DDC before EDID read */
-		DSS_REG_W_ND(io, HDMI_DDC_ARBITRATION ,
-			DSS_REG_R(io, HDMI_DDC_ARBITRATION) & ~(BIT(4)));
 
 		hdmi_tx_read_sink_info(hdmi_ctrl);
 		hdmi_tx_send_cable_notification(hdmi_ctrl, 1);
@@ -2062,7 +2164,7 @@ static int hdmi_tx_set_mhl_max_pclk(struct platform_device *pdev, u32 max_val)
 }
 
 int msm_hdmi_register_mhl(struct platform_device *pdev,
-			  struct msm_hdmi_mhl_ops *ops, void *data)
+		struct msm_hdmi_mhl_ops *ops)
 {
 	struct hdmi_tx_ctrl *hdmi_ctrl = platform_get_drvdata(pdev);
 
@@ -2078,8 +2180,6 @@ int msm_hdmi_register_mhl(struct platform_device *pdev,
 
 	ops->tmds_enabled = hdmi_tx_tmds_enabled;
 	ops->set_mhl_max_pclk = hdmi_tx_set_mhl_max_pclk;
-	ops->set_upstream_hpd = hdmi_tx_set_mhl_hpd;
-
 	return 0;
 }
 
@@ -2528,44 +2628,6 @@ static int hdmi_tx_sysfs_enable_hpd(struct hdmi_tx_ctrl *hdmi_ctrl, int on)
 	return rc;
 } /* hdmi_tx_sysfs_enable_hpd */
 
-static int hdmi_tx_set_mhl_hpd(struct platform_device *pdev, uint8_t on)
-{
-	int rc = 0;
-	struct hdmi_tx_ctrl *hdmi_ctrl = NULL;
-
-	hdmi_ctrl = platform_get_drvdata(pdev);
-
-	if (!hdmi_ctrl) {
-		DEV_ERR("%s: invalid input\n", __func__);
-		return -EINVAL;
-	}
-
-	/* mhl status should override */
-	hdmi_ctrl->mhl_hpd_on = on;
-
-	if (!on && hdmi_ctrl->hpd_feature_on) {
-		rc = hdmi_tx_sysfs_enable_hpd(hdmi_ctrl, false);
-	} else if (on && !hdmi_ctrl->hpd_feature_on) {
-		rc = hdmi_tx_sysfs_enable_hpd(hdmi_ctrl, true);
-	} else {
-		DEV_DBG("%s: hpd is already '%s'. return\n", __func__,
-			hdmi_ctrl->hpd_feature_on ? "enabled" : "disabled");
-		return rc;
-	}
-
-	if (!rc) {
-		hdmi_ctrl->hpd_feature_on =
-			(~hdmi_ctrl->hpd_feature_on) & BIT(0);
-		DEV_DBG("%s: '%d'\n", __func__, hdmi_ctrl->hpd_feature_on);
-	} else {
-		DEV_ERR("%s: failed to '%s' hpd. rc = %d\n", __func__,
-			on ? "enable" : "disable", rc);
-	}
-
-	return rc;
-
-}
-
 static irqreturn_t hdmi_tx_isr(int irq, void *data)
 {
 	struct dss_io_data *io = NULL;
@@ -2587,11 +2649,22 @@ static irqreturn_t hdmi_tx_isr(int irq, void *data)
 		hdmi_ctrl->hpd_state =
 			(DSS_REG_R(io, HDMI_HPD_INT_STATUS) & BIT(1)) >> 1;
 
-		/*
-		 * Ack the current hpd interrupt and stop listening to
-		 * new hpd interrupt.
-		 */
-		DSS_REG_W(io, HDMI_HPD_INT_CTRL, BIT(0));
+		/* Ack the current hpd */
+		if (hdmi_ctrl->hpd_state) {
+			/*
+			 * Ack the interrupt and enable HPD interrupts
+			 * to make sure to get disconnect interrupt.
+			 */
+			DSS_REG_W(io, HDMI_HPD_INT_CTRL, BIT(0) | BIT(2));
+		} else {
+			/*
+			 * Ack the interrupt and enable HPD interrupts
+			 * to make sure to get connect interrupt.
+			 */
+			DSS_REG_W(io, HDMI_HPD_INT_CTRL,
+				BIT(0) | BIT(2) | BIT(1));
+		}
+
 		queue_work(hdmi_ctrl->workq, &hdmi_ctrl->hpd_int_work);
 	}
 
@@ -2663,7 +2736,12 @@ static int hdmi_tx_dev_init(struct hdmi_tx_ctrl *hdmi_ctrl)
 
 	hdmi_setup_video_mode_lut();
 	mutex_init(&hdmi_ctrl->mutex);
-	hdmi_ctrl->workq = create_workqueue("hdmi_tx_workq");
+	/*
+	 * "hdmi_tx_workq" create as single thread so that connect
+	 * processing and disconnect processing are not executed at the
+	 * same time.
+	 */
+	hdmi_ctrl->workq = create_singlethread_workqueue("hdmi_tx_workq");
 	if (!hdmi_ctrl->workq) {
 		DEV_ERR("%s: hdmi_tx_workq creation failed.\n", __func__);
 		rc = -EPERM;

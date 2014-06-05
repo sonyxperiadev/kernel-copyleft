@@ -1,4 +1,5 @@
 /* Copyright (c) 2009-2013, Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -47,6 +48,7 @@
 #include <mach/msm_xo.h>
 #include <mach/msm_bus.h>
 #include <mach/rpm-regulator.h>
+#include <mach/board-usb.h>
 
 #define MSM_USB_BASE	(motg->regs)
 #define DRIVER_NAME	"msm_otg"
@@ -3838,6 +3840,11 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	struct msm_otg_platform_data *pdata;
 
 	dev_info(&pdev->dev, "msm_otg probe\n");
+
+	if (msm_is_usb3_available()) {
+		dev_info(&pdev->dev, "do not use usb2 stack.\n");
+		return -ENODEV;
+	}
 
 	if (pdev->dev.of_node) {
 		dev_dbg(&pdev->dev, "device tree enabled\n");
