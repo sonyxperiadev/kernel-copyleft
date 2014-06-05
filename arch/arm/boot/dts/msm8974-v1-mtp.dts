@@ -26,3 +26,9 @@
 &pm8941_chg {
 	qcom,charging-disabled;
 };
+
+&slim_msm {
+	taiko_codec {
+		qcom,cdc-micbias2-ext-cap;
+	};
+};

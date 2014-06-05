@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -255,6 +256,7 @@ static struct qpnp_adc_tm_reverse_scale_fn adc_tm_rscale_fn[] = {
 	[SCALE_RBATT_THERM] = {qpnp_adc_btm_scaler},
 	[SCALE_R_USB_ID] = {qpnp_adc_usb_scaler},
 	[SCALE_RPMIC_THERM] = {qpnp_adc_scale_millidegc_pmic_voltage_thr},
+	[SCALE_REMMC_THERM] = {qpnp_adc_emmc_scaler},
 };
 
 static int32_t qpnp_adc_tm_read_reg(int16_t reg, u8 *data)
@@ -873,7 +875,10 @@ static int qpnp_adc_tm_get_trip_temp(struct thermal_zone_device *thermal,
 		return -EINVAL;
 	}
 
-	rc = qpnp_adc_tm_scale_voltage_therm_pu2(reg, &result);
+	if (LR_MUX5_PU2_AMUX_THM2 == adc_tm_sensor->vadc_channel_num)
+		rc = qpnp_adc_tm_scale_voltage_therm_emmc(reg, &result);
+	else
+		rc = qpnp_adc_tm_scale_voltage_therm_pu2(reg, &result);
 	if (rc < 0) {
 		pr_err("Failed to lookup the therm thresholds\n");
 		return rc;
@@ -913,7 +918,10 @@ static int qpnp_adc_tm_set_trip_temp(struct thermal_zone_device *thermal,
 
 	pr_debug("requested a high - %d and low - %d with trip - %d\n",
 			tm_config.high_thr_temp, tm_config.low_thr_temp, trip);
-	rc = qpnp_adc_tm_scale_therm_voltage_pu2(&tm_config);
+	if (LR_MUX5_PU2_AMUX_THM2 == adc_tm_sensor->vadc_channel_num)
+		rc = qpnp_adc_tm_scale_therm_voltage_emmc(&tm_config);
+	else
+		rc = qpnp_adc_tm_scale_therm_voltage_pu2(&tm_config);
 	if (rc < 0) {
 		pr_err("Failed to lookup the adc-tm thresholds\n");
 		return rc;

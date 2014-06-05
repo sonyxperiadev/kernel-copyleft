@@ -1624,8 +1624,8 @@ adreno_ocmem_gmem_free(struct adreno_device *adreno_dev)
 	if (adreno_dev->ocmem_hdl == NULL)
 		return;
 
-	ocmem_free(OCMEM_GRAPHICS, adreno_dev->ocmem_hdl);
-	adreno_dev->ocmem_hdl = NULL;
+	if (!ocmem_free(OCMEM_GRAPHICS, adreno_dev->ocmem_hdl))
+		adreno_dev->ocmem_hdl = NULL;
 }
 #else
 static int

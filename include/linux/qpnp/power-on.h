@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -39,6 +40,8 @@ enum pon_trigger_source {
 int qpnp_pon_system_pwr_off(bool reset);
 int qpnp_pon_is_warm_reset(void);
 int qpnp_pon_trigger_config(enum pon_trigger_source pon_src, bool enable);
+bool qpnp_pon_is_initialized(void);
+int qpnp_pon_dvdd_reset(void);
 #else
 static int qpnp_pon_system_pwr_off(bool reset) { return -ENODEV; }
 static inline int qpnp_pon_is_warm_reset(void) { return -ENODEV; }
