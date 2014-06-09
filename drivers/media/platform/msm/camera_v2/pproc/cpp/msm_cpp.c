@@ -1,4 +1,5 @@
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -127,7 +128,11 @@ static struct msm_cam_clk_info cpp_clk_info[] = {
 	{"vfe_clk_src", 266670000},
 	{"camss_vfe_vfe_clk", -1},
 	{"iface_clk", -1},
+#if defined(CONFIG_SONY_CAM_V4L2)
+	{"cpp_core_clk", 465000000},
+#else
 	{"cpp_core_clk", 266670000},
+#endif
 	{"cpp_iface_clk", -1},
 	{"cpp_bus_clk", -1},
 	{"micro_iface_clk", -1},

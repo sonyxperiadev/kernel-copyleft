@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -862,3 +863,22 @@ int msm_fb_writeback_set_secure(struct fb_info *info, int enable)
 	return mdss_mdp_wb_set_secure(mfd, enable);
 }
 EXPORT_SYMBOL(msm_fb_writeback_set_secure);
+/**
+ * msm_fb_set_wfd_iommu_flag() - Power ON/OFF mdp clock
+ * @enable - true/false to Power ON/OFF mdp clock
+ *
+ * V4L2-WFD driver will call it to enable mdp clock at start of
+ * mdp_mmap/mdp_munmap API and to disable mdp clock at end of these
+ * API's to ensure iommu is in proper state while wfd driver map/un-map
+ * any buffers.
+ */
+int msm_fb_set_wfd_iommu_flag(int enable)
+{
+	if (enable)
+		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
+	else
+		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
+
+	return 0;
+}
+EXPORT_SYMBOL(msm_fb_set_wfd_iommu_flag);

@@ -1,0 +1,42 @@
+Configuration files can be found in arch/arm/configs.
+
+    Xperia Z2 D6503/D6502/L50w => shinano_sirius_defconfig
+    Xperia Z2 Tablet SGP521 => shinano_castor_defconfig
+
+How to build your kernel:
+
+  Prerequisites:
+
+    * ramdisk.img - root fs
+
+    * mkbootimg - boot.img generator
+
+    * The ARM cross-compiler
+      We recommend getting the CodeSourcery Lite compiler.
+      Or, you can also use prebuild executable binary which is included in
+      standard Android tree.
+
+
+  Step 1: Build Your Kernel (zImage)
+    $ cd kernel
+
+    $ export ARCH=arm
+
+    $ export CROSS_COMPILE=/opt/arm-2010q1/bin/arm-none-eabi-
+      NOTE: Please set the location and the prefix of the ARM cross-compiler.
+
+    $ make <defconfig_from_list_above>
+      NOTE: Please set a configuration file you want to build.
+
+    $ make
+
+    You can see arch/arm/boot/zImage if you succeed in building the kernel.
+
+  Step 2: Creating dt.img
+    $ dtbTool -o dt.img -s 2048 -p scripts/dtc/ arch/arm/boot/
+
+  Step 3: Assembling the boot.img
+    $ mkbootimg --kernel zImage --ramdisk ramdisk.img --pagesize 2048 --base 0x00000000 \
+      --ramdisk_offset 0x02000000 --tags_offset 0x01E00000 --cmdline "androidboot.hardware=qcom \
+      user_debug=31 msm_rtb.filter=0x37 ehci-hcd.park=3" --dt dt.img --output boot.img
+

@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+*  Copyright (c) 2014 Sony Mobile Communications AB.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -208,6 +209,7 @@ static int mdp_mmap(struct v4l2_subdev *sd, void *arg)
 		return -EINVAL;
 	}
 
+	msm_fb_set_wfd_iommu_flag(true);
 	if (inst->secure) {
 		rc = msm_ion_secure_buffer(mmap->ion_client,
 			mregion->ion_handle, VIDEO_PIXEL, 0);
@@ -231,12 +233,15 @@ static int mdp_mmap(struct v4l2_subdev *sd, void *arg)
 				!inst->secure ? "non" : "", rc);
 		goto iommu_fail;
 	}
+	msm_fb_set_wfd_iommu_flag(false);
 
 	return 0;
 iommu_fail:
 	if (inst->secure)
 		msm_ion_unsecure_buffer(mmap->ion_client, mregion->ion_handle);
 secure_fail:
+	msm_fb_set_wfd_iommu_flag(false);
+
 	return rc;
 }
 
@@ -252,6 +257,7 @@ static int mdp_munmap(struct v4l2_subdev *sd, void *arg)
 		return -EINVAL;
 	}
 
+	msm_fb_set_wfd_iommu_flag(true);
 	inst = mmap->cookie;
 	mregion = mmap->mregion;
 
@@ -264,6 +270,7 @@ static int mdp_munmap(struct v4l2_subdev *sd, void *arg)
 
 	if (inst->secure)
 		msm_ion_unsecure_buffer(mmap->ion_client, mregion->ion_handle);
+	msm_fb_set_wfd_iommu_flag(false);
 
 	return 0;
 }
