@@ -234,7 +234,7 @@ static struct notifier_block mnb = {
 	.notifier_call = modem_notifier_cb,
 };
 
-static void adsp_log_failure_reason(void)
+static void adsp_log_failure_reason(struct lpass_data *drv)
 {
 	char *reason;
 	char buffer[81];
@@ -254,6 +254,7 @@ static void adsp_log_failure_reason(void)
 
 	size = min(size, sizeof(buffer) - 1);
 	memcpy(buffer, reason, size);
+	update_crash_reason(drv->subsys, reason, size);
 	buffer[size] = '\0';
 	pr_err("ADSP subsystem failure reason: %s", buffer);
 	memset((void *)reason, 0x0, size);
@@ -262,7 +263,7 @@ static void adsp_log_failure_reason(void)
 
 static void restart_adsp(struct lpass_data *drv)
 {
-	adsp_log_failure_reason();
+	adsp_log_failure_reason(drv);
 	subsystem_restart_dev(drv->subsys);
 }
 
