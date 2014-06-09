@@ -3232,7 +3232,7 @@ int sdhci_add_host(struct sdhci_host *host)
 
 	/* SDR104 supports also implies SDR50 support */
 	if (caps[1] & SDHCI_SUPPORT_SDR104)
-		mmc->caps |= MMC_CAP_UHS_SDR104 | MMC_CAP_UHS_SDR50;
+		mmc->caps |= MMC_CAP_UHS_SDR50;
 	else if (caps[1] & SDHCI_SUPPORT_SDR50)
 		mmc->caps |= MMC_CAP_UHS_SDR50;
 

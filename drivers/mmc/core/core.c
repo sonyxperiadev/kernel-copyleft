@@ -5,6 +5,7 @@
  *  SD support Copyright (C) 2004 Ian Molton, All Rights Reserved.
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
  *  MMCv4 support Copyright (C) 2006 Philip Langdale, All Rights Reserved.
+ *  Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -35,6 +36,10 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/sd.h>
+
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+#include <linux/mmc/cd-gpio.h>
+#endif
 
 #include "core.h"
 #include "bus.h"
@@ -1229,13 +1234,23 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 	mult = mmc_card_sd(card) ? 100 : 10;
 
 	/*
+	 * eMMC also uses a 100 multiplier because timeout is seen
+	 * with specific eMMC devices.
+	 */
+	if (mmc_card_mmc(card))
+		mult = 100;
+
+	/*
 	 * Scale up the multiplier (and therefore the timeout) by
 	 * the r2w factor for writes.
 	 */
 	if (data->flags & MMC_DATA_WRITE)
 		mult <<= card->csd.r2w_factor;
 
-	data->timeout_ns = card->csd.tacc_ns * mult;
+	if ((unsigned long long)card->csd.tacc_ns * mult > UINT_MAX)
+		data->timeout_ns = UINT_MAX;
+	else
+		data->timeout_ns = card->csd.tacc_ns * mult;
 	data->timeout_clks = card->csd.tacc_clks * mult;
 
 	/*
@@ -1980,9 +1995,41 @@ static inline void mmc_bus_put(struct mmc_host *host)
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+static int mmc_resume_bus_sync(struct mmc_host *host)
+{
+	DECLARE_WAITQUEUE(wait, current);
+	unsigned long flags;
+
+	if (!mmc_bus_is_resuming(host))
+		return 0;
+
+	might_sleep();
+
+	add_wait_queue(&host->defer_wq, &wait);
+
+	spin_lock_irqsave(&host->lock, flags);
+	while (1) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		if (!mmc_bus_is_resuming(host))
+			break;
+		spin_unlock_irqrestore(&host->lock, flags);
+		schedule();
+		spin_lock_irqsave(&host->lock, flags);
+	}
+	set_current_state(TASK_RUNNING);
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	remove_wait_queue(&host->defer_wq, &wait);
+
+	return 0;
+}
+#endif
+
 int mmc_resume_bus(struct mmc_host *host)
 {
 	unsigned long flags;
+	int err;
 
 	if (!mmc_bus_needs_resume(host))
 		return -EINVAL;
@@ -1990,20 +2037,31 @@ int mmc_resume_bus(struct mmc_host *host)
 	printk("%s: Starting deferred resume\n", mmc_hostname(host));
 	spin_lock_irqsave(&host->lock, flags);
 	host->bus_resume_flags &= ~MMC_BUSRESUME_NEEDS_RESUME;
+	host->bus_resume_flags |= MMC_BUSRESUME_IS_RESUMING;
 	host->rescan_disable = 0;
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	mmc_bus_get(host);
 	if (host->bus_ops && !host->bus_dead) {
 		mmc_power_up(host);
+		mmc_select_voltage(host, host->ocr);
 		BUG_ON(!host->bus_ops->resume);
-		host->bus_ops->resume(host);
+		err = host->bus_ops->resume(host);
+		if (err)
+			pr_warning("%s: error %d during resume "
+					    "(card was removed?)\n",
+					    mmc_hostname(host), err);
 	}
 
-	if (host->bus_ops->detect && !host->bus_dead)
-		host->bus_ops->detect(host);
+	spin_lock_irqsave(&host->lock, flags);
+	host->bus_resume_flags &= ~MMC_BUSRESUME_IS_RESUMING;
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	wake_up(&host->defer_wq);
+#endif
+	spin_unlock_irqrestore(&host->lock, flags);
 
 	mmc_bus_put(host);
+	mmc_detect_change(host, 0);
 	printk("%s: Deferred resume completed\n", mmc_hostname(host));
 	return 0;
 }
@@ -3607,11 +3665,15 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 	case PM_POST_RESTORE:
 
 		spin_lock_irqsave(&host->lock, flags);
+		host->rescan_disable = 0;
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 		if (mmc_bus_manual_resume(host)) {
 			spin_unlock_irqrestore(&host->lock, flags);
-			break;
+			if (!mmc_cd_slot_status_changed(host))
+				break;
+			spin_lock_irqsave(&host->lock, flags);
 		}
-		host->rescan_disable = 0;
+#endif
 		spin_unlock_irqrestore(&host->lock, flags);
 		mmc_detect_change(host, 0);
 		break;
@@ -3670,6 +3732,12 @@ void mmc_rpm_hold(struct mmc_host *host, struct device *dev)
 		if (pm_runtime_suspended(dev))
 			BUG_ON(1);
 	}
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	if (mmc_bus_manual_resume(host))
+		mmc_resume_bus_sync(host);
+	if (mmc_bus_needs_resume(host))
+		mmc_resume_bus(host);
+#endif
 }
 
 EXPORT_SYMBOL(mmc_rpm_hold);

@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -645,6 +646,9 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 	struct msm_command *cmd;
 	int session_id, stream_id;
 	unsigned long flags = 0;
+#if defined(CONFIG_SONY_CAM_V4L2)
+	uint32_t retry_count = 0;
+#endif
 
 	session_id = event_data->session_id;
 	stream_id = event_data->stream_id;
@@ -680,9 +684,29 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 	}
 
 	/* should wait on session based condition */
+#if defined(CONFIG_SONY_CAM_V4L2)
+	retry_count = 5000;
+	do {
+		rc = wait_event_interruptible_timeout(cmd_ack->wait,
+			!list_empty_careful(&cmd_ack->command_q.list),
+			msecs_to_jiffies(timeout));
+		retry_count--;
+		if (rc != -ERESTARTSYS)
+			break;
+		pr_debug("%s: wait_event interrupted by signal, count = %d",
+				__func__, retry_count);
+		msleep(20);
+	} while (retry_count > 0);
+
+	if (rc == -ERESTARTSYS) {
+		pr_err("%s: rc = %d\n", __func__, rc);
+		rc = -EINVAL;
+	}
+#else
 	rc = wait_event_interruptible_timeout(cmd_ack->wait,
 		!list_empty_careful(&cmd_ack->command_q.list),
 		msecs_to_jiffies(timeout));
+#endif
 	if (list_empty_careful(&cmd_ack->command_q.list)) {
 		if (!rc) {
 			pr_err("%s: Timed out\n", __func__);

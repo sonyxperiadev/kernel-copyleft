@@ -61,6 +61,8 @@
 			linux,code = <116>;
 		};
 
+/* Disable RESIN shutdown here, we set it in boot code */
+/*
 		qcom,pon_2 {
 			qcom,pon-type = <1>;
 			qcom,support-reset = <1>;
@@ -70,7 +72,7 @@
 			qcom,s2-type = <1>;
 			linux,code = <114>;
 		};
-
+*/
 		qcom,pon_3 {
 			qcom,pon-type = <3>;
 			qcom,support-reset = <1>;

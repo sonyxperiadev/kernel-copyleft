@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -68,7 +69,7 @@ static int msm8974_auxpcm_rate = 8000;
 #define I2S_PCM_SEL_OFFSET 1
 
 
-#define WCD9XXX_MBHC_DEF_BUTTONS 8
+#define WCD9XXX_MBHC_DEF_BUTTONS 4
 #define WCD9XXX_MBHC_DEF_RLOADS 5
 #define TAIKO_EXT_CLK_RATE 9600000
 
@@ -133,9 +134,6 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET,
 	.insert_detect = true,
 	.swap_gnd_mic = NULL,
-	.cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING |
-			    1 << MBHC_CS_ENABLE_INSERTION |
-			    1 << MBHC_CS_ENABLE_REMOVAL),
 };
 
 struct msm_auxpcm_gpio {
@@ -685,6 +683,26 @@ static int msm8974_mclk_event(struct snd_soc_dapm_widget *w,
 
 	return 0;
 }
+
+static const struct snd_soc_dapm_widget rhine_msm8974_dapm_widgets[] = {
+
+	SND_SOC_DAPM_SUPPLY("MCLK",  SND_SOC_NOPM, 0, 0,
+	msm8974_mclk_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_SPK("Ext Spk Bottom Pos", msm_ext_spkramp_event),
+	SND_SOC_DAPM_SPK("Ext Spk Bottom Neg", msm_ext_spkramp_event),
+
+	SND_SOC_DAPM_SPK("Ext Spk Top Pos", msm_ext_spkramp_event),
+	SND_SOC_DAPM_SPK("Ext Spk Top Neg", msm_ext_spkramp_event),
+
+	SND_SOC_DAPM_MIC("Handset Mic", NULL),
+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("Secondary Mic", NULL),
+	SND_SOC_DAPM_MIC("Handset FB ANC Mic", NULL),
+	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
+
+};
 
 static const struct snd_soc_dapm_widget msm8974_dapm_widgets[] = {
 
@@ -1562,8 +1580,8 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		return err;
 	}
 
-	snd_soc_dapm_new_controls(dapm, msm8974_dapm_widgets,
-				ARRAY_SIZE(msm8974_dapm_widgets));
+	snd_soc_dapm_new_controls(dapm, rhine_msm8974_dapm_widgets,
+				ARRAY_SIZE(rhine_msm8974_dapm_widgets));
 
 	snd_soc_dapm_enable_pin(dapm, "Lineout_1 amp");
 	snd_soc_dapm_enable_pin(dapm, "Lineout_3 amp");
@@ -1677,8 +1695,13 @@ void *def_taiko_mbhc_cal(void)
 	S(t_ins_retry, 200);
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_PLUG_TYPE_PTR(taiko_cal)->X) = (Y))
-	S(v_no_mic, 30);
-	S(v_hs_max, 2400);
+#ifdef CONFIG_NOISE_DUMPING_JACK
+	S(v_no_mic, 900);
+	S(v_hs_max, 2500);
+#else
+	S(v_no_mic, 50);
+	S(v_hs_max, 2450);
+#endif
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_BTN_DET_PTR(taiko_cal)->X) = (Y))
 	S(c[0], 62);
@@ -1696,22 +1719,24 @@ void *def_taiko_mbhc_cal(void)
 	btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_V_BTN_LOW);
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
-	btn_low[0] = -50;
-	btn_high[0] = 20;
-	btn_low[1] = 21;
-	btn_high[1] = 61;
-	btn_low[2] = 62;
-	btn_high[2] = 104;
-	btn_low[3] = 105;
-	btn_high[3] = 148;
-	btn_low[4] = 149;
-	btn_high[4] = 189;
-	btn_low[5] = 190;
-	btn_high[5] = 228;
-	btn_low[6] = 229;
-	btn_high[6] = 269;
-	btn_low[7] = 270;
-	btn_high[7] = 500;
+	btn_low[0] = -30;
+#ifdef CONFIG_NOISE_DUMPING_JACK
+	btn_high[0] = 887;
+	btn_low[1] = 888;
+	btn_high[1] = 1009;
+	btn_low[2] = 1010;
+	btn_high[2] = 1189;
+	btn_low[3] = 1190;
+	btn_high[3] = 1411;
+#else
+	btn_high[0] = 50;
+	btn_low[1] = 51;
+	btn_high[1] = 336;
+	btn_low[2] = 337;
+	btn_high[2] = 680;
+	btn_low[3] = 681;
+	btn_high[3] = 1207;
+#endif
 	n_ready = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_N_READY);
 	n_ready[0] = 80;
 	n_ready[1] = 68;

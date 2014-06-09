@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2013 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/io.h>
@@ -41,6 +45,7 @@ struct hdmi_hdcp_ctrl {
 	struct work_struct hdcp_int_work;
 	struct completion r0_checked;
 	struct hdmi_hdcp_init_data init_data;
+	u8 bcaps;
 };
 
 const char *hdcp_state_name(enum hdmi_hdcp_state hdcp_state)
@@ -146,47 +151,28 @@ static void reset_hdcp_ddc_failures(struct hdmi_hdcp_ctrl *hdcp_ctrl)
 		__func__, HDCP_STATE_NAME, hdcp_ddc_status, failure, nack0);
 } /* reset_hdcp_ddc_failures */
 
-static void hdmi_hdcp_hw_ddc_clean(struct hdmi_hdcp_ctrl *hdcp_ctrl)
+void hdmi_hdcp_aksv(u8 aksv[5], void *input)
 {
-	struct dss_io_data *io = NULL;
-	u32 hdcp_ddc_status, ddc_hw_status;
-	u32 ddc_xfer_done, ddc_xfer_req, ddc_hw_done;
-	u32 ddc_hw_not_ready;
-	u32 timeout_count;
+	struct hdmi_hdcp_ctrl *hdcp_ctrl = (struct hdmi_hdcp_ctrl *)input;
+	u32 qfprom_aksv_lsb, qfprom_aksv_msb;
 
-	if (!hdcp_ctrl || !hdcp_ctrl->init_data.core_io) {
+	if (!hdcp_ctrl) {
 		DEV_ERR("%s: invalid input\n", __func__);
 		return;
 	}
 
-	io = hdcp_ctrl->init_data.core_io;
-	if (!io->base) {
-			DEV_ERR("%s: core io not inititalized\n", __func__);
-			return;
-	}
+	/* Fetch aksv from QFPROM, this info should be public. */
+	qfprom_aksv_lsb = DSS_REG_R(hdcp_ctrl->init_data.qfprom_io,
+		HDCP_KSV_LSB);
+	qfprom_aksv_msb = DSS_REG_R(hdcp_ctrl->init_data.qfprom_io,
+		HDCP_KSV_MSB);
 
-	if (DSS_REG_R(io, HDMI_DDC_HW_STATUS) != 0) {
-		/* Wait to be clean on DDC HW engine */
-		timeout_count = 100;
-		do {
-			hdcp_ddc_status = DSS_REG_R(io, HDMI_HDCP_DDC_STATUS);
-			ddc_hw_status = DSS_REG_R(io, HDMI_DDC_HW_STATUS);
-			ddc_xfer_done = (hdcp_ddc_status & BIT(10)) ;
-			ddc_xfer_req = (hdcp_ddc_status & BIT(4)) ;
-			ddc_hw_done = (ddc_hw_status & BIT(3)) ;
-			ddc_hw_not_ready = ((ddc_xfer_done != 1) ||
-			(ddc_xfer_req != 0) || (ddc_hw_done != 1));
-
-			DEV_DBG("%s: %s: timeout count(%d):ddc hw%sready\n",
-				__func__, HDCP_STATE_NAME, timeout_count,
-					ddc_hw_not_ready ? " not " : " ");
-			DEV_DBG("hdcp_ddc_status[0x%x], ddc_hw_status[0x%x]\n",
-					hdcp_ddc_status, ddc_hw_status);
-			if (ddc_hw_not_ready)
-				msleep(20);
-			} while (ddc_hw_not_ready && --timeout_count);
-	}
-} /* hdmi_hdcp_hw_ddc_clean */
+	aksv[0] =  qfprom_aksv_lsb        & 0xFF;
+	aksv[1] = (qfprom_aksv_lsb >> 8)  & 0xFF;
+	aksv[2] = (qfprom_aksv_lsb >> 16) & 0xFF;
+	aksv[3] = (qfprom_aksv_lsb >> 24) & 0xFF;
+	aksv[4] =  qfprom_aksv_msb        & 0xFF;
+} /* hdmi_hdcp_aksv */
 
 static int hdmi_hdcp_authentication_part1(struct hdmi_hdcp_ctrl *hdcp_ctrl)
 {
@@ -319,6 +305,7 @@ static int hdmi_hdcp_authentication_part1(struct hdmi_hdcp_ctrl *hdcp_ctrl)
 
 	/* Write BCAPS to the hardware */
 	DSS_REG_W(io, HDMI_HDCP_RCVPORT_DATA12, bcaps);
+	hdcp_ctrl->bcaps = bcaps;
 
 	/*
 	 * If we had stale values for the An ready bit, it should most
@@ -951,7 +938,6 @@ static void hdmi_hdcp_auth_work(struct work_struct *work)
 	struct delayed_work *dw = to_delayed_work(work);
 	struct hdmi_hdcp_ctrl *hdcp_ctrl = container_of(dw,
 		struct hdmi_hdcp_ctrl, hdcp_auth_work);
-	struct dss_io_data *io;
 
 	if (!hdcp_ctrl) {
 		DEV_ERR("%s: invalid input\n", __func__);
@@ -964,16 +950,18 @@ static void hdmi_hdcp_auth_work(struct work_struct *work)
 		return;
 	}
 
-	io = hdcp_ctrl->init_data.core_io;
-	/* Enabling Software DDC */
-	DSS_REG_W_ND(io, HDMI_DDC_ARBITRATION , DSS_REG_R(io,
-				HDMI_DDC_ARBITRATION) & ~(BIT(4)));
-
 	rc = hdmi_hdcp_authentication_part1(hdcp_ctrl);
 	if (rc) {
 		DEV_DBG("%s: %s: HDCP Auth Part I failed\n", __func__,
 			HDCP_STATE_NAME);
 		goto error;
+	}
+
+	/* if REPEATER (Bit 6), perform Part2 Authentication */
+	if (!(hdcp_ctrl->bcaps & BIT(6))) {
+		DEV_INFO("%s: %s: auth part II skipped, no repeater\n",
+			__func__, HDCP_STATE_NAME);
+		goto part2_skip;
 	}
 
 	rc = hdmi_hdcp_authentication_part2(hdcp_ctrl);
@@ -982,11 +970,8 @@ static void hdmi_hdcp_auth_work(struct work_struct *work)
 			HDCP_STATE_NAME);
 		goto error;
 	}
-	/* Disabling software DDC before going into part3 to make sure
-	 * there is no Arbitration between software and hardware for DDC */
-	DSS_REG_W_ND(io, HDMI_DDC_ARBITRATION , DSS_REG_R(io,
-				HDMI_DDC_ARBITRATION) | (BIT(4)));
 
+part2_skip:
 error:
 	/*
 	 * Ensure that the state did not change during authentication.
@@ -1115,8 +1100,12 @@ int hdmi_hdcp_reauthenticate(void *input)
 
 	DSS_REG_W(io, HDMI_HDCP_RESET, BIT(0));
 
-	/* Wait to be clean on DDC HW engine */
-	hdmi_hdcp_hw_ddc_clean(hdcp_ctrl);
+	/*
+	 * The DDC transaction for HDCP should be cleared before
+	 * shutdowining on the DDC for HDCP hw engin otherwise it goes into
+	 * bad state. So before clearing HDCP_CTRL register, wait some time.
+	 */
+	msleep(500);
 
 	/* Disable encryption and disable the HDCP block */
 	DSS_REG_W(io, HDMI_HDCP_CTRL, 0);
@@ -1185,9 +1174,6 @@ void hdmi_hdcp_off(void *input)
 
 	DSS_REG_W(io, HDMI_HDCP_RESET, BIT(0));
 
-	/* Wait to be clean on DDC HW engine */
-	hdmi_hdcp_hw_ddc_clean(hdcp_ctrl);
-
 	/* Disable encryption and disable the HDCP block */
 	DSS_REG_W(io, HDMI_HDCP_CTRL, 0);
 
@@ -1213,8 +1199,8 @@ int hdmi_hdcp_isr(void *input)
 
 	/* Ignore HDCP interrupts if HDCP is disabled */
 	if (HDCP_STATE_INACTIVE == hdcp_ctrl->hdcp_state) {
-		DEV_ERR("%s: HDCP inactive. Just clear int and return.\n",
-			__func__);
+		if (hdcp_int_val)
+			DEV_ERR("%s: HDCP inactive.\n", __func__);
 		DSS_REG_W(io, HDMI_HDCP_INT_CTRL, hdcp_int_val);
 		return 0;
 	}

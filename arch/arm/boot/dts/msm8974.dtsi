@@ -306,7 +306,7 @@
 
 		qcom,pad-pull-on = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
 		qcom,pad-pull-off = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
-		qcom,pad-drv-on = <0x4 0x4 0x4>; /* 10mA, 10mA, 10mA */
+		qcom,pad-drv-on = <0x7 0x4 0x4>; /* 16mA, 10mA, 10mA */
 		qcom,pad-drv-off = <0x0 0x0 0x0>; /* 2mA, 2mA, 2mA */
 
 		qcom,clk-rates = <400000 20000000 25000000 50000000 100000000 200000000>;
@@ -351,7 +351,7 @@
 
 		qcom,pad-pull-on = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
 		qcom,pad-pull-off = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
-		qcom,pad-drv-on = <0x4 0x4 0x4>; /* 10mA, 10mA, 10mA */
+		qcom,pad-drv-on = <0x7 0x4 0x4>; /* 16mA, 10mA, 10mA */
 		qcom,pad-drv-off = <0x0 0x0 0x0>; /* 2mA, 2mA, 2mA */
 
 		qcom,clk-rates = <400000 20000000 25000000 50000000 100000000 200000000>;
@@ -474,6 +474,12 @@
 		reg-names = "hc_mem", "core_mem";
 		interrupts = <0 123 0>, <0 138 0>;
 		interrupt-names = "hc_irq", "pwr_irq";
+
+		qcom,pad-pull-on = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
+		qcom,pad-pull-off = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
+		qcom,pad-drv-on = <0x7 0x4 0x4>; /* 16mA, 10mA, 10mA */
+		qcom,pad-drv-off = <0x0 0x0 0x0>; /* 2mA, 2mA, 2mA */
+
 		qcom,clk-rates = <400000 20000000 25000000 50000000 100000000 200000000>;
 		qcom,bus-speed-mode = "HS200_1p8v", "DDR_1p8v";
 		qcom,cpu-dma-latency-us = <200>;
@@ -499,6 +505,11 @@
 		reg-names = "hc_mem", "core_mem";
 		interrupts = <0 125 0>, <0 221 0>;
 		interrupt-names = "hc_irq", "pwr_irq";
+
+		qcom,pad-pull-on = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
+		qcom,pad-pull-off = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
+		qcom,pad-drv-on = <0x7 0x4 0x4>; /* 16mA, 10mA, 10mA */
+		qcom,pad-drv-off = <0x0 0x0 0x0>; /* 2mA, 2mA, 2mA */
 
 		qcom,clk-rates = <400000 20000000 25000000 50000000 100000000 200000000>;
 		qcom,bus-width = <4>;
@@ -769,6 +780,9 @@
 
 		qcom,cdc-mclk-gpios = <&pm8941_gpios 15 0>;
 		qcom,taiko-mclk-clk-freq = <9600000>;
+
+		qcom,hdmi-audio-rx;
+
 		qcom,prim-auxpcm-gpio-clk  = <&msmgpio 65 0>;
 		qcom,prim-auxpcm-gpio-sync = <&msmgpio 66 0>;
 		qcom,prim-auxpcm-gpio-din  = <&msmgpio 67 0>;
@@ -1560,8 +1574,7 @@
 
         memory_hole: qcom,msm-mem-hole {
                 compatible = "qcom,msm-mem-hole";
-                qcom,memblock-remove = <0x5d00000 0x7d00000
-					0xfa00000 0x500000>; /* Address and Size of Hole */
+                qcom,memblock-remove = <0x5d00000 0xa200000>; /* Address and Size of Hole */
         };
 
 	uart7: uart@f995d000 { /*BLSP #2, UART #7 */
@@ -1748,6 +1761,14 @@
 			qcom,smdtty-port-name = "LOOPBACK";
 			qcom,smdtty-dev-name = "LOOPBACK_TTY";
 		};
+	};
+
+	sony,ric_info {
+		compatible = "sony_ric";
+		sony,num-partition = <4>;
+		sony,partition-names = "system", "userdata", "cache", "apps_log";
+		sony,mount_paths = "/system", "/data", "/cache", "/mnt/idd";
+		sony,mount-flags = <0x1 0x6 0x6 0xE>;
 	};
 };
 
