@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -50,6 +51,7 @@
 				  SND_JACK_BTN_6 | SND_JACK_BTN_7)
 
 #define NUM_DCE_PLUG_DETECT 3
+#define NUM_DCE_BUTTON_FAKE_DETECT 1
 #define NUM_DCE_PLUG_INS_DETECT 5
 #define NUM_ATTEMPTS_INSERT_DETECT 25
 #define NUM_ATTEMPTS_TO_REPORT 5
@@ -63,7 +65,7 @@
 #define BUTTON_MIN 0x8000
 #define STATUS_REL_DETECTION 0x0C
 
-#define HS_DETECT_PLUG_TIME_MS (5 * 1000)
+#define HS_DETECT_PLUG_TIME_MS 1000
 #define HS_DETECT_PLUG_INERVAL_MS 100
 #define SWCH_REL_DEBOUNCE_TIME_MS 50
 #define SWCH_IRQ_DEBOUNCE_TIME_US 5000
@@ -110,7 +112,11 @@
 
 #define WCD9XXX_MBHC_NSC_CS 9
 #define WCD9XXX_GM_SWAP_THRES_MIN_MV 150
+#ifdef CONFIG_NOISE_DUMPING_JACK
+#define WCD9XXX_GM_SWAP_THRES_MAX_MV 1050
+#else
 #define WCD9XXX_GM_SWAP_THRES_MAX_MV 650
+#endif
 #define WCD9XXX_THRESHOLD_MIC_THRESHOLD 200
 
 #define WCD9XXX_USLEEP_RANGE_MARGIN_US 100
@@ -1547,14 +1553,6 @@ wcd9xxx_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		}
 	}
 
-	if (event_state & (1 << MBHC_EVENT_PA_HPHL)) {
-		pr_debug("%s: HPHL PA was ON\n", __func__);
-	} else if (ch != size && ch > 0) {
-		pr_debug("%s: Invalid, inconsistent HPHL\n", __func__);
-		type = PLUG_TYPE_INVALID;
-		goto exit;
-	}
-
 	for (i = 0, dprev = NULL, d = dt; i < size; i++, d++) {
 		if (d->vddio) {
 			dvddio = d;
@@ -1586,8 +1584,22 @@ wcd9xxx_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		if ((dgnd->_vdces + WCD9XXX_GM_SWAP_THRES_MIN_MV <
 		     minv) &&
 		    (dgnd->_vdces + WCD9XXX_GM_SWAP_THRES_MAX_MV >
-		     maxv))
+		     maxv)) {
 			type = PLUG_TYPE_GND_MIC_SWAP;
+			/*
+			 * if type is GND_MIC_SWAP we should not check
+			 * HPHL status hence goto exit
+			 */
+			goto exit;
+		}
+	}
+
+	if (event_state & (1 << MBHC_EVENT_PA_HPHL)) {
+		pr_debug("%s: HPHL PA was ON\n", __func__);
+	} else if (ch != size && ch > 0) {
+		pr_debug("%s: Invalid, inconsistent HPHL..\n", __func__);
+		type = PLUG_TYPE_INVALID;
+		goto exit;
 	}
 
 	/* if HPHL PA was on, we cannot use hphl status */
@@ -3013,16 +3025,9 @@ static int wcd9xxx_is_false_press(struct wcd9xxx_mbhc *mbhc)
 	    wcd9xxx_get_current_v(mbhc, WCD9XXX_CURRENT_V_B1_HU);
 	const s16 v_b1_h =
 	    wcd9xxx_get_current_v(mbhc, WCD9XXX_CURRENT_V_B1_H);
-	const unsigned long timeout =
-	    jiffies + msecs_to_jiffies(BTN_RELEASE_DEBOUNCE_TIME_MS);
 
-	while (time_before(jiffies, timeout)) {
-		/*
-		 * This function needs to run measurements just few times during
-		 * release debounce time.  Make 1ms interval to avoid
-		 * unnecessary excessive measurements.
-		 */
-		usleep_range(1000, 1000 + WCD9XXX_USLEEP_RANGE_MARGIN_US);
+	for (i = 0; i < NUM_DCE_BUTTON_FAKE_DETECT; i++) {
+		usleep_range(10000, 10000);
 		if (i == 0) {
 			mb_v = wcd9xxx_codec_sta_dce(mbhc, 0, true);
 			pr_debug("%s: STA[0]: %d,%d\n", __func__, mb_v,
@@ -4541,10 +4546,8 @@ static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 int wcd9xxx_mbhc_get_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 			       uint32_t *zr)
 {
-	WCD9XXX_BCL_LOCK(mbhc->resmgr);
 	*zl = mbhc->zl;
 	*zr = mbhc->zr;
-	WCD9XXX_BCL_UNLOCK(mbhc->resmgr);
 
 	if (*zl && *zr)
 		return 0;

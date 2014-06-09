@@ -140,29 +140,29 @@ int pas_init_image(enum pas_id id, const u8 *metadata, size_t size)
 	u32 scm_ret = 0;
 	void *mdata_buf;
 	dma_addr_t mdata_phys;
-	DEFINE_DMA_ATTRS(attrs);
 
 	ret = scm_pas_enable_bw();
 	if (ret)
 		return ret;
 
-	dma_set_attr(DMA_ATTR_STRONGLY_ORDERED, &attrs);
-	mdata_buf = dma_alloc_attrs(NULL, size, &mdata_phys, GFP_KERNEL,
-					&attrs);
-	if (!mdata_buf) {
-		pr_err("Allocation for metadata failed.\n");
+	/* Make memory physically contiguous, 4K aligned and non-cacheable */
+	mdata_buf = dma_alloc_coherent(NULL, size, &mdata_phys, GFP_KERNEL);
+	if (!mdata_buf)
 		return -ENOMEM;
-	}
 
 	memcpy(mdata_buf, metadata, size);
 
 	request.proc = id;
 	request.image_addr = mdata_phys;
 
+	/* Flush metadata to ensure secure world doesn't read stale data */
+	__cpuc_flush_dcache_area(mdata_buf, size);
+	outer_flush_range(request.image_addr, request.image_addr + size);
+
 	ret = scm_call(SCM_SVC_PIL, PAS_INIT_IMAGE_CMD, &request,
 			sizeof(request), &scm_ret, sizeof(scm_ret));
 
-	dma_free_attrs(NULL, size, mdata_buf, mdata_phys, &attrs);
+	dma_free_coherent(NULL, size, mdata_buf, mdata_phys);
 	scm_pas_disable_bw();
 
 	if (ret)

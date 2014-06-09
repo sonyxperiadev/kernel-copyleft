@@ -2655,6 +2655,9 @@ error:
 static int mdss_mdp_overlay_splash_image(struct msm_fb_data_type *mfd,
 						int *pipe_ndx, int splash_event)
 {
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	return 0;
+#else	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	struct mdp_overlay req;
 	int rc = 0;
 	struct fb_info *fbi = NULL;
@@ -2707,6 +2710,7 @@ static int mdss_mdp_overlay_splash_image(struct msm_fb_data_type *mfd,
 	}
 
 	return rc;
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 }
 
 int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)

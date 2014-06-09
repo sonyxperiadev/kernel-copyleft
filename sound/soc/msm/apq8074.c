@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013, Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -626,6 +627,26 @@ static int apq8074_mclk_event(struct snd_soc_dapm_widget *w,
 
 	return 0;
 }
+
+static const struct snd_soc_dapm_widget rhine_apq8074_dapm_widgets[] = {
+
+	SND_SOC_DAPM_SUPPLY("MCLK",  SND_SOC_NOPM, 0, 0,
+	apq8074_mclk_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_SPK("Ext Spk Bottom Pos", msm_ext_spkramp_event),
+	SND_SOC_DAPM_SPK("Ext Spk Bottom Neg", msm_ext_spkramp_event),
+
+	SND_SOC_DAPM_SPK("Ext Spk Top Pos", msm_ext_spkramp_event),
+	SND_SOC_DAPM_SPK("Ext Spk Top Neg", msm_ext_spkramp_event),
+
+	SND_SOC_DAPM_MIC("Handset Mic", NULL),
+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("Secondary Mic", NULL),
+	SND_SOC_DAPM_MIC("Handset FB ANC Mic", NULL),
+	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
+
+};
 
 static const struct snd_soc_dapm_widget apq8074_dapm_widgets[] = {
 
@@ -1377,8 +1398,8 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		return err;
 	}
 
-	snd_soc_dapm_new_controls(dapm, apq8074_dapm_widgets,
-				ARRAY_SIZE(apq8074_dapm_widgets));
+	snd_soc_dapm_new_controls(dapm, rhine_apq8074_dapm_widgets,
+				ARRAY_SIZE(rhine_apq8074_dapm_widgets));
 
 	snd_soc_dapm_enable_pin(dapm, "Lineout_1 amp");
 	snd_soc_dapm_enable_pin(dapm, "Lineout_3 amp");
@@ -1812,7 +1833,7 @@ static struct snd_soc_dai_link apq8074_common_dai_links[] = {
 		.name = "MSM8974 Compr",
 		.stream_name = "COMPR",
 		.cpu_dai_name	= "MultiMedia4",
-		.platform_name  = "msm-compr-dsp",
+		.platform_name  = "msm-compress-dsp",
 		.dynamic = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			 SND_SOC_DPCM_TRIGGER_POST},
