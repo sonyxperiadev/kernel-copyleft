@@ -1,4 +1,5 @@
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -685,7 +686,12 @@ static int msm_ispif_stop_frame_boundary(struct ispif_device *ispif,
 	uint16_t cid_mask = 0;
 	uint32_t intf_addr;
 	enum msm_ispif_vfe_intf vfe_intf;
+#if defined(CONFIG_SONY_CAM_V4L2)
+	int retry_cnt = 0;
+	int retry_max = 20;
+#else
 	uint32_t stop_flag = 0;
+#endif
 
 	BUG_ON(!ispif);
 	BUG_ON(!params);
@@ -745,12 +751,26 @@ static int msm_ispif_stop_frame_boundary(struct ispif_device *ispif,
 			goto end;
 		}
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+		for (retry_cnt = 0; retry_cnt < retry_max; retry_cnt++) {
+			if ((msm_camera_io_r(ispif->base + intf_addr) & 0xF)
+				== 0xF) {
+				break;
+			}
+			CDBG("%s: Wait for %d Idle\n", __func__,
+				params->entries[i].intftype);
+			msleep(20);
+		}
+		if (retry_cnt == retry_max)
+			pr_err("%s: retry over\n", __func__);
+#else
 		rc = readl_poll_timeout(ispif->base + intf_addr, stop_flag,
 					(stop_flag & 0xF) == 0xF,
 					ISPIF_TIMEOUT_SLEEP_US,
 					ISPIF_TIMEOUT_ALL_US);
 		if (rc < 0)
 			goto end;
+#endif
 
 		/* disable CIDs in CID_MASK register */
 		msm_ispif_enable_intf_cids(ispif, params->entries[i].intftype,

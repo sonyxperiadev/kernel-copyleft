@@ -61,6 +61,8 @@
 			linux,code = <116>;
 		};
 
+/* Disable RESIN shutdown here, we set it in boot code */
+/*
 		qcom,pon_2 {
 			qcom,pon-type = <1>;
 			qcom,support-reset = <1>;
@@ -71,7 +73,7 @@
 			linux,code = <114>;
 			qcom,use-bark;
 		};
-
+*/
 		qcom,pon_3 {
 			qcom,pon-type = <3>;
 			qcom,support-reset = <1>;
@@ -127,7 +129,6 @@
 		qcom,ocv-voltage-high-threshold-uv = <3750000>;
 		qcom,ocv-voltage-low-threshold-uv = <3650000>;
 		qcom,low-soc-calculate-soc-threshold = <15>;
-		qcom,low-voltage-calculate-soc-ms = <1000>;
 		qcom,low-soc-calculate-soc-ms = <5000>;
 		qcom,calculate-soc-ms = <20000>;
 		qcom,chg-term-ua = <100000>;

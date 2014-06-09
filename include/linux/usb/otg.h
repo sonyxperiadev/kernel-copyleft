@@ -4,6 +4,12 @@
  * These APIs may be used between USB controllers.  USB device drivers
  * (for either host or peripheral roles) don't use these calls; they
  * continue to use just usb_device and usb_gadget.
+ *
+ * A file without copyright statement was modified by Sony Mobile in 2013.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications AB,
+ * and licensed under the license of the file.
  */
 
 #ifndef __LINUX_USB_OTG_H
@@ -71,6 +77,11 @@ enum usb_phy_events {
 	USB_EVENT_ENUMERATED,   /* gadget driver enumerated */
 };
 
+enum usb_ocp_modes {
+	USB_OCP_MODE_DEFAULT,
+	USB_OCP_MODE_STRICTED,
+};
+
 struct usb_phy;
 
 /* for transceivers connected thru an ULPI interface, the user must
@@ -108,6 +119,8 @@ struct usb_otg {
 	int	(*send_event)(struct usb_otg *otg,
 			enum usb_otg_event event);
 
+	/* set default/strict to the ocp mode */
+	int	(*set_ocp_mode)(struct usb_otg *otg, enum usb_ocp_modes mode);
 };
 
 /*
@@ -311,5 +324,8 @@ usb_unregister_notifier(struct usb_phy *x, struct notifier_block *nb)
 
 /* for OTG controller drivers (and maybe other stuff) */
 extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);
+
+/* set/unset ocp mode */
+extern int usb_set_ocp_mode(enum usb_ocp_modes mode);
 
 #endif /* __LINUX_USB_OTG_H */

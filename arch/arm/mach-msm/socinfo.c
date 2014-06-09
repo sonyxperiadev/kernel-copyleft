@@ -1,4 +1,5 @@
 /* Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1080,7 +1081,7 @@ static struct device_attribute image_crm_version =
 			msm_get_image_crm_version, msm_set_image_crm_version);
 
 static struct device_attribute select_image =
-	__ATTR(select_image, S_IRUGO | S_IWUGO,
+	__ATTR(select_image, S_IRUGO | S_IWUSR,
 			msm_get_image_number, msm_select_image);
 
 static struct sysdev_class soc_sysdev_class = {

@@ -2,11 +2,15 @@
  * otg.c -- USB OTG utility code
  *
  * Copyright (C) 2004 Texas Instruments
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/kernel.h>
@@ -115,3 +119,18 @@ int otg_send_event(enum usb_otg_event event)
 	return ret;
 }
 EXPORT_SYMBOL(otg_send_event);
+
+int usb_set_ocp_mode(enum usb_ocp_modes mode)
+{
+	struct usb_phy *phy = usb_get_transceiver();
+	int ret = -ENOTSUPP;
+
+	if (phy && phy->otg && phy->otg->set_ocp_mode)
+		ret = phy->otg->set_ocp_mode(phy->otg, mode);
+
+	if (phy)
+		usb_put_transceiver(phy);
+
+	return ret;
+}
+EXPORT_SYMBOL(usb_set_ocp_mode);
