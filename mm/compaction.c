@@ -255,12 +255,21 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 		struct page *page = cursor;
 
 		nr_scanned++;
-		if (!pfn_valid_within(blockpfn))
-			continue;
+		if (!pfn_valid_within(blockpfn)) {
+			if (strict)
+				break;
+			else
+				continue;
+		}
+
 		if (!valid_page)
 			valid_page = page;
-		if (!PageBuddy(page))
-			continue;
+		if (!PageBuddy(page)) {
+			if (strict)
+				break;
+			else
+				continue;
+		}
 
 		/*
 		 * The zone lock must be held to isolate freepages.
@@ -280,8 +289,12 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 			break;
 
 		/* Recheck this is a buddy page under lock */
-		if (!PageBuddy(page))
-			continue;
+		if (!PageBuddy(page)) {
+			if (strict)
+				break;
+			else
+				continue;
+		}
 
 		/* Found a free page, break it into order-0 pages */
 		isolated = split_free_page(page);
