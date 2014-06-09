@@ -208,6 +208,7 @@ struct dwc3_msm {
 	enum usb_chg_state	chg_state;
 	int			pmic_id_irq;
 	struct work_struct	id_work;
+	struct work_struct	ocp_work;
 	struct qpnp_adc_tm_btm_param	adc_param;
 	struct qpnp_adc_tm_chip *adc_tm_dev;
 	struct delayed_work	init_adc_work;
@@ -221,6 +222,7 @@ struct dwc3_msm {
 	unsigned int		host_mode;
 	unsigned int		voltage_max;
 	unsigned int		current_max;
+	unsigned int		current_system_max;
 	unsigned int		vdd_no_vol_level;
 	unsigned int		vdd_low_vol_level;
 	unsigned int		vdd_high_vol_level;
@@ -1747,7 +1749,7 @@ static void dwc3_chg_detect_work(struct work_struct *w)
 				mdwc->ext_chg_active = true;
 			}
 		}
-		dev_dbg(mdwc->dev, "chg_type = %s\n",
+		dev_info(mdwc->dev, "chg_type = %s\n",
 			chg_to_string(mdwc->charger.chg_type));
 		mdwc->charger.notify_detection_complete(mdwc->otg_xceiv->otg,
 								&mdwc->charger);
@@ -2235,6 +2237,9 @@ static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		val->intval = mdwc->current_max;
 		break;
+	case POWER_SUPPLY_PROP_CURRENT_SYSTEM_MAX:
+		val->intval = mdwc->current_system_max;
+		break;
 	case POWER_SUPPLY_PROP_PRESENT:
 		val->intval = mdwc->vbus_active;
 		break;
@@ -2255,6 +2260,7 @@ static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
 				  const union power_supply_propval *val)
 {
 	static bool init;
+	unsigned uA;
 	struct dwc3_msm *mdwc = container_of(psy, struct dwc3_msm,
 								usb_psy);
 
@@ -2268,6 +2274,8 @@ static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
 		if (mdwc->otg_xceiv && !mdwc->ext_inuse &&
 		    (mdwc->ext_xceiv.otg_capability || !init)) {
 			mdwc->ext_xceiv.bsv = val->intval;
+			dev_info(mdwc->dev, "%s: set bsv=%d\n", __func__,
+							mdwc->ext_xceiv.bsv);
 			queue_delayed_work(system_nrt_wq,
 							&mdwc->resume_work, 20);
 
@@ -2283,7 +2291,29 @@ static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
 		mdwc->voltage_max = val->intval;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		mdwc->current_max = val->intval;
+		/* limit current_max to current_system_max */
+		uA = (mdwc->current_system_max &&
+			mdwc->current_system_max < val->intval) ?
+			mdwc->current_system_max : val->intval;
+		mdwc->current_max = uA;
+		dev_dbg(mdwc->dev, "set current_max = %d uA\n", uA);
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_SYSTEM_MAX:
+		/* update current_system_max */
+		uA = (val->intval > 1000 * DWC3_IDEV_CHG_MAX) ?
+			1000 * DWC3_IDEV_CHG_MAX : val->intval;
+		mdwc->current_system_max = uA;
+		dev_dbg(mdwc->dev, "set current_system_max = %d uA\n", uA);
+
+		/* update current_max if USB online (except ext_inuse) */
+		if (uA && mdwc->online && mdwc->current_max &&
+						!mdwc->ext_inuse) {
+			if (mdwc->charger.chg_type == DWC3_SDP_CHARGER &&
+				uA > 1000 * CONFIG_USB_GADGET_VBUS_DRAW)
+				uA = 1000 * CONFIG_USB_GADGET_VBUS_DRAW;
+			mdwc->current_max = uA;
+			dev_dbg(mdwc->dev, "set current_max = %d uA\n", uA);
+		}
 		break;
 	case POWER_SUPPLY_PROP_TYPE:
 		psy->type = val->intval;
@@ -2315,9 +2345,9 @@ static void dwc3_msm_external_power_changed(struct power_supply *psy)
 		dwc3_start_chg_det(&mdwc->charger, false);
 		mdwc->ext_vbus_psy->get_property(mdwc->ext_vbus_psy,
 					POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
-		power_supply_set_current_limit(&mdwc->usb_psy, ret.intval);
 	}
 
+	power_supply_set_current_limit(&mdwc->usb_psy, ret.intval);
 	power_supply_set_online(&mdwc->usb_psy, ret.intval);
 	power_supply_changed(&mdwc->usb_psy);
 }
@@ -2328,6 +2358,7 @@ dwc3_msm_property_is_writeable(struct power_supply *psy,
 {
 	switch (psp) {
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+	case POWER_SUPPLY_PROP_CURRENT_SYSTEM_MAX:
 		return 1;
 	default:
 		break;
@@ -2346,6 +2377,7 @@ static enum power_supply_property dwc3_msm_pm_power_props_usb[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
+	POWER_SUPPLY_PROP_CURRENT_SYSTEM_MAX,
 	POWER_SUPPLY_PROP_TYPE,
 	POWER_SUPPLY_PROP_SCOPE,
 };
@@ -2384,6 +2416,9 @@ static void dwc3_ext_notify_online(void *ctx, int on)
 		notify_otg |= mdwc->vbus_active;
 	}
 
+	dev_info(mdwc->dev, "%s: set bsv=%d, id=%d\n", __func__,
+				mdwc->ext_xceiv.bsv, mdwc->ext_xceiv.id);
+
 	if (mdwc->ext_vbus_psy)
 		power_supply_set_present(mdwc->ext_vbus_psy, on);
 
@@ -2420,6 +2455,8 @@ static void dwc3_id_work(struct work_struct *w)
 
 	if (!mdwc->ext_inuse) { /* notify OTG */
 		mdwc->ext_xceiv.id = mdwc->id_state;
+		dev_info(mdwc->dev, "%s: set id=%d\n", __func__,
+							mdwc->ext_xceiv.id);
 		dwc3_resume_work(&mdwc->resume_work.work);
 	}
 }
@@ -2437,6 +2474,37 @@ static irqreturn_t dwc3_pmic_id_irq(int irq, void *data)
 	}
 
 	return IRQ_HANDLED;
+}
+
+/**
+ * dwc3_ocp_work - workqueue function.
+ *
+ * @w: Pointer to the dwc3 ocp workqueue
+ *
+ * NOTE: After ocp, resume and notify the event to OTG.
+ */
+static void dwc3_ocp_work(struct work_struct *w)
+{
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm, ocp_work);
+
+	pr_info("%s: receive ocp notification\n", __func__);
+	if (!mdwc->ext_inuse) { /* notify OTG */
+		mdwc->ext_xceiv.ocp = true;
+		dwc3_resume_work(&mdwc->resume_work.work);
+	}
+}
+
+/**
+ * dwc3_ocp_notification - ocp notification callback from regulator.
+ * @ctxt: Pointer to the dwc3 context
+ *
+ * NOTE: This runs in interrupt context.
+ */
+static void dwc3_ocp_notification(void *ctxt)
+{
+	struct dwc3_msm *mdwc = (struct dwc3_msm *)ctxt;
+
+	queue_work(system_nrt_wq, &mdwc->ocp_work);
 }
 
 static void dwc3_adc_notification(enum qpnp_tm_state state, void *ctx)
@@ -2710,6 +2778,7 @@ static int __devinit dwc3_msm_probe(struct platform_device *pdev)
 	INIT_WORK(&mdwc->restart_usb_work, dwc3_restart_usb_work);
 	INIT_WORK(&mdwc->usb_block_reset_work, dwc3_block_reset_usb_work);
 	INIT_WORK(&mdwc->id_work, dwc3_id_work);
+	INIT_WORK(&mdwc->ocp_work, dwc3_ocp_work);
 	INIT_DELAYED_WORK(&mdwc->init_adc_work, dwc3_init_adc_work);
 	init_completion(&mdwc->ext_chg_wait);
 
@@ -3075,6 +3144,12 @@ static int __devinit dwc3_msm_probe(struct platform_device *pdev)
 
 		if (mdwc->ext_xceiv.otg_capability)
 			mdwc->ext_xceiv.ext_block_reset = dwc3_msm_block_reset;
+
+		if (mdwc->ext_xceiv.otg_capability) {
+			mdwc->ext_xceiv.ext_ocp_notification.notify
+				= dwc3_ocp_notification;
+			mdwc->ext_xceiv.ext_ocp_notification.ctxt = mdwc;
+		}
 		ret = dwc3_set_ext_xceiv(mdwc->otg_xceiv->otg,
 						&mdwc->ext_xceiv);
 		if (ret || !mdwc->ext_xceiv.notify_ext_events) {

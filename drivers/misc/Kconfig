@@ -620,6 +620,22 @@ config PMIC8058_XOADC
 	  PMIC8058. Driver interface to program registers of the ADC over
 	  AMUX channels, devices on programmable MPP's and xotherm.
 
+config PM8941_FLASH
+	tristate "Flash support for PM8941"
+	depends on SPMI && OF_SPMI
+	help
+	  This option enables device driver support for the flash
+	  on PM8941.
+
+config QPNP_VIBRATOR
+	tristate "Vibrator support for QPNP PMIC"
+	depends on OF_SPMI
+	help
+	  This option enables device driver support for the vibrator
+	  on the Qualcomm's QPNP PMICs. The vibrator is connected on the
+	  VIB_DRV_N line and can be controlled manually or by the DEST lines.
+	  It uses the android timed-output framework.
+
 config QSEECOM
 	tristate "Qualcomm Secure Execution Communicator driver"
 	help
@@ -664,6 +680,43 @@ config TI_DRV2667
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ti_drv2667.
+
+config CRASH_LAST_LOGS
+	bool "export kernel and amss logs in proc"
+	default n
+	depends on RAMDUMP_TAGS && ARCH_MSM && MSM_SMD
+	help
+	  This driver will export kernel and amss log in proc fs.
+	  they can be found in files /proc/last_kmsg
+	  and /proc/last_amsslog.This driver is mainly used in
+	  Ramdump kernel.
+
+config RAMDUMP_TAGS
+	bool "Ramdump tags to communicate between kernel and ramdump"
+	default n
+	depends on !RAMDUMP_CRASH_LOGS
+	help
+	  This option enables a driver which can be interacted with to
+	  supply the ramdumper with more information about the current
+	  state of the crashing kernel such as build info, HWWD registers,
+	  additional CPU registers not stored in crash_notes, crashing
+	  application info etc. A small amount of memory will be set
+	  aside to hold the information which will later be used by
+	  the ramdump application.
+
+config NFC_PN544
+	tristate "NFC driver for PN544"
+	default n
+	depends on I2C
+	help
+	  This option enables support for PN544.
+
+config SOMC_ISDBT_TUNER
+	tristate "SOMC ISDBT/Tmm tuner driver for SMT-EJ11x"
+	default n
+	depends on I2C
+	help
+	  Select this module to enable SOMC ISDB-T Tuner Driver.
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

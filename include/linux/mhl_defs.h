@@ -72,6 +72,7 @@ enum DevCapOffset_e {
 #define	MHL_DEV_VID_LINK_SUPPYCBCR422		0x04
 #define	MHL_DEV_VID_LINK_SUPP_PPIXEL		0x08
 #define	MHL_DEV_VID_LINK_SUPP_ISLANDS		0x10
+#define	MHL_DEV_VID_LINK_SUPP_VGA		0x20
 
 /*Audio Link Mode Support*/
 #define	MHL_DEV_AUD_LINK_2CH				0x01

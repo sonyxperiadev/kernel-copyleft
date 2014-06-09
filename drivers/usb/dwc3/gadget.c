@@ -2,6 +2,7 @@
  * gadget.c - DesignWare USB3 DRD Controller Gadget Framework Link
  *
  * Copyright (C) 2010-2011 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * Authors: Felipe Balbi <balbi@ti.com>,
  *	    Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -1606,7 +1607,7 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on)
 		udelay(1);
 	} while (1);
 
-	dev_vdbg(dwc->dev, "gadget %s data soft-%s\n",
+	dev_info(dwc->dev, "gadget %s data soft-%s\n",
 			dwc->gadget_driver
 			? dwc->gadget_driver->function : "no-function",
 			is_on ? "connect" : "disconnect");
@@ -2312,7 +2313,7 @@ static void dwc3_gadget_disconnect_interrupt(struct dwc3 *dwc)
 {
 	int			reg;
 
-	dev_vdbg(dwc->dev, "%s\n", __func__);
+	dev_info(dwc->dev, "%s\n", __func__);
 
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
 	reg &= ~DWC3_DCTL_INITU1ENA;
@@ -2362,7 +2363,7 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 	u32			reg;
 	struct dwc3_otg		*dotg = dwc->dotg;
 
-	dev_vdbg(dwc->dev, "%s\n", __func__);
+	dev_info(dwc->dev, "%s\n", __func__);
 
 	/*
 	 * WORKAROUND: DWC3 revisions <1.88a have an issue which
@@ -2466,6 +2467,23 @@ static void dwc3_gadget_phy_suspend(struct dwc3 *dwc, u8 speed)
 	}
 }
 
+static const char *dwc3_gadget_speed_string(u8 speed)
+{
+	switch (speed) {
+	case DWC3_DCFG_SUPERSPEED:
+		return "super speed";
+	case DWC3_DCFG_HIGHSPEED:
+		return "high speed";
+	case DWC3_DCFG_FULLSPEED2:
+	case DWC3_DCFG_FULLSPEED1:
+		return "full speed";
+	case DWC3_DCFG_LOWSPEED:
+		return "low speed";
+	default:
+		return "UNKNOWN speed";
+	}
+}
+
 static void dwc3_gadget_conndone_interrupt(struct dwc3 *dwc)
 {
 	struct dwc3_gadget_ep_cmd_params params;
@@ -2523,6 +2541,8 @@ static void dwc3_gadget_conndone_interrupt(struct dwc3 *dwc)
 		dwc->gadget.speed = USB_SPEED_LOW;
 		break;
 	}
+
+	dev_info(dwc->dev, "%s\n", dwc3_gadget_speed_string(speed));
 
 	/* Recent versions support automatic phy suspend and don't need this */
 	if (dwc->revision < DWC3_REVISION_194A) {
@@ -2632,7 +2652,7 @@ static void dwc3_gadget_linksts_change_interrupt(struct dwc3 *dwc,
 
 	dwc->link_state = next;
 
-	dev_vdbg(dwc->dev, "%s link %d\n", __func__, dwc->link_state);
+	dev_dbg(dwc->dev, "%s link %d\n", __func__, dwc->link_state);
 }
 
 static void dwc3_dump_reg_info(struct dwc3 *dwc)
@@ -2854,10 +2874,28 @@ int __devinit dwc3_gadget_init(struct dwc3 *dwc)
 	dev_set_name(&dwc->gadget.dev, "gadget");
 
 	dwc->gadget.ops			= &dwc3_gadget_ops;
-	dwc->gadget.max_speed		= USB_SPEED_SUPER;
 	dwc->gadget.speed		= USB_SPEED_UNKNOWN;
 	dwc->gadget.dev.parent		= dwc->dev;
 	dwc->gadget.sg_supported	= true;
+
+	switch (dwc->maximum_speed) {
+	case DWC3_DCFG_SUPERSPEED:
+		dwc->gadget.max_speed = USB_SPEED_SUPER;
+		break;
+	case DWC3_DCFG_HIGHSPEED:
+		dwc->gadget.max_speed = USB_SPEED_HIGH;
+		break;
+	case DWC3_DCFG_FULLSPEED1:
+	case DWC3_DCFG_FULLSPEED2:
+		dwc->gadget.max_speed = USB_SPEED_FULL;
+		break;
+	case DWC3_DCFG_LOWSPEED:
+		dwc->gadget.max_speed = USB_SPEED_LOW;
+		break;
+	default:
+		dwc->gadget.max_speed = USB_SPEED_SUPER;
+		break;
+	}
 
 	dma_set_coherent_mask(&dwc->gadget.dev, dwc->dev->coherent_dma_mask);
 

@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -907,8 +908,13 @@ int __msm_jpeg_init(struct msm_jpeg_device *pgmn_dev)
 
 	mutex_init(&pgmn_dev->lock);
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+	pr_info("%s:%d] Jpeg Device id %d", __func__, __LINE__,
+		   pgmn_dev->pdev->id);
+#else
 	pr_err("%s:%d] Jpeg Device id %d", __func__, __LINE__,
 		   pgmn_dev->pdev->id);
+#endif
 	idx = pgmn_dev->pdev->id;
 	pgmn_dev->idx = idx;
 	pgmn_dev->iommu_cnt = 1;

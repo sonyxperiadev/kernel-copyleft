@@ -522,6 +522,7 @@ static int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 			pipe->img_width /= 2;
 		} else {
 			pipe->src.h /= 2;
+			pipe->src.y = DIV_ROUND_UP(pipe->src.y, 2);
 		}
 	}
 

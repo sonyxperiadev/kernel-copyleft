@@ -363,7 +363,7 @@
 		qcom,ext-spk-amp-supply = <&ext_5v>;
 		qcom,ext-spk-amp-gpio = <&pm8841_mpps 1 0>;
 		qcom,dock-plug-det-irq = <&pm8841_mpps 2 0>;
-		qcom,ext-ult-spk-amp-gpio = <&pm8941_gpios 6 0>;
+		/* qcom,ext-ult-spk-amp-gpio = <&pm8941_gpios 6 0>; */
 		qcom,hdmi-audio-rx;
 
 		qcom,prim-auxpcm-gpio-clk  = <&msmgpio 74 0>;
@@ -805,7 +805,7 @@
 	status = "ok";
 	otg-parent-supply = <&ext_5v>;
 
-	qcom,charging-disabled;
+	/* qcom,charging-disabled; */
 
 	qcom,chgr@1000 {
 		status = "ok";
