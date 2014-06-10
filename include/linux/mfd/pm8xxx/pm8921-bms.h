@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +15,7 @@
 #define __PM8XXX_BMS_H
 
 #include <linux/errno.h>
+#include <linux/types.h>
 #include <linux/mfd/pm8xxx/batterydata-lib.h>
 
 #define PM8921_BMS_DEV_NAME	"pm8921-bms"
@@ -37,6 +39,7 @@ struct pm8xxx_bms_core_data {
  *			is considered empty(mV)
  * @enable_fcc_learning:	if set the driver will learn full charge
  *				capacity of the battery upon end of charge
+ * @allow_soc_increase: allow soc increase without charger attached
  * @normal_voltage_calc_ms:	The period of soc calculation in ms when battery
  *				voltage higher than cutoff voltage
  * @low_voltage_calc_ms:	The period of soc calculation in ms when battery
@@ -45,6 +48,7 @@ struct pm8xxx_bms_core_data {
 struct pm8921_bms_platform_data {
 	struct pm8xxx_bms_core_data	bms_cdata;
 	enum battery_type		battery_type;
+	struct bms_battery_data		*battery_data;
 	int				r_sense_uohm;
 	unsigned int			i_test;
 	unsigned int			v_cutoff;
@@ -55,6 +59,7 @@ struct pm8921_bms_platform_data {
 	int				ignore_shutdown_soc;
 	int				adjust_soc_low_threshold;
 	int				chg_term_ua;
+	bool				allow_soc_increase;
 	int				normal_voltage_calc_ms;
 	int				low_voltage_calc_ms;
 };
@@ -92,6 +97,12 @@ int pm8921_bms_get_battery_current(int *result);
  *
  */
 int pm8921_bms_get_percent_charge(void);
+
+/**
+ * pm8921_bms_get_init_fcc - returns initial fcc in mAh of the battery
+ *
+ */
+int pm8921_bms_get_init_fcc(void);
 
 /**
  * pm8921_bms_get_fcc - returns fcc in mAh of the battery depending on its age
@@ -152,6 +163,10 @@ static inline int pm8921_bms_get_battery_current(int *result)
 	return -ENXIO;
 }
 static inline int pm8921_bms_get_percent_charge(void)
+{
+	return -ENXIO;
+}
+static inline int pm8921_bms_get_init_fcc(void)
 {
 	return -ENXIO;
 }

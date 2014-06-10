@@ -88,4 +88,20 @@ kernelconfig: $(KERNEL_OUT) $(KERNEL_CONFIG)
 	     $(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- savedefconfig
 	cp $(KERNEL_OUT)/defconfig kernel/arch/arm/configs/$(KERNEL_DEFCONFIG)
 
+.PHONY: kernel-sparse-changed
+kernel-sparse-changed: $(KERNEL_CONFIG)
+	$(hide) $(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- C=1
+
+.PHONY: kernel-sparse-all
+kernel-sparse-all: $(KERNEL_CONFIG)
+	$(hide) $(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- C=2
+
+.PHONY: kernel-smatch-changed
+kernel-smatch-changed: $(KERNEL_CONFIG)
+	$(hide) $(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- CHECK="smatch -pkernel" C=1
+
+.PHONY: kernel-smatch-all
+kernel-smatch-all: $(KERNEL_CONFIG)
+	$(hide) $(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- CHECK="smatch -pkernel" C=2
+
 endif
