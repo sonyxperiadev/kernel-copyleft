@@ -1,7 +1,9 @@
 Configuration files can be found in arch/arm/configs.
 
-  Xperia ZL -> fusion3_odin_defconfig
-  Xperia Z  -> fusion3_yuga_defconfig
+  Xperia ZL       -> fusion3_odin_defconfig
+  Xperia Z        -> fusion3_yuga_defconfig
+  Xperia ZR       -> fusion3_dogo_defconfig
+  Xperia Tablet Z -> fusion3_pollux_defconfig
 
 
 How to flash your kernel using Fastboot:
@@ -24,7 +26,7 @@ Do:
 
    $ mkbootimg --kernel zImage --ramdisk ramdisk.img --pagesize 2048 --base 0x80200000 \
      --cmdline "androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.emmc=true" \
-     --ramdisk_offset 0x02000000 --output boot.img
+     --offset 0x02000000 --output boot.img
 
 2. Flash
 
