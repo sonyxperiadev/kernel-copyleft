@@ -48,6 +48,7 @@
 #define TAIKO_HPH_PA_SETTLE_COMP_OFF 13000
 
 #define DAPM_MICBIAS2_EXTERNAL_STANDALONE "MIC BIAS2 External Standalone"
+#define DAPM_MICBIAS3_EXTERNAL_STANDALONE "MIC BIAS3 External Standalone"
 
 /* RX_HPH_CNP_WG_TIME increases by 0.24ms */
 #define TAIKO_WG_TIME_FACTOR_US	240
@@ -1796,8 +1797,14 @@ static const struct soc_enum anc1_fb_mux_enum =
 static const struct soc_enum iir1_inp1_mux_enum =
 	SOC_ENUM_SINGLE(TAIKO_A_CDC_CONN_EQ1_B1_CTL, 0, 18, iir_inp1_text);
 
+static const struct soc_enum iir1_inp2_mux_enum =
+	SOC_ENUM_SINGLE(TAIKO_A_CDC_CONN_EQ1_B2_CTL, 0, 18, iir_inp1_text);
+
 static const struct soc_enum iir2_inp1_mux_enum =
 	SOC_ENUM_SINGLE(TAIKO_A_CDC_CONN_EQ2_B1_CTL, 0, 18, iir_inp1_text);
+
+static const struct soc_enum iir2_inp2_mux_enum =
+	SOC_ENUM_SINGLE(TAIKO_A_CDC_CONN_EQ2_B2_CTL, 0, 18, iir_inp1_text);
 
 static const struct snd_kcontrol_new rx_mix1_inp1_mux =
 	SOC_DAPM_ENUM("RX1 MIX1 INP1 Mux", rx_mix1_inp1_chain_enum);
@@ -2021,8 +2028,14 @@ static const struct snd_kcontrol_new dec10_mux =
 static const struct snd_kcontrol_new iir1_inp1_mux =
 	SOC_DAPM_ENUM("IIR1 INP1 Mux", iir1_inp1_mux_enum);
 
+static const struct snd_kcontrol_new iir1_inp2_mux =
+	SOC_DAPM_ENUM("IIR1 INP2 Mux", iir1_inp2_mux_enum);
+
 static const struct snd_kcontrol_new iir2_inp1_mux =
 	SOC_DAPM_ENUM("IIR2 INP1 Mux", iir2_inp1_mux_enum);
+
+static const struct snd_kcontrol_new iir2_inp2_mux =
+	SOC_DAPM_ENUM("IIR2 INP2 Mux", iir2_inp2_mux_enum);
 
 static const struct snd_kcontrol_new anc1_mux =
 	SOC_DAPM_ENUM("ANC1 MUX Mux", anc1_mux_enum);
@@ -2823,16 +2836,23 @@ static int taiko_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 }
 
 /* called under codec_resource_lock acquisition */
-static int taiko_enable_mbhc_micbias(struct snd_soc_codec *codec, bool enable)
+static int taiko_enable_mbhc_micbias(struct snd_soc_codec *codec, bool enable,
+				     enum wcd9xxx_micbias_num micb_num)
 {
 	int rc;
+	const char *micbias;
+
+	if (micb_num == MBHC_MICBIAS3)
+		micbias = DAPM_MICBIAS3_EXTERNAL_STANDALONE;
+	else
+		micbias = DAPM_MICBIAS2_EXTERNAL_STANDALONE;
 
 	if (enable)
 		rc = snd_soc_dapm_force_enable_pin(&codec->dapm,
-					     DAPM_MICBIAS2_EXTERNAL_STANDALONE);
+					     micbias);
 	else
 		rc = snd_soc_dapm_disable_pin(&codec->dapm,
-					     DAPM_MICBIAS2_EXTERNAL_STANDALONE);
+					     micbias);
 	if (!rc)
 		snd_soc_dapm_sync(&codec->dapm);
 	pr_debug("%s: leave ret %d\n", __func__, rc);
@@ -3982,6 +4002,25 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"IIR1 INP1 MUX", "RX6", "SLIM RX6"},
 	{"IIR1 INP1 MUX", "RX7", "SLIM RX7"},
 
+	{"IIR1", NULL, "IIR1 INP2 MUX"},
+	{"IIR1 INP2 MUX", "DEC1", "DEC1 MUX"},
+	{"IIR1 INP2 MUX", "DEC2", "DEC2 MUX"},
+	{"IIR1 INP2 MUX", "DEC3", "DEC3 MUX"},
+	{"IIR1 INP2 MUX", "DEC4", "DEC4 MUX"},
+	{"IIR1 INP2 MUX", "DEC5", "DEC5 MUX"},
+	{"IIR1 INP2 MUX", "DEC6", "DEC6 MUX"},
+	{"IIR1 INP2 MUX", "DEC7", "DEC7 MUX"},
+	{"IIR1 INP2 MUX", "DEC8", "DEC8 MUX"},
+	{"IIR1 INP2 MUX", "DEC9", "DEC9 MUX"},
+	{"IIR1 INP2 MUX", "DEC10", "DEC10 MUX"},
+	{"IIR1 INP2 MUX", "RX1", "SLIM RX1"},
+	{"IIR1 INP2 MUX", "RX2", "SLIM RX2"},
+	{"IIR1 INP2 MUX", "RX3", "SLIM RX3"},
+	{"IIR1 INP2 MUX", "RX4", "SLIM RX4"},
+	{"IIR1 INP2 MUX", "RX5", "SLIM RX5"},
+	{"IIR1 INP2 MUX", "RX6", "SLIM RX6"},
+	{"IIR1 INP2 MUX", "RX7", "SLIM RX7"},
+
 	{"IIR2", NULL, "IIR2 INP1 MUX"},
 	{"IIR2 INP1 MUX", "DEC1", "DEC1 MUX"},
 	{"IIR2 INP1 MUX", "DEC2", "DEC2 MUX"},
@@ -4001,6 +4040,25 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"IIR2 INP1 MUX", "RX6", "SLIM RX6"},
 	{"IIR2 INP1 MUX", "RX7", "SLIM RX7"},
 
+	{"IIR2", NULL, "IIR2 INP2 MUX"},
+	{"IIR2 INP2 MUX", "DEC1", "DEC1 MUX"},
+	{"IIR2 INP2 MUX", "DEC2", "DEC2 MUX"},
+	{"IIR2 INP2 MUX", "DEC3", "DEC3 MUX"},
+	{"IIR2 INP2 MUX", "DEC4", "DEC4 MUX"},
+	{"IIR2 INP2 MUX", "DEC5", "DEC5 MUX"},
+	{"IIR2 INP2 MUX", "DEC6", "DEC6 MUX"},
+	{"IIR2 INP2 MUX", "DEC7", "DEC7 MUX"},
+	{"IIR2 INP2 MUX", "DEC8", "DEC8 MUX"},
+	{"IIR2 INP2 MUX", "DEC9", "DEC9 MUX"},
+	{"IIR2 INP2 MUX", "DEC10", "DEC10 MUX"},
+	{"IIR2 INP2 MUX", "RX1", "SLIM RX1"},
+	{"IIR2 INP2 MUX", "RX2", "SLIM RX2"},
+	{"IIR2 INP2 MUX", "RX3", "SLIM RX3"},
+	{"IIR2 INP2 MUX", "RX4", "SLIM RX4"},
+	{"IIR2 INP2 MUX", "RX5", "SLIM RX5"},
+	{"IIR2 INP2 MUX", "RX6", "SLIM RX6"},
+	{"IIR2 INP2 MUX", "RX7", "SLIM RX7"},
+
 	{"MIC BIAS1 Internal1", NULL, "LDO_H"},
 	{"MIC BIAS1 Internal2", NULL, "LDO_H"},
 	{"MIC BIAS1 External", NULL, "LDO_H"},
@@ -4013,6 +4071,7 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"MIC BIAS3 External", NULL, "LDO_H"},
 	{"MIC BIAS4 External", NULL, "LDO_H"},
 	{DAPM_MICBIAS2_EXTERNAL_STANDALONE, NULL, "LDO_H Standalone"},
+	{DAPM_MICBIAS3_EXTERNAL_STANDALONE, NULL, "LDO_H Standalone"},
 };
 
 static int taiko_readable(struct snd_soc_codec *ssc, unsigned int reg)
@@ -5553,6 +5612,10 @@ static const struct snd_soc_dapm_widget taiko_dapm_widgets[] = {
 			       taiko_codec_enable_micbias,
 			       SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 			       SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_MICBIAS_E(DAPM_MICBIAS3_EXTERNAL_STANDALONE, SND_SOC_NOPM,
+			       7, 0, taiko_codec_enable_micbias,
+			       SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
+			       SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_MICBIAS_E("MIC BIAS3 External", SND_SOC_NOPM, 7, 0,
 			       taiko_codec_enable_micbias,
 			       SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
@@ -5653,10 +5716,16 @@ static const struct snd_soc_dapm_widget taiko_dapm_widgets[] = {
 
 	SND_SOC_DAPM_MIXER("IIR1", TAIKO_A_CDC_CLK_SD_CTL, 0, 0, NULL, 0),
 
+	SND_SOC_DAPM_MUX("IIR1 INP2 MUX", SND_SOC_NOPM, 0, 0, &iir1_inp2_mux),
+	SND_SOC_DAPM_MIXER("IIR1", TAIKO_A_CDC_CLK_SD_CTL, 0, 0, NULL, 0),
+
 	SND_SOC_DAPM_MUX_E("IIR2 INP1 MUX", TAIKO_A_CDC_IIR2_GAIN_B1_CTL, 0, 0,
 		&iir2_inp1_mux,  taiko_codec_iir_mux_event,
 		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
+	SND_SOC_DAPM_MIXER("IIR2", TAIKO_A_CDC_CLK_SD_CTL, 1, 0, NULL, 0),
+
+	SND_SOC_DAPM_MUX("IIR2 INP2 MUX", SND_SOC_NOPM, 0, 0, &iir2_inp2_mux),
 	SND_SOC_DAPM_MIXER("IIR2", TAIKO_A_CDC_CLK_SD_CTL, 1, 0, NULL, 0),
 
 	/* AUX PGA */
@@ -6490,7 +6559,7 @@ static int taiko_setup_zdet(struct wcd9xxx_mbhc *mbhc,
 		__wr(WCD9XXX_A_CDC_MBHC_TIMER_B5_CTL, 0xFF, 0x10);
 		/* Reset MBHC and set it up for STA */
 		__wr(WCD9XXX_A_CDC_MBHC_CLK_CTL, 0xFF, 0x0A);
-		__wr(WCD9XXX_A_CDC_MBHC_EN_CTL, 0xFF, 0x02);
+		snd_soc_write(codec, WCD9XXX_A_CDC_MBHC_EN_CTL, 0x2);
 		__wr(WCD9XXX_A_CDC_MBHC_CLK_CTL, 0xFF, 0x02);
 
 		/* Set HPH_MBHC for zdet */
