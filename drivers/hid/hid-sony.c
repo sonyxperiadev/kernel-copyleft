@@ -7,6 +7,7 @@
  *  Copyright (c) 2007 Paul Walmsley
  *  Copyright (c) 2008 Jiri Slaby
  *  Copyright (c) 2006-2008 Jiri Kosina
+ *  Copyright (c) 2012-2013 Sony Mobile Communications AB.
  */
 
 /*
@@ -80,6 +81,7 @@ static int sony_raw_event(struct hid_device *hdev, struct hid_report *report,
 	return 0;
 }
 
+#ifndef CONFIG_HID_SONY_PS3_CTRL_BT
 /*
  * The Sony Sixaxis does not handle HID Output Reports on the Interrupt EP
  * like it should according to usbhid/hid-core.c::usbhid_output_raw_report()
@@ -118,6 +120,7 @@ static int sixaxis_usb_output_raw_report(struct hid_device *hid, __u8 *buf,
 
 	return ret;
 }
+#endif
 
 /*
  * Sending HID_REQ_GET_REPORT changes the operation mode of the ps3 controller
@@ -184,7 +187,9 @@ static int sony_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	}
 
 	if (sc->quirks & SIXAXIS_CONTROLLER_USB) {
+#ifndef CONFIG_HID_SONY_PS3_CTRL_BT
 		hdev->hid_output_raw_report = sixaxis_usb_output_raw_report;
+#endif
 		ret = sixaxis_set_operational_usb(hdev);
 	}
 	else if (sc->quirks & SIXAXIS_CONTROLLER_BT)
