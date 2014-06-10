@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
  * Copyright (c) 2010-2012, Sony Ericsson Mobile Communications AB
- * Copyright (C) 2012 Sony Mobile Communications AB.
+ * Copyright (C) 2012-2013, Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -86,8 +86,9 @@
  * One chunk processed at a time by the data mover
  *
  */
-#define TSIF_PKTS_IN_CHUNK_DEFAULT  (64)  /**< packets in one DM chunk */
-#define TSIF_CHUNKS_IN_BUF_DEFAULT  (32)
+#define TSIF_DMA_QUEUE_NUM          (4)
+#define TSIF_PKTS_IN_CHUNK_DEFAULT  (192)  /**< packets in one DM chunk */
+#define TSIF_CHUNKS_IN_BUF_DEFAULT  (16)
 #define TSIF_PKTS_IN_CHUNK        (tsif_device->pkts_per_chunk)
 #define TSIF_CHUNKS_IN_BUF        (tsif_device->chunks_per_buf)
 #define TSIF_PKTS_IN_BUF          (TSIF_PKTS_IN_CHUNK * TSIF_CHUNKS_IN_BUF)
@@ -166,9 +167,9 @@ struct msm_tsif_device {
 	int ri;
 	int wi;
 	int dmwi;  /**< DataMover write index */
-	struct tsif_dmov_cmd *dmov_cmd[2];
-	dma_addr_t dmov_cmd_dma[2];
-	struct tsif_xfer xfer[2];
+	struct tsif_dmov_cmd *dmov_cmd[TSIF_DMA_QUEUE_NUM];
+	dma_addr_t dmov_cmd_dma[TSIF_DMA_QUEUE_NUM];
+	struct tsif_xfer xfer[TSIF_DMA_QUEUE_NUM];
 	struct tasklet_struct dma_refill;
 	struct tasklet_struct clocks_off;
 	/* statistics */
@@ -446,7 +447,7 @@ static void tsif_dma_schedule(struct msm_tsif_device *tsif_device)
 {
 	int i, dmwi0, dmwi1, found = 0;
 	/* find free entry */
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < TSIF_DMA_QUEUE_NUM; i++) {
 		struct tsif_xfer *xfer = &tsif_device->xfer[i];
 		if (xfer->busy)
 			continue;
@@ -484,6 +485,17 @@ static void tsif_dma_schedule(struct msm_tsif_device *tsif_device)
 	if (!found)
 		dev_info(&tsif_device->pdev->dev,
 			 "All xfer entries are busy\n");
+}
+
+static int tsif_dma_is_flushing(struct msm_tsif_device *tsif_device)
+{
+	int queue_cnt;
+
+	for (queue_cnt = 0; queue_cnt < TSIF_DMA_QUEUE_NUM; queue_cnt++) {
+		if (tsif_device->xfer[queue_cnt].busy)
+			break;
+	}
+	return queue_cnt == TSIF_DMA_QUEUE_NUM ? 0 : 1;
 }
 
 /**
@@ -599,10 +611,8 @@ static void tsif_dmov_complete_func(struct msm_dmov_cmd *cmd,
 			dev_info(&tsif_device->pdev->dev,
 				 "DMA channel flushed (0x%08x)\n", result);
 			if (tsif_device->state == tsif_state_flushing) {
-				if ((!tsif_device->xfer[0].busy) &&
-				    (!tsif_device->xfer[1].busy)) {
+				if (!tsif_dma_is_flushing(tsif_device))
 					tsif_device->state = tsif_state_stopped;
-				}
 			}
 		}
 		if (err)
@@ -649,10 +659,9 @@ static void tsif_dma_refill(unsigned long data)
  */
 static void tsif_dma_flush(struct msm_tsif_device *tsif_device)
 {
-	if (tsif_device->xfer[0].busy || tsif_device->xfer[1].busy) {
+	if (tsif_dma_is_flushing(tsif_device)) {
 		tsif_device->state = tsif_state_flushing;
-		while (tsif_device->xfer[0].busy ||
-		       tsif_device->xfer[1].busy) {
+		while (tsif_dma_is_flushing(tsif_device)) {
 			msm_dmov_flush(tsif_device->dma, 1);
 			usleep(10000);
 		}
@@ -673,7 +682,7 @@ static void tsif_dma_free(struct msm_tsif_device *tsif_device)
 {
 	int i;
 
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < TSIF_DMA_QUEUE_NUM; i++) {
 		if (tsif_device->dmov_cmd[i]) {
 			dma_free_coherent(NULL, sizeof(struct tsif_dmov_cmd),
 					  tsif_device->dmov_cmd[i],
@@ -700,7 +709,7 @@ static int tsif_dma_init(struct msm_tsif_device *tsif_device)
 	tsif_device->ri = 0;
 	tsif_device->wi = 0;
 	tsif_device->dmwi = 0;
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < TSIF_DMA_QUEUE_NUM; i++) {
 		dmov_box *box;
 		struct msm_dmov_cmd *hdr;
 		/* dst in 16 LSB, src in 16 MSB */
@@ -1163,7 +1172,7 @@ static ssize_t tsif_debugfs_dma_read(struct file *filp, char __user *userbuf,
 				"ri %3d | wi %3d | dmwi %3d |",
 				tsif_device->ri, tsif_device->wi,
 				tsif_device->dmwi);
-		for (i = 0; i < 2; i++) {
+		for (i = 0; i < TSIF_DMA_QUEUE_NUM; i++) {
 			struct tsif_xfer *xfer = &tsif_device->xfer[i];
 			if (xfer->busy) {
 				u32 dst =

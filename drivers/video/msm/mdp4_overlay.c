@@ -2630,7 +2630,7 @@ static int mdp4_calc_pipe_mdp_clk(struct msm_fb_data_type *mfd,
 	 * factor. Ideally this factor is passed from board file.
 	 */
 	if (rst < pclk) {
-		rst = ((pclk >> shift) * 23 / 20) << shift;
+		rst = ((pclk >> shift) * 30 / 20) << shift;
 		pr_debug("%s calculated mdp clk is less than pclk.\n",
 			__func__);
 	}
