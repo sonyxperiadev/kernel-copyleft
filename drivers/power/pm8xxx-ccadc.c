@@ -22,6 +22,7 @@
 #include <linux/ioport.h>
 #include <linux/debugfs.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
 #include <linux/delay.h>
 
 #define CCADC_ANA_PARAM		0x240
@@ -74,17 +75,10 @@ struct pm8xxx_ccadc_chip {
 	int			eoc_irq;
 	int			r_sense;
 	struct delayed_work	calib_ccadc_work;
+	spinlock_t		eoc_irq_lock;
 };
 
 static struct pm8xxx_ccadc_chip *the_chip;
-
-#ifdef DEBUG
-static s64 microvolt_to_ccadc_reading(struct pm8xxx_ccadc_chip *chip, s64 cc)
-{
-	return div_s64(uv * CCADC_READING_RESOLUTION_D,
-				CCADC_READING_RESOLUTION_N);
-}
-#endif
 
 static int cc_adjust_for_offset(u16 raw)
 {
@@ -480,6 +474,13 @@ static irqreturn_t pm8921_bms_ccadc_eoc_handler(int irq, void *data)
 	struct pm8xxx_ccadc_chip *chip = data;
 	int rc;
 
+	/* If locked, IRQ was handled on other CPU than was used when probing.
+	 * It means that probe is still active and we should disregard this
+	 * IRQ for now.
+	 */
+	if (spin_is_locked(&chip->eoc_irq_lock))
+		goto out;
+
 	pr_debug("irq = %d triggered\n", irq);
 	data_msb = chip->ccadc_offset >> 8;
 	data_lsb = chip->ccadc_offset;
@@ -488,6 +489,7 @@ static irqreturn_t pm8921_bms_ccadc_eoc_handler(int irq, void *data)
 						data_msb, data_lsb, 0);
 	disable_irq_nosync(chip->eoc_irq);
 
+out:
 	return IRQ_HANDLED;
 }
 
@@ -647,6 +649,7 @@ static void create_debugfs_entries(struct pm8xxx_ccadc_chip *chip)
 static int __devinit pm8xxx_ccadc_probe(struct platform_device *pdev)
 {
 	int rc = 0;
+	unsigned long flags;
 	struct pm8xxx_ccadc_chip *chip;
 	struct resource *res;
 	const struct pm8xxx_ccadc_platform_data *pdata
@@ -677,16 +680,25 @@ static int __devinit pm8xxx_ccadc_probe(struct platform_device *pdev)
 	calib_ccadc_read_offset_and_gain(chip,
 					&chip->ccadc_gain_uv,
 					&chip->ccadc_offset);
+
+	/* There might be cases where IRQ fires before it is disabled.
+	 * Solve it by temporary disable IRQs locally on running CPU with
+	 * spin_lock functionality until IRQ is requested and really
+	 * disabled. After that is done remove the temporary disabled IRQ.
+	 */
+	spin_lock_init(&chip->eoc_irq_lock);
+	spin_lock_irqsave(&chip->eoc_irq_lock, flags);
 	rc = request_irq(chip->eoc_irq,
 			pm8921_bms_ccadc_eoc_handler, IRQF_TRIGGER_RISING,
 			"bms_eoc_ccadc", chip);
 	if (rc) {
 		pr_err("failed to request %d irq rc= %d\n", chip->eoc_irq, rc);
+		spin_unlock_irqrestore(&chip->eoc_irq_lock, flags);
 		goto free_chip;
 	}
 
-
 	disable_irq_nosync(chip->eoc_irq);
+	spin_unlock_irqrestore(&chip->eoc_irq_lock, flags);
 
 	platform_set_drvdata(pdev, chip);
 	the_chip = chip;

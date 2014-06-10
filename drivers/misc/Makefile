@@ -64,6 +64,7 @@ obj-$(CONFIG_TSPP) += tspp.o
 obj-$(CONFIG_HAPTIC_ISA1200)		+= isa1200.o
 obj-$(CONFIG_PMIC8058_PWM) += pmic8058-pwm.o
 obj-$(CONFIG_PMIC8XXX_VIBRATOR) += pm8xxx-vibrator.o
+obj-$(CONFIG_VIBRATOR_LC898300) += vibrator-lc898300.o
 obj-$(CONFIG_PMIC8XXX_NFC) += pm8xxx-nfc.o
 obj-$(CONFIG_PMIC8XXX_UPL) += pm8xxx-upl.o
 obj-$(CONFIG_MSM_MEMORY_LOW_POWER_MODE_SUSPEND_DEEP_POWER_DOWN) \
@@ -71,3 +72,14 @@ obj-$(CONFIG_MSM_MEMORY_LOW_POWER_MODE_SUSPEND_DEEP_POWER_DOWN) \
 obj-$(CONFIG_PMIC8058_XOADC) += pmic8058-xoadc.o
 obj-$(CONFIG_QSEECOM) += qseecom.o
 obj-$(CONFIG_QFP_FUSE) += qfp_fuse.o
+obj-$(CONFIG_LM3560)		+= lm3560.o
+obj-$(CONFIG_LM3561)		+= lm3561.o
+obj-$(CONFIG_AS3649_FLASHLED)	+= as3649.o
+obj-$(CONFIG_SENSORS_MPU6050) += mpu6050/
+obj-$(CONFIG_SENSORS_MPU3050) += mpu3050/
+obj-$(CONFIG_NFC_PN544)		+= pn544.o
+obj-$(CONFIG_SONY_ONESEG_TUNER_PM) += oneseg_tunerpm.o
+obj-$(CONFIG_SOMC_ISDBT_TUNER) += isdbt_tuner_drv.o
+obj-$(CONFIG_RAMDUMP_TAGS) += rdtags.o
+obj-$(CONFIG_SONY_FELICA_SUPPORT) += felica.o
+obj-$(CONFIG_SONY_FELICA_NFC_SUPPORT) += felica_vdev.o

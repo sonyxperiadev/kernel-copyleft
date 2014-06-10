@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1100,7 +1101,11 @@ void msm_release_ion_client(struct kref *ref)
 {
 	struct msm_cam_media_controller *mctl = container_of(ref,
 		struct msm_cam_media_controller, refcount);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	D("%s Calling ion_client_destroy\n", __func__);
+#else
 	pr_err("%s Calling ion_client_destroy\n", __func__);
+#endif
 	ion_client_destroy(mctl->client);
 }
 
