@@ -24,6 +24,7 @@
 #include <linux/smp.h>
 #include <linux/suspend.h>
 #include <linux/tick.h>
+#include <linux/nmi.h>
 #include <mach/msm_iomap.h>
 #include <mach/socinfo.h>
 #include <mach/system.h>
@@ -50,6 +51,7 @@
 #include "timer.h"
 #include "pm-boot.h"
 #include <mach/event_timer.h>
+#include <mach/power_debug.h>
 
 /******************************************************************************
  * Debug Definitions
@@ -548,6 +550,17 @@ static bool __ref msm_pm_spm_power_collapse(
 	vfp_pm_suspend();
 #endif
 
+	/*
+	 * msm_pm_12x0_power_collapse will bring us into trustzone
+	 * for some time, so I just feed msm_watchdog to ensure we
+	 * have some time to go.
+	 * But if we are in trustzone for more than 11 seconds,
+	 * msm_watchdog will still bark/bite.
+	 * We only do this on CPU0 since that is where watchdog runs.
+	 */
+	if (cpu == 0)
+		touch_nmi_watchdog();
+
 	collapsed = msm_pm_l2x0_power_collapse();
 
 	msm_pm_boot_config_after_pc(cpu);
@@ -987,6 +1000,8 @@ static int msm_pm_enter(suspend_state_t state)
 			pr_info("%s: power collapse\n", __func__);
 
 		clock_debug_print_enabled();
+
+		power_debug_collapse();
 
 #ifdef CONFIG_MSM_SLEEP_TIME_OVERRIDE
 		if (msm_pm_sleep_time_override > 0) {

@@ -49,6 +49,8 @@ extern int msm8064_pm8917_regulator_pdata_len __devinitdata;
 #define GPIO_VREG_ID_EXT_3P3V		1
 #define GPIO_VREG_ID_EXT_TS_SW		2
 #define GPIO_VREG_ID_EXT_MPP8		3
+#define GPIO_VREG_ID_EXT_OTG_SW		4
+#define GPIO_VREG_ID_EXT_SD_PWR		5
 
 #define GPIO_VREG_ID_AVC_1P2V		0
 #define GPIO_VREG_ID_AVC_1P8V		1
@@ -94,6 +96,7 @@ void apq8064_init_cam(void);
 #define APQ_8064_TABLA_DIGITAL2_I2C_SLAVE_ADDR	0x55
 
 #define APQ_8064_GSBI1_QUP_I2C_BUS_ID 0
+#define APQ_8064_GSBI2_QUP_I2C_BUS_ID 2
 #define APQ_8064_GSBI3_QUP_I2C_BUS_ID 3
 #define APQ_8064_GSBI4_QUP_I2C_BUS_ID 4
 #define APQ_8064_GSBI5_QUP_I2C_BUS_ID 5

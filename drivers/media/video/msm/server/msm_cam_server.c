@@ -1,4 +1,5 @@
 /* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -826,8 +827,13 @@ int msm_server_proc_ctrl_cmd(struct msm_cam_v4l2_device *pcam,
 			goto end;
 		}
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+		if (copy_to_user((void __user *)ioctl_ptr->ioctl_ptr,
+			(void *)cmd_ptr, cmd_len)) {
+#else
 		if (copy_to_user((void __user *)ioctl_ptr->ioctl_ptr,
 			(void *)&tmp_cmd, cmd_len)) {
+#endif
 			pr_err("%s: copy_to_user failed in cpy, size=%d\n",
 				__func__, cmd_len);
 			rc = -EINVAL;
@@ -1425,9 +1431,16 @@ static int msm_close_server(struct file *fp)
 					/*so that it isn't closed again*/
 					pmctl->mctl_release = NULL;
 				}
+#if defined(CONFIG_SONY_CAM_V4L2)
+				if (pmctl)
+					msm_cam_server_send_error_evt(pmctl,
+						V4L2_EVENT_PRIVATE_START +
+						MSM_CAM_APP_NOTIFY_ERROR_EVENT);
+#else
 				msm_cam_server_send_error_evt(pmctl,
 					V4L2_EVENT_PRIVATE_START +
 					MSM_CAM_APP_NOTIFY_ERROR_EVENT);
+#endif
 			}
 		}
 		sub.type = V4L2_EVENT_ALL;
@@ -1729,7 +1742,11 @@ static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 	case NOTIFY_VFE_MSG_COMP_STATS:
 	case NOTIFY_VFE_BUF_EVT:
 		p_mctl = msm_cam_server_get_mctl(mctl_handle);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		if (p_mctl && p_mctl->isp_notify && p_mctl->vfe_sdev)
+#else
 		if (p_mctl->isp_notify && p_mctl->vfe_sdev)
+#endif
 			rc = p_mctl->isp_notify(p_mctl,
 				p_mctl->vfe_sdev, notification, arg);
 		break;
@@ -1748,18 +1765,33 @@ static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 		break;
 	case NOTIFY_AXI_RDI_SOF_COUNT:
 		p_mctl = msm_cam_server_get_mctl(mctl_handle);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		if (p_mctl && p_mctl->axi_sdev)
+#else
 		if (p_mctl->axi_sdev)
+#endif
 			rc = v4l2_subdev_call(p_mctl->axi_sdev, core, ioctl,
 				VIDIOC_MSM_AXI_RDI_COUNT_UPDATE, arg);
 		break;
 	case NOTIFY_PCLK_CHANGE:
 		p_mctl = v4l2_get_subdev_hostdata(sd);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		if (p_mctl) {
+			if (p_mctl->axi_sdev)
+				rc = v4l2_subdev_call(p_mctl->axi_sdev, video,
+				s_crystal_freq, *(uint32_t *)arg, 0);
+			else
+				rc = v4l2_subdev_call(p_mctl->vfe_sdev, video,
+				s_crystal_freq, *(uint32_t *)arg, 0);
+		}
+#else
 		if (p_mctl->axi_sdev)
 			rc = v4l2_subdev_call(p_mctl->axi_sdev, video,
 			s_crystal_freq, *(uint32_t *)arg, 0);
 		else
 			rc = v4l2_subdev_call(p_mctl->vfe_sdev, video,
 			s_crystal_freq, *(uint32_t *)arg, 0);
+#endif
 		break;
 	case NOTIFY_GESTURE_EVT:
 		rc = v4l2_subdev_call(g_server_dev.gesture_device,
@@ -1771,8 +1803,15 @@ static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 		break;
 	case NOTIFY_VFE_ERROR: {
 		p_mctl = msm_cam_server_get_mctl(mctl_handle);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		if (p_mctl)
+			msm_cam_server_send_error_evt(p_mctl,
+				V4L2_EVENT_PRIVATE_START +
+				MSM_CAM_APP_NOTIFY_ERROR_EVENT);
+#else
 		msm_cam_server_send_error_evt(p_mctl, V4L2_EVENT_PRIVATE_START
 			+ MSM_CAM_APP_NOTIFY_ERROR_EVENT);
+#endif
 		break;
 	}
 	default:
