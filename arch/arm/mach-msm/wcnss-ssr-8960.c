@@ -85,7 +85,7 @@ static void smsm_state_cb_hdlr(void *data, uint32_t old_state,
 		pr_err("%s: wcnss subsystem failure reason: %s\n",
 				__func__, buffer);
 #ifdef CONFIG_RAMDUMP_TAGS
-		rdtags_add_tag("ssr_reason", buffer, strnlen(buffer, MAX_BUF_SIZE));
+		rdtags_add_tag("ssr_reason", buffer, strnlen(buffer, MAX_BUF_SIZE - 1) + 1);
 #endif
 		memset(smem_reset_reason, 0, smem_reset_size);
 		wmb();

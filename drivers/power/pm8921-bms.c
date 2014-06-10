@@ -56,6 +56,8 @@
 #define TEMP_IAVG_STORAGE	0x105
 #define TEMP_IAVG_STORAGE_USE_MASK	0x0F
 
+#define SIGN(x) ((x) < 0 ? -1 : 1)
+
 enum pmic_bms_interrupts {
 	PM8921_BMS_SBI_WRITE_OK,
 	PM8921_BMS_CC_THR,
@@ -1583,7 +1585,6 @@ static void find_ocv_for_soc(struct pm8921_bms_chip *chip,
 	int pc, new_pc;
 	int batt_temp_degc = batt_temp / 10;
 	int ocv;
-	unsigned int spin_count = 0;
 
 	rc = (s64)shutdown_soc * (fcc_uah - uuc_uah);
 	rc = div_s64(rc, 100) + cc_uah + uuc_uah;
@@ -1597,21 +1598,65 @@ static void find_ocv_for_soc(struct pm8921_bms_chip *chip,
 	new_pc = interpolate_pc(chip, batt_temp_degc, ocv);
 	pr_debug("test revlookup pc = %d for ocv = %d\n", new_pc, ocv);
 
-	while (abs(new_pc - pc) > 1) {
+	if (abs(new_pc - pc) > 0) {
+		/* Maximum spins to make in while-loop when searching in
+		 * full resolution.
+		 */
+		const unsigned int max_spin_count =
+			chip->max_voltage_uv / 1000 - chip->v_cutoff + 1;
+		unsigned int spin_count = 0;
 		int delta_mv = 5;
-		spin_count++;
+		int diff = abs(new_pc - pc);
+		char sign = SIGN(new_pc - pc);
+		char old_sign;
+		int old_diff;
+		int old_ocv;
+		bool new_attempt;
 
-		if (new_pc > pc)
-			delta_mv = -1 * delta_mv;
+		do {
+			spin_count++;
+			new_attempt = false;
+			old_ocv = ocv;
+			old_diff = diff;
+			old_sign = sign;
+			if (new_pc > pc)
+				ocv -= delta_mv;
+			else
+				ocv += delta_mv;
 
-		ocv = ocv + delta_mv;
-		new_pc = interpolate_pc(chip, batt_temp_degc, ocv);
-		pr_debug("test revlookup pc = %d for ocv = %d\n", new_pc, ocv);
+			new_pc = interpolate_pc(chip, batt_temp_degc, ocv);
+			pr_debug("test revlookup pc = %d for ocv = %d\n",
+				new_pc, ocv);
+			diff = abs(new_pc - pc);
+			sign = SIGN(new_pc - pc);
+			if (diff >= old_diff && delta_mv > 1) {
+				/* The resolution was to low on delta_mv which
+				 * made us pass the good OCV point. Set to
+				 * highest resolution which is 1 mV and make new
+				 * attempt.
+				 */
+				pr_debug("Increasing resolution to maximum\n");
+				delta_mv = 1;
+				new_attempt = true;
+			} else if (diff == old_diff && sign != old_sign) {
+				pr_debug("Flip flop between two SOC values in "\
+					"OCV table for %d mV +-%d mV and %d " \
+					"degC\n",
+					ocv, delta_mv, batt_temp_degc);
+				break;
+			}
+		} while (spin_count <= max_spin_count &&
+			(new_attempt || (diff > 0 && diff <= old_diff)));
 
-		if (spin_count > 100) {
-			pr_err("max spin_count (%u) exceeded, giving up interpolation",
-				spin_count);
-			break;
+		if (diff > 0) {
+			ocv = old_ocv;
+
+			if (spin_count > max_spin_count)
+				pr_err("max_spin_count (%u) exceeded," \
+				"interpolation was given up\n", spin_count);
+
+			pr_err("No optimal OCV for SOC=%d%% found with %d mV" \
+				"search resolution\n", shutdown_soc, delta_mv);
 		}
 	}
 

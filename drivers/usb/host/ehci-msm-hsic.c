@@ -326,6 +326,26 @@ static void dump_hsic_regs(struct usb_hcd *hcd)
 				readl_relaxed(hcd->regs + i + 0xc));
 }
 
+static ssize_t override_wakelock_store(
+		struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+	long value;
+
+	if (kstrtol(buf, 10, &value))
+		return -EINVAL;
+
+	if (__mehci) {
+		if (value == 1)
+			wake_lock(&__mehci->wlock);
+		else if (value == 0)
+			wake_unlock(&__mehci->wlock);
+	}
+	return size;
+}
+
+static DEVICE_ATTR(override_wakelock, S_IWUSR, NULL, override_wakelock_store);
+
 #define ULPI_IO_TIMEOUT_USEC	(10 * 1000)
 
 #define USB_PHY_VDD_DIG_VOL_NONE	0 /*uV */
@@ -1772,6 +1792,8 @@ static int __devinit ehci_hsic_msm_probe(struct platform_device *pdev)
 
 	__mehci = mehci;
 
+	device_create_file(&pdev->dev, &dev_attr_override_wakelock);
+
 	if (pdata && pdata->swfi_latency)
 		pm_qos_add_request(&mehci->pm_qos_req_dma,
 			PM_QOS_CPU_DMA_LATENCY, PM_QOS_DEFAULT_VALUE);
@@ -1848,6 +1870,7 @@ static int __devexit ehci_hsic_msm_remove(struct platform_device *pdev)
 	msm_hsic_init_vddcx(mehci, 0);
 
 	msm_hsic_init_clocks(mehci, 0);
+	device_remove_file(&pdev->dev, &dev_attr_override_wakelock);
 	wake_lock_destroy(&mehci->wlock);
 	iounmap(hcd->regs);
 	usb_put_hcd(hcd);

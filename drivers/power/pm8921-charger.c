@@ -1,5 +1,5 @@
 /* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
- * Copyright (C) 2012 Sony Mobile Communications AB.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2808,6 +2808,19 @@ static void vin_collapse_check_worker(struct work_struct *work)
 	}
 }
 
+static void
+notify_input_chg_plug_unplug(struct pm8921_chg_chip *chip, int value)
+{
+	int plug;
+
+	if (!chip || !chip->chg_unplug_key)
+		return;
+
+	plug = value ? 1 : 0;
+	input_report_key(chip->chg_unplug_key, KEY_F24, plug);
+	input_sync(chip->chg_unplug_key);
+}
+
 #define VIN_MIN_COLLAPSE_CHECK_MS	50
 static irqreturn_t usbin_valid_irq_handler(int irq, void *data)
 {
@@ -2820,12 +2833,10 @@ static irqreturn_t usbin_valid_irq_handler(int irq, void *data)
 	else
 	    handle_usb_insertion_removal(data);
 
-	if (!is_usb_chg_plugged_in(chip)) {
-		if (chip->chg_unplug_key) {
-			input_report_key(chip->chg_unplug_key, KEY_F24, 1);
-			input_sync(chip->chg_unplug_key);
-		}
-	}
+	if (!is_usb_chg_plugged_in(chip))
+		notify_input_chg_plug_unplug(chip, 0);
+	else
+		notify_input_chg_plug_unplug(chip, 1);
 
 	return IRQ_HANDLED;
 }
@@ -3056,8 +3067,11 @@ static void unplug_check_worker(struct work_struct *work)
 				get_prop_batt_current(chip)
 				);
 
-			input_report_key(chip->chg_unplug_key, KEY_F24, 1);
-			input_sync(chip->chg_unplug_key);
+			/*
+			 * just in case, if notification is not
+			 * done in the interrupt
+			 */
+			notify_input_chg_plug_unplug(chip, 0);
 			return;
 		} else {
 			goto check_again_later;
@@ -3358,6 +3372,12 @@ static irqreturn_t dcin_valid_irq_handler(int irq, void *data)
 		power_supply_changed(&chip->dc_psy);
 	}
 	power_supply_changed(&chip->batt_psy);
+
+	if (dc_present)
+		notify_input_chg_plug_unplug(chip, 1);
+	else
+		notify_input_chg_plug_unplug(chip, 0);
+
 	return IRQ_HANDLED;
 }
 

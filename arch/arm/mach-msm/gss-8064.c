@@ -70,7 +70,7 @@ static void log_gss_sfr(void)
 	reason[size] = '\0';
 	pr_err("GSS subsystem failure reason: %s.\n", reason);
 #ifdef CONFIG_RAMDUMP_TAGS
-	rdtags_add_tag("ssr_reason", reason, strnlen(reason, MAX_SSR_REASON_LEN));
+	rdtags_add_tag("ssr_reason", reason, strnlen(reason, MAX_SSR_REASON_LEN - 1) + 1);
 #endif
 
 	smem_reason[0] = '\0';

@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,7 +19,6 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/log2.h>
-#include <linux/spinlock.h>
 
 #include <linux/mfd/pm8xxx/core.h>
 #include <linux/input/pmic8xxx-pwrkey.h>
@@ -36,31 +35,16 @@
 struct pmic8xxx_pwrkey {
 	struct input_dev *pwr;
 	int key_press_irq;
-	int key_release_irq;
-	bool press;
 	const struct pm8xxx_pwrkey_platform_data *pdata;
-	spinlock_t lock;
 };
 
 static irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
 {
 	struct pmic8xxx_pwrkey *pwrkey = _pwrkey;
-	unsigned long flags;
-
-	spin_lock_irqsave(&pwrkey->lock, flags);
-	if (pwrkey->press == true) {
-		pwrkey->press = false;
-		spin_unlock_irqrestore(&pwrkey->lock, flags);
-		return IRQ_HANDLED;
-	} else {
-		pwrkey->press = true;
-	}
-	spin_unlock_irqrestore(&pwrkey->lock, flags);
 
 #ifdef CONFIG_PMIC8XXX_FORCECRASH
 	pmic8xxx_forcecrash_timer_setup(1);
 #endif
-
 	input_report_key(pwrkey->pwr, KEY_POWER, 1);
 	input_sync(pwrkey->pwr);
 
@@ -70,17 +54,6 @@ static irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
 static irqreturn_t pwrkey_release_irq(int irq, void *_pwrkey)
 {
 	struct pmic8xxx_pwrkey *pwrkey = _pwrkey;
-	unsigned long flags;
-
-	spin_lock_irqsave(&pwrkey->lock, flags);
-	if (pwrkey->press == false) {
-		input_report_key(pwrkey->pwr, KEY_POWER, 1);
-		input_sync(pwrkey->pwr);
-		pwrkey->press = true;
-	} else {
-		pwrkey->press = false;
-	}
-	spin_unlock_irqrestore(&pwrkey->lock, flags);
 
 #ifdef CONFIG_PMIC8XXX_FORCECRASH
 	pmic8xxx_forcecrash_timer_setup(0);
@@ -96,10 +69,8 @@ static int pmic8xxx_pwrkey_suspend(struct device *dev)
 {
 	struct pmic8xxx_pwrkey *pwrkey = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev)) {
+	if (device_may_wakeup(dev))
 		enable_irq_wake(pwrkey->key_press_irq);
-		enable_irq_wake(pwrkey->key_release_irq);
-	}
 
 	return 0;
 }
@@ -108,10 +79,8 @@ static int pmic8xxx_pwrkey_resume(struct device *dev)
 {
 	struct pmic8xxx_pwrkey *pwrkey = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev)) {
+	if (device_may_wakeup(dev))
 		disable_irq_wake(pwrkey->key_press_irq);
-		disable_irq_wake(pwrkey->key_release_irq);
-	}
 
 	return 0;
 }
@@ -131,7 +100,6 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 	struct pmic8xxx_pwrkey *pwrkey;
 	const struct pm8xxx_pwrkey_platform_data *pdata =
 					dev_get_platdata(&pdev->dev);
-	unsigned long flags;
 
 	if (!pdata) {
 		dev_err(&pdev->dev, "power key platform data not supplied\n");
@@ -150,7 +118,6 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	pwrkey->pdata = pdata;
-	spin_lock_init(&pwrkey->lock);
 
 	pwr = input_allocate_device();
 	if (!pwr) {
@@ -194,23 +161,9 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 	}
 
 	pwrkey->key_press_irq = key_press_irq;
-	pwrkey->key_release_irq = key_release_irq;
 	pwrkey->pwr = pwr;
 
 	platform_set_drvdata(pdev, pwrkey);
-
-	/* check power key status during boot */
-	err = pm8xxx_read_irq_stat(pdev->dev.parent, key_press_irq);
-	if (err < 0) {
-		dev_err(&pdev->dev, "reading irq status failed\n");
-		goto unreg_input_dev;
-	}
-	pwrkey->press = !!err;
-
-	if (pwrkey->press) {
-		input_report_key(pwrkey->pwr, KEY_POWER, 1);
-		input_sync(pwrkey->pwr);
-	}
 
 	err = request_any_context_irq(key_press_irq, pwrkey_press_irq,
 		IRQF_TRIGGER_RISING, "pmic8xxx_pwrkey_press", pwrkey);
@@ -229,20 +182,6 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 		goto free_press_irq;
 	}
 
-	/* check power key status during boot */
-	spin_lock_irqsave(&pwrkey->lock, flags);
-	err = pm8xxx_read_irq_stat(pdev->dev.parent, key_press_irq);
-	if (err < 0) {
-		dev_err(&pdev->dev, "reading irq status failed\n");
-		goto unlock;
-	}
-	pwrkey->press = !!err;
-	if (pwrkey->press) {
-		input_report_key(pwrkey->pwr, KEY_POWER, 1);
-		input_sync(pwrkey->pwr);
-	}
-	spin_unlock_irqrestore(&pwrkey->lock, flags);
-
 	device_init_wakeup(&pdev->dev, pdata->wakeup);
 
 #ifdef CONFIG_PMIC8XXX_FORCECRASH
@@ -250,8 +189,7 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 #endif
 
 	return 0;
-unlock:
-	spin_unlock_irqrestore(&pwrkey->lock, flags);
+
 free_press_irq:
 	free_irq(key_press_irq, NULL);
 unreg_input_dev:

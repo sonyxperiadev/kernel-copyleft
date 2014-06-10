@@ -414,7 +414,11 @@ static int msm_server_control(struct msm_cam_server_dev *server_dev,
 	/* wait event may be interrupted by sugnal,
 	 * in this case -ERESTARTSYS is returned and retry is needed.
 	 * Now we only retry once. */
+#if defined(CONFIG_SONY_CAM_V4L2)
+	wait_count = 10;
+#else
 	wait_count = 2;
+#endif
 	do {
 		rc = wait_event_interruptible_timeout(queue->wait,
 			!list_empty_careful(&queue->list),
@@ -424,6 +428,9 @@ static int msm_server_control(struct msm_cam_server_dev *server_dev,
 			break;
 		D("%s: wait_event interrupted by signal, remain_count = %d",
 			__func__, wait_count);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		msleep(20);
+#endif
 	} while (wait_count > 0);
 	D("Waiting is over for config status\n");
 	if (list_empty_careful(&queue->list)) {

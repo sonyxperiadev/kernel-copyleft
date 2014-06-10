@@ -87,7 +87,7 @@ static struct gpiomux_setting rmi4_int_act_cfg = {
 #ifdef CONFIG_USB_EHCI_MSM_HSIC
 static struct gpiomux_setting hsic_act_cfg = {
 	.func = GPIOMUX_FUNC_1,
-	.drv = GPIOMUX_DRV_8MA,
+	.drv = GPIOMUX_DRV_10MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
 

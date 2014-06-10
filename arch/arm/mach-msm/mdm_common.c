@@ -154,7 +154,7 @@ static void mdm_restart_reason_fn(struct work_struct *work)
 		} else {
 			pr_err("mdm restart reason: %s\n", sfr_buf);
 #ifdef CONFIG_RAMDUMP_TAGS
-			rdtags_add_tag("ssr_reason", sfr_buf, strnlen(sfr_buf, RD_BUF_SIZE));
+			rdtags_add_tag("ssr_reason", sfr_buf, strnlen(sfr_buf, RD_BUF_SIZE - 1) + 1);
 #endif
 			break;
 		}

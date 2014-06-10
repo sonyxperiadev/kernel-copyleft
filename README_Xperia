@@ -24,8 +24,8 @@ Do:
 
    $ mkbootimg --kernel zImage --ramdisk ramdisk.img --pagesize 2048 --base 0x80200000 \
      --cmdline "androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.emmc=true" \
-     --offset 0x02000000 --output boot.img
+     --ramdisk_offset 0x02000000 --output boot.img
 
 2. Flash
 
-   $ fastboot flash boot kernel.elf
+   $ fastboot flash boot boot.img
