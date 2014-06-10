@@ -603,6 +603,14 @@ config PMIC8XXX_VIBRATOR
 	  on the PM8XXX chips. The vibrator is controlled using the
 	  timed output class.
 
+config VIBRATOR_LC898300
+	tristate "VIBRATOR Support for LC898300 I2C chips"
+	depends on ANDROID_TIMED_OUTPUT && I2C
+	default n
+	help
+	  This option enables device driver support for the vibrator
+	  on the LC898300 chips accessed via the I2C bus.
+
 config PMIC8XXX_NFC
 	tristate "Qualcomm PM8XXX support for Near Field Communication"
 	depends on MFD_PM8XXX
@@ -643,6 +651,37 @@ config QFP_FUSE
 	  to the fuse block. Currently this is supported only
 	  on FSM targets.
 
+config NFC_PN544
+	tristate "NFC driver for PN544"
+	default n
+	depends on I2C
+	help
+	  This option enables support for PN544.
+
+config LM3560
+        tristate "LED driver for LM3560"
+        default n
+        depends on I2C
+        help
+          This option enables support for LM3560
+          led controller.
+
+config LM3561
+        tristate "LED driver for LM3561"
+        default n
+        depends on I2C
+        help
+          This option enables support for LM3561
+          led controller.
+
+config AS3649_FLASHLED
+	tristate "FLASHLED driver for AS3649"
+	default n
+	depends on I2C
+	help
+	  This option enables support for AS3649
+	  flashled controller with AS3649 driver.
+
 config USB_HSIC_SMSC_HUB
 	tristate "Support for HSIC based MSM on-chip SMSC3503 HUB"
 	depends on USB_EHCI_MSM_HSIC
@@ -653,6 +692,46 @@ config USB_HSIC_SMSC_HUB
 	  This adds support for connecting devices like mouse in HSIC
 	  Host mode.
 
+config SONY_ONESEG_TUNER_PM
+	tristate "SONY Oneseg tuner pm driver"
+	default n
+	depends on GENERIC_GPIO
+	help
+	  Select this module to enable SONY Oneseg Tuner PM Driver.
+
+config RAMDUMP_TAGS
+	bool "Ramdump tags to communicate between kernel and ramdump"
+	default n
+	depends on !RAMDUMP_CRASH_LOGS
+	help
+	  This option enables a driver which can be interacted with to
+	  supply the ramdumper with more information about the current
+	  state of the crashing kernel such as build info, HWWD registers,
+	  additional CPU registers not stored in crash_notes, crashing
+	  application info etc. A small amount of memory will be set
+	  aside to hold the information which will later be used by
+	  the ramdump application.
+
+config SONY_FELICA_SUPPORT
+	bool "Enable FeliCa support"
+	default n
+	help
+	  This option enables support for FeliCa.
+
+config SONY_FELICA_NFC_SUPPORT
+	bool "Enable FeliCa/NFC combination device support"
+	default n
+	depends on SONY_FELICA_SUPPORT
+	help
+	  This option enables support for FeliCa/NFC combination device.
+
+config SOMC_ISDBT_TUNER
+	tristate "SOMC ISDBT/Tmm tuner driver for SMT-EJ103"
+	default n
+	depends on I2C
+	help
+	  Select this module to enable SOMC ISDB-T Tuner Driver.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
@@ -661,4 +740,6 @@ source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/altera-stapl/Kconfig"
+source "drivers/misc/mpu6050/Kconfig"
+source "drivers/misc/mpu3050/Kconfig"
 endmenu

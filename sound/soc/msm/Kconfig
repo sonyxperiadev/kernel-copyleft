@@ -200,4 +200,10 @@ config SND_SOC_MSM8660_APQ
         default n
         help
          To add support for SoC audio on APQ8060 board
+
+config SND_SOC_DIFFERENTIAL_SPEAKER
+	bool "support flag for differential speaker"
+	default n
+	help
+	 To add support for differential speaker.
 endmenu
