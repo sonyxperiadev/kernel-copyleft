@@ -98,6 +98,9 @@
 /* how many times low bat is checked */
 #define RETRY_NUM_FOR_FORCE_SHUTDOWN	5
 
+/* Wake locking time after charger unplugged */
+#define UNPLUG_WAKELOCK_TIME_SEC (2 * HZ)
+
 enum chg_fsm_state {
 	FSM_STATE_OFF_0 = 0,
 	FSM_STATE_BATFETDET_START_12 = 12,
@@ -461,6 +464,7 @@ struct pm8921_chg_chip {
 	int				vdd_max;
 	int				vbat_det;
 	enum power_supply_type		usb_type;
+	struct wake_lock		unplug_wake_lock;
 };
 
 /* user space parameter to limit usb current */
@@ -2664,6 +2668,16 @@ int pm8921_batt_temperature(void)
 	return temp;
 }
 
+static void check_unplug_wakelock(struct pm8921_chg_chip *chip)
+{
+	if (!wake_lock_active(&chip->unplug_wake_lock) &&
+		!is_usb_chg_plugged_in(chip) &&
+		!is_dc_chg_plugged_in(chip)) {
+		wake_lock_timeout(&chip->unplug_wake_lock,
+				UNPLUG_WAKELOCK_TIME_SEC);
+	}
+}
+
 static ulong limiting_msec = 500;
 module_param(limiting_msec, ulong, 0644);
 
@@ -3193,6 +3207,8 @@ notify_input_chg_plug_unplug(struct pm8921_chg_chip *chip, int value)
 #define VIN_MIN_COLLAPSE_CHECK_MS	50
 static irqreturn_t usbin_valid_irq_handler(int irq, void *data)
 {
+	check_unplug_wakelock(the_chip);
+
 	if (usb_target_ma)
 		schedule_delayed_work(&the_chip->vin_collapse_check_work,
 				      round_jiffies_relative(msecs_to_jiffies
@@ -3951,6 +3967,8 @@ static irqreturn_t dcin_valid_irq_handler(int irq, void *data)
 {
 	struct pm8921_chg_chip *chip = data;
 	int dc_present;
+
+	check_unplug_wakelock(the_chip);
 
 	pm_chg_failed_clear(chip, 1);
 	dc_present = pm_chg_get_rt_status(chip, DCIN_VALID_IRQ);
@@ -5967,7 +5985,8 @@ static int __devinit pm8921_charger_probe(struct platform_device *pdev)
 	wake_lock_init(&chip->dock_wake_lock, WAKE_LOCK_SUSPEND, "pm8921_dock");
 	wake_lock_init(&chip->low_voltage_wake_lock,
 			WAKE_LOCK_SUSPEND, "pm8921_low_voltage");
-
+	wake_lock_init(&chip->unplug_wake_lock,
+			WAKE_LOCK_SUSPEND, "pm8921_unplug");
 	INIT_DELAYED_WORK(&chip->eoc_work, eoc_worker);
 	INIT_DELAYED_WORK(&chip->vin_collapse_check_work,
 						vin_collapse_check_worker);
