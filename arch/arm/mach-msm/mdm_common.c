@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,6 +32,7 @@
 #include <linux/clk.h>
 #include <linux/mfd/pmic8058.h>
 #include <linux/msm_charm.h>
+#include <linux/mfd/pm8xxx/misc.h>
 #include <asm/mach-types.h>
 #include <asm/uaccess.h>
 #include <mach/mdm2.h>
@@ -42,6 +44,9 @@
 #include "msm_watchdog.h"
 #include "mdm_private.h"
 #include "sysmon.h"
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
 
 #define MDM_MODEM_TIMEOUT	6000
 #define MDM_MODEM_DELTA	100
@@ -148,6 +153,9 @@ static void mdm_restart_reason_fn(struct work_struct *work)
 					ntries + 1,	SFR_MAX_RETRIES);
 		} else {
 			pr_err("mdm restart reason: %s\n", sfr_buf);
+#ifdef CONFIG_RAMDUMP_TAGS
+			rdtags_add_tag("ssr_reason", sfr_buf, strnlen(sfr_buf, RD_BUF_SIZE - 1) + 1);
+#endif
 			break;
 		}
 	} while (++ntries < SFR_MAX_RETRIES);
@@ -227,6 +235,7 @@ long mdm_modem_ioctl(struct file *filp, unsigned int cmd,
 			put_user(0, (unsigned long __user *) arg);
 		break;
 	case NORMAL_BOOT_DONE:
+		gpio_set_value(mdm_drv->ap2mdm_status_gpio, 1);
 		pr_debug("%s: check if mdm is booted up\n", __func__);
 		get_user(status, (unsigned long __user *) arg);
 		if (status) {
@@ -300,6 +309,7 @@ long mdm_modem_ioctl(struct file *filp, unsigned int cmd,
 		if (ret)
 			pr_err("%s: Graceful shutdown of the external modem failed, ret = %d\n",
 				   __func__, ret);
+		put_user(ret, (unsigned long __user *) arg);
 		break;
 	default:
 		pr_err("%s: invalid ioctl cmd = %d\n", __func__, _IOC_NR(cmd));
@@ -330,9 +340,35 @@ static void mdm_disable_irqs(void)
 	disable_irq_nosync(mdm_drv->mdm_status_irq);
 }
 
+static unsigned long mdm_last_crash_time = INITIAL_JIFFIES;
+static long enable_ic_fulldump;
+module_param(enable_ic_fulldump, long, 0644);
+
+static void mdm_check_full_dump(void)
+{
+	/* Delay between IRQ must be move than 500 miliseconds */
+	const unsigned long check_period_jiffies = msecs_to_jiffies(500);
+	const unsigned long minimal_required_time = check_period_jiffies
+		+ mdm_last_crash_time;
+	const int no_force_crash = time_is_before_jiffies(minimal_required_time);
+
+	/* Check if MDM2AP_ERRFATAL triggered twice faster than in 500 msecs */
+	pr_debug("jiffies=%lu, last_time=%lu, target_time=%lu, no_force=%d\n",
+		jiffies, mdm_last_crash_time, minimal_required_time, no_force_crash);
+	if (!no_force_crash) {
+		pr_warn("%s: Reseting the SoC due to MDM-A5 crash\n", __func__);
+		panic("Reseting the SoC due to MDM-A5 crash");
+	}
+
+	mdm_last_crash_time = jiffies;
+}
+
 static irqreturn_t mdm_errfatal(int irq, void *dev_id)
 {
 	pr_debug("%s: mdm got errfatal interrupt\n", __func__);
+	if (enable_ic_fulldump) {
+		mdm_check_full_dump();
+	}
 	if (mdm_drv->mdm_ready &&
 		(gpio_get_value(mdm_drv->mdm2ap_status_gpio) == 1)) {
 		pr_info("%s: Reseting the mdm due to an errfatal\n", __func__);
@@ -392,6 +428,9 @@ static struct notifier_block mdm_panic_blk = {
 static irqreturn_t mdm_status_change(int irq, void *dev_id)
 {
 	int value = gpio_get_value(mdm_drv->mdm2ap_status_gpio);
+#if defined(CONFIG_HARD_RESET_TIMER) || defined(CONFIG_DISABLE_SMPL)
+	int rc;
+#endif /* CONFIG_HARD_RESET_TIMER || CONFIG_DISABLE_SMPL */
 
 	if ((mdm_debug_mask & MDM_DEBUG_MASK_SHDN_LOG) && (value == 0))
 		pr_info("%s: mdm2ap_status went low\n", __func__);
@@ -404,6 +443,31 @@ static irqreturn_t mdm_status_change(int irq, void *dev_id)
 		subsystem_restart_dev(mdm_subsys_dev);
 	} else if (value == 1) {
 		cancel_delayed_work(&mdm2ap_status_check_work);
+
+#ifdef CONFIG_HARD_RESET_SETTING
+		rc = pm8xxx_hard_reset_debounce_config(
+				CONFIG_HARD_RESET_DEBOUNCE_MS);
+		if (rc)
+			pr_err("%s: cannot set debounce config (%d)\n",
+							__func__, rc);
+		rc = pm8xxx_hard_reset_delay_config(
+				CONFIG_HARD_RESET_DELAY_MS);
+		if (rc)
+			pr_err("%s: cannot set delay config (%d)\n",
+							__func__, rc);
+
+		rc = pm8xxx_hard_reset_config(PM8XXX_RESTART_ON_HARD_RESET);
+		if (rc)
+			pr_err("%s: cannot set hard reset config (%d)\n",
+							__func__, rc);
+#endif /* CONFIG_HARD_RESET_SETTING */
+#ifdef CONFIG_DISABLE_SMPL
+		rc = pm8xxx_smpl_control(0);
+		if (rc)
+			pr_err("%s: cannot disable smpl (%d)\n",
+							__func__, rc);
+#endif /* CONFIG_DISABLE_SMPL */
+
 		pr_info("%s: status = 1: mdm is now ready\n", __func__);
 		queue_work(mdm_queue, &mdm_status_work);
 	}
@@ -644,7 +708,7 @@ int mdm_common_create(struct platform_device  *pdev,
 		}
 	}
 
-	gpio_direction_output(mdm_drv->ap2mdm_status_gpio, 1);
+	gpio_direction_output(mdm_drv->ap2mdm_status_gpio, 0);
 	gpio_direction_output(mdm_drv->ap2mdm_errfatal_gpio, 0);
 
 	if (GPIO_IS_VALID(mdm_drv->ap2mdm_wakeup_gpio))

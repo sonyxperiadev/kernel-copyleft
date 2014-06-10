@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -63,6 +64,8 @@ enum pm8921_chg_led_src_config {
  * @ttrkl_time:		max trckl charging time in minutes
  *			valid range 1 to 64 mins. PON default 15 min
  * @update_time:	how often the userland be updated of the charging (msec)
+ * @update_time_at_low_bat: how often the Fuel Gauge algorithm is updated
+ *			when 'low_bat' condition is reached (msec)
  * @alarm_low_mv:	the voltage (mV) when low battery alarm is triggered
  * @alarm_high_mv:	the voltage (mV) when high battery alarm is triggered
  * @max_voltage:	the max voltage (mV) the battery should be charged up to
@@ -70,6 +73,9 @@ enum pm8921_chg_led_src_config {
  *			trickle to fast. This is also the minimum voltage the
  *			system operates at
  * @uvd_thresh_voltage:	the USB falling UVD threshold (mV) (PM8917 only)
+ * @safe_current_ma:	The upper limit of current allowed to be pushed in
+ *			battery. This ends up writing in a one time
+ *			programmable register.
  * @resume_voltage_delta:	the (mV) drop to wait for before resume charging
  *				after the battery has been fully charged
  * @resume_charge_percent:	the % SOC the charger will drop to after the
@@ -82,6 +88,8 @@ enum pm8921_chg_led_src_config {
  * @warm_temp:		the temperature (degC) at which the battery is
  *			considered warm charging current and voltage is reduced
  *			Use INT_MIN to indicate not valid.
+ * @hysteresis_temp:	the hysteresis temperature (degC) to go between the
+			different [cold, cool, warm, hot] temp states
  * @temp_check_period:	The polling interval in seconds to check battery
  *			temeperature if it has gone to cool or warm temperature
  *			area
@@ -94,10 +102,6 @@ enum pm8921_chg_led_src_config {
  * @get_batt_capacity_percent:
  *			a board specific function to return battery
  *			capacity. If null - a default one will be used
- * @dc_unplug_check:	enables the reverse boosting fix for the DC_IN line
- *			however, this should only be enabled for devices which
- *			control the DC OVP FETs otherwise this option should
- *			remain disabled
  * @has_dc_supply:	report DC online if this bit is set in board file
  * @trkl_voltage:	the trkl voltage in (mV) below which hw controlled
  *			 trkl charging happens with linear charger
@@ -124,15 +128,32 @@ enum pm8921_chg_led_src_config {
  *			resistance of the pads, connectors, battery terminals
  *			and rsense.
  * @led_src_config:	Power source for anode of charger indicator LED.
+ * @btc_override:	disable the comparators for conifugrations where a
+ *			suitable voltages don't appear on vbatt therm line
+ *			for the charger to detect battery is either cold / hot.
+ * @btc_override_cold_degc:	Temperature in degCelcius when the battery is
+ *				deemed cold and charging never happens. Used
+ *				only if btc_override = 1
+ * @btc_override_hot_degc:	Temperature in degCelcius when the battery is
+ *				deemed hot and charging never happens. Used
+ *				only if btc_override = 1
+ * @btc_delay_ms:	Delay in milliseconds to monitor the battery temperature
+ *			while charging when btc_override = 1
+ * @btc_panic_if_cant_stop_chg:	flag to instruct the driver to panic if the
+ *				driver couldn't stop charging when battery
+ *				temperature is out of bounds. Used only if
+ *				btc_override = 1
  */
 struct pm8921_charger_platform_data {
 	struct pm8xxx_charger_core_data	charger_cdata;
 	unsigned int			safety_time;
 	unsigned int			ttrkl_time;
 	unsigned int			update_time;
+	unsigned int			update_time_at_low_bat;
 	unsigned int			max_voltage;
 	unsigned int			min_voltage;
 	unsigned int			uvd_thresh_voltage;
+	unsigned int			safe_current_ma;
 	unsigned int			alarm_low_mv;
 	unsigned int			alarm_high_mv;
 	unsigned int			resume_voltage_delta;
@@ -140,6 +161,7 @@ struct pm8921_charger_platform_data {
 	unsigned int			term_current;
 	int				cool_temp;
 	int				warm_temp;
+	int				hysteresis_temp;
 	unsigned int			temp_check_period;
 	unsigned int			max_bat_chg_current;
 	unsigned int			cool_bat_chg_current;
@@ -163,6 +185,12 @@ struct pm8921_charger_platform_data {
 	enum pm8921_chg_hot_thr		hot_thr;
 	int				rconn_mohm;
 	enum pm8921_chg_led_src_config	led_src_config;
+	int				repeat_safety_time;
+	int				btc_override;
+	int				btc_override_cold_degc;
+	int				btc_override_hot_degc;
+	int				btc_delay_ms;
+	int				btc_panic_if_cant_stop_chg;
 };
 
 enum pm8921_charger_source {

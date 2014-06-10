@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -212,6 +213,7 @@ struct external_common_state_type {
 	uint32 video_resolution;
 	struct device *dev;
 	struct switch_dev sdev;
+	struct switch_dev audio_sdev;
 #ifdef CONFIG_FB_MSM_HDMI_3D
 	boolean format_3d;
 	void (*switch_3d)(boolean on);
