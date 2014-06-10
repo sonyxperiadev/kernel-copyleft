@@ -3017,8 +3017,8 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 	unsigned long arg = 0;
 	struct hci_fm_tx_ps tx_ps = {0};
 	struct hci_fm_tx_rt tx_rt = {0};
-	struct hci_fm_def_data_rd_req rd_txgain;
-	struct hci_fm_def_data_wr_req wr_txgain;
+	struct hci_fm_def_data_rd_req rd;
+	struct hci_fm_def_data_wr_req wrd;
 	char sinr_th, sinr;
 	__u8 intf_det_low_th, intf_det_high_th, intf_det_out;
 
@@ -3320,25 +3320,25 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			ctrl->value = FM_TX_PWR_LVL_MAX;
 		if (ctrl->value < FM_TX_PWR_LVL_0)
 			ctrl->value = FM_TX_PWR_LVL_0;
-		rd_txgain.mode = FM_TX_PHY_CFG_MODE;
-		rd_txgain.length = FM_TX_PHY_CFG_LEN;
-		rd_txgain.param_len = 0x00;
-		rd_txgain.param = 0x00;
+		rd.mode = FM_TX_PHY_CFG_MODE;
+		rd.length = FM_TX_PHY_CFG_LEN;
+		rd.param_len = 0x00;
+		rd.param = 0x00;
 
-		retval = hci_def_data_read(&rd_txgain, radio->fm_hdev);
+		retval = hci_def_data_read(&rd, radio->fm_hdev);
 		if (retval < 0) {
 			FMDERR("Default data read failed for PHY_CFG %d\n",
 			retval);
 			break;
 		}
-		memset(&wr_txgain, 0, sizeof(wr_txgain));
-		wr_txgain.mode = FM_TX_PHY_CFG_MODE;
-		wr_txgain.length = FM_TX_PHY_CFG_LEN;
-		memcpy(&wr_txgain.data, &radio->default_data.data,
+		memset(&wrd, 0, sizeof(wrd));
+		wrd.mode = FM_TX_PHY_CFG_MODE;
+		wrd.length = FM_TX_PHY_CFG_LEN;
+		memcpy(&wrd.data, &radio->default_data.data,
 					radio->default_data.ret_data_len);
-		wr_txgain.data[FM_TX_PWR_GAIN_OFFSET] =
+		wrd.data[FM_TX_PWR_GAIN_OFFSET] =
 				(ctrl->value) * FM_TX_PWR_LVL_STEP_SIZE;
-		retval = hci_def_data_write(&wr_txgain, radio->fm_hdev);
+		retval = hci_def_data_write(&wrd, radio->fm_hdev);
 		if (retval < 0)
 			FMDERR("Default write failed for PHY_TXGAIN %d\n",
 			retval);
@@ -3530,6 +3530,27 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			radio->is_station_valid = VALID_CHANNEL;
 		else
 			radio->is_station_valid = INVALID_CHANNEL;
+		break;
+	case V4L2_CID_PRIVATE_RXREPEATCOUNT:
+		rd.mode = 0x01;
+		rd.length = 6;
+		rd.param_len = 0;
+		rd.param = 0;
+
+		retval = hci_def_data_read(&rd, radio->fm_hdev);
+		if (retval < 0) {
+			FMDERR("default data read failed for PS0 %x", retval);
+			return retval;
+		}
+		wrd.mode = 0x01;
+		wrd.length = 6;
+		memcpy(&wrd.data, &radio->default_data.data,
+		radio->default_data.ret_data_len);
+		wrd.data[5] = ctrl->value;
+
+		retval = hci_def_data_write(&wrd, radio->fm_hdev);
+		if (retval < 0)
+			FMDERR("set RxRePeat count failed\n");
 		break;
 	default:
 		retval = -EINVAL;
