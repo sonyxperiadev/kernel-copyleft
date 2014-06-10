@@ -1302,7 +1302,13 @@ static int synaptics_clearpad_set_power(struct synaptics_clearpad *this)
 
 		synaptics_clearpad_set_irq(this,
 				this->pdt[SYN_F01_RMI].irq_mask, true);
-		synaptics_read(this, SYNF(F01_RMI, DATA, 0x01), &irq, 1);
+		rc = synaptics_read(this, SYNF(F01_RMI, DATA, 0x01), &irq, 1);
+		if (rc) {
+			dev_err(&this->pdev->dev,
+					"%s, rc = %d, Resetting device\n",
+					__func__, rc);
+			synaptics_clearpad_reset_power(this);
+		}
 
 		if (this->pdt[SYN_F11_2D].number
 				== function_value[SYN_F11_2D]) {
