@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012-2013, Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +15,7 @@
 #define __PM8XXX_BMS_H
 
 #include <linux/errno.h>
+#include <linux/types.h>
 
 #define PM8921_BMS_DEV_NAME	"pm8921-bms"
 
@@ -120,10 +122,12 @@ enum battery_type {
  *			is considered empty(mV)
  * @enable_fcc_learning:	if set the driver will learn full charge
  *				capacity of the battery upon end of charge
+ * @allow_soc_increase:	allow soc increase without charger attached
  */
 struct pm8921_bms_platform_data {
 	struct pm8xxx_bms_core_data	bms_cdata;
 	enum battery_type		battery_type;
+	struct pm8921_bms_battery_data	*battery_data;
 	unsigned int			r_sense;
 	unsigned int			i_test;
 	unsigned int			v_cutoff;
@@ -134,6 +138,7 @@ struct pm8921_bms_platform_data {
 	int				ignore_shutdown_soc;
 	int				adjust_soc_low_threshold;
 	int				chg_term_ua;
+	bool				allow_soc_increase;
 };
 
 #if defined(CONFIG_PM8921_BMS) || defined(CONFIG_PM8921_BMS_MODULE)
@@ -173,6 +178,12 @@ int pm8921_bms_get_battery_current(int *result);
 int pm8921_bms_get_percent_charge(void);
 
 /**
+ * pm8921_bms_get_init_fcc - returns initial fcc in mAh of the battery
+ *
+ */
+int pm8921_bms_get_init_fcc(void);
+
+/**
  * pm8921_bms_get_fcc - returns fcc in mAh of the battery depending on its age
  *			and temperature
  *
@@ -191,6 +202,11 @@ void pm8921_bms_charging_began(void);
  *				track of chargecycles
  */
 void pm8921_bms_charging_end(int is_battery_full);
+
+/**
+ * pm8921_bms_cc_uah - function to get the coulomb counter value (uah)
+ */
+int pm8921_bms_cc_uah(int *cc_uah);
 
 void pm8921_bms_calibrate_hkadc(void);
 /**
@@ -225,7 +241,15 @@ static inline int pm8921_bms_get_percent_charge(void)
 {
 	return -ENXIO;
 }
+static inline int pm8921_bms_get_init_fcc(void)
+{
+	return -ENXIO;
+}
 static inline int pm8921_bms_get_fcc(void)
+{
+	return -ENXIO;
+}
+static inline int pm8921_bms_cc_uah(int *cc_uah)
 {
 	return -ENXIO;
 }
