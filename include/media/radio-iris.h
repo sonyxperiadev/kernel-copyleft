@@ -1,6 +1,7 @@
 /*
  *
  * Copyright (c) 2011-2012 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 Sony Mobile Communications AB.
  *
  * This file is based on include/net/bluetooth/hci_core.h
  *
@@ -27,6 +28,7 @@
 #ifndef __RADIO_HCI_CORE_H
 #define __RADIO_HCI_CORE_H
 
+#ifdef __KERNEL__
 #include <linux/skbuff.h>
 #include <linux/interrupt.h>
 #include <linux/mutex.h>
@@ -604,6 +606,8 @@ struct hci_fm_spur_data {
 #define hci_req_lock(d)		mutex_lock(&d->req_lock)
 #define hci_req_unlock(d)	mutex_unlock(&d->req_lock)
 
+#endif /* __KERNEL__ */
+
 /* FM RDS */
 #define RDS_PTYPE 2
 #define RDS_PID_LOWER 1
@@ -917,11 +921,13 @@ struct hci_cc_do_calibration_rsp {
 #define AUDIO_CTRL_INTR (1 << 2)
 #define AF_JUMP_ENABLE  (1 << 4)
 
+#ifdef __KERNEL__
 int hci_def_data_read(struct hci_fm_def_data_rd_req *arg,
 	struct radio_hci_dev *hdev);
 int hci_def_data_write(struct hci_fm_def_data_wr_req *arg,
 	struct radio_hci_dev *hdev);
 int hci_fm_do_calibration(__u8 *arg, struct radio_hci_dev *hdev);
 int hci_fm_do_calibration(__u8 *arg, struct radio_hci_dev *hdev);
+#endif /* __KERNEL__ */
 
 #endif /* __RADIO_HCI_CORE_H */

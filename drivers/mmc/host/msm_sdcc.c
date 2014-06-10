@@ -4,6 +4,7 @@
  *  Copyright (C) 2007 Google Inc,
  *  Copyright (C) 2003 Deep Blue Solutions, Ltd, All Rights Reserved.
  *  Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -5937,7 +5938,6 @@ msmsdcc_probe(struct platform_device *pdev)
 	mmc->caps2 |= (MMC_CAP2_BOOTPART_NOACC | MMC_CAP2_DETECT_ON_ERR);
 	mmc->caps2 |= MMC_CAP2_SANITIZE;
 	mmc->caps2 |= MMC_CAP2_INIT_BKOPS;
-	mmc->caps2 |= MMC_CAP2_POWEROFF_NOTIFY;
 
 	if (plat->nonremovable)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;
@@ -6547,8 +6547,10 @@ static int msmsdcc_runtime_idle(struct device *dev)
 	if (host->plat->is_sdio_al_client)
 		return 0;
 
-	/* Idle timeout is not configurable for now */
-	pm_schedule_suspend(dev, host->idle_tout_ms);
+	if (mmc->caps & MMC_CAP_NONREMOVABLE)
+		pm_schedule_suspend(dev, host->idle_tout_ms);
+	else
+		pm_schedule_suspend(dev, MSM_MMC_SDCARD_DEFAULT_IDLE_TIMEOUT);
 
 	return -EAGAIN;
 }
