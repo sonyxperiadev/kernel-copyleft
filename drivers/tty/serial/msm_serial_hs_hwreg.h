@@ -1,6 +1,7 @@
 /* drivers/serial/msm_serial_hs_hwreg.h
  *
  * Copyright (c) 2007-2009, 2012-2013,The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  * 
  * All source code in this file is licensed under the following license
  * except where indicated.
@@ -57,6 +58,7 @@ enum msm_hsl_regs {
 	UARTDM_BCR,
 	UARTDM_TXFS,
 	UARTDM_RXFS,
+	UARTDM_IRDA,
 	UARTDM_LAST,
 };
 
@@ -81,6 +83,7 @@ enum msm_hs_regs {
 	UART_DM_TXFS,
 	UART_DM_RXFS,
 	UART_DM_RX_TRANS_CTRL,
+	UART_DM_BCR,
 	UART_DM_LAST,
 };
 
@@ -94,7 +97,11 @@ enum msm_hs_regs {
  * UARTDM Core v1.4 STALE_IRQ_EMPTY bit defination
  * Stale interrupt will fire if bit is set when RX-FIFO is empty
  */
+#define UARTDM_BCR_TX_BREAK_DISABLE	0x1
 #define UARTDM_BCR_STALE_IRQ_EMPTY	0x2
+#define UARTDM_BCR_RX_DMRX_LOW_EN	0x4
+#define UARTDM_BCR_RX_STAL_IRQ_DMRX_EQL	0x10
+#define UARTDM_BCR_RX_DMRX_1BYTE_RES_EN	0x20
 
 /* TRANSFER_CONTROL Register for UARTDM Core v1.4 */
 #define UARTDM_RX_TRANS_CTRL_ADDR      0xcc
