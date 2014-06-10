@@ -77,7 +77,7 @@ struct msm_hsic_hcd {
 	struct clk		*phy_clk;
 	struct clk		*cal_clk;
 	struct regulator	*hsic_vddcx;
-	bool			async_int;
+	atomic_t		async_int;
 	atomic_t                in_lpm;
 	struct wake_lock	wlock;
 	int			peripheral_status_irq;
@@ -874,8 +874,8 @@ skip_phy_resume:
 
 	atomic_set(&mehci->in_lpm, 0);
 
-	if (mehci->async_int) {
-		mehci->async_int = false;
+	if (atomic_read(&mehci->async_int)) {
+		atomic_set(&mehci->async_int, 0);
 		pm_runtime_put_noidle(mehci->dev);
 		enable_irq(hcd->irq);
 	}
@@ -910,12 +910,18 @@ static irqreturn_t msm_hsic_irq(struct usb_hcd *hcd)
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	struct msm_hsic_hcd *mehci = hcd_to_hsic(hcd);
 	u32			status;
+	int 			ret;
 
 	if (atomic_read(&mehci->in_lpm)) {
 		disable_irq_nosync(hcd->irq);
 		dev_dbg(mehci->dev, "phy async intr\n");
-		mehci->async_int = true;
-		pm_runtime_get(mehci->dev);
+
+		ret = pm_runtime_get(mehci->dev);
+		if ((ret == 1) || (ret == -EINPROGRESS))
+			pm_runtime_put_noidle(mehci->dev);
+		else
+			atomic_set(&mehci->async_int, 1);
+
 		return IRQ_HANDLED;
 	}
 
@@ -1882,7 +1888,7 @@ static int msm_hsic_pm_suspend_noirq(struct device *dev)
 	struct usb_hcd *hcd = dev_get_drvdata(dev);
 	struct msm_hsic_hcd *mehci = hcd_to_hsic(hcd);
 
-	if (mehci->async_int) {
+	if (atomic_read(&mehci->async_int)) {
 		dev_dbg(dev, "suspend_noirq: Aborting due to pending interrupt\n");
 		return -EBUSY;
 	}
@@ -1909,7 +1915,8 @@ static int msm_hsic_pm_resume(struct device *dev)
 	 * start I/O.
 	 */
 	if (!atomic_read(&mehci->pm_usage_cnt) &&
-			pm_runtime_suspended(dev))
+			pm_runtime_suspended(dev) &&
+			!atomic_read(&mehci->async_int))
 		return 0;
 
 	ret = msm_hsic_resume(mehci);
