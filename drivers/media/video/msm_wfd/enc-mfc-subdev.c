@@ -988,7 +988,7 @@ static long venc_set_bitrate_mode(struct video_client_ctx *client_ctx,
 		rate_control.rate_control = VCD_RATE_CONTROL_VBR_VFR;
 		break;
 	case V4L2_MPEG_VIDEO_BITRATE_MODE_CBR:
-		rate_control.rate_control = VCD_RATE_CONTROL_CBR_VFR;
+		rate_control.rate_control = VCD_RATE_CONTROL_CBR_CFR;
 		break;
 	default:
 		WFD_MSG_ERR("unknown bitrate mode %d", mode);

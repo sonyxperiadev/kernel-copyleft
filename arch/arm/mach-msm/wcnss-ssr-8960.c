@@ -27,6 +27,9 @@
 #include <mach/peripheral-loader.h>
 #include "smd_private.h"
 #include "ramdump.h"
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
 
 #define MODULE_NAME			"wcnss_8960"
 #define MAX_BUF_SIZE			0x51
@@ -80,6 +83,9 @@ static void smsm_state_cb_hdlr(void *data, uint32_t old_state,
 		buffer[size] = '\0';
 		pr_err("%s: wcnss subsystem failure reason: %s\n",
 				__func__, buffer);
+#ifdef CONFIG_RAMDUMP_TAGS
+		rdtags_add_tag("ssr_reason", buffer, strnlen(buffer, MAX_BUF_SIZE - 1) + 1);
+#endif
 		memset(smem_reset_reason, 0, smem_reset_size);
 		wmb();
 	}
@@ -185,13 +191,8 @@ static int riva_ramdump(int enable, const struct subsys_desc *subsys)
 static void riva_crash_shutdown(const struct subsys_desc *subsys)
 {
 	pr_err("%s: crash shutdown : %d\n", MODULE_NAME, riva_crash);
-	if (riva_crash != true) {
+	if (riva_crash != true)
 		smsm_riva_reset();
-		/* give sufficient time for wcnss to finish it's error
-		 * fatal routine */
-		mdelay(3000);
-	}
-
 }
 
 static struct subsys_desc riva_8960 = {
