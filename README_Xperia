@@ -1,0 +1,4 @@
+Configuration files can be found in arch/arm/configs.
+
+    Xperia Z SO-02E => fusion3_yuga_dcm_defconfig
+    Xperia A SO-04E => fusion3_dogo_dcm_defconfig
