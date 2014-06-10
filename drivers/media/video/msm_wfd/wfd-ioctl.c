@@ -42,7 +42,7 @@
 #define WFD_DEVICE_SECURE (WFD_DEVICE_NUMBER_BASE + 1)
 #define DEFAULT_WFD_WIDTH 640
 #define DEFAULT_WFD_HEIGHT 480
-#define VENC_INPUT_BUFFERS 4
+#define VENC_INPUT_BUFFERS 6
 
 struct wfd_device {
 	struct mutex dev_lock;
@@ -364,7 +364,7 @@ int wfd_allocate_input_buffers(struct wfd_device *wfd_dev,
 			ALLOC_RECON_BUFFERS, NULL);
 	if (rc) {
 		WFD_MSG_ERR("Failed to allocate recon buffers\n");
-		goto alloc_fail;
+		goto recon_alloc_fail;
 	}
 	return rc;
 
@@ -372,6 +372,7 @@ alloc_fail:
 	kfree(mpair);
 	kfree(enc_mregion);
 	kfree(mdp_mregion);
+recon_alloc_fail:
 	return rc;
 }
 void wfd_free_input_buffers(struct wfd_device *wfd_dev,

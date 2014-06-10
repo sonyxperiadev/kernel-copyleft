@@ -1,4 +1,5 @@
 /* Copyright (c) 2008-2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -149,6 +150,7 @@ struct msm_fb_data_type {
 	__u32 bl_level;
 
 	struct platform_device *pdev;
+	struct platform_device *panel_pdev;
 
 	__u32 var_xres;
 	__u32 var_yres;
@@ -190,10 +192,14 @@ struct msm_fb_data_type {
 	u32 writeback_state;
 	bool writeback_active_cnt;
 	int cont_splash_done;
+#if defined(CONFIG_DEBUG_FS) || defined(CONFIG_FB_MSM_RECOVER_PANEL)
+	struct mutex power_lock;
+#endif
 	void *copy_splash_buf;
 	unsigned char *copy_splash_phys;
 	void *cpu_pm_hdl;
 	int vsync_sysfs_created;
+	bool nvrw_prohibit_draw;
 };
 
 struct dentry *msm_fb_get_debugfs_root(void);
@@ -222,10 +228,5 @@ void fill_black_screen(void);
 void unfill_black_screen(void);
 int msm_fb_check_frame_rate(struct msm_fb_data_type *mfd,
 				struct fb_info *info);
-
-#ifdef CONFIG_FB_MSM_LOGO
-#define INIT_IMAGE_FILE "/initlogo.rle"
-int load_565rle_image(char *filename, bool bf_supported);
-#endif
 
 #endif /* MSM_FB_H */

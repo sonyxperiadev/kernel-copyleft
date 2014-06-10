@@ -40,6 +40,7 @@
 #include "mdp.h"
 #include "msm_fb.h"
 #include "mdp4.h"
+#include "mipi_dsi_panel_driver.h"
 
 #define VERSION_KEY_MASK	0xFFFFFF00
 
@@ -107,15 +108,17 @@ static struct mdp4_overlay_ctrl *ctrl = &mdp4_overlay_db;
 
 struct mdp4_overlay_perf {
 	u32 mdp_clk_rate;
-	u32 use_ov_blt[MDP4_MIXER_MAX];
-	u64 mdp_ov_ab_bw[MDP4_MIXER_MAX];
-	u64 mdp_ov_ib_bw[MDP4_MIXER_MAX];
-	u32 mdp_ab_bw;
-	u32 mdp_ib_bw;
+	u32 use_ov0_blt;
+	u32 use_ov1_blt;
+	u32 mdp_bw;
 };
 
-struct mdp4_overlay_perf perf_request;
-struct mdp4_overlay_perf perf_current;
+struct mdp4_overlay_perf perf_request = {
+	.mdp_bw = OVERLAY_PERF_LEVEL4,
+};
+struct mdp4_overlay_perf perf_current = {
+	.mdp_bw = OVERLAY_PERF_LEVEL4,
+};
 
 static struct ion_client *display_iclient;
 
@@ -2479,10 +2482,12 @@ static int mdp4_calc_pipe_mdp_clk(struct msm_fb_data_type *mfd,
 
 	if (!pipe) {
 		pr_err("%s: pipe is null!\n", __func__);
+		pipe->req_bw = OVERLAY_PERF_LEVEL4;
 		return ret;
 	}
 	if (!mfd) {
 		pr_err("%s: mfd is null!\n", __func__);
+		pipe->req_bw = OVERLAY_PERF_LEVEL4;
 		return ret;
 	}
 
@@ -2625,7 +2630,7 @@ static int mdp4_calc_pipe_mdp_clk(struct msm_fb_data_type *mfd,
 	 * factor. Ideally this factor is passed from board file.
 	 */
 	if (rst < pclk) {
-		rst = ((pclk >> shift) * 23 / 20) << shift;
+		rst = ((pclk >> shift) * 30 / 20) << shift;
 		pr_debug("%s calculated mdp clk is less than pclk.\n",
 			__func__);
 	}
@@ -2648,13 +2653,18 @@ static int mdp4_calc_pipe_mdp_clk(struct msm_fb_data_type *mfd,
 	return 0;
 }
 
+#define OVERLAY_VGA_SIZE	0x04B000
+#define OVERLAY_720P_TILE_SIZE  0x0E6000
+#define OVERLAY_WSVGA_SIZE 0x98000 /* 1024x608, align 600 to 32bit */
+
+#define OVERLAY_BUS_SCALE_TABLE_BASE	6
+
+
 static int mdp4_calc_pipe_mdp_bw(struct msm_fb_data_type *mfd,
-			 struct mdp4_overlay_pipe *pipe)
+			  struct mdp4_overlay_pipe *pipe)
 {
-	u32 fps;
+	u32 res;
 	int ret = -EINVAL;
-	u32 quota;
-	u32 shift = 16;
 
 	if (!pipe) {
 		pr_err("%s: pipe is null!\n", __func__);
@@ -2665,79 +2675,28 @@ static int mdp4_calc_pipe_mdp_bw(struct msm_fb_data_type *mfd,
 		return ret;
 	}
 
-	fps = mdp_get_panel_framerate(mfd);
-	quota = pipe->src_w * pipe->src_h * fps * pipe->bpp;
-
-	quota >>= shift;
-	/* factor 1.15 for ab */
-	pipe->bw_ab_quota = quota * MDP4_BW_AB_FACTOR / 100;
-	/* factor 1.25 for ib */
-	pipe->bw_ib_quota = quota * MDP4_BW_IB_FACTOR / 100;
-	/* down scaling factor for ib */
-	if ((!pipe->dst_h) && (!pipe->src_h) &&
-	    (pipe->src_h > pipe->dst_h)) {
-		u64 ib = quota;
-		ib *= pipe->src_h;
-		ib /= pipe->dst_h;
-		pipe->bw_ib_quota = max(ib, pipe->bw_ib_quota);
-		pr_debug("%s: src_h=%d dst_h=%d mdp ib %llu, ib_quota=%llu\n",
-			 __func__, pipe->src_h, pipe->dst_h,
-			 ib<<shift, pipe->bw_ib_quota<<shift);
+	if (pipe->flags & MDP_DEINTERLACE) {
+		pr_info("%s deinterlace requires max mdp bw.\n",
+			__func__);
+		pipe->req_bw = OVERLAY_PERF_LEVEL1;
+		return 0;
 	}
 
-	pipe->bw_ab_quota <<= shift;
-	pipe->bw_ib_quota <<= shift;
-
-	pr_debug("%s: pipe ndx=%d src(h,w)(%d, %d) fps=%d bpp=%d\n",
-		 __func__, pipe->pipe_ndx,  pipe->src_h, pipe->src_w,
-		 fps, pipe->bpp);
-	pr_debug("%s: ab_quota=%llu ib_quota=%llu\n", __func__,
-		 pipe->bw_ab_quota, pipe->bw_ib_quota);
-
-	return 0;
-}
-
-int mdp4_calc_blt_mdp_bw(struct msm_fb_data_type *mfd,
-			 struct mdp4_overlay_pipe *pipe)
-{
-	struct mdp4_overlay_perf *perf_req = &perf_request;
-	u32 fps;
-	int bpp;
-	int ret = -EINVAL;
-	u32 quota;
-	u32 shift = 16;
-	if (!pipe) {
-		pr_err("%s: pipe is null!\n", __func__);
-		return ret;
-	}
-	if (!mfd) {
-		pr_err("%s: mfd is null!\n", __func__);
-		return ret;
+	if (pipe->pipe_type == OVERLAY_TYPE_BF) {
+		pipe->req_bw = OVERLAY_PERF_LEVEL4;
+		return 0;
 	}
 
-	bpp = BLT_BPP;
-	fps = mdp_get_panel_framerate(mfd);
+	res = pipe->src_w * pipe->src_h;
 
-	/* read and write bw*/
-	quota = pipe->dst_w * pipe->dst_h * fps * bpp * 2;
-	quota >>= shift;
-
-	perf_req->mdp_ov_ab_bw[pipe->mixer_num] =
-		quota * MDP4_BW_AB_FACTOR / 100;
-
-	perf_req->mdp_ov_ib_bw[pipe->mixer_num] =
-		quota * MDP4_BW_IB_FACTOR / 100;
-
-	perf_req->mdp_ov_ab_bw[pipe->mixer_num] <<= shift;
-	perf_req->mdp_ov_ib_bw[pipe->mixer_num] <<= shift;
-
-	pr_debug("%s: pipe ndx=%d dst(h,w)(%d, %d) fps=%d bpp=%d\n",
-		 __func__, pipe->pipe_ndx, pipe->dst_h, pipe->dst_w,
-		 fps, bpp);
-	pr_debug("%s: overlay=%d ab_bw=%llu ib_bw=%llu\n", __func__,
-		 pipe->mixer_num,
-		 perf_req->mdp_ov_ab_bw[pipe->mixer_num],
-		 perf_req->mdp_ov_ib_bw[pipe->mixer_num]);
+	if (res <= OVERLAY_WSVGA_SIZE)
+		pipe->req_bw = OVERLAY_PERF_LEVEL4;
+	else if (res <= OVERLAY_VGA_SIZE)
+		pipe->req_bw = OVERLAY_PERF_LEVEL3;
+	else if (res <= OVERLAY_720P_TILE_SIZE)
+		pipe->req_bw = OVERLAY_PERF_LEVEL2;
+	else
+		pipe->req_bw = OVERLAY_PERF_LEVEL1;
 
 	return 0;
 }
@@ -2746,12 +2705,12 @@ int mdp4_overlay_mdp_perf_req(struct msm_fb_data_type *mfd,
 			      struct mdp4_overlay_pipe *plist)
 {
 	u32 worst_mdp_clk = 0;
+	u32 worst_mdp_bw = OVERLAY_PERF_LEVEL4;
 	int i;
 	struct mdp4_overlay_perf *perf_req = &perf_request;
 	struct mdp4_overlay_pipe *pipe = plist;
 	u32 cnt = 0;
 	int ret = -EINVAL;
-	u64 ab_quota_total = 0, ib_quota_total = 0;
 
 	if (!mfd) {
 		pr_err("%s: mfd is null!\n", __func__);
@@ -2763,8 +2722,8 @@ int mdp4_overlay_mdp_perf_req(struct msm_fb_data_type *mfd,
 		return ret;
 	}
 
-	for (i = 0; i < MDP4_MIXER_MAX; i++)
-		perf_req->use_ov_blt[i] = 0;
+	perf_req->use_ov0_blt = 0;
+	perf_req->use_ov1_blt = 0;
 
 	for (i = 0; i < OVERLAY_PIPE_MAX; i++, pipe++) {
 
@@ -2776,17 +2735,25 @@ int mdp4_overlay_mdp_perf_req(struct msm_fb_data_type *mfd,
 		cnt++;
 		if (worst_mdp_clk < pipe->req_clk)
 			worst_mdp_clk = pipe->req_clk;
-
-		if (pipe->req_clk > mdp_max_clk)
-			perf_req->use_ov_blt[pipe->mixer_num] = 1;
-
-		if (pipe->mixer_num == MDP4_MIXER2)
-			perf_req->use_ov_blt[MDP4_MIXER2] = 1;
-
-		if (pipe->pipe_type != OVERLAY_TYPE_BF) {
-			ab_quota_total += pipe->bw_ab_quota;
-			ib_quota_total += pipe->bw_ib_quota;
+		if (pipe->req_clk > mdp_max_clk) {
+			if (pipe->mixer_num == MDP4_MIXER0)
+				perf_req->use_ov0_blt = 1;
+			if (pipe->mixer_num == MDP4_MIXER1)
+				perf_req->use_ov1_blt = 1;
 		}
+
+		if (!pipe->req_bw) {
+			pr_err("%s mdp pipe bw request should not be zero!\n",
+			       __func__);
+			pr_debug("%s %d pid %d num %d idx %d mix %d bw %d\n",
+				 __func__, __LINE__, current->pid,
+				 pipe->pipe_num, pipe->pipe_ndx,
+				 pipe->mixer_num, pipe->req_bw);
+			pipe->req_bw = OVERLAY_PERF_LEVEL4;
+		}
+
+		if (pipe->req_bw < worst_mdp_bw)
+			worst_mdp_bw = pipe->req_bw;
 
 		if (mfd->mdp_rev == MDP_REV_41) {
 			/*
@@ -2795,45 +2762,32 @@ int mdp4_overlay_mdp_perf_req(struct msm_fb_data_type *mfd,
 			 */
 			if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD) {
 				if (pipe->dst_x != 0)
-					perf_req->use_ov_blt[MDP4_MIXER0] = 1;
+					perf_req->use_ov0_blt = 1;
 			}
 			if ((mfd->panel_info.xres > 1280) &&
 			    (mfd->panel_info.type != DTV_PANEL)) {
-				perf_req->use_ov_blt[MDP4_MIXER0] = 1;
+				perf_req->use_ov0_blt = 1;
 			}
 		}
 	}
 
-	perf_req->mdp_clk_rate = min(worst_mdp_clk, mdp_max_clk);
+	perf_req->mdp_clk_rate = worst_mdp_clk;
+	if (perf_req->mdp_clk_rate > mdp_max_clk)
+		perf_req->mdp_clk_rate = mdp_max_clk;
+
 	perf_req->mdp_clk_rate = mdp_clk_round_rate(perf_req->mdp_clk_rate);
 
-	for (i = 0; i < MDP4_MIXER_MAX; i++) {
-		if (perf_req->use_ov_blt[i]) {
-			ab_quota_total += perf_req->mdp_ov_ab_bw[i];
-			ib_quota_total += perf_req->mdp_ov_ib_bw[i];
-		}
-	}
+	perf_req->mdp_bw = worst_mdp_bw;
 
-	perf_req->mdp_ab_bw = roundup(ab_quota_total, MDP_BUS_SCALE_AB_STEP);
-	perf_req->mdp_ib_bw = roundup(ib_quota_total, MDP_BUS_SCALE_AB_STEP);
+	if (cnt >= 3)
+		perf_req->mdp_bw = OVERLAY_PERF_LEVEL1;
 
-	pr_debug("%s %d: ab_quota_total=(%llu, %d) ib_quota_total=(%llu, %d)\n",
-		 __func__, __LINE__,
-		 ab_quota_total, perf_req->mdp_ab_bw,
-		 ib_quota_total, perf_req->mdp_ib_bw);
-
-	if (ab_quota_total > mdp_max_bw)
-		pr_warn("%s: req ab bw=%llu is larger than max bw=%llu",
-			__func__, ab_quota_total, mdp_max_bw);
-	if (ib_quota_total > mdp_max_bw)
-		pr_warn("%s: req ib bw=%llu is larger than max bw=%llu",
-			__func__, ib_quota_total, mdp_max_bw);
-
-	pr_debug("%s %d: pid %d cnt %d clk %d ov0_blt %d, ov1_blt %d\n",
+	pr_debug("%s %d pid %d cnt %d clk %d ov0_blt %d, ov1_blt %d bw %d\n",
 		 __func__, __LINE__, current->pid, cnt,
 		 perf_req->mdp_clk_rate,
-		 perf_req->use_ov_blt[0],
-		 perf_req->use_ov_blt[1]);
+		 perf_req->use_ov0_blt,
+		 perf_req->use_ov1_blt,
+		 perf_req->mdp_bw);
 
 	return 0;
 }
@@ -2869,7 +2823,7 @@ void mdp4_overlay_mdp_perf_upd(struct msm_fb_data_type *mfd,
 		 flag);
 
 	if (!mdp4_extn_disp)
-		perf_cur->use_ov_blt[1] = 0;
+		perf_cur->use_ov1_blt = 0;
 
 	if (flag) {
 		if (perf_req->mdp_clk_rate > perf_cur->mdp_clk_rate) {
@@ -2882,25 +2836,19 @@ void mdp4_overlay_mdp_perf_upd(struct msm_fb_data_type *mfd,
 			perf_cur->mdp_clk_rate =
 				perf_req->mdp_clk_rate;
 		}
-		if ((perf_req->mdp_ab_bw > perf_cur->mdp_ab_bw) ||
-		    (perf_req->mdp_ib_bw > perf_cur->mdp_ib_bw)) {
+		if (perf_req->mdp_bw < perf_cur->mdp_bw) {
 			mdp_bus_scale_update_request
-				(perf_req->mdp_ab_bw, perf_req->mdp_ib_bw);
-			pr_debug("%s mdp ab_bw is changed [%d] from %d to %d\n",
+				(OVERLAY_BUS_SCALE_TABLE_BASE -
+				 perf_req->mdp_bw);
+			pr_info("%s mdp bw is changed [%d] from %d to %d\n",
 				__func__,
 				flag,
-				perf_cur->mdp_ab_bw,
-				perf_req->mdp_ab_bw);
-			pr_debug("%s mdp ib_bw is changed [%d] from %d to %d\n",
-				__func__,
-				flag,
-				perf_cur->mdp_ib_bw,
-				perf_req->mdp_ib_bw);
-			perf_cur->mdp_ab_bw = perf_req->mdp_ab_bw;
-			perf_cur->mdp_ib_bw = perf_req->mdp_ib_bw;
+				perf_cur->mdp_bw,
+				perf_req->mdp_bw);
+			perf_cur->mdp_bw = perf_req->mdp_bw;
 		}
-		if ((mfd->panel_info.pdest == DISPLAY_1 &&
-		     perf_req->use_ov_blt[0] && !perf_cur->use_ov_blt[0])) {
+		if (mfd->panel_info.pdest == DISPLAY_1 &&
+		    perf_req->use_ov0_blt && !perf_cur->use_ov0_blt) {
 			if (mfd->panel_info.type == LCDC_PANEL ||
 			    mfd->panel_info.type == LVDS_PANEL)
 				mdp4_lcdc_overlay_blt_start(mfd);
@@ -2911,19 +2859,19 @@ void mdp4_overlay_mdp_perf_upd(struct msm_fb_data_type *mfd,
 			pr_info("%s mixer0 start blt [%d] from %d to %d.\n",
 				__func__,
 				flag,
-				perf_cur->use_ov_blt[0],
-				perf_req->use_ov_blt[0]);
-			perf_cur->use_ov_blt[0] = perf_req->use_ov_blt[0];
+				perf_cur->use_ov0_blt,
+				perf_req->use_ov0_blt);
+			perf_cur->use_ov0_blt = perf_req->use_ov0_blt;
 		}
-		if ((mfd->panel_info.pdest == DISPLAY_2 &&
-		     perf_req->use_ov_blt[1] && !perf_cur->use_ov_blt[1])) {
+		if (mfd->panel_info.pdest == DISPLAY_2 &&
+		    perf_req->use_ov1_blt && !perf_cur->use_ov1_blt) {
 			mdp4_dtv_overlay_blt_start(mfd);
 			pr_info("%s mixer1 start blt [%d] from %d to %d.\n",
 				__func__,
 				flag,
-				perf_cur->use_ov_blt[1],
-				perf_req->use_ov_blt[1]);
-			perf_cur->use_ov_blt[1] = perf_req->use_ov_blt[1];
+				perf_cur->use_ov1_blt,
+				perf_req->use_ov1_blt);
+			perf_cur->use_ov1_blt = perf_req->use_ov1_blt;
 		}
 	} else {
 		if (perf_req->mdp_clk_rate < perf_cur->mdp_clk_rate) {
@@ -2936,25 +2884,19 @@ void mdp4_overlay_mdp_perf_upd(struct msm_fb_data_type *mfd,
 			perf_cur->mdp_clk_rate =
 				perf_req->mdp_clk_rate;
 		}
-		if (perf_req->mdp_ab_bw < perf_cur->mdp_ab_bw ||
-		    perf_req->mdp_ib_bw < perf_cur->mdp_ib_bw) {
+		if (perf_req->mdp_bw > perf_cur->mdp_bw) {
+			pr_info("%s mdp bw is changed [%d] from %d to %d\n",
+				__func__,
+				flag,
+				perf_cur->mdp_bw,
+				perf_req->mdp_bw);
 			mdp_bus_scale_update_request
-				(perf_req->mdp_ab_bw, perf_req->mdp_ib_bw);
-			pr_debug("%s mdp ab bw is changed [%d] from %d to %d\n",
-				__func__,
-				flag,
-				perf_cur->mdp_ab_bw,
-				perf_req->mdp_ab_bw);
-			pr_debug("%s mdp ib bw is changed [%d] from %d to %d\n",
-				__func__,
-				flag,
-				perf_cur->mdp_ib_bw,
-				perf_req->mdp_ib_bw);
-			perf_cur->mdp_ab_bw = perf_req->mdp_ab_bw;
-			perf_cur->mdp_ib_bw = perf_req->mdp_ib_bw;
+				(OVERLAY_BUS_SCALE_TABLE_BASE -
+				 perf_req->mdp_bw);
+			perf_cur->mdp_bw = perf_req->mdp_bw;
 		}
-		if ((mfd->panel_info.pdest == DISPLAY_1 &&
-		     !perf_req->use_ov_blt[0] && perf_cur->use_ov_blt[0])) {
+		if (mfd->panel_info.pdest == DISPLAY_1 &&
+		    !perf_req->use_ov0_blt && perf_cur->use_ov0_blt) {
 			if (mfd->panel_info.type == LCDC_PANEL ||
 			    mfd->panel_info.type == LVDS_PANEL)
 				mdp4_lcdc_overlay_blt_stop(mfd);
@@ -2965,19 +2907,19 @@ void mdp4_overlay_mdp_perf_upd(struct msm_fb_data_type *mfd,
 			pr_info("%s mixer0 stop blt [%d] from %d to %d.\n",
 				__func__,
 				flag,
-				perf_cur->use_ov_blt[0],
-				perf_req->use_ov_blt[0]);
-			perf_cur->use_ov_blt[0] = perf_req->use_ov_blt[0];
+				perf_cur->use_ov0_blt,
+				perf_req->use_ov0_blt);
+			perf_cur->use_ov0_blt = perf_req->use_ov0_blt;
 		}
-		if ((mfd->panel_info.pdest == DISPLAY_2 &&
-		     !perf_req->use_ov_blt[1] && perf_cur->use_ov_blt[1])) {
+		if (mfd->panel_info.pdest == DISPLAY_2 &&
+		    !perf_req->use_ov1_blt && perf_cur->use_ov1_blt) {
 			mdp4_dtv_overlay_blt_stop(mfd);
 			pr_info("%s mixer1 stop blt [%d] from %d to %d.\n",
 				__func__,
 				flag,
-				perf_cur->use_ov_blt[1],
-				perf_req->use_ov_blt[1]);
-			perf_cur->use_ov_blt[1] = perf_req->use_ov_blt[1];
+				perf_cur->use_ov1_blt,
+				perf_req->use_ov1_blt);
+			perf_cur->use_ov1_blt = perf_req->use_ov1_blt;
 		}
 	}
 	return;
@@ -3526,6 +3468,8 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req)
 		if (ctrl->panel_mode & MDP4_PANEL_DTV)
 			mdp4_dtv_pipe_queue(0, pipe);/* cndx = 0 */
 	}
+
+	mipi_dsi_panel_fps_data_update(mfd);
 
 	mutex_unlock(&mfd->dma->ov_mutex);
 	return ret;

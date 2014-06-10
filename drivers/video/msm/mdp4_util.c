@@ -1,4 +1,5 @@
 /* Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -34,6 +35,7 @@
 #include "mdp4.h"
 
 struct mdp4_statistic mdp4_stat;
+struct mdp_pcc_cfg_data *pcc_cfg_ptr;
 
 struct mdp_csc_cfg_data csc_cfg_matrix[CSC_MAX_BLOCKS] = {
 	{
@@ -392,8 +394,7 @@ void mdp4_hw_init(void)
 	/* MDP cmd block enable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 
-	mdp_bus_scale_update_request
-		(MDP_BUS_SCALE_INIT, MDP_BUS_SCALE_INIT);
+	mdp_bus_scale_update_request(5);
 
 #ifdef MDP4_ERROR
 	/*
@@ -531,6 +532,9 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 				continue;
 			mgmt->mdp_is_hist_valid = FALSE;
 		}
+
+		if (pcc_cfg_ptr != NULL)
+			mdp4_pcc_cfg(pcc_cfg_ptr);
 	}
 
 	if (isr & INTR_EXTERNAL_INTF_UDERRUN) {
