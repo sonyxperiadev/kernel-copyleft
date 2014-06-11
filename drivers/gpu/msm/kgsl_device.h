@@ -451,6 +451,9 @@ kgsl_device_get_drvdata(struct kgsl_device *dev)
 
 void kgsl_context_destroy(struct kref *kref);
 
+int kgsl_memfree_find_entry(pid_t pid, unsigned long *gpuaddr,
+	unsigned long *size, unsigned int *flags);
+
 /**
  * kgsl_context_put - Release context reference count
  * @context
