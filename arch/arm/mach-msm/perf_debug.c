@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,6 +26,7 @@ static char *descriptions =
 	"1  Perf: Restore counter after powercollapse for generic ARM PMU's\n"
 	"2  Perf: Toggle PMU IRQ when CPU's are hotplugged\n"
 	"3  Perf: Correct irq for CPU hotplug detection\n"
+	"4  Perf: Check perf activity on correct CPU\n"
 ;
 
 static ssize_t desc_read(struct file *fp, char __user *buf,
