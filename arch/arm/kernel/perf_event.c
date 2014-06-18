@@ -194,6 +194,9 @@ armpmu_event_update(struct perf_event *event,
 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
 	u64 delta, prev_raw_count, new_raw_count;
 
+	if (event->state <= PERF_EVENT_STATE_OFF)
+		return 0;
+
 again:
 	prev_raw_count = local64_read(&hwc->prev_count);
 	new_raw_count = armpmu->read_counter(idx);
@@ -661,6 +664,7 @@ static void armpmu_init(struct arm_pmu *armpmu)
 	armpmu->pmu.start = armpmu_start;
 	armpmu->pmu.stop = armpmu_stop;
 	armpmu->pmu.read = armpmu_read;
+	armpmu->pmu.events_across_hotplug = 1;
 }
 
 int armpmu_register(struct arm_pmu *armpmu, char *name, int type)
@@ -747,15 +751,14 @@ static void __init cpu_pmu_init(struct arm_pmu *armpmu)
 	armpmu->type = ARM_PMU_DEVICE_CPU;
 }
 
-static int cpu_has_active_perf(void)
+static int cpu_has_active_perf(int cpu)
 {
 	struct pmu_hw_events *hw_events;
 	int enabled;
 
 	if (!cpu_pmu)
 		return 0;
-
-	hw_events = cpu_pmu->get_hw_events();
+	hw_events = &per_cpu(cpu_hw_events, cpu);
 	enabled = bitmap_weight(hw_events->used_mask, cpu_pmu->num_events);
 
 	if (enabled)
@@ -775,62 +778,6 @@ void disable_irq_callback(void *info)
 {
 	int irq = *(unsigned int *)info;
 	disable_percpu_irq(irq);
-}
-
-/*
- * PMU hardware loses all context when a CPU goes offline.
- * When a CPU is hotplugged back in, since some hardware registers are
- * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
- * junk values out of them.
- */
-static int __cpuinit pmu_cpu_notify(struct notifier_block *b,
-					unsigned long action, void *hcpu)
-{
-	int irq;
-
-	if (cpu_has_active_perf()) {
-		switch ((action & ~CPU_TASKS_FROZEN)) {
-
-		case CPU_DOWN_PREPARE:
-			/*
-			 * If this is on a multicore CPU, we need
-			 * to disarm the PMU IRQ before disappearing.
-			 */
-			if (cpu_pmu &&
-				cpu_pmu->plat_device->dev.platform_data) {
-				irq = platform_get_irq(cpu_pmu->plat_device, 0);
-				smp_call_function_single((int)hcpu,
-						disable_irq_callback, &irq, 1);
-			}
-			return NOTIFY_DONE;
-
-		case CPU_UP_PREPARE:
-			/*
-			 * If this is on a multicore CPU, we need
-			 * to arm the PMU IRQ before appearing.
-			 */
-			if (cpu_pmu &&
-				cpu_pmu->plat_device->dev.platform_data) {
-				irq = platform_get_irq(cpu_pmu->plat_device, 0);
-				smp_call_function_single((int)hcpu,
-						enable_irq_callback, &irq, 1);
-			}
-			return NOTIFY_DONE;
-
-		case CPU_STARTING:
-			if (cpu_pmu && cpu_pmu->reset) {
-				cpu_pmu->reset(NULL);
-				return NOTIFY_OK;
-			}
-		default:
-			return NOTIFY_DONE;
-		}
-	}
-
-	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
-		return NOTIFY_DONE;
-
-	return NOTIFY_OK;
 }
 
 static void armpmu_update_counters(void)
@@ -853,6 +800,80 @@ static void armpmu_update_counters(void)
 	}
 }
 
+/*
+ * PMU hardware loses all context when a CPU goes offline.
+ * When a CPU is hotplugged back in, since some hardware registers are
+ * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
+ * junk values out of them.
+ */
+static int __cpuinit pmu_cpu_notify(struct notifier_block *b,
+					unsigned long action, void *hcpu)
+{
+	int irq;
+	struct pmu *pmu;
+	int cpu = (int)hcpu;
+
+	switch ((action & ~CPU_TASKS_FROZEN)) {
+	case CPU_DOWN_PREPARE:
+		if (cpu_pmu && cpu_pmu->save_pm_registers)
+			smp_call_function_single(cpu,
+						 cpu_pmu->save_pm_registers,
+						 hcpu, 1);
+		break;
+	case CPU_STARTING:
+		if (cpu_pmu && cpu_pmu->reset)
+			cpu_pmu->reset(NULL);
+		if (cpu_pmu && cpu_pmu->restore_pm_registers)
+			smp_call_function_single(cpu,
+						 cpu_pmu->restore_pm_registers,
+						 hcpu, 1);
+	}
+
+	if (cpu_has_active_perf((int)hcpu)) {
+		switch ((action & ~CPU_TASKS_FROZEN)) {
+
+		case CPU_DOWN_PREPARE:
+			armpmu_update_counters();
+			/*
+			 * If this is on a multicore CPU, we need
+			 * to disarm the PMU IRQ before disappearing.
+			 */
+			if (cpu_pmu &&
+				cpu_pmu->plat_device->dev.platform_data) {
+				irq = platform_get_irq(cpu_pmu->plat_device, 0);
+				smp_call_function_single((int)hcpu,
+						disable_irq_callback, &irq, 1);
+			}
+			return NOTIFY_DONE;
+
+		case CPU_STARTING:
+			/*
+			 * If this is on a multicore CPU, we need
+			 * to arm the PMU IRQ before appearing.
+			 */
+			if (cpu_pmu &&
+				cpu_pmu->plat_device->dev.platform_data) {
+				irq = platform_get_irq(cpu_pmu->plat_device, 0);
+				enable_irq_callback(&irq);
+			}
+
+			if (cpu_pmu) {
+				__get_cpu_var(from_idle) = 1;
+				pmu = &cpu_pmu->pmu;
+				pmu->pmu_enable(pmu);
+				return NOTIFY_OK;
+			}
+		default:
+			return NOTIFY_DONE;
+		}
+	}
+
+	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
+		return NOTIFY_DONE;
+
+	return NOTIFY_OK;
+}
+
 static struct notifier_block __cpuinitdata pmu_cpu_notifier = {
 	.notifier_call = pmu_cpu_notify,
 };
@@ -861,24 +882,32 @@ static struct notifier_block __cpuinitdata pmu_cpu_notifier = {
 static int perf_cpu_pm_notifier(struct notifier_block *self, unsigned long cmd,
 		void *v)
 {
+	struct pmu *pmu;
 	switch (cmd) {
 	case CPU_PM_ENTER:
-		if (cpu_has_active_perf()) {
+		if (cpu_pmu && cpu_pmu->save_pm_registers)
+			cpu_pmu->save_pm_registers((void *)smp_processor_id());
+		if (cpu_has_active_perf((int)v)) {
 			armpmu_update_counters();
-			perf_pmu_disable(&cpu_pmu->pmu);
+			pmu = &cpu_pmu->pmu;
+			pmu->pmu_disable(pmu);
 		}
 		break;
 
 	case CPU_PM_ENTER_FAILED:
 	case CPU_PM_EXIT:
-		if (cpu_has_active_perf() && cpu_pmu->reset) {
+		if (cpu_pmu && cpu_pmu->restore_pm_registers)
+			cpu_pmu->restore_pm_registers(
+				(void *)smp_processor_id());
+		if (cpu_has_active_perf((int)v) && cpu_pmu->reset) {
 			/*
 			 * Flip this bit so armpmu_enable knows it needs
 			 * to re-enable active counters.
 			 */
 			__get_cpu_var(from_idle) = 1;
 			cpu_pmu->reset(NULL);
-			perf_pmu_enable(&cpu_pmu->pmu);
+			pmu = &cpu_pmu->pmu;
+			pmu->pmu_enable(pmu);
 		}
 		break;
 	}

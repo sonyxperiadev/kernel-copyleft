@@ -65,7 +65,7 @@ int kgsl_sharedmem_set(const struct kgsl_memdesc *memdesc,
 
 void kgsl_cache_range_op(struct kgsl_memdesc *memdesc, int op);
 
-void kgsl_process_init_sysfs(struct kgsl_process_private *private);
+int kgsl_process_init_sysfs(struct kgsl_process_private *private);
 void kgsl_process_uninit_sysfs(struct kgsl_process_private *private);
 
 int kgsl_sharedmem_init_sysfs(void);
