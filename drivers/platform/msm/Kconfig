@@ -76,10 +76,19 @@ config QPNP_CLKDIV
 	  PNP PMIC. It configures the frequency of clkdiv outputs on the
 	  PMIC. These clocks are typically wired through alternate functions
 	  on gpio pins.
+
 config MSM_AVTIMER
 	tristate "Avtimer Driver"
 	depends on ARCH_MSM8960
 	help
 	  This driver gets the Q6 out of power collapsed state and
           exposes ioctl control to read avtimer tick.
+
+config MPMTIME
+	tristate "Expose mpm time"
+	default y
+	depends on MSM_RPM
+	help
+	  Expose the time since last power reset in /proc/mpmtime.
+
 endmenu

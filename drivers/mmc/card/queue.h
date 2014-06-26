@@ -21,6 +21,7 @@ enum mmc_blk_status {
 	MMC_BLK_DATA_ERR,
 	MMC_BLK_ECC_ERR,
 	MMC_BLK_NOMEDIUM,
+	MMC_BLK_RETRY_SINGLE,
 };
 
 enum mmc_packed_cmd {

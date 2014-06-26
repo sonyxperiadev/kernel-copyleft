@@ -1,0 +1,43 @@
+Configuration files can be found in arch/arm/configs.
+
+    Xperia Z          => fusion3_yuga_defconfig
+    Xperia ZL         => fusion3_odin_defconfig
+    Xperia ZR         => fusion3_dogo_defconfig
+    Xperia Tablet Z   => fusion3_pollux_defconfig
+    Xperia Tablet Z SGP311/SGP312 => fusion3_pollux_windy_defconfig
+
+How to build your kernel:
+
+  Prerequisites:
+
+    * ramdisk.img - root fs
+
+    * mkbootimg - boot.img generator
+
+    * The ARM cross-compiler
+      We recommend getting the CodeSourcery Lite compiler.
+      Or, you can also use prebuild executable binary which is included in
+      standard Android tree.
+
+
+  Step 1: Build Your Kernel (zImage)
+    $ cd kernel
+
+    $ export ARCH=arm
+
+    $ export CROSS_COMPILE=/opt/arm-2010q1/bin/arm-none-eabi-
+      NOTE: Please set the location and the prefix of the ARM cross-compiler.
+
+    $ make fusion3_yuga_defconfig
+      NOTE: Please set a configuration file you want to build.
+
+    $ make
+
+    You can see arch/arm/boot/zImage if you succeed in building the kernel.
+
+
+  Step 2: Assembling the boot.img
+    $ mkbootimg --kernel zImage --ramdisk ramdisk.img --pagesize 2048 --base 0x80200000 \
+   --cmdline "androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x3F ehci-hcd.park=3 vmalloc=400M androidboot.emmc=true" \
+     --ramdisk_offset 0x02000000 --output boot.img
+

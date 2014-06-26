@@ -56,6 +56,8 @@ unsigned int iio_buffer_poll(struct file *filp,
 {
 	struct iio_dev *indio_dev = filp->private_data;
 	struct iio_buffer *rb = indio_dev->buffer;
+	if (rb->stufftoread)
+		return POLLIN | POLLRDNORM;
 
 	poll_wait(filp, &rb->pollq, wait);
 	if (rb->stufftoread)
@@ -458,7 +460,9 @@ ssize_t iio_buffer_store_enable(struct device *dev,
 		}
 	} else {
 		if (indio_dev->setup_ops->predisable) {
+			mutex_unlock(&indio_dev->mlock);
 			ret = indio_dev->setup_ops->predisable(indio_dev);
+			mutex_lock(&indio_dev->mlock);
 			if (ret)
 				goto error_ret;
 		}
