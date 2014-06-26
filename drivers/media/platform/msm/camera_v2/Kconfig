@@ -164,6 +164,13 @@ config SP1628
 		1280 * 270. It does not support auto focus. It supports
 		few special effects like mono.
 
+config SONY_CAM_V4L2
+	bool "SONY specific camera"
+	depends on MSMB_CAMERA
+	default n
+	---help---
+	  SONY specific camera module
+
 config OV8825
 	bool "OmniVision OV8825 (BAYER 8MP)"
 	depends on MSMB_CAMERA

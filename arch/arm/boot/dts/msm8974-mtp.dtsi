@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,7 +11,7 @@
  * GNU General Public License for more details.
  */
 
-/include/ "dsi-panel-toshiba-720p-video.dtsi"
+/* /include/ "dsi-panel-toshiba-720p-video.dtsi" */
 /include/ "msm8974-camera-sensor-mtp.dtsi"
 /include/ "msm8974-leds.dtsi"
 
@@ -362,7 +363,7 @@
 
 &pm8941_chg {
 	status = "ok";
-	qcom,charging-disabled;
+	/* qcom,charging-disabled; */
 
 	qcom,chgr@1000 {
 		status = "ok";
@@ -682,6 +683,7 @@
 	};
 };
 
+/*
 &slim_msm {
 	taiko_codec {
 		qcom,cdc-micbias1-ext-cap;
@@ -689,6 +691,7 @@
 		qcom,cdc-micbias4-ext-cap;
 	};
 };
+*/
 
 &spi_epm {
 	epm-adc@0 {

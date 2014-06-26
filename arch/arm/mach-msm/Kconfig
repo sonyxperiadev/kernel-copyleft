@@ -278,6 +278,7 @@ config ARCH_MSM8974
 	select ARM_HAS_SG_CHAIN
 	select MSM_RUN_QUEUE_STATS
 	select MEMORY_HOLE_CARVEOUT
+	select HAVE_NMI_WATCHDOG if MSM_WATCHDOG_V2
 	select MSM_RPM_STATS_LOG
 	select QMI_ENCDEC
 	select DONT_MAP_HOLE_AFTER_MEMBANK0
@@ -1050,6 +1051,114 @@ config MACH_MSM9615_MTP
 	bool "MSM9615 MTP"
 	help
 	  Support for the Qualcomm MSM9615 MTP device.
+
+config MACH_SONY_RHINE_CDB
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Rhine CDB"
+	help
+	  Support for the SONY Mobile RHINE CDB device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_ROW
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari ROW"
+	help
+	  Support for the SONY Mobile Togari ROW device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_WINDY
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari Windy"
+	help
+	  Support for the SONY Mobile Togari Windy device.
+	  It is based on QCOM APQ8074 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_BRAZIL
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari Brazil"
+	help
+	  Support for the SONY Mobile Togari Brazil device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_KDDI
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari Kddi"
+	help
+	  Support for the SONY Mobile Togari Kddi device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_ROW
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami ROW"
+	help
+	  Support for the SONY Mobile Honami ROW device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_CMCC
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami CMCC"
+	help
+	  Support for the SONY Mobile Honami CMCC device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_DCM
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Docomo"
+	help
+	  Support for the SONY Mobile Honami Docomo device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_KDDI
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Kddi"
+	help
+	  Support for the SONY Mobile Honami Kddi device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_BRAZIL
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Brazil"
+	help
+	  Support for the SONY Mobile Honami Brazil device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_AMAMI_ROW
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Amami ROW"
+	help
+	  Support for the SONY Mobile Amami ROW device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_AMAMI_DCM
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Amami Docomo"
+	help
+	  Support for the SONY Mobile Amami Docomo device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
 
 config MSM_USE_TSIF1
 	depends on ARCH_MSM8X60
@@ -2922,6 +3031,15 @@ config MSM_CACHE_DUMP_ON_PANIC
 	  want to dump the L1 and L2 caches on panic before any flush occurs.
 	  If unsure, say N
 
+config SONY_SSM
+	bool "Support Super Stamina Mode"
+	default n
+	help
+	  This enables support for power mode notifications, required by Super
+	  Stamina Mode. The driver will let a user space application register
+	  for notifications when the device is ready to switch into a new
+	  power mode.
+
 config MSM_HSIC_SYSMON
 	tristate "MSM HSIC system monitor driver"
 	depends on USB
@@ -3018,6 +3136,14 @@ config MSM_BOOT_STATS
 	 display init, total boot time.
 	 This figures are reported in mpm sleep clock cycles and have a
 	 resolution of 31 bits as 1 bit is used as an overflow check.
+
+config MSM_MODEM_SUBSYSTEM_RESTART_MONITOR
+	bool "MSM Modem Subsystem Restart Monitor"
+	default n
+	depends on MSM_SUBSYSTEM_RESTART
+	help
+	  This option enables a module which can notify user-space
+	  applications of modem subsystem power up/down event via uevent.
 
 config MSM_XPU_ERR_FATAL
 	bool "Configure XPU violations as fatal errors"

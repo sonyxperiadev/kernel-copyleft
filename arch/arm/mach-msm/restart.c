@@ -69,7 +69,7 @@ static bool dload_mode_enabled;
 
 /* Download mode master kill-switch */
 static int dload_set(const char *val, struct kernel_param *kp);
-static int download_mode = 1;
+static int download_mode;
 module_param_call(download_mode, dload_set, param_get_int,
 			&download_mode, 0644);
 
@@ -93,11 +93,6 @@ static void set_dload_mode(int on)
 		mb();
 		dload_mode_enabled = on;
 	}
-}
-
-static bool get_dload_mode(void)
-{
-	return dload_mode_enabled;
 }
 
 static int dload_set(const char *val, struct kernel_param *kp)
@@ -241,17 +236,15 @@ static void msm_restart_prepare(const char *cmd)
 
 	pm8xxx_reset_pwr_off(1);
 
-	/* Hard reset the PMIC unless memory contents must be maintained. */
-	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0'))
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
-	else
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
+	qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			__raw_writel(0x77665500, restart_reason);
 		} else if (!strncmp(cmd, "recovery", 8)) {
 			__raw_writel(0x77665502, restart_reason);
+		} else if (!strncmp(cmd, "s1bootloader", 12)) {
+			__raw_writel(0x6f656d53, restart_reason);
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned long code;
 			code = simple_strtoul(cmd + 4, NULL, 16) & 0xff;
@@ -259,7 +252,11 @@ static void msm_restart_prepare(const char *cmd)
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}
+	} else {
+		__raw_writel(0x776655AA, restart_reason);
 	}
+	if (in_panic)
+		__raw_writel(0xC0DEDEAD, restart_reason);
 
 	flush_cache_all();
 	outer_flush_all();
@@ -319,6 +316,19 @@ static int __init msm_pmic_restart_init(void)
 
 late_initcall(msm_pmic_restart_init);
 
+static int msm_reboot_call(struct notifier_block *this,
+			   unsigned long code, void *_cmd)
+{
+	if (code == SYS_DOWN)
+		disable_nonboot_cpus();
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block msm_reboot_notifier = {
+	.notifier_call = msm_reboot_call,
+};
+
 static int __init msm_restart_init(void)
 {
 #ifdef CONFIG_MSM_DLOAD_MODE
@@ -326,6 +336,7 @@ static int __init msm_restart_init(void)
 	dload_mode_addr = MSM_IMEM_BASE + DLOAD_MODE_ADDR;
 	set_dload_mode(download_mode);
 #endif
+	register_reboot_notifier(&msm_reboot_notifier);
 	msm_tmr0_base = msm_timer_get_timer0_base();
 	restart_reason = MSM_IMEM_BASE + RESTART_REASON_ADDR;
 	pm_power_off = msm_power_off;

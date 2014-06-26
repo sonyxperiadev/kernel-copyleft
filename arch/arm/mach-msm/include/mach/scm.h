@@ -25,6 +25,7 @@
 #define SCM_SVC_DCVS			0xD
 #define SCM_SVC_ES			0x10
 #define SCM_SVC_TZSCHEDULER		0xFC
+#define SCM_SVC_OEM			0xFE
 
 #ifdef CONFIG_MSM_SCM
 extern int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,

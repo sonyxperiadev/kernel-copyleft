@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2007 Google Incorporated
  * Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -51,6 +52,8 @@
 #include <mach/msm_memtypes.h>
 
 #include "mdss_fb.h"
+#include "mdss_mdp.h"
+#include "mdss_dsi.h"
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
@@ -143,7 +146,7 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	if (value > MDSS_MAX_BL_BRIGHTNESS)
 		value = MDSS_MAX_BL_BRIGHTNESS;
 
-	/* This maps android backlight level 0 to 255 into
+	/* This maps light HAL backlight level 0 to 4095 into
 	   driver backlight level 0 to bl_max with rounding */
 	MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
 						MDSS_MAX_BL_BRIGHTNESS);
@@ -163,6 +166,7 @@ static struct led_classdev backlight_led = {
 	.name           = "lcd-backlight",
 	.brightness     = MDSS_MAX_BL_BRIGHTNESS,
 	.brightness_set = mdss_fb_set_bl_brightness,
+	.max_brightness = MDSS_MAX_BL_BRIGHTNESS,
 };
 
 static ssize_t mdss_fb_get_type(struct device *dev,
@@ -277,6 +281,7 @@ static int mdss_fb_probe(struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd = NULL;
 	struct mdss_panel_data *pdata;
+	struct mdss_panel_common_pdata *panel_data;
 	struct fb_info *fbi;
 	int rc;
 
@@ -361,6 +366,38 @@ static int mdss_fb_probe(struct platform_device *pdev)
 			return -ENOMEM;
 		} else {
 			mfd->timeline_value = 0;
+		}
+	}
+#ifdef CONFIG_DEBUG_FS
+	if ((mfd->panel_info->type == MIPI_VIDEO_PANEL) ||
+		(mfd->panel_info->type == MIPI_CMD_PANEL))
+		mipi_dsi_panel_create_debugfs(mfd);
+#endif
+	if (mfd->index == 0) {
+		panel_data = dev_get_platdata(&pdata->panel_pdev->dev);
+		if (panel_data) {
+			struct mdss_dsi_ctrl_pdata *ctrl = NULL;
+
+			ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+			if (!ctrl) {
+				pr_err("%s: Invalid input data\n", __func__);
+				return -EINVAL;
+			}
+			if (panel_data->panel_detect) {
+				mdss_fb_blank_sub(FB_BLANK_UNBLANK, mfd->fbi,
+					mfd->op_enable);
+				if (pdata->detect)
+					pdata->detect(pdata);
+				if (panel_data && panel_data->pcc_setup)
+					panel_data->pcc_setup(mfd);
+				mdss_fb_blank_sub(FB_BLANK_POWERDOWN, mfd->fbi,
+					mfd->op_enable);
+				if (pdata->update_panel)
+					pdata->update_panel(pdata);
+			} else {
+				ctrl->spec_pdata->detected = true;
+			}
 		}
 	}
 
@@ -865,16 +902,32 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 	fix->mmio_len = 0;	/* No MMIO Address */
 	fix->accel = FB_ACCEL_NONE;/* FB_ACCEL_MSM needes to be added in fb.h */
 
-	var->xoffset = 0,	/* Offset from virtual to visible */
-	var->yoffset = 0,	/* resolution */
-	var->grayscale = 0,	/* No graylevels */
-	var->nonstd = 0,	/* standard pixel format */
-	var->activate = FB_ACTIVATE_VBL,	/* activate it at vsync */
-	var->height = -1,	/* height of picture in mm */
-	var->width = -1,	/* width of picture in mm */
-	var->accel_flags = 0,	/* acceleration flags */
-	var->sync = 0,	/* see FB_SYNC_* */
-	var->rotate = 0,	/* angle we rotate counter clockwise */
+	var->xoffset = 0;	/* Offset from virtual to visible */
+	var->yoffset = 0;	/* resolution */
+	var->grayscale = 0;	/* No graylevels */
+	var->nonstd = 0;	/* standard pixel format */
+	var->activate = FB_ACTIVATE_VBL;	/* activate it at vsync */
+
+	/* height&width of picture in mm */
+	if (panel_info) {
+		if (panel_info->height)
+			var->height = panel_info->height;
+		else
+			var->height = -1;
+		if (panel_info->width)
+			var->width = panel_info->width;
+		else
+			var->width = -1;
+	} else {
+		var->height = -1;
+		var->width = -1;
+		pr_err("%s panel_info null\n", __func__);
+		return ret;
+	}
+
+	var->accel_flags = 0;	/* acceleration flags */
+	var->sync = 0;	/* see FB_SYNC_* */
+	var->rotate = 0;	/* angle we rotate counter clockwise */
 	mfd->op_enable = false;
 
 	switch (mfd->fb_imgType) {
@@ -1337,6 +1390,7 @@ static void mdss_fb_commit_wq_handler(struct work_struct *work)
 			mfd->mdp.kickoff_fnc(mfd);
 		mdss_fb_update_backlight(mfd);
 		mdss_fb_signal_timeline(mfd);
+		mdss_dsi_panel_fps_data_update(mfd);
 	} else {
 		var = &fb_backup->disp_commit.var;
 		ret = mdss_fb_pan_display_sub(var, info);

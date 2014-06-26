@@ -277,7 +277,7 @@ obj-$(CONFIG_MACH_MSM8930_MTP) += board-8930-all.o board-8930-regulator-pm8038.o
 obj-$(CONFIG_MACH_MSM8930_FLUID) += board-8930-all.o board-8930-regulator-pm8038.o board-8930-regulator-pm8917.o
 obj-$(CONFIG_PM8921_BMS) += bms-batterydata.o bms-batterydata-desay.o batterydata-lib.o
 obj-$(CONFIG_QPNP_BMS) += bms-batterydata.o bms-batterydata-desay.o batterydata-lib.o
-obj-$(CONFIG_QPNP_BMS) += bms-batterydata-oem.o bms-batterydata-qrd-4v35-2000mah.o bms-batterydata-qrd-4v2-1300mah.o
+obj-$(CONFIG_QPNP_BMS) += bms-batterydata-qrd-4v35-2000mah.o
 obj-$(CONFIG_MACH_APQ8064_CDP) += board-8064-all.o board-8064-regulator.o
 obj-$(CONFIG_MACH_APQ8064_MTP) += board-8064-all.o board-8064-regulator.o
 obj-$(CONFIG_MACH_APQ8064_LIQUID) += board-8064-all.o board-8064-regulator.o
@@ -287,7 +287,8 @@ obj-$(CONFIG_ARCH_MSM9615) += board-9615.o devices-9615.o board-9615-regulator.o
 obj-$(CONFIG_ARCH_MSM9615) += clock-local.o clock-9615.o acpuclock-9615.o clock-rpm.o clock-pll.o
 obj-$(CONFIG_ARCH_APQ8084) += board-8084.o board-8084-gpiomux.o
 obj-$(CONFIG_ARCH_APQ8084) += clock-8084.o
-obj-$(CONFIG_ARCH_MSM8974) += board-8974.o board-8974-gpiomux.o
+obj-$(CONFIG_ARCH_MSM8974) += board-8974.o
+obj-$(CONFIG_ARCH_MSM8974) += board-8974-console.o
 obj-$(CONFIG_ARCH_MSM8974) += acpuclock-8974.o
 obj-$(CONFIG_ARCH_MSM8974) += clock-local2.o clock-pll.o clock-8974.o clock-rpm.o clock-voter.o clock-mdss-8974.o
 obj-$(CONFIG_ARCH_MSM8974) += gdsc.o
@@ -314,6 +315,34 @@ obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire.o board-sapphire-gpio.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-keypad.o board-sapphire-panel.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-mmc.o board-sapphire-wifi.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-rfkill.o msm_vibrator.o
+
+ifdef CONFIG_MACH_SONY_RHINE_CDB
+	obj-$(CONFIG_MACH_SONY_RHINE_CDB) += board-sony_rhine_cdb-gpiomux.o board-sony_rhine-usb.o bms-batterydata-oem.o
+else ifdef CONFIG_MACH_SONY_TOGARI_ROW
+	obj-$(CONFIG_MACH_SONY_TOGARI_ROW) += board-sony_togari_row-gpiomux.o board-sony_togari-usb.o bms-batterydata-burton.o
+else ifdef CONFIG_MACH_SONY_TOGARI_WINDY
+	obj-$(CONFIG_MACH_SONY_TOGARI_WINDY) += board-sony_togari_windy-gpiomux.o board-sony_rhine-usb.o bms-batterydata-burton.o
+else ifdef CONFIG_MACH_SONY_TOGARI_BRAZIL
+	obj-$(CONFIG_MACH_SONY_TOGARI_BRAZIL) += board-sony_togari_brazil-gpiomux.o board-sony_rhine-usb.o bms-batterydata-burton.o
+else ifdef CONFIG_MACH_SONY_TOGARI_KDDI
+	obj-$(CONFIG_MACH_SONY_TOGARI_KDDI) += board-sony_togari_kddi-gpiomux.o board-sony_rhine-usb.o bms-batterydata-burton.o
+else ifdef CONFIG_MACH_SONY_HONAMI_ROW
+	obj-$(CONFIG_MACH_SONY_HONAMI_ROW) += board-sony_honami_row-gpiomux.o board-sony_rhine-usb.o bms-batterydata-salomon.o
+else ifdef CONFIG_MACH_SONY_HONAMI_CMCC
+	obj-$(CONFIG_MACH_SONY_HONAMI_CMCC) += board-sony_honami_cmcc-gpiomux.o board-sony_rhine-usb.o bms-batterydata-salomon.o
+else ifdef CONFIG_MACH_SONY_HONAMI_DCM
+	obj-$(CONFIG_MACH_SONY_HONAMI_DCM) += board-sony_honami_dcm-gpiomux.o board-sony_rhine-usb.o bms-batterydata-salomon.o
+else ifdef CONFIG_MACH_SONY_HONAMI_KDDI
+	obj-$(CONFIG_MACH_SONY_HONAMI_KDDI) += board-sony_honami_kddi-gpiomux.o board-sony_rhine-usb.o bms-batterydata-salomon.o
+else ifdef CONFIG_MACH_SONY_HONAMI_BRAZIL
+	obj-$(CONFIG_MACH_SONY_HONAMI_BRAZIL) += board-sony_honami_brazil-gpiomux.o board-sony_rhine-usb.o bms-batterydata-salomon.o
+else ifdef CONFIG_MACH_SONY_AMAMI_ROW
+	obj-$(CONFIG_MACH_SONY_AMAMI_ROW) += board-sony_amami_row-gpiomux.o board-sony_rhine-usb.o bms-batterydata-ray.o
+else ifdef CONFIG_MACH_SONY_AMAMI_DCM
+	obj-$(CONFIG_MACH_SONY_AMAMI_DCM) += board-sony_amami_dcm-gpiomux.o board-sony_rhine-usb.o bms-batterydata-ray.o
+else
+	obj-$(CONFIG_ARCH_MSM8974) += board-8974-gpiomux.o board-sony_rhine-usb.o bms-batterydata-oem.o
+endif
 
 CFLAGS_msm_vibrator.o += -Idrivers/staging/android
 CFLAGS_board-9615.o += -Idrivers/usb/gadget
@@ -396,6 +425,7 @@ obj-$(CONFIG_MSM_RTB) += msm_rtb.o
 obj-$(CONFIG_MSM_CACHE_ERP) += cache_erp.o
 obj-$(CONFIG_MSM_EBI_ERP) += ebi_erp.o
 obj-$(CONFIG_MSM_CACHE_DUMP) += msm_cache_dump.o
+obj-$(CONFIG_SONY_SSM) += sony_ssm.o
 
 obj-$(CONFIG_MSM_HSIC_SYSMON) += hsic_sysmon.o
 obj-$(CONFIG_MSM_HSIC_SYSMON_TEST) += hsic_sysmon_test.o
@@ -417,11 +447,18 @@ endif
 obj-$(CONFIG_MSM_FIQ) += msm7k_fiq.o
 obj-$(CONFIG_MSM_FIQ) += msm7k_fiq_handler.o
 
+obj-$(CONFIG_RAMDUMP_TAGS) += board-rdtags.o
+CFLAGS_board-rdtags.o  := \
+	-D"INFO_PRODUCT=\"$(if $(TARGET_PRODUCT),$(TARGET_PRODUCT),unknown)\"" \
+	-D"INFO_VARIANT= \
+	\"$(if $(TARGET_BUILD_VARIANT),$(TARGET_BUILD_VARIANT),unknown)\"" \
+	-D"INFO_BUILDID=\"$(if $(BUILD_ID),$(BUILD_ID),unknown)\""
+
 obj-$(CONFIG_MEMORY_HOLE_CARVEOUT) +=  msm_mem_hole.o
 
 obj-$(CONFIG_MSM_SMCMOD) += smcmod.o
 obj-$(CONFIG_MSM_CPU_PWRCTL) +=  msm_cpu_pwrctl.o
-
+obj-$(CONFIG_MSM_MODEM_SUBSYSTEM_RESTART_MONITOR) += modem_restart_monitor.o
 obj-$(CONFIG_ARCH_MSM8974) += msm_mpmctr.o
 obj-$(CONFIG_MSM_CPR_REGULATOR) += cpr-regulator.o
 obj-$(CONFIG_CPU_FREQ_MSM) += cpufreq.o

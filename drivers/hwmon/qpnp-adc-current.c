@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,6 +33,7 @@
 #include <linux/qpnp/qpnp-adc.h>
 #include <linux/platform_device.h>
 #include <linux/wakelock.h>
+#include <linux/qpnp/power-on.h>
 
 /* QPNP IADC register definition */
 #define QPNP_IADC_REVISION1				0x0
@@ -114,7 +116,7 @@
 
 #define QPNP_ADC_CONV_TIME_MIN				2000
 #define QPNP_ADC_CONV_TIME_MAX				2100
-#define QPNP_ADC_ERR_COUNT				20
+#define QPNP_ADC_ERR_COUNT				1000
 
 #define QPNP_ADC_GAIN_NV				17857
 #define QPNP_OFFSET_CALIBRATION_SHORT_CADC_LEADS_IDEAL	0
@@ -149,12 +151,11 @@ struct qpnp_iadc_drv {
 	struct mutex				iadc_vadc_lock;
 	bool					iadc_mode_sel;
 	struct qpnp_iadc_comp			iadc_comp;
-	bool					skip_auto_calibrations;
 	bool					iadc_poll_eoc;
 	struct sensor_device_attribute		sens_attr[0];
 };
 
-static struct qpnp_iadc_drv	*qpnp_iadc;
+struct qpnp_iadc_drv	*qpnp_iadc;
 
 static int32_t qpnp_iadc_read_reg(uint32_t reg, u8 *data)
 {
@@ -270,6 +271,9 @@ static int32_t qpnp_iadc_status_debug(void)
 
 	pr_debug("EOC not set with status:%x, dig:%x, ch:%x, mode:%x, en:%x\n",
 			status1, dig, chan, mode, en);
+
+	/* somc workaround for adc lock-up issue */
+	qpnp_pon_dvdd_reset();
 
 	rc = qpnp_iadc_enable(false);
 	if (rc < 0) {
@@ -395,13 +399,8 @@ static int32_t qpnp_iadc_comp_info(void)
 
 	rc = qpnp_iadc_read_reg(QPNP_IADC_ATE_GAIN_CALIB_OFFSET,
 						&iadc->iadc_comp.sys_gain);
-	if (rc < 0) {
+	if (rc < 0)
 		pr_err("full scale read failed with %d\n", rc);
-		return rc;
-	}
-
-	if (iadc->external_rsense)
-		iadc->iadc_comp.ext_rsense = true;
 
 	pr_debug("fab id = %u, revision = %u, sys gain = %u, external_rsense = %d\n",
 			iadc->iadc_comp.id,
@@ -558,7 +557,7 @@ static int32_t qpnp_convert_raw_offset_voltage(void)
 	return 0;
 }
 
-int32_t qpnp_iadc_calibrate_for_trim(bool batfet_closed)
+int32_t qpnp_iadc_calibrate_for_trim(void)
 {
 	struct qpnp_iadc_drv *iadc = qpnp_iadc;
 	uint8_t rslt_lsb, rslt_msb;
@@ -576,6 +575,14 @@ int32_t qpnp_iadc_calibrate_for_trim(bool batfet_closed)
 		pm_stay_awake(iadc->dev);
 	}
 
+	/* Exported symbol may be called from outside this driver.
+	 * Ensure this driver is ready (probed) before supporting
+	 * calibration.
+	 */
+	rc = qpnp_iadc_is_ready();
+	if (rc < 0)
+		goto fail;
+
 	rc = qpnp_iadc_configure(GAIN_CALIBRATION_17P857MV,
 					&raw_data, mode_sel);
 	if (rc < 0) {
@@ -585,14 +592,7 @@ int32_t qpnp_iadc_calibrate_for_trim(bool batfet_closed)
 
 	iadc->adc->calib.gain_raw = raw_data;
 
-	/*
-	 * there is a features in the BMS where if the batfet is opened
-	 * the BMS reads from INTERNAL_RSENSE (channel 0) actually go to
-	 * OFFSET_CALIBRATION_CSP_CSN (channel 5). Hence if batfet is opened
-	 * we have to calibrate based on OFFSET_CALIBRATION_CSP_CSN even for
-	 * internal rsense.
-	 */
-	if (!batfet_closed || iadc->external_rsense) {
+	if (iadc->external_rsense) {
 		/* external offset calculation */
 		rc = qpnp_iadc_configure(OFFSET_CALIBRATION_CSP_CSN,
 						&raw_data, mode_sel);
@@ -673,15 +673,13 @@ static void qpnp_iadc_work(struct work_struct *work)
 	struct qpnp_iadc_drv *iadc = qpnp_iadc;
 	int rc = 0;
 
-	if (!iadc->skip_auto_calibrations) {
-		rc = qpnp_iadc_calibrate_for_trim(true);
-		if (rc)
-			pr_debug("periodic IADC calibration failed\n");
-	}
-
-	schedule_delayed_work(&iadc->iadc_work,
-		round_jiffies_relative(msecs_to_jiffies
-				(QPNP_IADC_CALIB_SECONDS)));
+	rc = qpnp_iadc_calibrate_for_trim();
+	if (rc)
+		pr_debug("periodic IADC calibration failed\n");
+	else
+		schedule_delayed_work(&iadc->iadc_work,
+			round_jiffies_relative(msecs_to_jiffies
+					(QPNP_IADC_CALIB_SECONDS)));
 	return;
 }
 
@@ -770,12 +768,11 @@ static int32_t qpnp_check_pmic_temp(void)
 		die_temp_offset = -die_temp_offset;
 
 	if (die_temp_offset > QPNP_IADC_DIE_TEMP_CALIB_OFFSET) {
-		iadc->die_temp = result_pmic_therm.physical;
-		if (!iadc->skip_auto_calibrations) {
-			rc = qpnp_iadc_calibrate_for_trim(true);
-			if (rc)
-				pr_err("IADC calibration failed rc = %d\n", rc);
-		}
+		iadc->die_temp =
+			result_pmic_therm.physical;
+		rc = qpnp_iadc_calibrate_for_trim();
+		if (rc)
+			pr_err("periodic IADC calibration failed\n");
 	}
 
 	return rc;
@@ -883,30 +880,6 @@ int32_t qpnp_iadc_get_gain_and_offset(struct qpnp_iadc_calib *result)
 	return 0;
 }
 EXPORT_SYMBOL(qpnp_iadc_get_gain_and_offset);
-
-int qpnp_iadc_skip_calibration(void)
-{
-	struct qpnp_iadc_drv *iadc = qpnp_iadc;
-
-	if (!iadc || !iadc->iadc_initialized)
-		return -EPROBE_DEFER;
-
-	iadc->skip_auto_calibrations = true;
-	return 0;
-}
-EXPORT_SYMBOL(qpnp_iadc_skip_calibration);
-
-int qpnp_iadc_resume_calibration(void)
-{
-	struct qpnp_iadc_drv *iadc = qpnp_iadc;
-
-	if (!iadc || !iadc->iadc_initialized)
-		return -EPROBE_DEFER;
-
-	iadc->skip_auto_calibrations = false;
-	return 0;
-}
-EXPORT_SYMBOL(qpnp_iadc_resume_calibration);
 
 int32_t qpnp_iadc_vadc_sync_read(
 	enum qpnp_iadc_channels i_channel, struct qpnp_iadc_result *i_result,
@@ -1028,6 +1001,12 @@ static int __devinit qpnp_iadc_probe(struct spmi_device *spmi)
 		return -EBUSY;
 	}
 
+	if (!qpnp_pon_is_initialized()) {
+		/* pon reset is needed for iadc queries */
+		pr_err("qpnp-adc-current requests probe deferral\n");
+		return -EPROBE_DEFER;
+	}
+
 	for_each_child_of_node(node, child)
 		count_adc_channel_list++;
 
@@ -1110,7 +1089,7 @@ static int __devinit qpnp_iadc_probe(struct spmi_device *spmi)
 	}
 	iadc->iadc_initialized = true;
 
-	rc = qpnp_iadc_calibrate_for_trim(true);
+	rc = qpnp_iadc_calibrate_for_trim();
 	if (rc)
 		dev_err(&spmi->dev, "failed to calibrate for USR trim\n");
 

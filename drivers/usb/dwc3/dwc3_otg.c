@@ -2,6 +2,7 @@
  * dwc3_otg.c - DesignWare USB3 DRD Controller OTG
  *
  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,6 +19,9 @@
 #include <linux/usb/hcd.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+#include <linux/usb/host_ext_event.h>
+#endif
 
 #include "core.h"
 #include "dwc3_otg.h"
@@ -190,6 +194,18 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 		}
 
 		dwc3_otg_notify_host_mode(otg, on);
+
+		/* register ocp notification */
+		if (ext_xceiv && ext_xceiv->otg_capability &&
+				ext_xceiv->ext_ocp_notification.notify) {
+			ret = regulator_register_ocp_notification(
+					dotg->vbus_otg,
+					&ext_xceiv->ext_ocp_notification);
+			if (ret)
+				dev_err(otg->phy->dev,
+					"unable to register ocp\n");
+		}
+
 		ret = regulator_enable(dotg->vbus_otg);
 		if (ret) {
 			dev_err(otg->phy->dev, "unable to enable vbus_otg\n");
@@ -208,6 +224,17 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 			dev_err(otg->phy->dev, "unable to disable vbus_otg\n");
 			return ret;
 		}
+
+		/* unregister ocp notification */
+		if (ext_xceiv && ext_xceiv->otg_capability &&
+				ext_xceiv->ext_ocp_notification.notify) {
+			ret = regulator_register_ocp_notification(
+					dotg->vbus_otg, NULL);
+			if (ret)
+				dev_err(otg->phy->dev,
+					"unable to unregister ocp\n");
+		}
+
 		dwc3_otg_notify_host_mode(otg, on);
 
 		platform_device_del(dwc->xhci);
@@ -415,19 +442,25 @@ static void dwc3_ext_event_notify(struct usb_otg *otg,
 				dev_warn(phy->dev, "pm_runtime_get failed!!\n");
 		}
 		if (ext_xceiv->id == DWC3_ID_FLOAT) {
-			dev_dbg(phy->dev, "XCVR: ID set\n");
+			dev_info(phy->dev, "XCVR: ID set\n");
 			set_bit(ID, &dotg->inputs);
 		} else {
-			dev_dbg(phy->dev, "XCVR: ID clear\n");
+			dev_info(phy->dev, "XCVR: ID clear\n");
 			clear_bit(ID, &dotg->inputs);
 		}
 
 		if (ext_xceiv->bsv) {
-			dev_dbg(phy->dev, "XCVR: BSV set\n");
+			dev_info(phy->dev, "XCVR: BSV set\n");
 			set_bit(B_SESS_VLD, &dotg->inputs);
 		} else {
-			dev_dbg(phy->dev, "XCVR: BSV clear\n");
+			dev_info(phy->dev, "XCVR: BSV clear\n");
 			clear_bit(B_SESS_VLD, &dotg->inputs);
+		}
+
+		if (ext_xceiv->ocp) {
+			dev_dbg(phy->dev, "XCVR: OCP set\n");
+			ext_xceiv->ocp = false;
+			set_bit(A_VBUS_DROP_DET, &dotg->inputs);
 		}
 
 		if (!init) {
@@ -477,6 +510,40 @@ static void dwc3_otg_notify_host_mode(struct usb_otg *otg, int host_mode)
 		power_supply_set_scope(dotg->psy, POWER_SUPPLY_SCOPE_DEVICE);
 }
 
+static void dwc3_otg_set_dcp_present(struct dwc3_otg *dotg, bool enable)
+{
+	if (!dotg->dc_psy)
+		dotg->dc_psy = power_supply_get_by_name("qpnp-dc");
+
+	if (dotg->dc_psy)
+		power_supply_set_present(dotg->dc_psy, enable);
+}
+
+static const char *dwc3_otg_supply_type_string(int supply_type)
+{
+	const char *ret;
+
+	switch (supply_type) {
+	case POWER_SUPPLY_TYPE_USB:
+		ret = "SDP";
+		break;
+	case POWER_SUPPLY_TYPE_USB_CDP:
+		ret = "CDP";
+		break;
+	case POWER_SUPPLY_TYPE_USB_DCP:
+		ret = "DCP";
+		break;
+	case POWER_SUPPLY_TYPE_BATTERY:
+		ret = "BATTERY";
+		break;
+	default:
+		ret = "unknown";
+		break;
+	}
+
+	return ret;
+}
+
 static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 {
 	static int power_supply_type;
@@ -501,6 +568,8 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 	else
 		power_supply_type = POWER_SUPPLY_TYPE_BATTERY;
 
+	dev_info(phy->dev, "set power supply type = %s\n",
+			dwc3_otg_supply_type_string(power_supply_type));
 	power_supply_set_supply_type(dotg->psy, power_supply_type);
 
 	if ((dotg->charger->chg_type == DWC3_CDP_CHARGER) && mA > 2)
@@ -513,12 +582,15 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 
 	if (dotg->charger->max_power <= 2 && mA > 2) {
 		/* Enable charging */
+		if (power_supply_type == POWER_SUPPLY_TYPE_USB_DCP)
+			dwc3_otg_set_dcp_present(dotg, true);
 		if (power_supply_set_online(dotg->psy, true))
 			goto psy_error;
 		if (power_supply_set_current_limit(dotg->psy, 1000*mA))
 			goto psy_error;
 	} else if (dotg->charger->max_power > 0 && (mA == 0 || mA == 2)) {
 		/* Disable charging */
+		dwc3_otg_set_dcp_present(dotg, false);
 		if (power_supply_set_online(dotg->psy, false))
 			goto psy_error;
 		/* Set max current limit */
@@ -569,10 +641,10 @@ static irqreturn_t dwc3_otg_interrupt(int irq, void *_dotg)
 
 		if (oevt_reg & DWC3_OEVTEN_OTGCONIDSTSCHNGEVNT) {
 			if (osts & DWC3_OTG_OSTS_CONIDSTS) {
-				dev_dbg(phy->dev, "ID set\n");
+				dev_info(phy->dev, "ID set\n");
 				set_bit(ID, &dotg->inputs);
 			} else {
-				dev_dbg(phy->dev, "ID clear\n");
+				dev_info(phy->dev, "ID clear\n");
 				clear_bit(ID, &dotg->inputs);
 			}
 			handled_irqs |= DWC3_OEVTEN_OTGCONIDSTSCHNGEVNT;
@@ -580,10 +652,10 @@ static irqreturn_t dwc3_otg_interrupt(int irq, void *_dotg)
 
 		if (oevt_reg & DWC3_OEVTEN_OTGBDEVVBUSCHNGEVNT) {
 			if (osts & DWC3_OTG_OSTS_BSESVALID) {
-				dev_dbg(phy->dev, "BSV set\n");
+				dev_info(phy->dev, "BSV set\n");
 				set_bit(B_SESS_VLD, &dotg->inputs);
 			} else {
-				dev_dbg(phy->dev, "BSV clear\n");
+				dev_info(phy->dev, "BSV clear\n");
 				clear_bit(B_SESS_VLD, &dotg->inputs);
 			}
 			handled_irqs |= DWC3_OEVTEN_OTGBDEVVBUSCHNGEVNT;
@@ -656,7 +728,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 	bool work = 0;
 
 	pm_runtime_resume(phy->dev);
-	dev_dbg(phy->dev, "%s state\n", otg_state_string(phy->state));
+	dev_info(phy->dev, "%s state\n", otg_state_string(phy->state));
 
 	/* Check OTG state */
 	switch (phy->state) {
@@ -797,6 +869,10 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			dev_dbg(phy->dev, "id\n");
 			phy->state = OTG_STATE_B_IDLE;
 			work = 1;
+			clear_bit(A_VBUS_DROP_DET, &dotg->inputs);
+		} else if (test_bit(A_VBUS_DROP_DET, &dotg->inputs)) {
+			dev_dbg(phy->dev, "vbus_drop_det\n");
+			/* staying on here until exit from A-Device */
 		} else {
 			phy->state = OTG_STATE_A_HOST;
 			if (dwc3_otg_start_host(&dotg->otg, 1)) {
@@ -819,6 +895,15 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			dwc3_otg_start_host(&dotg->otg, 0);
 			phy->state = OTG_STATE_B_IDLE;
 			work = 1;
+			clear_bit(A_VBUS_DROP_DET, &dotg->inputs);
+		} else if (test_bit(A_VBUS_DROP_DET, &dotg->inputs)) {
+			dev_dbg(phy->dev, "vbus_drop_det\n");
+			dwc3_otg_start_host(&dotg->otg, 0);
+			phy->state = OTG_STATE_A_IDLE;
+			work = 1;
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+			host_send_uevent(USB_HOST_EXT_EVENT_VBUS_DROP);
+#endif
 		}
 		break;
 

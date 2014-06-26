@@ -4,6 +4,7 @@
  *  Copyright (C) 2007 Google Inc,
  *  Copyright (C) 2003 Deep Blue Solutions, Ltd, All Rights Reserved.
  *  Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2013 Sony Mobile Communications AB.
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -6183,10 +6184,9 @@ msmsdcc_probe(struct platform_device *pdev)
 	mmc->caps2 |= MMC_CAP2_PACKED_WR_CONTROL;
 	mmc->caps2 |= (MMC_CAP2_BOOTPART_NOACC | MMC_CAP2_DETECT_ON_ERR);
 	mmc->caps2 |= MMC_CAP2_SANITIZE;
-	mmc->caps2 |= MMC_CAP2_CACHE_CTRL;
-	mmc->caps2 |= MMC_CAP2_POWEROFF_NOTIFY;
 	mmc->caps2 |= MMC_CAP2_STOP_REQUEST;
 	mmc->caps2 |= MMC_CAP2_ASYNC_SDIO_IRQ_4BIT_MODE;
+	mmc->caps2 |= MMC_CAP2_INIT_BKOPS;
 
 	if (plat->nonremovable)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;
@@ -6344,7 +6344,10 @@ msmsdcc_probe(struct platform_device *pdev)
 	mmc->clk_scaling.up_threshold = 35;
 	mmc->clk_scaling.down_threshold = 5;
 	mmc->clk_scaling.polling_delay_ms = 100;
-	mmc->caps2 |= MMC_CAP2_CLK_SCALE;
+
+	if (plat->nonremovable == 0) {
+		mmc->caps2 |= MMC_CAP2_CLK_SCALE;
+	}
 
 	pr_info("%s: Qualcomm MSM SDCC-core %pr %pr,%d dma %d dmacrcri %d\n",
 		mmc_hostname(mmc), core_memres, core_irqres,

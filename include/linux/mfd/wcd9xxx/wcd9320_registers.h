@@ -1,3 +1,15 @@
+/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
 #ifndef WCD9320_REGISTERS_H
 #define WCD9320_REGISTERS_H
 
@@ -306,7 +318,7 @@
 #define TAIKO_A_TX_3_4_SAR_ERR_CH4			(0x166)
 #define TAIKO_A_TX_3_4_SAR_ERR_CH4__POR				(0x00)
 #define TAIKO_A_TX_5_6_EN			(0x167)
-#define TAIKO_A_TX_5_6_EN__POR				(0x11)
+#define TAIKO_A_TX_5_6_EN__POR				(0x00)
 #define TAIKO_A_TX_5_6_TEST_EN			(0x168)
 #define TAIKO_A_TX_5_6_TEST_EN__POR				(0xCC)
 #define TAIKO_A_TX_5_6_ADC_CH5			(0x169)
@@ -528,7 +540,7 @@
 #define TAIKO_A_SPKR_DRV_CLIP_DET			(0x1E3)
 #define TAIKO_A_SPKR_DRV_CLIP_DET__POR				(0x48)
 #define TAIKO_A_SPKR_DRV_IEC			(0x1E4)
-#define TAIKO_A_SPKR_DRV_IEC__POR				(0x20)
+#define TAIKO_A_SPKR_DRV_IEC__POR				(0x08)
 #define TAIKO_A_SPKR_DRV_DBG_DAC			(0x1E5)
 #define TAIKO_A_SPKR_DRV_DBG_DAC__POR				(0x05)
 #define TAIKO_A_SPKR_DRV_DBG_PA			(0x1E6)

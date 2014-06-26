@@ -884,6 +884,10 @@ int mdss_hw_init(struct mdss_data_type *mdata)
 	mdata->mdp_rev = MDSS_MDP_REG_READ(MDSS_MDP_REG_HW_VERSION);
 	pr_info_once("MDP Rev=%x\n", mdata->mdp_rev);
 
+	/* disable hw underrun recovery */
+	writel_relaxed(0x0, mdata->mdp_base +
+			MDSS_MDP_REG_VIDEO_INTF_UNDERFLOW_CTL);
+
 	if (mdata->hw_settings) {
 		struct mdss_hw_settings *hws = mdata->hw_settings;
 
@@ -1623,8 +1627,7 @@ static inline int mdss_mdp_suspend_sub(struct mdss_data_type *mdata)
 
 static inline int mdss_mdp_resume_sub(struct mdss_data_type *mdata)
 {
-	if (mdata->suspend_fs_ena)
-		mdss_mdp_footswitch_ctrl(mdata, true);
+	mdss_mdp_footswitch_ctrl(mdata, true);
 
 	pr_debug("resume done fs=%d\n", mdata->suspend_fs_ena);
 

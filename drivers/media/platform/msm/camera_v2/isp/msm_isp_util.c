@@ -1,4 +1,5 @@
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -906,6 +907,9 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	vfe_dev->axi_data.hw_info = vfe_dev->hw_info->axi_hw_info;
 	vfe_dev->vfe_open_cnt++;
 	vfe_dev->taskletq_idx = 0;
+#if defined(CONFIG_SONY_CAM_V4L2)
+	vfe_dev->timeout = VFE_MAX_CFG_TIMEOUT;
+#endif
 	mutex_unlock(&vfe_dev->core_mutex);
 	mutex_unlock(&vfe_dev->realtime_mutex);
 	return 0;

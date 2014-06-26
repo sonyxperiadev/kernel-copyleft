@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -208,6 +209,7 @@ enum qpnp_adc_channel_scaling_param {
  *				 Uses a mapping table with 150K pullup.
  * %SCALE_QRD_BATT_THERM: Conversion to temperature(decidegC) based on
  *			btm parameters.
+ * %SCALE_EMMC_THERM: Returns result in decidegreesC.
  * %SCALE_NONE: Do not use this scaling type.
  */
 enum qpnp_adc_scale_fn_type {
@@ -218,6 +220,7 @@ enum qpnp_adc_scale_fn_type {
 	SCALE_XOTHERM,
 	SCALE_THERM_150K_PULLUP,
 	SCALE_QRD_BATT_THERM,
+	SCALE_EMMC_THERM,
 	SCALE_NONE,
 };
 
@@ -238,6 +241,7 @@ enum qpnp_adc_tm_rscale_fn_type {
 	SCALE_RBATT_THERM,
 	SCALE_R_USB_ID,
 	SCALE_RPMIC_THERM,
+	SCALE_REMMC_THERM,
 	SCALE_RSCALE_NONE,
 };
 
@@ -1164,6 +1168,21 @@ int32_t qpnp_adc_scale_therm_pu2(int32_t adc_code,
 			const struct qpnp_vadc_chan_properties *chan_prop,
 			struct qpnp_vadc_result *chan_rslt);
 /**
+ * qpnp_adc_scale_emmc_therm() - Scales the pre-calibrated digital output
+ *		of an ADC to the ADC reference and compensates for the
+ *		gain and offset. Returns the temperature in decidegreesC.
+ * @adc_code:	pre-calibrated digital ouput of the ADC.
+ * @adc_prop:	adc properties of the pm8xxx adc such as bit resolution,
+ *		reference voltage.
+ * @chan_prop:	individual channel properties to compensate the i/p scaling,
+ *		slope and offset.
+ * @chan_rslt:	physical result to be stored.
+ */
+int32_t qpnp_adc_scale_emmc_therm(int32_t adc_code,
+			const struct qpnp_adc_properties *adc_prop,
+			const struct qpnp_vadc_chan_properties *chan_prop,
+			struct qpnp_vadc_result *chan_rslt);
+/**
  * qpnp_vadc_is_ready() - Clients can use this API to check if the
  *			  device is ready to use.
  * @result:	0 on success and -EPROBE_DEFER when probe for the device
@@ -1236,6 +1255,21 @@ int32_t qpnp_adc_tm_scale_therm_voltage_pu2(struct qpnp_adc_tm_config *param);
  */
 int32_t qpnp_adc_tm_scale_voltage_therm_pu2(uint32_t reg, int64_t *result);
 /**
+ * qpnp_adc_tm_scale_therm_voltage_emmc() - Performs reverse calibration
+ *		and convert given temperature to voltage on supported
+ *		emmc thermistor channel.
+ * @param:	The input temperature values(deci-degC).
+ */
+int32_t qpnp_adc_tm_scale_therm_voltage_emmc(struct qpnp_adc_tm_config *param);
+/**
+ * qpnp_adc_tm_scale_voltage_therm_emmc() - Performs reverse calibration
+ *		and converts the given ADC code to temperature for
+ *		emmc thermistor channel.
+ * @reg:	The input ADC code.
+ * @result:	The physical measurement temperature on the thermistor.
+ */
+int32_t qpnp_adc_tm_scale_voltage_therm_emmc(uint32_t reg, int64_t *result);
+/**
  * qpnp_adc_usb_scaler() - Performs reverse calibration on the low/high
  *		voltage threshold values passed by the client.
  *		The function applies ratiometric calibration on the
@@ -1264,6 +1298,20 @@ int32_t qpnp_adc_usb_scaler(struct qpnp_adc_tm_btm_param *param,
 int32_t qpnp_adc_vbatt_rscaler(struct qpnp_adc_tm_btm_param *param,
 		uint32_t *low_threshold, uint32_t *high_threshold);
 /**
+ * qpnp_adc_emmc_scaler() - Performs reverse calibration on the low/high
+ *		voltage threshold values passed by the client.
+ *		The function applies ratiometric calibration on the
+ *		voltage values.
+ * @param:	The input parameters that contain the low/high voltage
+ *		threshold values.
+ * @low_threshold: The low threshold value that needs to be updated with
+ *		the above calibrated voltage value.
+ * @high_threshold: The low threshold value that needs to be updated with
+ *		the above calibrated voltage value.
+ */
+int32_t qpnp_adc_emmc_scaler(struct qpnp_adc_tm_btm_param *param,
+		uint32_t *low_threshold, uint32_t *high_threshold);
+/**
  * qpnp_vadc_iadc_sync_request() - Performs Voltage ADC read and
  *		locks the peripheral. When performing simultaneous
  *		voltage and current request the VADC peripheral is
@@ -1285,6 +1333,11 @@ int32_t qpnp_vadc_iadc_sync_complete_request(
  * @result:	Voltage in uV that needs compensation.
  */
 int32_t qpnp_vbat_sns_comp_result(int64_t *result);
+/**
+ * qpnp_adc_therm_table_sel() - select of thermistor table
+ * @val:	0: use new table	1: use old table
+ */
+void qpnp_adc_therm_table_sel(bool val);
 #else
 static inline int32_t qpnp_vadc_read(uint32_t channel,
 				struct qpnp_vadc_result *result)
@@ -1334,6 +1387,11 @@ static inline int32_t qpnp_adc_scale_therm_pu2(int32_t adc_code,
 			const struct qpnp_vadc_chan_properties *chan_prop,
 			struct qpnp_vadc_result *chan_rslt)
 { return -ENXIO; }
+static inline int32_t qpnp_adc_scale_emmc_therm(int32_t adc_code,
+			const struct qpnp_adc_properties *adc_prop,
+			const struct qpnp_vadc_chan_properties *chan_prop,
+			struct qpnp_vadc_result *chan_rslt)
+{ return -ENXIO; }
 static inline int32_t qpnp_vadc_is_ready(void)
 { return -ENXIO; }
 static inline int32_t qpnp_get_vadc_gain_and_offset(
@@ -1361,6 +1419,16 @@ static inline int32_t qpnp_adc_tm_scale_therm_voltage_pu2(
 { return -ENXIO; }
 static inline int32_t qpnp_adc_tm_scale_voltage_therm_pu2(
 				uint32_t reg, int64_t *result)
+{ return -ENXIO; }
+static inline int32_t qpnp_adc_tm_scale_therm_voltage_emmc(
+				struct qpnp_adc_tm_config *param)
+{ return -ENXIO; }
+static inline int32_t qpnp_adc_tm_scale_voltage_therm_emmc(
+				uint32_t reg, int64_t *result)
+{ return -ENXIO; }
+static inline int32_t qpnp_adc_emmc_scaler(
+		struct qpnp_adc_tm_btm_param *param,
+		uint32_t *low_threshold, uint32_t *high_threshold)
 { return -ENXIO; }
 static inline int32_t qpnp_vadc_iadc_sync_request(
 				enum qpnp_vadc_channels channel)
@@ -1419,16 +1487,11 @@ int32_t qpnp_iadc_vadc_sync_read(
 	enum qpnp_iadc_channels i_channel, struct qpnp_iadc_result *i_result,
 	enum qpnp_vadc_channels v_channel, struct qpnp_vadc_result *v_result);
 /**
- * qpnp_iadc_calibrate_for_trim - Clients can use this API to re-calibrate
- *		IADC. The offset and gain values are programmed in the trim
- *		registers. The offset and the gain can be retrieved using
- *		qpnp_iadc_get_gain_and_offset
- * @batfet_closed: batfet is opened or closed. The IADC chooses proper
- *			channel (internal/external) based on batfet status
- *			for calibration.
- * RETURNS:	0 on success.
+ * qpnp_iadc_calibrate_for_trim() - Clients can use this API to re-calibrate
+ *		IADC.
+ * @result:	0 on success.
  */
-int32_t qpnp_iadc_calibrate_for_trim(bool batfet_closed);
+int32_t qpnp_iadc_calibrate_for_trim(void);
 int32_t qpnp_iadc_comp_result(int64_t *result);
 #else
 static inline int32_t qpnp_iadc_read(enum qpnp_iadc_channels channel,
@@ -1445,7 +1508,7 @@ static inline int32_t qpnp_iadc_vadc_sync_read(
 	enum qpnp_iadc_channels i_channel, struct qpnp_iadc_result *i_result,
 	enum qpnp_vadc_channels v_channel, struct qpnp_vadc_result *v_result)
 { return -ENXIO; }
-static inline int32_t qpnp_iadc_calibrate_for_trim(bool batfet_closed)
+static inline int32_t qpnp_iadc_calibrate_for_trim(void)
 { return -ENXIO; }
 static inline int32_t qpnp_iadc_comp_result(int64_t *result, int32_t sign)
 { return -ENXIO; }
@@ -1499,20 +1562,6 @@ int32_t qpnp_adc_tm_disable_chan_meas(struct qpnp_adc_tm_btm_param *param);
  *		has not occured.
  */
 int32_t	qpnp_adc_tm_is_ready(void);
-/**
- * qpnp_iadc_skip_calibration() - Clients can use this API to ask the driver
- *				to skip iadc calibrations
- * @result:	0 on success and -EPROBE_DEFER when probe for the device
- *		has not occured.
- */
-int qpnp_iadc_skip_calibration(void);
-/**
- * qpnp_iadc_resume_calibration() - Clients can use this API to ask the driver
- *				to resume iadc calibrations
- * @result:	0 on success and -EPROBE_DEFER when probe for the device
- *		has not occured.
- */
-int qpnp_iadc_resume_calibration(void);
 #else
 static inline int32_t qpnp_adc_tm_usbid_configure(
 			struct qpnp_adc_tm_btm_param *param)
@@ -1525,10 +1574,6 @@ static inline int32_t qpnp_adc_tm_channel_measure(
 static inline int32_t qpnp_adc_tm_disable_chan_meas(void)
 { return -ENXIO; }
 static inline int32_t qpnp_adc_tm_is_ready(void)
-{ return -ENXIO; }
-static inline int qpnp_iadc_skip_calibration(void)
-{ return -ENXIO; }
-static inline int qpnp_iadc_resume_calibration(void);
 { return -ENXIO; }
 #endif
 

@@ -25,6 +25,7 @@
 #include <linux/of.h>
 #include <linux/cpu.h>
 #include <linux/platform_device.h>
+#include <linux/suspend.h>
 #include <mach/scm.h>
 #include <mach/msm_memory_dump.h>
 
@@ -294,6 +295,29 @@ static void pet_watchdog_work(struct work_struct *work)
 				&wdog_dd->dogwork_struct, delay_time);
 }
 
+static struct device *dev;
+static int wdog_init_done;
+
+void touch_nmi_watchdog(void)
+{
+	unsigned long long ns;
+	unsigned long delay_time;
+	struct msm_watchdog_data *wdog_dd =
+			(struct msm_watchdog_data *)dev_get_drvdata(dev);
+
+	if (!wdog_dd || !wdog_init_done)
+		return;
+
+	delay_time = msecs_to_jiffies(wdog_dd->pet_time);
+
+	ns = sched_clock() - wdog_dd->last_pet;
+	if (nsecs_to_jiffies(ns) > delay_time)
+		pet_watchdog(wdog_dd);
+
+	touch_softlockup_watchdog();
+}
+EXPORT_SYMBOL(touch_nmi_watchdog);
+
 static int msm_watchdog_remove(struct platform_device *pdev)
 {
 	struct wdog_disable_work_data work_data;
@@ -445,6 +469,8 @@ static void init_watchdog_work(struct work_struct *work)
 		dev_err(wdog_dd->dev, "cannot create sysfs attribute\n");
 	if (wdog_dd->irq_ppi)
 		enable_percpu_irq(wdog_dd->bark_irq, 0);
+	dev = wdog_dd->dev;
+	wdog_init_done = 1;
 	dev_info(wdog_dd->dev, "MSM Watchdog Initialized\n");
 	return;
 }
@@ -515,6 +541,27 @@ static int __devinit msm_wdog_dt_to_pdata(struct platform_device *pdev,
 	return 0;
 }
 
+static int wdog_pm_notifier(struct notifier_block *nb, unsigned long event,
+		void *dummy)
+{
+	struct msm_watchdog_data *wdog_dd =
+		(struct msm_watchdog_data *)dev_get_drvdata(dev);
+
+		switch (event) {
+		case PM_SUSPEND_PREPARE:
+			pet_watchdog(wdog_dd);
+			break;
+		default:
+			break;
+		}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block wdog_pm_nb = {
+	.notifier_call = wdog_pm_notifier,
+	.priority = 0,
+};
+
 static int __devinit msm_watchdog_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -540,6 +587,7 @@ static int __devinit msm_watchdog_probe(struct platform_device *pdev)
 	INIT_WORK(&wdog_dd->init_dogwork_struct, init_watchdog_work);
 	INIT_DELAYED_WORK(&wdog_dd->dogwork_struct, pet_watchdog_work);
 	queue_work_on(0, wdog_wq, &wdog_dd->init_dogwork_struct);
+	register_pm_notifier(&wdog_pm_nb);
 	return 0;
 err:
 	destroy_workqueue(wdog_wq);

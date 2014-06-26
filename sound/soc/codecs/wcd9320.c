@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -3310,6 +3311,7 @@ static int taiko_codec_enable_anc_hph(struct snd_soc_dapm_widget *w,
 					TAIKO_A_TX_7_MBHC_EN, 0x80, 00);
 			ret |= taiko_codec_enable_anc(w, kcontrol, event);
 		}
+		break;
 	case SND_SOC_DAPM_POST_PMD:
 		ret = taiko_hph_pa_event(w, kcontrol, event);
 		break;
@@ -4921,7 +4923,7 @@ static int taiko_codec_enable_slimtx(struct snd_soc_dapm_widget *w,
 	struct wcd9xxx *core;
 	struct snd_soc_codec *codec = w->codec;
 	struct taiko_priv *taiko_p = snd_soc_codec_get_drvdata(codec);
-	u32  ret = 0;
+	int ret = 0;
 	struct wcd9xxx_codec_dai_data *dai;
 
 	core = dev_get_drvdata(codec->dev->parent);

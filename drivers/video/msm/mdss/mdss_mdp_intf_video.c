@@ -486,9 +486,28 @@ static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 		WARN(rc <= 0, "timeout (%d) enabling timegen on ctl=%d\n",
 				rc, ctl->num);
 
+                if (ctl->mfd) {
+                        struct mdss_panel_data *pdata;
+                        pdata = dev_get_platdata(&ctl->mfd->pdev->dev);
+                        if (!pdata) {
+                                pr_err("no panel connected\n");
+				spin_unlock(&ctx->vsync_lock);
+                                return -ENODEV;
+                        }
+
+                        if (pdata->intf_ready)
+                                pdata->intf_ready(pdata);
+                }
+
 		ctx->timegen_en = true;
 		rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_PANEL_ON, NULL);
 		WARN(rc, "intf %d panel on error (%d)\n", ctl->intf_num, rc);
+
+        } else {
+		rc = wait_for_completion_interruptible_timeout(&ctx->vsync_comp,
+				usecs_to_jiffies(VSYNC_TIMEOUT_US));
+		WARN(rc <= 0, "timeout (%d) enabling timegen on ctl=%d\n",
+				rc, ctl->num);
 	}
 
 	return 0;

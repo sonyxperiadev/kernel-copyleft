@@ -687,6 +687,10 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 	if (profile_ready)
 		total_sizedwords += 6;   /* space for pre_ib and post_ib */
 
+	/* Add space for the power on shader fixup if we need it */
+	if (flags & KGSL_CMD_FLAGS_PWRON_FIXUP)
+		total_sizedwords += 5;
+
 	ringcmds = adreno_ringbuffer_allocspace(rb, context, total_sizedwords);
 	if (!ringcmds) {
 		/*
@@ -727,6 +731,18 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 			rb->timestamp[context_id]++;
 	}
 	timestamp = rb->timestamp[context_id];
+
+	if (flags & KGSL_CMD_FLAGS_PWRON_FIXUP) {
+		GSL_RB_WRITE(rb->device, ringcmds, rcmd_gpu, cp_nop_packet(1));
+		GSL_RB_WRITE(rb->device, ringcmds, rcmd_gpu,
+				KGSL_PWRON_FIXUP_IDENTIFIER);
+		GSL_RB_WRITE(rb->device, ringcmds, rcmd_gpu,
+			CP_HDR_INDIRECT_BUFFER_PFD);
+		GSL_RB_WRITE(rb->device, ringcmds, rcmd_gpu,
+			adreno_dev->pwron_fixup.gpuaddr);
+		GSL_RB_WRITE(rb->device, ringcmds, rcmd_gpu,
+			adreno_dev->pwron_fixup_dwords);
+	}
 
 	/* scratchpad ts for fault tolerance */
 	GSL_RB_WRITE(rb->device, ringcmds, rcmd_gpu,
@@ -1197,9 +1213,20 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 
 	adreno_drawctxt_switch(adreno_dev, drawctxt, flags);
 
+	flags &= KGSL_CMD_FLAGS_EOF;
+
+	/*
+	 * For some targets, we need to execute a dummy shader operation after a
+	 * power collapse
+	 */
+
+	if (test_and_clear_bit(ADRENO_DEVICE_PWRON, &adreno_dev->priv) &&
+		test_bit(ADRENO_DEVICE_PWRON_FIXUP, &adreno_dev->priv))
+		flags |= KGSL_CMD_FLAGS_PWRON_FIXUP;
+
 	*timestamp = adreno_ringbuffer_addcmds(&adreno_dev->ringbuffer,
 					drawctxt,
-					(flags & KGSL_CMD_FLAGS_EOF),
+					flags,
 					&link[0], (cmds - link), *timestamp);
 
 #ifdef CONFIG_MSM_KGSL_CFF_DUMP

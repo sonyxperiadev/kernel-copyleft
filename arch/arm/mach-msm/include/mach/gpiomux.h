@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2011,2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -113,6 +114,7 @@ struct msm_gpiomux_configs {
 enum msm_tlmm_misc_reg {
 	TLMM_ETM_MODE_REG = 0x2014,
 	TLMM_SDC2_HDRV_PULL_CTL = 0x2048,
+	TLMM_SPARE_REG = 0x2024,
 };
 
 void msm_tlmm_misc_reg_write(enum msm_tlmm_misc_reg misc_reg, int val);
