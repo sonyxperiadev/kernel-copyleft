@@ -287,6 +287,7 @@ config ARCH_MSM8974
 	select ARCH_WANT_KMAP_ATOMIC_FLUSH
 	select KRAIT_REGULATOR
 	select ENABLE_VMALLOC_SAVINGS
+	select HAVE_NMI_WATCHDOG if MSM_WATCHDOG_V2
 
 config ARCH_APQ8084
 	bool "APQ8084"
@@ -1075,6 +1076,114 @@ config MACH_MSM9615_MTP
 	bool "MSM9615 MTP"
 	help
 	  Support for the Qualcomm MSM9615 MTP device.
+
+config MACH_SONY_TOGARI_ROW
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari ROW"
+	help
+	  Support for the SONY Mobile Togari ROW device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_WINDY
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari Windy"
+	help
+	  Support for the SONY Mobile Togari Windy device.
+	  It is based on QCOM APQ8074 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_BRAZIL
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari Brazil"
+	help
+	  Support for the SONY Mobile Togari Brazil device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_KDDI
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari Kddi"
+	help
+	  Support for the SONY Mobile Togari Kddi device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_ROW
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami ROW"
+	help
+	  Support for the SONY Mobile Honami ROW device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_DCM
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Docomo"
+	help
+	  Support for the SONY Mobile Honami Docomo device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_KDDI
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Kddi"
+	help
+	  Support for the SONY Mobile Honami Kddi device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_BRAZIL
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Brazil"
+	help
+	  Support for the SONY Mobile Honami Brazil device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_TMOUS
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami TMOUS"
+	help
+	  Support for the SONY Mobile Honami tmobile us device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_AMAMI_ROW
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Amami ROW"
+	help
+	  Support for the SONY Mobile Amami ROW device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_AMAMI_DCM
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Amami Docomo"
+	help
+	  Support for the SONY Mobile Amami Docomo device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_ALTAIR_DCM
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Altair Docomo"
+	help
+	  Support for the SONY Mobile Altair Docomo device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
 
 config MSM_USE_TSIF1
 	depends on ARCH_MSM8X60
@@ -2917,6 +3026,15 @@ config MSM_CACHE_DUMP_ON_PANIC
 	  want to dump the L1 and L2 caches on panic before any flush occurs.
 	  If unsure, say N
 
+config SONY_SSM
+	bool "Support Super Stamina Mode"
+	default n
+	help
+	  This enables support for power mode notifications, required by Super
+	  Stamina Mode. The driver will let a user space application register
+	  for notifications when the device is ready to switch into a new
+	  power mode.
+
 config MSM_HSIC_SYSMON
 	tristate "MSM HSIC system monitor driver"
 	depends on USB
@@ -3053,4 +3171,12 @@ config KRAIT_REGULATOR
 	 line from the PMIC. This supply line is powered by multiple
 	 regulators running in ganged mode inside the PMIC. Enable
 	 this option to support such configurations.
+
+config MSM_MODEM_SUBSYSTEM_RESTART_MONITOR
+	bool "MSM Modem Subsystem Restart Monitor"
+	default n
+	depends on MSM_SUBSYSTEM_RESTART
+	help
+	  This option enables a module which can notify user-space
+	  applications of modem subsystem power up/down event via uevent.
 endif

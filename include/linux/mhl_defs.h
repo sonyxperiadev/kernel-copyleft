@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #ifndef __MHL_SPEC_DEFS_H__
 #define __MHL_SPEC_DEFS_H__
@@ -57,7 +60,7 @@ enum DevCapOffset_e {
 /* bits 4..7 */
 #define	MHL_VER_MAJOR           (0x01 << 4)
 /* bits 0..3 */
-#define	MHL_VER_MINOR		0x02
+#define	MHL_VER_MINOR		0x03
 #define MHL_VERSION		(MHL_VER_MAJOR | MHL_VER_MINOR)
 
 /*Device Category*/
@@ -72,6 +75,7 @@ enum DevCapOffset_e {
 #define	MHL_DEV_VID_LINK_SUPPYCBCR422		0x04
 #define	MHL_DEV_VID_LINK_SUPP_PPIXEL		0x08
 #define	MHL_DEV_VID_LINK_SUPP_ISLANDS		0x10
+#define	MHL_DEV_VID_LINK_SUPP_VGA		0x20
 
 /*Audio Link Mode Support*/
 #define	MHL_DEV_AUD_LINK_2CH				0x01
