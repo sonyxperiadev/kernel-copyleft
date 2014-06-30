@@ -61,6 +61,12 @@
 #define RSPIN_INIT_WAIT_MS 1000
 #define SMD_FIFO_FULL_RESERVE 4
 
+#ifdef CONFIG_SIM_DETECT_FEATURE
+#define MAX_SSR_REASON_LEN 80
+#define CARD_INSERT_DETECT 1
+#define CARD_REMOVE_DETECT 0
+#endif
+
 uint32_t SMSM_NUM_ENTRIES = 8;
 uint32_t SMSM_NUM_HOSTS = 3;
 
@@ -2638,10 +2644,41 @@ restore_snapshot_count:
 	}
 }
 
+#ifdef CONFIG_SIM_DETECT_FEATURE
+static int sim_hotswap_detect(void)
+{
+	char *smem_reason, reason[MAX_SSR_REASON_LEN];
+	u32 size = 0;
+	u32 rc = -1;
+	const char uim_notify_insert_message[] =
+	"acdfdead hotswap happend inserted acdfdead";
+	const char uim_notify_remove_message[] =
+	"deadacdf hotswap happend removed deadacdf";
+	smem_reason = smem_get_entry_no_rlock(SMEM_SSR_REASON_MSS0, &size);
+	if ((NULL != smem_reason) && (0 != size)) {
+		strlcpy(reason, smem_reason, min(size, sizeof(reason)));
+		if (0 == strncmp(uim_notify_insert_message, reason,
+				sizeof(uim_notify_insert_message) - 1)) {
+			rc = CARD_INSERT_DETECT;
+			smem_reason[0] = '\0';
+		} else if (0 == strncmp(uim_notify_remove_message, reason,
+				sizeof(uim_notify_remove_message) - 1)) {
+			rc = CARD_REMOVE_DETECT;
+			smem_reason[0] = '\0';
+		} else {
+			rc = -1;
+		}
+	}
+	return rc;
+}
+#endif
+
 static irqreturn_t smsm_irq_handler(int irq, void *data)
 {
 	unsigned long flags;
-
+#ifdef CONFIG_SIM_DETECT_FEATURE
+	int uim_detect_flag = -1;
+#endif
 	if (irq == INT_ADSP_A11_SMSM) {
 		uint32_t mux_val;
 		static uint32_t prev_smem_q6_apps_smsm;
@@ -2684,6 +2721,23 @@ static irqreturn_t smsm_irq_handler(int irq, void *data)
 			modem_queue_start_reset_notify();
 
 		} else if (modm & SMSM_RESET) {
+#ifdef CONFIG_SIM_DETECT_FEATURE
+			uim_detect_flag = sim_hotswap_detect();
+			/*card insert*/
+			if (CARD_INSERT_DETECT == uim_detect_flag) {
+				pr_err("sim_detect: card instert detected");
+				modem_queue_sim_insert_notify();
+				spin_unlock_irqrestore(&smem_lock, flags);
+				return IRQ_HANDLED;
+			}
+			/*card remove*/
+			else if (CARD_REMOVE_DETECT == uim_detect_flag) {
+				pr_err("sim_detect: card remove detected");
+				modem_queue_sim_remove_notify();
+				spin_unlock_irqrestore(&smem_lock, flags);
+				return IRQ_HANDLED;
+			}
+#endif
 			pr_err("\nSMSM: Modem SMSM state changed to SMSM_RESET.");
 			if (!disable_smsm_reset_handshake) {
 				apps |= SMSM_RESET;

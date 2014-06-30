@@ -43,6 +43,12 @@ struct msm_actuator_func_tbl {
 			struct damping_params_t *,
 			int8_t,
 			int16_t);
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	int32_t (*actuator_set_focus_pd) (struct msm_actuator_ctrl_t *);
+	int32_t (*actuator_set_init_settings) (struct msm_actuator_ctrl_t *,
+		uint16_t, enum msm_actuator_data_type, struct reg_settings_t *);
+
+#endif
 };
 
 struct msm_actuator {
@@ -82,5 +88,9 @@ struct msm_actuator_ctrl_t {
 	enum cci_i2c_master_t cci_master;
 	uint32_t subdev_id;
 };
+
+#ifdef CONFIG_SONY_CAM_QCAMERA
+extern void msm_eeprom_get_camera_moudle_name(uint8_t id, uint8_t *module_name);
+#endif
 
 #endif

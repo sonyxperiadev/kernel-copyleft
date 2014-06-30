@@ -19,6 +19,7 @@
 #include <asm/cachetype.h>
 #include <asm/proc-fns.h>
 #include <asm-generic/mm_hooks.h>
+#include <asm/tlbflush.h>
 
 void __check_kvm_seq(struct mm_struct *mm);
 
@@ -124,6 +125,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		*crt_mm = next;
 #endif
 		check_context(next);
+		flush_tlb_all();
 		cpu_switch_mm(next->pgd, next);
 		if (cache_is_vivt())
 			cpumask_clear_cpu(cpu, mm_cpumask(prev));

@@ -504,8 +504,7 @@ static int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 	} else {
 		pipe->overfetch_disable = 0;
 	}
-	pipe->overfetch_disable = fmt->is_yuv &&
-			!(pipe->flags & MDP_SOURCE_ROTATED_90);
+
 	pipe->bg_color = req->bg_color;
 
 	req->id = pipe->ndx;

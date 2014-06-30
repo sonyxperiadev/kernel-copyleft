@@ -16,6 +16,7 @@
 #include <linux/cpuidle.h>
 
 #include <mach/cpuidle.h>
+#include <linux/nmi.h>
 
 #include "pm.h"
 
@@ -73,6 +74,8 @@ static int msm_cpuidle_enter(
 	int ret = 0;
 	int i;
 	enum msm_pm_sleep_mode pm_mode;
+
+	touch_nmi_watchdog();
 
 	pm_mode = msm_pm_idle_enter(dev, drv, index);
 

@@ -93,6 +93,7 @@ static unsigned long offset_translate(loff_t user_offset,
 }
 
 #define MAX_IOREMAP_SIZE SZ_1M
+#define USER_FLG 0x00010000
 
 static int ramdump_read(struct file *filep, char __user *buf, size_t count,
 			loff_t *pos)
@@ -112,6 +113,10 @@ static int ramdump_read(struct file *filep, char __user *buf, size_t count,
 	ret = wait_event_interruptible(rd_dev->dump_wait_q, rd_dev->data_ready);
 	if (ret)
 		return ret;
+	if (count & USER_FLG) {
+		rd_dev->ramdump_status = 0;
+		goto ramdump_done;
+	}
 
 	if (*pos < rd_dev->elfcore_size) {
 		copy_size = rd_dev->elfcore_size - *pos;

@@ -222,6 +222,7 @@ qup_i2c_interrupt(int irq, void *devid)
 	uint32_t status1 = 0;
 	uint32_t op_flgs = 0;
 	int err = 0;
+	static unsigned long status_err_time;
 
 	if (pm_runtime_suspended(dev->dev))
 		return IRQ_NONE;
@@ -241,8 +242,9 @@ qup_i2c_interrupt(int irq, void *devid)
 	}
 
 	if (status & I2C_STATUS_ERROR_MASK) {
-		dev_err(dev->dev, "QUP: I2C status flags :0x%x, irq:%d\n",
-			status, irq);
+		if (printk_timed_ratelimit(&status_err_time, 5 * 1000))
+			dev_err(dev->dev, "QUP: I2C status flags :0x%x, irq:%d\n",
+				status, irq);
 		err = status;
 		/* Clear Error interrupt if it's a level triggered interrupt*/
 		if (dev->num_irqs == 1) {
@@ -947,6 +949,7 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	int rem = num;
 	long timeout;
 	int err;
+	static unsigned long notconn_err_time;
 
 	/* Alternate if runtime power management is disabled */
 	if (!pm_runtime_enabled(dev->dev)) {
@@ -1175,14 +1178,17 @@ timeout_err:
 			if (dev->err) {
 				if (dev->err > 0 &&
 					dev->err & QUP_I2C_NACK_FLAG) {
-					dev_err(dev->dev,
-					"I2C slave addr:0x%x not connected\n",
-					dev->msg->addr);
-					dev->err = ENOTCONN;
+					if (printk_timed_ratelimit(&notconn_err_time,
+								5 * 1000))
+						dev_err(dev->dev,
+						"I2C slave addr:0x%x not connected\n",
+						dev->msg->addr);
+					ret = -ENOTCONN;
+					goto out_err;
 				} else if (dev->err < 0) {
 					dev_err(dev->dev,
 					"QUP data xfer error %d\n", dev->err);
-					ret = dev->err;
+					ret = -EIO;
 					goto out_err;
 				} else if (dev->err > 0) {
 					/*
@@ -1193,7 +1199,7 @@ timeout_err:
 					 */
 					qup_i2c_recover_bus_busy(dev);
 				}
-				ret = -dev->err;
+				ret = -EIO;
 				goto out_err;
 			}
 			if (dev->msg->flags & I2C_M_RD) {

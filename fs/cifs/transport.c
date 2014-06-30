@@ -340,7 +340,7 @@ wait_for_response(struct TCP_Server_Info *server, struct mid_q_entry *midQ)
 {
 	int error;
 
-	error = wait_event_freezekillable(server->response_q,
+	error = wait_event_freezekillable_unsafe(server->response_q,
 				    midQ->mid_state != MID_REQUEST_SUBMITTED);
 	if (error < 0)
 		return -ERESTARTSYS;
@@ -569,7 +569,7 @@ SendReceive2(const unsigned int xid, struct cifs_ses *ses,
 {
 	int rc = 0;
 	int long_op;
-	struct mid_q_entry *midQ;
+	struct mid_q_entry *midQ = NULL;
 	char *buf = iov[0].iov_base;
 
 	long_op = flags & CIFS_TIMEOUT_MASK;

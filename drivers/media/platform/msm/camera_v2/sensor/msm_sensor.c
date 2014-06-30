@@ -27,6 +27,10 @@
 #define CDBG(fmt, args...) do { } while (0)
 #endif
 
+#ifdef CONFIG_SONY_CAM_QCAMERA
+extern void msm_eeprom_get_camera_moudle_name(uint8_t id, uint8_t *module_name);
+#endif
+
 static int32_t msm_sensor_enable_i2c_mux(struct msm_camera_i2c_conf *i2c_conf)
 {
 	struct v4l2_subdev *i2c_mux_sd =
@@ -54,6 +58,9 @@ static int32_t msm_sensor_get_sub_module_index(struct device_node *of_node,
 	uint32_t val = 0, count = 0;
 	uint32_t *val_array = NULL;
 	struct device_node *src_node = NULL;
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	uint8_t camera_module_name[8];
+#endif
 
 	sensordata->sensor_info = kzalloc(sizeof(struct msm_sensor_info_t),
 		GFP_KERNEL);
@@ -64,6 +71,45 @@ static int32_t msm_sensor_get_sub_module_index(struct device_node *of_node,
 	for (i = 0; i < SUB_MODULE_MAX; i++)
 		sensordata->sensor_info->subdev_id[i] = -1;
 
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	msm_eeprom_get_camera_moudle_name(0, camera_module_name);
+
+	if (!strncmp(camera_module_name, "SOI13BS2", 8)) {
+		src_node = of_parse_phandle(of_node, "qcom,actuator-src1", 0);
+		if (!src_node) {
+			CDBG("%s:%d src_node NULL\n", __func__, __LINE__);
+		} else {
+			rc = of_property_read_u32(src_node, "cell-index", &val);
+			CDBG("%s qcom,actuator cell index %d, rc %d\n",
+				__func__, val, rc);
+			if (rc < 0) {
+				pr_err("%s failed %d\n", __func__, __LINE__);
+				goto ERROR;
+			}
+			sensordata->sensor_info->
+				subdev_id[SUB_MODULE_ACTUATOR] = val;
+			of_node_put(src_node);
+			src_node = NULL;
+		}
+	} else {
+		src_node = of_parse_phandle(of_node, "qcom,actuator-src", 0);
+		if (!src_node) {
+			CDBG("%s:%d src_node NULL\n", __func__, __LINE__);
+		} else {
+			rc = of_property_read_u32(src_node, "cell-index", &val);
+			CDBG("%s qcom,actuator cell index %d, rc %d\n",
+				__func__, val, rc);
+			if (rc < 0) {
+				pr_err("%s failed %d\n", __func__, __LINE__);
+				goto ERROR;
+			}
+			sensordata->sensor_info->
+				subdev_id[SUB_MODULE_ACTUATOR] = val;
+			of_node_put(src_node);
+			src_node = NULL;
+		}
+	}
+#else
 	src_node = of_parse_phandle(of_node, "qcom,actuator-src", 0);
 	if (!src_node) {
 		CDBG("%s:%d src_node NULL\n", __func__, __LINE__);
@@ -80,6 +126,7 @@ static int32_t msm_sensor_get_sub_module_index(struct device_node *of_node,
 		of_node_put(src_node);
 		src_node = NULL;
 	}
+#endif
 
 	src_node = of_parse_phandle(of_node, "qcom,eeprom-src", 0);
 	if (!src_node) {

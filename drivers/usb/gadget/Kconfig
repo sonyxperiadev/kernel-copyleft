@@ -1081,4 +1081,10 @@ config RMNET_SDIO_SMD_DATA_CHANNEL
        help
 	  Data SMD channel for transferring network data
 
+config USB_MIRRORLINK
+       boolean "Handle MirrorLink USB command"
+       default n
+       help
+         Enabling this option adds support for MirrorLink USB command.
+
 endif # USB_GADGET
