@@ -176,10 +176,12 @@ static int ion_iommu_buffer_zero(struct ion_iommu_priv_data *data,
 		if (!ptr)
 			return -ENOMEM;
 
-		memset(ptr, 0, npages_to_vmap * PAGE_SIZE);
 		if (is_cached) {
 			/*
-			 * invalidate the cache to pick up the zeroing
+			 * We have to invalidate the cache here because there
+			 * might be dirty lines to these physical pages (which
+			 * we don't care about) that could get written out at
+			 * any moment.
 			 */
 			for (k = 0; k < npages_to_vmap; k++) {
 				void *p = kmap_atomic(data->pages[i + k]);
@@ -191,6 +193,7 @@ static int ion_iommu_buffer_zero(struct ion_iommu_priv_data *data,
 				kunmap_atomic(p);
 			}
 		}
+		memset(ptr, 0, npages_to_vmap * PAGE_SIZE);
 		vunmap(ptr);
 	}
 

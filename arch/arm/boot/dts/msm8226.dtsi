@@ -18,7 +18,6 @@
 	interrupt-parent = <&intc>;
 
 	aliases {
-		spi0 = &spi_0;
 		sdhc1 = &sdhc_1; /* SDC1 eMMC slot */
 		sdhc2 = &sdhc_2; /* SDC2 SD card slot */
 		sdhc3 = &sdhc_3; /* SDC3 SDIO slot */
@@ -441,6 +440,7 @@
 		compatible = "qcom,msm-pcm-dsp";
 		qcom,msm-pcm-dsp-id = <1>;
 		qcom,msm-pcm-low-latency;
+		qcom,latency-level = "regular";
 	};
 
 	qcom,msm-pcm-lpa {
@@ -965,8 +965,18 @@
 		reg-names = "qup_phys_addr";
 		interrupts = <0 97 0>;
 		interrupt-names = "qup_err_intr";
-		qcom,i2c-bus-freq = <400000>;
+		qcom,i2c-bus-freq = <350000>;
 		qcom,i2c-src-freq = <19200000>;
+		nfc@28{
+			compatible = "nxp,pn547";
+			reg = <0x28>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <21 0x0>;
+			nxp,irq_gpio = <&msmgpio 21 0x00>;
+			nxp,dwld_en = <&msmgpio 20 0x00>;
+			nxp,ven = <&pm8226_gpios 2 0x01>;
+			nxp,clk_req = <&pm8226_gpios 3 0x00>;
+		};
 	};
 	i2c@f9926000 { /* BLSP-1 QUP-4 */
 		cell-index = <0>;
@@ -977,7 +987,24 @@
 		reg-names = "qup_phys_addr";
 		interrupts = <0 98 0>;
 		interrupt-names = "qup_err_intr";
-		qcom,i2c-bus-freq = <100000>;
+		qcom,i2c-bus-freq = <400000>;
+		qcom,i2c-src-freq = <19200000>;
+		ti_lm3630_bl@36{
+			compatible = "ti,lm3630_bl";
+			reg = <0x36>;
+			gpio_hw_en = <&msmgpio 27 0>;
+			pwm_feedback = <0x09>;
+			ctl = <0x05>;
+			fsc = <20000 0>;
+			iname = "lm3630-lcd-bl";
+			connected = <0x01 0x00>;
+			bank = <0x00 0x01>;
+			filter_str = <0x03>;
+			ovp_boost = <0x46>;
+			led_fault = <0x00>;
+			intf_name = "lm3630-lcd-bl";
+			brightness = <255 0>;
+		};
 	};
 
 	i2c@f9927000 { /* BLSP1 QUP5 */
@@ -989,10 +1016,27 @@
 		reg = <0xf9927000 0x1000>;
 		interrupt-names = "qup_err_intr";
 		interrupts = <0 99 0>;
-		qcom,i2c-bus-freq = <384000>;
-		qcom,i2c-src-freq = <19200000>;
-		qcom,sda-gpio = <&msmgpio 18 0>;
 		qcom,scl-gpio = <&msmgpio 19 0>;
+		qcom,sda-gpio = <&msmgpio 18 0>;
+		qcom,i2c-bus-freq = <400000>;
+		qcom,i2c-src-freq = <19200000>;
+		cypress@24 {
+			compatible = "cypress,cyttsp4_i2c_adapter";
+			reg = <0x24>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <17 0x2>;
+			touch_vdd-supply = <&pm8226_l19>;
+                        vcc_i2c-supply = <&pm8226_lvs1>;
+			cypress,reset-gpio = <&msmgpio 16 0x00>;
+			cypress,irq-gpio = <&msmgpio 17 0x00>;
+			cypress,button-map = <0x8B 0x66 0x9E>;
+			cypress,i2c-pull-up;
+			cypress,reg-en;
+		};
+
+	};
+	cyttsp4_core {
+		compatible = "cypress,cyttsp4_core";
 	};
 
 	qcom,acpuclk@f9011050 {
@@ -1157,30 +1201,6 @@
 			qcom,levels = <600000 787200 998400>;
 			qcom,freq-req;
 		};
-	};
-
-	spi_0: spi@f9923000 { /* BLSP1 QUP1 */
-		compatible = "qcom,spi-qup-v2";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg-names = "spi_physical", "spi_bam_physical";
-		reg = <0xf9923000 0x1000>,
-		      <0xf9904000 0xF000>;
-		interrupt-names = "spi_irq", "spi_bam_irq";
-		interrupts = <0 95 0>, <0 238 0>;
-		spi-max-frequency = <19200000>;
-
-		qcom,gpio-mosi = <&msmgpio 0 0>;
-		qcom,gpio-miso = <&msmgpio 1 0>;
-		qcom,gpio-clk  = <&msmgpio 3 0>;
-		qcom,gpio-cs0  = <&msmgpio 22 0>;
-
-		qcom,infinite-mode = <0>;
-		qcom,use-bam;
-		qcom,ver-reg-exists;
-		qcom,bam-consumer-pipe-index = <12>;
-		qcom,bam-producer-pipe-index = <13>;
-		qcom,master-id = <86>;
 	};
 
 	qcom,bam_dmux@fc834000 {
@@ -1510,6 +1530,10 @@
 		qcom,btm-channel-number = <0x80>;
 		qcom,thermal-node;
 	};
+};
+
+&mdss_mdp {
+	qcom,mdss-pref-prim-intf = "dsi";
 };
 
 &pm8226_chg {

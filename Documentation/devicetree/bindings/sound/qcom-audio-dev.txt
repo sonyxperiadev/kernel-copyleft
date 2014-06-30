@@ -21,6 +21,12 @@ Required properties:
       - qcom,msm-pcm-low-latency : Flag indicating whether
         the device node is of type low latency.
 
+      - qcom,latency-level :  Flag indicating whether the device node
+			      is of type regular low latency or ultra
+			      low latency.
+                              regular : regular low latency stream
+			      ultra   : ultra low latency stream
+
 * msm-pcm-routing
 
 Required properties:

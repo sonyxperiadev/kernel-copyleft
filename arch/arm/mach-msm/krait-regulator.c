@@ -812,6 +812,7 @@ static int configure_ldo_or_hs_all(struct krait_power_vreg *from, int vmax)
 	int rc = 0;
 
 	list_for_each_entry(kvreg, &pvreg->krait_power_vregs, link) {
+
 		rc = configure_ldo_or_hs_one(kvreg, vmax);
 		if (rc) {
 			pr_err("could not switch %s\n", kvreg->name);
@@ -1173,6 +1174,9 @@ static void online_at_probe(struct krait_power_vreg *kvreg)
 			& readl_relaxed(kvreg->reg_base + CPU_PWR_CTL);
 	kvreg->online_at_probe
 		= online ? (WAIT_FOR_LOAD | WAIT_FOR_VOLTAGE) : 0x0;
+
+	if (online)
+		kvreg->force_bhs = false;
 }
 
 static void glb_init(void __iomem *apcs_gcc_base)
@@ -1333,6 +1337,7 @@ static int __devinit krait_power_probe(struct platform_device *pdev)
 	kvreg->ldo_threshold_uV = ldo_threshold_uV;
 	kvreg->ldo_delta_uV	= ldo_delta_uV;
 	kvreg->cpu_num		= cpu_num;
+	kvreg->force_bhs	= true;
 
 	platform_set_drvdata(pdev, kvreg);
 

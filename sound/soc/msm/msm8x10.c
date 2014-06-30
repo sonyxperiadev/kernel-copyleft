@@ -1053,7 +1053,6 @@ static __devinit int msm8x10_asoc_machine_probe(struct platform_device *pdev)
 						"qcom,headset-jack-type-NC");
 	mbhc_cfg.use_int_rbias = of_property_read_bool(pdev->dev.of_node,
 						"qcom,mbhc-bias-internal");
-
 	spdev = pdev;
 
 	ret = snd_soc_register_card(card);

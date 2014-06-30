@@ -27,6 +27,10 @@
 /* Common PNP defines */
 #define QPNP_PON_REVISION2(base)		(base + 0x01)
 
+#ifdef CONFIG_POWERKEY_FORCECRASH
+#include "forcecrash.h"
+#endif
+
 /* PON common register addresses */
 #define QPNP_PON_RT_STS(base)			(base + 0x10)
 #define QPNP_PON_PULL_CTL(base)			(base + 0x70)
@@ -87,6 +91,11 @@
 
 #define QPNP_KEY_STATUS_DELAY			msecs_to_jiffies(250)
 #define QPNP_PON_REV_B				0x01
+
+#ifdef CONFIG_POWERKEY_FORCECRASH
+static int forcecrash_on;
+module_param(forcecrash_on, int, S_IRUGO | S_IWUSR);
+#endif
 
 enum pon_type {
 	PON_KPDPWR,
@@ -341,6 +350,11 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	switch (cfg->pon_type) {
 	case PON_KPDPWR:
 		pon_rt_bit = QPNP_PON_KPDPWR_N_SET;
+#ifdef CONFIG_POWERKEY_FORCECRASH
+		if (forcecrash_on)
+			qpnp_powerkey_forcecrash_timer_setup(pon_rt_sts &
+					pon_rt_bit);
+#endif
 		break;
 	case PON_RESIN:
 		pon_rt_bit = QPNP_PON_RESIN_N_SET;
@@ -980,6 +994,40 @@ free_input_dev:
 	return rc;
 }
 
+#ifdef CONFIG_POWERKEY_FORCECRASH
+/**
+ * qpnp_pon_off_kpdpwr_reset - QPNP_PON_KPDPWR_S2_CNTL2 is enabled in PBL,
+ * to use SW forcecrash feature, disable this register to avoid HW reset.
+ */
+static int __devinit qpnp_pon_off_kpdpwr_reset(struct qpnp_pon *pon)
+{
+	u8 pon_ver;
+	u16 rst_en_reg;
+	int rc;
+
+	rc = spmi_ext_register_readl(pon->spmi->ctrl, pon->spmi->sid,
+			QPNP_PON_REVISION2(pon->base), &pon_ver, 1);
+	if (rc) {
+		dev_err(&pon->spmi->dev,
+			"Unable to read addr=%x, rc(%d)\n",
+			QPNP_PON_REVISION2(pon->base), rc);
+		return rc;
+	}
+
+	if (pon_ver == QPNP_PON_REV_B)
+		rst_en_reg = QPNP_PON_KPDPWR_S2_CNTL2(pon->base);
+	else
+		rst_en_reg = QPNP_PON_KPDPWR_S2_CNTL(pon->base);
+
+	rc = qpnp_pon_masked_write(pon, rst_en_reg, QPNP_PON_RESET_EN, 0);
+	if (rc)
+		dev_err(&pon->spmi->dev,
+			"Unable to write to addr=%x, rc(%d)\n", rst_en_reg, rc);
+
+	return rc;
+}
+#endif
+
 static int __devinit qpnp_pon_probe(struct spmi_device *spmi)
 {
 	struct qpnp_pon *pon;
@@ -1102,6 +1150,11 @@ static int __devinit qpnp_pon_probe(struct spmi_device *spmi)
 		return rc;
 	}
 
+#ifdef CONFIG_POWERKEY_FORCECRASH
+	qpnp_pon_off_kpdpwr_reset(pon);
+	qpnp_powerkey_forcecrash_init(spmi, pon->base);
+#endif
+
 	return rc;
 }
 
@@ -1113,6 +1166,10 @@ static int qpnp_pon_remove(struct spmi_device *spmi)
 
 	if (pon->pon_input)
 		input_unregister_device(pon->pon_input);
+
+#ifdef CONFIG_POWERKEY_FORCECRASH
+	qpnp_powerkey_forcecrash_exit(spmi);
+#endif
 
 	return 0;
 }

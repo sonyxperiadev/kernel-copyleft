@@ -31,6 +31,7 @@
 #include <linux/of_platform.h>
 #include <linux/regulator/krait-regulator.h>
 #include <linux/cpu.h>
+#include <linux/nmi.h>
 #include <mach/msm_iomap.h>
 #include <mach/socinfo.h>
 #include <mach/system.h>
@@ -506,6 +507,17 @@ static bool __ref msm_pm_spm_power_collapse(
 			cpu, __func__, entry);
 	if (from_idle && msm_pm_pc_reset_timer)
 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
+
+	/*
+	 * msm_pm_collapse() : msm_pm_pc_hotplug() will bring us into trustzone
+	 * for some time, so I just feed msm_watchdog to ensure we
+	 * have some time to go.
+	 * But if we are in trustzone for more than 11 seconds,
+	 * msm_watchdog will still bark/bite.
+	 * We only do this on CPU0 since that is where watchdog runs.
+	 */
+	if (cpu == 0)
+		touch_nmi_watchdog();
 
 #ifdef CONFIG_VFP
 	vfp_pm_suspend();

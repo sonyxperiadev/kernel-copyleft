@@ -18,6 +18,7 @@
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
+#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/err.h>
@@ -1022,6 +1023,7 @@ static int qpnp_lpg_configure_lut_state(struct pwm_device *pwm,
 	addr = SPMI_LPG_REG_ADDR(lpg_config->base_addr,
 				QPNP_ENABLE_CONTROL);
 
+	udelay(500);
 	rc = qpnp_lpg_save_and_write(value2, mask2, reg2,
 					addr, 1, chip);
 	if (rc)

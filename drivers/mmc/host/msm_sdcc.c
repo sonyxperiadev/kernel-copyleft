@@ -6141,6 +6141,7 @@ msmsdcc_probe(struct platform_device *pdev)
 	mmc->caps2 |= MMC_CAP2_POWEROFF_NOTIFY;
 	mmc->caps2 |= MMC_CAP2_STOP_REQUEST;
 	mmc->caps2 |= MMC_CAP2_ASYNC_SDIO_IRQ_4BIT_MODE;
+	mmc->caps2 |= MMC_CAP2_INIT_BKOPS;
 
 	if (plat->nonremovable)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;

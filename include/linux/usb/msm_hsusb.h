@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Author: Brian Swetland <swetland@google.com>
- * Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -346,6 +346,7 @@ struct msm_otg_platform_data {
  * @chg_check_timer: The timer used to implement the workaround to detect
  *               very slow plug in of wall charger.
  * @ui_enabled: USB Intterupt is enabled or disabled.
+ * @pm_done: Indicates whether USB is PM resumed
  */
 struct msm_otg {
 	struct usb_phy phy;
@@ -379,6 +380,7 @@ struct msm_otg {
 #define B_BUS_REQ	16
 #define MHL	        17
 #define B_FALSE_SDP	18
+#define VBUS_DROP_DET  19
 	unsigned long inputs;
 	struct work_struct sm_work;
 	bool sm_work_pending;
@@ -448,6 +450,8 @@ struct msm_otg {
 	struct hrtimer timer;
 	enum usb_vdd_type vdd_type;
 	struct power_supply usb_psy;
+	struct power_supply *dc_psy;
+	bool vbus_active;
 	unsigned int online;
 	unsigned int host_mode;
 	unsigned int voltage_max;
@@ -462,6 +466,7 @@ struct msm_otg {
 	bool ext_chg_active;
 	struct completion ext_chg_wait;
 	int ui_enabled;
+	bool pm_done;
 };
 
 struct ci13xxx_platform_data {
@@ -621,5 +626,6 @@ static inline int msm_register_usb_ext_notification(
 {
 	return -ENODEV;
 }
+
 #endif
 #endif

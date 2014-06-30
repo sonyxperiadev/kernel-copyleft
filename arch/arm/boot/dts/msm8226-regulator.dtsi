@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 /* SPM controlled regulators: */
@@ -84,7 +88,7 @@
 
 		qti,cpr-enable;
 		qti,cpr-fuse-cond-min-volt-sel = <54 42 6 7 1>;
-		qti,cpr-cond-min-voltage = <1140000>;
+		qti,cpr-cond-min-voltage = <1150000>;
 		qti,cpr-fuse-uplift-sel = <22 53 1 0 0>;
 		qti,cpr-uplift-voltage = <50000>;
 		qti,cpr-uplift-quotient = <0 0 120>;
@@ -235,9 +239,9 @@
 		status = "okay";
 		pm8226_l5: regulator-l5 {
 			regulator-name = "8226_l5";
-			regulator-min-microvolt = <1200000>;
-			regulator-max-microvolt = <1200000>;
-			qcom,init-voltage = <1200000>;
+			regulator-min-microvolt = <1125000>;
+			regulator-max-microvolt = <1125000>;
+			qcom,init-voltage = <1125000>;
 			status = "okay";
 		};
 	};
@@ -485,8 +489,9 @@
 		pm8226_l28: regulator-l28 {
 			regulator-name = "8226_l28";
 			regulator-min-microvolt = <1800000>;
-			regulator-max-microvolt = <2950000>;
-			qcom,init-voltage = <2950000>;
+			regulator-max-microvolt = <1800000>;
+			qcom,init-voltage = <1800000>;
+			regulator-always-on;
 			status = "okay";
 		};
 	};
