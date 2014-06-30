@@ -156,6 +156,8 @@ int pas_init_image(enum pas_id id, const u8 *metadata, size_t size)
 
 	memcpy(mdata_buf, metadata, size);
 
+	request.image_addr = mdata_phys;
+
 	request.proc = id;
 	request.image_addr = mdata_phys;
 

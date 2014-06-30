@@ -24,6 +24,7 @@
 #include <linux/percpu.h>
 #include <linux/of.h>
 #include <linux/cpu.h>
+#include <linux/smp.h>
 #include <linux/platform_device.h>
 #include <mach/scm.h>
 #include <mach/msm_memory_dump.h>
@@ -235,6 +236,9 @@ static void pet_watchdog(struct msm_watchdog_data *wdog_dd)
 	unsigned long long slack_ns;
 	unsigned long long bark_time_ns = wdog_dd->bark_time * 1000000ULL;
 
+	if (smp_processor_id() != 0)
+		return;
+
 	for (i = 0; i < 2; i++) {
 		count = (__raw_readl(wdog_dd->base + WDT0_STS) >> 1) & 0xFFFFF;
 		if (count != prev_count) {
@@ -293,6 +297,23 @@ static void pet_watchdog_work(struct work_struct *work)
 		queue_delayed_work_on(0, wdog_wq,
 				&wdog_dd->dogwork_struct, delay_time);
 }
+
+static struct device *dev;
+static int wdog_init_done;
+
+void touch_nmi_watchdog(void)
+{
+	struct msm_watchdog_data *wdog_dd =
+			(struct msm_watchdog_data *)dev_get_drvdata(dev);
+
+	if (!wdog_dd || !wdog_init_done)
+		return;
+
+	pet_watchdog(wdog_dd);
+
+	touch_softlockup_watchdog();
+}
+EXPORT_SYMBOL(touch_nmi_watchdog);
 
 static int msm_watchdog_remove(struct platform_device *pdev)
 {
@@ -450,6 +471,8 @@ static void init_watchdog_work(struct work_struct *work)
 		dev_err(wdog_dd->dev, "cannot create sysfs attribute\n");
 	if (wdog_dd->irq_ppi)
 		enable_percpu_irq(wdog_dd->bark_irq, 0);
+	dev = wdog_dd->dev;
+	wdog_init_done = 1;
 	dev_info(wdog_dd->dev, "MSM Watchdog Initialized\n");
 	return;
 }

@@ -27,6 +27,10 @@
 #define CDBG(fmt, args...) do { } while (0)
 #endif
 
+#ifdef CONFIG_SONY_CAM_QCAMERA
+extern void msm_eeprom_get_camera_moudle_name(uint8_t id, uint8_t *module_name);
+#endif
+
 static int32_t msm_sensor_enable_i2c_mux(struct msm_camera_i2c_conf *i2c_conf)
 {
 	struct v4l2_subdev *i2c_mux_sd =
@@ -54,6 +58,9 @@ static int32_t msm_sensor_get_sub_module_index(struct device_node *of_node,
 	uint32_t val = 0, count = 0;
 	uint32_t *val_array = NULL;
 	struct device_node *src_node = NULL;
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	uint8_t camera_module_name[8];
+#endif
 
 	sensordata->sensor_info = kzalloc(sizeof(struct msm_sensor_info_t),
 		GFP_KERNEL);
@@ -64,6 +71,45 @@ static int32_t msm_sensor_get_sub_module_index(struct device_node *of_node,
 	for (i = 0; i < SUB_MODULE_MAX; i++)
 		sensordata->sensor_info->subdev_id[i] = -1;
 
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	msm_eeprom_get_camera_moudle_name(0, camera_module_name);
+
+	if (!strncmp(camera_module_name, "SOI13BS2", 8)) {
+		src_node = of_parse_phandle(of_node, "qcom,actuator-src1", 0);
+		if (!src_node) {
+			CDBG("%s:%d src_node NULL\n", __func__, __LINE__);
+		} else {
+			rc = of_property_read_u32(src_node, "cell-index", &val);
+			CDBG("%s qcom,actuator cell index %d, rc %d\n",
+				__func__, val, rc);
+			if (rc < 0) {
+				pr_err("%s failed %d\n", __func__, __LINE__);
+				goto ERROR;
+			}
+			sensordata->sensor_info->
+				subdev_id[SUB_MODULE_ACTUATOR] = val;
+			of_node_put(src_node);
+			src_node = NULL;
+		}
+	} else {
+		src_node = of_parse_phandle(of_node, "qcom,actuator-src", 0);
+		if (!src_node) {
+			CDBG("%s:%d src_node NULL\n", __func__, __LINE__);
+		} else {
+			rc = of_property_read_u32(src_node, "cell-index", &val);
+			CDBG("%s qcom,actuator cell index %d, rc %d\n",
+				__func__, val, rc);
+			if (rc < 0) {
+				pr_err("%s failed %d\n", __func__, __LINE__);
+				goto ERROR;
+			}
+			sensordata->sensor_info->
+				subdev_id[SUB_MODULE_ACTUATOR] = val;
+			of_node_put(src_node);
+			src_node = NULL;
+		}
+	}
+#else
 	src_node = of_parse_phandle(of_node, "qcom,actuator-src", 0);
 	if (!src_node) {
 		CDBG("%s:%d src_node NULL\n", __func__, __LINE__);
@@ -80,6 +126,7 @@ static int32_t msm_sensor_get_sub_module_index(struct device_node *of_node,
 		of_node_put(src_node);
 		src_node = NULL;
 	}
+#endif
 
 	src_node = of_parse_phandle(of_node, "qcom,eeprom-src", 0);
 	if (!src_node) {
@@ -964,6 +1011,9 @@ static struct msm_cam_clk_info cam_8974_clk_info[] = {
 int32_t msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	int32_t rc = 0, index = 0;
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+	uint8_t retry_count = 0;
+#endif
 	struct msm_sensor_power_setting_array *power_setting_array = NULL;
 	struct msm_sensor_power_setting *power_setting = NULL;
 	struct msm_camera_sensor_board_info *data = s_ctrl->sensordata;
@@ -1068,10 +1118,24 @@ int32_t msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 		}
 	}
 
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+	retry_count = 4;
+	do {
+		if (s_ctrl->func_tbl->sensor_match_id)
+			rc = s_ctrl->func_tbl->sensor_match_id(s_ctrl);
+		else
+			rc = msm_sensor_match_id(s_ctrl);
+		if (!rc)
+			break;
+		msleep(20);
+		pr_err("%s: match id failed rc %d, try again\n", __func__, rc);
+	} while (retry_count-- > 0);
+#else
 	if (s_ctrl->func_tbl->sensor_match_id)
 		rc = s_ctrl->func_tbl->sensor_match_id(s_ctrl);
 	else
 		rc = msm_sensor_match_id(s_ctrl);
+#endif
 	if (rc < 0) {
 		pr_err("%s:%d match id failed rc %d\n", __func__, __LINE__, rc);
 		goto power_up_failed;
