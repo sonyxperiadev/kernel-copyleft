@@ -687,6 +687,18 @@ static struct ecryptfs_cache_info {
 		.name = "ecryptfs_open_req_cache",
 		.size = sizeof(struct ecryptfs_open_req),
 	},
+#ifdef CONFIG_CRYPTO_DEV_KFIPS
+	{
+		.cache = &ecryptfs_page_crypt_req_cache,
+		.name = "ecryptfs_page_crypt_req_cache",
+		.size = sizeof(struct ecryptfs_page_crypt_req),
+	},
+	{
+		.cache = &ecryptfs_extent_crypt_req_cache,
+		.name = "ecryptfs_extent_crypt_req_cache",
+		.size = sizeof(struct ecryptfs_extent_crypt_req),
+	},
+#endif
 };
 
 static void ecryptfs_free_kmem_caches(void)

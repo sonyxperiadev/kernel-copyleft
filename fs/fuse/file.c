@@ -692,6 +692,7 @@ static int fuse_readpages_fill(void *_data, struct page *page)
 		lock_page(newpage);
 		put_page(newpage);
 
+		/* Add new page to LRU */
 		lru_cache_add_file(newpage);
 
 		/* finally release the old page and swap pointers */

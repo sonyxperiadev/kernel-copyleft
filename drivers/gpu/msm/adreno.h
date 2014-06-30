@@ -217,6 +217,7 @@ enum adreno_device_flags {
 	ADRENO_DEVICE_PWRON_FIXUP = 1,
 	ADRENO_DEVICE_INITIALIZED = 2,
 	ADRENO_DEVICE_STARTED = 3,
+	ADRENO_DEVICE_HANG_INTR = 4,
 };
 
 #define PERFCOUNTER_FLAG_NONE 0x0
@@ -568,6 +569,8 @@ static inline int adreno_is_a2xx(struct adreno_device *adreno_dev)
 {
 	return (adreno_dev->gpurev <= 299);
 }
+
+bool adreno_hw_isidle(struct kgsl_device *device);
 
 static inline int adreno_is_a3xx(struct adreno_device *adreno_dev)
 {

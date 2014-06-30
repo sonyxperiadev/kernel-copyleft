@@ -1,0 +1,65 @@
+#include "CppUTestExt/MockSupport.h"
+
+extern "C"{
+#include "linux/gpio.h"
+#include "GpioSpy.h"
+#include "linux/dummy_util.h"
+#include "linux/of_gpio.h"
+}
+
+#define GPIO_LIST_SIZE 100
+int gpios[GPIO_LIST_SIZE];
+
+static bool isMockMode;
+
+void spy_gpio_MockMode(void) {
+	isMockMode = true;
+}
+
+void gpio_spy_clean(void)
+{
+	isMockMode = false;
+	unsigned i = 0;
+	for (i = 0; i<sizeof(gpios); i++)
+		gpios[i]=0;
+}
+
+
+void gpio_set_value(unsigned gpio, int value)
+{
+	pr_debug("\n test : set value \n");
+	if (!isMockMode) {
+		if (gpio >= GPIO_LIST_SIZE)
+			printf("invalid value!!");
+		gpios[gpio] = value;
+	} else {
+		pr_debug("\n -- test mock start -- \n");
+
+		mock("GPIO")
+			.actualCall("gpio_set_value")
+			.withParameter("gpio", (int)gpio)
+			.withParameter("value", (int)value);
+
+		pr_debug("\n -- test mock end -- \n");
+	}
+}
+
+int gpio_get_value(unsigned gpio)
+{
+	if (!isMockMode) {
+		if (gpio >= GPIO_LIST_SIZE)
+			return -1;
+		return gpios[gpio];
+	} else {
+		int res = mock("GPIO")
+				.actualCall("gpio_get_value")
+				.withParameter("gpio", (int)gpio)
+				.returnValue().getIntValue();
+		return res;
+	}
+}
+
+int of_get_named_gpio(struct device_node *np,const char *propname, int index)
+{
+	return 0;
+}
