@@ -1156,6 +1156,7 @@ static int __qseecom_send_cmd(struct qseecom_dev_handle *data,
 	unsigned long flags;
 	struct qseecom_registered_app_list *ptr_app;
 	bool found_app = false;
+	int name_len = 0;
 
 	reqd_len_sb_in = req->cmd_req_len + req->resp_len;
 
@@ -1163,10 +1164,11 @@ static int __qseecom_send_cmd(struct qseecom_dev_handle *data,
 	spin_lock_irqsave(&qseecom.registered_app_list_lock, flags);
 	list_for_each_entry(ptr_app, &qseecom.registered_app_list_head,
 							list) {
+		name_len = min(strlen(data->client.app_name),
+				strlen(ptr_app->app_name));
 		if ((ptr_app->app_id == data->client.app_id) &&
 			 (!memcmp((void *)ptr_app->app_name,
-				(void *)data->client.app_name,
-				strlen(data->client.app_name)))) {
+				(void *)data->client.app_name, name_len))) {
 			found_app = true;
 			break;
 		}
