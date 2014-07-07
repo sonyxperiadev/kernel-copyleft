@@ -367,6 +367,12 @@ extern int root_mountflags;
 
 extern bool early_boot_irqs_disabled;
 
+/* Temp change to help analyze L1 cache error */
+extern int current_speed_bin;
+extern int current_pvs_bin;
+extern int current_vdd_core0;
+extern int current_vdd_core1;
+
 /* Values used for system_state */
 extern enum system_states {
 	SYSTEM_BOOTING,

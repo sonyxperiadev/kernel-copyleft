@@ -138,6 +138,7 @@ struct kgsl_memdesc {
 	unsigned int sglen;
 	struct kgsl_memdesc_ops *ops;
 	int flags;
+	int *faulted;
 };
 
 /* List of different memory entry types */

@@ -1,4 +1,5 @@
 /* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -413,7 +414,11 @@ static int msm_server_control(struct msm_cam_server_dev *server_dev,
 	/* wait event may be interrupted by sugnal,
 	 * in this case -ERESTARTSYS is returned and retry is needed.
 	 * Now we only retry once. */
+#if defined(CONFIG_SONY_CAM_V4L2)
+	wait_count = 10;
+#else
 	wait_count = 2;
+#endif
 	do {
 		rc = wait_event_interruptible_timeout(queue->wait,
 			!list_empty_careful(&queue->list),
@@ -423,6 +428,9 @@ static int msm_server_control(struct msm_cam_server_dev *server_dev,
 			break;
 		D("%s: wait_event interrupted by signal, remain_count = %d",
 			__func__, wait_count);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		msleep(20);
+#endif
 	} while (wait_count > 0);
 	D("Waiting is over for config status\n");
 	if (list_empty_careful(&queue->list)) {
@@ -746,7 +754,11 @@ int msm_server_streamoff(struct msm_cam_v4l2_device *pcam, int idx)
 
 	D("%s, pcam = 0x%x\n", __func__, (u32)pcam);
 	ctrlcmd.type        = MSM_V4L2_STREAM_OFF;
+#ifdef CONFIG_SONY_CAM_V4L2
+	ctrlcmd.timeout_ms  = 3000;
+#else
 	ctrlcmd.timeout_ms  = 10000;
+#endif
 	ctrlcmd.length      = 0;
 	ctrlcmd.value       = NULL;
 	ctrlcmd.stream_type = pcam->dev_inst[idx]->image_mode;
@@ -825,8 +837,13 @@ int msm_server_proc_ctrl_cmd(struct msm_cam_v4l2_device *pcam,
 			goto end;
 		}
 		tmp_cmd.status = cmd_ptr->status = ctrlcmd.status;
+#if defined(CONFIG_SONY_CAM_V4L2)
 		if (copy_to_user((void __user *)ioctl_ptr->ioctl_ptr,
 			(void *)cmd_ptr, cmd_len)) {
+#else
+		if (copy_to_user((void __user *)ioctl_ptr->ioctl_ptr,
+			(void *)cmd_ptr, cmd_len)) {
+#endif
 			pr_err("%s: copy_to_user failed in cpy, size=%d\n",
 				__func__, cmd_len);
 			rc = -EINVAL;
@@ -1424,10 +1441,16 @@ static int msm_close_server(struct file *fp)
 					/*so that it isn't closed again*/
 					pmctl->mctl_release = NULL;
 				}
+#if defined(CONFIG_SONY_CAM_V4L2)
 				if (pmctl)
 					msm_cam_server_send_error_evt(pmctl,
 						V4L2_EVENT_PRIVATE_START +
 						MSM_CAM_APP_NOTIFY_ERROR_EVENT);
+#else
+				msm_cam_server_send_error_evt(pmctl,
+					V4L2_EVENT_PRIVATE_START +
+					MSM_CAM_APP_NOTIFY_ERROR_EVENT);
+#endif
 			}
 		}
 		sub.type = V4L2_EVENT_ALL;
@@ -1729,7 +1752,11 @@ static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 	case NOTIFY_VFE_MSG_COMP_STATS:
 	case NOTIFY_VFE_BUF_EVT:
 		p_mctl = msm_cam_server_get_mctl(mctl_handle);
+#if defined(CONFIG_SONY_CAM_V4L2)
 		if (p_mctl && p_mctl->isp_notify && p_mctl->vfe_sdev)
+#else
+		if (p_mctl->isp_notify && p_mctl->vfe_sdev)
+#endif
 			rc = p_mctl->isp_notify(p_mctl,
 				p_mctl->vfe_sdev, notification, arg);
 		break;
@@ -1748,12 +1775,17 @@ static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 		break;
 	case NOTIFY_AXI_RDI_SOF_COUNT:
 		p_mctl = msm_cam_server_get_mctl(mctl_handle);
+#if defined(CONFIG_SONY_CAM_V4L2)
 		if (p_mctl && p_mctl->axi_sdev)
+#else
+		if (p_mctl->axi_sdev)
+#endif
 			rc = v4l2_subdev_call(p_mctl->axi_sdev, core, ioctl,
 				VIDIOC_MSM_AXI_RDI_COUNT_UPDATE, arg);
 		break;
 	case NOTIFY_PCLK_CHANGE:
 		p_mctl = v4l2_get_subdev_hostdata(sd);
+#if defined(CONFIG_SONY_CAM_V4L2)
 		if (p_mctl) {
 			if (p_mctl->axi_sdev)
 				rc = v4l2_subdev_call(p_mctl->axi_sdev, video,
@@ -1762,6 +1794,14 @@ static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 				rc = v4l2_subdev_call(p_mctl->vfe_sdev, video,
 				s_crystal_freq, *(uint32_t *)arg, 0);
 		}
+#else
+		if (p_mctl->axi_sdev)
+			rc = v4l2_subdev_call(p_mctl->axi_sdev, video,
+			s_crystal_freq, *(uint32_t *)arg, 0);
+		else
+			rc = v4l2_subdev_call(p_mctl->vfe_sdev, video,
+			s_crystal_freq, *(uint32_t *)arg, 0);
+#endif
 		break;
 	case NOTIFY_GESTURE_EVT:
 		rc = v4l2_subdev_call(g_server_dev.gesture_device,
@@ -1773,10 +1813,15 @@ static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 		break;
 	case NOTIFY_VFE_ERROR: {
 		p_mctl = msm_cam_server_get_mctl(mctl_handle);
+#if defined(CONFIG_SONY_CAM_V4L2)
 		if (p_mctl)
 			msm_cam_server_send_error_evt(p_mctl,
 				V4L2_EVENT_PRIVATE_START +
 				MSM_CAM_APP_NOTIFY_ERROR_EVENT);
+#else
+		msm_cam_server_send_error_evt(p_mctl, V4L2_EVENT_PRIVATE_START
+			+ MSM_CAM_APP_NOTIFY_ERROR_EVENT);
+#endif
 		break;
 	}
 	default:
@@ -2707,40 +2752,6 @@ static unsigned int msm_poll_config(struct file *fp,
 	return rc;
 }
 
-static int msm_mmap_config(struct file *fp, struct vm_area_struct *vma)
-{
-	struct msm_cam_config_dev *config_cam = fp->private_data;
-	int rc = 0;
-	int phyaddr;
-	int retval;
-	unsigned long size;
-
-	D("%s: phy_addr=0x%x", __func__, config_cam->mem_map.cookie);
-	phyaddr = (int)config_cam->mem_map.cookie;
-	if (!phyaddr) {
-		pr_err("%s: no physical memory to map", __func__);
-		return -EFAULT;
-	}
-	memset(&config_cam->mem_map, 0,
-		sizeof(struct msm_mem_map_info));
-	size = vma->vm_end - vma->vm_start;
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-	retval = remap_pfn_range(vma, vma->vm_start,
-					phyaddr >> PAGE_SHIFT,
-					size, vma->vm_page_prot);
-	if (retval) {
-		pr_err("%s: remap failed, rc = %d",
-					__func__, retval);
-		rc = -ENOMEM;
-		goto end;
-	}
-	D("%s: phy_addr=0x%x: %08lx-%08lx, pgoff %08lx\n",
-			__func__, (uint32_t)phyaddr,
-			vma->vm_start, vma->vm_end, vma->vm_pgoff);
-end:
-	return rc;
-}
-
 static int msm_open_config(struct inode *inode, struct file *fp)
 {
 	int rc;
@@ -3011,12 +3022,6 @@ static long msm_ioctl_config(struct file *fp, unsigned int cmd,
 		rc = msm_v4l2_evt_notify(config_cam->p_mctl, cmd, arg);
 		break;
 
-	case MSM_CAM_IOCTL_SET_MEM_MAP_INFO:
-		if (copy_from_user(&config_cam->mem_map, (void __user *)arg,
-				sizeof(struct msm_mem_map_info)))
-			rc = -EINVAL;
-		break;
-
 	case MSM_CAM_IOCTL_SET_MCTL_SDEV:{
 		struct msm_mctl_set_sdev_data set_data;
 		if (copy_from_user(&set_data, (void __user *)arg,
@@ -3094,7 +3099,6 @@ static const struct file_operations msm_fops_config = {
 	.open  = msm_open_config,
 	.poll  = msm_poll_config,
 	.unlocked_ioctl = msm_ioctl_config,
-	.mmap	= msm_mmap_config,
 	.release = msm_close_config,
 };
 

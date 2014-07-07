@@ -2,7 +2,10 @@
  *
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2008-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012 Sony Mobile Communications AB.
+ *
  * Author: Brian Swetland <swetland@google.com>
+ * Author: Johan Olson <johan.olson@sonymobile.com>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -480,6 +483,7 @@ struct msm_fb_platform_data {
 
 struct msm_hdmi_platform_data {
 	int irq;
+	const char *coupled_mhl_device;
 	int (*cable_detect)(int insert);
 	int (*comm_power)(int on, int show);
 	int (*enable_5v)(int on);

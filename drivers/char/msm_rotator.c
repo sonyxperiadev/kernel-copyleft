@@ -1,4 +1,5 @@
 /* Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1364,7 +1365,7 @@ do_rotate_unlock_mutex:
 	return rc;
 }
 
-static void msm_rotator_set_perf_level(u32 wh, u32 is_rgb)
+static u32 msm_rotator_set_perf_level(u32 wh, u32 is_rgb)
 {
 	u32 perf_level;
 
@@ -1381,6 +1382,7 @@ static void msm_rotator_set_perf_level(u32 wh, u32 is_rgb)
 	msm_bus_scale_client_update_request(msm_rotator_dev->bus_client_handle,
 		perf_level);
 #endif
+	return perf_level;
 
 }
 
@@ -1393,6 +1395,7 @@ static int msm_rotator_start(unsigned long arg,
 	int s, is_rgb = 0;
 	int first_free_idx = INVALID_SESSION;
 	unsigned int dst_w, dst_h;
+	u32 perf_level;
 	unsigned int is_planar420 = 0;
 	int fast_yuv_en = 0;
 
@@ -1428,25 +1431,42 @@ static int msm_rotator_start(unsigned long arg,
 	switch (info.src.format) {
 	case MDP_Y_CB_CR_H2V2:
 	case MDP_Y_CR_CB_H2V2:
-	case MDP_Y_CR_CB_GH2V2:
+	/* To support Movie Studio, the following line needs to be removed */
+	/* case MDP_Y_CR_CB_GH2V2: */
 		is_planar420 = 1;
 	case MDP_Y_CBCR_H2V2:
 	case MDP_Y_CRCB_H2V2:
 	case MDP_Y_CRCB_H2V2_TILE:
 	case MDP_Y_CBCR_H2V2_TILE:
-		if (rotator_hw_revision >= ROTATOR_REVISION_V2 &&
-			!(info.downscale_ratio &&
-			(info.rotations & MDP_ROT_90)))
+	if (rotator_hw_revision >= ROTATOR_REVISION_V2) {
+
+		if (!info.downscale_ratio) {
 			fast_yuv_en = !fast_yuv_invalid_size_checker(
-						info.rotations,
-						info.src.width,
-						dst_w,
-						dst_h,
-						dst_w,
-						is_planar420);
-	break;
-	default:
-		fast_yuv_en = 0;
+							info.rotations,
+							info.src.width,
+							dst_w,
+							dst_h,
+							dst_w,
+							is_planar420);
+		} else if ((info.src.width == 1920) &&
+			   (info.downscale_ratio == 1) &&
+			   (!info.rotations)) {
+			/*
+			* Also allow fast_yuv when down scaling
+			* 1080p to 720p without rotations
+			*/
+			fast_yuv_en = !fast_yuv_invalid_size_checker(
+			info.rotations,
+			info.src.width,
+			info.dst.width,
+			info.dst.height,
+			info.dst.width,
+			is_planar420);
+			}
+		}
+		break;
+		default:
+		    fast_yuv_en = 0;
 	}
 
 	switch (info.src.format) {
@@ -1498,7 +1518,18 @@ static int msm_rotator_start(unsigned long arg,
 
 	mutex_lock(&msm_rotator_dev->rotator_lock);
 
-	msm_rotator_set_perf_level((info.src.width*info.src.height), is_rgb);
+	perf_level = msm_rotator_set_perf_level(
+				(info.src.width*info.src.height), is_rgb);
+	dev_info(msm_rotator_dev->device,
+		 "scale: %i, rot: %i, src: %ix%i, dst: %ix%i, s_dst: %ix%i, " \
+		 "sfmt: %i, dfmt: %i => fyuv: %i, pl: %u\n",
+		info.downscale_ratio, info.rotations,
+		info.src.width, info.src.height,
+		info.dst.width, info.dst.height,
+		dst_w, dst_h,
+		info.src.format,
+		info.dst.format,
+		fast_yuv_en, perf_level);
 
 	for (s = 0; s < MAX_SESSIONS; s++) {
 		if ((msm_rotator_dev->rot_session[s] != NULL) &&

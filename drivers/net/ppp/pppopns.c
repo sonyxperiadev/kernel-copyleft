@@ -31,7 +31,7 @@
 #include <linux/net.h>
 #include <linux/ppp_defs.h>
 #include <linux/if.h>
-#include <linux/if_ppp.h>
+#include <linux/ppp-ioctl.h>
 #include <linux/if_pppox.h>
 #include <linux/ppp_channel.h>
 #include <asm/uaccess.h>

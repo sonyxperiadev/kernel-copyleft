@@ -1608,9 +1608,13 @@ int mdp4_mixer_info(int mixer_num, struct mdp_mixer_info *info)
 	cnt = 0;
 	ndx = MDP4_MIXER_STAGE_BASE;
 	for ( ; ndx < MDP4_MIXER_STAGE_MAX; ndx++) {
-		pipe = ctrl->stage[mixer_num][ndx];
+		pipe = &ctrl->plist[ndx];
 		if (pipe == NULL)
 			continue;
+
+		if (!pipe->pipe_used)
+			continue;
+
 		info->z_order = pipe->mixer_stage - MDP4_MIXER_STAGE0;
 		/* z_order == -1, means base layer */
 		info->ptype = pipe->pipe_type;
@@ -1744,11 +1748,25 @@ void mdp4_overlay_borderfill_stage_up(struct mdp4_overlay_pipe *pipe)
 
 	bspipe = ctrl->stage[mixer][MDP4_MIXER_STAGE_BASE];
 
+	if (bspipe == NULL) {
+		pr_err("%s: no base layer at mixer=%d\n",
+			__func__, mixer);
+		return;
+	}
+
+
 	/*
 	 * bspipe is clone here
 	 * get real pipe
 	 */
 	bspipe = mdp4_overlay_ndx2pipe(bspipe->pipe_ndx);
+
+	if (bspipe == NULL) {
+		pr_err("%s: mdp4_overlay_ndx2pipe returned null pipe ndx\n",
+			__func__);
+		return;
+	}
+
 
 	/* save original base layer */
 	ctrl->baselayer[mixer] = bspipe;
@@ -1770,15 +1788,17 @@ void mdp4_overlay_borderfill_stage_up(struct mdp4_overlay_pipe *pipe)
 
 	/* free original base layer pipe to be sued as normal pipe */
 	bspipe->pipe_used = 0;
-
-	if (ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO)
-		mdp4_dsi_video_base_swap(0, pipe);
-	else if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD)
-		mdp4_dsi_cmd_base_swap(0, pipe);
-	else if (ctrl->panel_mode & MDP4_PANEL_LCDC)
-		mdp4_lcdc_base_swap(0, pipe);
-	else if (ctrl->panel_mode & MDP4_PANEL_DTV)
-		mdp4_dtv_base_swap(0, pipe);
+	if (!hdmi_prim_display && mixer == 0) {
+		if (ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO)
+			mdp4_dsi_video_base_swap(0, pipe);
+		else if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD)
+			mdp4_dsi_cmd_base_swap(0, pipe);
+		else if (ctrl->panel_mode & MDP4_PANEL_LCDC)
+			mdp4_lcdc_base_swap(0, pipe);
+	} else if (hdmi_prim_display || mixer == 1) {
+		if (ctrl->panel_mode & MDP4_PANEL_DTV)
+			mdp4_dtv_base_swap(0, pipe);
+	}
 
 	mdp4_overlay_reg_flush(bspipe, 1);
 	/* borderfill pipe as base layer */
@@ -1827,15 +1847,17 @@ void mdp4_overlay_borderfill_stage_down(struct mdp4_overlay_pipe *pipe)
 
 	/* free borderfill pipe */
 	pipe->pipe_used = 0;
-
-	if (ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO)
-		mdp4_dsi_video_base_swap(0, bspipe);
-	else if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD)
-		mdp4_dsi_cmd_base_swap(0, bspipe);
-	else if (ctrl->panel_mode & MDP4_PANEL_LCDC)
-		mdp4_lcdc_base_swap(0, bspipe);
-	else if (ctrl->panel_mode & MDP4_PANEL_DTV)
-		mdp4_dtv_base_swap(0, bspipe);
+	if (!hdmi_prim_display && mixer == 0) {
+		if (ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO)
+			mdp4_dsi_video_base_swap(0, bspipe);
+		else if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD)
+			mdp4_dsi_cmd_base_swap(0, bspipe);
+		else if (ctrl->panel_mode & MDP4_PANEL_LCDC)
+			mdp4_lcdc_base_swap(0, bspipe);
+	} else if (hdmi_prim_display || mixer == 1) {
+		if (ctrl->panel_mode & MDP4_PANEL_DTV)
+			mdp4_dtv_base_swap(0, bspipe);
+	}
 
 	/* free borderfill pipe */
 	mdp4_overlay_reg_flush(pipe, 1);

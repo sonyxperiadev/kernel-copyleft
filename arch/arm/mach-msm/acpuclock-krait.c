@@ -435,6 +435,8 @@ static int calculate_vdd_core(const struct acpu_level *tgt)
 	return tgt->vdd_core + (enable_boost ? drv.boost_uv : 0);
 }
 
+int current_vdd_core0;
+int current_vdd_core1;
 /* Set the CPU's clock rate and adjust the L2 rate, voltage and BW requests. */
 static int acpuclk_krait_set_rate(int cpu, unsigned long rate,
 				  enum setrate_reason reason)
@@ -475,6 +477,12 @@ static int acpuclk_krait_set_rate(int cpu, unsigned long rate,
 	vdd_data.vdd_dig  = calculate_vdd_dig(tgt);
 	vdd_data.vdd_core = calculate_vdd_core(tgt);
 	vdd_data.ua_core = tgt->ua_core;
+
+	/* Temp for L1 cache error analysis. */
+	if (cpu == 0)
+		current_vdd_core0 = vdd_data.vdd_core;
+	else
+		current_vdd_core1 = vdd_data.vdd_core;
 
 	/* Disable AVS before voltage switch */
 	if (reason == SETRATE_CPUFREQ && drv.scalable[cpu].avs_enabled) {
@@ -946,6 +954,9 @@ static void krait_apply_vmin(struct acpu_level *tbl)
 	}
 }
 
+int current_speed_bin;
+int current_pvs_bin;
+
 static int __init get_speed_bin(u32 pte_efuse)
 {
 	uint32_t speed_bin;
@@ -960,6 +971,8 @@ static int __init get_speed_bin(u32 pte_efuse)
 	} else {
 		dev_info(drv.dev, "SPEED BIN: %d\n", speed_bin);
 	}
+
+	current_speed_bin = speed_bin;
 
 	return speed_bin;
 }
@@ -978,6 +991,8 @@ static int __init get_pvs_bin(u32 pte_efuse)
 	} else {
 		dev_info(drv.dev, "ACPU PVS: %d\n", pvs_bin);
 	}
+
+	current_pvs_bin = pvs_bin;
 
 	return pvs_bin;
 }

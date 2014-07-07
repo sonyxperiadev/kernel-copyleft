@@ -416,24 +416,45 @@ config FB_MSM_NO_MDP_PIPE_CTRL
 
 config FB_MSM_OVERLAY0_WRITEBACK
 	depends on FB_MSM_OVERLAY
-        bool "MDP overlay0 write back mode enable"
+	bool "MDP overlay0 write back mode enable"
 	---help---
 	  Support for MDP4 OVERLAY0 write back mode
 
 
 config FB_MSM_OVERLAY1_WRITEBACK
-        depends on FB_MSM_OVERLAY
-        bool "MDP overlay1 write back mode enable"
-        ---help---
-          Support for MDP4 OVERLAY1 write back mode
+	depends on FB_MSM_OVERLAY
+	bool "MDP overlay1 write back mode enable"
+	---help---
+	  Support for MDP4 OVERLAY1 write back mode
 
 config FB_MSM_WRITEBACK_MSM_PANEL
 	depends on FB_MSM_OVERLAY
-        bool "MDP overlay write back panel enable"
+	bool "MDP overlay write back panel enable"
 	---help---
 	  Support for MDP4 OVERLAY write back mode
+
+config FB_MSM_MIPI_DSI_VENDOR_DET
+	bool "Detect different DrIC enable"
+	default n
+	---help---
+	  Support for different DrIC detection.
+	  The specific GPIO is used.
+	  Use GPIO high/low status to detect different DrIC.
+	  Only support two DrIC.
+
+config FB_MSM_MIPI_DSI_SAMSUNG_S6D6AA0
+	bool
+	select FB_MSM_MIPI_DSI
+	default n
+
+config FB_MSM_MIPI_DSI_RENESAS_R63306
+	bool
+	select FB_MSM_MIPI_DSI
+	default n
+
 choice
 	prompt "LCD Panel"
+	optional
 	default FB_MSM_MDDI_AUTO_DETECT
 
 config FB_MSM_LCDC_PRISM_WVGA_PANEL
@@ -736,6 +757,47 @@ config FB_MSM_PANEL_NONE
 	  This will disable LCD panel
 endchoice
 
+config FB_MSM_MIPI_R63306_PANEL_SHARP_LS046K3SY01
+	bool "SHARP LS046K3SY01 Panel"
+	select FB_MSM_MIPI_DSI_RENESAS_R63306
+	---help---
+	Support SHARP LS046K3SY01 Panel.
+	This is video mode panel.
+	The resolution is 720X1280.
+	The DrIC is R63306.
+
+config FB_MSM_MIPI_R63306_PANEL_TMD_MDW30
+	bool "TMD MDW30 Panel"
+	select FB_MSM_MIPI_DSI_RENESAS_R63306
+
+config FB_MSM_MIPI_R63306_PANEL_SHARP_LS043K3SX04
+	bool "SHARP LS043K3SX04 Panel"
+	select FB_MSM_MIPI_DSI_RENESAS_R63306
+
+config FB_MSM_MIPI_R63306_PANEL_SHARP_LS043K3SX01
+	bool "SHARP LS043K3SX01 Panel"
+	select FB_MSM_MIPI_DSI_RENESAS_R63306
+	---help---
+	Support SHARP LS043K3SX01 Panel.
+	This is video mode panel.
+	The resolution is 720X1280.
+	The DrIC is R63306.
+
+config FB_MSM_MIPI_S6D6AA0_PANEL_SONY_ACX444AKM
+	bool "SONY ACX444AKM Panel"
+	select FB_MSM_MIPI_DSI_SAMSUNG_S6D6AA0
+	default n
+
+config FB_MSM_MIPI_S6D6AA0_PANEL_AUO_H455TVN01
+	bool "AUO H455TVN01 Panel"
+	select FB_MSM_MIPI_DSI_SAMSUNG_S6D6AA0
+	default n
+	---help---
+	  Support AUO H455TVN01 Panel.
+	  This is video mode panel.
+	  The resolution is 720X1280.
+	  The DrIC is S6D6AA0.
+
 choice
 	prompt "Secondary LCD Panel"
 	depends on  FB_MSM_MDP31
@@ -828,6 +890,13 @@ config FB_MSM_HDMI_MSM_PANEL_CEC_SUPPORT
 	  Support for HDMI CEC Feature
 	  Choose to enable CEC
 
+config FB_MSM_MHL_SII8334
+   depends on MHL && FB_MSM_HDMI_MSM_PANEL
+   bool "SiI8334 MHL Transmitter"
+   default n
+   ---help---
+     Support for SiI8334 MHL Transmitter
+
 config FB_MSM_HDMI_MHL_9244
 	depends on FB_MSM_HDMI_MSM_PANEL
 	bool 'SI_MHL 9244 support'
@@ -845,6 +914,10 @@ config FB_MSM_HDMI_MHL_8334
 	  Support the HDMI to MHL conversion.
 	  MHL (Mobile High-Definition Link) technology
 	  uses USB connector to output HDMI content
+
+config FB_MSM_RECOVER_PANEL
+	bool "Enable Recovery"
+	default n
 
 choice
 	depends on  (FB_MSM_MDP22 || FB_MSM_MDP31 || FB_MSM_MDP40)
