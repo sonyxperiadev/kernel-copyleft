@@ -915,6 +915,10 @@ config FB_MSM_HDMI_MHL_8334
 	  MHL (Mobile High-Definition Link) technology
 	  uses USB connector to output HDMI content
 
+config FB_MSM_RECOVER_PANEL
+	bool "Enable Recovery"
+	default n
+
 choice
 	depends on  (FB_MSM_MDP22 || FB_MSM_MDP31 || FB_MSM_MDP40)
 	prompt "TVOut Region"

@@ -14,6 +14,7 @@
  * GNU General Public License for more details.
  *
  */
+#include <asm/cacheflush.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fb.h>
@@ -140,7 +141,7 @@ int load_565rle_image(char *filename, bool bf_supported)
 		ptr += 2;
 		count -= 4;
 	}
-
+	dmac_flush_range(info->screen_base, bits);
 err_logo_free_data:
 	kfree(data);
 err_logo_close_file:

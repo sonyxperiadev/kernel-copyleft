@@ -40,6 +40,7 @@ struct mipi_dsi_data {
 	const struct panel **panels;
 	int (*lcd_power)(bool on);
 	int (*lcd_reset)(bool on);
+	int (*vreg_power)(int on);
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dir;
 #endif
@@ -50,7 +51,25 @@ struct mipi_dsi_data {
 	struct delayed_work esd_work;
 	void (*esd_check)(struct mipi_dsi_data *dsi_data);
 	bool esd_check_enable;
+#ifdef CONFIG_FB_MSM_RECOVER_PANEL
+	int nvrw_ic_vendor;
+	bool nvrw_panel_detective;
+	int nvrw_result;
+	int nvrw_retry_cnt;
+
+	int (*override_nvm_data)(struct msm_fb_data_type *mfd,
+					const char *buf, int count);
+	int (*seq_nvm_read)(struct msm_fb_data_type *mfd, char *buf);
+	int (*seq_nvm_erase)(struct msm_fb_data_type *mfd);
+	int (*seq_nvm_rsp_write)(struct msm_fb_data_type *mfd);
+	int (*seq_nvm_user_write)(struct msm_fb_data_type *mfd);
+#endif
 };
+
+#ifdef CONFIG_FB_MSM_RECOVER_PANEL
+int drv_ic_sysfs_register(struct device *dev);
+void drv_ic_sysfs_unregister(struct device *dev);
+#endif
 
 #ifdef CONFIG_DEBUG_FS
 extern void mipi_dsi_panel_create_debugfs(struct platform_device *pdev);

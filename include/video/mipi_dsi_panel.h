@@ -1,6 +1,6 @@
 /* include/video/mipi_dsi_panel.h
  *
- * Copyright (c) 2012 Sony Mobile Communications AB.
+ * Copyright (c) 2012-2013 Sony Mobile Communications AB.
  *
  * Author: Johan Olson <johan.olson@sonymobile.com>
  * Author: Joakim Wesslen <joakim.wesslen@sonymobile.com>
@@ -17,6 +17,17 @@
 #include <linux/types.h>
 
 #define MIPI_DSI_PANEL_NAME "mipi_dsi_panel"
+
+#ifdef CONFIG_FB_MSM_RECOVER_PANEL
+enum {
+	NVRW_DRV_NONE,
+	NVRW_DRV_RENESAS,
+	NVRW_DRV_SAMSUNG,
+	NVRW_DRV_NOVATEK
+};
+#define NVRW_NUM_E7_PARAM	4
+#define NVRW_NUM_DE_PARAM	12
+#endif
 
 enum panel_cmd_type {
 	CMD_END,
@@ -47,11 +58,44 @@ struct dsi_controller {
 	const struct panel_cmd *read_id;
 };
 
+#ifdef CONFIG_FB_MSM_RECOVER_PANEL
+struct dsi_nvm_rewrite_ctl {
+	struct dsi_cmd_desc *nvm_disp_off;
+	struct dsi_cmd_desc *nvm_mcap;
+	struct dsi_cmd_desc *nvm_mcap_lock;
+	struct dsi_cmd_desc *nvm_open;
+	struct dsi_cmd_desc *nvm_close;
+	struct dsi_cmd_desc *nvm_status;
+	struct dsi_cmd_desc *nvm_erase;
+	struct dsi_cmd_desc *nvm_erase_res;
+	struct dsi_cmd_desc *nvm_read;
+	struct dsi_cmd_desc *nvm_write_rsp;
+	struct dsi_cmd_desc *nvm_flash_rsp;
+	struct dsi_cmd_desc *nvm_write_user;
+	struct dsi_cmd_desc *nvm_flash_user;
+
+	int nvm_disp_off_size;
+	int nvm_mcap_size;
+	int nvm_mcap_lock_size;
+	int nvm_open_size;
+	int nvm_close_size;
+	int nvm_erase_size;
+	int nvm_read_size;
+	int nvm_write_rsp_size;
+	int nvm_flash_rsp_size;
+	int nvm_write_user_size;
+	int nvm_flash_user_size;
+};
+#endif
+
 struct panel {
 	const char			*name;
 	const char			*panel_id;
 	const char			*panel_rev;
 	struct dsi_controller		*pctrl;
+#ifdef CONFIG_FB_MSM_RECOVER_PANEL
+	struct dsi_nvm_rewrite_ctl	*pnvrw_ctl;
+#endif
 	const u32			width;	/* in mm */
 	const u32			height;	/* in mm */
 	const char			*id;
@@ -66,6 +110,8 @@ struct panel_platform_data {
 	int (*platform_reset)(bool high);
 	const struct panel **panels;
 	const struct panel **default_panels;
+	int (*vreg_power)(int on);
+	int ic_vendor;
 };
 
 #ifdef CONFIG_FB_MSM_MIPI_R63306_PANEL_SHARP_LS046K3SY01

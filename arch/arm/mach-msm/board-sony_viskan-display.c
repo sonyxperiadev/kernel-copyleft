@@ -846,11 +846,15 @@ void __init mipi_dsi_panel_add_device(void)
 	default_panel_ids = default_panel_ids_r63306;
 	panel_ids = panel_ids_r63306;
 	mipi_dsi_pdata.dsi_power_save = r63306_lcd_power;
+	pdata->vreg_power = r63306_vreg_power;
+	pdata->ic_vendor = NVRW_DRV_RENESAS;
 #endif /*CONFIG_FB_MSM_MIPI_DSI_RENESAS_R63306*/
 #ifdef CONFIG_FB_MSM_MIPI_DSI_SAMSUNG_S6D6AA0
 	default_panel_ids = default_panel_ids_s6d6aa0;
 	panel_ids = panel_ids_s6d6aa0;
 	mipi_dsi_pdata.dsi_power_save = s6d6aa0_lcd_power;
+	pdata->vreg_power = s6d6aa0_vreg_power;
+	pdata->ic_vendor = NVRW_DRV_SAMSUNG;
 #endif /*CONFIG_FB_MSM_MIPI_DSI_SAMSUNG_S6D6AA0*/
 #ifdef CONFIG_FB_MSM_MIPI_DSI_NOVATEK_NT35565
 	default_panel_ids = default_panel_ids_nt35565;
@@ -863,12 +867,16 @@ void __init mipi_dsi_panel_add_device(void)
 		default_panel_ids = default_panel_ids_s6d6aa0;
 		panel_ids = panel_ids_s6d6aa0;
 		mipi_dsi_pdata.dsi_power_save = s6d6aa0_lcd_power;
+		pdata->vreg_power = s6d6aa0_vreg_power;
+		pdata->ic_vendor = NVRW_DRV_SAMSUNG;
 #endif
 	} else {
 #ifdef CONFIG_FB_MSM_MIPI_DSI_RENESAS_R63306
 		default_panel_ids = default_panel_ids_r63306;
 		panel_ids = panel_ids_r63306;
 		mipi_dsi_pdata.dsi_power_save = r63306_lcd_power;
+		pdata->vreg_power = r63306_vreg_power;
+		pdata->ic_vendor = NVRW_DRV_RENESAS;
 #endif
 	}
 #endif /* CONFIG_FB_MSM_MIPI_DSI_VENDOR_DET */

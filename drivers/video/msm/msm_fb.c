@@ -4,6 +4,7 @@
  *
  * Copyright (C) 2007 Google Incorporated
  * Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -394,6 +395,9 @@ static int msm_fb_probe(struct platform_device *pdev)
 	bl_min_lvl = 255;
 #ifdef CONFIG_FB_MSM_OVERLAY
 	mfd->overlay_play_enable = 1;
+#endif
+#ifdef CONFIG_FB_MSM_RECOVER_PANEL
+	mfd->nvrw_prohibit_draw = false;
 #endif
 
 	bf_supported = mdp4_overlay_borderfill_supported();
@@ -914,15 +918,15 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 			msleep(16);
 			if (pdata->controller_on_panel_on)
 				pdata->power_on_panel_at_pan = 1;
-#ifdef CONFIG_DEBUG_FS
+
 			mutex_lock(&mfd->power_lock);
-#endif
+
 			ret = pdata->on(mfd->pdev);
 			if (ret == 0) {
 				mfd->panel_power_on = TRUE;
-#ifdef CONFIG_DEBUG_FS
+
 			mutex_unlock(&mfd->power_lock);
-#endif
+
 /* ToDo: possible conflict with android which doesn't expect sw refresher */
 /*
 	  if (!mfd->hw_refresh)
@@ -945,9 +949,9 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 		if (mfd->panel_power_on) {
 			int curr_pwr_state;
 
-#ifdef CONFIG_DEBUG_FS
+
 			mutex_lock(&mfd->power_lock);
-#endif
+
 			mfd->op_enable = FALSE;
 			curr_pwr_state = mfd->panel_power_on;
 			mfd->panel_power_on = FALSE;
@@ -958,9 +962,9 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 			ret = pdata->off(mfd->pdev);
 			if (ret)
 				mfd->panel_power_on = curr_pwr_state;
-#ifdef CONFIG_DEBUG_FS
+
 			mutex_unlock(&mfd->power_lock);
-#endif
+
 
 			mfd->op_enable = TRUE;
 		}
@@ -1761,6 +1765,11 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct msm_fb_panel_data *pdata =
 		(struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
+
+#ifdef CONFIG_FB_MSM_RECOVER_PANEL
+	if (mfd->nvrw_prohibit_draw)
+		return 0;
+#endif
 
 	/*
 	 * If framebuffer is 2, io pen display is not allowed.
@@ -3013,6 +3022,11 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 	if (mfd->overlay_play_enable == 0)	/* nothing to do */
 		return 0;
 
+#ifdef CONFIG_FB_MSM_RECOVER_PANEL
+	if (mfd->nvrw_prohibit_draw)
+		return 0;
+#endif
+
 	ret = copy_from_user(&req, argp, sizeof(req));
 	if (ret) {
 		printk(KERN_ERR "%s:msmfb_overlay_play ioctl failed \n",
@@ -3868,9 +3882,9 @@ struct platform_device *msm_fb_add_device(struct platform_device *pdev)
 
 	/* link to the panel pdev */
 	mfd->panel_pdev = pdev;
-#ifdef CONFIG_DEBUG_FS
+
 	mutex_init(&mfd->power_lock);
-#endif
+
 
 	mfd_list[mfd_list_index++] = mfd;
 	fbi_list[fbi_list_index++] = fbi;
