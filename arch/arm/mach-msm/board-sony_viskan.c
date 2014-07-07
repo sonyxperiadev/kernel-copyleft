@@ -4600,6 +4600,7 @@ static void __init msm8960_cdp_init(void)
 #endif
 }
 
+
 #ifdef CONFIG_MACH_VISKAN_HUASHAN_CMCC
 MACHINE_START(VISKAN_HUASHAN_CMCC, "VISKAN HUASHAN_CMCC")
 	.map_io = msm8960_map_io,

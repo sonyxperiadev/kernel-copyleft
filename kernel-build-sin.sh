@@ -12,6 +12,7 @@ FSCONFIG=$2
 [ "$2" = "" ] && die "fsconfig.xml has to be specified as second argument"
 
 if [ ! -f "arch/arm/configs/${PRODUCT_DEFCNFG}" ]; then
+    # instead of specifying viskan_huashan_cmcc_defconfig, it could be 'huashan_cmcc'
     PRODUCT_DEFCNFG=viskan_${PRODUCT_DEFCNFG}_defconfig
 fi
 
