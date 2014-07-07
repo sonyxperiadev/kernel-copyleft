@@ -104,42 +104,18 @@ static void mdm_atomic_soft_reset(struct mdm_modem_drv *mdm_drv)
 
 static void mdm_power_down_common(struct mdm_modem_drv *mdm_drv)
 {
-	int i;
-	int soft_reset_direction =
-		mdm_drv->pdata->soft_reset_inverted ? 1 : 0;
-
 	mdm_peripheral_disconnect(mdm_drv);
-
-	/* Wait for the modem to complete its power down actions. */
-	for (i = 20; i > 0; i--) {
-		if (gpio_get_value(mdm_drv->mdm2ap_status_gpio) == 0) {
-			if (mdm_debug_mask & MDM_DEBUG_MASK_SHDN_LOG)
-				pr_info("%s: mdm2ap_status went low, i = %d\n",
-					__func__, i);
-			break;
-		}
-		msleep(100);
-	}
-	if (i == 0) {
-		pr_err("%s: MDM2AP_STATUS never went low. Doing a hard reset\n",
-			   __func__);
-		gpio_direction_output(mdm_drv->ap2mdm_soft_reset_gpio,
-					soft_reset_direction);
-		/*
-		* Currently, there is a debounce timer on the charm PMIC. It is
-		* necessary to hold the PMIC RESET low for ~3.5 seconds
-		* for the reset to fully take place. Sleep here to ensure the
-		* reset has occured before the function exits.
-		*/
-		msleep(4000);
-	}
 }
 
 static void mdm_do_first_power_on(struct mdm_modem_drv *mdm_drv)
 {
 	int i;
 	int pblrdy;
+#ifdef CONFIG_SONY_QSCFLASHING_UART4
+	if (power_on_count != 1 && mdm_drv->mdm_edload_status != 1) {
+#else
 	if (power_on_count != 1) {
+#endif
 		pr_err("%s: Calling fn when power_on_count != 1\n",
 			   __func__);
 		return;
@@ -226,6 +202,18 @@ static void mdm_power_on_common(struct mdm_modem_drv *mdm_drv)
 	if (mdm_drv->pdata->early_power_on &&
 			(power_on_count == 2))
 		return;
+
+#ifdef CONFIG_SONY_QSCFLASHING_UART4
+	/*
+	 * If we want to enter into edl mode, we should hard reboot the QSC,
+	 * so we use the mdm_do_first_power_on
+	 */
+	if (mdm_drv->mdm_edload_status == 1) {
+		mdm_do_first_power_on(mdm_drv);
+		power_on_count--;
+		return;
+	}
+#endif
 
 	if (power_on_count == 1)
 		mdm_do_first_power_on(mdm_drv);

@@ -49,17 +49,39 @@ CREATE_IPV4_FILE(tcp_wmem_min, sysctl_tcp_wmem[0]);
 CREATE_IPV4_FILE(tcp_wmem_def, sysctl_tcp_wmem[1]);
 CREATE_IPV4_FILE(tcp_wmem_max, sysctl_tcp_wmem[2]);
 
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+CREATE_IPV4_FILE(tcp_spec_if_wmem_min, sysctl_tcp_wmem[3]);
+CREATE_IPV4_FILE(tcp_spec_if_wmem_def, sysctl_tcp_wmem[4]);
+CREATE_IPV4_FILE(tcp_spec_if_wmem_max, sysctl_tcp_wmem[5]);
+#endif
+
 CREATE_IPV4_FILE(tcp_rmem_min, sysctl_tcp_rmem[0]);
 CREATE_IPV4_FILE(tcp_rmem_def, sysctl_tcp_rmem[1]);
 CREATE_IPV4_FILE(tcp_rmem_max, sysctl_tcp_rmem[2]);
+
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+CREATE_IPV4_FILE(tcp_spec_if_rmem_min, sysctl_tcp_rmem[3]);
+CREATE_IPV4_FILE(tcp_spec_if_rmem_def, sysctl_tcp_rmem[4]);
+CREATE_IPV4_FILE(tcp_spec_if_rmem_max, sysctl_tcp_rmem[5]);
+#endif
 
 static struct attribute *ipv4_attrs[] = {
 	&tcp_wmem_min_attr.attr,
 	&tcp_wmem_def_attr.attr,
 	&tcp_wmem_max_attr.attr,
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+	&tcp_spec_if_wmem_min_attr.attr,
+	&tcp_spec_if_wmem_def_attr.attr,
+	&tcp_spec_if_wmem_max_attr.attr,
+#endif
 	&tcp_rmem_min_attr.attr,
 	&tcp_rmem_def_attr.attr,
 	&tcp_rmem_max_attr.attr,
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+	&tcp_spec_if_rmem_min_attr.attr,
+	&tcp_spec_if_rmem_def_attr.attr,
+	&tcp_spec_if_rmem_max_attr.attr,
+#endif
 	NULL
 };
 

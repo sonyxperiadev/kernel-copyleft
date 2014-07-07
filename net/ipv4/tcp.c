@@ -288,8 +288,14 @@ int sysctl_tcp_fin_timeout __read_mostly = TCP_FIN_TIMEOUT;
 struct percpu_counter tcp_orphan_count;
 EXPORT_SYMBOL_GPL(tcp_orphan_count);
 
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+int sysctl_tcp_wmem[6] __read_mostly;
+int sysctl_tcp_rmem[6] __read_mostly;
+#define SPEC_INTERFACE_NAME "rmnet_smux0"
+#else
 int sysctl_tcp_wmem[3] __read_mostly;
 int sysctl_tcp_rmem[3] __read_mostly;
+#endif
 
 EXPORT_SYMBOL(sysctl_tcp_rmem);
 EXPORT_SYMBOL(sysctl_tcp_wmem);
@@ -1324,6 +1330,40 @@ static inline struct sk_buff *tcp_recv_skb(struct sock *sk, u32 seq, u32 *off)
 	}
 	return NULL;
 }
+/*
+ * This routine will check which group of
+ * tcp buffer size datas should be used in
+ * current "sock" by interface name.
+ * These datas are stored in "sysctl_tcp_wmem[]"
+ * for receive and "sysctl_tcp_rmem[]" for send.
+ * Every 3 integers of these 2 arrays are one group
+ * for a kind of  network interface, so the caller
+ * should multiply the returned value by 3 for used.
+ */
+int tcp_get_mem_size_pst(struct sock *sk)
+{
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+	struct dst_entry *sk_dst_entry = NULL;
+	char *inn = NULL;
+	char *spec_if_name = SPEC_INTERFACE_NAME;
+	if (sk) {
+		sk_dst_entry = __sk_dst_get(sk);
+		if (sk_dst_entry && sk_dst_entry->dev)
+			inn = sk_dst_entry->dev->name;
+		if (!inn || strlen(inn) == 0) {
+			printk(KERN_ERR "tcp_get_mem_size_pst: can not get dst interface!\n");
+			return 0;
+		} else if (!strcmp(inn, spec_if_name))
+			return 1;
+		else
+			return 0;
+	}
+	return 0;
+#else
+	return 0;
+#endif
+}
+EXPORT_SYMBOL_GPL(tcp_get_mem_size_pst);
 
 /*
  * This routine provides an alternative to tcp_recvmsg() for routines
@@ -3330,9 +3370,21 @@ void __init tcp_init(void)
 	sysctl_tcp_wmem[1] = 16*1024;
 	sysctl_tcp_wmem[2] = max(64*1024, max_wshare);
 
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+	sysctl_tcp_wmem[3] = SK_MEM_QUANTUM;
+	sysctl_tcp_wmem[4] = 16*1024;
+	sysctl_tcp_wmem[5] = max(64*1024, max_wshare);
+#endif
+
 	sysctl_tcp_rmem[0] = SK_MEM_QUANTUM;
 	sysctl_tcp_rmem[1] = 87380;
 	sysctl_tcp_rmem[2] = max(87380, max_rshare);
+
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+	sysctl_tcp_rmem[3] = SK_MEM_QUANTUM;
+	sysctl_tcp_rmem[4] = 87380;
+	sysctl_tcp_rmem[5] = max(87380, max_rshare);
+#endif
 
 	pr_info("Hash tables configured (established %u bind %u)\n",
 		tcp_hashinfo.ehash_mask + 1, tcp_hashinfo.bhash_size);

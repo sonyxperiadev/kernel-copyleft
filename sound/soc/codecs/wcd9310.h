@@ -44,6 +44,7 @@ enum tabla_micbias_num {
 	TABLA_MICBIAS2,
 	TABLA_MICBIAS3,
 	TABLA_MICBIAS4,
+	TABLA_NUM_MICBIAS,
 };
 
 enum tabla_pid_current {
