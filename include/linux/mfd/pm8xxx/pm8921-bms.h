@@ -1,4 +1,5 @@
-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +15,7 @@
 #define __PM8XXX_BMS_H
 
 #include <linux/errno.h>
+#include <linux/types.h>
 #include <linux/mfd/pm8xxx/batterydata-lib.h>
 
 #define PM8921_BMS_DEV_NAME	"pm8921-bms"
@@ -41,20 +43,16 @@ struct pm8xxx_bms_core_data {
  *				voltage higher than cutoff voltage
  * @low_voltage_calc_ms:	The period of soc calculation in ms when battery
  *				voltage is near cutoff voltage
- * @disable_flat_portion_ocv:	feature to disable ocv updates while in sleep
- * @ocv_dis_high_soc:		the high soc percent when ocv should be disabled
- * @ocv_dis_low_soc:		the low soc percent when ocv should be enabled
  */
 struct pm8921_bms_platform_data {
 	struct pm8xxx_bms_core_data	bms_cdata;
 	enum battery_type		battery_type;
+	struct bms_battery_data		*battery_data;
 	int				r_sense_uohm;
 	unsigned int			i_test;
 	unsigned int			v_cutoff;
 	unsigned int			max_voltage_uv;
 	unsigned int			rconn_mohm;
-	unsigned int			alarm_low_mv;
-	unsigned int			alarm_high_mv;
 	int				enable_fcc_learning;
 	int				shutdown_soc_valid_limit;
 	int				ignore_shutdown_soc;
@@ -62,9 +60,6 @@ struct pm8921_bms_platform_data {
 	int				chg_term_ua;
 	int				normal_voltage_calc_ms;
 	int				low_voltage_calc_ms;
-	int				disable_flat_portion_ocv;
-	int				ocv_dis_high_soc;
-	int				ocv_dis_low_soc;
 };
 
 #if defined(CONFIG_PM8921_BMS) || defined(CONFIG_PM8921_BMS_MODULE)
@@ -102,6 +97,12 @@ int pm8921_bms_get_battery_current(int *result);
 int pm8921_bms_get_percent_charge(void);
 
 /**
+ * pm8921_bms_get_init_fcc - returns initial fcc in mAh of the battery
+ *
+ */
+int pm8921_bms_get_init_fcc(void);
+
+/**
  * pm8921_bms_get_fcc - returns fcc in mAh of the battery depending on its age
  *			and temperature
  *
@@ -131,11 +132,9 @@ void pm8921_bms_calibrate_hkadc(void);
 int pm8921_bms_get_simultaneous_battery_voltage_and_current(int *ibat_ua,
 								int *vbat_uv);
 /**
- * pm8921_bms_get_current_max
- *	- function to get the max current that can be drawn from
- *	  the battery before it dips below the min allowed voltage
+ * pm8921_bms_get_rbatt - function to get the battery resistance in mOhm.
  */
-int pm8921_bms_get_current_max(void);
+int pm8921_bms_get_rbatt(void);
 /**
  * pm8921_bms_invalidate_shutdown_soc - function to notify the bms driver that
  *					the battery was replaced between reboot
@@ -165,6 +164,10 @@ static inline int pm8921_bms_get_percent_charge(void)
 {
 	return -ENXIO;
 }
+static inline int pm8921_bms_get_init_fcc(void)
+{
+	return -ENXIO;
+}
 static inline int pm8921_bms_get_fcc(void)
 {
 	return -ENXIO;
@@ -191,10 +194,6 @@ static inline void pm8921_bms_invalidate_shutdown_soc(void)
 {
 }
 static inline int pm8921_bms_cc_uah(int *cc_uah)
-{
-	return -ENXIO;
-}
-static inline int pm8921_bms_get_current_max(void)
 {
 	return -ENXIO;
 }

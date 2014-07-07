@@ -258,6 +258,10 @@ static irqreturn_t msm_l1_erp_irq(int irq, void *dev_id)
 		pr_alert("\tCESR      = 0x%08x\n", cesr);
 		pr_alert("\tCPU speed = %lu\n", acpuclk_get_rate(cpu));
 		pr_alert("\tMIDR      = 0x%08x\n", read_cpuid_id());
+		pr_alert("\tACPU PVS       = %d\n", current_pvs_bin);
+		pr_alert("\tSPEED BIN      = %d\n", current_speed_bin);
+		pr_alert("\tVDD CORE0      = %d\n", current_vdd_core0);
+		pr_alert("\tVDD CORE1      = %d\n", current_vdd_core1);
 	}
 
 	if (cesr & CESR_DCTPE) {

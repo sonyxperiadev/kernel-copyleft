@@ -37,5 +37,13 @@ struct mdm_platform_data {
 	int send_shdn;
 };
 
+#ifdef CONFIG_SONY_QSCFLASHING_UART4
+#define AP2MDM_EDLOAD     41
+#define MDM_HW_ID_FIRST   12
+#define MDM_HW_ID_SECOND  13
+#define MDM_HW_ID_THIRD   14
+#define MDM_HW_ID_FORTH   15
+#endif
+
 #endif
 

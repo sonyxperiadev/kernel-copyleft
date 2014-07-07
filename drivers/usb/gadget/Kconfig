@@ -1121,4 +1121,37 @@ config RMNET_SDIO_SMD_DATA_CHANNEL
        help
 	  Data SMD channel for transferring network data
 
+config USB_ANDROID_RMNET_CTRL_SMD
+       boolean "RmNet(BAM) control over SMD driver"
+       depends on MSM_SMD
+       help
+         Enabling this option adds rmnet control over SMD
+	 support to the android gadget. Rmnet is an
+	 alternative to CDC-ECM and Windows RNDIS.
+	 It uses QUALCOMM MSM Interface for control
+	 transfers. This option enables only control interface.
+	 Data interface used is BAM.
+
+config USB_ANDROID_NCM
+       boolean "Gadget driver for NCM, Network Control Model"
+       depends on USB_G_ANDROID
+       default n
+       help
+         Enabling this option adds packet transfer driver
+         support to the android gadget.
+
+config USB_ANDROID_MBIM
+       boolean "Gadget driver for MIBM, Mobile Broadband Interface Model"
+       depends on USB_G_ANDROID && !USB_ANDROID_NCM
+       default n
+       help
+         Provides MIBM ethernet function for android gadget driver.
+         MIBM is the one of communication device class.
+
+config USB_MIRRORLINK
+       boolean "Handle MirrorLink USB command"
+       default n
+       help
+         Enabling this option adds support for MirrorLink USB command.
+
 endif # USB_GADGET

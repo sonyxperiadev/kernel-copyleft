@@ -4,6 +4,7 @@
  *  Copyright (C) 2003-2004 Russell King, All Rights Reserved.
  *  SD support Copyright (C) 2004 Ian Molton, All Rights Reserved.
  *  Copyright (C) 2005-2007 Pierre Ossman, All Rights Reserved.
+ *  Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -24,6 +25,10 @@
 #include "mmc_ops.h"
 #include "sd.h"
 #include "sd_ops.h"
+
+#ifdef CONFIG_MMC_SD_CHECK_BOOT_SIGNATURE
+#include "sd_check_mbr.h"
+#endif
 
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
@@ -1309,6 +1314,15 @@ int mmc_attach_sd(struct mmc_host *host)
 	err = mmc_sd_init_card(host, host->ocr, NULL);
 	if (err)
 		goto err;
+#endif
+
+#ifdef CONFIG_MMC_SD_CHECK_BOOT_SIGNATURE
+	if (mmc_sd_check_boot_signature(host->card)) {
+		err = -EFAULT;
+		printk(KERN_ERR "%s: mmc_sd_check_boot_signature() failure (err = %d)\n",
+				mmc_hostname(host), err);
+		goto err;
+	}
 #endif
 
 	mmc_release_host(host);

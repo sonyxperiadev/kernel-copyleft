@@ -39,6 +39,11 @@
 #include <mach/subsystem_restart.h>
 #include <mach/rpm.h>
 #include <mach/gpiomux.h>
+
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
+
 #include "msm_watchdog.h"
 #include "mdm_private.h"
 #include "sysmon.h"
@@ -208,6 +213,9 @@ long mdm_modem_ioctl(struct file *filp, unsigned int cmd,
 				unsigned long arg)
 {
 	int status, ret = 0;
+#ifdef CONFIG_SONY_QSCFLASHING_UART4
+	int hw_id = 0;
+#endif
 
 	if (_IOC_TYPE(cmd) != CHARM_CODE) {
 		pr_err("%s: invalid ioctl code\n", __func__);
@@ -302,6 +310,42 @@ long mdm_modem_ioctl(struct file *filp, unsigned int cmd,
 				   __func__, ret);
 		put_user(ret, (unsigned long __user *) arg);
 		break;
+#ifdef CONFIG_SONY_QSCFLASHING_UART4
+	case START_EDLOAD:
+		get_user(status, (unsigned long __user *) arg);
+		pr_info("START_EDLOAD received,status:%d\n", status);
+		if (status)
+			mdm_drv->mdm_ready = 0;
+		mdm_drv->mdm_edload_status = 1;
+		gpio_set_value(AP2MDM_EDLOAD, 1);
+		break;
+	case EDLOAD_DONE:
+		pr_info("%s: EDLOAD_DONE received\n", __func__);
+		if (mdm_drv->mdm_edload_status)
+			mdm_drv->mdm_edload_status = 0;
+		gpio_set_value(AP2MDM_EDLOAD, 0);
+		break;
+	case GET_HW_CONFIG:
+		pr_debug("get hardware config\n");
+		gpio_request(MDM_HW_ID_FIRST, "HW_ID_FIRST");
+		gpio_request(MDM_HW_ID_SECOND, "HW_ID_SECOND");
+		gpio_request(MDM_HW_ID_THIRD, "HW_ID_THIRD");
+		gpio_request(MDM_HW_ID_FORTH, "HW_ID_FORTH");
+		if (gpio_get_value(MDM_HW_ID_FIRST) == 1)
+			hw_id = 1;
+		if (gpio_get_value(MDM_HW_ID_SECOND) == 1)
+			hw_id += 2;
+		if (gpio_get_value(MDM_HW_ID_THIRD) == 1)
+			hw_id += 4;
+		if (gpio_get_value(MDM_HW_ID_FORTH) == 1)
+			hw_id += 8;
+		put_user(hw_id, (unsigned long __user *) arg);
+		gpio_free(MDM_HW_ID_FIRST);
+		gpio_free(MDM_HW_ID_SECOND);
+		gpio_free(MDM_HW_ID_THIRD);
+		gpio_free(MDM_HW_ID_FORTH);
+		break;
+#endif
 	default:
 		pr_err("%s: invalid ioctl cmd = %d\n", __func__, _IOC_NR(cmd));
 		ret = -EINVAL;
@@ -337,6 +381,13 @@ static irqreturn_t mdm_errfatal(int irq, void *dev_id)
 	if (mdm_drv->mdm_ready &&
 		(gpio_get_value(mdm_drv->mdm2ap_status_gpio) == 1)) {
 		pr_info("%s: Reseting the mdm due to an errfatal\n", __func__);
+
+#ifdef CONFIG_RAMDUMP_TAGS
+	/* save crash type/processname in rdtags for external modem crash */
+	if (!rdtags_add_tag_string("rdinfo_type", "8"))
+		rdtags_add_tag_string("rdinfo_processname", "exmodem");
+#endif
+
 		mdm_drv->mdm_ready = 0;
 		subsystem_restart_dev(mdm_subsys_dev);
 	}
@@ -400,6 +451,13 @@ static irqreturn_t mdm_status_change(int irq, void *dev_id)
 	pr_debug("%s: mdm sent status change interrupt\n", __func__);
 	if (value == 0 && mdm_drv->mdm_ready == 1) {
 		pr_info("%s: unexpected reset external modem\n", __func__);
+
+#ifdef CONFIG_RAMDUMP_TAGS
+	/* save crash type/processname in rdtags for external modem crash */
+	if (!rdtags_add_tag_string("rdinfo_type", "8"))
+		rdtags_add_tag_string("rdinfo_processname", "exmodem");
+#endif
+
 		mdm_drv->mdm_unexpected_reset_occurred = 1;
 		mdm_drv->mdm_ready = 0;
 		subsystem_restart_dev(mdm_subsys_dev);
@@ -471,23 +529,23 @@ static int mdm_subsys_ramdumps(int want_dumps,
 {
 	mdm_drv->mdm_ram_dump_status = 0;
 	cancel_delayed_work(&mdm2ap_status_check_work);
-	if (want_dumps) {
-		mdm_drv->boot_type = CHARM_RAM_DUMPS;
-		complete(&mdm_needs_reload);
-		if (!wait_for_completion_timeout(&mdm_ram_dumps,
-				msecs_to_jiffies(dump_timeout_ms))) {
-			mdm_drv->mdm_ram_dump_status = -ETIMEDOUT;
-			pr_info("%s: mdm modem ramdumps timed out.\n",
-					__func__);
-		} else
-			pr_info("%s: mdm modem ramdumps completed.\n",
-					__func__);
-		INIT_COMPLETION(mdm_ram_dumps);
-		if (!mdm_drv->pdata->no_powerdown_after_ramdumps) {
-			mdm_drv->ops->power_down_mdm_cb(mdm_drv);
-			/* Update gpio configuration to "booting" config. */
-			mdm_update_gpio_configs(GPIO_UPDATE_BOOTING_CONFIG);
-		}
+	/*Always enable QSC1215 ramdump*/
+	mdm_drv->boot_type = CHARM_RAM_DUMPS;
+	INIT_COMPLETION(mdm_ram_dumps);
+	complete(&mdm_needs_reload);
+	if (!wait_for_completion_timeout(&mdm_ram_dumps,
+		msecs_to_jiffies(dump_timeout_ms))) {
+		mdm_drv->mdm_ram_dump_status = -ETIMEDOUT;
+		pr_info("%s: mdm modem ramdumps timed out.\n",
+				__func__);
+	} else
+		pr_info("%s: mdm modem ramdumps completed.\n",
+				__func__);
+	INIT_COMPLETION(mdm_ram_dumps);
+	if (!mdm_drv->pdata->no_powerdown_after_ramdumps) {
+		mdm_drv->ops->power_down_mdm_cb(mdm_drv);
+		/* Update gpio configuration to "booting" config. */
+		mdm_update_gpio_configs(GPIO_UPDATE_BOOTING_CONFIG);
 	}
 	return mdm_drv->mdm_ram_dump_status;
 }
@@ -601,6 +659,9 @@ static void mdm_modem_initialize_data(struct platform_device  *pdev,
 	mdm_drv->usb_switch_gpio = pres ? pres->start : -1;
 
 	mdm_drv->boot_type                  = CHARM_NORMAL_BOOT;
+#ifdef CONFIG_SONY_QSCFLASHING_UART4
+	mdm_drv->mdm_edload_status          = 0;
+#endif
 
 	mdm_drv->ops      = mdm_ops;
 	mdm_drv->pdata    = pdev->dev.platform_data;
@@ -625,6 +686,11 @@ int mdm_common_create(struct platform_device  *pdev,
 
 	gpio_request(mdm_drv->ap2mdm_status_gpio, "AP2MDM_STATUS");
 	gpio_request(mdm_drv->ap2mdm_errfatal_gpio, "AP2MDM_ERRFATAL");
+
+#ifdef CONFIG_SONY_QSCFLASHING_UART4
+	gpio_request(AP2MDM_EDLOAD, "AP2MDM_EDLOAD");
+	gpio_direction_output(AP2MDM_EDLOAD, 0);
+#endif
 	if (GPIO_IS_VALID(mdm_drv->ap2mdm_kpdpwr_n_gpio))
 		gpio_request(mdm_drv->ap2mdm_kpdpwr_n_gpio, "AP2MDM_KPDPWR_N");
 	gpio_request(mdm_drv->mdm2ap_status_gpio, "MDM2AP_STATUS");

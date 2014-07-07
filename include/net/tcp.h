@@ -206,6 +206,12 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 /* TCP initial congestion window as per draft-hkchu-tcpm-initcwnd-01 */
 #define TCP_INIT_CWND		10
 
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+#define TCP_RWMEM_COUNT	6
+#else
+#define TCP_RWMEM_COUNT	3
+#endif
+
 extern struct inet_timewait_death_row tcp_death_row;
 
 /* sysctl variables for tcp */
@@ -231,8 +237,8 @@ extern int sysctl_tcp_fack;
 extern int sysctl_tcp_reordering;
 extern int sysctl_tcp_ecn;
 extern int sysctl_tcp_dsack;
-extern int sysctl_tcp_wmem[3];
-extern int sysctl_tcp_rmem[3];
+extern int sysctl_tcp_wmem[TCP_RWMEM_COUNT];
+extern int sysctl_tcp_rmem[TCP_RWMEM_COUNT];
 extern int sysctl_tcp_app_win;
 extern int sysctl_tcp_adv_win_scale;
 extern int sysctl_tcp_tw_reuse;
@@ -997,6 +1003,12 @@ extern void tcp_select_initial_window(int __space, __u32 mss,
 				      __u32 *rcv_wnd, __u32 *window_clamp,
 				      int wscale_ok, __u8 *rcv_wscale,
 				      __u32 init_rcv_wnd);
+
+extern int tcp_get_mem_size_pst(struct sock *sk);
+extern void tcp_select_initial_window2(int __space, __u32 mss,
+				      __u32 *rcv_wnd, __u32 *window_clamp,
+				      int wscale_ok, __u8 *rcv_wscale,
+				      __u32 init_rcv_wnd, struct sock *sk);
 
 static inline int tcp_win_from_space(int space)
 {

@@ -49,6 +49,9 @@ struct mdm_modem_drv {
 	int mdm_ready;
 	int mdm_boot_status;
 	int mdm_ram_dump_status;
+#ifdef CONFIG_SONY_QSCFLASHING_UART4
+	int mdm_edload_status;
+#endif
 	enum charm_boot_type boot_type;
 	int mdm_debug_on;
 	int mdm_unexpected_reset_occurred;

@@ -1170,6 +1170,7 @@ static int smux_handle_rx_open_ack(struct smux_pkt_t *pkt)
 	int ret;
 	struct smux_lch_t *ch;
 	int enable_powerdown = 0;
+	int tx_ready = 0;
 
 	lcid = pkt->hdr.lcid;
 	ch = &smux_lch[lcid];
@@ -1184,8 +1185,11 @@ static int smux_handle_rx_open_ack(struct smux_pkt_t *pkt)
 			enable_powerdown = 1;
 
 		ch->local_state = SMUX_LCH_LOCAL_OPENED;
-		if (ch->remote_state == SMUX_LCH_REMOTE_OPENED)
+		if (ch->remote_state == SMUX_LCH_REMOTE_OPENED) {
 			schedule_notify(lcid, SMUX_CONNECTED, NULL);
+			if (!(list_empty(&ch->tx_queue)))
+				tx_ready = 1;
+		}
 		ret = 0;
 	} else if (ch->remote_mode == SMUX_LCH_MODE_REMOTE_LOOPBACK) {
 		SMUX_DBG("smux: Remote loopback OPEN ACK received\n");
@@ -1206,6 +1210,9 @@ static int smux_handle_rx_open_ack(struct smux_pkt_t *pkt)
 		}
 		spin_unlock(&smux.tx_lock_lha2);
 	}
+
+	if (tx_ready)
+		list_channel(ch);
 
 	return ret;
 }
@@ -1287,8 +1294,9 @@ static int smux_handle_rx_open_cmd(struct smux_pkt_t *pkt)
 			goto out;
 		}
 		ack_pkt->hdr.cmd = SMUX_CMD_OPEN_LCH;
-		ack_pkt->hdr.flags = SMUX_CMD_OPEN_ACK
-			| SMUX_CMD_OPEN_POWER_COLLAPSE;
+		ack_pkt->hdr.flags = SMUX_CMD_OPEN_ACK;
+		if (enable_powerdown)
+			ack_pkt->hdr.flags |= SMUX_CMD_OPEN_POWER_COLLAPSE;
 		ack_pkt->hdr.lcid = lcid;
 		ack_pkt->hdr.payload_len = 0;
 		ack_pkt->hdr.pad_len = 0;
@@ -1308,8 +1316,9 @@ static int smux_handle_rx_open_cmd(struct smux_pkt_t *pkt)
 			if (ack_pkt) {
 				ack_pkt->hdr.lcid = lcid;
 				ack_pkt->hdr.cmd = SMUX_CMD_OPEN_LCH;
-				ack_pkt->hdr.flags =
-					SMUX_CMD_OPEN_POWER_COLLAPSE;
+				if (enable_powerdown)
+					ack_pkt->hdr.flags |=
+						SMUX_CMD_OPEN_POWER_COLLAPSE;
 				ack_pkt->hdr.payload_len = 0;
 				ack_pkt->hdr.pad_len = 0;
 				smux_tx_queue(ack_pkt, ch, 0);
