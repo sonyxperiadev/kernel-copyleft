@@ -77,6 +77,7 @@ int mipi_dsi_clk_init(struct platform_device *pdev)
 		amp_pclk = NULL;
 		goto mipi_dsi_clk_err;
 	}
+	clk_prepare(amp_pclk);
 
 	dsi_m_pclk = clk_get(dev, "master_iface_clk");
 	if (IS_ERR_OR_NULL(dsi_m_pclk)) {
@@ -84,6 +85,7 @@ int mipi_dsi_clk_init(struct platform_device *pdev)
 		dsi_m_pclk = NULL;
 		goto mipi_dsi_clk_err;
 	}
+	clk_prepare(dsi_m_pclk);
 
 	dsi_s_pclk = clk_get(dev, "slave_iface_clk");
 	if (IS_ERR_OR_NULL(dsi_s_pclk)) {
@@ -91,6 +93,7 @@ int mipi_dsi_clk_init(struct platform_device *pdev)
 		dsi_s_pclk = NULL;
 		goto mipi_dsi_clk_err;
 	}
+	clk_prepare(dsi_s_pclk);
 
 	dsi_byte_div_clk = clk_get(dev, "byte_clk");
 	if (IS_ERR(dsi_byte_div_clk)) {
@@ -98,6 +101,7 @@ int mipi_dsi_clk_init(struct platform_device *pdev)
 		dsi_byte_div_clk = NULL;
 		goto mipi_dsi_clk_err;
 	}
+	clk_prepare(dsi_byte_div_clk);
 
 	dsi_esc_clk = clk_get(dev, "esc_clk");
 	if (IS_ERR(dsi_esc_clk)) {
@@ -105,6 +109,7 @@ int mipi_dsi_clk_init(struct platform_device *pdev)
 		dsi_esc_clk = NULL;
 		goto mipi_dsi_clk_err;
 	}
+	clk_prepare(dsi_esc_clk);
 
 	return 0;
 
@@ -115,16 +120,26 @@ mipi_dsi_clk_err:
 
 void mipi_dsi_clk_deinit(struct device *dev)
 {
-	if (amp_pclk)
+	if (amp_pclk) {
+		clk_unprepare(amp_pclk);
 		clk_put(amp_pclk);
-	if (amp_pclk)
+	}
+	if (amp_pclk) {
+		clk_unprepare(dsi_m_pclk);
 		clk_put(dsi_m_pclk);
-	if (dsi_s_pclk)
+	}
+	if (dsi_s_pclk) {
+		clk_unprepare(dsi_s_pclk);
 		clk_put(dsi_s_pclk);
-	if (dsi_byte_div_clk)
+	}
+	if (dsi_byte_div_clk) {
+		clk_unprepare(dsi_byte_div_clk);
 		clk_put(dsi_byte_div_clk);
-	if (dsi_esc_clk)
+	}
+	if (dsi_esc_clk) {
+		clk_unprepare(dsi_esc_clk);
 		clk_put(dsi_esc_clk);
+	}
 }
 
 static void mipi_dsi_clk_ctrl(struct dsi_clk_desc *clk, int clk_en)

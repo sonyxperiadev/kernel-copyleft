@@ -79,6 +79,8 @@ static int mipi_dsi_off(struct platform_device *pdev)
 	else
 		down(&mfd->dma->mutex);
 
+	ret = panel_next_off(pdev);
+
 	if (mfd->panel_info.type == MIPI_CMD_PANEL) {
 		mipi_dsi_prepare_clocks();
 		mipi_dsi_ahb_ctrl(1);
@@ -103,8 +105,6 @@ static int mipi_dsi_off(struct platform_device *pdev)
 			mipi_dsi_set_tear_off(mfd);
 		}
 	}
-
-	ret = panel_next_off(pdev);
 
 #ifdef CONFIG_MSM_BUS_SCALING
 	mdp_bus_scale_update_request(0);

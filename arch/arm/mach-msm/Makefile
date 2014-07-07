@@ -307,6 +307,15 @@ obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-keypad.o board-sapphire-panel.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-mmc.o board-sapphire-wifi.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-rfkill.o msm_vibrator.o
 
+#viskan
+board-sony_viskan-all-objs += board-sony_viskan.o board-sony_viskan-display.o board-sony_viskan-storage.o
+
+obj-$(CONFIG_MACH_VISKAN_HUASHAN) += board-sony_viskan-all.o board-sony_viskan_huashan-gpiomux.o board-sony_viskan_huashan-pmic.o board-sony_viskan_huashan-regulator.o
+obj-$(CONFIG_MACH_VISKAN_HUASHAN) += board-sony_viskan_huashan-camera.o bms-batterydata-sleipner.o
+
+obj-$(CONFIG_MACH_VISKAN_HUASHAN_CT) += board-sony_viskan-all.o board-sony_viskan_huashan_ct-gpiomux.o board-sony_viskan_huashan_ct-pmic.o board-sony_viskan_huashan_ct-regulator.o
+obj-$(CONFIG_MACH_VISKAN_HUASHAN_CT) += board-sony_viskan_huashan_ct-camera.o bms-batterydata-sleipner.o
+
 CFLAGS_msm_vibrator.o += -Idrivers/staging/android
 CFLAGS_board-9615.o += -Idrivers/usb/gadget
 
@@ -389,7 +398,16 @@ obj-$(CONFIG_MSM_RPM_SMD) += rpm-smd.o
 obj-$(CONFIG_MSM_CPR) += msm_cpr.o
 obj-$(CONFIG_MSM_VP_REGULATOR) += msm_vp.o
 
+obj-$(CONFIG_MSM_USE_USER_ACCESSIBLE_TIMERS) += timer_page.o
+
 ifdef CONFIG_MSM_CPR
 obj-$(CONFIG_DEBUG_FS) += msm_cpr-debug.o
 endif
 obj-$(CONFIG_MSM_CPU_PWRCTL) +=  msm_cpu_pwrctl.o
+
+obj-$(CONFIG_RAMDUMP_TAGS) += board-rdtags.o
+obj-$(CONFIG_SONY_SSM) += sony_ssm.o
+CFLAGS_board-rdtags.o	:= \
+	-D"INFO_PRODUCT=\"$(if $(TARGET_PRODUCT),$(TARGET_PRODUCT),unknown)\"" \
+	-D"INFO_VARIANT=\"$(if $(TARGET_BUILD_VARIANT),$(TARGET_BUILD_VARIANT),unknown)\"" \
+	-D"INFO_BUILDID=\"$(if $(BUILD_ID),$(BUILD_ID),unknown)\""

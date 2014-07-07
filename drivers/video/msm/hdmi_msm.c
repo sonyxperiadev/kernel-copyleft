@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,7 +9,8 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 /* #define DEBUG */
@@ -26,6 +28,10 @@
 #include <mach/clk.h>
 #include <mach/msm_iomap.h>
 #include <mach/socinfo.h>
+
+#ifdef CONFIG_MHL
+#include <linux/mhl.h>
+#endif
 
 #include "msm_fb.h"
 #include "hdmi_msm.h"
@@ -1086,7 +1092,7 @@ static irqreturn_t hdmi_msm_isr(int irq, void *dev_id)
 		return IRQ_HANDLED;
 	}
 
-	if (!hdmi_msm_process_hdcp_interrupts())
+	 if (!hdmi_msm_process_hdcp_interrupts())
 		return IRQ_HANDLED;
 
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL_CEC_SUPPORT
@@ -1285,7 +1291,7 @@ static void msm_hdmi_init_ddc(void)
 		* 0x3: 3/4 of total samples */
 	/* Configure the Pre-Scale multiplier
 	 * Configure the Threshold */
-	HDMI_OUTP_ND(0x0220, (10 << 16) | (2 << 0));
+	HDMI_OUTP_ND(0x0220, (5 << 16) | (2 << 0));
 
 	/*
 	 * 0x0224 HDMI_DDC_SETUP
@@ -1301,8 +1307,8 @@ static void msm_hdmi_init_ddc(void)
 	   [15:0] REFTIMER	Value to set the register in order to generate
 		DDC strobe. This register counts on HDCP application clock */
 	/* Enable reference timer
-	 * 27 micro-seconds */
-	HDMI_OUTP_ND(0x027C, (1 << 16) | (27 << 0));
+	 * 68 micro-seconds */
+	HDMI_OUTP_ND(0x027C, (1 << 16) | (68 << 0));
 }
 
 static int hdmi_msm_ddc_clear_irq(const char *what)
@@ -2452,6 +2458,12 @@ static int hdcp_authentication_part1(void)
 			mutex_unlock(&hdcp_auth_state_mutex);
 			goto error;
 		}
+
+		/*
+		 * A small delay is needed here to avoid device crash observed
+		 * during reauthentication in MSM8960
+		 */
+		msleep(200);
 
 		/* 0x0168 HDCP_RCVPORT_DATA12
 		   [23:8] BSTATUS
@@ -3630,8 +3642,8 @@ static uint8 hdmi_msm_avi_iframe_lut[][16] = {
 	 0x10,	0x10,	0x10,	0x10,	0x10, 0x10, 0x10}, /*00*/
 	{0x18,	0x18,	0x28,	0x28,	0x28,	 0x28,	0x28,	0x28,	0x28,
 	 0x28,	0x28,	0x28,	0x28,	0x18, 0x28, 0x18}, /*01*/
-	{0x00,	0x04,	0x04,	0x04,	0x04,	 0x04,	0x04,	0x04,	0x04,
-	 0x04,	0x04,	0x04,	0x04,	0x88, 0x00, 0x04}, /*02*/
+	{0x00,	0x00,	0x00,	0x00,	0x00,	 0x00,	0x00,	0x00,	0x00,
+	 0x00,	0x00,	0x00,	0x00,	0x00, 0x00, 0x00}, /*02*/
 	{0x02,	0x06,	0x11,	0x15,	0x04,	 0x13,	0x10,	0x05,	0x1F,
 	 0x14,	0x20,	0x22,	0x21,	0x01, 0x03, 0x11}, /*03*/
 	{0x00,	0x01,	0x00,	0x01,	0x00,	 0x00,	0x00,	0x00,	0x00,
@@ -4146,8 +4158,10 @@ static void hdmi_msm_turn_on(void)
 	hdmi_msm_spd_infoframe_packetsetup();
 
 	if (hdmi_msm_state->hdcp_enable && hdmi_msm_state->reauth) {
-		hdmi_msm_hdcp_enable();
 		hdmi_msm_state->reauth = FALSE ;
+		cancel_work_sync(&hdmi_msm_state->hdcp_reauth_work);
+		del_timer_sync(&hdmi_msm_state->hdcp_timer);
+		queue_work(hdmi_work_queue, &hdmi_msm_state->hdcp_work);
 	}
 
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL_CEC_SUPPORT
@@ -4463,9 +4477,11 @@ EXPORT_SYMBOL(mhl_connect_api);
 static int hdmi_msm_power_off(struct platform_device *pdev)
 {
 	int ret = 0;
+	char *envp[2];
 
-	if (!hdmi_ready()) {
-		DEV_ERR("%s: HDMI/HPD not initialized\n", __func__);
+	if (!(MSM_HDMI_BASE && hdmi_msm_state &&
+		hdmi_msm_state->hdmi_app_clk)) {
+		DEV_ERR("%s: HDMI not initialized\n", __func__);
 		return ret;
 	}
 
@@ -4473,6 +4489,15 @@ static int hdmi_msm_power_off(struct platform_device *pdev)
 		DEV_DBG("%s: panel not ON\n", __func__);
 		goto error;
 	}
+
+	envp[0] = "HDCP_STATE=FAIL";
+	envp[1] = NULL;
+	DEV_INFO("HDMI HPD: QDSP OFF\n");
+	kobject_uevent_env(external_common_state->uevent_kobj,
+			   KOBJ_CHANGE, envp);
+	switch_set_state(&external_common_state->sdev, 0);
+	DEV_INFO("Hdmi state switch to %d: %s\n",
+		external_common_state->sdev.state, __func__);
 
 	if (hdmi_msm_state->hdcp_enable) {
 		if (hdmi_msm_state->hdcp_activating) {
@@ -4775,9 +4800,15 @@ static int hdmi_msm_hpd_feature(int on)
 	DEV_INFO("%s: %d\n", __func__, on);
 	if (on) {
 		rc = hdmi_msm_hpd_on();
+#ifdef CONFIG_MHL
+		/* MHL full operation start */
+		if (hdmi_msm_state->pd->coupled_mhl_device)
+			mhl_full_operation(
+				hdmi_msm_state->pd->coupled_mhl_device,
+				TRUE);
+#endif
 	} else {
 		if (external_common_state->hpd_state) {
-			external_common_state->hpd_state = 0;
 
 			/* Send offline event to switch OFF HDMI and HAL FD */
 			hdmi_msm_send_event(HPD_EVENT_OFFLINE);
@@ -4786,6 +4817,7 @@ static int hdmi_msm_hpd_feature(int on)
 			INIT_COMPLETION(hdmi_msm_state->hpd_event_processed);
 			wait_for_completion_interruptible_timeout(
 				&hdmi_msm_state->hpd_event_processed, HZ);
+			external_common_state->hpd_state = 0;
 		}
 
 		hdmi_msm_hpd_off();
@@ -4794,6 +4826,13 @@ static int hdmi_msm_hpd_feature(int on)
 		switch_set_state(&external_common_state->sdev, 0);
 		DEV_INFO("%s: hdmi state switched to %d\n", __func__,
 				external_common_state->sdev.state);
+#ifdef CONFIG_MHL
+		/* MHL full operation stop */
+		if (hdmi_msm_state->pd->coupled_mhl_device)
+			mhl_full_operation(
+				hdmi_msm_state->pd->coupled_mhl_device,
+				FALSE);
+#endif
 	}
 
 	return rc;
@@ -4930,6 +4969,8 @@ static void __exit hdmi_msm_exit(void)
 	platform_driver_unregister(&this_driver);
 }
 
+/* SoMC: disabled for production due to security reasons */
+#if 0
 static int set_hdcp_feature_on(const char *val, const struct kernel_param *kp)
 {
 	int rv = param_set_bool(val, kp);
@@ -4959,6 +5000,7 @@ static struct kernel_param_ops hdcp_feature_on_param_ops = {
 module_param_cb(hdcp, &hdcp_feature_on_param_ops, &hdcp_feature_on,
 			S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(hdcp, "Enable or Disable HDCP");
+#endif
 
 module_init(hdmi_msm_init);
 module_exit(hdmi_msm_exit);

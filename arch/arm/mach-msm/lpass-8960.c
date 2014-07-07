@@ -25,6 +25,10 @@
 #include <mach/subsystem_restart.h>
 #include <mach/subsystem_notif.h>
 
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
+
 #include "smd_private.h"
 #include "ramdump.h"
 #include "sysmon.h"
@@ -134,6 +138,13 @@ static void lpass_smsm_state_cb(void *data, uint32_t old_state,
 		pr_err("%s: LPASS SMSM state changed to SMSM_RESET,"
 			" new_state = 0x%x, old_state = 0x%x\n", __func__,
 			new_state, old_state);
+
+#ifdef CONFIG_RAMDUMP_TAGS
+		/* save crash type/processname in rdtags when lpass crashed */
+		if (!rdtags_add_tag_string("rdinfo_type", "3"))
+			rdtags_add_tag_string("rdinfo_processname", "modem");
+#endif
+
 		lpass_log_failure_reason();
 		panic(MODULE_NAME ": Resetting the SoC");
 	}

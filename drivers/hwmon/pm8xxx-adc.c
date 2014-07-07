@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,6 +32,7 @@
 #include <linux/mfd/pm8xxx/core.h>
 #include <linux/regulator/consumer.h>
 #include <linux/mfd/pm8xxx/pm8xxx-adc.h>
+#include <mach/msm_xo.h>
 
 /* User Bank register set */
 #define PM8XXX_ADC_ARB_USRP_CNTRL1			0x197
@@ -123,6 +125,8 @@
 #define PM8XXX_ADC_HWMON_NAME_LENGTH			32
 #define PM8XXX_ADC_BTM_INTERVAL_MAX			0x14
 #define PM8XXX_ADC_COMPLETION_TIMEOUT			(2 * HZ)
+#define PM8XXX_ADC_SETTLE_TIME_MIN_TEST			10000
+#define PM8XXX_ADC_SETTLE_TIME_MAX_TEST			10100
 
 struct pm8xxx_adc {
 	struct device				*dev;
@@ -141,9 +145,11 @@ struct pm8xxx_adc {
 	struct work_struct			cool_work;
 	uint32_t				mpp_base;
 	struct device				*hwmon;
+	struct msm_xo_voter			*adc_voter;
 	int					msm_suspend_check;
 	struct pm8xxx_adc_amux_properties	*conv;
 	struct pm8xxx_adc_arb_btm_param		batt;
+	struct msm_xo_voter			*voter;
 	struct sensor_device_attribute		sens_attr[0];
 };
 
@@ -295,9 +301,18 @@ static int32_t pm8xxx_adc_channel_power_enable(uint32_t channel,
 {
 	int rc = 0;
 
-	switch (channel)
+	switch (channel) {
 	case ADC_MPP_1_AMUX8:
 		rc = pm8xxx_adc_patherm_power(power_cntrl);
+		break;
+	case CHANNEL_DIE_TEMP:
+	case CHANNEL_MUXOFF:
+		usleep_range(PM8XXX_ADC_SETTLE_TIME_MIN_TEST,
+					PM8XXX_ADC_SETTLE_TIME_MAX_TEST);
+		break;
+	default:
+		break;
+	}
 
 	return rc;
 }
@@ -689,6 +704,8 @@ uint32_t pm8xxx_adc_read(enum pm8xxx_adc_channels channel,
 			break;
 	}
 
+	msm_xo_mode_vote(adc_pmic->adc_voter, MSM_XO_MODE_ON);
+
 	if (i == adc_pmic->adc_num_board_channel ||
 		(pm8xxx_adc_check_channel_valid(channel) != 0)) {
 		rc = -EBADF;
@@ -770,6 +787,8 @@ uint32_t pm8xxx_adc_read(enum pm8xxx_adc_channels channel,
 		goto fail_unlock;
 	}
 
+	msm_xo_mode_vote(adc_pmic->adc_voter, MSM_XO_MODE_OFF);
+
 	mutex_unlock(&adc_pmic->adc_lock);
 
 	return 0;
@@ -778,6 +797,7 @@ fail:
 	if (rc_fail)
 		pr_err("pm8xxx adc power disable failed\n");
 fail_unlock:
+	msm_xo_mode_vote(adc_pmic->adc_voter, MSM_XO_MODE_OFF);
 	mutex_unlock(&adc_pmic->adc_lock);
 	pr_err("pm8xxx adc error with %d\n", rc);
 	return rc;
@@ -1117,8 +1137,14 @@ hwmon_err_sens:
 static int pm8xxx_adc_suspend_noirq(struct device *dev)
 {
 	struct pm8xxx_adc *adc_pmic = pmic_adc;
+	int rc;
 
 	adc_pmic->msm_suspend_check = 1;
+
+	rc = msm_xo_mode_vote(adc_pmic->voter, MSM_XO_MODE_OFF);
+	if (rc)
+		pr_err("%s failed to vote for TCXO D0 buffer%d\n",
+			__func__, rc);
 
 	return 0;
 }
@@ -1126,8 +1152,14 @@ static int pm8xxx_adc_suspend_noirq(struct device *dev)
 static int pm8xxx_adc_resume_noirq(struct device *dev)
 {
 	struct pm8xxx_adc *adc_pmic = pmic_adc;
+	int rc;
 
 	adc_pmic->msm_suspend_check = 0;
+
+	rc = msm_xo_mode_vote(adc_pmic->voter, MSM_XO_MODE_ON);
+	if (rc)
+		pr_err("%s failed to vote for TCXO D0 buffer%d\n",
+			__func__, rc);
 
 	return 0;
 }
@@ -1147,6 +1179,7 @@ static int __devexit pm8xxx_adc_teardown(struct platform_device *pdev)
 	struct pm8xxx_adc *adc_pmic = pmic_adc;
 	int i;
 
+	msm_xo_put(adc_pmic->adc_voter);
 	platform_set_drvdata(pdev, NULL);
 	pmic_adc = NULL;
 	if (!pa_therm) {
@@ -1246,6 +1279,18 @@ static int __devinit pm8xxx_adc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to request btm irq\n");
 	}
 
+	adc_pmic->voter = msm_xo_get(MSM_XO_TCXO_D0, "pm8xxx-adc");
+	if (IS_ERR(adc_pmic->voter)) {
+		rc = PTR_ERR(adc_pmic->voter);
+		pr_err("failed to request voter with error %d\n", rc);
+		adc_pmic->voter = NULL;
+		return rc;
+	}
+	rc = msm_xo_mode_vote(adc_pmic->voter, MSM_XO_MODE_ON);
+	if (rc)
+		pr_err("%s failed to vote for TCXO D0 buffer%d\n",
+			__func__, rc);
+
 	disable_irq_nosync(adc_pmic->btm_cool_irq);
 	platform_set_drvdata(pdev, adc_pmic);
 	adc_pmic->msm_suspend_check = 0;
@@ -1264,6 +1309,14 @@ static int __devinit pm8xxx_adc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to initialize pm8xxx hwmon adc\n");
 	}
 	adc_pmic->hwmon = hwmon_device_register(adc_pmic->dev);
+
+	if (adc_pmic->adc_voter == NULL) {
+		adc_pmic->adc_voter = msm_xo_get(MSM_XO_TCXO_D0, "pmic_xoadc");
+		if (IS_ERR(adc_pmic->adc_voter)) {
+			dev_err(&pdev->dev, "Failed to get XO vote\n");
+			return PTR_ERR(adc_pmic->adc_voter);
+		}
+	}
 
 	pa_therm = regulator_get(adc_pmic->dev, "pa_therm");
 	if (IS_ERR(pa_therm)) {

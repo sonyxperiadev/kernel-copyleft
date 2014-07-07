@@ -416,7 +416,6 @@ static int msm_fb_probe(struct platform_device *pdev)
 			lcd_backlight_registered = 1;
 	}
 #endif
-
 	pdev_list[pdev_list_cnt++] = pdev;
 	msm_fb_create_sysfs(pdev);
 	return 0;
@@ -514,6 +513,28 @@ static int msm_fb_suspend(struct platform_device *pdev, pm_message_t state)
 #else
 #define msm_fb_suspend NULL
 #endif
+
+static void msm_fb_shutdown(struct platform_device *pdev)
+{
+	struct msm_fb_data_type *mfd;
+	int ret = 0;
+	MSM_FB_DEBUG("msm_fb_shutdown\n");
+
+	mfd = (struct msm_fb_data_type *)platform_get_drvdata(pdev);
+	if (mfd) {
+		if (mfd->op_enable) {
+			ret = msm_fb_blank_sub(FB_BLANK_POWERDOWN, mfd->fbi,
+					     mfd->op_enable);
+		}
+
+		if (ret)
+			MSM_FB_INFO
+				("msm_fb_shutdown: can't turn off display!\n");
+
+		mfd->op_enable = FALSE;
+		mdp_pipe_ctrl(MDP_MASTER_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+	}
+}
 
 static int msm_fb_suspend_sub(struct msm_fb_data_type *mfd)
 {
@@ -731,7 +752,7 @@ static struct platform_driver msm_fb_driver = {
 	.suspend = msm_fb_suspend,
 	.resume = msm_fb_resume,
 #endif
-	.shutdown = NULL,
+	.shutdown = msm_fb_shutdown,
 	.driver = {
 		   /* Driver name must match the device name added in platform.c. */
 		   .name = "msm_fb",
@@ -891,10 +912,17 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 	case FB_BLANK_UNBLANK:
 		if (!mfd->panel_power_on) {
 			msleep(16);
+			if (pdata->controller_on_panel_on)
+				pdata->power_on_panel_at_pan = 1;
+#ifdef CONFIG_DEBUG_FS
+			mutex_lock(&mfd->power_lock);
+#endif
 			ret = pdata->on(mfd->pdev);
 			if (ret == 0) {
 				mfd->panel_power_on = TRUE;
-
+#ifdef CONFIG_DEBUG_FS
+			mutex_unlock(&mfd->power_lock);
+#endif
 /* ToDo: possible conflict with android which doesn't expect sw refresher */
 /*
 	  if (!mfd->hw_refresh)
@@ -917,6 +945,9 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 		if (mfd->panel_power_on) {
 			int curr_pwr_state;
 
+#ifdef CONFIG_DEBUG_FS
+			mutex_lock(&mfd->power_lock);
+#endif
 			mfd->op_enable = FALSE;
 			curr_pwr_state = mfd->panel_power_on;
 			mfd->panel_power_on = FALSE;
@@ -927,6 +958,9 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 			ret = pdata->off(mfd->pdev);
 			if (ret)
 				mfd->panel_power_on = curr_pwr_state;
+#ifdef CONFIG_DEBUG_FS
+			mutex_unlock(&mfd->power_lock);
+#endif
 
 			mfd->op_enable = TRUE;
 		}
@@ -1157,16 +1191,26 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	fix->mmio_len = 0;	/* No MMIO Address */
 	fix->accel = FB_ACCEL_NONE;/* FB_ACCEL_MSM needes to be added in fb.h */
 
-	var->xoffset = 0,	/* Offset from virtual to visible */
-	var->yoffset = 0,	/* resolution */
-	var->grayscale = 0,	/* No graylevels */
-	var->nonstd = 0,	/* standard pixel format */
-	var->activate = FB_ACTIVATE_VBL,	/* activate it at vsync */
-	var->height = -1,	/* height of picture in mm */
-	var->width = -1,	/* width of picture in mm */
-	var->accel_flags = 0,	/* acceleration flags */
-	var->sync = 0,	/* see FB_SYNC_* */
-	var->rotate = 0,	/* angle we rotate counter clockwise */
+	var->xoffset = 0;	/* Offset from virtual to visible */
+	var->yoffset = 0;	/* resolution */
+	var->grayscale = 0;	/* No graylevels */
+	var->nonstd = 0;	/* standard pixel format */
+	var->activate = FB_ACTIVATE_VBL;	/* activate it at vsync */
+	/* height of picture in mm */
+	if (panel_info && panel_info->height)
+		var->height = panel_info->height;
+	else
+		var->height = -1;
+
+	/* width of picture in mm */
+	if (panel_info && panel_info->width)
+		var->width = panel_info->width;
+	else
+		var->width = -1;
+
+	var->accel_flags = 0;	/* acceleration flags */
+	var->sync = 0;	/* see FB_SYNC_* */
+	var->rotate = 0;	/* angle we rotate counter clockwise */
 	mfd->op_enable = FALSE;
 
 	switch (mfd->fb_imgType) {
@@ -1483,14 +1527,10 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	fbram_size -= fix->smem_len;
 
 	MSM_FB_INFO
-	    ("FrameBuffer[%d] %dx%d size=%d bytes is registered successfully!\n",
-	     mfd->index, fbi->var.xres, fbi->var.yres, fbi->fix.smem_len);
+	("FrameBuffer[%d] %dx%dx%d size=%d bytes is registered successfully!\n",
+	mfd->index, fbi->var.xres, fbi->var.yres, fbi->var.bits_per_pixel,
+							fbi->fix.smem_len);
 
-#ifdef CONFIG_FB_MSM_LOGO
-	/* Flip buffer */
-	if (!load_565rle_image(INIT_IMAGE_FILE, bf_supported))
-		;
-#endif
 	ret = 0;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -1719,6 +1759,8 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 	struct mdp_dirty_region dirty;
 	struct mdp_dirty_region *dirtyPtr = NULL;
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
+	struct msm_fb_panel_data *pdata =
+		(struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 
 	/*
 	 * If framebuffer is 2, io pen display is not allowed.
@@ -1799,14 +1841,26 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 		}
 	}
 
-	mdp_set_dma_pan_info(info, dirtyPtr,
-			     (var->activate == FB_ACTIVATE_VBL));
+	if (pdata->power_on_panel_at_pan) {
+		/* No vsync allowed at first pan since it will hang
+		   during dma transfer */
+		mdp_set_dma_pan_info(info, dirtyPtr, FALSE);
+	} else {
+		mdp_set_dma_pan_info(info, dirtyPtr,
+					(var->activate == FB_ACTIVATE_VBL));
+	}
 	mdp_dma_pan_update(info);
 	up(&msm_fb_pan_sem);
+
+	if (pdata->power_on_panel_at_pan && pdata->on) {
+		(void)pdata->controller_on_panel_on(mfd->pdev);
+		pdata->power_on_panel_at_pan = 0;
+	}
 
 	if (unset_bl_level && !bl_updated)
 		schedule_delayed_work(&mfd->backlight_worker,
 				backlight_duration);
+
 
 	if (info->node == 0 && (mfd->cont_splash_done)) /* primary */
 		mdp_free_splash_buffer(mfd);
@@ -3012,6 +3066,7 @@ static int msmfb_overlay_play_enable(struct fb_info *info, unsigned long *argp)
 	return 0;
 }
 
+#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
 static int msmfb_overlay_blt(struct fb_info *info, unsigned long *argp)
 {
 	int     ret;
@@ -3028,6 +3083,16 @@ static int msmfb_overlay_blt(struct fb_info *info, unsigned long *argp)
 	return ret;
 }
 
+#else
+static int msmfb_overlay_blt(struct fb_info *info, unsigned long *argp)
+{
+	return 0;
+}
+static int msmfb_overlay_blt_off(struct fb_info *info, unsigned long *argp)
+{
+	return 0;
+}
+#endif
 #ifdef CONFIG_FB_MSM_WRITEBACK_MSM_PANEL
 static int msmfb_overlay_ioctl_writeback_init(struct fb_info *info)
 {
@@ -3800,6 +3865,12 @@ struct platform_device *msm_fb_add_device(struct platform_device *pdev)
 	mfd->iclient = iclient;
 	/* link to the latest pdev */
 	mfd->pdev = this_dev;
+
+	/* link to the panel pdev */
+	mfd->panel_pdev = pdev;
+#ifdef CONFIG_DEBUG_FS
+	mutex_init(&mfd->power_lock);
+#endif
 
 	mfd_list[mfd_list_index++] = mfd;
 	fbi_list[fbi_list_index++] = fbi;

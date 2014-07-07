@@ -30,6 +30,7 @@
 #include <linux/if_pppol2tp.h>
 #include <linux/if_pppolac.h>
 #include <linux/if_pppopns.h>
+#include <linux/if_pppocpw.h>
 
 /* For user-space programs to pick up these definitions
  * which they wouldn't get otherwise without defining __KERNEL__
@@ -65,7 +66,8 @@ struct pptp_addr {
 #define PX_PROTO_PPTP  2
 #define PX_PROTO_OLAC  3
 #define PX_PROTO_OPNS  4
-#define PX_MAX_PROTO   5
+#define PX_PROTO_OCPW  5
+#define PX_MAX_PROTO   6
 
 struct sockaddr_pppox {
 	__kernel_sa_family_t sa_family;       /* address family, AF_PPPOX */
@@ -191,6 +193,12 @@ struct pppopns_opt {
 	int		(*backlog_rcv)(struct sock *sk_raw, struct sk_buff *skb);
 };
 
+struct pppocpw_opt {
+	__u32		stream_id;
+	int	(*backlog_rcv)(struct sock *sk_udp, struct sk_buff *skb);
+};
+
+
 #include <net/sock.h>
 
 struct pppox_sock {
@@ -203,6 +211,7 @@ struct pppox_sock {
 		struct pptp_opt  pptp;
 		struct pppolac_opt lac;
 		struct pppopns_opt pns;
+		struct pppocpw_opt cpw;
 	} proto;
 	__be16			num;
 };

@@ -149,6 +149,7 @@ struct msm_fb_data_type {
 	__u32 bl_level;
 
 	struct platform_device *pdev;
+	struct platform_device *panel_pdev;
 
 	__u32 var_xres;
 	__u32 var_yres;
@@ -190,6 +191,9 @@ struct msm_fb_data_type {
 	u32 writeback_state;
 	bool writeback_active_cnt;
 	int cont_splash_done;
+#ifdef CONFIG_DEBUG_FS
+	struct mutex power_lock;
+#endif
 	void *copy_splash_buf;
 	unsigned char *copy_splash_phys;
 	void *cpu_pm_hdl;
