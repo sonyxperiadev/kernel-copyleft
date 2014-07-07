@@ -1,4 +1,5 @@
 /* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -777,7 +778,11 @@ int msm_server_streamoff(struct msm_cam_v4l2_device *pcam, int idx)
 
 	D("%s, pcam = 0x%x\n", __func__, (u32)pcam);
 	ctrlcmd.type        = MSM_V4L2_STREAM_OFF;
+#ifdef CONFIG_SONY_CAM_V4L2
+	ctrlcmd.timeout_ms  = 3000;
+#else
 	ctrlcmd.timeout_ms  = 10000;
+#endif
 	ctrlcmd.length      = 0;
 	ctrlcmd.value       = NULL;
 	ctrlcmd.stream_type = pcam->dev_inst[idx]->image_mode;
@@ -1698,7 +1703,11 @@ static const struct v4l2_file_operations msm_fops_server = {
 
 static const struct v4l2_ioctl_ops msm_ioctl_ops_server = {
 	.vidioc_subscribe_event = msm_server_v4l2_subscribe_event,
+#if defined(CONFIG_SONY_CAM_V4L2)
+	.vidioc_unsubscribe_event = msm_server_v4l2_unsubscribe_event,
+#else
 	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
+#endif
 	.vidioc_default = msm_ioctl_server,
 };
 

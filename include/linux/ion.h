@@ -21,6 +21,11 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+#define CACHED          1
+#define UNCACHED        0
+#endif
+
 struct ion_handle;
 /**
  * enum ion_heap_types - list of all possible types of heaps

@@ -617,12 +617,30 @@ config TOUCHSENSE_VIBRATOR
 	  This option enables device driver support for Immersion Touchsense
 	  vibrator.
 
+config VIBRATOR_LC898300
+	tristate "VIBRATOR Support for LC898300 I2C chips"
+	depends on ANDROID_TIMED_OUTPUT && I2C
+	default n
+	help
+	  This option enables device driver support for the vibrator
+	  on the LC898300 chips accessed via the I2C bus.
+
 config PMIC8XXX_NFC
 	tristate "Qualcomm PM8XXX support for Near Field Communication"
 	depends on MFD_PM8XXX
 	help
 	  Qualcomm PM8XXX chips have a module to support NFC (Near Field
 	  Communication). This option enables the driver to support it.
+
+config LM3561
+	tristate "LED driver for LM3561"
+	default n
+	depends on I2C
+	help
+	  This option enables support for LM3561
+	  led controller.
+	  The LM3561 is the flash led that works
+	  with camera.
 
 config PMIC8XXX_UPL
 	tristate "Qualcomm PM8XXX support for User Programmable Logic"
@@ -642,6 +660,14 @@ config PMIC8058_XOADC
 	  PMIC8058. Driver interface to program registers of the ADC over
 	  AMUX channels, devices on programmable MPP's and xotherm.
 
+config LM3560_FLASHLED
+	tristate "LED driver for LM3560"
+	default n
+	depends on I2C
+	help
+	  This option enables support for LM3560
+	  led controller with lm3560 driver.
+
 config QSEECOM
 	tristate "Qualcomm Secure Execution Communicator driver"
 	help
@@ -656,6 +682,13 @@ config QFP_FUSE
 	  fuses. The ioctls provides the necessary interface
 	  to the fuse block. Currently this is supported only
 	  on FSM targets.
+
+config NFC_PN544
+	tristate "NFC driver for PN544"
+	default n
+	depends on I2C
+	help
+	  This option enables support for PN544.
 
 config USB_HSIC_SMSC_HUB
 	tristate "Support for HSIC based MSM on-chip SMSC3503 HUB"
@@ -681,6 +714,26 @@ config BU52031NVX_POUCHDETECT
 	help
 	  depends on BU52031NVX
 
+config RAMDUMP_TAGS
+	bool "Ramdump tags to communicate between kernel and ramdump"
+	default n
+	help
+	  This option enables a driver which can be interacted with to
+	  supply the ramdumper with more information about the current
+	  state of the crashing kernel such as build info, HWWD registers,
+	  additional CPU registers not stored in crash_notes, crashing
+	  application info etc. A small amount of memory will be set
+	  aside to hold the information which will later be used by
+	  the ramdump application.
+
+config RAMDUMP_CRASH_LOGS
+	bool "amsslog as proc entries"
+	default n
+	depends on ARCH_MSM
+	help
+	  This will enable /proc/last_amsslog
+	  on a reboot after crash.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
@@ -690,5 +743,6 @@ source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/altera-stapl/Kconfig"
 source "drivers/misc/slimport_anx7808/Kconfig"
+source "drivers/misc/mpu3050/Kconfig"
 
 endmenu

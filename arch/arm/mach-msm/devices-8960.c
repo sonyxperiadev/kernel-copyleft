@@ -85,6 +85,7 @@
 #define MSM_UART9DM_PHYS	(MSM_GSBI9_PHYS + 0x40000)
 #define MSM_UART10DM_PHYS	(MSM_GSBI10_PHYS + 0x40000)
 #define MSM_UART11DM_PHYS	(MSM_GSBI11_PHYS + 0x10000)
+#define MSM_UART12DM_PHYS	(MSM_GSBI12_PHYS + 0x10000)
 
 /* GSBI QUP devices */
 #define MSM_GSBI1_QUP_PHYS	(MSM_GSBI1_PHYS + 0x80000)
@@ -508,10 +509,6 @@ struct platform_device msm8960_device_uart_gsbi5 = {
 	.resource	= resources_uart_gsbi5,
 };
 
-static struct msm_serial_hslite_platform_data uart_gsbi8_pdata = {
-	.line		= 0,
-};
-
 static struct resource resources_uart_gsbi8[] = {
 	{
 		.start	= GSBI8_UARTDM_IRQ,
@@ -534,11 +531,39 @@ static struct resource resources_uart_gsbi8[] = {
 
 struct platform_device msm8960_device_uart_gsbi8 = {
 	.name	= "msm_serial_hsl",
-	.id	= 1,
-	.num_resources	   = ARRAY_SIZE(resources_uart_gsbi8),
-	.resource	   = resources_uart_gsbi8,
-	.dev.platform_data = &uart_gsbi8_pdata,
+	.id	= 0,
+	.num_resources	= ARRAY_SIZE(resources_uart_gsbi8),
+	.resource	= resources_uart_gsbi8,
 };
+
+#ifdef CONFIG_MSM_GSBI12_UART
+static struct resource resources_uart_gsbi12[] = {
+	{
+		.start	= GSBI12_UARTDM_IRQ,
+		.end	= GSBI12_UARTDM_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.start	= MSM_UART12DM_PHYS,
+		.end	= MSM_UART12DM_PHYS + PAGE_SIZE - 1,
+		.name	= "uartdm_resource",
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= MSM_GSBI12_PHYS,
+		.end	= MSM_GSBI12_PHYS + PAGE_SIZE - 1,
+		.name	= "gsbi_resource",
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+struct platform_device msm8960_device_uart_gsbi12 = {
+	.name	= "msm_serial_hsl",
+	.id	= 3,
+	.num_resources	= ARRAY_SIZE(resources_uart_gsbi12),
+	.resource	= resources_uart_gsbi12,
+};
+#endif
 
 /* MSM Video core device */
 #ifdef CONFIG_MSM_BUS_SCALING

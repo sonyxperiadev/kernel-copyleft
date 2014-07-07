@@ -294,6 +294,7 @@ config USB_QCOM_MDM_BRIDGE
 	  To compile this driver as a module, choose M here: the module
 	  will be called mdm_bridge. If unsure, choose N.
 
+
 config USB_QCOM_KS_BRIDGE
 	tristate "USB Qualcomm kick start bridge"
 	depends on USB
@@ -312,3 +313,10 @@ config USB_QCOM_IPC_BRIDGE
 	  will be bridged in kernel space. This driver works as a transport
 	  layer for IPC router module that enables communication between
 	  APPS processor and MODEM processor.
+
+config USB_NCP373
+	bool "ON Semiconductor Load switch NCP373 support"
+	depends on USB
+	default n
+	help
+	  Say Y here if your device uses NCP373.

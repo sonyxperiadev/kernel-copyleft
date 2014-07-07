@@ -172,6 +172,11 @@ config ARCH_MSM8960
 	select MSM_KRAIT_WFE_FIXUP
 	select MSM_IOMMU_GPU_SYNC
 	select MSM_CPU_PWRCTL
+	select HAVE_NMI_WATCHDOG if MSM_WATCHDOG || MSM_WATCHDOG_V2
+	select GENERIC_TIME_VSYSCALL
+	select USE_USER_ACCESSIBLE_TIMERS
+	select ARM_USE_USER_ACCESSIBLE_TIMERS
+	select MSM_USE_USER_ACCESSIBLE_TIMERS
 
 config ARCH_MSM8930
 	bool "MSM8930"
@@ -206,6 +211,10 @@ config ARCH_MSM8930
 	select MSM_KRAIT_WFE_FIXUP
 	select MSM_IOMMU_GPU_SYNC
 	select MSM_CPU_PWRCTL
+	select GENERIC_TIME_VSYSCALL
+	select USE_USER_ACCESSIBLE_TIMERS
+	select ARM_USE_USER_ACCESSIBLE_TIMERS
+	select MSM_USE_USER_ACCESSIBLE_TIMERS
 
 config ARCH_APQ8064
 	bool "APQ8064"
@@ -235,6 +244,11 @@ config ARCH_APQ8064
 	select MSM_KRAIT_WFE_FIXUP
 	select MSM_IOMMU_GPU_SYNC
 	select MSM_CPU_PWRCTL
+	select HAVE_NMI_WATCHDOG if MSM_WATCHDOG || MSM_WATCHDOG_V2
+	select GENERIC_TIME_VSYSCALL
+	select USE_USER_ACCESSIBLE_TIMERS
+	select ARM_USE_USER_ACCESSIBLE_TIMERS
+	select MSM_USE_USER_ACCESSIBLE_TIMERS
 
 config ARCH_MSM8974
 	bool "MSM8974"
@@ -905,6 +919,62 @@ config MACH_FSM9XXX_SURF
 	  Support for the Qualcomm FSM9xxx femtocell
 	  chipset based SURF evaluation board and
 	  FFA board.
+
+config MACH_BLUE_CDB
+       depends on ARCH_MSM8960
+       default n
+       bool "SONY Blue CDB"
+       help
+         Support for the Sony Blue CDB
+
+config MACH_BLUE_TSUBASA
+        depends on ARCH_MSM8960
+        default n
+        bool "SONY Tsubasa RoW"
+        help
+          Support for the Sony Tsubasa RoW
+
+config MACH_BLUE_TSUBASA_DCM
+        depends on ARCH_MSM8960
+        default n
+        bool "SONY Tsubasa Docomo"
+        help
+          Support for the Sony Tsubasa Docomo
+
+config MACH_BLUE_TSUBASA_KDDI
+        depends on ARCH_MSM8960
+        default n
+        bool "SONY Tsubasa KDDI"
+        help
+          Support for the Sony Tsubasa KDDI
+
+config MACH_BLUE_MINT
+	depends on ARCH_MSM8960
+	default n
+	bool "SONY Mint"
+	help
+	  Support for the Sony Mint
+
+config MACH_BLUE_HAYABUSA
+	depends on ARCH_MSM8960
+	default n
+	bool "SONY Hayabusa"
+	help
+	  Support for the Sony Hayabusa
+
+config MACH_BLUE_HAYABUSA_DCM
+	depends on ARCH_MSM8960
+	default n
+	bool "SONY Hayabusa Maki"
+	help
+	  Support for the Sony Hayabusa Maki
+
+config MACH_VISKAN_HUASHAN
+	depends on ARCH_MSM8960
+	default n
+	bool "SONY HUASHAN"
+	help
+	  Support for the Sony Huashan
 
 config MACH_MSM_DUMMY
 	bool "NONE (No device)"
@@ -2247,6 +2317,12 @@ config MSM_GSBI9_UART
 	help
 	  This enables GSBI9 configured into UART.
 
+config MSM_GSBI12_UART
+	bool "Enable GSBI12 UART device"
+	default n
+	help
+	  This enables GSBI12 configured into UART.
+
 config MSM_SHARED_GPIO_FOR_UART2DM
 	bool "Use shared GPIOs into UART mode"
 	depends on (ARCH_MSM7X27A && !MMC_MSM_SDC3_8_BIT_SUPPORT && !MMC_MSM_SDC4_SUPPORT)
@@ -2454,6 +2530,19 @@ config MSM_OCMEM_POWER_DISABLE
 	  never allowing them to be turned OFF. Both local power
 	  management and RPM assisted power modes are supported.
 
+config PM8921_MIC_BIAS
+	bool "pm8921 mic bias driver"
+	default n
+	help
+	  Provides support for activate pm8921 mic bias driver used for
+	  primary and secondary mic.
+
+config CODEC_MICBIAS_WITH_CAPACITANCE
+	bool "wcd9310 micbias bypass capacitance"
+	default n
+	help
+	  Provides support for config wcd9310 micbias cap mode.
+
 config MSM_RTB
 	bool "Register tracing"
 	help
@@ -2480,6 +2569,22 @@ config MSM_EBI_ERP
 	  seemingly broken memory accesses.
 
 	  For production builds, you should probably say 'N' here.
+
+config SIMPLE_REMOTE_PLATFORM
+        bool "Simple Remote platform specific driver"
+        default n
+        help
+          Provides support for detecting 3.5mm audio jack, such as wired
+          headset. This is the platform specific layer.
+
+config SIMPLE_REMOTE_INVERT_PLUG_DETECTION_STATE
+	bool "Invert state of plug detection"
+	depends on SIMPLE_REMOTE_PLATFORM
+	help
+	  This option enables to invert headphone plug detection state,
+	  currently the plug detection state was low state when headphone
+	  was inserted, but it is high state on some products, so that
+	  we need invert this state on these products.
 
 config MSM_CACHE_ERP
 	bool "Cache / CPU error reporting"
@@ -2616,6 +2721,15 @@ config MSM_CACHE_DUMP_ON_PANIC
 	  want to dump the L1 and L2 caches on panic before any flush occurs.
 	  If unsure, say N
 
+config SONY_SSM
+	bool "Support Super Stamina Mode"
+	default n
+	help
+	  This enables support for power mode notifications, required by Super
+	  Stamina Mode. The driver will let a user space application register
+	  for notifications when the device is ready to switch into a new
+	  power mode.
+
 config MSM_HSIC_SYSMON
 	tristate "MSM HSIC system monitor driver"
 	depends on USB
@@ -2639,5 +2753,18 @@ config MSM_CPU_PWRCTL
 	  Droop detector mechanism can adversely affect krait plls during
 	  stand alone power collapse operation. Selecting this option
 	  ensures that they are always off.
+
+config MMC_MSM_POWER_SUPPLY_SDC3_VIA_MPP04
+	bool "PMIC MPP04"
+	default n
+	help
+	  The power supply for uSD is controlled via MPP04(GPIO)
+
+config MSM_USE_USER_ACCESSIBLE_TIMERS
+	bool "Enables mapping an MSM timer counter page to user space."
+	depends on ARM_USE_USER_ACCESSIBLE_TIMERS
+	help
+	  Enables MSM-specific user accessible timers via a shared
+	  memory page containing the cycle counter.
 
 endif

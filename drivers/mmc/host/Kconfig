@@ -325,6 +325,13 @@ config MMC_MSM
 	  MSM and QSD SOCs from Qualcomm. The controller also has
 	  support for SDIO devices.
 
+config MMC_MSM_CARD_HW_DETECTION
+	boolean "Qualcomm MMC Hardware detection support"
+	depends on MMC_MSM
+	default n
+	help
+	  Select Y if the hardware has support to detect card insertion/removal.
+
 config MMC_MXC
 	tristate "Freescale i.MX21/27/31 Multimedia Card Interface support"
 	depends on ARCH_MXC

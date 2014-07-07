@@ -832,9 +832,9 @@ xt_replace_table(struct xt_table *table,
 		return NULL;
 	}
 
-	table->private = newinfo;
 	newinfo->initial_entries = private->initial_entries;
-
+	smp_wmb();
+	table->private = newinfo;
 	/*
 	 * Even though table entries have now been swapped, other CPU's
 	 * may still be using the old entries. This is okay, because

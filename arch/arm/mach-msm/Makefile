@@ -50,6 +50,11 @@ else
 endif
 obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
 
+ifdef CONFIG_ARCH_MSM8960
+	obj-$(CONFIG_PM8921_MIC_BIAS) += pm8921-mic_bias.o
+	obj-$(CONFIG_SIMPLE_REMOTE_PLATFORM) += simple_remote_msm8960_pf.o
+endif
+
 obj-$(CONFIG_MSM_AVS_HW) += avs.o
 obj-$(CONFIG_CPU_V6) += idle-v6.o
 obj-$(CONFIG_CPU_V7) += idle-v7.o
@@ -307,6 +312,44 @@ obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-mmc.o board-sapphire-wifi.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-rfkill.o msm_vibrator.o
 
 obj-$(CONFIG_MACH_LGE) += lge/
+#blue
+board-blue-all-objs += board-blue.o board-blue-display.o board-blue-storage.o
+
+obj-$(CONFIG_MACH_BLUE_CDB) += board-blue-all.o board-blue_cdb-pmic.o board-blue_cdb-gpiomux.o board-blue_cdb-regulator.o
+obj-$(CONFIG_MACH_BLUE_CDB) += gyro-sony_common.o board-blue_cdb-mpu.o board-blue_cdb-leds.o board-blue_cdb-camera.o board-blue_cdb-usb.o
+obj-$(CONFIG_MACH_BLUE_CDB) += irda-blue_common.o
+obj-$(CONFIG_MACH_BLUE_CDB) += oneseg-blue_common.o
+
+obj-$(CONFIG_MACH_BLUE_TSUBASA) += board-blue-all.o board-blue_tsubasa-pmic.o board-blue_tsubasa-gpiomux.o board-blue_tsubasa-regulator.o bms-batterydata-august.o
+obj-$(CONFIG_MACH_BLUE_TSUBASA) += gyro-sony_common.o board-blue_tsubasa-mpu.o board-blue_tsubasa-leds.o board-blue_tsubasa-camera.o board-blue_tsubasa-usb.o
+
+obj-$(CONFIG_MACH_BLUE_TSUBASA_DCM) += board-blue-all.o board-blue_tsubasa_dcm-pmic.o board-blue_tsubasa_dcm-gpiomux.o board-blue_tsubasa-regulator.o bms-batterydata-august.o
+obj-$(CONFIG_MACH_BLUE_TSUBASA_DCM) += gyro-sony_common.o board-blue_tsubasa-mpu.o board-blue_tsubasa-leds.o board-blue_tsubasa-camera.o
+obj-$(CONFIG_MACH_BLUE_TSUBASA_DCM) += irda-blue_common.o
+obj-$(CONFIG_MACH_BLUE_TSUBASA_DCM) += oneseg-blue_common.o
+obj-$(CONFIG_MACH_BLUE_TSUBASA_DCM) += felica-blue_common.o
+
+obj-$(CONFIG_MACH_BLUE_TSUBASA_KDDI) += board-blue-all.o board-blue_tsubasa_kddi-pmic.o board-blue_tsubasa_kddi-gpiomux.o board-blue_tsubasa-regulator.o bms-batterydata-august.o
+obj-$(CONFIG_MACH_BLUE_TSUBASA_KDDI) += gyro-sony_common.o board-blue_tsubasa-mpu.o board-blue_tsubasa-leds.o board-blue_tsubasa-camera.o
+obj-$(CONFIG_MACH_BLUE_TSUBASA_KDDI) += irda-blue_common.o
+obj-$(CONFIG_MACH_BLUE_TSUBASA_KDDI) += oneseg-blue_common.o
+obj-$(CONFIG_MACH_BLUE_TSUBASA_KDDI) += felica-blue_common.o
+
+obj-$(CONFIG_MACH_BLUE_MINT) += board-blue-all.o board-blue_mint-pmic.o board-blue_mint-gpiomux.o board-blue_mint-regulator.o bms-batterydata-mentos.o
+obj-$(CONFIG_MACH_BLUE_MINT) += gyro-sony_common.o board-blue_mint-mpu.o board-blue_mint-camera.o board-blue_mint-leds.o board-blue_mint-usb.o
+
+obj-$(CONFIG_MACH_BLUE_HAYABUSA) += board-blue-all.o board-blue_hayabusa-pmic.o board-blue_hayabusa-gpiomux.o board-blue_hayabusa-regulator.o devices-8960.o bms-batterydata-falk.o
+obj-$(CONFIG_MACH_BLUE_HAYABUSA) += gyro-sony_common.o board-blue_hayabusa-mpu.o board-blue_hayabusa-camera.o board-blue_hayabusa-leds.o board-blue_hayabusa-usb.o
+
+obj-$(CONFIG_MACH_BLUE_HAYABUSA_DCM) += board-blue-all.o board-blue_hayabusa-pmic.o board-blue_hayabusa-gpiomux.o board-blue_hayabusa-regulator.o devices-8960.o bms-batterydata-falk.o
+obj-$(CONFIG_MACH_BLUE_HAYABUSA_DCM) += gyro-sony_common.o board-blue_hayabusa-mpu.o board-blue_hayabusa-camera.o board-blue_hayabusa-leds.o board-blue_hayabusa-usb.o
+obj-$(CONFIG_MACH_BLUE_HAYABUSA_DCM) += felica-blue_common.o
+
+#viskan
+board-viskan-all-objs += board-viskan.o board-viskan-display.o board-viskan-storage.o
+
+obj-$(CONFIG_MACH_VISKAN_HUASHAN) += board-viskan-all.o board-viskan_huashan-gpiomux.o board-viskan_huashan-pmic.o board-viskan_huashan-regulator.o bms-batterydata-sleipner.o
+obj-$(CONFIG_MACH_VISKAN_HUASHAN) += board-viskan_huashan-camera.o
 
 CFLAGS_msm_vibrator.o += -Idrivers/staging/android
 CFLAGS_board-9615.o += -Idrivers/usb/gadget
@@ -382,6 +425,7 @@ obj-$(CONFIG_MSM_RTB) += msm_rtb.o
 obj-$(CONFIG_MSM_CACHE_ERP) += cache_erp.o
 obj-$(CONFIG_MSM_EBI_ERP) += ebi_erp.o
 obj-$(CONFIG_MSM_CACHE_DUMP) += msm_cache_dump.o
+obj-$(CONFIG_SONY_SSM) += sony_ssm.o
 
 obj-$(CONFIG_MSM_HSIC_SYSMON) += hsic_sysmon.o
 obj-$(CONFIG_MSM_HSIC_SYSMON_TEST) += hsic_sysmon_test.o
@@ -390,9 +434,17 @@ obj-$(CONFIG_MSM_RPM_SMD) += rpm-smd.o
 obj-$(CONFIG_MSM_CPR) += msm_cpr.o
 obj-$(CONFIG_MSM_VP_REGULATOR) += msm_vp.o
 
+obj-$(CONFIG_MSM_USE_USER_ACCESSIBLE_TIMERS) += timer_page.o
+
 ifdef CONFIG_MSM_CPR
 obj-$(CONFIG_DEBUG_FS) += msm_cpr-debug.o
 endif
 obj-$(CONFIG_MSM_CPU_PWRCTL) +=  msm_cpu_pwrctl.o
 
 obj-$(CONFIG_ARCH_RANDOM) += early_random.o
+
+obj-$(CONFIG_RAMDUMP_TAGS) += board-rdtags.o
+CFLAGS_board-rdtags.o	:= \
+	-D"INFO_PRODUCT=\"$(if $(TARGET_PRODUCT),$(TARGET_PRODUCT),unknown)\"" \
+	-D"INFO_VARIANT=\"$(if $(TARGET_BUILD_VARIANT),$(TARGET_BUILD_VARIANT),unknown)\"" \
+	-D"INFO_BUILDID=\"$(if $(SEMC_SYSTEM_VERSION),$(SEMC_SYSTEM_VERSION),private)\""

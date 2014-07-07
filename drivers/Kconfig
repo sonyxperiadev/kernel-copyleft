@@ -150,4 +150,7 @@ source "drivers/gud/Kconfig"
 
 source "drivers/coresight/Kconfig"
 
+source "drivers/rmi4/Kconfig"
+
+source "drivers/ttsp/Kconfig"
 endmenu
