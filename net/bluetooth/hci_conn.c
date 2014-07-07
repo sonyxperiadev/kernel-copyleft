@@ -467,6 +467,14 @@ static void hci_conn_timeout(unsigned long arg)
 		break;
 	case BT_CONFIG:
 	case BT_CONNECTED:
+		if (conn->type != ACL_LINK) {
+			struct hci_conn *acl = conn->link;
+			if (acl) {
+				acl->power_save = 1;
+				hci_conn_enter_active_mode(acl, 1);
+			}
+		}
+
 		if (!atomic_read(&conn->refcnt)) {
 			reason = hci_proto_disconn_ind(conn);
 			hci_acl_disconn(conn, reason);

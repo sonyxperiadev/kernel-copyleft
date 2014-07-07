@@ -3,6 +3,7 @@
  *
  * Copyright 2002 Hewlett-Packard Company
  * Copyright 2005-2008 Pierre Ossman
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * Use consistent with the GNU GPL is permitted,
  * provided that this copyright notice is
@@ -593,12 +594,141 @@ blk_err:
 	return err;
 }
 
+static int mmc_queue_halt(struct mmc_queue *mq)
+{
+	struct request_queue *q = mq->queue;
+	unsigned long flags;
+	int rc = 0;
+
+	spin_lock_irqsave(q->queue_lock, flags);
+	queue_flag_set(QUEUE_FLAG_STOPPED, q);
+	spin_unlock_irqrestore(q->queue_lock, flags);
+
+	rc = down_trylock(&mq->thread_sem);
+	if (rc) {
+		/*
+		 * Failed to take the lock so better to abort the
+		 * halt because mmcqd thread is processing requests.
+		 */
+		spin_lock_irqsave(q->queue_lock, flags);
+		queue_flag_clear(QUEUE_FLAG_STOPPED, q);
+		spin_unlock_irqrestore(q->queue_lock, flags);
+		rc = -EBUSY;
+	}
+	return rc;
+}
+static void mmc_queue_continue(struct mmc_queue *mq)
+{
+	struct request_queue *q = mq->queue;
+	unsigned long flags;
+	up(&mq->thread_sem);
+
+	spin_lock_irqsave(q->queue_lock, flags);
+	queue_flag_clear(QUEUE_FLAG_STOPPED, q);
+	spin_unlock_irqrestore(q->queue_lock, flags);
+}
+
+static int mmc_oob_close(struct mmc_blk_data *md)
+{
+	struct mmc_blk_data *part_md;
+
+	if (!md)
+		return -EINVAL;
+
+	/* Continue all the halted queues. */
+	md->part_curr = md->part_type;
+	mmc_queue_continue(&md->queue);
+	printk(KERN_WARNING "Queue on %s continued\n",
+	       md->disk->disk_name);
+	list_for_each_entry(part_md, &md->part, part) {
+	  printk(KERN_WARNING "Queue on %s continued\n",
+		 part_md->disk->disk_name);
+	  mmc_queue_continue(&part_md->queue);
+	}
+	return 0;
+}
+
+static int mmc_oob_open(struct mmc_blk_data *md)
+{
+	struct mmc_blk_data *part_md;
+	int rc = 0;
+	printk(KERN_WARNING "Queue oob halt. %s\n", md->disk->disk_name);
+	if (!md)
+		return 0;
+
+	rc = mmc_queue_halt(&md->queue);
+
+	printk(KERN_WARNING "Queue halted status %s %d\n",
+	       md->disk->disk_name, rc);
+	if (rc)
+		return rc;
+
+	list_for_each_entry(part_md, &md->part, part) {
+	  rc = mmc_queue_halt(&part_md->queue);
+	  printk(KERN_WARNING "Queue halted on %s.\n",
+		 part_md->disk->disk_name);
+	}
+	if (rc) {
+		printk(KERN_WARNING "Queue halting failed.\n");
+		mmc_queue_continue(&md->queue);
+		list_for_each_entry(part_md, &md->part, part) {
+			mmc_queue_continue(&part_md->queue);
+		}
+	}
+
+	return rc;
+}
+
+static int mmc_blk_ioctl_oob(struct block_device *bdev,
+	struct mmc_ioc_oob __user *ic_ptr)
+{
+	struct mmc_ioc_oob data;
+	struct mmc_blk_data *md;
+	int ret = -EINVAL;
+
+	/*
+	 * The caller must have CAP_SYS_RAWIO, and must be calling this on the
+	 * whole block device, not on a partition.  This prevents overspray
+	 * between sibling partitions.
+	 */
+	if ((!capable(CAP_SYS_RAWIO)) || (bdev != bdev->bd_contains))
+		return -EPERM;
+
+	if (copy_from_user(&data, ic_ptr, sizeof(data)))
+		return -EFAULT;
+
+	md = mmc_blk_get(bdev->bd_disk);
+
+	if (!md)
+		return -EINVAL;
+
+	if (IS_ERR(md->queue.card)) {
+		mmc_blk_put(md);
+		return PTR_ERR(md->queue.card);
+	}
+
+	if (data.magic == OOB_MAGIC_ON)
+		ret = mmc_oob_open(md);
+	else if (data.magic == OOB_MAGIC_OFF)
+		ret = mmc_oob_close(md);
+
+	mmc_blk_put(md);
+	return ret;
+}
+
 static int mmc_blk_ioctl(struct block_device *bdev, fmode_t mode,
 	unsigned int cmd, unsigned long arg)
 {
 	int ret = -EINVAL;
-	if (cmd == MMC_IOC_CMD)
+
+	switch (cmd) {
+	case MMC_IOC_CMD:
 		ret = mmc_blk_ioctl_cmd(bdev, (struct mmc_ioc_cmd __user *)arg);
+		break;
+	case MMC_IOC_OOB:
+		ret = mmc_blk_ioctl_oob(bdev, (struct mmc_ioc_oob __user *)arg);
+		break;
+	}
 	return ret;
 }
 
@@ -783,10 +913,9 @@ static int mmc_blk_cmd_error(struct request *req, const char *name, int error,
  * Initial r/w and stop cmd error recovery.
  * We don't know whether the card received the r/w cmd or not, so try to
  * restore things back to a sane state.  Essentially, we do this as follows:
- * - Obtain card status.  If the first attempt to obtain card status fails,
- *   the status word will reflect the failed status cmd, not the failed
- *   r/w cmd.  If we fail to obtain card status, it suggests we can no
- *   longer communicate with the card.
+ * - Check card status. If the status_valid argument is false, the first attempt
+ *   to obtain card status failed and the status argument will not reflect the
+ *   failed r/w cmd.
  * - Check the card state.  If the card received the cmd but there was a
  *   transient problem with the response, it might still be in a data transfer
  *   mode.  Try to send it a stop command.  If this fails, we can't recover.
@@ -798,37 +927,14 @@ static int mmc_blk_cmd_error(struct request *req, const char *name, int error,
  * Otherwise we don't understand what happened, so abort.
  */
 static int mmc_blk_cmd_recovery(struct mmc_card *card, struct request *req,
-	struct mmc_blk_request *brq, int *ecc_err)
+	struct mmc_blk_request *brq, int *ecc_err, u32 status,
+	bool status_valid)
 {
-	bool prev_cmd_status_valid = true;
-	u32 status, stop_status = 0;
-	int err, retry;
+	u32 stop_status = 0;
+	int err;
 
 	if (mmc_card_removed(card))
 		return ERR_NOMEDIUM;
-
-	/*
-	 * Try to get card status which indicates both the card state
-	 * and why there was no response.  If the first attempt fails,
-	 * we can't be sure the returned status is for the r/w command.
-	 */
-	for (retry = 2; retry >= 0; retry--) {
-		err = get_card_status(card, &status, 0);
-		if (!err)
-			break;
-
-		prev_cmd_status_valid = false;
-		pr_err("%s: error %d sending status command, %sing\n",
-		       req->rq_disk->disk_name, err, retry ? "retry" : "abort");
-	}
-
-	/* We couldn't get a response from the card.  Give up. */
-	if (err) {
-		/* Check if the card is removed */
-		if (mmc_detect_card_removed(card->host))
-			return ERR_NOMEDIUM;
-		return ERR_ABORT;
-	}
 
 	/* Flag ECC errors */
 	if ((status & R1_CARD_ECC_FAILED) ||
@@ -860,12 +966,12 @@ static int mmc_blk_cmd_recovery(struct mmc_card *card, struct request *req,
 	/* Check for set block count errors */
 	if (brq->sbc.error)
 		return mmc_blk_cmd_error(req, "SET_BLOCK_COUNT", brq->sbc.error,
-				prev_cmd_status_valid, status);
+				status_valid, status);
 
 	/* Check for r/w command errors */
 	if (brq->cmd.error)
 		return mmc_blk_cmd_error(req, "r/w cmd", brq->cmd.error,
-				prev_cmd_status_valid, status);
+				status_valid, status);
 
 	/* Data errors */
 	if (!brq->stop.error)
@@ -940,7 +1046,7 @@ static int mmc_blk_issue_discard_rq(struct mmc_queue *mq, struct request *req)
 
 	if (mmc_can_discard(card))
 		arg = MMC_DISCARD_ARG;
-	else if (mmc_can_trim(card))
+	else if (mmc_can_trim(card) && !(card->cid.manfid == 0x15 && card->ext_csd.rev <= 5))
 		arg = MMC_TRIM_ARG;
 	else
 		arg = MMC_ERASE_ARG;
@@ -1057,10 +1163,13 @@ static int mmc_blk_issue_sanitize_rq(struct mmc_queue *mq,
 					EXT_CSD_SANITIZE_START, 1,
 					MMC_SANITIZE_REQ_TIMEOUT);
 
-	if (err)
+	if (err) {
 		pr_err("%s: %s - mmc_switch() with "
 		       "EXT_CSD_SANITIZE_START failed. err=%d\n",
 		       mmc_hostname(card->host), __func__, err);
+		if (err == -ETIMEDOUT)
+			mmc_interrupt_hpi(card);
+	}
 
 	pr_debug("%s: %s - SANITIZE COMPLETED\n", mmc_hostname(card->host),
 					     __func__);
@@ -1117,6 +1226,12 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
 	 R1_CC_ERROR |		/* Card controller error */		\
 	 R1_ERROR)		/* General/unknown error */
 
+#define EXE_ERRORS							\
+	(R1_OUT_OF_RANGE |	/* Command argument out of range */	\
+	 R1_ADDRESS_ERROR |	/* Misaligned address */		\
+	 R1_WP_VIOLATION |	/* Tried to write to protected block */	\
+	 R1_ERROR)		/* General/unknown error */
+
 static int mmc_blk_err_check(struct mmc_card *card,
 			     struct mmc_async_req *areq)
 {
@@ -1124,7 +1239,33 @@ static int mmc_blk_err_check(struct mmc_card *card,
 						    mmc_active);
 	struct mmc_blk_request *brq = &mq_mrq->brq;
 	struct request *req = mq_mrq->req;
-	int ecc_err = 0;
+	int retries, err, ecc_err = 0;
+	u32 status = 0;
+	bool status_valid = true;
+
+	/*
+	 * Try to get card status which indicates the card state after
+	 * command execution. If the first attempt fails, we can't be
+	 * sure the returned status is for the r/w command.
+	 */
+	for (retries = 2; retries >= 0; retries--) {
+		err = get_card_status(card, &status, 0);
+		if (!err)
+			break;
+
+		status_valid = false;
+		pr_err("%s: error %d sending status command, %sing\n",
+		       req->rq_disk->disk_name, err,
+		       retries ? "retry" : "abort");
+	}
+
+	/* We couldn't get a response from the card.  Give up. */
+	if (err) {
+		/* Check if the card is removed */
+		if (mmc_detect_card_removed(card->host))
+			return MMC_BLK_NOMEDIUM;
+		return MMC_BLK_ABORT;
+	}
 
 	/*
 	 * sbc.error indicates a problem with the set block count
@@ -1138,7 +1279,8 @@ static int mmc_blk_err_check(struct mmc_card *card,
 	 */
 	if (brq->sbc.error || brq->cmd.error || brq->stop.error ||
 	    brq->data.error) {
-		switch (mmc_blk_cmd_recovery(card, req, brq, &ecc_err)) {
+		switch (mmc_blk_cmd_recovery(card, req, brq, &ecc_err, status,
+		    status_valid)) {
 		case ERR_RETRY:
 			return MMC_BLK_RETRY;
 		case ERR_ABORT:
@@ -1153,11 +1295,12 @@ static int mmc_blk_err_check(struct mmc_card *card,
 	/*
 	 * Check for errors relating to the execution of the
 	 * initial command - such as address errors.  No data
-	 * has been transferred.
+	 * has been transferred. Also check for errors during
+	 * command execution. In this case execution was aborted.
 	 */
-	if (brq->cmd.resp[0] & CMD_ERRORS) {
-		pr_err("%s: r/w command failed, status = %#x\n",
-		       req->rq_disk->disk_name, brq->cmd.resp[0]);
+	if (brq->cmd.resp[0] & CMD_ERRORS || status & EXE_ERRORS) {
+		pr_err("%s: r/w command failed, cmd status = %#x, status = %#x\n",
+		       req->rq_disk->disk_name, brq->cmd.resp[0], status);
 		return MMC_BLK_ABORT;
 	}
 
@@ -1167,11 +1310,16 @@ static int mmc_blk_err_check(struct mmc_card *card,
 	 * program mode, which we have to wait for it to complete.
 	 */
 	if (!mmc_host_is_spi(card->host) && rq_data_dir(req) != READ) {
-		u32 status;
 		unsigned long timeout;
 
 		timeout = jiffies + msecs_to_jiffies(MMC_BLK_TIMEOUT_MS);
-		do {
+		/*
+		 * Some cards mishandle the status bits,
+		 * so make sure to check both the busy
+		 * indication and the card state.
+		 */
+		 while (!(status & R1_READY_FOR_DATA) ||
+			 (R1_CURRENT_STATE(status) == R1_STATE_PRG)) {
 			int err = get_card_status(card, &status, 5);
 			if (err) {
 				pr_err("%s: error %d requesting status\n",
@@ -1189,13 +1337,7 @@ static int mmc_blk_err_check(struct mmc_card *card,
 
 				return MMC_BLK_CMD_ERR;
 			}
-			/*
-			 * Some cards mishandle the status bits,
-			 * so make sure to check both the busy
-			 * indication and the card state.
-			 */
-		} while (!(status & R1_READY_FOR_DATA) ||
-			 (R1_CURRENT_STATE(status) == R1_STATE_PRG));
+		}
 	}
 
 	if (brq->data.error) {
@@ -1548,6 +1690,10 @@ void print_mmc_packing_stats(struct mmc_card *card)
 		pr_info("%s: %d times: rel write\n",
 			mmc_hostname(card->host),
 			card->wr_pack_stats.pack_stop_reason[REL_WRITE]);
+	if (card->wr_pack_stats.pack_stop_reason[NON_SEQ_WRITE])
+		pr_info("%s: %d times: non sequential write\n",
+			mmc_hostname(card->host),
+			card->wr_pack_stats.pack_stop_reason[NON_SEQ_WRITE]);
 	if (card->wr_pack_stats.pack_stop_reason[THRESHOLD])
 		pr_info("%s: %d times: Threshold\n",
 			mmc_hostname(card->host),
@@ -1618,6 +1764,12 @@ static u8 mmc_blk_prep_packed_list(struct mmc_queue *mq, struct request *req)
 		spin_unlock_irq(q->queue_lock);
 		if (!next) {
 			MMC_BLK_UPDATE_STOP_REASON(stats, EMPTY_QUEUE);
+			break;
+		}
+
+		if (blk_rq_pos(cur) + blk_rq_sectors(cur) != blk_rq_pos(next)) {
+			MMC_BLK_UPDATE_STOP_REASON(stats, NON_SEQ_WRITE);
+			put_back = 1;
 			break;
 		}
 

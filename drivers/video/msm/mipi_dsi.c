@@ -1,4 +1,5 @@
 /* Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -34,6 +35,7 @@
 #include "mipi_dsi.h"
 #include "mdp.h"
 #include "mdp4.h"
+#include "mipi_dsi_panel_driver.h"
 
 u32 dsi_irq;
 u32 esc_byte_ratio;
@@ -98,6 +100,8 @@ static int mipi_dsi_off(struct platform_device *pdev)
 		mipi_dsi_cmd_mdp_busy();
 	}
 
+	ret = panel_next_off(pdev);
+
 	/*
 	 * Desctiption: change to DSI_CMD_MODE since it needed to
 	 * tx DCS dsiplay off comamnd to panel
@@ -113,8 +117,6 @@ static int mipi_dsi_off(struct platform_device *pdev)
 			mipi_dsi_set_tear_off(mfd);
 		}
 	}
-
-	ret = panel_next_off(pdev);
 
 	spin_lock_bh(&dsi_clk_lock);
 
@@ -163,6 +165,7 @@ static int mipi_dsi_on(struct platform_device *pdev)
 	fbi = mfd->fbi;
 	var = &fbi->var;
 	pinfo = &mfd->panel_info;
+	esc_byte_ratio = pinfo->mipi.esc_byte_ratio;
 
 	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save)
 		mipi_dsi_pdata->dsi_power_save(1);
@@ -269,6 +272,8 @@ static int mipi_dsi_on(struct platform_device *pdev)
 		down(&mfd->dma->mutex);
 
 	ret = panel_next_on(pdev);
+
+	udelay(10);
 
 	mipi_dsi_op_mode_config(mipi->mode);
 
@@ -602,6 +607,16 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 		goto mipi_dsi_probe_err;
 
 	pdev_list[pdev_list_cnt++] = pdev;
+
+	if (mfd->panel_pdev) {
+		struct mipi_dsi_data *dsi_data;
+		dsi_data = platform_get_drvdata(mfd->panel_pdev);
+		if (!dsi_data)
+			return -ENODEV;
+		if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save)
+			dsi_data->dsi_power_save =
+				mipi_dsi_pdata->dsi_power_save;
+	}
 
 	esc_byte_ratio = pinfo->mipi.esc_byte_ratio;
 

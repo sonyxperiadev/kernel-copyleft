@@ -24,6 +24,7 @@
 #include <linux/percpu.h>
 #include <linux/interrupt.h>
 #include <linux/reboot.h>
+#include <linux/smp.h>
 #include <asm/fiq.h>
 #include <asm/hardware/gic.h>
 #include <mach/msm_iomap.h>
@@ -104,12 +105,17 @@ module_param(print_all_stacks, int,  S_IRUGO | S_IWUSR);
 /* Area for context dump in secure mode */
 static void *scm_regsave;
 
+/* This variable is used by the ramdump.
+ * It holds the physical address to the dump of the CPU registers.
+ */
+unsigned scm_regsave_pa;
+
 static struct msm_watchdog_pdata __percpu **percpu_pdata;
 
-static void pet_watchdog_work(struct work_struct *work);
+static void pet_watchdog_fn(unsigned long data);
 static void init_watchdog_work(struct work_struct *work);
-static DECLARE_DELAYED_WORK(dogwork_struct, pet_watchdog_work);
 static DECLARE_WORK(init_dogwork_struct, init_watchdog_work);
+static struct timer_list wdog_timer;
 
 /* Called from the FIQ bark handler */
 void msm_wdog_bark_fin(void)
@@ -118,6 +124,7 @@ void msm_wdog_bark_fin(void)
 	pr_crit("\nApps Watchdog bark received - Calling Panic\n");
 	panic("Apps Watchdog Bark received\n");
 }
+
 
 static int msm_watchdog_suspend(struct device *dev)
 {
@@ -206,7 +213,7 @@ static void wdog_disable_work(struct work_struct *work)
 	enable = 0;
 	atomic_notifier_chain_unregister(&panic_notifier_list, &panic_blk);
 	unregister_reboot_notifier(&msm_reboot_notifier);
-	cancel_delayed_work(&dogwork_struct);
+	del_timer(&wdog_timer);
 	/* may be suspended after the first write above */
 	__raw_writel(0, msm_wdt_base + WDT_EN);
 	complete(&work_data->complete);
@@ -259,6 +266,9 @@ void pet_watchdog(void)
 	if (!enable)
 		return;
 
+	if (smp_processor_id() != 0)
+		return;
+
 	slack = __raw_readl(msm_wdt_base + WDT_STS) >> 3;
 	slack = ((bark_time*WDT_HZ)/1000) - slack;
 	if (slack < min_slack_ticks)
@@ -271,13 +281,27 @@ void pet_watchdog(void)
 	last_pet = time_ns;
 }
 
-static void pet_watchdog_work(struct work_struct *work)
+static void pet_watchdog_fn(unsigned long data)
 {
 	pet_watchdog();
-
-	if (enable)
-		schedule_delayed_work_on(0, &dogwork_struct, delay_time);
+	if (enable) {
+		wdog_timer.expires += delay_time;
+		add_timer_on(&wdog_timer, 0);
+	}
 }
+
+static int wdog_init_done;
+
+void touch_nmi_watchdog(void)
+{
+	if (!wdog_init_done)
+		return;
+
+	pet_watchdog();
+
+	touch_softlockup_watchdog();
+}
+EXPORT_SYMBOL(touch_nmi_watchdog);
 
 static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 {
@@ -336,6 +360,9 @@ static void configure_bark_dump(void)
 				pr_err("Setting register save address failed.\n"
 				       "Registers won't be dumped on a dog "
 				       "bite\n");
+			else
+				scm_regsave_pa = cmd_buf.addr;
+
 		} else {
 			pr_err("Allocating register save space failed\n"
 			       "Registers won't be dumped on a dog bite\n");
@@ -397,7 +424,10 @@ static void init_watchdog_work(struct work_struct *work)
 	__raw_writel(timeout, msm_wdt_base + WDT_BARK_TIME);
 	__raw_writel(timeout + 3*WDT_HZ, msm_wdt_base + WDT_BITE_TIME);
 
-	schedule_delayed_work_on(0, &dogwork_struct, delay_time);
+	init_timer(&wdog_timer);
+	wdog_timer.function = pet_watchdog_fn;
+	wdog_timer.expires = jiffies + delay_time;
+	add_timer_on(&wdog_timer, 0);
 
 	atomic_notifier_chain_register(&panic_notifier_list,
 				       &panic_blk);
@@ -409,6 +439,7 @@ static void init_watchdog_work(struct work_struct *work)
 	__raw_writel(1, msm_wdt_base + WDT_EN);
 	__raw_writel(1, msm_wdt_base + WDT_RST);
 	last_pet = sched_clock();
+	wdog_init_done = 1;
 
 	if (!has_vic)
 		enable_percpu_irq(msm_wdog_irq, IRQ_TYPE_EDGE_RISING);
