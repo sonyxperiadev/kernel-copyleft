@@ -630,3 +630,10 @@ config TCP_MD5SIG
 	  on the Internet.
 
 	  If unsure, say N.
+config SOMC_TCP_SPEC_IF_BUFFER_SIZE
+	bool "Set different TCP buffer size for specific interface"
+	default n
+	---help---
+	  TCP/IP stack only support one set of files to control TCP buffer size.
+	  If user application need set differents TCP buffer size to different
+	  net interface(device), we need enable this switcher.

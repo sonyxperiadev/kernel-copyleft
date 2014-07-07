@@ -358,9 +358,11 @@ static uint32_t socinfo_get_accessory_chip(void)
 
 uint32_t socinfo_get_platform_subtype(void)
 {
-	return socinfo ?
+    return 6;
+/*	return socinfo ?
 		(socinfo->v1.format >= 6 ? socinfo->v6.hw_platform_subtype : 0)
 		: 0;
+*/
 }
 
 enum pmic_model socinfo_get_pmic_model(void)
@@ -855,6 +857,11 @@ int __init socinfo_init(void)
 		pr_err("%s: Unknown format found\n", __func__);
 		break;
 	}
+
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+	if (socinfo->v1.format >= 6)
+		socinfo->v6.hw_platform_subtype = PLATFORM_SUBTYPE_SGLTE;
+#endif
 
 	return 0;
 }

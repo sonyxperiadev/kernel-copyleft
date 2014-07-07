@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -5417,6 +5418,9 @@ static struct msm_cam_clk_info vfe32_clk_info[] = {
 	{"vfe_clk", 228570000},
 	{"vfe_pclk", -1},
 	{"csi_vfe_clk", -1},
+#if defined(CONFIG_SONY_CAM_V4L2)
+	{"dfab_clk", 64000000},
+#endif
 };
 
 static int msm_axi_subdev_s_crystal_freq(struct v4l2_subdev *sd,
