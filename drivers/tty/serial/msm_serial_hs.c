@@ -2173,19 +2173,11 @@ static int msm_hs_runtime_idle(struct device *dev)
 
 static int msm_hs_runtime_resume(struct device *dev)
 {
-	struct platform_device *pdev = container_of(dev, struct
-						    platform_device, dev);
-	struct msm_hs_port *msm_uport = &q_uart_port[pdev->id];
-	msm_hs_request_clock_on(&msm_uport->uport);
 	return 0;
 }
 
 static int msm_hs_runtime_suspend(struct device *dev)
 {
-	struct platform_device *pdev = container_of(dev, struct
-						    platform_device, dev);
-	struct msm_hs_port *msm_uport = &q_uart_port[pdev->id];
-	msm_hs_request_clock_off(&msm_uport->uport);
 	return 0;
 }
 

@@ -456,4 +456,6 @@ extern struct platform_device msm_gpio_device;
 extern struct platform_device apq_cpudai_mi2s;
 extern struct platform_device apq_cpudai_i2s_rx;
 extern struct platform_device apq_cpudai_i2s_tx;
-
+#ifdef CONFIG_SONY_QSCFLASHING_UART4
+extern struct platform_device msm8960_device_uart_gsbi11;
+#endif

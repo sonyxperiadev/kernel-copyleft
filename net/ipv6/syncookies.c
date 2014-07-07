@@ -252,10 +252,17 @@ struct sock *cookie_v6_check(struct sock *sk, struct sk_buff *skb)
 	}
 
 	req->window_clamp = tp->window_clamp ? :dst_metric(dst, RTAX_WINDOW);
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+	tcp_select_initial_window2(tcp_full_space(sk), req->mss,
+				  &req->rcv_wnd, &req->window_clamp,
+				  ireq->wscale_ok, &rcv_wscale,
+				  dst_metric(dst, RTAX_INITRWND), sk);
+#else
 	tcp_select_initial_window(tcp_full_space(sk), req->mss,
 				  &req->rcv_wnd, &req->window_clamp,
 				  ireq->wscale_ok, &rcv_wscale,
 				  dst_metric(dst, RTAX_INITRWND));
+#endif
 
 	ireq->rcv_wscale = rcv_wscale;
 

@@ -1777,10 +1777,13 @@ int __sk_mem_schedule(struct sock *sk, int size, int kind)
 	int amt = sk_mem_pages(size);
 	long allocated;
 	int parent_status = UNDER_LIMIT;
+	int ini = 0;
 
 	sk->sk_forward_alloc += amt * SK_MEM_QUANTUM;
 
 	allocated = sk_memory_allocated_add(sk, amt, &parent_status);
+	if (sk->sk_protocol == IPPROTO_TCP)
+		ini = tcp_get_mem_size_pst(sk);
 
 	/* Under limit. */
 	if (parent_status == UNDER_LIMIT &&
@@ -1801,15 +1804,16 @@ int __sk_mem_schedule(struct sock *sk, int size, int kind)
 
 	/* guarantee minimum buffer size under pressure */
 	if (kind == SK_MEM_RECV) {
-		if (atomic_read(&sk->sk_rmem_alloc) < prot->sysctl_rmem[0])
+		if (atomic_read(&sk->sk_rmem_alloc) <
+			prot->sysctl_rmem[0 + 3 * ini])
 			return 1;
 
 	} else { /* SK_MEM_SEND */
 		if (sk->sk_type == SOCK_STREAM) {
-			if (sk->sk_wmem_queued < prot->sysctl_wmem[0])
+			if (sk->sk_wmem_queued < prot->sysctl_wmem[0 + 3 * ini])
 				return 1;
 		} else if (atomic_read(&sk->sk_wmem_alloc) <
-			   prot->sysctl_wmem[0])
+			   prot->sysctl_wmem[0 + 3 * ini])
 				return 1;
 	}
 

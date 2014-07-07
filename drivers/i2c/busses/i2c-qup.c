@@ -1190,7 +1190,8 @@ blsp_core_init:
 		clk_put(clk);
 		goto err_clk_get_failed;
 	}
-
+	if (pdata->keep_ahb_clk_on)
+		clk_enable(pclk);
 	/* We support frequencies upto FAST Mode(400KHz) */
 	if (pdata->clk_freq <= 0 ||
 			pdata->clk_freq > 400000) {

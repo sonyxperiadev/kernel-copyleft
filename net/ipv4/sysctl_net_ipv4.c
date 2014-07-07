@@ -477,6 +477,36 @@ static struct ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
 	},
+#ifdef CONFIG_SOMC_TCP_SPEC_IF_BUFFER_SIZE
+	{
+		.procname	= "tcp_wmem",
+		.data		= &sysctl_tcp_wmem,
+		.maxlen		= sizeof(sysctl_tcp_wmem)/2,
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+	{
+		.procname	= "tcp_spec_if_wmem",
+		.data		= &(sysctl_tcp_wmem[3]),
+		.maxlen		= sizeof(sysctl_tcp_wmem)/2,
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+	{
+		.procname	= "tcp_rmem",
+		.data		= &sysctl_tcp_rmem,
+		.maxlen		= sizeof(sysctl_tcp_rmem)/2,
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+	{
+		.procname	= "tcp_spec_if_rmem",
+		.data		= &(sysctl_tcp_rmem[3]),
+		.maxlen		= sizeof(sysctl_tcp_rmem)/2,
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+#else
 	{
 		.procname	= "tcp_wmem",
 		.data		= &sysctl_tcp_wmem,
@@ -491,6 +521,7 @@ static struct ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
 	},
+#endif
 	{
 		.procname	= "tcp_app_win",
 		.data		= &sysctl_tcp_app_win,
