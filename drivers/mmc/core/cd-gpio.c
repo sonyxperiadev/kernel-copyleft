@@ -2,6 +2,7 @@
  * Generic GPIO card-detect helper
  *
  * Copyright (C) 2011, Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,11 +20,13 @@
 
 struct mmc_cd_gpio {
 	unsigned int gpio;
-	char label[0];
 	bool status;
+	char label[0];
+	/* Don't add any fields at the end of this structure as they will
+	 * overwrite the label. */
 };
 
-static int mmc_cd_get_status(struct mmc_host *host)
+int mmc_cd_get_status(struct mmc_host *host)
 {
 	int ret = -ENOSYS;
 	struct mmc_cd_gpio *cd = host->hotplug.handler_priv;
@@ -36,6 +39,24 @@ static int mmc_cd_get_status(struct mmc_host *host)
 out:
 	return ret;
 }
+
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+int mmc_cd_slot_status_changed(struct mmc_host *host)
+{
+	int status;
+	struct mmc_cd_gpio *cd = host->hotplug.handler_priv;
+
+	if (!cd)
+		goto out;
+
+	status = mmc_cd_get_status(host);
+	if (status || host->card)
+		return 1;
+out:
+	return 0;
+}
+EXPORT_SYMBOL(mmc_cd_slot_status_changed);
+#endif
 
 static irqreturn_t mmc_cd_gpio_irqt(int irq, void *dev_id)
 {
