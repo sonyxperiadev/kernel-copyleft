@@ -3332,7 +3332,6 @@ static struct platform_device battery_bcl_device = {
 };
 #endif
 
-
 static struct platform_device msm8960_device_rpm_regulator __devinitdata = {
 	.name	= "rpm-regulator",
 	.id	= -1,
@@ -4414,6 +4413,7 @@ static void __init msm8960_cdp_init(void)
 				     msm8960_num_footswitch);
 	}
 	platform_device_register(&msm8960_device_uart_gsbi8);
+
 	platform_device_register(&msm_device_uart_dm9);
 
 	if (cpu_is_msm8960ab())
@@ -4445,6 +4445,7 @@ static void __init msm8960_cdp_init(void)
 	sony_viskan_cyttsp4_init();
 #endif
 	msm_pm_set_tz_retention_flag(1);
+
 }
 
 #ifdef CONFIG_MACH_VISKAN_HUASHAN
