@@ -875,6 +875,22 @@ config USB_G_ANDROID
 	  Each function can be configured and enabled/disabled
 	  dynamically from userspace through a sysfs interface.
 
+config USB_ANDROID_GG
+	boolean "GordonsGate driver"
+	depends on USB_G_ANDROID
+	default n
+	help
+	  Enabling this option adds GordonsGate support to the
+	  android gadget.
+
+config USB_AUTO_CDROM_EJECTION
+	boolean "Auto Cdrom Ejection"
+	depends on USB_G_ANDROID
+	default n
+	help
+	  This feature provides a automatic cdrom ejection. If multiple cdrom
+	  lun exists, this feature works at only first cdrom lun.
+
 config USB_CDC_COMPOSITE
 	tristate "CDC Composite Device (Ethernet and ACM)"
 	depends on NET
@@ -1080,5 +1096,11 @@ config RMNET_SDIO_SMD_DATA_CHANNEL
        default "DATA40"
        help
 	  Data SMD channel for transferring network data
+
+config USB_MIRRORLINK
+       boolean "Handle MirrorLink USB command"
+       default n
+       help
+         Enabling this option adds support for MirrorLink USB command.
 
 endif # USB_GADGET
