@@ -69,6 +69,8 @@ struct cyttsp4_mt_data {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend es;
 #endif
+	struct mutex report_lock;
+	bool is_suspended;
 	char phys[NAME_MAX];
 	int num_prv_tch;
 	int prv_tch_type;

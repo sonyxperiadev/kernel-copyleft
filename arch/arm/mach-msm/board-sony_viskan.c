@@ -4445,6 +4445,7 @@ static void __init msm8960_cdp_init(void)
 	sony_viskan_cyttsp4_init();
 #endif
 	msm_pm_set_tz_retention_flag(1);
+
 }
 
 #ifdef CONFIG_MACH_VISKAN_HUASHAN

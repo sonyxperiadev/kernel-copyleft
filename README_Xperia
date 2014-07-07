@@ -1,1 +1,3 @@
-Xperia SP C5302/C5303/C5306/M35h => viskan_huashan_defconfig
+Configuration files can be found in arch/arm/configs.
+
+  Xperia SP C5302/C5303/C5306/M35h => viskan_huashan_defconfig
