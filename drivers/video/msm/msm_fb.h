@@ -1,4 +1,5 @@
 /* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -149,6 +150,7 @@ struct msm_fb_data_type {
 	__u32 bl_level;
 
 	struct platform_device *pdev;
+	struct platform_device *panel_pdev;
 
 	__u32 var_xres;
 	__u32 var_yres;
@@ -190,10 +192,16 @@ struct msm_fb_data_type {
 	u32 writeback_state;
 	bool writeback_active_cnt;
 	int cont_splash_done;
+
+	struct mutex power_lock;
+
 	void *copy_splash_buf;
 	unsigned char *copy_splash_phys;
 	void *cpu_pm_hdl;
 	int vsync_sysfs_created;
+#ifdef CONFIG_FB_MSM_RECOVER_PANEL
+	bool nvrw_prohibit_draw;
+#endif
 };
 
 struct dentry *msm_fb_get_debugfs_root(void);

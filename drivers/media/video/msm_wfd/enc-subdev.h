@@ -19,6 +19,11 @@
 #include <media/videobuf2-core.h>
 #define VENC_MAGIC_IOCTL 'V'
 
+enum venc_framerate_modes {
+	VENC_MODE_CFR,
+	VENC_MODE_VFR,
+};
+
 struct mem_region {
 	struct list_head list;
 	u8 *kvaddr;
@@ -75,6 +80,7 @@ struct venc_msg_ops {
 #define FREE_INPUT_BUFFER _IOWR('V', 22, struct mem_region *)
 #define FREE_RECON_BUFFERS _IO('V', 23)
 #define ENCODE_FLUSH _IO('V', 24)
+#define SET_FRAMERATE_MODE _IO('V', 27)
 
 extern int venc_init(struct v4l2_subdev *sd, u32 val);
 extern int venc_load_fw(struct v4l2_subdev *sd);

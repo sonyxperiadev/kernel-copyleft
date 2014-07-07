@@ -71,3 +71,8 @@ obj-$(CONFIG_MSM_MEMORY_LOW_POWER_MODE_SUSPEND_DEEP_POWER_DOWN) \
 obj-$(CONFIG_PMIC8058_XOADC) += pmic8058-xoadc.o
 obj-$(CONFIG_QSEECOM) += qseecom.o
 obj-$(CONFIG_QFP_FUSE) += qfp_fuse.o
+obj-$(CONFIG_NFC_PN544)		+= pn544.o
+obj-$(CONFIG_RAMDUMP_TAGS) += rdtags.o
+obj-$(CONFIG_LM3561)		+= lm3561.o
+obj-$(CONFIG_RAMDUMP_CRASH_LOGS) += ramdumplogs.o
+

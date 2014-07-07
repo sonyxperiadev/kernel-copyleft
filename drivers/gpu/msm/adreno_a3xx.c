@@ -2742,9 +2742,13 @@ static struct a3xx_vbif_data a320_vbif[] = {
 	/* Set up AOOO */
 	{ A3XX_VBIF_OUT_AXI_AOOO_EN, 0x0000003C },
 	{ A3XX_VBIF_OUT_AXI_AOOO, 0x003C003C },
+/*SOMC BEGIN (Fix 2024 integration problem)*/
+#if 0
 	/* Enable 1K sort */
 	{ A3XX_VBIF_ABIT_SORT, 0x000000FF },
 	{ A3XX_VBIF_ABIT_SORT_CONF, 0x000000A4 },
+#endif
+/*SOMC END (Fix 2024 integration problem)*/
 	{0, 0},
 };
 

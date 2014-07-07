@@ -137,7 +137,7 @@ static struct bus_type subsys_bus_type = {
 
 static DEFINE_IDA(subsys_ida);
 
-static int enable_ramdumps;
+static int enable_ramdumps = 1;
 module_param(enable_ramdumps, int, S_IRUGO | S_IWUSR);
 
 struct workqueue_struct *ssr_wq;
@@ -187,7 +187,7 @@ static struct subsys_soc_restart_order *restart_orders_8960_sglte[] = {
 static struct subsys_soc_restart_order **restart_orders;
 static int n_restart_orders;
 
-static int restart_level = RESET_SOC;
+static int restart_level = RESET_SUBSYS_INDEPENDENT;
 
 int get_restart_level()
 {

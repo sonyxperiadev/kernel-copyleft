@@ -178,6 +178,11 @@ config ARCH_MSM8960
 	select MSM_KRAIT_WFE_FIXUP
 	select MSM_IOMMU_GPU_SYNC
 	select MSM_CPU_PWRCTL
+	select HAVE_NMI_WATCHDOG if MSM_WATCHDOG || MSM_WATCHDOG_V2
+	select GENERIC_TIME_VSYSCALL
+	select USE_USER_ACCESSIBLE_TIMERS
+	select ARM_USE_USER_ACCESSIBLE_TIMERS
+	select MSM_USE_USER_ACCESSIBLE_TIMERS
 
 config ARCH_MSM8930
 	bool "MSM8930"
@@ -212,6 +217,10 @@ config ARCH_MSM8930
 	select MSM_KRAIT_WFE_FIXUP
 	select MSM_IOMMU_GPU_SYNC
 	select MSM_CPU_PWRCTL
+	select GENERIC_TIME_VSYSCALL
+	select USE_USER_ACCESSIBLE_TIMERS
+	select ARM_USE_USER_ACCESSIBLE_TIMERS
+	select MSM_USE_USER_ACCESSIBLE_TIMERS
 
 config ARCH_APQ8064
 	bool "APQ8064"
@@ -241,6 +250,11 @@ config ARCH_APQ8064
 	select MSM_KRAIT_WFE_FIXUP
 	select MSM_IOMMU_GPU_SYNC
 	select MSM_CPU_PWRCTL
+	select HAVE_NMI_WATCHDOG if MSM_WATCHDOG || MSM_WATCHDOG_V2
+	select GENERIC_TIME_VSYSCALL
+	select USE_USER_ACCESSIBLE_TIMERS
+	select ARM_USE_USER_ACCESSIBLE_TIMERS
+	select MSM_USE_USER_ACCESSIBLE_TIMERS
 
 config ARCH_MSM8974
 	bool "MSM8974"
@@ -912,6 +926,13 @@ config MACH_FSM9XXX_SURF
 	  Support for the Qualcomm FSM9xxx femtocell
 	  chipset based SURF evaluation board and
 	  FFA board.
+
+config MACH_VISKAN_HUASHAN
+	depends on ARCH_MSM8960
+	default n
+	bool "SONY HUASHAN"
+	help
+	  Support for the Sony Huashan
 
 endmenu
 
@@ -2608,5 +2629,24 @@ config MSM_CPU_PWRCTL
 	  Droop detector mechanism can adversely affect krait plls during
 	  stand alone power collapse operation. Selecting this option
 	  ensures that they are always off.
+
+config SONY_SSM
+	bool "Support Super Stamina Mode"
+	default n
+	help
+	  This enables support for power mode notifications, required by Super
+	  Stamina Mode.
+
+config SONY_QSCFLASHING_UART4
+	bool "Support QSC1215 Image Upgrade"
+	default n
+	help
+	  This enables support for QSC1215 Image Upgrade.
+config MSM_USE_USER_ACCESSIBLE_TIMERS
+	bool "Enables mapping an MSM timer counter page to user space."
+	depends on ARM_USE_USER_ACCESSIBLE_TIMERS
+	help
+	  Enables MSM-specific user accessible timers via a shared
+	  memory page containing the cycle counter.
 
 endif
