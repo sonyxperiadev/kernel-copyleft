@@ -313,9 +313,6 @@ board-sony_viskan-all-objs += board-sony_viskan.o board-sony_viskan-display.o bo
 obj-$(CONFIG_MACH_VISKAN_HUASHAN) += board-sony_viskan-all.o board-sony_viskan_huashan-gpiomux.o board-sony_viskan_huashan-pmic.o board-sony_viskan_huashan-regulator.o
 obj-$(CONFIG_MACH_VISKAN_HUASHAN) += board-sony_viskan_huashan-camera.o bms-batterydata-sleipner.o
 
-obj-$(CONFIG_MACH_VISKAN_HUASHAN_CT) += board-sony_viskan-all.o board-sony_viskan_huashan_ct-gpiomux.o board-sony_viskan_huashan_ct-pmic.o board-sony_viskan_huashan_ct-regulator.o
-obj-$(CONFIG_MACH_VISKAN_HUASHAN_CT) += board-sony_viskan_huashan_ct-camera.o bms-batterydata-sleipner.o
-
 CFLAGS_msm_vibrator.o += -Idrivers/staging/android
 CFLAGS_board-9615.o += -Idrivers/usb/gadget
 

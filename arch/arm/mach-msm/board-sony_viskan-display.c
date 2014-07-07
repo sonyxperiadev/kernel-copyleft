@@ -137,11 +137,7 @@ static struct platform_device msm_fb_device = {
 };
 
 #define MLCD_RESET_N 43
-#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
-#define LCD_PWR_EN 42
-#else
 #define LCD_PWR_EN 36
-#endif
 #define LCD_VREG_ON_WAIT_MS 10
 #define LCD_RESET_WAIT_MS 10
 #define LCD_POWER_WAIT_MS 50
