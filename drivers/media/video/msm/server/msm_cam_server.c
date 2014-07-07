@@ -1,4 +1,5 @@
 /* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -311,6 +312,13 @@ static int msm_ctrl_cmd_done(void *arg)
 		goto ctrl_cmd_done_error;
 	}
 
+	if (command->queue_idx < 0 ||
+		command->queue_idx >= MAX_NUM_ACTIVE_CAMERA) {
+		pr_err("%s: Invalid value OR index %d\n", __func__,
+		  command->queue_idx);
+		goto ctrl_cmd_done_error;
+	}
+
 	if (!g_server_dev.server_queue[command->queue_idx].queue_active) {
 		pr_err("%s: Invalid queue\n", __func__);
 		goto ctrl_cmd_done_error;
@@ -339,7 +347,8 @@ static int msm_ctrl_cmd_done(void *arg)
 				max_control_command_size);
 			goto ctrl_cmd_done_error;
 		}
-		if (copy_from_user(command->value, uptr, command->length)) {
+		if (copy_from_user(command->value, (void __user *)uptr,
+			command->length)) {
 			pr_err("%s: copy_from_user failed, size=%d\n",
 				__func__, sizeof(struct msm_ctrl_cmd));
 			goto ctrl_cmd_done_error;
@@ -777,7 +786,11 @@ int msm_server_streamoff(struct msm_cam_v4l2_device *pcam, int idx)
 
 	D("%s, pcam = 0x%x\n", __func__, (u32)pcam);
 	ctrlcmd.type        = MSM_V4L2_STREAM_OFF;
+#ifdef CONFIG_SONY_CAM_V4L2
+	ctrlcmd.timeout_ms  = 3000;
+#else
 	ctrlcmd.timeout_ms  = 10000;
+#endif
 	ctrlcmd.length      = 0;
 	ctrlcmd.value       = NULL;
 	ctrlcmd.stream_type = pcam->dev_inst[idx]->image_mode;
@@ -1382,6 +1395,16 @@ static long msm_ioctl_server(struct file *file, void *fh,
 		}
 
 		mutex_lock(&g_server_dev.server_queue_lock);
+
+		if (u_isp_event.isp_data.ctrl.queue_idx < 0 ||
+			u_isp_event.isp_data.ctrl.queue_idx >=
+			MAX_NUM_ACTIVE_CAMERA) {
+			pr_err("%s: Invalid index %d\n", __func__,
+				u_isp_event.isp_data.ctrl.queue_idx);
+			rc = -EINVAL;
+			return rc;
+		}
+
 		if (!g_server_dev.server_queue
 			[u_isp_event.isp_data.ctrl.queue_idx].queue_active) {
 			pr_err("%s: Invalid queue\n", __func__);
@@ -1698,7 +1721,11 @@ static const struct v4l2_file_operations msm_fops_server = {
 
 static const struct v4l2_ioctl_ops msm_ioctl_ops_server = {
 	.vidioc_subscribe_event = msm_server_v4l2_subscribe_event,
+#if defined(CONFIG_SONY_CAM_V4L2)
+	.vidioc_unsubscribe_event = msm_server_v4l2_unsubscribe_event,
+#else
 	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
+#endif
 	.vidioc_default = msm_ioctl_server,
 };
 
@@ -2650,12 +2677,16 @@ int msm_server_send_ctrl(struct msm_ctrl_cmd *out,
 	struct msm_queue_cmd *event_qcmd;
 	struct msm_ctrl_cmd *ctrlcmd;
 	struct msm_cam_server_dev *server_dev = &g_server_dev;
-	struct msm_device_queue *queue =
-		&server_dev->server_queue[out->queue_idx].ctrl_q;
-
+	struct msm_device_queue *queue;
 	struct v4l2_event v4l2_evt;
 	struct msm_isp_event_ctrl *isp_event;
 	void *ctrlcmd_data;
+
+	if (out->queue_idx < 0 || out->queue_idx >= MAX_NUM_ACTIVE_CAMERA) {
+		pr_err("%s: Invalid index %d\n", __func__, out->queue_idx);
+		return -EINVAL;
+	}
+	queue = &server_dev->server_queue[out->queue_idx].ctrl_q;
 
 	event_qcmd = kzalloc(sizeof(struct msm_queue_cmd), GFP_KERNEL);
 	if (!event_qcmd) {

@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2007-2013, The Linux Foundation. All rights reserved.
  * Copyright (C) 2007 Google Incorporated
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -2791,6 +2792,8 @@ static int mdp_irq_clk_setup(struct platform_device *pdev,
 #endif
 
 	if (mdp_rev == MDP_REV_42 && !cont_splashScreen) {
+		/* Turn on the clocks to the mdp HW block */
+		mdp_clk_ctrl(1);
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 		/* DSI Video Timing generator disable */
 		outpdw(MDP_BASE + 0xE0000, 0x0);
@@ -2798,6 +2801,8 @@ static int mdp_irq_clk_setup(struct platform_device *pdev,
 		outpdw(MDP_BASE + 0x50, 0x0);
 		/* Set Overlay Proc 0 to reset state */
 		outpdw(MDP_BASE + 0x10004, 0x3);
+		/* Turn off the clocks to the mdp HW block */
+		mdp_clk_ctrl(0);
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	}
 	return 0;
@@ -2810,6 +2815,7 @@ static int mdp_probe(struct platform_device *pdev)
 	struct msm_fb_panel_data *pdata = NULL;
 	int rc;
 	resource_size_t  size ;
+	struct msm_panel_info *pinfo = NULL;
 	unsigned long flag;
 	u32 frame_rate;
 #ifdef CONFIG_FB_MSM_MDP40
@@ -3275,6 +3281,26 @@ static int mdp_probe(struct platform_device *pdev)
 
 	/* set driver data */
 	platform_set_drvdata(msm_fb_dev, mfd);
+
+	/* panel detection */
+	MSM_FB_INFO("mdp_probe: panel_detect function\n");
+	if (pdata && pdata->panel_detect && pdata->update_panel) {
+		rc = panel_next_on(msm_fb_dev);
+		if (!rc) {
+			pinfo = pdata->panel_detect(mfd);
+			rc = panel_next_off(msm_fb_dev);
+		}
+		if (!rc && pinfo)
+			mfd->panel_info = *pinfo;
+		pdata->update_panel(pdev);
+#ifdef CONFIG_FB_MSM_MDP40
+		if (mfd->panel.type == MIPI_CMD_PANEL) {
+			mipi = &mfd->panel_info.mipi;
+		}
+#endif
+	} else {
+		MSM_FB_INFO("mdp_probe: no panel_detect function\n");
+	}
 
 	rc = platform_device_add(msm_fb_dev);
 	if (rc) {

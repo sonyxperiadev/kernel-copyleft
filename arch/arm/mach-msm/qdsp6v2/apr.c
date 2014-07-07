@@ -249,7 +249,7 @@ int apr_send_pkt(void *handle, uint32_t *buf)
 	struct apr_hdr *hdr;
 	uint16_t dest_id;
 	uint16_t client_id;
-	uint16_t w_len;
+	int w_len;
 	unsigned long flags;
 
 	if (!handle || !buf) {

@@ -142,6 +142,9 @@ enum pm8921_chg_led_src_config {
  *				stop charging the battery when the safety timer
  *				expires. If not set the charger driver will
  *				restart charging upon expiry.
+ * @repeat_safety_time:		how many times safety_time should should repeat
+ * @safety_time:		charging safety timer in minutes
+ * @soc_scaling:		indicates whether capacity scaling is to be used
  */
 struct pm8921_charger_platform_data {
 	struct pm8xxx_charger_core_data	charger_cdata;
@@ -189,7 +192,10 @@ struct pm8921_charger_platform_data {
 	int				btc_delay_ms;
 	int				btc_panic_if_cant_stop_chg;
 	int				stop_chg_upon_expiry;
+	int				repeat_safety_time;
+	unsigned int			safety_time;
 	bool				disable_chg_rmvl_wrkarnd;
+	int				soc_scaling;
 	bool				enable_tcxo_warmup_delay;
 };
 
@@ -200,6 +206,7 @@ enum pm8921_charger_source {
 };
 
 #if defined(CONFIG_PM8921_CHARGER) || defined(CONFIG_PM8921_CHARGER_MODULE)
+int pm8921_set_chg_vin_min(bool recover, int voltage);
 void pm8921_charger_vbus_draw(unsigned int mA);
 int pm8921_charger_register_vbus_sn(void (*callback)(int));
 void pm8921_charger_unregister_vbus_sn(void (*callback)(int));
@@ -318,6 +325,9 @@ int pm8921_usb_ovp_disable(int disable);
  */
 int pm8921_is_batfet_closed(void);
 #else
+static inline int pm8921_set_chg_vin_min(bool recover, int voltage)
+{
+}
 static inline void pm8921_charger_vbus_draw(unsigned int mA)
 {
 }

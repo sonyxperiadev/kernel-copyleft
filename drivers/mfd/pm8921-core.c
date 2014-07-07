@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,6 +26,8 @@
 #include <linux/mfd/pm8xxx/core.h>
 #include <linux/mfd/pm8xxx/regulator.h>
 #include <linux/leds-pm8xxx.h>
+#include <mach/pm8921-mic_bias.h>
+#include <mach/simple_remote_msm8960_pf.h>
 
 #define REG_HWREV		0x002  /* PMIC4 revision */
 #define REG_HWREV_2		0x0E8  /* PMIC4 revision 2 */
@@ -378,6 +381,22 @@ static struct mfd_cell ccadc_cell __devinitdata = {
 static struct mfd_cell vibrator_cell __devinitdata = {
 	.name           = PM8XXX_VIBRATOR_DEV_NAME,
 	.id             = -1,
+};
+
+static struct mfd_cell mic_bias_cell __devinitdata = {
+	.name           = PM8921_MIC_BIAS_NAME,
+	.id             = -1,
+};
+
+static const struct resource resources_simple_remote[] __devinitconst = {
+	SINGLE_IRQ_RESOURCE(NULL, PM8921_HSED_BTN_IRQ),
+};
+
+static struct mfd_cell simple_remote_cell __devinitdata = {
+	.name = SIMPLE_REMOTE_PF_NAME,
+	.id = -1,
+	.num_resources = ARRAY_SIZE(resources_simple_remote),
+	.resources = resources_simple_remote,
 };
 
 static struct pm8xxx_vreg regulator_data[] = {
@@ -814,6 +833,31 @@ pm8921_add_subdevices(const struct pm8921_platform_data *pdata,
 					irq_base);
 		if (ret) {
 			pr_err("Failed to add ccadc subdevice ret=%d\n", ret);
+			goto bail;
+		}
+	}
+
+	if (pdata->mic_bias_pdata) {
+		mic_bias_cell.platform_data = pdata->mic_bias_pdata;
+		mic_bias_cell.pdata_size =
+				sizeof(struct pm8921_mic_bias_platform_data);
+		ret = mfd_add_devices(pmic->dev, 0, &mic_bias_cell, 1, NULL, 0);
+		if (ret) {
+			pr_err("Failed to add mic bias subdevice ret=%d\n",
+									ret);
+			goto bail;
+		}
+	}
+
+	if (pdata->simple_remote_pdata) {
+		simple_remote_cell.platform_data = pdata->simple_remote_pdata;
+		simple_remote_cell.pdata_size =
+				sizeof(struct simple_remote_platform_data);
+		ret = mfd_add_devices(pmic->dev, 0, &simple_remote_cell, 1,
+					NULL, irq_base);
+		if (ret) {
+			pr_err("Failed to add simple remote subdevice"
+			       " ret=%d\n", ret);
 			goto bail;
 		}
 	}

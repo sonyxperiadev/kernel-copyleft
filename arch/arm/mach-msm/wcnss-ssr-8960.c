@@ -25,6 +25,11 @@
 #include <mach/subsystem_restart.h>
 #include <mach/subsystem_notif.h>
 #include <mach/peripheral-loader.h>
+
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
+
 #include "smd_private.h"
 #include "ramdump.h"
 
@@ -185,13 +190,21 @@ static int riva_ramdump(int enable, const struct subsys_desc *subsys)
 static void riva_crash_shutdown(const struct subsys_desc *subsys)
 {
 	pr_err("%s: crash shutdown : %d\n", MODULE_NAME, riva_crash);
+
+#ifdef CONFIG_RAMDUMP_TAGS
+	/* save crash type/processname in rdtags when riva crashed */
+	if (riva_crash) {
+		if (!rdtags_add_tag_string("rdinfo_type", "3"))
+			rdtags_add_tag_string("rdinfo_processname", "modem");
+	}
+#endif
+
 	if (riva_crash != true) {
 		smsm_riva_reset();
 		/* give sufficient time for wcnss to finish it's error
 		 * fatal routine */
 		mdelay(3000);
 	}
-
 }
 
 static struct subsys_desc riva_8960 = {

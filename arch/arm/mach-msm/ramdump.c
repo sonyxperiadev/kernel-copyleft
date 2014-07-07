@@ -103,6 +103,7 @@ static unsigned long offset_translate(loff_t user_offset,
 }
 
 #define MAX_IOREMAP_SIZE SZ_1M
+#define USER_FLG 0x00010000
 
 static int ramdump_read(struct file *filep, char __user *buf, size_t count,
 			loff_t *pos)
@@ -114,6 +115,11 @@ static int ramdump_read(struct file *filep, char __user *buf, size_t count,
 	unsigned long addr = 0;
 	size_t copy_size = 0;
 	int ret = 0;
+
+	if (count&USER_FLG) {
+		rd_dev->ramdump_status = 0;
+		goto ramdump_done;
+	}
 
 	if (rd_dev->data_ready == 0) {
 		pr_err("Ramdump(%s): Read when there's no dump available!",

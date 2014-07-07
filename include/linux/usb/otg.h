@@ -33,6 +33,10 @@ enum usb_otg_state {
 	OTG_STATE_A_PERIPHERAL,
 	OTG_STATE_A_WAIT_VFALL,
 	OTG_STATE_A_VBUS_ERR,
+
+	/* MHL */
+	OTG_STATE_MHL_DETECTED,
+	OTG_STATE_MHL_CONNECTED,
 };
 
 enum usb_otg_event {

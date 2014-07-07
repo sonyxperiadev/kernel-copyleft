@@ -4807,6 +4807,9 @@ static DEFINE_CLK_VOTER(dfab_sdc2_clk, &dfab_clk.c, 0);
 static DEFINE_CLK_VOTER(dfab_sdc3_clk, &dfab_clk.c, 0);
 static DEFINE_CLK_VOTER(dfab_sdc4_clk, &dfab_clk.c, 0);
 static DEFINE_CLK_VOTER(dfab_sdc5_clk, &dfab_clk.c, 0);
+#if defined(CONFIG_SONY_CAM_V4L2)
+static DEFINE_CLK_VOTER(dfab_vfe_clk, &dfab_clk.c, 0);
+#endif
 static DEFINE_CLK_VOTER(dfab_sps_clk, &dfab_clk.c, 0);
 static DEFINE_CLK_VOTER(dfab_bam_dmux_clk, &dfab_clk.c, 0);
 static DEFINE_CLK_VOTER(dfab_scm_clk, &dfab_clk.c, 0);
@@ -5679,17 +5682,20 @@ static struct clk_lookup msm_clocks_8960_common[] __initdata = {
 	CLK_LOOKUP("core_clk",		gsbi2_uart_clk.c,	""),
 	CLK_LOOKUP("core_clk",		gsbi3_uart_clk.c,	""),
 	CLK_LOOKUP("core_clk",		gsbi4_uart_clk.c,	""),
-	CLK_LOOKUP("core_clk",		gsbi5_uart_clk.c, "msm_serial_hsl.0"),
+	CLK_LOOKUP("core_clk",		gsbi5_uart_clk.c,       ""),
 	CLK_LOOKUP("core_clk",		gsbi6_uart_clk.c, "msm_serial_hs.0"),
 	CLK_LOOKUP("core_clk",		gsbi7_uart_clk.c,	""),
-	/* used on 8960 SGLTE for console */
-	CLK_LOOKUP("core_clk",		gsbi8_uart_clk.c, "msm_serial_hsl.1"),
+	CLK_LOOKUP("core_clk",		gsbi8_uart_clk.c, "msm_serial_hsl.0"),
 	/* used on 8960 standalone with Atheros Bluetooth */
 	CLK_LOOKUP("core_clk",		gsbi8_uart_clk.c, "msm_serial_hs.2"),
 	CLK_LOOKUP("core_clk",		gsbi9_uart_clk.c, "msm_serial_hs.1"),
 	CLK_LOOKUP("core_clk",		gsbi10_uart_clk.c,	""),
 	CLK_LOOKUP("core_clk",		gsbi11_uart_clk.c,	""),
+#ifdef CONFIG_MSM_GSBI12_UART
+	CLK_LOOKUP("core_clk",		gsbi12_uart_clk.c, "msm_serial_hsl.3"),
+#else
 	CLK_LOOKUP("core_clk",		gsbi12_uart_clk.c,	""),
+#endif
 	CLK_LOOKUP("core_clk",		gsbi1_qup_clk.c,	"spi_qsd.0"),
 	CLK_LOOKUP("core_clk",		gsbi2_qup_clk.c,	""),
 	CLK_LOOKUP("core_clk",		gsbi3_qup_clk.c,	"qup_i2c.3"),
@@ -5734,16 +5740,18 @@ static struct clk_lookup msm_clocks_8960_common[] __initdata = {
 	CLK_LOOKUP("iface_clk",		gsbi2_p_clk.c,		""),
 	CLK_LOOKUP("iface_clk",		gsbi3_p_clk.c,		"qup_i2c.3"),
 	CLK_LOOKUP("iface_clk",		gsbi4_p_clk.c,		"qup_i2c.4"),
-	CLK_LOOKUP("iface_clk",		gsbi5_p_clk.c,	"msm_serial_hsl.0"),
+	CLK_LOOKUP("iface_clk",		gsbi5_p_clk.c,	        NULL),
 	CLK_LOOKUP("iface_clk",		gsbi6_p_clk.c,  "msm_serial_hs.0"),
 	CLK_LOOKUP("iface_clk",		gsbi7_p_clk.c,		""),
-	/* used on 8960 SGLTE for serial console */
-	CLK_LOOKUP("iface_clk",		gsbi8_p_clk.c,	"msm_serial_hsl.1"),
+	CLK_LOOKUP("iface_clk",		gsbi8_p_clk.c,	"msm_serial_hsl.0"),
 	/* used on 8960 standalone with Atheros Bluetooth */
 	CLK_LOOKUP("iface_clk",		gsbi8_p_clk.c,	"msm_serial_hs.2"),
 	CLK_LOOKUP("iface_clk",		gsbi9_p_clk.c,  "msm_serial_hs.1"),
 	CLK_LOOKUP("iface_clk",		gsbi10_p_clk.c,		"qup_i2c.10"),
 	CLK_LOOKUP("iface_clk",		gsbi11_p_clk.c,		""),
+#ifdef CONFIG_MSM_GSBI12_UART
+	CLK_LOOKUP("iface_clk",		gsbi12_p_clk.c,	"msm_serial_hsl.3"),
+#endif
 	CLK_LOOKUP("iface_clk",		gsbi12_p_clk.c,		"qup_i2c.12"),
 	CLK_LOOKUP("iface_clk",		tsif_p_clk.c,		""),
 	CLK_LOOKUP("ref_clk",	tsif_ref_clk.c,	"msm_tspp.0"),
@@ -5765,7 +5773,12 @@ static struct clk_lookup msm_clocks_8960_common[] __initdata = {
 	CLK_LOOKUP("cam_clk",		cam0_clk.c,	"4-001a"),
 	CLK_LOOKUP("cam_clk",		cam0_clk.c,	"4-0010"),
 	CLK_LOOKUP("cam_clk",		cam0_clk.c,	"4-006c"),
+#if defined(CONFIG_SONY_CAM_V4L2)
+	CLK_LOOKUP("cam_clk",		cam1_clk.c,	"4-0048"),
+	CLK_LOOKUP("cam_clk",		cam1_clk.c,	"4-003d"),
+#else
 	CLK_LOOKUP("cam_clk",		cam0_clk.c,	"4-0048"),
+#endif
 	CLK_LOOKUP("cam_clk",		cam2_clk.c,		NULL),
 	CLK_LOOKUP("cam_clk",		cam0_clk.c,	"4-0020"),
 	CLK_LOOKUP("cam_clk",		cam0_clk.c,	"4-0034"),
@@ -5826,11 +5839,18 @@ static struct clk_lookup msm_clocks_8960_common[] __initdata = {
 	CLK_LOOKUP("tv_clk",		mdp_tv_clk.c,	"footswitch-8x60.4"),
 	CLK_LOOKUP("hdmi_clk",		hdmi_tv_clk.c,		"dtv.0"),
 	CLK_LOOKUP("core_clk",		hdmi_app_clk.c,	"hdmi_msm.1"),
+#if defined(CONFIG_SONY_VPE)
+	CLK_LOOKUP("vpe_clk",		vpe_clk.c,		"sony_vpe.0"),
+#else
 	CLK_LOOKUP("vpe_clk",		vpe_clk.c,		"msm_vpe.0"),
+#endif
 	CLK_LOOKUP("core_clk",		vpe_clk.c,	"footswitch-8x60.9"),
 	CLK_LOOKUP("vfe_clk",		vfe_clk.c,		"msm_vfe.0"),
 	CLK_LOOKUP("core_clk",		vfe_clk.c,	"footswitch-8x60.8"),
 	CLK_LOOKUP("csi_vfe_clk",	csi_vfe_clk.c,		"msm_vfe.0"),
+#if defined(CONFIG_SONY_CAM_V4L2)
+	CLK_LOOKUP("dfab_clk",		dfab_vfe_clk.c, "msm_vfe.0"),
+#endif
 	CLK_LOOKUP("bus_clk",		vfe_axi_clk.c,	"footswitch-8x60.8"),
 	CLK_LOOKUP("bus_clk",		mdp_axi_clk.c,	"footswitch-8x60.4"),
 	CLK_LOOKUP("bus_clk",		rot_axi_clk.c,	"footswitch-8x60.6"),
@@ -5864,7 +5884,11 @@ static struct clk_lookup msm_clocks_8960_common[] __initdata = {
 	CLK_LOOKUP("iface_clk",		vcodec_p_clk.c,	"footswitch-8x60.7"),
 	CLK_LOOKUP("vfe_pclk",		vfe_p_clk.c,		"msm_vfe.0"),
 	CLK_LOOKUP("iface_clk",		vfe_p_clk.c,	"footswitch-8x60.8"),
+#if defined(CONFIG_SONY_VPE)
+	CLK_LOOKUP("vpe_pclk",		vpe_p_clk.c,		"sony_vpe.0"),
+#else
 	CLK_LOOKUP("vpe_pclk",		vpe_p_clk.c,		"msm_vpe.0"),
+#endif
 	CLK_LOOKUP("iface_clk",		vpe_p_clk.c,	"footswitch-8x60.9"),
 	CLK_LOOKUP("bit_clk",		mi2s_bit_clk.c,
 			    "msm-dai-q6-mi2s"),

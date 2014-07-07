@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2011 Google, Inc.
  * Author: Mike Lockwood <lockwood@android.com>
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -791,7 +792,9 @@ static int acc_ctrlrequest(struct usb_composite_dev *cdev,
 		if (b_request == ACCESSORY_START) {
 			dev->start_requested = 1;
 			schedule_delayed_work(
-				&dev->start_work, msecs_to_jiffies(10));
+				&dev->start_work,
+				msecs_to_jiffies(50 +
+					WAIT_TIME_BEFORE_SENDING_CONFIGURED));
 			value = 0;
 		} else if (b_request == ACCESSORY_SEND_STRING) {
 			dev->string_index = w_index;

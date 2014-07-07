@@ -1,0 +1,202 @@
+#
+# RMI4 bus configuration
+#
+
+menuconfig RMI4_BUS
+	tristate "RMI4 bus"
+	default n
+	help
+	  Say yes here if you want to use the RMI4 bus.
+	  This will enable support for all Synaptics touch chips that
+	  use the RMI4 protocol.
+
+	  This option will build the bus driver andmake all other
+	   drivers for this selectble.
+
+	  If unsure, say N
+
+if RMI4_BUS
+
+config RMI4_DEBUG_BUS
+	bool "RMI4 bus debug messages"
+	help
+	  Say Y here if you want or need to debug the RMI4 bus. This
+	  will enable a lot of debug information which is useful for
+	  debugging
+
+	  If unsure, say N here.
+
+config RMI4_DRIVER
+	tristate "rmi4 core driver"
+	depends on RMI4_BUS
+	default y
+	help
+	  This is the core driver for RMI4 based devices. It is
+	  responsible for core functionality like IRQ handling, PDT
+	  scanning etc.
+	  Without this, nothing RMI4 related will work.
+
+	  To compile this driver as a module, choose M here. The
+	  module will be called rmi4_driver.
+
+	  If unsure, say Y
+
+config RMI4_SPI_ADAPTOR
+	tristate "rmi4 spi adaptor"
+	depends on (RMI4_BUS && SPI)
+	default n
+	help
+	  This is an RMI4 adaptor that uses the SPI bus. If you have
+	  an RMI4 compatible chip on an SPI bus, you will need this.
+
+	  To compile this driver as a module, say M here. The module
+	  will be called rmi4_spi_adaptor.
+
+	  If unsure, say N here.
+
+config RMI4_I2C_ADAPTOR
+	tristate "rmi4 i2c adaptor"
+	depends on (RMI4_BUS && I2C)
+	default n
+	help
+	  This is an RMI4 adaptor that uses the I2C bus. If you have
+	  an RMI4 compatible chip on an I2C bus, you will need this.
+
+	  To compile this driver as a module, say M here. The module
+	  will be called rmi4_i2c_adaptor.
+
+	  If unsure, say N here.
+
+config RMI4_F01
+	tristate "rmi4 function 01 handler"
+	depends on RMI4_BUS
+	default y
+	help
+	  This is a function handler for RMI4 function 01. This function
+	  is responsible for interrupt handling and other interesting low
+	  level features.
+	  Without this, none of the other function handler will work.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called rmi4_function_01.
+
+	  If unsure, say Y here.
+
+config RMI4_F11
+	tristate "rmi4 function 11 handler"
+	depends on RMI4_BUS
+	default y
+	help
+	  This is a function handler for RMI4 function 11. This function
+	  is responsible for the 2D area of touch panels.
+	  Without this, the touch panel will not work.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called rmi4_function_11.
+
+	  If unsure, say Y here.
+
+config RMI4_F34
+	tristate "rmi4 function 34 handler"
+	depends on RMI4_BUS
+	default y
+	help
+	  This module does firmware upgrade on the chip. If you are going to
+	  update chip FW on running devices via for example system SW update,
+	  you will want this.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called rmi4_finction_34.
+
+	  If unsure, say Y here.
+
+config RMI4_F54
+	tristate "rmi4 function 54 handler"
+	depends on RMI4_BUS
+	default n
+	help
+	  This module is used for in-hw tuning. This is something that normally
+	  is not used.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called rmi4_function_54.
+
+	  If unsure, say N here.
+
+config RMI4_F54_DBG_RAW_HEX
+	bool "Print data in raw hex"
+	depends on RMI4_F54
+	help
+	  Prints read data as raw hex in kernel log.
+	  This is mainly used for debugging.
+
+	  This option will enable debug printouts in F54.
+
+	  If unsure, say N here.
+
+config RMI4_F54_DBG_HUMAN_READABLE
+	bool "Print data human readable"
+	depends on RMI4_F54
+	help
+	  Prints read data in human readable form in kernel log.
+	  This is mainly of use for debugging.
+
+	  This option will enable some debug functionality in F54.
+
+	  If unsure, say N here.
+
+config RMI4_F54_WATCHDOG
+	bool "Enable watchdog to reset F54"
+	depends on RMI4_F54
+	help
+	  If some call fails, the function can get stuck. This
+	  watchdog will reset this function in these cases.
+
+	  This option will enable the wathcdog feature in F54,
+	  which wil lensure that it can't get stuck in some
+	  arbitrary mode.
+
+	  If unsure, say Y here.
+
+config RMI4_CHAR_DEV
+	tristate "rmi4 char_dev handler"
+	depends on RMI4_BUS
+	default n
+	help
+	  This module is used for in-hw tuning. This is something that normally
+	  is not used.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called rmi4_char_dev.
+
+	  If unsure, say N here.
+
+config RMI4_WATCHDOG
+	bool "Enable watchdog to reset touch device"
+	depends on RMI4_BUS
+	help
+	  If device gets stuck this triggers HW
+	  reset.
+
+	  This option will enable the wathcdog feature,
+	  which will ensure device HW reset if device gets stuck
+	  by some reason like ESD.
+
+	  If unsure, say Y here.
+
+config RMI4_EARLY_SUSPEND
+	tristate "Enable early suspend for the RMI4 driver"
+	depends on HAS_EARLYSUSPEND
+	default n
+	help
+	  This module implements early suspend functionality
+	  for the Synaptics RMI4 based touch chip.
+	  If you are using one of these chips and are running
+	  on Android, you will want to say yes here.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called rmi4_early_suspend
+
+	  If unsure, say N here.
+
+endif # RMI4_BUS

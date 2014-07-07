@@ -89,6 +89,7 @@ void msm8960_mdp_writeback(struct memtype_reserve *reserve_table);
 #define MSM_8960_GSBI4_QUP_I2C_BUS_ID 4
 #define MSM_8960_GSBI3_QUP_I2C_BUS_ID 3
 #define MSM_8960_GSBI10_QUP_I2C_BUS_ID 10
+#define MSM_8960_GSBI12_QUP_I2C_BUS_ID 12
 
 extern struct msm_rtb_platform_data msm8960_rtb_pdata;
 extern struct msm_cache_dump_platform_data msm8960_cache_dump_pdata;

@@ -126,6 +126,12 @@ int pm8921_bms_get_battery_current(int *result);
 int pm8921_bms_get_percent_charge(void);
 
 /**
+ * pm8921_bms_get_init_fcc - returns initial fcc in mAh of the battery
+ *
+ */
+int pm8921_bms_get_init_fcc(void);
+
+/**
  * pm8921_bms_get_fcc - returns fcc in mAh of the battery depending on its age
  *			and temperature
  *
@@ -199,6 +205,10 @@ static inline int pm8921_bms_get_battery_current(int *result)
 	return -ENXIO;
 }
 static inline int pm8921_bms_get_percent_charge(void)
+{
+	return -ENXIO;
+}
+static inline int pm8921_bms_get_init_fcc(void)
 {
 	return -ENXIO;
 }

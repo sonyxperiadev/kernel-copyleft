@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -98,6 +99,8 @@
 #define PM8921_DCIN_OV_IRQ		PM8921_IRQ_BLOCK_BIT(5, 1)
 #define PM8921_DCIN_UV_IRQ		PM8921_IRQ_BLOCK_BIT(5, 0)
 
+#define PM8921_HSED_BTN_IRQ		PM8921_IRQ_BLOCK_BIT(7, 3)
+
 #define PM8921_BMS_SBI_WRITE_OK		PM8921_IRQ_BLOCK_BIT(15, 7)
 #define PM8921_BMS_CC_THR		PM8921_IRQ_BLOCK_BIT(15, 6)
 #define PM8921_BMS_VSENSE_THR		PM8921_IRQ_BLOCK_BIT(15, 5)
@@ -142,6 +145,8 @@ struct pm8921_platform_data {
 	struct pm8xxx_vibrator_platform_data	*vibrator_pdata;
 	struct pm8xxx_ccadc_platform_data	*ccadc_pdata;
 	struct pm8xxx_pwm_platform_data		*pwm_pdata;
+	struct pm8921_mic_bias_platform_data	*mic_bias_pdata;
+	struct simple_remote_platform_data	*simple_remote_pdata;
 };
 
 #endif
