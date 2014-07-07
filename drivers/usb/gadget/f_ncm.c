@@ -104,7 +104,7 @@ static inline unsigned ncm_bitrate(struct usb_gadget *g)
  * because it's used by default by the current linux host driver
  */
 #define NTB_DEFAULT_IN_SIZE	USB_CDC_NCM_NTB_MIN_IN_SIZE
-#define NTB_OUT_SIZE		16384
+#define NTB_OUT_SIZE		(32768 + 512)
 
 /*
  * skbs of size less than that will not be aligned
