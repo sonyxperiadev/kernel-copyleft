@@ -36,11 +36,6 @@ static char read_ddb_start[] = {
 	0xA1, 0x00
 };
 
-/* Reading Display Power Mode Sequence */
-static char read_dpm[] = {
-	0x0A, 0x00
-};
-
 static struct dsi_cmd_desc display_init_cmd_seq[] = {
 	{DTYPE_DCS_WRITE, 1, 0, 0, 140,
 		sizeof(exit_sleep), exit_sleep},
@@ -64,10 +59,6 @@ static struct dsi_cmd_desc read_ddb_cmd_seq[] = {
 	{DTYPE_DCS_READ, 1, 0, 1, 5, sizeof(read_ddb_start), read_ddb_start},
 };
 
-static struct dsi_cmd_desc read_dpm_cmd_seq[] = {
-	{DTYPE_DCS_READ, 1, 0, 1, 5, sizeof(read_dpm), read_dpm},
-};
-
 static const struct panel_cmd display_init_cmds[] = {
 	{CMD_DSI, {.dsi_payload = {display_init_cmd_seq,
 				ARRAY_SIZE(display_init_cmd_seq)} } },
@@ -89,20 +80,6 @@ static const struct panel_cmd display_off_cmds[] = {
 static const struct panel_cmd read_ddb_cmds[] = {
 	{CMD_DSI, {.dsi_payload = {read_ddb_cmd_seq,
 				ARRAY_SIZE(read_ddb_cmd_seq)} } },
-	{CMD_END, {} },
-};
-
-static const struct panel_cmd read_dpm_cmds[] = {
-	{CMD_DSI, {.dsi_payload = {read_dpm_cmd_seq,
-				ARRAY_SIZE(read_dpm_cmd_seq)} } },
-	{CMD_END, {} },
-};
-
-static const struct panel_cmd esd_failed_reset_cmds[] = {
-	{CMD_DSI, {.dsi_payload = {display_init_cmd_seq,
-				ARRAY_SIZE(display_init_cmd_seq)} } },
-	{CMD_DSI, {.dsi_payload = {display_on_cmd_seq,
-				ARRAY_SIZE(display_on_cmd_seq)} } },
 	{CMD_END, {} },
 };
 
@@ -190,8 +167,6 @@ static struct dsi_controller dsi_video_controller_panel = {
 	.display_on	= display_on_cmds,
 	.display_off	= display_off_cmds,
 	.read_id	= read_ddb_cmds,
-	.read_dpm	= read_dpm_cmds,
-	.esd_failed_reset	= esd_failed_reset_cmds,
 };
 
 static char ddb_val_1a[] = {

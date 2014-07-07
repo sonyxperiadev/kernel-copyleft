@@ -934,6 +934,13 @@ config MACH_VISKAN_HUASHAN
 	help
 	  Support for the Sony Huashan
 
+config MACH_VISKAN_HUASHAN_CT
+	depends on ARCH_MSM8960
+	default n
+	bool "SONY HUASHAN_CT"
+	help
+	  Support for the Sony Huashan_ct.
+
 endmenu
 
 config MSM_STACKED_MEMORY

@@ -858,6 +858,11 @@ int __init socinfo_init(void)
 		break;
 	}
 
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+	if (socinfo->v1.format >= 6)
+		socinfo->v6.hw_platform_subtype = PLATFORM_SUBTYPE_SGLTE;
+#endif
+
 	return 0;
 }
 

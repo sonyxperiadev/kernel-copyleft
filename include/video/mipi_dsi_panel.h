@@ -45,8 +45,6 @@ struct dsi_controller {
 	const struct panel_cmd *display_on;
 	const struct panel_cmd *display_off;
 	const struct panel_cmd *read_id;
-	const struct panel_cmd *read_dpm;
-	const struct panel_cmd *esd_failed_reset;
 };
 
 struct panel {

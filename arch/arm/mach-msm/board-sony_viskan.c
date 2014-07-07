@@ -258,7 +258,11 @@ early_param("pmem_audio_size", pmem_audio_size_setup);
 #define CYTTSP4_LDR_TCH_ADR 0x24
 
 #define CYTTSP4_I2C_IRQ_GPIO 11
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+#define CYTTSP4_I2C_RST_GPIO 32
+#else
 #define CYTTSP4_I2C_RST_GPIO 6
+#endif
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_SPI
@@ -665,7 +669,11 @@ static void __init sony_viskan_cyttsp4_init(void)
 */
 #ifdef CONFIG_NFC_PN544
 #define PMIC_GPIO_NFC_EN	(33)
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+#define MSM_GPIO_NFC_FWDL_EN	(52)
+#else
 #define MSM_GPIO_NFC_FWDL_EN	(19)
+#endif
 #define MSM_GPIO_NFC_IRQ	(106)
 #endif
 
@@ -2134,6 +2142,18 @@ static struct platform_device qcedev_device = {
 };
 #endif
 
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+static struct mdm_platform_data sglte_platform_data = {
+	.mdm_version = "4.0",
+	.ramdump_delay_ms = 1000,
+	.soft_reset_inverted = 1,
+	.peripheral_platform_device = NULL,
+	.ramdump_timeout_ms = 600000,
+	.no_powerdown_after_ramdumps = 1,
+	.image_upgrade_supported = 1,
+};
+#endif
+
 #define MSM_TSIF0_PHYS			(0x18200000)
 #define MSM_TSIF1_PHYS			(0x18201000)
 #define MSM_TSIF_SIZE			(0x200)
@@ -2379,7 +2399,11 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 
 #ifdef CONFIG_USB_NCP373
 #define GPIO_USB_OTG_EN		51
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+#define GPIO_OTG_OVRCUR_DET_N	43
+#else
 #define GPIO_OTG_OVRCUR_DET_N	37
+#endif
 #define GPIO_OTG_OVP_CNTL	PM8921_GPIO_PM_TO_SYS(42)
 
 struct ncp373_res_hdl {
@@ -2912,13 +2936,13 @@ struct as3677_platform_data as3677_pdata = {
 		.name = "lcd-backlight1",
 		.on_charge_pump = 0,
 		.max_current_uA = 20000,
-		.startup_current_uA = 20000,
+		.startup_current_uA = 5000,
 	},
 	.leds[1] = {
 		.name = "lcd-backlight2",
 		.on_charge_pump = 0,
 		.max_current_uA = 20000,
-		.startup_current_uA = 20000,
+		.startup_current_uA = 5000,
 	},
 };
 #endif
@@ -3273,6 +3297,9 @@ static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi3_pdata = {
 static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi10_pdata = {
 	.clk_freq = 355000,
 	.src_clk_rate = 24000000,
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+	.keep_ahb_clk_on = true,
+#endif
 };
 
 static struct msm_i2c_platform_data msm8960_i2c_qup_gsbi12_pdata = {
@@ -3332,6 +3359,17 @@ static struct platform_device battery_bcl_device = {
 };
 #endif
 
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+static struct platform_device msm8960_device_ext_otg_sw_vreg __devinitdata = {
+	.name	= GPIO_REGULATOR_DEV_NAME,
+	.id	= PM8921_GPIO_PM_TO_SYS(42),
+	.dev	= {
+		.platform_data =
+			&msm_gpio_regulator_pdata[GPIO_VREG_ID_EXT_OTG_SW],
+	},
+};
+#endif
+
 static struct platform_device msm8960_device_rpm_regulator __devinitdata = {
 	.name	= "rpm-regulator",
 	.id	= -1,
@@ -3339,6 +3377,69 @@ static struct platform_device msm8960_device_rpm_regulator __devinitdata = {
 		.platform_data = &msm_rpm_regulator_pdata,
 	},
 };
+
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+#ifdef CONFIG_SERIAL_MSM_HS
+static int configure_uart_gpios(int on)
+{
+	int ret = 0, i;
+	int uart_gpios[] = {93, 94, 95, 96};
+
+	for (i = 0; i < ARRAY_SIZE(uart_gpios); i++) {
+		if (on) {
+			ret = gpio_request(uart_gpios[i], NULL);
+			if (ret) {
+				pr_err("%s: unable to request uart gpio[%d]\n",
+						__func__, uart_gpios[i]);
+				break;
+			}
+		} else {
+			gpio_free(uart_gpios[i]);
+		}
+	}
+
+	if (ret && on && i)
+		for (; i >= 0; i--)
+			gpio_free(uart_gpios[i]);
+	return ret;
+}
+
+static struct msm_serial_hs_platform_data msm_uart_dm9_pdata = {
+	.gpio_config	= configure_uart_gpios,
+};
+
+static int configure_gsbi8_uart_gpios(int on)
+{
+	int ret = 0, i;
+	int uart_gpios[] = {34, 35, 36, 37};
+
+	for (i = 0; i < ARRAY_SIZE(uart_gpios); i++) {
+		if (on) {
+			ret = gpio_request(uart_gpios[i], NULL);
+			if (ret) {
+				pr_err("%s: unable to request uart gpio[%d]\n",
+						__func__, uart_gpios[i]);
+				break;
+			}
+		} else {
+			gpio_free(uart_gpios[i]);
+		}
+	}
+
+	if (ret && on && i)
+		for (; i >= 0; i--)
+			gpio_free(uart_gpios[i]);
+	return ret;
+}
+
+static struct msm_serial_hs_platform_data msm_uart_dm8_pdata = {
+	.gpio_config	= configure_gsbi8_uart_gpios,
+};
+#else
+static struct msm_serial_hs_platform_data msm_uart_dm8_pdata;
+static struct msm_serial_hs_platform_data msm_uart_dm9_pdata;
+#endif
+#endif
 
 #if defined(CONFIG_BT) && defined(CONFIG_BT_HCIUART_ATH3K)
 enum WLANBT_STATUS {
@@ -3510,6 +3611,9 @@ static struct platform_device *common_devices[] __initdata = {
 	&msm_device_saw_core1,
 	&msm8960_device_ext_5v_vreg,
 	&msm8960_device_ssbi_pmic,
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+	&msm8960_device_ext_otg_sw_vreg,
+#endif
 #ifdef CONFIG_SPI_QUP
 	&msm8960_device_qup_spi_gsbi1,
 #endif
@@ -4414,7 +4518,21 @@ static void __init msm8960_cdp_init(void)
 	}
 	platform_device_register(&msm8960_device_uart_gsbi8);
 
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+	/* For 8960 Fusion 2.2 Primary IPC */
+	if (socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE) {
+		msm_uart_dm9_pdata.wakeup_irq = gpio_to_irq(94); /* GSBI9(2) */
+		msm_device_uart_dm9.dev.platform_data = &msm_uart_dm9_pdata;
+	}
+#endif
 	platform_device_register(&msm_device_uart_dm9);
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+	/* For 8960 Standalone External Bluetooth Interface */
+	if (socinfo_get_platform_subtype() != PLATFORM_SUBTYPE_SGLTE) {
+		msm_device_uart_dm8.dev.platform_data = &msm_uart_dm8_pdata;
+		platform_device_register(&msm_device_uart_dm8);
+	}
+#endif
 
 	if (cpu_is_msm8960ab())
 		platform_device_register(&msm8960ab_device_acpuclk);
@@ -4446,6 +4564,12 @@ static void __init msm8960_cdp_init(void)
 #endif
 	msm_pm_set_tz_retention_flag(1);
 
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+	if (socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE) {
+		mdm_sglte_device.dev.platform_data = &sglte_platform_data;
+		platform_device_register(&mdm_sglte_device);
+	}
+#endif
 }
 
 #ifdef CONFIG_MACH_VISKAN_HUASHAN
@@ -4462,6 +4586,19 @@ MACHINE_START(VISKAN_HUASHAN, "VISKAN HUASHAN")
 MACHINE_END
 #endif
 
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+MACHINE_START(VISKAN_HUASHAN_CT, "VISKAN HUASHAN_CT")
+	.map_io = msm8960_map_io,
+	.reserve = msm8960_reserve,
+	.init_irq = msm8960_init_irq,
+	.handle_irq = gic_handle_irq,
+	.timer = &msm_timer,
+	.init_machine = msm8960_cdp_init,
+	.init_early = msm8960_allocate_memory_regions,
+	.init_very_early = msm8960_early_memory,
+	.restart = msm_restart,
+MACHINE_END
+#endif
 struct viskan_mbhc_data viskan_mbhc_data = {
 	.v_hs_max = 2850,
 	.hs_detect_extn_cable = false,

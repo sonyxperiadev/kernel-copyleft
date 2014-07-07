@@ -1,6 +1,6 @@
 /* drivers/video/msm/mipi_dsi_panel_driver.c
  *
- * Copyright (C) 2012 Sony Mobile Communications AB.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * Author: Johan Olson <johan.olson@sonymobile.com>
  * Author: Joakim Wesslen <joakim.wesslen@sonymobile.com>
@@ -25,9 +25,9 @@
 #include "mipi_dsi_panel_driver.h"
 
 #ifdef CONFIG_FB_MSM_MDP303
-#define DSI_VIDEO_BASE	0xF0000 /* Taken from mdp_dma_dsi_video.c */
+#define DSI_VIDEO_BASE	0xF0000
 #else
-#define DSI_VIDEO_BASE	0xE0000 /* Taken from mdp4_overlay_dsi_video.c */
+#define DSI_VIDEO_BASE	0xE0000
 #endif
 
 #define PANEL_ESD_CHECK_PERIOD		msecs_to_jiffies(1000)
@@ -161,26 +161,17 @@ exit:
 	return ret;
 }
 
-static void prepare_for_reg_access(struct msm_fb_data_type *mfd)
+static void mipi_dsi_clk_toggle(struct msm_fb_data_type *mfd)
 {
 	mutex_lock(&mfd->dma->ov_mutex);
-	/* This should not be needed, but without this we sometimes don't get an
-	 * interrupt when transmitting the command */
+
 	if (mfd->panel_info.mipi.mode == DSI_VIDEO_MODE) {
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-		msleep(20);
 		mipi_dsi_controller_cfg(0);
 		mipi_dsi_op_mode_config(DSI_CMD_MODE);
-	}
-}
 
-static void post_reg_access(struct msm_fb_data_type *mfd)
-{
-	/* This should not be needed, but without this we sometimes don't get an
-	 * interrupt when transmitting the command */
-	if (mfd->panel_info.mipi.mode == DSI_VIDEO_MODE) {
 		mipi_dsi_op_mode_config(DSI_VIDEO_MODE);
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 		mipi_dsi_sw_reset();
@@ -188,89 +179,23 @@ static void post_reg_access(struct msm_fb_data_type *mfd)
 		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 1);
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	}
+
 	mutex_unlock(&mfd->dma->ov_mutex);
-}
-
-static int panel_dpm_reg_check(struct msm_fb_data_type *mfd,
-			      struct mipi_dsi_data *dsi_data,
-			      const struct panel *panel)
-{
-	struct device *dev = &mfd->panel_pdev->dev;
-	int ret;
-
-	dev_dbg(dev, "%s\n", __func__);
-
-	ret = panel_execute_cmd(mfd, dsi_data,
-				panel->pctrl->read_dpm,
-				1);
-	if (ret) {
-		dev_err(dev, "%s: read dpm failed\n", __func__);
-		goto exit;
-	}
-
-	if ((dsi_data->rx_buf.len < 1) ||
-		(dsi_data->rx_buf.data[0] != 0x9C)) {
-		dev_err(dev, "panel display power mode: len=%d, data=0x%x\n",
-			dsi_data->rx_buf.len, dsi_data->rx_buf.data[0]);
-		ret = -ENODATA;
-		goto exit;
-	}
-
-exit:
-	return ret;
-}
-
-static int panel_esd_failed_reset(struct msm_fb_data_type *mfd,
-			      struct mipi_dsi_data *dsi_data,
-			      const struct panel *panel)
-{
-	struct device *dev = &mfd->panel_pdev->dev;
-	int ret;
-
-	dev_dbg(dev, "%s\n", __func__);
-
-	ret = panel_execute_cmd(mfd, dsi_data,
-				panel->pctrl->esd_failed_reset,
-				0);
-	if (ret) {
-		dev_err(dev, "%s: ESD failed reset operation failed\n",
-								__func__);
-		goto exit;
-	}
-
-exit:
-	return ret;
 }
 
 static void mipi_dsi_panel_esd_failed_check(struct mipi_dsi_data *dsi_data)
 {
 	struct device *dev = &mipi_dsi_panel_mfd->panel_pdev->dev;
-	int ret;
 
-	/* Needed to make sure the display stack isn't powered on/off while */
-	/* we are executing. The best solution would be a read/write function */
-	/* that handles the current power state */
+	dev_dbg(dev, "%s: enter...", __func__);
+
 	mutex_lock(&mipi_dsi_panel_mfd->power_lock);
 	/*if the panel was power off, it's no need to check ESD failed*/
 	if (!mipi_dsi_panel_mfd->panel_power_on)
 		goto unlock_exit;
 
 	/*ESD Failed check*/
-	prepare_for_reg_access(mipi_dsi_panel_mfd);
-	ret = panel_dpm_reg_check(mipi_dsi_panel_mfd,
-					dsi_data,
-					dsi_data->panel);
-	post_reg_access(mipi_dsi_panel_mfd);
-	if (ret) {
-		dev_info(dev, "%s:ESD failed rc=%d, Start sleep-out sequence\n",
-								__func__, ret);
-		dsi_data->lcd_reset(1);
-		prepare_for_reg_access(mipi_dsi_panel_mfd);
-		panel_esd_failed_reset(mipi_dsi_panel_mfd,
-					dsi_data,
-					dsi_data->panel);
-		post_reg_access(mipi_dsi_panel_mfd);
-	}
+	mipi_dsi_clk_toggle(mipi_dsi_panel_mfd);
 
 unlock_exit:
 	mutex_unlock(&mipi_dsi_panel_mfd->power_lock);
@@ -754,7 +679,8 @@ static int __devinit mipi_dsi_panel_probe(struct platform_device *pdev)
 	dsi_data->panel_data.off = panel_off;
 
 	if (dsi_data->panel->esd_failed_check) {
-		dsi_data->esd_wq = create_singlethread_workqueue("panel_esd_check");
+		dsi_data->esd_wq =
+			create_singlethread_workqueue("panel_esd_check");
 		if (dsi_data->esd_wq == NULL) {
 			dev_err(&pdev->dev, "can't create ESD workqueue\n");
 			goto out_tx_release;

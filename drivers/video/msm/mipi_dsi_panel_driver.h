@@ -1,6 +1,6 @@
 /* drivers/video/msm/mipi_dsi_panel_driver.h
  *
- * Copyright (C) 2012 Sony Mobile Communications AB.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * Author: Yosuke Hatanaka <yosuke.hatanaka@sonyericsson.com>
  * Author: Johan Olson <johan.olson@sonymobile.com>
