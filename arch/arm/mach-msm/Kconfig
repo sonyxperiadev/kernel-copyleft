@@ -1052,11 +1052,110 @@ config MACH_MSM9615_MTP
 	help
 	  Support for the Qualcomm MSM9615 MTP device.
 
+config MACH_SONY_RHINE_CDB
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Rhine CDB"
+	help
+	  Support for the SONY Mobile RHINE CDB device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_ROW
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari ROW"
+	help
+	  Support for the SONY Mobile Togari ROW device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_WINDY
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari Windy"
+	help
+	  Support for the SONY Mobile Togari Windy device.
+	  It is based on QCOM APQ8074 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_BRAZIL
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari Brazil"
+	help
+	  Support for the SONY Mobile Togari Brazil device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TOGARI_KDDI
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Togari Kddi"
+	help
+	  Support for the SONY Mobile Togari Kddi device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_ROW
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami ROW"
+	help
+	  Support for the SONY Mobile Honami ROW device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
 config MACH_SONY_HONAMI_CMCC
 	depends on ARCH_MSM8974
 	bool "Sony Mobile Honami CMCC"
 	help
 	  Support for the SONY Mobile Honami CMCC device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_DCM
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Docomo"
+	help
+	  Support for the SONY Mobile Honami Docomo device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_KDDI
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Kddi"
+	help
+	  Support for the SONY Mobile Honami Kddi device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_HONAMI_BRAZIL
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Honami Brazil"
+	help
+	  Support for the SONY Mobile Honami Brazil device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_AMAMI_ROW
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Amami ROW"
+	help
+	  Support for the SONY Mobile Amami ROW device.
+	  It is based on QCOM MSM8974 chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_AMAMI_DCM
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Amami Docomo"
+	help
+	  Support for the SONY Mobile Amami Docomo device.
 	  It is based on QCOM MSM8974 chipset.
 	  If you enable this config,
 	  Please use SONY Mobile source tree.
