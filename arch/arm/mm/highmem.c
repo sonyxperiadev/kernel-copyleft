@@ -141,6 +141,7 @@ struct page *kmap_atomic_to_page(const void *ptr)
 static void kmap_remove_unused_cpu(int cpu)
 {
 	int start_idx, idx, type;
+	int need_flush = 0;
 
 	pagefault_disable();
 	type = kmap_atomic_idx();
@@ -151,10 +152,18 @@ static void kmap_remove_unused_cpu(int cpu)
 		pte_t ptep;
 
 		ptep = get_top_pte(vaddr);
-		if (ptep)
+		if (ptep) {
 			set_top_pte(vaddr, __pte(0));
+			need_flush = 1;
+		}
 	}
 	pagefault_enable();
+
+	/* flush the caches and tlb if required */
+	if (need_flush) {
+		local_flush_tlb_all();
+		flush_cache_all();
+	}
 }
 
 static void kmap_remove_unused(void *unused)
