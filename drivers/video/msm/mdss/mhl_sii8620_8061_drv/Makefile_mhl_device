@@ -1,0 +1,33 @@
+# write test target file
+SRC_FILES = mhl_sii8620_device_edid.c\
+	./mhl_lib_edid.c
+    #./mhl_sii8620_8061_device.c
+
+# test case
+TEST_SRC_DIRS += \
+	./test/tests/mhl_sii8620_8061_device\
+	./test/tests/Mock\
+	./test/tests/Spy/cpp\
+
+INCLUDE_DIRS +=\
+	./test/tests/mhl_tx_edid\
+	./test/tests/Mock\
+	./test/tests/Spy\
+	./test/tests/Spy/cpp\
+
+MOCKS_SRC += \
+	./test/tests/Spy/cpp/mocks_src/mhl_tx_rcp_spy.cpp\
+	./test/tests/Spy/cpp/mocks_src/mhl_platform_stub.cpp\
+	./test/tests/Spy/cpp/mocks_src/mhl_platform_switch_stub.cpp\
+	./test/tests/Spy/cpp/mocks_src/mhl_cbus_control_stub.cpp\
+	./test/tests/Spy/cpp/mocks_src/mhl_platform_power_stub.cpp\
+	./test/tests/Spy/cpp/mocks_src/mhl_lib_timer_stub.cpp\
+	./test/tests/Spy/cpp/mocks_src/mhl_lib_infoframe_stub.cpp\
+	./test/tests/Spy/cpp/mocks_src/mhl_sii8620_8061_device_stub.cpp\
+
+
+
+#The mk kicks test framwork.
+include $(CPPUTEST_HOME)/build/MakefileWorker.mk
+
+

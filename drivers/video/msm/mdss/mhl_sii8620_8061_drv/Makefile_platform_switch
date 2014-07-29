@@ -1,0 +1,19 @@
+# write test target file
+SRC_FILES = mhl_platform_switch.c
+
+# test case
+TEST_SRC_DIRS += \
+	./test/tests/mhl_platform_switch\
+
+export INCLUDE_DIRS +=\
+	./test/tests/mhl_platform_switch\
+	./test/tests/Spy\
+
+MOCKS_SRC_DIRS += \
+	./test/tests/Spy\
+	./test/tests/Spy/cpp\
+	./test/tests/Spy/usb\
+
+# The mk kicks test framwork.
+include $(CPPUTEST_HOME)/build/MakefileWorker.mk
+

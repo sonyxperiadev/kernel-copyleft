@@ -1,0 +1,18 @@
+# write test target file
+SRC_FILES = mhl_platform_i2c.c
+
+# test case
+TEST_SRC_DIRS += \
+	./test/tests/mhl_platform\
+	./test/tests/Spy/cpp\
+
+INCLUDE_DIRS +=\
+	./test/tests/mhl_platform\
+	./test/tests/Spy\
+
+MOCKS_SRC += \
+	./test/tests/Spy/cpp/mocks_src/mhl_platform_stub.cpp\
+
+#The mk kicks test framwork.
+include $(CPPUTEST_HOME)/build/MakefileWorker.mk
+

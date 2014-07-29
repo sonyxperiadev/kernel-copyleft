@@ -2,6 +2,7 @@
  * This is the linux wireless configuration interface.
  *
  * Copyright 2006-2010		Johannes Berg <johannes@sipsolutions.net>
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -341,7 +342,7 @@ struct wiphy *wiphy_new(const struct cfg80211_ops *ops, int sizeof_priv)
 
 	alloc_size = sizeof(*rdev) + sizeof_priv;
 
-	rdev = kzalloc(alloc_size, GFP_KERNEL);
+	rdev = kzalloc(alloc_size, GFP_KERNEL | __GFP_REPEAT);
 	if (!rdev)
 		return NULL;
 
