@@ -40,10 +40,10 @@ import subprocess
 # force LANG to be set to en_US.UTF-8 to get consistent warnings.
 
 allowed_warnings = set([
-    "alignment.c:327",
-    "mmu.c:602",
-    "return_address.c:62",
-	"swab.h:49",
+   "alignment.c:327",
+   "mmu.c:602",
+   "return_address.c:62",
+   "swab.h:49",
    "SemaLambda.cpp:946",
    "CGObjCGNU.cpp:1414",
    "BugReporter.h:146",
@@ -63,6 +63,13 @@ allowed_warnings = set([
    "inet_hashtables.h:356",
    "xc4000.c:1049",
    "xc4000.c:1063",	
+   "f_qdss.c:586",
+   "mipi_tc358764_dsi2lvds.c:746",
+   "dynamic_debug.h:75",
+   "hci_conn.c:407",
+   "f_qdss.c:740",
+   "mipi_novatek.c:569",
+   "swab.h:34",
  ])
 
 # Capture the name of the object file, can find it.
