@@ -2697,6 +2697,9 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 			qpnp_chg_aicl_iusb_set(chip, ret.intval / MA_TO_UA);
 			if (ret.intval / MA_TO_UA < QPNP_CHG_I_MAX_MIN_150)
 				schedule_work(&chip->somc_params.aicl_set_work);
+			else
+				qpnp_chg_iusbmax_set(chip,
+						QPNP_CHG_I_MAX_MIN_150);
 
 			if ((chip->flags & POWER_STAGE_WA)
 			&& ((ret.intval / 1000) > USB_WALL_THRESHOLD_MA)
@@ -5242,6 +5245,8 @@ qpnp_dc_power_set_property(struct power_supply *psy,
 		chip->somc_params.input_dc_ma = (ma > chip->maxinput_dc_ma) ?
 						chip->maxinput_dc_ma : ma;
 		qpnp_chg_aicl_idc_set(chip, chip->somc_params.input_dc_ma);
+		if (qpnp_chg_is_dc_chg_plugged_in(chip))
+			qpnp_chg_idcmax_set(chip, QPNP_CHG_I_MAX_MIN_150);
 
 		break;
 	default:
