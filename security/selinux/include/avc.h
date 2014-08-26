@@ -1,8 +1,19 @@
 /*
  * Access vector cache interface for object managers.
  *
+ * Copyright (C) 2013 Sony Mobile Communications AB.
+ *
  * Author : Stephen Smalley, <sds@epoch.ncsc.mil>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
+
 #ifndef _SELINUX_AVC_H_
 #define _SELINUX_AVC_H_
 
@@ -57,6 +68,9 @@ struct selinux_late_audit_data {
 	u32 audited;
 	u32 denied;
 	int result;
+#ifdef CONFIG_SECURITY_SELINUX_AVC_EXTRA_INFO
+	int op_result;
+#endif
 };
 
 /*

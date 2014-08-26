@@ -18,6 +18,7 @@
  *
  */
 
+#include <linux/module.h>
 #include <net/addrconf.h>
 #include <net/ipv6.h>
 #include <net/ip6_route.h>
@@ -25,7 +26,6 @@
 #include <net/udp.h>
 #include <net/transp_v6.h>
 #include <net/ping.h>
-#include <linux/module.h>
 
 struct proto pingv6_prot = {
 	.name =		"PINGv6",

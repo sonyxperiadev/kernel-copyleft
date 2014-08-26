@@ -6,6 +6,11 @@
  * published by the Free Software Foundation.
  *
  *  Host driver specific definitions.
+ *
+ * Copyright (C) 2014 Sony Mobile Communications AB.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #ifndef LINUX_MMC_HOST_H
 #define LINUX_MMC_HOST_H
@@ -359,7 +364,11 @@ struct mmc_host {
 	unsigned int		bus_resume_flags;
 #define MMC_BUSRESUME_MANUAL_RESUME	(1 << 0)
 #define MMC_BUSRESUME_NEEDS_RESUME	(1 << 1)
+#define MMC_BUSRESUME_IS_RESUMING	(1 << 2)
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	wait_queue_head_t	defer_wq;
+#endif
 	unsigned int		sdio_irqs;
 	struct task_struct	*sdio_irq_thread;
 	bool			sdio_irq_pending;
@@ -450,6 +459,7 @@ static inline void *mmc_priv(struct mmc_host *host)
 #define mmc_hostname(x)	(dev_name(&(x)->class_dev))
 #define mmc_bus_needs_resume(host) ((host)->bus_resume_flags & MMC_BUSRESUME_NEEDS_RESUME)
 #define mmc_bus_manual_resume(host) ((host)->bus_resume_flags & MMC_BUSRESUME_MANUAL_RESUME)
+#define mmc_bus_is_resuming(host) ((host)->bus_resume_flags & MMC_BUSRESUME_IS_RESUMING)
 
 static inline void mmc_set_bus_resume_policy(struct mmc_host *host, int manual)
 {

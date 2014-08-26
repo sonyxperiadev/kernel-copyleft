@@ -423,6 +423,16 @@ config INPUT_GPIO
 	help
 	  Say Y here if you want to support gpio based keys, wheels etc...
 
+config INPUT_BU52031NVX
+	tristate "BU52031NVX driver support"
+	default n
+	help
+	  Say Y here if you want to support BU52031NVX
+	  as bipolar detection device.
+
+	  This function is for auto wake up/sleep mode setting
+	  by smart cover.
+
 config INPUT_ISA1200_FF_MEMLESS
 	tristate "ISA1200 haptic ff-memless support"
 	depends on I2C

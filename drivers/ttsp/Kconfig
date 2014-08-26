@@ -1,0 +1,71 @@
+menuconfig CYPRESS_CYTTSP4_BUS
+	bool "Cypress TTSP core bus"
+	default n
+	help
+	  This option enables support Cypress TTSP core bus.
+	  This support is needed for various device and drivers
+	  using Cypress TrueTouch(TM) Standard Product
+	  protocol.
+
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4
+	tristate "Cypress TrueTouch Gen4 Touchscreen Driver"
+	depends on CYPRESS_CYTTSP4_BUS
+	default n
+	help
+	  Say Y here if you have a Cypress Gen4 touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here.
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4_DEBUG
+	bool "Enable debug output"
+	depends on TOUCHSCREEN_CYPRESS_CYTTSP4
+	default n
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4_VDEBUG
+	bool "Enable verbose debug output"
+	depends on TOUCHSCREEN_CYPRESS_CYTTSP4_DEBUG
+	default n
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4_I2C
+	tristate "Cypress TrueTouch Gen4 I2C"
+	depends on (TOUCHSCREEN_CYPRESS_CYTTSP4 && I2C)
+	default n
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4_SPI
+	tristate "Cypress TrueTouch Gen4 SPI"
+	depends on (TOUCHSCREEN_CYPRESS_CYTTSP4 && SPI)
+	default n
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4_MT_A
+	tristate "Cypress TrueTouch Gen4 MultiTouch Protocol A"
+	depends on TOUCHSCREEN_CYPRESS_CYTTSP4
+	default n
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4_MT_B
+	tristate "Cypress TrueTouch Gen4 MultiTouch Protocol B"
+	depends on TOUCHSCREEN_CYPRESS_CYTTSP4
+	default n
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4_BUTTON
+	tristate "Cypress TrueTouch Gen4 MultiTouch CapSense Button"
+	depends on TOUCHSCREEN_CYPRESS_CYTTSP4
+	default n
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4_DEVICE_ACCESS
+	tristate "Cypress TrueTouch Gen4 MultiTouch Device Access"
+	depends on TOUCHSCREEN_CYPRESS_CYTTSP4
+	default n
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4_LOADER
+	tristate "Cypress TrueTouch Gen4 MultiTouch Loader"
+	depends on TOUCHSCREEN_CYPRESS_CYTTSP4
+	default n
+
+config TOUCHSCREEN_CYPRESS_CYTTSP4_DEBUG_MODULE
+	tristate "Cypress TrueTouch Gen4 MultiTouch Debug Module"
+	depends on TOUCHSCREEN_CYPRESS_CYTTSP4
+	default n
+

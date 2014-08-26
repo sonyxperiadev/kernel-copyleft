@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 &soc {
@@ -82,32 +86,24 @@
 		cell-index = <0>;
 		reg = <0xfd922800 0x600>;
 		qcom,mdss-fb-map = <&mdss_fb0>;
+
 		qcom,mdss-mdp = <&mdss_mdp>;
-		vdd-supply = <&pm8226_l15>;
 		vddio-supply = <&pm8226_l8>;
 		vdda-supply = <&pm8226_l4>;
+		vcc-supply = <&pm8226_l19>;
+		qcom,platform-enable-gpio = <&msmgpio 36 0>;
 		qcom,platform-reset-gpio = <&msmgpio 25 0>;
 		qcom,platform-te-gpio = <&msmgpio 24 0>;
+		qcom,platform-reset-sequence = <0 10 1 25>;
 		qcom,platform-strength-ctrl = [ff 06];
 		qcom,platform-bist-ctrl = [00 00 b1 ff 00 00];
-		qcom,platform-regulator-settings = [07 09 03 00 20 00 01];
-		qcom,platform-lane-config = [00 00 00 00 00 00 00 01 97
-			00 00 00 00 05 00 00 01 97
-			00 00 00 00 0a 00 00 01 97
-			00 00 00 00 0f 00 00 01 97
-			00 c0 00 00 00 00 00 01 bb];
+		qcom,platform-regulator-settings = [03 0a 04 00 20 00 01];
+		qcom,platform-lane-config = [00 02 ef 00 00 00 00 01 ff
+			00 02 ef 00 00 00 00 01 ff
+			00 02 ef 00 00 00 00 01 ff
+			00 02 ef 00 00 00 00 01 ff
+			00 02 45 00 00 00 00 01 97];
 		qcom,platform-supply-entry1 {
-			qcom,supply-name = "vdd";
-			qcom,supply-min-voltage = <2800000>;
-			qcom,supply-max-voltage = <2800000>;
-			qcom,supply-enable-load = <100000>;
-			qcom,supply-disable-load = <100>;
-			qcom,supply-pre-on-sleep = <0>;
-			qcom,supply-post-on-sleep = <0>;
-			qcom,supply-pre-off-sleep = <0>;
-			qcom,supply-post-off-sleep = <0>;
-		};
-		qcom,platform-supply-entry2 {
 			qcom,supply-name = "vddio";
 			qcom,supply-min-voltage = <1800000>;
 			qcom,supply-max-voltage = <1800000>;
@@ -118,7 +114,7 @@
 			qcom,supply-pre-off-sleep = <0>;
 			qcom,supply-post-off-sleep = <0>;
 		};
-		qcom,platform-supply-entry3 {
+		qcom,platform-supply-entry2 {
 			qcom,supply-name = "vdda";
 			qcom,supply-min-voltage = <1200000>;
 			qcom,supply-max-voltage = <1200000>;
@@ -126,6 +122,17 @@
 			qcom,supply-disable-load = <100>;
 			qcom,supply-pre-on-sleep = <0>;
 			qcom,supply-post-on-sleep = <20>;
+			qcom,supply-pre-off-sleep = <0>;
+			qcom,supply-post-off-sleep = <0>;
+		};
+		qcom,platform-supply-entry3 {
+			qcom,supply-name = "vcc";
+			qcom,supply-min-voltage = <2850000>;
+			qcom,supply-max-voltage = <2850000>;
+			qcom,supply-enable-load = <100000>;
+			qcom,supply-disable-load = <0>;
+			qcom,supply-pre-on-sleep = <0>;
+			qcom,supply-post-on-sleep = <11>;
 			qcom,supply-pre-off-sleep = <0>;
 			qcom,supply-post-off-sleep = <0>;
 		};

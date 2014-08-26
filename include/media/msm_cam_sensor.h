@@ -1,3 +1,16 @@
+/* Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 Sony Mobile Communications AB.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
 #ifndef __LINUX_MSM_CAM_SENSOR_H
 #define __LINUX_MSM_CAM_SENSOR_H
 
@@ -40,6 +53,9 @@
 #define MAX_ACTUATOR_REGION 5
 #define MAX_ACTUATOR_INIT_SET 12
 #define MAX_ACTUATOR_REG_TBL_SIZE 8
+/* extension begin */
+#define MAX_ACTUATOR_PD_SET 12
+/* extension end */
 
 #define MOVE_NEAR 0
 #define MOVE_FAR  1
@@ -443,6 +459,9 @@ enum msm_actuator_cfg_type_t {
 	CFG_SET_DEFAULT_FOCUS,
 	CFG_SET_POSITION,
 	CFG_MOVE_FOCUS,
+/* extension begin */
+	CFG_SET_FOCUS_POWER_DOWN,
+/* extension end */
 };
 
 enum actuator_type {
@@ -501,11 +520,18 @@ struct msm_actuator_params_t {
 	uint8_t reg_tbl_size;
 	uint16_t data_size;
 	uint16_t init_setting_size;
+/* extension begin */
+	uint16_t pd_setting_size;
+/* extension end */
 	uint32_t i2c_addr;
 	enum msm_actuator_addr_type i2c_addr_type;
 	enum msm_actuator_data_type i2c_data_type;
 	struct msm_actuator_reg_params_t *reg_tbl_params;
 	struct reg_settings_t *init_settings;
+/* extension begin */
+	struct reg_settings_t *pd_settings;
+	struct damping_params_t *ringing_params;
+/* extension end */
 };
 
 struct msm_actuator_set_info_t {

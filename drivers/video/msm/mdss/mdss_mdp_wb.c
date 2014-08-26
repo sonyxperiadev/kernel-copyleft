@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
@@ -27,6 +30,8 @@
 #include "mdss_fb.h"
 #include "mdss_wb.h"
 
+#define DEBUG_WRITEBACK
+#define DEBUG
 
 enum mdss_mdp_wb_state {
 	WB_OPEN,

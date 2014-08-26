@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -36,6 +37,12 @@ static struct msm_actuator *actuators[] = {
 	&msm_piezo_actuator_table,
 };
 
+#ifdef CONFIG_SONY_CAM_QCAMERA
+static uint16_t pd_setting_size;
+static struct reg_settings_t *pd_settings;
+static uint16_t control_setting_size;
+static struct reg_settings_t *control_settings;
+#endif
 static int32_t msm_actuator_piezo_set_default_focus(
 	struct msm_actuator_ctrl_t *a_ctrl,
 	struct msm_actuator_move_params_t *move_params)
@@ -94,7 +101,11 @@ static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 				i2c_byte1 = write_arr[i].reg_addr;
 				i2c_byte2 = value;
 				if (size != (i+1)) {
+#ifdef CONFIG_SONY_CAM_QCAMERA
+					i2c_byte2 = (value & 0xFF00) >> 8;
+#else
 					i2c_byte2 = value & 0xFF;
+#endif
 					CDBG("byte1:0x%x, byte2:0x%x\n",
 						i2c_byte1, i2c_byte2);
 					i2c_tbl[a_ctrl->i2c_tbl_index].
@@ -106,7 +117,11 @@ static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 					a_ctrl->i2c_tbl_index++;
 					i++;
 					i2c_byte1 = write_arr[i].reg_addr;
+#ifdef CONFIG_SONY_CAM_QCAMERA
+					i2c_byte2 = value & 0xFF;
+#else
 					i2c_byte2 = (value & 0xFF00) >> 8;
+#endif
 				}
 			} else {
 				i2c_byte1 = (value & 0xFF00) >> 8;
@@ -161,6 +176,122 @@ static int32_t msm_actuator_init_focus(struct msm_actuator_ctrl_t *a_ctrl,
 	return rc;
 }
 
+#ifdef CONFIG_SONY_CAM_QCAMERA
+static int32_t msm_actuator_pd(
+	struct msm_actuator_ctrl_t *a_ctrl)
+{
+	int32_t rc = -EFAULT;
+	int32_t i = 0;
+	CDBG("Enter\n");
+
+	if (pd_settings != NULL) {
+		for (i = 0; i < pd_setting_size; i++) {
+			switch (a_ctrl->i2c_data_type) {
+			case MSM_ACTUATOR_BYTE_DATA:
+				rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+					&a_ctrl->i2c_client,
+					pd_settings[i].reg_addr,
+					pd_settings[i].reg_data,
+					MSM_CAMERA_I2C_BYTE_DATA);
+				break;
+			case MSM_ACTUATOR_WORD_DATA:
+				rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+					&a_ctrl->i2c_client,
+					pd_settings[i].reg_addr,
+					pd_settings[i].reg_data,
+					MSM_CAMERA_I2C_WORD_DATA);
+				break;
+			default:
+				pr_err("Unsupport data type: %d\n",
+					a_ctrl->i2c_data_type);
+				break;
+			}
+			if (rc < 0)
+				break;
+		}
+		kfree(pd_settings);
+		pd_settings = NULL;
+		if (rc < 0) {
+			pr_err("Error msm_actuator_pd I2C error\n");
+			return -EFAULT;
+		}
+	} else {
+		CDBG("msm_actuator_pd NULL\n");
+	}
+	return rc;
+}
+
+static int32_t msm_actuator_init_default_focus(
+	struct msm_actuator_ctrl_t *a_ctrl,
+	struct damping_params_t ringing_param)
+{
+	int32_t rc = 0;
+	struct msm_camera_i2c_reg_setting reg_setting;
+	CDBG("Enter\n");
+
+	if (a_ctrl->func_tbl->actuator_set_init_settings) {
+		a_ctrl->func_tbl->actuator_set_init_settings(a_ctrl,
+					control_setting_size,
+					a_ctrl->i2c_data_type,
+					control_settings);
+	}
+
+	a_ctrl->i2c_tbl_index = 0;
+	a_ctrl->func_tbl->actuator_parse_i2c_params(a_ctrl,
+		a_ctrl->initial_code, ringing_param.hw_params,
+		ringing_param.damping_delay);
+	reg_setting.reg_setting = a_ctrl->i2c_reg_tbl;
+	reg_setting.data_type = a_ctrl->i2c_data_type;
+	reg_setting.size = a_ctrl->i2c_tbl_index;
+	rc = a_ctrl->i2c_client.i2c_func_tbl->
+		i2c_write_table_w_microdelay(
+		&a_ctrl->i2c_client, &reg_setting);
+	a_ctrl->i2c_tbl_index = 0;
+	if (rc < 0) {
+		pr_err("%s: i2c write error:%d\n",
+			__func__, rc);
+		return rc;
+	}
+
+	CDBG("Exit\n");
+	return rc;
+}
+
+static int32_t msm_actuator_init_settings(struct msm_actuator_ctrl_t *a_ctrl,
+	uint16_t size, enum msm_actuator_data_type type,
+	struct reg_settings_t *settings)
+{
+	int32_t rc = -EFAULT;
+	int32_t i = 0;
+	CDBG("Enter\n");
+
+	for (i = 0; i < size; i++) {
+		switch (type) {
+		case MSM_ACTUATOR_BYTE_DATA:
+			rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+				&a_ctrl->i2c_client,
+				settings[i].reg_addr,
+				settings[i].reg_data, MSM_CAMERA_I2C_BYTE_DATA);
+			break;
+		case MSM_ACTUATOR_WORD_DATA:
+			rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+				&a_ctrl->i2c_client,
+				settings[i].reg_addr,
+				settings[i].reg_data, MSM_CAMERA_I2C_WORD_DATA);
+			break;
+		default:
+			pr_err("Unsupport data type: %d\n", type);
+			break;
+		}
+		if (rc < 0)
+			break;
+	}
+
+	CDBG("Exit\n");
+	return rc;
+}
+#endif
+
 static void msm_actuator_write_focus(
 	struct msm_actuator_ctrl_t *a_ctrl,
 	uint16_t curr_lens_pos,
@@ -172,6 +303,15 @@ static void msm_actuator_write_focus(
 	uint16_t damping_code_step = 0;
 	uint16_t wait_time = 0;
 	CDBG("Enter\n");
+
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	if (a_ctrl->func_tbl->actuator_set_init_settings) {
+		a_ctrl->func_tbl->actuator_set_init_settings(a_ctrl,
+					control_setting_size,
+					a_ctrl->i2c_data_type,
+					control_settings);
+	}
+#endif
 
 	damping_code_step = damping_params->damping_step;
 	wait_time = damping_params->damping_delay;
@@ -454,6 +594,9 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 	int32_t rc = -EFAULT;
 	uint16_t i = 0;
 	struct msm_camera_cci_client *cci_client = NULL;
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	struct damping_params_t ringing_params;
+#endif
 	CDBG("Enter\n");
 
 	for (i = 0; i < ARRAY_SIZE(actuators); i++) {
@@ -554,7 +697,6 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 			}
 		}
 	}
-
 	a_ctrl->initial_code = set_info->af_tuning_params.initial_code;
 	if (a_ctrl->func_tbl->actuator_init_step_table)
 		rc = a_ctrl->func_tbl->
@@ -562,6 +704,69 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 
 	a_ctrl->curr_step_pos = 0;
 	a_ctrl->curr_region_index = 0;
+
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	if (pd_settings != NULL) {
+		kfree(pd_settings);
+		pd_settings = NULL;
+	}
+	pd_setting_size = set_info->actuator_params.pd_setting_size;
+	if ((pd_setting_size != 0) && (pd_settings == NULL)) {
+		pd_settings = kmalloc(sizeof(struct reg_settings_t) *
+			pd_setting_size,
+			GFP_KERNEL);
+		if (pd_settings == NULL) {
+			kfree(a_ctrl->i2c_reg_tbl);
+			pr_err("Error allocating memory for pd_settings\n");
+			return -EFAULT;
+		}
+		if (copy_from_user(pd_settings,
+			(void *)set_info->actuator_params.pd_settings,
+			pd_setting_size *
+			sizeof(struct reg_settings_t))) {
+			kfree(pd_settings);
+			kfree(a_ctrl->i2c_reg_tbl);
+			pr_err("Error copying pd_settings\n");
+			return -EFAULT;
+		}
+	}
+
+	if (control_settings != NULL) {
+		kfree(control_settings);
+		control_settings = NULL;
+	}
+
+	control_setting_size = set_info->actuator_params.init_setting_size;
+	control_settings = kmalloc(sizeof(struct reg_settings_t) *
+			(set_info->actuator_params.init_setting_size),
+			GFP_KERNEL);
+	if (control_settings == NULL) {
+		kfree(a_ctrl->i2c_reg_tbl);
+		pr_err("Error allocating memory for init_settings\n");
+		return -EFAULT;
+	}
+	if (copy_from_user(control_settings,
+		(void *)set_info->actuator_params.init_settings,
+		set_info->actuator_params.init_setting_size *
+		sizeof(struct reg_settings_t))) {
+		kfree(control_settings);
+		kfree(a_ctrl->i2c_reg_tbl);
+		pr_err("Error copying init_settings\n");
+		return -EFAULT;
+	}
+
+	if (copy_from_user(&ringing_params,
+		(void *)set_info->actuator_params.ringing_params,
+		sizeof(struct damping_params_t))) {
+		pr_err("copy_from_user failed\n");
+		return -EFAULT;
+	}
+	rc = msm_actuator_init_default_focus(a_ctrl, ringing_params);
+	if (rc < 0) {
+		pr_err("Error msm_actuator_init_default_focus\n");
+		return -EFAULT;
+	}
+#endif
 	CDBG("Exit\n");
 
 	return rc;
@@ -602,12 +807,20 @@ static int32_t msm_actuator_config(struct msm_actuator_ctrl_t *a_ctrl,
 			pr_err("move focus failed %d\n", rc);
 		break;
 
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	case CFG_SET_FOCUS_POWER_DOWN:
+		rc = a_ctrl->func_tbl->actuator_set_focus_pd(a_ctrl);
+		if (rc < 0)
+			pr_err("focus power down failed %d\n", rc);
+		break;
+#endif
 	case CFG_SET_POSITION:
 		rc = a_ctrl->func_tbl->actuator_set_position(a_ctrl,
 			&cdata->cfg.setpos);
 		if (rc < 0)
 			pr_err("actuator_set_position failed %d\n", rc);
 		break;
+
 	default:
 		break;
 	}
@@ -616,10 +829,58 @@ static int32_t msm_actuator_config(struct msm_actuator_ctrl_t *a_ctrl,
 	return rc;
 }
 
+#ifdef CONFIG_SONY_CAM_QCAMERA
+static int msm_actuator_low_power(struct msm_actuator_ctrl_t *a_ctrl)
+{
+	int rc = 0;
+	uint16_t reg_addr = 0x02;
+	uint16_t reg_data = 0x03;
+	struct msm_camera_cci_client *cci_client = NULL;
+
+	CDBG("Enter\n");
+	if (!a_ctrl)
+		return rc;
+
+	if (a_ctrl->act_device_type == MSM_CAMERA_PLATFORM_DEVICE) {
+		rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_util(
+			&a_ctrl->i2c_client, MSM_CCI_INIT);
+		if (rc < 0)
+			pr_err("cci_init failed\n");
+
+		cci_client = a_ctrl->i2c_client.cci_client;
+		cci_client->sid = 0x0C;
+		cci_client->retries = 3;
+		cci_client->id_map = 0;
+		cci_client->cci_i2c_master = MASTER_0;
+	}
+
+	a_ctrl->i2c_data_type = MSM_CAMERA_I2C_BYTE_DATA;
+	a_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_BYTE_DATA;
+	rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+			&a_ctrl->i2c_client,
+			reg_addr,
+			reg_data, MSM_CAMERA_I2C_BYTE_DATA);
+	if (rc < 0) {
+			pr_err("%s: write low power failed\n", __func__);
+			return rc;
+	}
+	rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_util(
+		&a_ctrl->i2c_client, MSM_CCI_RELEASE);
+	if (rc < 0)
+		pr_err("cci_release failed\n");
+	CDBG("Exit\n");
+	return rc;
+}
+#endif
 static int32_t msm_actuator_get_subdev_id(struct msm_actuator_ctrl_t *a_ctrl,
 	void *arg)
 {
 	uint32_t *subdev_id = (uint32_t *)arg;
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	uint8_t camera_module_name[8];
+	int rc = 0;
+#endif
+
 	CDBG("Enter\n");
 	if (!subdev_id) {
 		pr_err("failed\n");
@@ -631,6 +892,16 @@ static int32_t msm_actuator_get_subdev_id(struct msm_actuator_ctrl_t *a_ctrl,
 		*subdev_id = a_ctrl->subdev_id;
 
 	CDBG("subdev_id %d\n", *subdev_id);
+
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	msm_eeprom_get_camera_moudle_name(0, camera_module_name);
+	if ((*subdev_id == 7) &&
+			(!strncmp(camera_module_name, "SOI13BS2", 8))) {
+		rc = msm_actuator_low_power(a_ctrl);
+		if (rc < 0)
+			pr_err("%s: low power failed\n", __func__);
+	}
+#endif
 	CDBG("Exit\n");
 	return 0;
 }
@@ -691,6 +962,12 @@ static int msm_actuator_close(struct v4l2_subdev *sd,
 			pr_err("cci_init failed\n");
 	}
 	kfree(a_ctrl->i2c_reg_tbl);
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	if (control_settings != NULL) {
+		kfree(control_settings);
+		control_settings = NULL;
+	}
+#endif
 	a_ctrl->i2c_reg_tbl = NULL;
 
 	CDBG("Exit\n");
@@ -963,6 +1240,10 @@ static struct msm_actuator msm_vcm_actuator_table = {
 		.actuator_init_focus = msm_actuator_init_focus,
 		.actuator_parse_i2c_params = msm_actuator_parse_i2c_params,
 		.actuator_set_position = msm_actuator_set_position,
+		#ifdef CONFIG_SONY_CAM_QCAMERA
+		.actuator_set_focus_pd = msm_actuator_pd,
+		.actuator_set_init_settings = msm_actuator_init_settings,
+		#endif
 	},
 };
 
@@ -976,6 +1257,10 @@ static struct msm_actuator msm_piezo_actuator_table = {
 			msm_actuator_piezo_set_default_focus,
 		.actuator_init_focus = msm_actuator_init_focus,
 		.actuator_parse_i2c_params = msm_actuator_parse_i2c_params,
+		#ifdef CONFIG_SONY_CAM_QCAMERA
+		.actuator_set_focus_pd = NULL,
+		.actuator_set_init_settings = NULL,
+		#endif
 	},
 };
 

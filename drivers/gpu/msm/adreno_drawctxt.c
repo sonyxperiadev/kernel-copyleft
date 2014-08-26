@@ -171,9 +171,9 @@ static int _check_context_timestamp(struct kgsl_device *device,
 		drawctxt->state != ADRENO_CONTEXT_STATE_ACTIVE)
 		return 1;
 
-	mutex_lock(&device->mutex);
+	kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 	ret = kgsl_check_timestamp(device, &drawctxt->base, timestamp);
-	mutex_unlock(&device->mutex);
+	kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 
 	return ret;
 }
@@ -227,7 +227,7 @@ int adreno_drawctxt_wait(struct adreno_device *adreno_dev,
 	io = (io_cnt < pwr->pwrlevels[pwr->active_pwrlevel].io_fraction)
 		? 0 : 1;
 
-	mutex_unlock(&device->mutex);
+	kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 
 	if (timeout) {
 		ret = (int) adreno_wait_event_interruptible_timeout(
@@ -245,7 +245,7 @@ int adreno_drawctxt_wait(struct adreno_device *adreno_dev,
 				io);
 	}
 
-	mutex_lock(&device->mutex);
+	kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 
 	/* -EDEADLK if the context was invalidated while we were waiting */
 	if (drawctxt->state == ADRENO_CONTEXT_STATE_INVALID)
@@ -314,7 +314,7 @@ int adreno_drawctxt_wait_global(struct adreno_device *adreno_dev,
 		goto done;
 	}
 
-	mutex_unlock(&device->mutex);
+	kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 
 	if (timeout) {
 		ret = (int) wait_event_timeout(drawctxt->waiting,
@@ -330,7 +330,7 @@ int adreno_drawctxt_wait_global(struct adreno_device *adreno_dev,
 			_check_global_timestamp(device, drawctxt, timestamp));
 	}
 
-	mutex_lock(&device->mutex);
+	kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 
 	if (ret)
 		kgsl_cancel_events_timestamp(device, NULL, timestamp);
@@ -381,10 +381,10 @@ void adreno_drawctxt_invalidate(struct kgsl_device *device,
 
 		mutex_unlock(&drawctxt->mutex);
 
-		mutex_lock(&device->mutex);
+		kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 		kgsl_cancel_events_timestamp(device, context,
 			cmdbatch->timestamp);
-		mutex_unlock(&device->mutex);
+		kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 
 		kgsl_cmdbatch_destroy(cmdbatch);
 		mutex_lock(&drawctxt->mutex);
@@ -607,7 +607,7 @@ int adreno_context_restore(struct adreno_device *adreno_dev,
 				  struct adreno_context *context)
 {
 	struct kgsl_device *device;
-	unsigned int cmds[5];
+	unsigned int cmds[8];
 
 	if (adreno_dev == NULL || context == NULL)
 		return -EINVAL;
@@ -621,8 +621,14 @@ int adreno_context_restore(struct adreno_device *adreno_dev,
 	cmds[3] = device->memstore.gpuaddr +
 		KGSL_MEMSTORE_OFFSET(KGSL_MEMSTORE_GLOBAL, current_context);
 	cmds[4] = context->base.id;
+	/* Flush the UCHE for new context */
+	cmds[5] = cp_type0_packet(
+		adreno_getreg(adreno_dev, ADRENO_REG_UCHE_INVALIDATE0), 2);
+	cmds[6] = 0;
+	if (adreno_is_a3xx(adreno_dev))
+		cmds[7] = 0x90000000;
 	return adreno_ringbuffer_issuecmds(device, context,
-				KGSL_CMD_FLAGS_NONE, cmds, 5);
+				KGSL_CMD_FLAGS_NONE, cmds, 8);
 }
 
 

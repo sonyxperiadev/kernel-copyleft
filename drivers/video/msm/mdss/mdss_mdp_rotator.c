@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
@@ -30,6 +33,9 @@ static DEFINE_MUTEX(rotator_lock);
 static struct mdss_mdp_rotator_session rotator_session[MAX_ROTATOR_SESSIONS];
 static LIST_HEAD(rotator_queue);
 
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+static u32 count;
+#endif
 static int mdss_mdp_rotator_finish(struct mdss_mdp_rotator_session *rot);
 static void mdss_mdp_rotator_commit_wq_handler(struct work_struct *work);
 static int mdss_mdp_rotator_busy_wait(struct mdss_mdp_rotator_session *rot);
@@ -147,6 +153,14 @@ static int mdss_mdp_rotator_kickoff(struct mdss_mdp_ctl *ctl,
 
 	mutex_lock(&rot->lock);
 	rot->busy = true;
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+	/* first kickoff change vbif settings */
+	if (!count) {
+		writel_relaxed(0x08010808, mdss_res->vbif_base + 0xB0);
+		writel_relaxed(0x02101010, mdss_res->vbif_base + 0xC0);
+		count++;
+	}
+#endif
 	ret = mdss_mdp_writeback_display_commit(ctl, &wb_args);
 	if (ret) {
 		rot->busy = false;
@@ -650,6 +664,11 @@ static int mdss_mdp_rotator_finish(struct mdss_mdp_rotator_session *rot)
 		else
 			mixer = tmp->mixer_left;
 		mdss_mdp_wb_mixer_destroy(mixer);
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+		writel_relaxed(0x08080808, mdss_res->vbif_base + 0xB0);
+		writel_relaxed(0x10101010, mdss_res->vbif_base + 0xC0);
+		count = 0;
+#endif
 	}
 	return ret;
 }
