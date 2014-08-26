@@ -10,36 +10,53 @@
  */
 
 #include <linux/workqueue.h>
+#include <linux/iopoll.h>
 #include "msm_fb.h"
 #include "mipi_dsi.h"
 #include "mipi_dsi_panel.h"
 
-#define PANEL_ESD_CHECK_PERIOD		msecs_to_jiffies(1000)
+#define PANEL_ESD_CHECK_PERIOD		msecs_to_jiffies(5000)
 #define DSI_VIDEO_BASE	0xE0000
 
 static struct mutex esd_lock;
 static struct msm_fb_data_type *mipi_dsi_panel_mfd;
 
+static void mipi_dsi_wait_for_video_eng_busy(void)
+{
+	u32 status;
+	int sleep_us = 4000;
+
+	/*
+	 * if video mode engine was not busy (in BLLP)
+	 * wait to pass BLLP
+	 */
+
+	/* check for VIDEO_MODE_ENGINE_BUSY */
+	readl_poll((MIPI_DSI_BASE + 0x0004), /* DSI_STATUS */
+				status,
+				(status & 0x08),
+				sleep_us);
+}
+
 static void mipi_dsi_clk_toggle(struct msm_fb_data_type *mfd)
 {
-	mutex_lock(&mfd->dma->ov_mutex);
+	mipi_dsi_wait_for_video_eng_busy();
 
 	if (mfd->panel_info.mipi.mode == DSI_VIDEO_MODE) {
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-		mipi_dsi_controller_cfg(0);
+		mipi_dsi_controller_cfg_toggle(0);
 		mipi_dsi_op_mode_config(DSI_CMD_MODE);
 
 		mipi_dsi_op_mode_config(DSI_VIDEO_MODE);
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 		mipi_dsi_sw_reset();
-		mipi_dsi_controller_cfg(1);
+		mipi_dsi_controller_cfg_toggle(1);
 		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 1);
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	}
 
-	mutex_unlock(&mfd->dma->ov_mutex);
 }
 
 static void mipi_dsi_panel_esd_failed_check(struct mipi_dsi_data *dsi_data)

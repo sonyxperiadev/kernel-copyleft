@@ -325,6 +325,7 @@ void mipi_dsi_post_kickoff_add(struct dsi_kickoff_action *act);
 void mipi_dsi_pre_kickoff_del(struct dsi_kickoff_action *act);
 void mipi_dsi_post_kickoff_del(struct dsi_kickoff_action *act);
 void mipi_dsi_controller_cfg(int enable);
+void mipi_dsi_controller_cfg_toggle(int enable);
 void mipi_dsi_sw_reset(void);
 void mipi_dsi_mdp_busy_wait(void);
 

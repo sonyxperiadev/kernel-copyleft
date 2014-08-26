@@ -526,7 +526,7 @@ int mdp4_dsi_video_splash_done(void)
 	vctrl = &vsync_ctrl_db[cndx];
 
 	mdp4_dsi_video_tg_off(vctrl);
-	mipi_dsi_controller_cfg(0);
+	mipi_dsi_controller_cfg_toggle(0);
 
 	return 0;
 }

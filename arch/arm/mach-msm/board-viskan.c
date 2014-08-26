@@ -290,8 +290,13 @@ early_param("pmem_audio_size", pmem_audio_size_setup);
 #define CYTTSP4_I2C_NAME "cyttsp4_i2c_adapter"
 #define CYTTSP4_I2C_TCH_ADR 0x24
 #define CYTTSP4_LDR_TCH_ADR 0x24
+
 #define CYTTSP4_I2C_IRQ_GPIO 11
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+#define CYTTSP4_I2C_RST_GPIO 32
+#else
 #define CYTTSP4_I2C_RST_GPIO 6
+#endif
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_SPI
@@ -2242,6 +2247,18 @@ static struct platform_device qcedev_device = {
 };
 #endif
 
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+static struct mdm_platform_data sglte_platform_data = {
+	.mdm_version = "4.0",
+	.ramdump_delay_ms = 1000,
+	.soft_reset_inverted = 1,
+	.peripheral_platform_device = NULL,
+	.ramdump_timeout_ms = 600000,
+	.no_powerdown_after_ramdumps = 1,
+	.image_upgrade_supported = 1,
+};
+#endif
+
 #define MSM_TSIF0_PHYS			(0x18200000)
 #define MSM_TSIF1_PHYS			(0x18201000)
 #define MSM_TSIF_SIZE			(0x200)
@@ -3885,6 +3902,69 @@ static struct platform_device msm8960_device_rpm_regulator __devinitdata = {
 	},
 };
 
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+#ifdef CONFIG_SERIAL_MSM_HS
+static int configure_uart_gpios(int on)
+{
+	int ret = 0, i;
+	int uart_gpios[] = {93, 94, 95, 96};
+
+	for (i = 0; i < ARRAY_SIZE(uart_gpios); i++) {
+		if (on) {
+			ret = gpio_request(uart_gpios[i], NULL);
+			if (ret) {
+				pr_err("%s: unable to request uart gpio[%d]\n",
+						__func__, uart_gpios[i]);
+				break;
+			}
+		} else {
+			gpio_free(uart_gpios[i]);
+		}
+	}
+
+	if (ret && on && i)
+		for (; i >= 0; i--)
+			gpio_free(uart_gpios[i]);
+	return ret;
+}
+
+static struct msm_serial_hs_platform_data msm_uart_dm9_pdata = {
+	.gpio_config	= configure_uart_gpios,
+};
+
+static int configure_gsbi8_uart_gpios(int on)
+{
+	int ret = 0, i;
+	int uart_gpios[] = {34, 35, 36, 37};
+
+	for (i = 0; i < ARRAY_SIZE(uart_gpios); i++) {
+		if (on) {
+			ret = gpio_request(uart_gpios[i], NULL);
+			if (ret) {
+				pr_err("%s: unable to request uart gpio[%d]\n",
+						__func__, uart_gpios[i]);
+				break;
+			}
+		} else {
+			gpio_free(uart_gpios[i]);
+		}
+	}
+
+	if (ret && on && i)
+		for (; i >= 0; i--)
+			gpio_free(uart_gpios[i]);
+	return ret;
+}
+
+static struct msm_serial_hs_platform_data msm_uart_dm8_pdata = {
+	.gpio_config	= configure_gsbi8_uart_gpios,
+};
+#else
+static struct msm_serial_hs_platform_data msm_uart_dm8_pdata;
+static struct msm_serial_hs_platform_data msm_uart_dm9_pdata;
+#endif
+#endif
+
 #if defined(CONFIG_BT) && defined(CONFIG_BT_HCIUART_ATH3K)
 enum WLANBT_STATUS {
 	WLANOFF_BTOFF = 1,
@@ -4998,8 +5078,21 @@ static void __init msm8960_cdp_init(void)
 
 	platform_device_register(&msm8960_device_uart_gsbi8);
 
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+	/* For 8960 Fusion 2.2 Primary IPC */
+	if (socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE) {
+		msm_uart_dm9_pdata.wakeup_irq = gpio_to_irq(94); /* GSBI9(2) */
+		msm_device_uart_dm9.dev.platform_data = &msm_uart_dm9_pdata;
+	}
+#endif
 	platform_device_register(&msm_device_uart_dm9);
-
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+	/* For 8960 Standalone External Bluetooth Interface */
+	if (socinfo_get_platform_subtype() != PLATFORM_SUBTYPE_SGLTE) {
+		msm_device_uart_dm8.dev.platform_data = &msm_uart_dm8_pdata;
+		platform_device_register(&msm_device_uart_dm8);
+	}
+#endif
 	if (cpu_is_msm8960ab())
 		platform_device_register(&msm8960ab_device_acpuclk);
 	else
@@ -5032,7 +5125,12 @@ static void __init msm8960_cdp_init(void)
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4
 	sony_viskan_cyttsp4_init();
 #endif
-
+#ifdef CONFIG_MACH_VISKAN_HUASHAN_CT
+	if (socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE) {
+		mdm_sglte_device.dev.platform_data = &sglte_platform_data;
+		platform_device_register(&mdm_sglte_device);
+	}
+#endif
 	if (machine_is_msm8960_mtp() || machine_is_msm8960_fluid() ||
 		machine_is_msm8960_cdp()) {
 		platform_device_register(&msm_dev_avtimer_device);

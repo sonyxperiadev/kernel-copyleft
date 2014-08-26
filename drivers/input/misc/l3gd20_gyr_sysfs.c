@@ -36,6 +36,7 @@
 *
 *******************************************************************************/
 /*#define DEBUG*/
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
 #include <linux/l3gd20_gyr.h>
@@ -291,10 +292,12 @@ static void l3gd20_device_power_off(struct l3gd20_data *dev_data)
 	dev_data->enabled = 0;
 }
 
+#define RETRY_COUNTER_MAX 10
 static int l3gd20_device_power_on(struct l3gd20_data *dev_data)
 {
 	int err = 0;
 	u8 buf[6];
+	int retry_counter = 0;
 
 	if (dev_data->enabled)
 		return err;
@@ -309,6 +312,7 @@ static int l3gd20_device_power_on(struct l3gd20_data *dev_data)
 		}
 	}
 
+retry:
 	buf[0] = AUTO_INCREMENT | CTRL_REG1;
 	buf[1] = dev_data->resume_state[0];
 	buf[2] = dev_data->resume_state[1];
@@ -318,6 +322,12 @@ static int l3gd20_device_power_on(struct l3gd20_data *dev_data)
 
 	err = l3gd20_i2c_write(dev_data, buf, sizeof(buf));
 	if (err < 0) {
+		retry_counter++;
+		if (retry_counter < RETRY_COUNTER_MAX) {
+			dev_err(&dev_data->client->dev, "not power, retry!\n");
+			usleep_range(5000, 6000);
+			goto retry;
+		}
 		dev_err(&dev_data->client->dev, "power on failed\n");
 		l3gd20_device_power_off(dev_data);
 		return err;

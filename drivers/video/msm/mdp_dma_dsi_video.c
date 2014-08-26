@@ -219,7 +219,7 @@ int mdp_dsi_video_on(struct platform_device *pdev)
 		mdp_pipe_ctrl(MDP_CMD_BLOCK,
 			MDP_BLOCK_POWER_OFF, FALSE);
 		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
-		mipi_dsi_controller_cfg(0);
+		mipi_dsi_controller_cfg_toggle(0);
 	}
 
 	MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE + 0x4, hsync_ctrl);

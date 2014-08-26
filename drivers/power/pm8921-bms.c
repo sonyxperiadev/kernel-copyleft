@@ -210,6 +210,7 @@ struct pm8921_bms_chip {
 	int			last_soc_at_suspend;
 	int			total_ratio_for_readjust_fcc;
 	struct bms_monitor	bmsm;
+	bool			ignore_last_soc;
 };
 
 #define to_chip_from_dev(x) platform_get_drvdata(to_platform_device(x))
@@ -1913,6 +1914,7 @@ static int adjust_soc(struct pm8921_bms_chip *chip, int soc,
 	int rc = 0;
 	int delta_ocv_uv_limit = 0;
 	int correction_limit_uv = 0;
+	bool below_cutoff = false;
 
 	rc = pm8921_bms_get_simultaneous_battery_voltage_and_current(
 							&ibat_ua,
@@ -1927,6 +1929,7 @@ static int adjust_soc(struct pm8921_bms_chip *chip, int soc,
 	if (chip->low_voltage_detect &&
 		wake_lock_active(&chip->low_voltage_wake_lock)) {
 		if (is_voltage_below_cutoff_window(chip, ibat_ua, vbat_uv)) {
+			below_cutoff = true;
 			soc = 0;
 			pr_info("Voltage below cutoff, setting soc to 0\n");
 			goto out;
@@ -2056,6 +2059,9 @@ skip_limiting_corrections:
 	soc = soc_new;
 
 out:
+	if (chip->low_voltage_detect && !soc && !below_cutoff)
+		soc = 1;
+
 	pr_debug("ibat_ua = %d, vbat_uv = %d, ocv_est_uv = %d, pc_est = %d, "
 		"soc_est = %d, n = %d, delta_ocv_uv = %d, last_ocv_uv = %d, "
 		"pc_new = %d, soc_new = %d, rbatt = %d, m = %d\n",
@@ -2161,6 +2167,15 @@ static int scale_soc_while_chg(struct pm8921_bms_chip *chip,
 	 * value from prev_soc to the new soc based on a charge time
 	 * weighted average
 	 */
+
+	/*
+	 * ignore the first last_soc after EOC to
+	 * avoid SOC oscillation between 99% and 100%
+	 */
+	if (chip->ignore_last_soc) {
+		chip->ignore_last_soc = false;
+		return new_soc;
+	}
 
 	/* if we are not charging return last soc */
 	if (the_chip->start_percent == -EINVAL)
@@ -3017,10 +3032,10 @@ void pm8921_bms_charging_end(int is_battery_full)
 				the_chip->ocv_reading_at_100);
 
 		/*
-		 * Allow SOC to increase without any limitation on
-		 * previous value
+		 * ignore the first last_soc after EOC to
+		 * avoid SOC oscillation between 99% and 100%
 		 */
-		last_soc = -EINVAL;
+		the_chip->ignore_last_soc = true;
 	}
 
 	the_chip->end_percent = calculate_state_of_charge(the_chip, &raw,

@@ -443,7 +443,7 @@ static int pm8921_therm_mitigation[] = {
 };
 
 #define MAX_VOLTAGE_MV		4200
-#define V_CUTOFF_MV		3200
+#define V_CUTOFF_MV		3300
 #define CHG_TERM_MA		115
 static struct pm8921_charger_platform_data pm8921_chg_pdata __devinitdata = {
 	.update_time		= 30000,
