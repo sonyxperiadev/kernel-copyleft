@@ -120,7 +120,8 @@ static struct tfa98xx_param_data *preset_data_table[SPEAKER_TYPE_MAX][2] = {
 	{&preset_data[TYPE_VOICECALLSPEAKER_TOP],
 	 &preset_data[TYPE_VOICECALLSPEAKER_BOTTOM]},
 	/* SPEAKER_TYPE_VOICECALL */
-	{NULL, NULL},
+	{&preset_data[TYPE_VOICECALLEARPICE_TOP],
+	 NULL},
 	/* SPEAKER_TYPE_FM */
 	{&preset_data[TYPE_FMSPEAKER_TOP],
 	 &preset_data[TYPE_FMSPEAKER_BOTTOM]},
@@ -140,7 +141,7 @@ static struct tfa98xx_param_data *eql_data_table[SPEAKER_TYPE_MAX][2] = {
 	{&eql_data[TYPE_VOICECALLSPEAKER_TOP],
 	 &eql_data[TYPE_VOICECALLSPEAKER_BOTTOM]},
 	/* SPEAKER_TYPE_VOICECALL */
-	{NULL,
+	{&eql_data[TYPE_VOICECALLEARPICE_TOP],
 	 NULL},
 	/* SPEAKER_TYPE_FM */
 	{&eql_data[TYPE_FMSPEAKER_TOP],
@@ -1187,8 +1188,17 @@ static int tfa98xx_enable(void)
 	}
 	speaker_ptr[TOP] = &speaker_data[AMP_TOP];
 	speaker_ptr[BOTTOM] = &speaker_data[AMP_BOTTOM];
-	config_ptr[TOP] = &config_data[AMP_TOP];
-	config_ptr[BOTTOM] = &config_data[AMP_BOTTOM];
+
+	if (speaker_type == SPEAKER_TYPE_VOICECALL) {
+		config_ptr[TOP] = &config_data[AMP_RECEIVER];
+		config_ptr[BOTTOM] = NULL;
+		pr_info("config_ptr = AMP_RECEIVER");
+	} else {
+		config_ptr[TOP] = &config_data[AMP_TOP];
+		config_ptr[BOTTOM] = &config_data[AMP_BOTTOM];
+		pr_info("config_ptr = AMP_Normal");
+	}
+
 	if (speaker_type >= 0 && speaker_type < SPEAKER_TYPE_MAX) {
 		preset_ptr[TOP] = preset_data_table[speaker_type][TOP];
 		preset_ptr[BOTTOM] = preset_data_table[speaker_type][BOTTOM];

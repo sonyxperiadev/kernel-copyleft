@@ -1185,6 +1185,15 @@ config MACH_SONY_CASTOR_WINDY
 	  If you enable this config,
 	  Please use SONY Mobile source tree.
 
+config MACH_SONY_CANOPUS
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Canopus"
+	help
+	  Support for the SONY Mobile Canopus device.
+	  It is based on QCOM MSM8974 AB chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
 endmenu
 
 config MSM_STACKED_MEMORY

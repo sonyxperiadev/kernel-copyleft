@@ -3639,9 +3639,6 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 		notify_block, struct mmc_host, pm_notify);
 	unsigned long flags;
 	int err = 0;
-#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
-	int status = 0;
-#endif
 
 	switch (mode) {
 	case PM_HIBERNATION_PREPARE:
@@ -3701,12 +3698,8 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 		host->rescan_disable = 0;
 		spin_unlock_irqrestore(&host->lock, flags);
 #ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
-		status = mmc_cd_slot_status_changed(host);
-		if (!host->card && !status)
+		if (!mmc_cd_slot_status_changed(host))
 			break;
-
-		if (mmc_bus_manual_resume(host) && !status)
-				break;
 #endif
 		mmc_detect_change(host, 0);
 		break;

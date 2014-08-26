@@ -364,6 +364,12 @@ struct ad7146_driver_data {
 	unsigned char index;
 };
 
+struct cap_sensor_dev {
+	const char *name;
+	struct device *dev;
+	void *data;
+};
+
 struct ad7146_chip {
 	unsigned short high_status;
 	unsigned short low_status;
@@ -381,6 +387,7 @@ struct ad7146_chip {
 	struct device *dev;
 	struct delayed_work work;
 	struct work_struct calib_work;
+	struct work_struct resume_work;
 	ad7146_read_t read;
 	ad7146_write_t write;
 	unsigned product;
@@ -392,6 +399,7 @@ struct ad7146_chip {
 	struct switch_dev sw_state;
 	struct switch_dev sw_stg0;
 	struct switch_dev sw_stg1;
+	struct cap_sensor_dev cap_dev;
 	unsigned short sw_updata;
 	const char *vdd_supply_name;
 	struct regulator *vreg_prox_vdd;
@@ -405,6 +413,8 @@ struct ad7146_chip {
 	unsigned short keep_detect_flag;
 	unsigned short sv_threshold[PAD_NUM_MAX];
 };
+
+struct class *cap_sensor_class;
 
 
 static void ad7146_set_switch_status(struct ad7146_chip *ad7146,
@@ -578,8 +588,10 @@ static ssize_t store_obj_detect(struct device *dev,
 			__func__, val);
 		return count;
 	}
-	if (!ad7146->pad_enable_state)
+	if (!ad7146->pad_enable_state) {
+		dev_err(ad7146->dev, "%s not enable pad !", __func__);
 		return count;
+	}
 
 	ad7146_set_switch_status(ad7146, val);
 	return count;
@@ -976,14 +988,19 @@ static ssize_t store_dac_mid_value(struct device *dev,
 	int err;
 	unsigned short val;
 	err = kstrtou16(buf, 0, &val);
-	if (err)
+	if (err) {
+		dev_err(ad7146->dev, "%s: INVALID CMD", __func__);
 		return err;
+	}
 	mutex_lock(&ad7146->mutex);
 
 	dev_dbg(ad7146->dev, "%s: val = 0x%04x\n", __func__, val);
 	if (val >= MIN_DAC_MID_VAL && val <= MAX_DAC_MID_VAL) {
 		ad7146->open_air_low = val - DAC_DIFF_VAL;
 		ad7146->open_air_high = val + DAC_DIFF_VAL;
+	} else {
+		dev_err(ad7146->dev, "%s: Invalid val = 0x%04x\n",
+			__func__, val);
 	}
 
 	mutex_unlock(&ad7146->mutex);
@@ -1018,10 +1035,15 @@ static ssize_t do_force_calibrate(struct device *dev,
 	unsigned short temp_th[PAD_NUM_MAX];
 
 	err = kstrtou16(buf, 0, &val);
-	if (err)
+	if (err) {
+		dev_err(ad7146->dev,
+			"%s: INVALID CMD (%d)", __func__, err);
 		goto force_calib_end;
+	}
 	if (ENABLE_AD7146 != val) {
 		err = -EINVAL;
+		dev_err(ad7146->dev,
+			"%s: INVALID VAL(%u)", __func__, val);
 		goto force_calib_end;
 	}
 	if (!(ad7146->pad_enable_state & STG0_EN_FLG) ||
@@ -1029,6 +1051,8 @@ static ssize_t do_force_calibrate(struct device *dev,
 		ad7146->fc_flag = DISABLE_AD7146;
 		ad7146->keep_detect_flag = DISABLE_AD7146;
 		err = -EINVAL;
+		dev_err(ad7146->dev,
+			"%s: INVALID CMD", __func__);
 		goto force_calib_end;
 	}
 
@@ -1058,7 +1082,7 @@ static ssize_t do_force_calibrate(struct device *dev,
 	}
 	ad7146_set_switch_status(ad7146, AD7146_SENS_NOT_DET);
 	ad7146->sw_updata = AD7146_SENS_NOT_DET;
-	sysfs_notify(&ad7146->dev->kobj, NULL, "ad7146_sw_updata");
+	sysfs_notify(&ad7146->cap_dev.dev->kobj, NULL, "sw_updata");
 	ad7146->read(ad7146->dev, AMB_COMP_CTRL0_REG, &temp);
 	temp = temp | AD7146_FORCED_CAL_MASK;
 	ad7146->write(ad7146->dev, AMB_COMP_CTRL0_REG, temp);
@@ -1105,10 +1129,21 @@ static ssize_t store_pad_num(struct device *dev,
 	int err;
 	unsigned short val;
 	err = kstrtou16(buf, 0, &val);
-	if (err)
+	if (err) {
+		dev_err(ad7146->dev,
+			"%s: INVALID CMD (%d)", __func__, err);
 		return err;
-	if (PAD_NUMBER_MIN > val || PAD_NUMBER_MAX < val)
+	}
+	if (PAD_NUMBER_MIN > val || PAD_NUMBER_MAX < val) {
+		dev_err(ad7146->dev,
+			"%s: INVALID VAL (%u)", __func__, val);
 		return -EINVAL;
+	}
+	if (PAD_NUM_MAX < val) {
+		dev_err(ad7146->dev,
+			"%s: Not support pad (%u)", __func__, val);
+		return -EINVAL;
+	}
 
 	ad7146->current_pad_no = val - PAD_NUMBER_MIN;
 	return count;
@@ -1122,8 +1157,10 @@ static ssize_t show_pad_data(struct device *dev,
 	unsigned short rd_data;
 	char temp_buf[TEMP_BUFER_MAX_LEN];
 
-	if (!ad7146->pad_enable_state)
+	if (!ad7146->pad_enable_state) {
+		dev_err(ad7146->dev, "%s not enable pad !", __func__);
 		return -EINVAL;
+	}
 
 	ad7146->read(ad7146->dev,
 		(CDC_RESULT_S0_REG + ad7146->current_pad_no), &rd_data);
@@ -1141,8 +1178,11 @@ static ssize_t store_pad_offset(struct device *dev,
 	unsigned short val;
 
 	err = kstrtou16(buf, 0, &val);
-	if (err)
+	if (err) {
+		dev_err(ad7146->dev,
+			"%s: INVALID CMD (%d)", __func__, err);
 		return err;
+	}
 
 	dev_dbg(ad7146->dev, "%s: val = 0x%04x\n", __func__, val);
 	ad7146->product_data[ad7146->current_pad_no].stgx_afe_offset = val;
@@ -1172,8 +1212,11 @@ static ssize_t show_sw_updata(struct device *dev,
 	int ret;
 	char temp_buf[TEMP_BUFER_MAX_LEN];
 
-	if (!ad7146->pad_enable_state)
+	if (!ad7146->pad_enable_state) {
+		dev_err(ad7146->dev,
+			"%s: INVALID CMD", __func__);
 		return -EINVAL;
+	}
 
 	if (!ad7146->sw_updata) {
 		dev_dbg(ad7146->dev, "%s: sw_updata not detect.\n",
@@ -1316,8 +1359,17 @@ static ssize_t store_pad_set(struct device *dev,
 	struct ad7146_driver_data *sw = NULL;
 
 	err = kstrtou16(buf, 0, &val);
-	if (err)
+	if (err) {
+		dev_err(ad7146->dev, "%s: pat set error [%d]\n",
+			__func__, err);
 		return err;
+	}
+
+	if (val > (STG0_EN_FLG | STG1_EN_FLG)) {
+		dev_err(ad7146->dev, "%s: pat set error [%d]\n",
+			__func__, -EINVAL);
+		return -EINVAL;
+	}
 
 	if (val != ad7146->pad_enable_state) {
 		cancel_delayed_work(&ad7146->work);
@@ -1356,37 +1408,50 @@ static ssize_t store_pad_set(struct device *dev,
 			ad7146_set_switch_status(ad7146,
 				AD7146_SENS_NOT_DET);
 			ad7146->sw_updata = AD7146_SENS_NOT_DET;
-			sysfs_notify(&ad7146->dev->kobj, NULL,
-				"ad7146_sw_updata");
+			sysfs_notify(&ad7146->cap_dev.dev->kobj, NULL,
+				"sw_updata");
 		}
 	}
 	return count;
 }
 
+static ssize_t show_cap_dev_name(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	int ret;
+	char temp_buf[TEMP_BUFER_MAX_LEN];
+	ret = snprintf(temp_buf, TEMP_BUFER_MAX_LEN,
+		"%s\n", DRIVER_NAME);
+	memcpy(buf, temp_buf, ret);
+	return ret;
+}
+
 /* sysfs table */
 static struct device_attribute ad7146_sysfs_entries[] = {
-	__ATTR(ad7146_dac_calibrate,
+	__ATTR(dac_calibrate,
 		(S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP),
 		show_dac_status, do_dac_calibrate),
-	__ATTR(ad7146_obj_detect,
+	__ATTR(obj_detect,
 		(S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP),
 		show_obj_detect, store_obj_detect),
-	__ATTR(ad7146_dac_mid_val,
+	__ATTR(dac_mid_val,
 		(S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP),
 		show_dac_mid_value, store_dac_mid_value),
-	__ATTR(ad7146_force_calib,
+	__ATTR(force_calib,
 		(S_IWUSR | S_IWGRP), NULL, do_force_calibrate),
-	__ATTR(ad7146_pad_set,
+	__ATTR(pad_set,
 		(S_IWUSR | S_IWGRP), NULL, store_pad_set),
-	__ATTR(ad7146_pad_num,
+	__ATTR(pad_num,
 		(S_IWUSR | S_IWGRP), NULL, store_pad_num),
-	__ATTR(ad7146_pad_data,
+	__ATTR(pad_data,
 		(S_IRUSR | S_IRGRP), show_pad_data, NULL),
-	__ATTR(ad7146_pad_offset,
+	__ATTR(pad_offset,
 		(S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP),
 		show_pad_offset, store_pad_offset),
-	__ATTR(ad7146_sw_updata,
+	__ATTR(sw_updata,
 		(S_IRUSR | S_IRGRP), show_sw_updata, NULL),
+	__ATTR(name,
+		(S_IRUSR | S_IRGRP), show_cap_dev_name, NULL),
 };
 
 static int ad7146_sysfs_create(struct device *dev)
@@ -1415,6 +1480,45 @@ static void ad7146_sysfs_remove(struct device *dev)
 		cnt++)
 		device_remove_file(dev, ad7146_sysfs_entries + cnt);
 	return;
+}
+
+static int create_cap_sensor_class(void)
+{
+	cap_sensor_class = class_create(THIS_MODULE, "cap_sensor");
+	if (IS_ERR(cap_sensor_class))
+		return PTR_ERR(cap_sensor_class);
+	return 0;
+}
+
+static int cap_sensor_dev_register(struct cap_sensor_dev *cdev)
+{
+	int ret;
+
+	cdev->dev = device_create(cap_sensor_class, NULL,
+		MKDEV(0, 1), NULL, "%s", DRIVER_NAME);
+	if (IS_ERR(cdev->dev))
+		return PTR_ERR(cdev->dev);
+
+	ret = ad7146_sysfs_create(cdev->dev);
+	if (ret < 0)
+		goto err_create_dev;
+
+	dev_set_drvdata(cdev->dev, cdev->data);
+	return 0;
+
+err_create_dev:
+	device_destroy(cap_sensor_class, MKDEV(0, 1));
+	printk(KERN_ERR "cap_sensor: Failed to register driver %s\n",
+		cdev->name);
+
+	return ret;
+}
+
+static void cap_sensor_dev_unregister(struct cap_sensor_dev *cdev)
+{
+	ad7146_sysfs_remove(cdev->dev);
+	dev_set_drvdata(cdev->dev, NULL);
+	device_destroy(cap_sensor_class, MKDEV(0, 1));
 }
 
 static void ad7146_hys_comp_neg(struct ad7146_chip *ad7146,
@@ -1645,8 +1749,8 @@ static void switch_set_work(struct work_struct *work)
 	if (prev_sw_data != sw_data) {
 		ad7146->sw_updata = sw_data;
 		if (!prev_sw_data && sw_data)
-			sysfs_notify(&ad7146->dev->kobj, NULL,
-				"ad7146_sw_updata");
+			sysfs_notify(&ad7146->cap_dev.dev->kobj, NULL,
+				"sw_updata");
 	}
 
 	if (ENABLE_AD7146 == force_calib) {
@@ -1734,6 +1838,41 @@ static irqreturn_t ad7146_isr(int irq, void *handle)
 		((pwr_data & PWR_MODE_SHUTDOWN) != PWR_MODE_SHUTDOWN))
 		schedule_delayed_work(&ad7146->work, msecs_to_jiffies(tm_val));
 	return IRQ_HANDLED;
+}
+
+static void resume_set_work(struct work_struct *work)
+{
+	struct ad7146_chip *ad7146 = container_of(work,
+						struct ad7146_chip,
+						resume_work);
+	struct ad7146_driver_data *sw = NULL;
+	int cnt;
+
+	dev_dbg(ad7146->dev, "%s call: pad_enable_state = %x\n",
+		__func__, ad7146->pad_enable_state);
+	for (cnt = 0; cnt < PAD_NUM_MAX; cnt++) {
+		sw = &ad7146->sw[cnt];
+		sw->state = IDLE;
+		if (STG_ZERO == sw->index)
+			switch_set_state(&ad7146->sw_stg0, AD7146_SENS_NOT_DET);
+		else if (STG_ONE == sw->index)
+			switch_set_state(&ad7146->sw_stg1, AD7146_SENS_NOT_DET);
+		else
+			dev_err(ad7146->dev,
+				"Failed to set state of the switch device %u.\n",
+				sw->index);
+	}
+	ad7146_set_switch_status(ad7146, AD7146_SENS_NOT_DET);
+	ad7146->sw_updata = AD7146_SENS_NOT_DET;
+	ad7146->i2c_err_flag = AD7146_I2C_RW_NO_ERR;
+	ad7146->fc_flag = DISABLE_AD7146;
+	ad7146->keep_detect_flag = DISABLE_AD7146;
+
+	enable_irq(ad7146->irq);
+	if (ad7146->pad_enable_state) {
+		ad7146_setup_defaults(ad7146);
+		ad7146_pad_setting(ad7146, ad7146->pad_enable_state);
+	}
 }
 
 static int ad7146_hw_detect(struct ad7146_chip *ad7146)
@@ -1950,19 +2089,21 @@ static int vreg_turn_off(struct ad7146_chip *ad7146)
 static int ad7146_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
-	struct device *dev = &client->dev;
+	struct device *dev;
 	struct ad7146_chip *ad7146 = NULL;
-	int irq = client->irq;
+	int irq;
 	int error;
 	int cnt;
 	struct ad7146_driver_data *driver_data;
 
 	if (NULL == client) {
-		dev_dbg(dev, "I2C Client doesn't exist\n");
+		printk(KERN_ERR "I2C Client doesn't exist\n");
 		error = -EINVAL;
 		goto err_out;
 	}
 
+	dev = &client->dev;
+	irq = client->irq;
 	dev_info(dev, "%s called IRQ = %d\n", __func__, irq);
 
 	ad7146 = kzalloc(sizeof(*ad7146), GFP_KERNEL);
@@ -2037,22 +2178,29 @@ static int ad7146_probe(struct i2c_client *client,
 	/* initialize and request sw/hw resources */
 	INIT_WORK(&ad7146->calib_work, dac_calibration_work);
 	INIT_DELAYED_WORK(&ad7146->work, switch_set_work);
+	INIT_WORK(&ad7146->resume_work, resume_set_work);
 
-	error = ad7146_sysfs_create(ad7146->dev);
-	if (error)
+	error = create_cap_sensor_class();
+	if (error < 0)
 		goto err_switch_reg;
+
+	ad7146->cap_dev.name = DRIVER_NAME;
+	ad7146->cap_dev.data = ad7146;
+	error = cap_sensor_dev_register(&ad7146->cap_dev);
+	if (error < 0)
+		goto err_cap_class;
 
 	if (irq <= 0) {
 		dev_err(dev, "IRQ not configured!\n");
 		error = -EINVAL;
-		goto err_free_sysfs;
+		goto err_cap_reg;
 	}
 	error = request_threaded_irq(ad7146->irq, NULL, ad7146_isr,
 			IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 			dev_name(dev), ad7146);
 	if (error) {
 		dev_err(dev, "irq %d busy?\nDriver init Failed", ad7146->irq);
-		goto err_free_sysfs;
+		goto err_cap_reg;
 	}
 
 	ad7146_setup_defaults(ad7146);
@@ -2075,8 +2223,10 @@ static int ad7146_probe(struct i2c_client *client,
 	ad7146->sw_updata = AD7146_SENS_NOT_DET;
 	return 0;
 
-err_free_sysfs:
-	ad7146_sysfs_remove(ad7146->dev);
+err_cap_reg:
+	cap_sensor_dev_unregister(&ad7146->cap_dev);
+err_cap_class:
+	class_destroy(cap_sensor_class);
 err_switch_reg:
 	switch_dev_unregister(&ad7146->sw_stg1);
 err_switch_reg_2:
@@ -2097,7 +2247,9 @@ void ad7146_remove(struct ad7146_chip *ad7146)
 	free_irq(ad7146->irq, ad7146);
 	cancel_delayed_work(&ad7146->work);
 	cancel_work_sync(&ad7146->calib_work);
-	ad7146_sysfs_remove(ad7146->dev);
+	cancel_work_sync(&ad7146->resume_work);
+	cap_sensor_dev_unregister(&ad7146->cap_dev);
+	class_destroy(cap_sensor_class);
 	switch_dev_unregister(&ad7146->sw_stg1);
 	switch_dev_unregister(&ad7146->sw_stg0);
 	switch_dev_unregister(&ad7146->sw_state);
@@ -2113,6 +2265,7 @@ int ad7146_i2c_suspend(struct device *dev)
 	struct ad7146_chip *ad7146 = i2c_get_clientdata(to_i2c_client(dev));
 	unsigned short pwr_data;
 
+	cancel_work_sync(&ad7146->resume_work);
 	if (ad7146->pad_enable_state) {
 		pwr_data = shadow_reg[PWR_CONTROL].data | PWR_MODE_SHUTDOWN;
 		ad7146->write(ad7146->dev,
@@ -2128,34 +2281,9 @@ int ad7146_i2c_suspend(struct device *dev)
 int ad7146_i2c_resume(struct device *dev)
 {
 	struct ad7146_chip *ad7146 = i2c_get_clientdata(to_i2c_client(dev));
-	int cnt;
-	struct ad7146_driver_data *sw = NULL;
 
-	dev_dbg(ad7146->dev, "%s call: pad_enable_state = %x\n",
-		__func__, ad7146->pad_enable_state);
-	for (cnt = 0; cnt < PAD_NUM_MAX; cnt++) {
-		sw = &ad7146->sw[cnt];
-		sw->state = IDLE;
-		if (STG_ZERO == sw->index)
-			switch_set_state(&ad7146->sw_stg0, AD7146_SENS_NOT_DET);
-		else if (STG_ONE == sw->index)
-			switch_set_state(&ad7146->sw_stg1, AD7146_SENS_NOT_DET);
-		else
-			dev_err(ad7146->dev,
-				"Failed to set state of the switch device %u.\n",
-				sw->index);
-	}
-	ad7146_set_switch_status(ad7146, AD7146_SENS_NOT_DET);
-	ad7146->sw_updata = AD7146_SENS_NOT_DET;
-	ad7146->i2c_err_flag = AD7146_I2C_RW_NO_ERR;
-	ad7146->fc_flag = DISABLE_AD7146;
-	ad7146->keep_detect_flag = DISABLE_AD7146;
-
-	enable_irq(ad7146->irq);
-	if (ad7146->pad_enable_state) {
-		ad7146_setup_defaults(ad7146);
-		ad7146_pad_setting(ad7146, ad7146->pad_enable_state);
-	}
+	dev_dbg(ad7146->dev, "%s: schedule resume work thread.\n", __func__);
+	schedule_work(&ad7146->resume_work);
 	return 0;
 }
 

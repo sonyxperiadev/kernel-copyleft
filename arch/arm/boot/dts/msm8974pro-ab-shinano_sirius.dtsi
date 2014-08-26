@@ -1118,7 +1118,7 @@
 			compatible = "qcom,qpnp-vibrator";
 			reg = <0xc000 0x100>;
 			label = "vibrator";
-			qcom,qpnp-vib-vtg-level-mV = <3100>;
+			qcom,qpnp-vib-vtg-level-mV = <2900>;
 		};
 
 		qcom,vibrator@c100 {
@@ -1162,6 +1162,10 @@
 };
 
 &sdcc3 {
+	interrupts = <0 1>;
+	interrupt-map = <0 &intc 0 127 0
+			1 &intc 0 223 0>;
+	interrupt-names = "core_irq", "bam_irq";
 	qcom,sup-voltages = <1800 2950>;
 	status = "ok";
 };

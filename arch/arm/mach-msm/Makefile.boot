@@ -52,6 +52,7 @@ endif
    dtb-$(CONFIG_MACH_SONY_CASTOR)	+= msm8974pro-ab-shinano_castor.dtb
    dtb-$(CONFIG_MACH_SONY_CASTOR_BRAZIL)+= msm8974pro-ab-shinano_castor_brazil.dtb
    dtb-$(CONFIG_MACH_SONY_CASTOR_WINDY)	+= apq8074pro-ab-shinano_castor_windy.dtb
+   dtb-$(CONFIG_MACH_SONY_CANOPUS)	+= msm8974pro-ab-shinano_canopus.dtb
 
 # APQ8084
    zreladdr-$(CONFIG_ARCH_APQ8084)	:= 0x00008000
