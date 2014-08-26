@@ -1,4 +1,5 @@
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #include "msm_sensor.h"
 #define IMX135_SENSOR_NAME "imx135"
@@ -17,6 +20,68 @@ DEFINE_MSM_MUTEX(imx135_mut);
 static struct msm_sensor_ctrl_t imx135_s_ctrl;
 
 static struct msm_sensor_power_setting imx135_power_setting[] = {
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_STANDBY,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_VIO,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VDIG,
+		.config_val = 0,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VANA,
+		.config_val = 0,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VIO,
+		.config_val = 0,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VAF,
+		.config_val = 0,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_CLK,
+		.seq_val = SENSOR_CAM_MCLK,
+		.config_val = 24000000,
+		.delay = 5,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 5,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_I2C_MUX,
+		.seq_val = 0,
+		.config_val = 0,
+		.delay = 0,
+	},
+#else
 	{
 		.seq_type = SENSOR_VREG,
 		.seq_val = CAM_VDIG,
@@ -77,11 +142,12 @@ static struct msm_sensor_power_setting imx135_power_setting[] = {
 		.config_val = 0,
 		.delay = 0,
 	},
+#endif
 };
 
 static struct v4l2_subdev_info imx135_subdev_info[] = {
 	{
-		.code = V4L2_MBUS_FMT_SBGGR10_1X10,
+		.code = V4L2_MBUS_FMT_SRGGB10_1X10,
 		.colorspace = V4L2_COLORSPACE_JPEG,
 		.fmt = 1,
 		.order = 0,

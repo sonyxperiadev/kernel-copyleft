@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -12,6 +13,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 /* Acknowledgements:
@@ -1987,7 +1991,7 @@ static void __exit msm_serial_hsl_exit(void)
 	uart_unregister_driver(&msm_hsl_uart_driver);
 }
 
-module_init(msm_serial_hsl_init);
+subsys_initcall(msm_serial_hsl_init);
 module_exit(msm_serial_hsl_exit);
 
 MODULE_DESCRIPTION("Driver for msm HSUART serial device");

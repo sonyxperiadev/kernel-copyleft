@@ -1,4 +1,5 @@
 /* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -310,17 +311,23 @@ struct mdss_panel_info {
 
 	uint32_t panel_dead;
 
+	/* physical size in mm */
+	__u32 width;
+	__u32 height;
+
 	struct lcd_panel_info lcdc;
 	struct fbc_panel_info fbc;
 	struct mipi_panel_info mipi;
 	struct lvds_panel_info lvds;
 	struct edp_panel_info edp;
+	const char *panel_id_name;
 };
 
 struct mdss_panel_data {
 	struct mdss_panel_info panel_info;
 	void (*set_backlight) (struct mdss_panel_data *pdata, u32 bl_level);
 	unsigned char *mmss_cc_base;
+	struct platform_device *panel_pdev;
 
 	/**
 	 * event_handler() - callback handler for MDP core events
@@ -335,6 +342,8 @@ struct mdss_panel_data {
 	 * and teardown.
 	 */
 	int (*event_handler) (struct mdss_panel_data *pdata, int e, void *arg);
+	int (*detect) (struct mdss_panel_data *pdata);
+	int (*update_panel) (struct mdss_panel_data *pdata);
 
 	struct mdss_panel_data *next;
 };
@@ -411,6 +420,16 @@ static inline int mdss_panel_get_htotal(struct mdss_panel_info *pinfo)
 int mdss_register_panel(struct platform_device *pdev,
 	struct mdss_panel_data *pdata);
 
+struct msm_fb_data_type;
+#ifdef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
+void mipi_dsi_panel_create_debugfs(struct msm_fb_data_type *mfd);
+void mipi_dsi_panel_remove_debugfs(struct msm_fb_data_type *mfd);
+#else
+#define mipi_dsi_panel_create_debugfs(mfd) do { }while(0);
+
+#define mipi_dsi_panel_remove_debugfs(mfd)  do { }while(0);
+
+#endif
 /**
  * mdss_panel_intf_type: - checks if a given intf type is primary
  * @intf_val: panel interface type of the individual controller

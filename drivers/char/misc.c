@@ -31,6 +31,11 @@
  *	Cyrus Durgin <cider@speakeasy.org>
  *
  * Added devfs support. Richard Gooch <rgooch@atnf.csiro.au>  10-Jan-1998
+ *
+ * Copyright (C) 2014 Sony Mobile Communications AB.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/module.h>
@@ -59,7 +64,7 @@ static DEFINE_MUTEX(misc_mtx);
 /*
  * Assigned numbers, used for dynamic minors
  */
-#define DYNAMIC_MINORS 96 /* like dynamic majors */
+#define DYNAMIC_MINORS 128 /* like dynamic majors */
 static DECLARE_BITMAP(misc_minors, DYNAMIC_MINORS);
 
 #ifdef CONFIG_PROC_FS

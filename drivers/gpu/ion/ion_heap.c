@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2011 Google, Inc.
  * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -13,6 +14,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/err.h>
@@ -141,9 +144,11 @@ int ion_heap_pages_zero(struct page **pages, int num_pages)
 		if (!ptr)
 			return -ENOMEM;
 
-		memset(ptr, 0, npages_to_vmap * PAGE_SIZE);
 		/*
-		 * invalidate the cache to pick up the zeroing
+		 * We have to invalidate the cache here because there
+		 * might be dirty lines to these physical pages (which
+		 * we don't care about) that could get written out at
+		 * any moment.
 		 */
 		for (k = 0; k < npages_to_vmap; k++) {
 			void *p = kmap_atomic(pages[i + k]);
@@ -154,6 +159,7 @@ int ion_heap_pages_zero(struct page **pages, int num_pages)
 			outer_inv_range(phys, phys + PAGE_SIZE);
 			kunmap_atomic(p);
 		}
+		memset(ptr, 0, npages_to_vmap * PAGE_SIZE);
 		vunmap(ptr);
 	}
 

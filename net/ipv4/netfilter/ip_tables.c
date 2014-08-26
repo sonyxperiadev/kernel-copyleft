@@ -3,10 +3,14 @@
  *
  * Copyright (C) 1999 Paul `Rusty' Russell & Michael J. Neuling
  * Copyright (C) 2000-2005 Netfilter Core Team <coreteam@netfilter.org>
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <linux/cache.h>

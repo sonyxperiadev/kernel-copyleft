@@ -262,7 +262,7 @@ obj-$(CONFIG_MACH_MSM8930_MTP) += board-8930-all.o board-8930-regulator-pm8038.o
 obj-$(CONFIG_MACH_MSM8930_FLUID) += board-8930-all.o board-8930-regulator-pm8038.o board-8930-regulator-pm8917.o
 obj-$(CONFIG_PM8921_BMS) += bms-batterydata.o bms-batterydata-desay.o batterydata-lib.o
 obj-$(CONFIG_QPNP_BMS) += bms-batterydata.o bms-batterydata-desay.o batterydata-lib.o
-obj-$(CONFIG_QPNP_BMS) += bms-batterydata-oem.o bms-batterydata-qrd-4v35-2000mah.o bms-batterydata-qrd-4v2-1300mah.o
+obj-$(CONFIG_QPNP_BMS) += bms-batterydata-qrd-4v35-2000mah.o bms-batterydata-qrd-4v2-1300mah.o
 obj-$(CONFIG_MACH_APQ8064_CDP) += board-8064-all.o board-8064-regulator.o
 obj-$(CONFIG_MACH_APQ8064_MTP) += board-8064-all.o board-8064-regulator.o
 obj-$(CONFIG_MACH_APQ8064_LIQUID) += board-8064-all.o board-8064-regulator.o
@@ -288,7 +288,12 @@ obj-$(CONFIG_ARCH_MSM9625) += board-9625.o board-9625-gpiomux.o
 obj-$(CONFIG_ARCH_MSM9625) += clock-local2.o clock-pll.o clock-9625.o clock-rpm.o clock-voter.o acpuclock-9625.o acpuclock-cortex.o
 obj-$(CONFIG_ARCH_MPQ8092) += board-8092.o board-8092-gpiomux.o
 obj-$(CONFIG_ARCH_MPQ8092) += clock-8092.o
+ifdef CONFIG_MACH_SONY_TIANCHI_DSDS
+obj-$(CONFIG_MACH_SONY_TIANCHI_DSDS) += board-8226.o board-sony_tianchi_dsds-gpiomux.o bms-batterydata-mari.o bms-batterydata-marie.o sim_detect_somc.o
+else
 obj-$(CONFIG_ARCH_MSM8226) += board-8226.o board-8226-gpiomux.o
+endif
+obj-$(CONFIG_ARCH_MSM8226) += board-8226-console.o
 obj-$(CONFIG_ARCH_MSM8226) += clock-local2.o clock-pll.o clock-8226.o clock-rpm.o clock-voter.o clock-mdss-8974.o
 obj-$(CONFIG_ARCH_MSM8226) += acpuclock-8226.o acpuclock-cortex.o
 obj-$(CONFIG_ARCH_MSM8610) += board-8610.o board-8610-gpiomux.o
@@ -384,6 +389,7 @@ obj-$(CONFIG_MSM_RTB) += msm_rtb.o
 obj-$(CONFIG_MSM_CACHE_ERP) += cache_erp.o
 obj-$(CONFIG_MSM_EBI_ERP) += ebi_erp.o
 obj-$(CONFIG_MSM_CACHE_DUMP) += msm_cache_dump.o
+obj-$(CONFIG_SONY_SSM) += sony_ssm.o
 
 obj-$(CONFIG_MSM_HSIC_SYSMON) += hsic_sysmon.o
 obj-$(CONFIG_MSM_HSIC_SYSMON_TEST) += hsic_sysmon_test.o
@@ -411,6 +417,7 @@ obj-$(CONFIG_MSM_SMCMOD) += smcmod.o
 obj-$(CONFIG_MSM_CPU_PWRCTL) +=  msm_cpu_pwrctl.o
 
 obj-$(CONFIG_ARCH_MSM8974) += msm_mpmctr.o
+obj-$(CONFIG_ARCH_MSM8226) += msm_mpmctr.o
 obj-$(CONFIG_MSM_CPR_REGULATOR) += cpr-regulator.o
 obj-$(CONFIG_CPU_FREQ_MSM) += cpufreq.o
 obj-$(CONFIG_MSM_DEVFREQ_CPUBW) += devfreq_cpubw.o
@@ -419,3 +426,10 @@ obj-$(CONFIG_WALL_CLK) += wallclk.o
 obj-$(CONFIG_WALL_CLK_SYSFS) += wallclk_sysfs.o
 obj-$(CONFIG_ARCH_RANDOM) += early_random.o
 obj-$(CONFIG_PERFMAP) += perfmap.o
+
+obj-$(CONFIG_RAMDUMP_TAGS) += board-rdtags.o
+CFLAGS_board-rdtags.o  := \
+	-D"INFO_PRODUCT=\"$(if $(TARGET_PRODUCT),$(TARGET_PRODUCT),unknown)\"" \
+	-D"INFO_VARIANT= \
+	\"$(if $(TARGET_BUILD_VARIANT),$(TARGET_BUILD_VARIANT),unknown)\"" \
+	-D"INFO_BUILDID=\"$(if $(SEMC_SYSTEM_VERSION),$(SEMC_SYSTEM_VERSION),private)\""

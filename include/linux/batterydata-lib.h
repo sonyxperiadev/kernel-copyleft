@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #ifndef __BMS_BATTERYDATA_H
@@ -131,7 +135,8 @@ struct bms_battery_data {
 	defined(CONFIG_QPNP_BMS)
 extern struct bms_battery_data  palladium_1500_data;
 extern struct bms_battery_data  desay_5200_data;
-extern struct bms_battery_data  oem_batt_data;
+extern struct bms_battery_data  oem_lgc_batt_data;
+extern struct bms_battery_data  oem_send_batt_data;
 extern struct bms_battery_data QRD_4v35_2000mAh_data;
 extern struct bms_battery_data  qrd_4v2_1300mah_data;
 

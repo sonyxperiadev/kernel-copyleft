@@ -3,6 +3,7 @@
  * Copyright (C) 2008 Google, Inc.
  * Author: Brian Swetland <swetland@google.com>
  * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -13,6 +14,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #ifndef __ASM_ARCH_MSM_HSUSB_H
@@ -380,6 +383,7 @@ struct msm_otg {
 #define B_BUS_REQ	16
 #define MHL	        17
 #define B_FALSE_SDP	18
+#define VBUS_DROP_DET  19
 	unsigned long inputs;
 	struct work_struct sm_work;
 	bool sm_work_pending;
@@ -449,6 +453,8 @@ struct msm_otg {
 	struct hrtimer timer;
 	enum usb_vdd_type vdd_type;
 	struct power_supply usb_psy;
+	struct power_supply *dc_psy;
+	bool vbus_active;
 	unsigned int online;
 	unsigned int host_mode;
 	unsigned int voltage_max;
@@ -621,5 +627,6 @@ static inline int msm_register_usb_ext_notification(
 {
 	return -ENODEV;
 }
+
 #endif
 #endif

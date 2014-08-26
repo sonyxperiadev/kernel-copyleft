@@ -1,4 +1,5 @@
 /* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,6 +26,34 @@ struct wcnss_prealloc {
 
 /* pre-alloced mem for WLAN driver */
 static struct wcnss_prealloc wcnss_allocs[] = {
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 4  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
+	{0, 8  * 1024, NULL},
 	{0, 8  * 1024, NULL},
 	{0, 8  * 1024, NULL},
 	{0, 8  * 1024, NULL},
@@ -36,7 +65,7 @@ static struct wcnss_prealloc wcnss_allocs[] = {
 	{0, 32 * 1024, NULL},
 	{0, 32 * 1024, NULL},
 	{0, 32 * 1024, NULL},
-	{0, 64 * 1024, NULL},
+	{0, 32 * 1024, NULL},
 	{0, 64 * 1024, NULL},
 };
 

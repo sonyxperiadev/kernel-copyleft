@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -118,10 +122,10 @@
 /* RX_HPH_CNP_WG_TIME increases by 0.24ms */
 #define WCD9XXX_WG_TIME_FACTOR_US	240
 
-#define WCD9XXX_V_CS_HS_MAX 500
+#define WCD9XXX_V_CS_HS_MAX 850
 #define WCD9XXX_V_CS_NO_MIC 5
-#define WCD9XXX_MB_MEAS_DELTA_MAX_MV 80
-#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 12
+#define WCD9XXX_MB_MEAS_DELTA_MAX_MV 180
+#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 200
 
 static int impedance_detect_en;
 module_param(impedance_detect_en, int,

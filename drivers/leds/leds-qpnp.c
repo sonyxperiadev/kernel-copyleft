@@ -1,5 +1,6 @@
 
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/kernel.h>
@@ -106,7 +110,12 @@
 #define FLASH_PERIPHERAL_SUBTYPE(base)	(base + 0x05)
 #define FLASH_CURRENT_RAMP(base)	(base + 0x54)
 
+#ifdef CONFIG_SONY_CAM_QCAMERA
+#define FLASH_MAX_LEVEL			0x31
+#else
 #define FLASH_MAX_LEVEL			0x4F
+#endif
+
 #define TORCH_MAX_LEVEL			0x0F
 #define	FLASH_NO_MASK			0x00
 
@@ -1820,12 +1829,10 @@ static ssize_t pause_lo_store(struct device *dev,
 		pwm_cfg->lut_params.lut_pause_lo = previous_pause_lo;
 		pwm_free(pwm_cfg->pwm_dev);
 		qpnp_pwm_init(pwm_cfg, led->spmi_dev, led->cdev.name);
-		qpnp_led_set(&led->cdev, led->cdev.brightness);
 		dev_err(&led->spmi_dev->dev,
 			"Failed to initialize pwm with new pause lo value\n");
 		return ret;
 	}
-	qpnp_led_set(&led->cdev, led->cdev.brightness);
 	return count;
 }
 
@@ -1872,12 +1879,10 @@ static ssize_t pause_hi_store(struct device *dev,
 		pwm_cfg->lut_params.lut_pause_hi = previous_pause_hi;
 		pwm_free(pwm_cfg->pwm_dev);
 		qpnp_pwm_init(pwm_cfg, led->spmi_dev, led->cdev.name);
-		qpnp_led_set(&led->cdev, led->cdev.brightness);
 		dev_err(&led->spmi_dev->dev,
 			"Failed to initialize pwm with new pause hi value\n");
 		return ret;
 	}
-	qpnp_led_set(&led->cdev, led->cdev.brightness);
 	return count;
 }
 
@@ -2029,12 +2034,10 @@ static ssize_t lut_flags_store(struct device *dev,
 		pwm_cfg->lut_params.flags = previous_lut_flags;
 		pwm_free(pwm_cfg->pwm_dev);
 		qpnp_pwm_init(pwm_cfg, led->spmi_dev, led->cdev.name);
-		qpnp_led_set(&led->cdev, led->cdev.brightness);
 		dev_err(&led->spmi_dev->dev,
 			"Failed to initialize pwm with new lut flags value\n");
 		return ret;
 	}
-	qpnp_led_set(&led->cdev, led->cdev.brightness);
 	return count;
 }
 
@@ -2108,7 +2111,6 @@ static ssize_t duty_pcts_store(struct device *dev,
 	if (ret)
 		goto restore;
 
-	qpnp_led_set(&led->cdev, led->cdev.brightness);
 	return count;
 
 restore:
@@ -2120,7 +2122,6 @@ restore:
 	pwm_cfg->lut_params.idx_len = pwm_cfg->duty_cycles->num_duty_pcts;
 	pwm_free(pwm_cfg->pwm_dev);
 	qpnp_pwm_init(pwm_cfg, led->spmi_dev, led->cdev.name);
-	qpnp_led_set(&led->cdev, led->cdev.brightness);
 	return ret;
 }
 

@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 /* SPM controlled regulators: */
@@ -35,6 +39,8 @@
 		reg-names = "rbcpr", "rbcpr_clk", "efuse_addr";
 		interrupts = <0 15 0>;
 		regulator-name = "apc_corner";
+                regulator-min-microvolt = <1>;
+		regulator-max-microvolt = <12>;
 
 		qcom,pvs-fuse-redun-sel = <22 24 3 2 0>;
 		qcom,pvs-fuse = <22 6 5 0>;
@@ -112,6 +118,16 @@
 		qcom,cpr-uplift-max-volt = <1330000>;
 		qcom,cpr-uplift-speed-bin = <1>;
 		qcom,speed-bin-fuse-sel = <22 0 3 0>;
+                qcom,cpr-corner-map = <1 1 2 2 3 3 3 3 3 3 3 3>;
+                qcom,cpr-quot-adjust-table =
+                                        <1 5 450>,
+                                        <1 6 375>,
+                                        <1 7 300>,
+                                        <1 8 225>,
+                                        <1 9 187>,
+                                        <1 10 150>,
+                                        <1 11 75>;
+
 	};
 };
 
@@ -247,9 +263,9 @@
 		status = "okay";
 		pm8226_l5: regulator-l5 {
 			regulator-name = "8226_l5";
-			regulator-min-microvolt = <1200000>;
-			regulator-max-microvolt = <1200000>;
-			qcom,init-voltage = <1200000>;
+			regulator-min-microvolt = <1125000>;
+			regulator-max-microvolt = <1125000>;
+			qcom,init-voltage = <1125000>;
 			status = "okay";
 		};
 	};
@@ -497,8 +513,9 @@
 		pm8226_l28: regulator-l28 {
 			regulator-name = "8226_l28";
 			regulator-min-microvolt = <1800000>;
-			regulator-max-microvolt = <2950000>;
-			qcom,init-voltage = <2950000>;
+			regulator-max-microvolt = <1800000>;
+			qcom,init-voltage = <1800000>;
+			regulator-always-on;
 			status = "okay";
 		};
 	};
