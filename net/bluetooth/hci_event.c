@@ -1,6 +1,7 @@
 /*
    BlueZ - Bluetooth protocol stack for Linux
    Copyright (c) 2000-2001, 2010-2013 The Linux Foundation. All rights reserved.
+   Copyright (C) 2012 Sony Mobile Communications AB.
 
    Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>
 
@@ -2699,8 +2700,13 @@ static inline void hci_link_key_request_evt(struct hci_dev *hdev, struct sk_buff
 		goto not_found;
 	}
 
+	/* ignore unauthenticated link key if mitm is required and we can
+	   upgrade */
 	if (key->key_type == 0x04 && conn && conn->auth_type != 0xff &&
-						(conn->auth_type & 0x01)) {
+		(conn->auth_type & 0x01) &&
+		((conn->io_capability == 0x01) &&
+			(conn->remote_cap == 0x01 ||
+			conn->remote_cap == 0x02))) {
 		BT_DBG("%s ignoring unauthenticated key", hdev->name);
 		goto not_found;
 	}

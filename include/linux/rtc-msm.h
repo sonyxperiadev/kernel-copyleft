@@ -14,6 +14,10 @@
 #ifndef __RTC_MSM_H__
 #define __RTC_MSM_H__
 
+#include <linux/types.h>
+
+struct timespec;
+
 /*
  * This is the only function which updates the xtime structure. This
  * function is supposed to be called only once during kernel initialization.

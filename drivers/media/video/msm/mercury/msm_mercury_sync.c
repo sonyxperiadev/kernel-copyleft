@@ -1,4 +1,5 @@
 /* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,6 +25,9 @@
 #include "msm_mercury_macros.h"
 #include "msm_mercury_hw_reg.h"
 
+#ifndef UINT32_MAX
+#define UINT32_MAX    (4294967295U)
+#endif
 static struct msm_mercury_core_buf out_buf_local;
 static struct msm_mercury_core_buf in_buf_local;
 
@@ -470,7 +474,7 @@ int msm_mercury_ioctl_hw_cmds(struct msm_mercury_device *pmercury_dev,
 	void * __user arg)
 {
 	int is_copy_to_user;
-	int len;
+	uint32_t len;
 	uint32_t m;
 	struct msm_mercury_hw_cmds *hw_cmds_p;
 	struct msm_mercury_hw_cmd *hw_cmd_p;
@@ -479,7 +483,12 @@ int msm_mercury_ioctl_hw_cmds(struct msm_mercury_device *pmercury_dev,
 		MCR_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
 		return -EFAULT;
 	}
-
+	if ((m == 0) || (m > ((UINT32_MAX-sizeof(struct msm_mercury_hw_cmds))/
+		sizeof(struct msm_mercury_hw_cmd)))) {
+		MCR_PR_ERR("%s:%d] out of range of hwcmds\n",
+			__func__, __LINE__);
+		return -EINVAL;
+	}
 	len = sizeof(struct msm_mercury_hw_cmds) +
 		sizeof(struct msm_mercury_hw_cmd) * (m - 1);
 	hw_cmds_p = kmalloc(len, GFP_KERNEL);
