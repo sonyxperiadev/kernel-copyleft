@@ -530,6 +530,7 @@ config ARCH_MSM8226
 	select MSM_RPM_STATS_LOG
 	select ARCH_WANT_KMAP_ATOMIC_FLUSH
 	select ENABLE_VMALLOC_SAVINGS
+	select HAVE_NMI_WATCHDOG if MSM_WATCHDOG_V2
 
 config ARCH_MSMSAMARIUM
 	bool "MSMSAMARIUM"
@@ -1009,6 +1010,26 @@ config MACH_MSM8X60_DRAGON
 	bool "MSM8x60 DRAGON"
 	help
 	  Support for the Qualcomm MSM8x60 Dragon board.
+
+config MACH_SONY_TIANCHI_DSDS
+	depends on ARCH_MSM8226
+	default n
+	bool "Sony Mobile TIANCHI_DSDS"
+	help
+	  Support for the SONY Mobile TIANCHI_DSDS device.
+	  It is based on QCOM MSM8x26 chipset
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
+config MACH_SONY_TIANCHI
+	depends on ARCH_MSM8226
+	default n
+	bool "Sony Mobile TIANCHI"
+	help
+	  Support for the SONY Mobile TIANCHI device.
+	  It is based on QCOM MSM8x26 chipset
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
 
 config MACH_MSM8960_CDP
 	depends on ARCH_MSM8960
@@ -2917,6 +2938,15 @@ config MSM_CACHE_DUMP_ON_PANIC
 	  want to dump the L1 and L2 caches on panic before any flush occurs.
 	  If unsure, say N
 
+config SONY_SSM
+	bool "Support Super Stamina Mode"
+	default n
+	help
+	  This enables support for power mode notifications, required by Super
+	  Stamina Mode. The driver will let a user space application register
+	  for notifications when the device is ready to switch into a new
+	  power mode.
+
 config MSM_HSIC_SYSMON
 	tristate "MSM HSIC system monitor driver"
 	depends on USB
@@ -3054,3 +3084,10 @@ config KRAIT_REGULATOR
 	 regulators running in ganged mode inside the PMIC. Enable
 	 this option to support such configurations.
 endif
+
+config SIM_DETECT_FEATURE
+	bool "work around GPIO 56/60 prevent AP sleep"
+	help
+	 based on modem hotstwap ISR to work around GPIO 56/60
+	 prevent AP suspend issue.use modem side GPIO detect to SIM insert
+	 or remove, and notify AP to handle reboot

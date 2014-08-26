@@ -816,6 +816,7 @@ static int configure_ldo_or_hs_all(struct krait_power_vreg *from, int vmax)
 	int rc = 0;
 
 	list_for_each_entry(kvreg, &pvreg->krait_power_vregs, link) {
+
 		rc = configure_ldo_or_hs_one(kvreg, vmax);
 		if (rc) {
 			pr_err("could not switch %s\n", kvreg->name);
