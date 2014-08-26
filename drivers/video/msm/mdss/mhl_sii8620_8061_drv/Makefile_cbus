@@ -1,0 +1,31 @@
+# write test target file
+SRC_FILES = mhl_cbus_write_burst.c
+SRC_FILES += mhl_lib_edid.c
+
+# test case
+TEST_SRC_DIRS += \
+	./test/tests/mhl_cbus\
+
+TEST_SRC += \
+	./test/tests/Mock/MockRegAccess.cpp\
+
+INCLUDE_DIRS +=\
+	./test/tests/mhl_platform\
+	./test/tests/Spy\
+
+MOCKS_SRC_DIRS += \
+	./test/tests/Spy\
+	./test/tests/Spy/cpp\
+	./test/tests/Spy/usb\
+
+MOCKS_SRC += \
+	./test/tests/Mock/MockRegAccess.cpp\
+	./test/tests/Spy/cpp/mocks_src/mhl_tx_rcp_spy.cpp\
+	./test/tests/Spy/cpp/mocks_src/mhl_sii8620_device_edid_stub.cpp\
+        ./test/tests/Spy/cpp/mocks_src/mhl_cbus_control_stub.cpp\
+
+
+
+#The mk kicks test framwork.
+include $(CPPUTEST_HOME)/build/MakefileWorker.mk
+

@@ -18,7 +18,7 @@
  * and processes may not get killed until the normal oom killer is triggered.
  *
  * Copyright (C) 2007-2008 Google, Inc.
- *
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -28,6 +28,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/module.h>
@@ -41,6 +43,7 @@
 #include <linux/delay.h>
 #include <linux/swap.h>
 #include <linux/fs.h>
+#include <linux/string.h>
 
 #ifdef CONFIG_HIGHMEM
 #define _ZONE ZONE_HIGHMEM
@@ -225,7 +228,14 @@ void tune_lmk_param(int *other_free, int *other_file, struct shrink_control *sc)
 			     "%d\n", *other_free, *other_file);
 	}
 }
-
+#ifdef CONFIG_SONY_JPROBE_LMK_HOOK
+#define JPROBE_LINE_SZ 80
+static char jprobe_buf[JPROBE_LINE_SZ];
+noinline void idd_jprobe_lmk_hook(char *buf)
+{
+	asm("");
+}
+#endif
 static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 {
 	struct task_struct *tsk;
@@ -341,10 +351,19 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 			     selected->pid, selected->comm,
 			     selected_oom_score_adj, selected_tasksize);
 		lowmem_deathpending_timeout = jiffies + HZ;
+#ifdef CONFIG_SONY_JPROBE_LMK_HOOK
+		scnprintf(jprobe_buf, JPROBE_LINE_SZ, "%d %s %d %s %d %d",
+			  current->pid, current->comm, selected->pid,
+			  selected->comm, selected_oom_score_adj,
+			  selected_tasksize);
+#endif
 		send_sig(SIGKILL, selected, 0);
 		set_tsk_thread_flag(selected, TIF_MEMDIE);
 		rem -= selected_tasksize;
 		rcu_read_unlock();
+#ifdef CONFIG_SONY_JPROBE_LMK_HOOK
+		idd_jprobe_lmk_hook(jprobe_buf);
+#endif
 		/* give the system time to free up the memory */
 		msleep_interruptible(20);
 	} else

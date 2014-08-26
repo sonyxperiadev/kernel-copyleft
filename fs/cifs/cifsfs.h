@@ -17,6 +17,10 @@
  *   You should have received a copy of the GNU Lesser General Public License
  *   along with this library; if not, write to the Free Software
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
+ *  Contains pick of 24261fc23db950951760d00c188ba63cc756b932
+ *  from future version of this file, with
+ *  Copyright (C) International Business Machines  Corp., 2002,2010
  */
 
 #ifndef _CIFSFS_H
@@ -40,6 +44,10 @@ cifs_uniqueid_to_ino_t(u64 fileid)
 extern struct file_system_type cifs_fs_type;
 extern const struct address_space_operations cifs_addr_ops;
 extern const struct address_space_operations cifs_addr_ops_smallbuf;
+
+/* Functions related to super block operations */
+extern void cifs_sb_active(struct super_block *sb);
+extern void cifs_sb_deactive(struct super_block *sb);
 
 /* Functions related to inodes */
 extern const struct inode_operations cifs_dir_inode_ops;

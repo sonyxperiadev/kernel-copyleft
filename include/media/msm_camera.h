@@ -1,4 +1,5 @@
 /* Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1305,6 +1306,21 @@ enum msm_sensor_resolution_t {
 	MSM_SENSOR_RES_5,
 	MSM_SENSOR_RES_6,
 	MSM_SENSOR_RES_7,
+/* extension begin */
+	MSM_SENSOR_RES_8,
+	MSM_SENSOR_RES_9,
+	MSM_SENSOR_RES_10,
+	MSM_SENSOR_RES_11,
+	MSM_SENSOR_RES_12,
+	MSM_SENSOR_RES_13,
+	MSM_SENSOR_RES_14,
+	MSM_SENSOR_RES_15,
+	MSM_SENSOR_RES_16,
+	MSM_SENSOR_RES_17,
+	MSM_SENSOR_RES_18,
+	MSM_SENSOR_RES_19,
+	MSM_SENSOR_RES_20,
+/* extension end */
 	MSM_SENSOR_INVALID_RES,
 };
 
