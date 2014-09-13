@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -165,7 +165,7 @@ the appropriate macros. */
 #define MSG_SSID_21			10300
 #define MSG_SSID_21_LAST		10300
 #define MSG_SSID_22			10350
-#define MSG_SSID_22_LAST		10374
+#define MSG_SSID_22_LAST		10377
 #define MSG_SSID_23			0xC000
 #define MSG_SSID_23_LAST		0xC063
 
@@ -695,6 +695,9 @@ static const uint32_t msg_bld_masks_21[] = {
 };
 
 static const uint32_t msg_bld_masks_22[] = {
+	MSG_LVL_LOW,
+	MSG_LVL_LOW,
+	MSG_LVL_LOW,
 	MSG_LVL_LOW,
 	MSG_LVL_LOW,
 	MSG_LVL_LOW,
