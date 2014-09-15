@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -907,7 +907,9 @@ int diag_process_apps_pkt(unsigned char *buf, int len)
 		*(uint16_t *)(driver->apps_rsp_buf + 94) = MSG_SSID_21_LAST;
 		*(uint16_t *)(driver->apps_rsp_buf + 96) = MSG_SSID_22;
 		*(uint16_t *)(driver->apps_rsp_buf + 98) = MSG_SSID_22_LAST;
-		encode_rsp_and_send(99);
+		*(uint16_t *)(driver->apps_rsp_buf + 100) = MSG_SSID_23;
+		*(uint16_t *)(driver->apps_rsp_buf + 102) = MSG_SSID_23_LAST;
+		encode_rsp_and_send(103);
 		return 0;
 	}
 	/* Check for Apps Only Respond to Get Subsys Build mask */
