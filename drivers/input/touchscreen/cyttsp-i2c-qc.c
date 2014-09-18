@@ -1031,39 +1031,48 @@ static void cyttsp_xy_handler(struct cyttsp *ts, bool is_ready_to_suspend)
 			"Spurious err opmode (tt_mode=%02X hst_mode=%02X)\n", \
 			g_xy_data.tt_mode, g_xy_data.hst_mode);
 		cyttsp_debug("Reset TTSP Device; Terminating active tracks\n");
-		/* terminate all active tracks */
-		cur_tch = CY_NTCH;
-		/* reset TTSP part and take it back out of Bootloader mode */
-		/* reset TTSP Device back to bootloader mode */
-		host_reg = CY_SOFT_RESET_MODE;
-		retval = i2c_smbus_write_i2c_block_data(ts->client, CY_REG_BASE,
-			sizeof(host_reg), &host_reg);
-		/* wait for TTSP Device to complete reset back to bootloader */
-		tries = 0;
-		do {
-			usleep_range(1000, 1000);
-			cyttsp_putbl(ts, 1, false, false, false);
-		} while (g_bl_data.bl_status != 0x10 &&
-			g_bl_data.bl_status != 0x11 &&
-			tries++ < 100);
-		retval = cyttsp_putbl(ts, 1, true, true, true);
-		/* switch back to operational mode */
-		/* take TTSP device out of bootloader mode;
-		 * switch back to TrueTouch operational mode */
-		if (!(retval < CY_OK)) {
-			int tries;
+
+		if (!is_ready_to_suspend) {
+			/* terminate all active tracks */
+			cur_tch = CY_NTCH;
+			/* reset TTSP part and take it back out of Bootloader
+			mode */
+			/* reset TTSP Device back to bootloader mode */
+			host_reg = CY_SOFT_RESET_MODE;
 			retval = i2c_smbus_write_i2c_block_data(ts->client,
-				CY_REG_BASE,
-				sizeof(bl_cmd), bl_cmd);
-			/* wait for TTSP Device to complete
-			 * switch to Operational mode */
+					CY_REG_BASE,
+					sizeof(host_reg), &host_reg);
+			/* wait for TTSP Device to complete reset back to
+			bootloader */
 			tries = 0;
 			do {
-				msleep(100);
-				cyttsp_putbl(ts, 2, false, false, false);
-			} while (GET_BOOTLOADERMODE(g_bl_data.bl_status) &&
+				usleep_range(1000, 1000);
+				cyttsp_putbl(ts, 1, false, false, false);
+			} while (g_bl_data.bl_status != 0x10 &&
+				g_bl_data.bl_status != 0x11 &&
 				tries++ < 100);
-			cyttsp_putbl(ts, 2, true, false, false);
+			retval = cyttsp_putbl(ts, 1, true, true, true);
+			/* switch back to operational mode */
+			/* take TTSP device out of bootloader mode;
+			 * switch back to TrueTouch operational mode */
+			if (!(retval < CY_OK)) {
+				int tries;
+				retval = i2c_smbus_write_i2c_block_data(
+					ts->client,
+					CY_REG_BASE,
+					sizeof(bl_cmd), bl_cmd);
+				/* wait for TTSP Device to complete
+				 * switch to Operational mode */
+				tries = 0;
+				do {
+					msleep(100);
+					cyttsp_putbl(ts, 2, false, false,
+							false);
+				} while (GET_BOOTLOADERMODE(
+					g_bl_data.bl_status) &&
+					tries++ < 100);
+				cyttsp_putbl(ts, 2, true, false, false);
+			}
 		}
 		goto exit_xy_handler;
 	} else {
