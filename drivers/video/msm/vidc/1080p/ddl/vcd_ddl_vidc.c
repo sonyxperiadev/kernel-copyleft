@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -617,10 +618,6 @@ void ddl_vidc_encode_init_codec(struct ddl_client_context *ddl)
 	scaled_frame_rate = DDL_FRAMERATE_SCALE(encoder->\
 			frame_rate.fps_numerator) /
 			encoder->frame_rate.fps_denominator;
-	if ((encoder->codec.codec == VCD_CODEC_H263) &&
-		(DDL_FRAMERATE_SCALE(DDL_INITIAL_FRAME_RATE)
-		 != scaled_frame_rate))
-		h263_cpfc_enable = true;
 	if (encoder->codec.codec == VCD_CODEC_H264)
 		pic_order_count = true;
 

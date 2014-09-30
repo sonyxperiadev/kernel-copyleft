@@ -132,6 +132,12 @@ static void mdm_power_down_common(struct mdm_modem_drv *mdm_drv)
 		*/
 		msleep(4000);
 	}
+	if (gpio_get_value(mdm_drv->ap2mdm_soft_reset_gpio) !=
+	    soft_reset_direction) {
+		gpio_direction_output(mdm_drv->ap2mdm_soft_reset_gpio,
+					soft_reset_direction);
+		msleep(4000);
+	}
 }
 
 static void mdm_do_first_power_on(struct mdm_modem_drv *mdm_drv)

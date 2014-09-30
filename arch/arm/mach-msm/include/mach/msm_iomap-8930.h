@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2008-2011, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -18,6 +19,8 @@
  * them into the right virtual location rough.  Instead, we will
  * provide a master phys->virt mapping for peripherals here.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #ifndef __ASM_ARCH_MSM_IOMAP_8930_H
@@ -103,7 +106,7 @@
 
 #ifdef CONFIG_DEBUG_MSM8930_UART
 #define MSM_DEBUG_UART_BASE		IOMEM(0xFA740000)
-#define MSM_DEBUG_UART_PHYS		0x16440000
+#define MSM_DEBUG_UART_PHYS		0x1A240000
 #endif
 
 #define MSM8930_QFPROM_PHYS		0x00700000

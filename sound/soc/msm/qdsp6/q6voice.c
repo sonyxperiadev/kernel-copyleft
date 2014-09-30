@@ -1,4 +1,5 @@
 /*  Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2013 Sony Mobile Communications AB. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -3770,11 +3771,11 @@ int voc_standby_voice_call(uint16_t session_id)
 	u16 mvm_handle;
 	int ret = 0;
 
-	pr_debug("%s: voc state=%d", __func__, v->voc_state);
 	if (v == NULL) {
 		pr_err("%s: v is NULL\n", __func__);
 		return -EINVAL;
 	}
+	pr_debug("%s: voc state=%d", __func__, v->voc_state);
 	if (v->voc_state == VOC_RUN) {
 		apr_mvm = common.apr_q6_mvm;
 		if (!apr_mvm) {

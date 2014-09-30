@@ -1,3 +1,9 @@
+/*
+ * Copyright (C) 2013 Sony Mobile Communications AB.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
+ */
 #ifndef MMC_QUEUE_H
 #define MMC_QUEUE_H
 
@@ -21,6 +27,7 @@ enum mmc_blk_status {
 	MMC_BLK_DATA_ERR,
 	MMC_BLK_ECC_ERR,
 	MMC_BLK_NOMEDIUM,
+	MMC_BLK_RETRY_SINGLE,
 };
 
 enum mmc_packed_cmd {

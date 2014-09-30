@@ -117,7 +117,7 @@ config SPARSEMEM_VMEMMAP_ENABLE
 
 config SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
 	def_bool y
-	depends on SPARSEMEM && X86_64
+	depends on SPARSEMEM && (X86_64 || ARM)
 
 config SPARSEMEM_VMEMMAP
 	bool "Sparse Memory virtual memmap"

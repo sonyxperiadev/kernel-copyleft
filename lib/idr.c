@@ -3,6 +3,8 @@
  *	Copyright (C) 2002 by Concurrent Computer Corporation
  *	Distributed under the GNU GPL license version 2.
  *
+ * Copyright (C) 2013 Sony Mobile Communications AB.
+ *
  * Modified by George Anzinger to reuse immediately and to use
  * find bit instructions.  Also removed _irq on spinlocks.
  *
@@ -24,12 +26,15 @@
  * don't need to go to the memory "store" during an id allocate, just
  * so you don't need to be too concerned about locking and conflicts
  * with the slab allocator.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the Licens
  */
 
 #ifndef TEST                        // to test in user space...
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/export.h>
+#include <linux/module.h>
 #endif
 #include <linux/err.h>
 #include <linux/string.h>

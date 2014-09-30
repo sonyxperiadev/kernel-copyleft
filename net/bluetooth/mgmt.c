@@ -961,6 +961,7 @@ static int remove_uuid(struct sock *sk, u16 index, unsigned char *data, u16 len)
 			continue;
 
 		list_del(&match->list);
+		kfree(match);
 		found++;
 	}
 

@@ -1,10 +1,14 @@
 /* industrial I/O data types needed both in and out of kernel
  *
  * Copyright (c) 2008 Jonathan Cameron
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
  * the Free Software Foundation.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the Licens
  */
 
 #ifndef _IIO_TYPES_H_
@@ -27,6 +31,7 @@ enum iio_chan_type {
 	IIO_ANGL,
 	IIO_TIMESTAMP,
 	IIO_CAPACITANCE,
+	IIO_QUATERNION,
 };
 
 enum iio_modifier {
@@ -44,6 +49,7 @@ enum iio_modifier {
 	IIO_MOD_X_OR_Y_OR_Z,
 	IIO_MOD_LIGHT_BOTH,
 	IIO_MOD_LIGHT_IR,
+	IIO_MOD_R,
 };
 
 #define IIO_VAL_INT 1

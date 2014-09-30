@@ -1,12 +1,16 @@
 /* The industrial I/O core
  *
  * Copyright (c) 2008 Jonathan Cameron
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
  * the Free Software Foundation.
  *
  * Based on elements of hwmon and input subsystems.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/kernel.h>
@@ -68,6 +72,7 @@ static const char * const iio_chan_type_name_spec[] = {
 	[IIO_ANGL] = "angl",
 	[IIO_TIMESTAMP] = "timestamp",
 	[IIO_CAPACITANCE] = "capacitance",
+	[IIO_QUATERNION] = "quaternion",
 };
 
 static const char * const iio_modifier_names[] = {
@@ -76,6 +81,7 @@ static const char * const iio_modifier_names[] = {
 	[IIO_MOD_Z] = "z",
 	[IIO_MOD_LIGHT_BOTH] = "both",
 	[IIO_MOD_LIGHT_IR] = "ir",
+	[IIO_MOD_R]  = "r",
 };
 
 /* relies on pairs of these shared then separate */
@@ -501,7 +507,7 @@ int __iio_device_attr_init(struct device_attribute *dev_attr,
 	}
 
 	if (writefunc) {
-		dev_attr->attr.mode |= S_IWUSR;
+		dev_attr->attr.mode |= S_IWUSR | S_IWGRP;
 		dev_attr->store = writefunc;
 	}
 	kfree(name_format);
