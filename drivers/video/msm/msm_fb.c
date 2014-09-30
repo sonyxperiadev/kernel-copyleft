@@ -5,6 +5,7 @@
  *
  * Copyright (C) 2007 Google Incorporated
  * Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -390,7 +391,7 @@ static void msm_fb_shutdown(struct platform_device *pdev)
                return;
        }
        lock_fb_info(mfd->fbi);
-       msm_fb_release_all(mfd->fbi, true);
+	msm_fb_release_all(mfd->fbi, true);
        unlock_fb_info(mfd->fbi);
 }
 static int msm_fb_probe(struct platform_device *pdev)
@@ -457,6 +458,7 @@ static int msm_fb_probe(struct platform_device *pdev)
 #ifdef CONFIG_FB_MSM_OVERLAY
 	mfd->overlay_play_enable = 1;
 #endif
+	mfd->nvrw_prohibit_draw = false;
 
 	bf_supported = mdp4_overlay_borderfill_supported();
 
@@ -991,6 +993,7 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct msm_fb_panel_data *pdata = NULL;
 	int ret = 0;
+	struct fb_event event;
 
 	pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 	if ((!pdata) || (!pdata->on) || (!pdata->off)) {
@@ -998,9 +1001,17 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 		return -ENODEV;
 	}
 
+	event.info = info;
+	event.data = &blank_mode;
+
 	switch (blank_mode) {
 	case FB_BLANK_UNBLANK:
 		if (!mfd->panel_power_on) {
+			if (pdata->controller_on_panel_on)
+				pdata->power_on_panel_at_pan = 1;
+#if defined(CONFIG_DEBUG_FS) || defined(CONFIG_FB_MSM_RECOVER_PANEL)
+			mutex_lock(&mfd->power_lock);
+#endif
 			ret = pdata->on(mfd->pdev);
 			if (ret == 0) {
 				down(&mfd->sem);
@@ -1008,6 +1019,21 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 				up(&mfd->sem);
 				mfd->panel_driver_on = mfd->op_enable;
 			}
+#if defined(CONFIG_DEBUG_FS) || defined(CONFIG_FB_MSM_RECOVER_PANEL)
+			mutex_unlock(&mfd->power_lock);
+#endif
+/* ToDo: possible conflict with android which doesn't expect sw refresher */
+/*
+	  if (!mfd->hw_refresh)
+	  {
+	    if ((ret = msm_fb_resume_sw_refresher(mfd)) != 0)
+	    {
+	      MSM_FB_INFO("msm_fb_blank_sub: msm_fb_resume_sw_refresher failed = %d!\n",ret);
+	    }
+	  }
+*/
+			if ((ret == 0) && (mfd->index == 0))
+				fb_notifier_call_chain(FB_EVENT_BLANK, &event);
 		}
 		break;
 
@@ -1019,10 +1045,13 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 		if (mfd->panel_power_on) {
 			int curr_pwr_state;
 
-			mfd->op_enable = FALSE;
-			curr_pwr_state = mfd->panel_power_on;
+			if (mfd->index == 0)
+				fb_notifier_call_chain(FB_EVENT_BLANK, &event);
+
+#if defined(CONFIG_DEBUG_FS) || defined(CONFIG_FB_MSM_RECOVER_PANEL)
+			mutex_lock(&mfd->power_lock);
+#endif
 			down(&mfd->sem);
-			mfd->panel_power_on = FALSE;
 			if (mfd->fbi->node == 0)
 				bl_updated = 0;
 			up(&mfd->sem);
@@ -1033,13 +1062,20 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 			complete(&mfd->msmfb_no_update_notify);
 
 			/* clean fb to prevent displaying old fb */
-			if (info->screen_base)
+			if (info->screen_base) {
 				memset((void *)info->screen_base, 0,
 				       info->fix.smem_len);
-
+				msm_fb_pan_display(&info->var, info);
+			}
+			mfd->op_enable = FALSE;
+			curr_pwr_state = mfd->panel_power_on;
+			mfd->panel_power_on = FALSE;
 			ret = pdata->off(mfd->pdev);
 			if (ret)
 				mfd->panel_power_on = curr_pwr_state;
+#if defined(CONFIG_DEBUG_FS) || defined(CONFIG_FB_MSM_RECOVER_PANEL)
+			mutex_unlock(&mfd->power_lock);
+#endif
 
 			msm_fb_release_timeline(mfd);
 			mfd->op_enable = TRUE;
@@ -1298,9 +1334,20 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	var->yoffset = 0,	/* resolution */
 	var->grayscale = 0,	/* No graylevels */
 	var->nonstd = 0,	/* standard pixel format */
-	var->activate = FB_ACTIVATE_VBL,	/* activate it at vsync */
-	var->height = -1,	/* height of picture in mm */
-	var->width = -1,	/* width of picture in mm */
+	var->activate = FB_ACTIVATE_VBL;	/* activate it at vsync */
+
+	/* height of picture in mm */
+	if (panel_info && panel_info->height)
+		var->height = panel_info->height;
+	else
+		var->height = -1;
+
+	/* width of picture in mm */
+	if (panel_info && panel_info->width)
+		var->width = panel_info->width;
+	else
+		var->width = -1;
+
 	var->accel_flags = 0,	/* acceleration flags */
 	var->sync = 0,	/* see FB_SYNC_* */
 	var->rotate = 0,	/* angle we rotate counter clockwise */
@@ -1635,14 +1682,10 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	}
 
 	MSM_FB_INFO
-	    ("FrameBuffer[%d] %dx%d size=%d bytes is registered successfully!\n",
-	     mfd->index, fbi->var.xres, fbi->var.yres, fbi->fix.smem_len);
+	("FrameBuffer[%d] %dx%dx%d size=%d bytes is registered successfully!\n",
+	mfd->index, fbi->var.xres, fbi->var.yres, fbi->var.bits_per_pixel,
+							fbi->fix.smem_len);
 
-#ifdef CONFIG_FB_MSM_LOGO
-	/* Flip buffer */
-	if (!load_565rle_image(INIT_IMAGE_FILE, bf_supported))
-		;
-#endif
 	ret = 0;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -1813,7 +1856,7 @@ static int msm_fb_open(struct fb_info *info, int user)
 		return 0;
 	}
 
-	if (!mfd->ref_cnt) {
+	if (!mfd->ref_cnt && info->node != 1) {
 		if (!bf_supported ||
 			(info->node != 1 && info->node != 2))
 			mdp_set_dma_pan_info(info, NULL, TRUE);
@@ -1882,7 +1925,7 @@ static int msm_fb_release_all(struct fb_info *info, boolean is_all)
 }
 static int msm_fb_release(struct fb_info *info, int user)
 {
-        return msm_fb_release_all(info, false);
+	return msm_fb_release_all(info, false);
 }
 
 void msm_fb_wait_for_fence(struct msm_fb_data_type *mfd)
@@ -2068,6 +2111,8 @@ static int msm_fb_pan_display_sub(struct fb_var_screeninfo *var,
 	struct mdp_dirty_region *dirtyPtr = NULL;
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 
+	if (mfd->nvrw_prohibit_draw)
+		return 0;
 	/*
 	 * If framebuffer is 2, io pen display is not allowed.
 	 */
@@ -2177,6 +2222,7 @@ static void msm_fb_commit_wq_handler(struct work_struct *work)
 	struct fb_var_screeninfo *var;
 	struct fb_info *info;
 	struct msm_fb_backup_type *fb_backup;
+	struct msm_fb_panel_data *pdata;
 
 	mfd = container_of(work, struct msm_fb_data_type, commit_work);
 	fb_backup = (struct msm_fb_backup_type *)mfd->msm_fb_backup;
@@ -2196,6 +2242,12 @@ static void msm_fb_commit_wq_handler(struct work_struct *work)
 	if (!bl_updated)
 		schedule_delayed_work(&mfd->backlight_worker,
 					backlight_duration);
+
+	pdata = mfd->pdev->dev.platform_data;
+	if (pdata->power_on_panel_at_pan && pdata->on) {
+		(void)pdata->controller_on_panel_on(mfd->pdev);
+		pdata->power_on_panel_at_pan = 0;
+	}
 }
 
 static int msm_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
@@ -3263,7 +3315,11 @@ static int msmfb_overlay_get(struct fb_info *info, void __user *p)
 static int msmfb_overlay_set(struct fb_info *info, void __user *p)
 {
 	struct mdp_overlay req;
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	int ret;
+
+	if (mfd->nvrw_prohibit_draw)
+		return -EFAULT;
 
 	if (copy_from_user(&req, p, sizeof(req)))
 		return -EFAULT;
@@ -3341,6 +3397,8 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 
 	if (mfd->overlay_play_enable == 0)	/* nothing to do */
+		return 0;
+	if (mfd->nvrw_prohibit_draw)
 		return 0;
 
 	ret = copy_from_user(&req, argp, sizeof(req));
@@ -4351,6 +4409,12 @@ struct platform_device *msm_fb_add_device(struct platform_device *pdev)
 	mfd->iclient = iclient;
 	/* link to the latest pdev */
 	mfd->pdev = this_dev;
+
+	/* link to the panel pdev */
+	mfd->panel_pdev = pdev;
+#if defined(CONFIG_DEBUG_FS) || defined(CONFIG_FB_MSM_RECOVER_PANEL)
+	mutex_init(&mfd->power_lock);
+#endif
 
 	mfd_list[mfd_list_index++] = mfd;
 	fbi_list[fbi_list_index++] = fbi;
