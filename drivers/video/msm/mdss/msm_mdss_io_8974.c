@@ -259,7 +259,7 @@ int mdss_dsi_clk_div_config(struct mdss_panel_info *panel_info,
 	return 0;
 }
 
-static int mdss_dsi_bus_clk_start(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+int mdss_dsi_bus_clk_start(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	int rc = 0;
 
@@ -303,7 +303,7 @@ error:
 	return rc;
 }
 
-static void mdss_dsi_bus_clk_stop(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+void mdss_dsi_bus_clk_stop(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	if (ctrl_pdata->mmss_misc_ahb_clk)
 		clk_disable_unprepare(ctrl_pdata->mmss_misc_ahb_clk);

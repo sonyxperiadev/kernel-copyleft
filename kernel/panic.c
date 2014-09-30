@@ -2,6 +2,10 @@
  *  linux/kernel/panic.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
+ *  Copyright (C) 2014 Sony Mobile Communications AB.
+ *
+ *  NOTE: This file has been modified by Sony Mobile Communications AB.
+ *  Modifications are licensed under the License.
  */
 
 /*
@@ -366,7 +370,19 @@ int oops_may_print(void)
  */
 void oops_enter(void)
 {
+	static int kick_watchdog_on_oops_done;
 	tracing_off();
+
+	/* we want to kick the watchdog on a die or panic call so
+	we don't get a HWWD bark before we finish writing the full oops.
+	But we only want to do this once in case we get a recursive
+	crash, we need the watchdog to reset us in that case;
+	*/
+	if (!kick_watchdog_on_oops_done) {
+		kick_watchdog_on_oops_done = 1;
+		touch_nmi_watchdog();
+	}
+
 	/* can't trust the integrity of the kernel anymore: */
 	debug_locks_off();
 	do_oops_enter_exit();

@@ -5,10 +5,14 @@
  *  Copyright © 2007  Anton Vorontsov <cbou@mail.ru>
  *  Copyright © 2004  Szabolcs Gyurko
  *  Copyright © 2003  Ian Molton <spyro@f2s.com>
+ *  Copyright (C) 2014 Sony Mobile Communications AB.
  *
  *  Modified: 2004, Oct     Szabolcs Gyurko
  *
  *  You may use this code as per GPL version 2
+ *
+ *  NOTE: This file has been modified by Sony Mobile Communications AB.
+ *  Modifications are licensed under the License.
  */
 
 #include <linux/ctype.h>
@@ -185,6 +189,8 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(scope),
 	POWER_SUPPLY_ATTR(system_temp_level),
 	POWER_SUPPLY_ATTR(resistance),
+	POWER_SUPPLY_ATTR(discharging_enable_for_shutdown),
+	POWER_SUPPLY_ATTR(chemistry),
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_ATTR(model_name),
 	POWER_SUPPLY_ATTR(manufacturer),

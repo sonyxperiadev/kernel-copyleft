@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #include <linux/types.h>
 #include <linux/delay.h>
@@ -1790,6 +1793,7 @@ static void kgsl_iommu_flush_tlb_pt_current(struct kgsl_pagetable *pt)
 	if (lock_taken)
 		kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 }
+
 
 static int
 kgsl_iommu_unmap(struct kgsl_pagetable *pt,

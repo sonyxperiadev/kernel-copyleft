@@ -1,6 +1,7 @@
 /*Qualcomm Secure Execution Environment Communicator (QSEECOM) driver
  *
  * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -915,6 +916,7 @@ static int qseecom_load_app(struct qseecom_dev_handle *data, void __user *argp)
 		}
 		spin_unlock_irqrestore(
 		&qseecom.registered_app_list_lock, flags);
+		ret = 0;
 	} else {
 		pr_warn("App (%s) does'nt exist, loading apps for first time\n",
 			(char *)(load_img_req.img_name));
@@ -4341,6 +4343,8 @@ static int qseecom_resume(struct platform_device *pdev)
 			pr_err("Fail to scale up bus to %d\n", mode);
 		else
 			qseecom.current_mode = mode;
+			qseecom.current_mode = mode;
+
 	}
 
 	if (qclk->clk_access_cnt) {

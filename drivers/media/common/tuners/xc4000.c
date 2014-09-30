@@ -6,6 +6,7 @@
  *  Copyright (c) 2009 Devin Heitmueller <dheitmueller@kernellabs.com>
  *  Copyright (c) 2009 Davide Ferri <d.ferri@zero11.it>
  *  Copyright (c) 2010 Istvan Varga <istvan_v@mailbox.hu>
+ *  Copyright (C) 2014 Sony Mobile Communications AB.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,6 +21,9 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ *  NOTE: This file has been modified by Sony Mobile Communications AB.
+ *  Modifications are licensed under the License.
  */
 
 #include <linux/module.h>
@@ -935,7 +939,7 @@ static int check_firmware(struct dvb_frontend *fe, unsigned int type,
 	int			   rc = 0, is_retry = 0;
 	u16			   hwmodel;
 	v4l2_std_id		   std0;
-	u8			   hw_major, hw_minor, fw_major, fw_minor;
+	u8			   hw_major = 0, hw_minor = 0, fw_major = 0, fw_minor = 0;
 
 	dprintk(1, "%s called\n", __func__);
 
