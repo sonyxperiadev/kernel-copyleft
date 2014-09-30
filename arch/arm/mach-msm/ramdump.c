@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/kernel.h>
@@ -26,6 +30,7 @@
 #include <linux/wait.h>
 
 #include <mach/ramdump.h>
+#include <mach/ssr_monitor.h>
 
 #define RAMDUMP_WAIT_MSECS	120000
 
@@ -93,6 +98,7 @@ static unsigned long offset_translate(loff_t user_offset,
 }
 
 #define MAX_IOREMAP_SIZE SZ_1M
+#define USER_FLG 0x00010000
 
 static int ramdump_read(struct file *filep, char __user *buf, size_t count,
 			loff_t *pos)
@@ -112,6 +118,10 @@ static int ramdump_read(struct file *filep, char __user *buf, size_t count,
 	ret = wait_event_interruptible(rd_dev->dump_wait_q, rd_dev->data_ready);
 	if (ret)
 		return ret;
+	if (count & USER_FLG) {
+		rd_dev->ramdump_status = 0;
+		goto ramdump_done;
+	}
 
 	if (*pos < rd_dev->elfcore_size) {
 		copy_size = rd_dev->elfcore_size - *pos;
@@ -173,6 +183,7 @@ ramdump_done:
 	rd_dev->data_ready = 0;
 	*pos = 0;
 	complete(&rd_dev->ramdump_complete);
+	ssr_monitor_notify(rd_dev->name);
 	return ret;
 }
 

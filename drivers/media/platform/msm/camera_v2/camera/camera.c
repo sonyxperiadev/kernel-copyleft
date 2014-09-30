@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,6 +27,9 @@
 #include <linux/msm_ion.h>
 #include <linux/iommu.h>
 #include <linux/platform_device.h>
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+#include <linux/wakelock.h>
+#endif
 #include <media/v4l2-fh.h>
 
 #include "camera.h"
@@ -40,6 +44,9 @@ struct camera_v4l2_private {
 	unsigned int stream_id;
 	unsigned int is_vb2_valid; /*0 if no vb2 buffers on stream, else 1*/
 	struct vb2_queue vb2_q;
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+	struct wake_lock wakelock;
+#endif
 };
 
 static void camera_pack_event(struct file *filep, int evt_id,
@@ -531,6 +538,9 @@ static int camera_v4l2_open(struct file *filep)
 	int rc = 0;
 	struct v4l2_event event;
 	struct msm_video_device *pvdev = video_drvdata(filep);
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+	struct camera_v4l2_private *sp = NULL;
+#endif
 	BUG_ON(!pvdev);
 
 	rc = camera_v4l2_fh_open(filep);
@@ -548,6 +558,12 @@ static int camera_v4l2_open(struct file *filep)
 				__func__, __LINE__, rc);
 		goto vb2_q_fail;
 	}
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+	sp = fh_to_private(filep->private_data);
+	wake_lock_init(&sp->wakelock, WAKE_LOCK_SUSPEND, "msm_camera");
+	wake_lock(&sp->wakelock);
+#endif
+
 	if (!atomic_read(&pvdev->opened)) {
 		pm_stay_awake(&pvdev->vdev->dev);
 
@@ -568,12 +584,21 @@ static int camera_v4l2_open(struct file *filep)
 		}
 		camera_pack_event(filep, MSM_CAMERA_NEW_SESSION, 0, -1, &event);
 		rc = msm_post_event(&event, MSM_POST_EVT_TIMEOUT);
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+		if (rc < 0) {
+			camera_pack_event(filep, MSM_CAMERA_DEL_SESSION,
+				0, -1, &event);
+			msm_post_event(&event, MSM_POST_EVT_TIMEOUT);
+			goto post_fail;
+		}
+#else
 		if (rc < 0) {
 			pr_err("%s : posting of NEW_SESSION event failed\n",
 					__func__);
 			pr_err("%s : Line %d rc %d\n", __func__, __LINE__, rc);
 			goto post_fail;
 		}
+#endif
 		rc = camera_check_event_status(&event);
 		if (rc < 0) {
 			pr_err("%s : checking event status fails Line %d rc %d\n",
@@ -600,6 +625,10 @@ command_ack_q_fail:
 	msm_destroy_session(pvdev->vdev->num);
 session_fail:
 	pm_relax(&pvdev->vdev->dev);
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+	wake_unlock(&sp->wakelock);
+	wake_lock_destroy(&sp->wakelock);
+#endif
 	camera_v4l2_vb2_q_release(filep);
 vb2_q_fail:
 	camera_v4l2_fh_release(filep);
@@ -664,6 +693,10 @@ static int camera_v4l2_close(struct file *filep)
 		msm_delete_stream(pvdev->vdev->num, sp->stream_id);
 	}
 
+#if defined(CONFIG_SONY_CAM_QCAMERA)
+	wake_unlock(&sp->wakelock);
+	wake_lock_destroy(&sp->wakelock);
+#endif
 	camera_v4l2_vb2_q_release(filep);
 	camera_v4l2_fh_release(filep);
 

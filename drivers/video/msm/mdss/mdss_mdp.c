@@ -68,7 +68,6 @@ struct msm_mdp_interface mdp5 = {
 	.fb_mem_get_iommu_domain = mdss_fb_mem_get_iommu_domain,
 	.panel_register_done = mdss_panel_register_done,
 	.fb_stride = mdss_mdp_fb_stride,
-	.check_dsi_status = mdss_check_dsi_ctrl_status,
 };
 
 #define DEFAULT_TOTAL_RGB_PIPES 3
@@ -2154,17 +2153,6 @@ static int mdss_mdp_parse_dt_misc(struct platform_device *pdev)
 	mdata->ib_factor.denom = 5;
 	mdss_mdp_parse_dt_fudge_factors(pdev, "qcom,mdss-ib-factor",
 		&mdata->ib_factor);
-
-	/*
-	 * Set overlap ib value equal to ib by default. This value can
-	 * be tuned in device tree to be different from ib.
-	 * This factor apply when the max bandwidth per pipe
-	 * is the overlap BW.
-	 */
-	mdata->ib_factor_overlap.numer = mdata->ib_factor.numer;
-	mdata->ib_factor_overlap.denom = mdata->ib_factor.denom;
-	mdss_mdp_parse_dt_fudge_factors(pdev, "qcom,mdss-ib-factor-overlap",
-		&mdata->ib_factor_overlap);
 
 	mdata->clk_factor.numer = 1;
 	mdata->clk_factor.denom = 1;

@@ -3,6 +3,7 @@
  * driver source file
  *
  * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2573,6 +2574,7 @@ static void sdhci_msm_disable_data_xfer(struct sdhci_host *host)
 	u32 value;
 	int ret;
 	u32 version;
+	int i;
 
 	version = readl_relaxed(msm_host->core_mem + CORE_MCI_VERSION);
 	/* Core version 3.1.0 doesn't need this workaround */
@@ -2592,8 +2594,28 @@ static void sdhci_msm_disable_data_xfer(struct sdhci_host *host)
 			!(value & CORE_DEBUG_REG_AHB_HTRANS),
 			CORE_AHB_DATA_DELAY_US, 1);
 	if (ret) {
-		pr_err("%s: %s: can't stop ongoing AHB bus access by ADMA\n",
-				mmc_hostname(host->mmc), __func__);
+		pr_err("%s: %s: can't stop ongoing AHB bus access by ADMA,"
+			"MCI_DATA_CTL = 0x%X, SDCC_DEBUG_REG = 0x%X, HTRANS = 0x%X\n",
+			mmc_hostname(host->mmc), __func__,
+			readl(msm_host->core_mem + CORE_MCI_DATA_CTRL), value,
+			(value & CORE_DEBUG_REG_AHB_HTRANS) >> 12);
+		sdhci_dumpregs(host);
+
+		for (i = 0; i < 1000; i++) {
+			ret = readl_poll_timeout_noirq(msm_host->core_mem
+				+ CORE_SDCC_DEBUG_REG, value,
+				!(value & CORE_DEBUG_REG_AHB_HTRANS),
+				CORE_AHB_DATA_DELAY_US, 1);
+			if (ret) {
+				continue;
+			} else {
+				pr_err("%s: %s: Now stopped AHB bus access by ADMA,"
+					"i = %d, SDCC_DEBUG_REG = 0x%X, HTRANS = 0x%X\n",
+					mmc_hostname(host->mmc), __func__, i, value,
+					(value & CORE_DEBUG_REG_AHB_HTRANS) >> 12);
+				break;
+			}
+		}
 		BUG();
 	}
 	/* Disable the test bus for device slot */
@@ -2892,13 +2914,11 @@ static int __devinit sdhci_msm_probe(struct platform_device *pdev)
 	msm_host->mmc->caps2 |= (MMC_CAP2_BOOTPART_NOACC |
 				MMC_CAP2_DETECT_ON_ERR);
 	msm_host->mmc->caps2 |= MMC_CAP2_SANITIZE;
-	msm_host->mmc->caps2 |= MMC_CAP2_CACHE_CTRL;
-	msm_host->mmc->caps2 |= MMC_CAP2_POWEROFF_NOTIFY;
-	msm_host->mmc->caps2 |= MMC_CAP2_CLK_SCALE;
 	msm_host->mmc->caps2 |= MMC_CAP2_STOP_REQUEST;
 	msm_host->mmc->caps2 |= MMC_CAP2_ASYNC_SDIO_IRQ_4BIT_MODE;
 	msm_host->mmc->caps2 |= MMC_CAP2_CORE_PM;
 	msm_host->mmc->pm_caps |= MMC_PM_KEEP_POWER;
+	msm_host->mmc->caps2 |= MMC_CAP2_INIT_BKOPS;
 
 	if (msm_host->pdata->nonremovable)
 		msm_host->mmc->caps |= MMC_CAP_NONREMOVABLE;
@@ -2929,6 +2949,12 @@ static int __devinit sdhci_msm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Add host failed (%d)\n", ret);
 		goto free_cd_gpio;
 	}
+
+	/*
+	 *disable SDR104 because our electric source
+	 * can't support such huge current
+	 */
+	msm_host->mmc->caps &= ~MMC_CAP_UHS_SDR104;
 
 	msm_host->msm_bus_vote.max_bus_bw.show = show_sdhci_max_bus_bw;
 	msm_host->msm_bus_vote.max_bus_bw.store = store_sdhci_max_bus_bw;

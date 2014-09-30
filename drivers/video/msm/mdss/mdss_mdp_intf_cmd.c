@@ -25,7 +25,8 @@
 
 /* wait for at most 2 vsync for lowest refresh rate (24hz) */
 #define KOFF_TIMEOUT msecs_to_jiffies(84)
-#define STOP_TIMEOUT(hz) msecs_to_jiffies((1000 / hz) * (VSYNC_EXPIRE_TICK + 2))
+
+#define STOP_TIMEOUT msecs_to_jiffies(16 * (VSYNC_EXPIRE_TICK + 2))
 #define ULPS_ENTER_TIME msecs_to_jiffies(100)
 
 struct mdss_mdp_cmd_ctx {
@@ -264,6 +265,8 @@ static void mdss_mdp_cmd_readptr_done(void *arg)
 		return;
 	}
 
+	mdss_mdp_ctl_perf_taken(ctl);
+
 	vsync_time = ktime_get();
 	ctl->vsync_cnt++;
 
@@ -325,8 +328,7 @@ static void mdss_mdp_cmd_pingpong_done(void *arg)
 		return;
 	}
 
-	mdss_mdp_ctl_perf_set_transaction_status(ctl,
-		PERF_HW_MDP_STATE, PERF_STATUS_DONE);
+	mdss_mdp_ctl_perf_done(ctl);
 
 	spin_lock(&ctx->clk_lock);
 	list_for_each_entry(tmp, &ctx->vsync_handlers, list) {
@@ -553,9 +555,6 @@ int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 		return -ENODEV;
 	}
 
-	mdss_mdp_ctl_perf_set_transaction_status(ctl,
-		PERF_HW_MDP_STATE, PERF_STATUS_BUSY);
-
 	if (ctx->panel_on == 0) {
 		rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_UNBLANK, NULL);
 		WARN(rc, "intf %d unblank error (%d)\n", ctl->intf_num, rc);
@@ -582,9 +581,6 @@ int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 	spin_lock_irqsave(&ctx->clk_lock, flags);
 	ctx->koff_cnt++;
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
-	
-	mdss_mdp_ctl_perf_set_transaction_status(ctl,
-		PERF_SW_COMMIT_STATE, PERF_STATUS_DONE);
 	mb();
 
 	return 0;
@@ -598,7 +594,6 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 	struct mdss_mdp_vsync_handler *tmp, *handle;
 	int need_wait = 0;
 	int ret = 0;
-	int hz;
 
 	ctx = (struct mdss_mdp_cmd_ctx *) ctl->priv_data;
 	if (!ctx) {
@@ -616,11 +611,8 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 	}
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
 
-	hz = mdss_panel_get_framerate(&ctl->panel_data->panel_info);
-
 	if (need_wait)
-		if (wait_for_completion_timeout(&ctx->stop_comp,
-					STOP_TIMEOUT(hz))
+		if (wait_for_completion_timeout(&ctx->stop_comp, STOP_TIMEOUT)
 		    <= 0) {
 			WARN(1, "stop cmd time out\n");
 

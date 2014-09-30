@@ -1,4 +1,5 @@
 /* Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -284,7 +285,6 @@ struct msm_mctl_post_proc_cmd {
 #define MAX_ACTUATOR_INIT_SET 12
 #define MAX_ACTUATOR_TYPE_SIZE 32
 #define MAX_ACTUATOR_REG_TBL_SIZE 8
-
 
 #define MSM_MAX_CAMERA_CONFIGS 2
 
@@ -1002,8 +1002,10 @@ struct msm_snapshot_pp_status {
 #define CFG_CONFIG_VREG_ARRAY         52
 #define CFG_CONFIG_CLK_ARRAY          53
 #define CFG_GPIO_OP                   54
-#define CFG_MAX                       55
-
+/* extension begin */
+#define CFG_SET_FOCUS_POWER_DOWN 55
+#define CFG_MAX                       56
+/* extension end */
 
 #define MOVE_NEAR	0
 #define MOVE_FAR	1

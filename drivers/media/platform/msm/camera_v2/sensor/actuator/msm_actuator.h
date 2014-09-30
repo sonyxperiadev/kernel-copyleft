@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #ifndef MSM_ACTUATOR_H
 #define MSM_ACTUATOR_H
@@ -45,6 +49,12 @@ struct msm_actuator_func_tbl {
 			int16_t);
 	int32_t (*actuator_set_position)(struct msm_actuator_ctrl_t *,
 		struct msm_actuator_set_position_t *);
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	int32_t (*actuator_set_focus_pd) (struct msm_actuator_ctrl_t *);
+	int32_t (*actuator_set_init_settings) (struct msm_actuator_ctrl_t *,
+		uint16_t, enum msm_actuator_data_type, struct reg_settings_t *);
+
+#endif
 };
 
 struct msm_actuator {
@@ -84,5 +94,9 @@ struct msm_actuator_ctrl_t {
 	enum cci_i2c_master_t cci_master;
 	uint32_t subdev_id;
 };
+
+#ifdef CONFIG_SONY_CAM_QCAMERA
+extern void msm_eeprom_get_camera_moudle_name(uint8_t id, uint8_t *module_name);
+#endif
 
 #endif

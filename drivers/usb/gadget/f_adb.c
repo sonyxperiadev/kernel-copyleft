@@ -2,6 +2,7 @@
  * Gadget Driver for Android ADB
  *
  * Copyright (C) 2008 Google, Inc.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  * Author: Mike Lockwood <lockwood@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -13,6 +14,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/module.h>
@@ -239,8 +242,11 @@ static void adb_complete_in(struct usb_ep *ep, struct usb_request *req)
 {
 	struct adb_dev *dev = _adb_dev;
 
-	if (req->status != 0)
+	if (req->status != 0) {
 		atomic_set(&dev->error, 1);
+		/* wakeup the reader to notify it of the error */
+		wake_up(&dev->read_wq);
+	}
 
 	adb_req_put(dev, &dev->tx_idle, req);
 
@@ -252,8 +258,11 @@ static void adb_complete_out(struct usb_ep *ep, struct usb_request *req)
 	struct adb_dev *dev = _adb_dev;
 
 	dev->rx_done = 1;
-	if (req->status != 0 && req->status != -ECONNRESET)
+	if (req->status != 0 && req->status != -ECONNRESET) {
 		atomic_set(&dev->error, 1);
+		/* wakeup the writer to notify it of the error */
+		wake_up(&dev->write_wq);
+	}
 
 	wake_up(&dev->read_wq);
 }

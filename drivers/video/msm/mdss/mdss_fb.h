@@ -1,4 +1,5 @@
 /* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -134,7 +135,6 @@ struct msm_mdp_interface {
 	int (*splash_fnc) (struct msm_fb_data_type *mfd, int *index, int req);
 	struct msm_sync_pt_data *(*get_sync_fnc)(struct msm_fb_data_type *mfd,
 				const struct mdp_buf_sync *buf_sync);
-	void (*check_dsi_status)(struct work_struct *work, uint32_t interval);
 	void *private1;
 };
 
@@ -227,6 +227,13 @@ struct msm_fb_data_type {
 
 	u32 dcm_state;
 	struct list_head proc_list;
+
+	/* speed up wakeup */
+	/* do unblank (>150ms) on own kworker
+	 * so we don't starve other works
+	 */
+	struct workqueue_struct *unblank_kworker;
+	struct work_struct unblank_work;
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)

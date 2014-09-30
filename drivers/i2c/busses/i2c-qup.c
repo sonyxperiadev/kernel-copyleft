@@ -1,4 +1,5 @@
 /* Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 /*
  * QUP driver for Qualcomm MSM platforms
@@ -192,6 +195,7 @@ struct qup_i2c_dev {
 	int                          wr_sz;
 	struct msm_i2c_platform_data *pdata;
 	enum msm_i2c_state           pwr_state;
+	atomic_t		     xfer_progress;
 	struct mutex                 mlock;
 	void                         *complete;
 	int                          i2c_gpios[ARRAY_SIZE(i2c_rsrcs)];
@@ -229,8 +233,10 @@ qup_i2c_interrupt(int irq, void *devid)
 	uint32_t op_flgs = 0;
 	int err = 0;
 
-	if (pm_runtime_suspended(dev->dev))
+	if (atomic_read(&dev->xfer_progress) != 1) {
+		dev_err(dev->dev, "irq:%d when PM suspended\n", irq);
 		return IRQ_NONE;
+	}
 
 	status = readl_relaxed(dev->base + QUP_I2C_STATUS);
 	status1 = readl_relaxed(dev->base + QUP_ERROR_FLAGS);
@@ -1001,6 +1007,7 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	if (dev->pdata->clk_ctl_xfer)
 		i2c_qup_pm_resume_clk(dev);
 
+	atomic_set(&dev->xfer_progress, 1);
 	/* Initialize QUP registers during first transfer */
 	if (dev->clk_ctl == 0) {
 		int fs_div;
@@ -1217,11 +1224,12 @@ timeout_err:
 					dev_err(dev->dev,
 					"I2C slave addr:0x%x not connected\n",
 					dev->msg->addr);
-					dev->err = ENOTCONN;
+					ret = -ENOTCONN;
+					goto out_err;
 				} else if (dev->err < 0) {
 					dev_err(dev->dev,
 					"QUP data xfer error %d\n", dev->err);
-					ret = dev->err;
+					ret = -EIO;
 					goto out_err;
 				} else if (dev->err > 0) {
 					/*
@@ -1232,7 +1240,7 @@ timeout_err:
 					 */
 					qup_i2c_recover_bus_busy(dev);
 				}
-				ret = -dev->err;
+				ret = -EIO;
 				goto out_err;
 			}
 			if (dev->msg->flags & I2C_M_RD) {
@@ -1304,6 +1312,7 @@ timeout_err:
 	dev->cnt = 0;
 	if (dev->pdata->clk_ctl_xfer)
 		i2c_qup_pm_suspend_clk(dev);
+	atomic_set(&dev->xfer_progress, 0);
 	mutex_unlock(&dev->mlock);
 	pm_runtime_mark_last_busy(dev->dev);
 	pm_runtime_put_autosuspend(dev->dev);
@@ -1654,6 +1663,7 @@ blsp_core_init:
 
 	mutex_init(&dev->mlock);
 	dev->pwr_state = MSM_I2C_PM_SUSPENDED;
+	atomic_set(&dev->xfer_progress, 0);
 	/* If the same AHB clock is used on Modem side
 	 * switch it on here itself and don't switch it
 	 * on and off during suspend and resume.
