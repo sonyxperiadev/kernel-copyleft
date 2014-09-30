@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2011, 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -227,9 +228,10 @@ static ssize_t msm_rpm_log_file_read(struct file *file, char __user *bufu,
 						&(buf->read_idx));
 	}
 
-	if ((file->f_flags & O_NONBLOCK) && buf->len == 0)
+	if ((file->f_flags & O_NONBLOCK) && buf->len == 0) {
 		mutex_unlock(&buf->mutex);
 		return -EAGAIN;
+	}
 
 	/* loop until new messages arrive */
 	while (buf->len == 0) {
