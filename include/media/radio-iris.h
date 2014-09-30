@@ -1,6 +1,7 @@
 /*
  *
  * Copyright (c) 2011-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 Sony Mobile Communications AB.
  *
  * This file is based on include/net/bluetooth/hci_core.h
  *
@@ -27,55 +28,12 @@
 #ifndef __RADIO_HCI_CORE_H
 #define __RADIO_HCI_CORE_H
 
+#ifdef __KERNEL__
 #include <linux/skbuff.h>
 #include <linux/interrupt.h>
 #include <linux/mutex.h>
 #include <linux/atomic.h>
 #include "radio-iris-commands.h"
-const unsigned char MIN_TX_TONE_VAL = 0x00;
-const unsigned char MAX_TX_TONE_VAL = 0x07;
-const unsigned char MIN_HARD_MUTE_VAL = 0x00;
-const unsigned char MAX_HARD_MUTE_VAL = 0x03;
-const unsigned char MIN_SRCH_MODE = 0x00;
-const unsigned char MAX_SRCH_MODE = 0x09;
-const unsigned char MIN_SCAN_DWELL = 0x00;
-const unsigned char MAX_SCAN_DWELL = 0x0F;
-const unsigned char MIN_SIG_TH = 0x00;
-const unsigned char MAX_SIG_TH = 0x03;
-const unsigned char MIN_PTY = 0X00;
-const unsigned char MAX_PTY = 0x1F;
-const unsigned short MIN_PI = 0x0000;
-const unsigned short MAX_PI = 0xFFFF;
-const unsigned char MIN_SRCH_STATIONS_CNT = 0x00;
-const unsigned char MAX_SRCH_STATIONS_CNT = 0x14;
-const unsigned char MIN_CHAN_SPACING = 0x00;
-const unsigned char MAX_CHAN_SPACING = 0x02;
-const unsigned char MIN_EMPHASIS = 0x00;
-const unsigned char MAX_EMPHASIS = 0x01;
-const unsigned char MIN_RDS_STD = 0x00;
-const unsigned char MAX_RDS_STD = 0x02;
-const unsigned char MIN_ANTENNA_VAL = 0x00;
-const unsigned char MAX_ANTENNA_VAL = 0x01;
-const unsigned char MIN_TX_PS_REPEAT_CNT = 0x01;
-const unsigned char MAX_TX_PS_REPEAT_CNT = 0x0F;
-const unsigned char MIN_SOFT_MUTE = 0x00;
-const unsigned char MAX_SOFT_MUTE = 0x01;
-const unsigned char MIN_PEEK_ACCESS_LEN = 0x01;
-const unsigned char MAX_PEEK_ACCESS_LEN = 0xF9;
-const unsigned char MIN_RESET_CNTR = 0x00;
-const unsigned char MAX_RESET_CNTR = 0x01;
-const unsigned char MIN_HLSI = 0x00;
-const unsigned char MAX_HLSI = 0x02;
-const unsigned char MIN_NOTCH_FILTER = 0x00;
-const unsigned char MAX_NOTCH_FILTER = 0x02;
-const unsigned char MIN_INTF_DET_OUT_LW_TH = 0x00;
-const unsigned char MAX_INTF_DET_OUT_LW_TH = 0xFF;
-const unsigned char MIN_INTF_DET_OUT_HG_TH = 0x00;
-const unsigned char MAX_INTF_DET_OUT_HG_TH = 0xFF;
-const signed char MIN_SINR_TH = -128;
-const signed char MAX_SINR_TH = 127;
-const unsigned char MIN_SINR_SAMPLES = 0x01;
-const unsigned char MAX_SINR_SAMPLES = 0xFF;
 
 /* ---- HCI Packet structures ---- */
 #define RADIO_HCI_COMMAND_HDR_SIZE sizeof(struct radio_hci_command_hdr)
@@ -649,6 +607,53 @@ struct hci_fm_spur_data {
 #define hci_req_lock(d)		mutex_lock(&d->req_lock)
 #define hci_req_unlock(d)	mutex_unlock(&d->req_lock)
 
+#endif /* __KERNEL__ */
+
+const unsigned char MIN_TX_TONE_VAL = 0x00;
+const unsigned char MAX_TX_TONE_VAL = 0x07;
+const unsigned char MIN_HARD_MUTE_VAL = 0x00;
+const unsigned char MAX_HARD_MUTE_VAL = 0x03;
+const unsigned char MIN_SRCH_MODE = 0x00;
+const unsigned char MAX_SRCH_MODE = 0x09;
+const unsigned char MIN_SCAN_DWELL = 0x00;
+const unsigned char MAX_SCAN_DWELL = 0x0F;
+const unsigned char MIN_SIG_TH = 0x00;
+const unsigned char MAX_SIG_TH = 0x03;
+const unsigned char MIN_PTY = 0X00;
+const unsigned char MAX_PTY = 0x1F;
+const unsigned short MIN_PI = 0x0000;
+const unsigned short MAX_PI = 0xFFFF;
+const unsigned char MIN_SRCH_STATIONS_CNT = 0x00;
+const unsigned char MAX_SRCH_STATIONS_CNT = 0x14;
+const unsigned char MIN_CHAN_SPACING = 0x00;
+const unsigned char MAX_CHAN_SPACING = 0x02;
+const unsigned char MIN_EMPHASIS = 0x00;
+const unsigned char MAX_EMPHASIS = 0x01;
+const unsigned char MIN_RDS_STD = 0x00;
+const unsigned char MAX_RDS_STD = 0x02;
+const unsigned char MIN_ANTENNA_VAL = 0x00;
+const unsigned char MAX_ANTENNA_VAL = 0x01;
+const unsigned char MIN_TX_PS_REPEAT_CNT = 0x01;
+const unsigned char MAX_TX_PS_REPEAT_CNT = 0x0F;
+const unsigned char MIN_SOFT_MUTE = 0x00;
+const unsigned char MAX_SOFT_MUTE = 0x01;
+const unsigned char MIN_PEEK_ACCESS_LEN = 0x01;
+const unsigned char MAX_PEEK_ACCESS_LEN = 0xF9;
+const unsigned char MIN_RESET_CNTR = 0x00;
+const unsigned char MAX_RESET_CNTR = 0x01;
+const unsigned char MIN_HLSI = 0x00;
+const unsigned char MAX_HLSI = 0x02;
+const unsigned char MIN_NOTCH_FILTER = 0x00;
+const unsigned char MAX_NOTCH_FILTER = 0x02;
+const unsigned char MIN_INTF_DET_OUT_LW_TH = 0x00;
+const unsigned char MAX_INTF_DET_OUT_LW_TH = 0xFF;
+const unsigned char MIN_INTF_DET_OUT_HG_TH = 0x00;
+const unsigned char MAX_INTF_DET_OUT_HG_TH = 0xFF;
+const signed char MIN_SINR_TH = -128;
+const signed char MAX_SINR_TH = 127;
+const unsigned char MIN_SINR_SAMPLES = 0x01;
+const unsigned char MAX_SINR_SAMPLES = 0xFF;
+
 /* FM RDS */
 #define RDS_PTYPE 2
 #define RDS_PID_LOWER 1
@@ -866,12 +871,14 @@ struct hci_cc_do_calibration_rsp {
 #define AUDIO_CTRL_INTR (1 << 2)
 #define AF_JUMP_ENABLE  (1 << 4)
 
+#ifdef __KERNEL__
 int hci_def_data_read(struct hci_fm_def_data_rd_req *arg,
 	struct radio_hci_dev *hdev);
 int hci_def_data_write(struct hci_fm_def_data_wr_req *arg,
 	struct radio_hci_dev *hdev);
 int hci_fm_do_calibration(__u8 *arg, struct radio_hci_dev *hdev);
 int hci_fm_do_calibration(__u8 *arg, struct radio_hci_dev *hdev);
+#endif /* __KERNEL__ */
 
 static inline int is_valid_tone(int tone)
 {

@@ -4,6 +4,10 @@
  * Opportunistic sleep support.
  *
  * Copyright (C) 2012 Rafael J. Wysocki <rjw@sisk.pl>
+ * Copyright (C) 2013 Sony Mobile Communications AB.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/device.h>
@@ -11,7 +15,7 @@
 #include <linux/pm_wakeup.h>
 
 #include "power.h"
-
+#define SUSPEND_TIME_SLICE (2 * HZ)
 static suspend_state_t autosleep_state;
 static struct workqueue_struct *autosleep_wq;
 /*
@@ -26,6 +30,9 @@ static struct wakeup_source *autosleep_ws;
 static void try_to_suspend(struct work_struct *work)
 {
 	unsigned int initial_count, final_count;
+	int ret;
+	static unsigned long last_suspend_exit_time;
+	static int fail_number;
 
 	if (!pm_get_wakeup_count(&initial_count, true))
 		goto out;
@@ -43,8 +50,37 @@ static void try_to_suspend(struct work_struct *work)
 	}
 	if (autosleep_state >= PM_SUSPEND_MAX)
 		hibernate();
-	else
-		pm_suspend(autosleep_state);
+	else {
+		if (last_suspend_exit_time == 0 ||
+			time_after(jiffies,
+				last_suspend_exit_time + SUSPEND_TIME_SLICE)) {
+suspend:
+			ret = pm_suspend(autosleep_state);
+			if (ret == 0) {
+				last_suspend_exit_time = jiffies;
+				fail_number = 0;
+			} else if (ret == -EBUSY) {
+				fail_number++;
+				if (fail_number == 3) {
+					fail_number = 0;
+					mutex_unlock(&autosleep_lock);
+					schedule_timeout_uninterruptible(10 * HZ);
+					mutex_lock(&autosleep_lock);
+				}
+			} else
+				fail_number = 0;
+		} else {
+			long sleep_time =
+				SUSPEND_TIME_SLICE -
+				(jiffies - last_suspend_exit_time);
+			if (sleep_time > 0) {
+				mutex_unlock(&autosleep_lock);
+				schedule_timeout_uninterruptible(sleep_time);
+				mutex_lock(&autosleep_lock);
+			} else
+				goto suspend;
+		}
+	}
 
 	mutex_unlock(&autosleep_lock);
 
