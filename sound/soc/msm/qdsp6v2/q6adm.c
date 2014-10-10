@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,6 +38,7 @@
 
 #define ULL_SUPPORTED_SAMPLE_RATE 48000
 #define ULL_MAX_SUPPORTED_CHANNEL 2
+uint8_t *adm_get_param_buffer;
 enum {
 	ADM_RX_AUDPROC_CAL,
 	ADM_TX_AUDPROC_CAL,
@@ -441,6 +443,174 @@ adm_get_param_return:
 	return rc;
 }
 
+/* SOMC effect control start */
+int sony_copp_effect_get(int port_id, void *params,
+				uint32_t param_size, uint32_t module_id)
+{
+	struct adm_cmd_get_pp_params_v5 *cmd = NULL;
+	uint32_t cmd_size = sizeof(struct adm_cmd_get_pp_params_v5);
+	int ret = 0, sz = 0;
+	int index;
+
+	if (params == NULL) {
+		pr_err("%s: effect param pointer is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	sz = cmd_size + param_size;
+	cmd = kzalloc(sz, GFP_KERNEL);
+	if (cmd == NULL) {
+		pr_err("%s: allocate cmd failed\n", __func__);
+		return -ENOMEM;
+	}
+
+	cmd->data_payload_addr_lsw = 0;
+	cmd->data_payload_addr_msw = 0;
+	cmd->mem_map_handle = 0;
+	cmd->reserved = 0;
+	cmd->module_id = module_id;
+	cmd->param_id = PARAM_ID_SONY_EFFECT;
+	cmd->param_max_size = SONY_ADM_PAYLOAD_SIZE + param_size;
+
+	adm_get_param_buffer = kzalloc(param_size, GFP_KERNEL);
+	if (adm_get_param_buffer == NULL) {
+		pr_err("%s: allocate param buf failed\n", __func__);
+		kfree(cmd);
+		return -ENOMEM;
+	}
+
+	cmd->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	cmd->hdr.pkt_size = sz;
+	cmd->hdr.src_svc = APR_SVC_ADM;
+	cmd->hdr.src_domain = APR_DOMAIN_APPS;
+	cmd->hdr.src_port = port_id;
+	cmd->hdr.dest_svc = APR_SVC_ADM;
+	cmd->hdr.dest_domain = APR_DOMAIN_ADSP;
+	index = afe_get_port_index(port_id);
+	if (index < 0) {
+		pr_err("%s: AFE get port index %d failed\n", __func__,
+			index);
+		goto fail_cmd;
+	}
+	cmd->hdr.dest_port = atomic_read(&this_adm.copp_id[index]);
+	cmd->hdr.token = port_id;
+	cmd->hdr.opcode = ADM_CMD_GET_PP_PARAMS_V5;
+
+	atomic_set(&this_adm.copp_stat[index], 0);
+
+	pr_info("%s: Get effect param(0x%08x) from APR, param size %d\n",
+				__func__, module_id, param_size);
+	ret = apr_send_pkt(this_adm.apr, (uint32_t *)cmd);
+	if (ret < 0) {
+		pr_err("%s: ADM enable for port %d failed\n", __func__,
+			port_id);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+
+	/* Wait for the callback with copp id */
+	ret = wait_event_timeout(this_adm.wait[index],
+			atomic_read(&this_adm.copp_stat[index]),
+			msecs_to_jiffies(TIMEOUT_MS));
+	if (!ret) {
+		pr_err("%s: Getting copp effect param(0x%08x) failed\n",
+			__func__, module_id);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	ret = 0;
+
+	memcpy(params, adm_get_param_buffer, param_size);
+
+fail_cmd:
+	kfree(cmd);
+	kfree(adm_get_param_buffer);
+	return ret;
+}
+
+int sony_copp_effect_set(int port_id, void *params,
+				uint32_t param_size, uint32_t module_id)
+{
+	struct adm_cmd_set_pp_params_inband_v5 *cmd = NULL;
+	uint32_t cmd_size =
+		sizeof(struct adm_cmd_set_pp_params_inband_v5);
+	uint32_t data_size = sizeof(struct adm_param_data_v5);
+	void *param_ptr = NULL;
+	int ret = 0, sz = 0;
+	int index;
+
+	if (params == NULL) {
+		pr_err("%s: effect param pointer is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	sz = cmd_size + param_size;
+	cmd = kzalloc(sz, GFP_KERNEL);
+	if (cmd == NULL) {
+		pr_err("%s: allocate cmd failed\n", __func__);
+		return -ENOMEM;
+	}
+
+	cmd->payload_addr_lsw = 0;
+	cmd->payload_addr_msw = 0;
+	cmd->mem_map_handle = 0;
+	cmd->payload_size = data_size + param_size;
+
+	cmd->params.reserved = 0;
+	cmd->params.module_id = module_id;
+	cmd->params.param_id = PARAM_ID_SONY_EFFECT;
+	cmd->params.param_size = param_size;
+
+	param_ptr = (void *)((u8 *)cmd + cmd_size);
+	memcpy(param_ptr, params, param_size);
+
+	cmd->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	cmd->hdr.pkt_size = sz;
+	cmd->hdr.src_svc = APR_SVC_ADM;
+	cmd->hdr.src_domain = APR_DOMAIN_APPS;
+	cmd->hdr.src_port = port_id;
+	cmd->hdr.dest_svc = APR_SVC_ADM;
+	cmd->hdr.dest_domain = APR_DOMAIN_ADSP;
+	index = afe_get_port_index(port_id);
+	if (index < 0) {
+		pr_err("%s: AFE get port index %d failed\n", __func__,
+			index);
+		goto fail_cmd;
+	}
+	cmd->hdr.dest_port = atomic_read(&this_adm.copp_id[index]);
+	cmd->hdr.token = port_id;
+	cmd->hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+	atomic_set(&this_adm.copp_stat[index], 0);
+
+	pr_info("%s: send effect param(0x%08x) to APR, param size %d\n",
+				__func__, module_id, param_size);
+	ret = apr_send_pkt(this_adm.apr, (uint32_t *)cmd);
+	if (ret < 0) {
+		pr_err("%s: ADM enable for port %d failed\n", __func__,
+			port_id);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+
+	/* Wait for the callback with copp id */
+	ret = wait_event_timeout(this_adm.wait[index],
+			atomic_read(&this_adm.copp_stat[index]),
+			msecs_to_jiffies(TIMEOUT_MS));
+	if (!ret) {
+		pr_err("%s: Setting copp effect param(0x%08x) failed\n",
+			__func__, module_id);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	ret = 0;
+
+fail_cmd:
+	kfree(cmd);
+	return ret;
+}
+/* SOMC effect control end */
 
 static void adm_callback_debug_print(struct apr_client_data *data)
 {

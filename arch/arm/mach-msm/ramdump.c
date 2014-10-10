@@ -1,4 +1,6 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +10,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/kernel.h>
@@ -26,6 +31,7 @@
 #include <linux/wait.h>
 
 #include <mach/ramdump.h>
+#include <mach/ssr_monitor.h>
 
 #define RAMDUMP_WAIT_MSECS	120000
 
@@ -173,6 +179,7 @@ ramdump_done:
 	rd_dev->data_ready = 0;
 	*pos = 0;
 	complete(&rd_dev->ramdump_complete);
+	ssr_monitor_notify(rd_dev->name);
 	return ret;
 }
 

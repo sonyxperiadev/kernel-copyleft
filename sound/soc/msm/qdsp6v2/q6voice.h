@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1446,6 +1447,9 @@ int voc_set_tx_mute(uint32_t session_id, uint32_t dir, uint32_t mute,
 		    uint32_t ramp_duration);
 int voc_set_rx_device_mute(uint32_t session_id, uint32_t mute,
 			   uint32_t ramp_duration);
+int voc_set_tx_device_mute(uint32_t session_id, uint32_t mute,
+			   uint32_t ramp_duration);
+int voc_get_tx_device_mute(uint32_t session_id);
 int voc_get_rx_device_mute(uint32_t session_id);
 int voc_disable_cvp(uint32_t session_id);
 int voc_enable_cvp(uint32_t session_id);
@@ -1468,7 +1472,7 @@ uint32_t voc_get_session_id(char *name);
 int voc_start_playback(uint32_t set, uint16_t port_id);
 int voc_start_record(uint32_t port_id, uint32_t set, uint32_t session_id);
 int voice_get_idx_for_session(u32 session_id);
-int voc_set_ext_ec_ref(uint16_t port_id, bool state);
 int voc_update_amr_vocoder_rate(uint32_t session_id);
+int voc_set_ext_ec_ref(uint16_t port_id, bool state);
 
 #endif
