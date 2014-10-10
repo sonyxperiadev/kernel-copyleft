@@ -3,6 +3,7 @@
  * driver source file
  *
  * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2892,10 +2893,8 @@ static int __devinit sdhci_msm_probe(struct platform_device *pdev)
 	msm_host->mmc->caps2 |= (MMC_CAP2_BOOTPART_NOACC |
 				MMC_CAP2_DETECT_ON_ERR);
 	msm_host->mmc->caps2 |= MMC_CAP2_SANITIZE;
-	msm_host->mmc->caps2 |= MMC_CAP2_CACHE_CTRL;
-	msm_host->mmc->caps2 |= MMC_CAP2_POWEROFF_NOTIFY;
-	msm_host->mmc->caps2 |= MMC_CAP2_CLK_SCALE;
 	msm_host->mmc->caps2 |= MMC_CAP2_STOP_REQUEST;
+	msm_host->mmc->caps2 |= MMC_CAP2_INIT_BKOPS;
 	msm_host->mmc->caps2 |= MMC_CAP2_ASYNC_SDIO_IRQ_4BIT_MODE;
 	msm_host->mmc->caps2 |= MMC_CAP2_CORE_PM;
 	msm_host->mmc->pm_caps |= MMC_PM_KEEP_POWER;
@@ -3067,12 +3066,16 @@ static int sdhci_msm_runtime_resume(struct device *dev)
 static int sdhci_msm_suspend(struct device *dev)
 {
 	struct sdhci_host *host = dev_get_drvdata(dev);
+#ifndef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_msm_host *msm_host = pltfm_host->priv;
+#endif
 	int ret = 0;
 
+#ifndef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	if (gpio_is_valid(msm_host->pdata->status_gpio))
 		mmc_cd_gpio_free(msm_host->mmc);
+#endif
 
 	if (pm_runtime_suspended(dev)) {
 		pr_debug("%s: %s: already runtime suspended\n",
@@ -3088,10 +3091,13 @@ out:
 static int sdhci_msm_resume(struct device *dev)
 {
 	struct sdhci_host *host = dev_get_drvdata(dev);
+#ifndef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_msm_host *msm_host = pltfm_host->priv;
+#endif
 	int ret = 0;
 
+#ifndef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	if (gpio_is_valid(msm_host->pdata->status_gpio)) {
 		ret = mmc_cd_gpio_request(msm_host->mmc,
 				msm_host->pdata->status_gpio);
@@ -3099,6 +3105,7 @@ static int sdhci_msm_resume(struct device *dev)
 			pr_err("%s: %s: Failed to request card detection IRQ %d\n",
 					mmc_hostname(host->mmc), __func__, ret);
 	}
+#endif
 
 	if (pm_runtime_suspended(dev)) {
 		pr_debug("%s: %s: runtime suspended, defer system resume\n",

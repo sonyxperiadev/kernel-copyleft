@@ -1,6 +1,7 @@
 /*Qualcomm Secure Execution Environment Communicator (QSEECOM) driver
  *
  * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -637,6 +638,7 @@ static int qseecom_scale_bus_bandwidth(struct qseecom_dev_handle *data,
 static void __qseecom_add_bw_scale_down_timer(uint32_t duration)
 {
 	mutex_lock(&qsee_bw_mutex);
+	del_timer_sync(&(qseecom.bw_scale_down_timer));
 	qseecom.bw_scale_down_timer.expires = jiffies +
 		msecs_to_jiffies(duration);
 	mod_timer(&(qseecom.bw_scale_down_timer),
@@ -915,6 +917,7 @@ static int qseecom_load_app(struct qseecom_dev_handle *data, void __user *argp)
 		}
 		spin_unlock_irqrestore(
 		&qseecom.registered_app_list_lock, flags);
+		ret = 0;
 	} else {
 		pr_warn("App (%s) does'nt exist, loading apps for first time\n",
 			(char *)(load_img_req.img_name));
@@ -3416,6 +3419,7 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 		/* Only one client allowed here at a time */
 		mutex_lock(&app_access_lock);
 		if (qseecom.support_bus_scaling) {
+			/* register bus bw in case the client doesn't do it */
 			if (!data->mode) {
 				mutex_lock(&qsee_bw_mutex);
 				__qseecom_register_bus_bandwidth_needs(
@@ -4368,6 +4372,7 @@ static int qseecom_resume(struct platform_device *pdev)
 	}
 
 	if (qclk->clk_access_cnt || qseecom.cumulative_mode) {
+		del_timer_sync(&(qseecom.bw_scale_down_timer));
 		qseecom.bw_scale_down_timer.expires = jiffies +
 			msecs_to_jiffies(QSEECOM_SEND_CMD_CRYPTO_TIMEOUT);
 		mod_timer(&(qseecom.bw_scale_down_timer),

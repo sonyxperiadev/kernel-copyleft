@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -654,6 +655,26 @@ const struct file_operations diag_dbgfs_bridge_ops = {
 };
 #endif
 
+static int diag_dbgfs_read_mask_check_flag(void *data, u64 *val)
+{
+	*val = (u64) driver->mask_check;
+	return 0;
+}
+
+static int diag_dbgfs_write_mask_check_flag(void *data, u64 val)
+{
+	if (val > 1)
+		return -EINVAL;
+
+	driver->mask_check = (int) val;
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(diag_dbgfs_mask_check_ops,
+			diag_dbgfs_read_mask_check_flag,
+			diag_dbgfs_write_mask_check_flag,
+			"%llu\n");
+
 const struct file_operations diag_dbgfs_status_ops = {
 	.read = diag_dbgfs_read_status,
 };
@@ -699,6 +720,9 @@ void diag_debugfs_init(void)
 	debugfs_create_file("bridge", 0444, diag_dbgfs_dent, 0,
 		&diag_dbgfs_bridge_ops);
 #endif
+
+	debugfs_create_file("mask_check", 0664, diag_dbgfs_dent, 0,
+		&diag_dbgfs_mask_check_ops);
 
 	diag_dbgfs_table_index = 0;
 	diag_dbgfs_finished = 0;

@@ -1428,7 +1428,6 @@ static int venus_hfi_iface_cmdq_write_nolock(struct venus_hfi_device *device,
 		result = -EINVAL;
 		goto err_q_null;
 	}
-
 	q_info = &device->iface_queues[VIDC_IFACEQ_CMDQ_IDX];
 	if (!q_info) {
 		dprintk(VIDC_ERR, "cannot write to shared Q's");
@@ -2870,6 +2869,15 @@ static int venus_hfi_try_clk_gating(struct venus_hfi_device *device)
 	mutex_unlock(&device->write_lock);
 	return rc;
 }
+
+static void venus_hfi_crash_reason(struct hfi_sfr_struct *vsfr)
+{
+	char msg[81];
+	snprintf(msg, sizeof(msg), "SFR Message from FW : %s",
+						vsfr->rg_data);
+	subsystem_crash_reason("venus", msg);
+}
+
 static void venus_hfi_process_msg_event_notify(
 	struct venus_hfi_device *device, void *packet)
 {
@@ -2884,9 +2892,11 @@ static void venus_hfi_process_msg_event_notify(
 		HFI_EVENT_SYS_ERROR) {
 		vsfr = (struct hfi_sfr_struct *)
 				device->sfr.align_virtual_addr;
-		if (vsfr)
+		if (vsfr) {
 			dprintk(VIDC_ERR, "SFR Message from FW : %s",
 				vsfr->rg_data);
+			venus_hfi_crash_reason(vsfr);
+		}
 	}
 }
 static void venus_hfi_response_handler(struct venus_hfi_device *device)
@@ -2902,10 +2912,12 @@ static void venus_hfi_response_handler(struct venus_hfi_device *device)
 				__func__);
 			vsfr = (struct hfi_sfr_struct *)
 					device->sfr.align_virtual_addr;
-			if (vsfr)
+			if (vsfr) {
 				dprintk(VIDC_ERR,
 					"SFR Message from FW : %s",
 						vsfr->rg_data);
+				venus_hfi_crash_reason(vsfr);
+			}
 			venus_hfi_process_sys_watchdog_timeout(device);
 		}
 
@@ -3781,6 +3793,29 @@ int venus_hfi_get_core_capabilities(void)
 	return rc;
 }
 
+int venus_hfi_capability_check(u32 fourcc, u32 width,
+				u32 *max_width, u32 *max_height)
+{
+	int rc = 0;
+	if (!max_width || !max_height) {
+		dprintk(VIDC_ERR, "%s - invalid parameter\n", __func__);
+		return -EINVAL;
+	}
+
+	if (msm_vp8_low_tier && fourcc == V4L2_PIX_FMT_VP8) {
+		*max_width = DEFAULT_WIDTH;
+		*max_height = DEFAULT_HEIGHT;
+	}
+
+	if (width > *max_width) {
+		dprintk(VIDC_ERR,
+			"Unsupported width = %u supported max width = %u\n",
+			width, *max_width);
+		rc = -ENOTSUPP;
+	}
+	return rc;
+}
+
 static void *venus_hfi_add_device(u32 device_id,
 			struct msm_vidc_platform_resources *res,
 			hfi_cmd_response_callback callback)
@@ -3943,6 +3978,7 @@ static void venus_init_hfi_callbacks(struct hfi_device *hdev)
 	hdev->get_info = venus_hfi_get_info;
 	hdev->get_stride_scanline = venus_hfi_get_stride_scanline;
 	hdev->get_core_capabilities = venus_hfi_get_core_capabilities;
+	hdev->capability_check = venus_hfi_capability_check;
 	hdev->power_enable = venus_hfi_power_enable;
 }
 

@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2014 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/io.h>
@@ -189,6 +193,29 @@ static void hdmi_hdcp_hw_ddc_clean(struct hdmi_hdcp_ctrl *hdcp_ctrl)
 			} while (ddc_hw_not_ready && --timeout_count);
 	}
 } /* hdmi_hdcp_hw_ddc_clean */
+
+void hdmi_hdcp_aksv(u8 aksv[5], void *input)
+{
+	struct hdmi_hdcp_ctrl *hdcp_ctrl = (struct hdmi_hdcp_ctrl *)input;
+	u32 qfprom_aksv_lsb, qfprom_aksv_msb;
+
+	if (!hdcp_ctrl) {
+		DEV_ERR("%s: invalid input\n", __func__);
+		return;
+	}
+
+	/* Fetch aksv from QFPROM, this info should be public. */
+	qfprom_aksv_lsb = DSS_REG_R(hdcp_ctrl->init_data.qfprom_io,
+		HDCP_KSV_LSB);
+	qfprom_aksv_msb = DSS_REG_R(hdcp_ctrl->init_data.qfprom_io,
+		HDCP_KSV_MSB);
+
+	aksv[0] =  qfprom_aksv_lsb        & 0xFF;
+	aksv[1] = (qfprom_aksv_lsb >> 8)  & 0xFF;
+	aksv[2] = (qfprom_aksv_lsb >> 16) & 0xFF;
+	aksv[3] = (qfprom_aksv_lsb >> 24) & 0xFF;
+	aksv[4] =  qfprom_aksv_msb        & 0xFF;
+} /* hdmi_hdcp_aksv */
 
 static int hdmi_hdcp_authentication_part1(struct hdmi_hdcp_ctrl *hdcp_ctrl)
 {
@@ -1195,8 +1222,8 @@ int hdmi_hdcp_isr(void *input)
 
 	/* Ignore HDCP interrupts if HDCP is disabled */
 	if (HDCP_STATE_INACTIVE == hdcp_ctrl->hdcp_state) {
-		DEV_ERR("%s: HDCP inactive. Just clear int and return.\n",
-			__func__);
+		if (hdcp_int_val)
+			DEV_ERR("%s: HDCP inactive.\n", __func__);
 		DSS_REG_W(io, HDMI_HDCP_INT_CTRL, HDCP_INT_CLR);
 		return 0;
 	}
