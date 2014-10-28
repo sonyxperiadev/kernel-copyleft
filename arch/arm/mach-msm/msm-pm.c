@@ -31,6 +31,11 @@
 #include <asm/cacheflush.h>
 #include <asm/outercache.h>
 #include <mach/remote_spinlock.h>
+#include <asm/hardware/gic.h>
+#ifdef CONFIG_VFP
+#include <asm/vfp.h>
+#endif
+#include <mach/msm_iomap.h>
 #include <mach/scm.h>
 #include <mach/msm_bus.h>
 #include <mach/jtag.h>
@@ -538,6 +543,10 @@ static bool __ref msm_pm_spm_power_collapse(
 	bool collapsed = 0;
 	int ret;
 	bool save_cpu_regs = !cpu || from_idle;
+	unsigned int saved_gic_cpu_ctrl;
+
+	saved_gic_cpu_ctrl = readl_relaxed(MSM_QGIC_CPU_BASE + GIC_CPU_CTRL);
+	mb();
 
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
 		pr_info("CPU%u: %s: notify_rpm %d\n",
@@ -558,6 +567,9 @@ static bool __ref msm_pm_spm_power_collapse(
 		pr_info("CPU%u: %s: program vector to %p\n",
 			cpu, __func__, entry);
 
+#ifdef CONFIG_VFP
+	vfp_pm_suspend();
+#endif
 	msm_jtag_save_state();
 
 	collapsed = save_cpu_regs ?
@@ -572,7 +584,14 @@ static bool __ref msm_pm_spm_power_collapse(
 	msm_jtag_restore_state();
 
 	if (collapsed) {
+#ifdef CONFIG_VFP
+		vfp_pm_resume();
+#endif
 		cpu_init();
+		writel(0xF0, MSM_QGIC_CPU_BASE + GIC_CPU_PRIMASK);
+		writel_relaxed(saved_gic_cpu_ctrl,
+				MSM_QGIC_CPU_BASE + GIC_CPU_CTRL);
+		mb();
 		local_fiq_enable();
 	}
 

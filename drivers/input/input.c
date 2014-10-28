@@ -2,6 +2,7 @@
  * The input core
  *
  * Copyright (c) 1999-2002 Vojtech Pavlik
+ * Copyright (C) 2012-2014 Sony Mobile Communications AB.
  */
 
 /*
@@ -1604,8 +1605,15 @@ static int input_dev_resume(struct device *dev)
 {
 	struct input_dev *input_dev = to_input_dev(dev);
 
-	input_reset_device(input_dev);
-
+	if (0) {
+		/* removed to avoid the injection of fake key release events */
+		input_reset_device(input_dev);
+	} else {
+		mutex_lock(&input_dev->mutex);
+		if (input_dev->users)
+			input_dev_toggle(input_dev, true);
+		mutex_unlock(&input_dev->mutex);
+	}
 	return 0;
 }
 

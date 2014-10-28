@@ -5,6 +5,7 @@
  * Copyright (c) 2002-2003 Open Source Development Labs
  * Copyright (c) 2006-2008 Greg Kroah-Hartman <greg@kroah.com>
  * Copyright (c) 2006-2008 Novell Inc.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This file is released under the GPLv2.
  *
@@ -28,7 +29,7 @@
 #include <linux/atomic.h>
 
 #define UEVENT_HELPER_PATH_LEN		256
-#define UEVENT_NUM_ENVP			32	/* number of env pointers */
+#define UEVENT_NUM_ENVP			40	/* number of env pointers */
 #define UEVENT_BUFFER_SIZE		2048	/* buffer for the variables */
 
 /* path to the userspace helper executed on an event */
