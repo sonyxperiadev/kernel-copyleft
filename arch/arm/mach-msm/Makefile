@@ -322,6 +322,8 @@ else ifdef CONFIG_MACH_SONY_LEO_DCM
 	obj-$(CONFIG_MACH_SONY_LEO_DCM) += board-sony_leo_dcm-gpiomux.o bms-batterydata-leo.o
 else ifdef CONFIG_MACH_SONY_ARIES
 	obj-$(CONFIG_MACH_SONY_ARIES) += board-sony_aries-gpiomux.o bms-batterydata-aries.o board-sony_shinano-nfc.o
+else ifdef CONFIG_MACH_SONY_ARIES_DCM
+	obj-$(CONFIG_MACH_SONY_ARIES_DCM) += board-sony_aries_dcm-gpiomux.o bms-batterydata-aries.o board-sony_shinano-nfc.o
 else ifdef CONFIG_MACH_SONY_SCORPION
 	obj-$(CONFIG_MACH_SONY_SCORPION) += board-sony_scorpion-gpiomux.o bms-batterydata-scorpion.o board-sony_shinano-nfc.o
 else ifdef CONFIG_MACH_SONY_SCORPION_WINDY

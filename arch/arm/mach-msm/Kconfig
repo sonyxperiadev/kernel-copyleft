@@ -1211,6 +1211,15 @@ config MACH_SONY_ARIES
 	  If you enable this config,
 	  Please use SONY Mobile source tree.
 
+config MACH_SONY_ARIES_DCM
+	depends on ARCH_MSM8974
+	bool "Sony Mobile Aries Docomo"
+	help
+	  Support for the SONY Mobile Aries Docomo device.
+	  It is based on QCOM MSM8974 AC chipset.
+	  If you enable this config,
+	  Please use SONY Mobile source tree.
+
 config MACH_SONY_SCORPION
 	depends on ARCH_MSM8974
 	bool "Sony Mobile Scorpion"

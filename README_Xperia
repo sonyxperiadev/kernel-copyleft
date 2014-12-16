@@ -7,6 +7,7 @@ Configuration files can be found in arch/arm/configs.
     Xperia Z3 D6603/D6653/D6643            => shinano_leo_defconfig
     Xperia Z3 SO-01G                       => shinano_leo_dcm_defconfig
     Xperia Z3 Compact D5803/D5833          => shinano_aries_defconfig
+    Xperia Z3 Compact SO-02G               => shinano_aries_dcm_defconfig
     Xperia Z3 Tablet Compact SGP621/SGP641 => shinano_scorpion_defconfig
     Xperia Z3 Tablet Compact SGP611/SGP612 => shinano_scorpion_windy_defconfig
 
