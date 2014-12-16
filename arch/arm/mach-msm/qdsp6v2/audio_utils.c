@@ -255,11 +255,12 @@ long audio_in_ioctl(struct file *file,
 		   but with in maximum frames number */
 		if ((cfg.buffer_size < (audio->min_frame_size+ \
 			sizeof(struct meta_out_dsp))) ||
-			(cfg.buffer_count > FRAME_NUM)) {
+			(cfg.buffer_count < FRAME_NUM)) {
 			rc = -EINVAL;
 			break;
 		}
-		if (cfg.buffer_size > FRAME_SIZE) {
+		if ((cfg.buffer_size > FRAME_SIZE) ||
+			(cfg.buffer_count != FRAME_NUM)) {
 			rc = -EINVAL;
 			break;
 		}

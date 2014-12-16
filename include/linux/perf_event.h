@@ -254,9 +254,8 @@ struct perf_event_attr {
 
 				exclude_host   :  1, /* don't count in host   */
 				exclude_guest  :  1, /* don't count in guest  */
-				constraint_duplicate : 1,
 
-				__reserved_1   : 42;
+				__reserved_1   : 43;
 
 	union {
 		__u32		wakeup_events;	  /* wakeup every n events */
@@ -741,8 +740,6 @@ struct pmu {
 	int * __percpu			pmu_disable_count;
 	struct perf_cpu_context * __percpu pmu_cpu_context;
 	int				task_ctx_nr;
-	u32                             events_across_hotplug:1,
-					reserved:31;
 
 	/*
 	 * Fully disable/enable this PMU, can be used to protect from the PMI

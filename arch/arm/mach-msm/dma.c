@@ -373,8 +373,9 @@ static void __msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd)
 
 	spin_lock_irqsave(&dmov_conf[adm].list_lock, flags);
 	list_add_tail(&cmd->list, &dmov_conf[adm].staged_commands[ch]);
-	queue_work(dmov_conf[adm].cmd_wq, &cmd->work);
 	spin_unlock_irqrestore(&dmov_conf[adm].list_lock, flags);
+
+	queue_work(dmov_conf[adm].cmd_wq, &cmd->work);
 }
 
 void msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd)

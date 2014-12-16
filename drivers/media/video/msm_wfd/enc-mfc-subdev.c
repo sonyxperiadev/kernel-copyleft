@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, Linux Foundation. All rights reserved.
+* Copyright (C) 2013 Sony Mobile Communications AB.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 * GNU General Public License for more details.
 *
+* NOTE: This file has been modified by Sony Mobile Communications AB.
+* Modifications are licensed under the License.
 */
 
 #include <media/v4l2-subdev.h>
@@ -988,7 +991,7 @@ static long venc_set_bitrate_mode(struct video_client_ctx *client_ctx,
 		rate_control.rate_control = VCD_RATE_CONTROL_VBR_VFR;
 		break;
 	case V4L2_MPEG_VIDEO_BITRATE_MODE_CBR:
-		rate_control.rate_control = VCD_RATE_CONTROL_CBR_VFR;
+		rate_control.rate_control = VCD_RATE_CONTROL_CBR_CFR;
 		break;
 	default:
 		WFD_MSG_ERR("unknown bitrate mode %d", mode);
@@ -2072,14 +2075,6 @@ static long venc_alloc_recon_buffers(struct v4l2_subdev *sd, void *arg)
 				= ion_alloc(client_ctx->user_ion_client,
 			control.size, SZ_8K, heap_mask, ion_flags);
 
-			if (IS_ERR_OR_NULL(
-				client_ctx->recon_buffer_ion_handle[i])) {
-				WFD_MSG_ERR("%s() :WFD ION alloc failed\n",
-					__func__);
-				rc = -ENOMEM;
-				goto bail_out;
-			}
-
 			ctrl->kernel_virtual_addr = ion_map_kernel(
 				client_ctx->user_ion_client,
 				client_ctx->recon_buffer_ion_handle[i]);
@@ -2137,54 +2132,26 @@ static long venc_alloc_recon_buffers(struct v4l2_subdev *sd, void *arg)
 	return rc;
 unmap_ion_iommu:
 	if (!inst->secure) {
-		if (!IS_ERR_OR_NULL(
-			client_ctx->recon_buffer_ion_handle[i])) {
+		if (client_ctx->recon_buffer_ion_handle[i]) {
 			ion_unmap_iommu(client_ctx->user_ion_client,
 				client_ctx->recon_buffer_ion_handle[i],
 				VIDEO_DOMAIN, VIDEO_MAIN_POOL);
 		}
 	}
 unmap_ion_alloc:
-	if (!IS_ERR_OR_NULL(client_ctx->recon_buffer_ion_handle[i])) {
+	if (client_ctx->recon_buffer_ion_handle[i]) {
 		ion_unmap_kernel(client_ctx->user_ion_client,
 			client_ctx->recon_buffer_ion_handle[i]);
-		client_ctx->recon_buffer[i].kernel_virtual_addr = NULL;
-		client_ctx->recon_buffer[i].physical_addr = NULL;
-		client_ctx->recon_buffer[i].user_virtual_addr = NULL;
+		ctrl->kernel_virtual_addr = NULL;
+		ctrl->physical_addr = NULL;
 	}
 free_ion_alloc:
-	if (!IS_ERR_OR_NULL(client_ctx->recon_buffer_ion_handle[i])) {
+	if (client_ctx->recon_buffer_ion_handle[i]) {
 		ion_free(client_ctx->user_ion_client,
 			client_ctx->recon_buffer_ion_handle[i]);
 		client_ctx->recon_buffer_ion_handle[i] = NULL;
 	}
-
-bail_out:
-
-	WFD_MSG_ERR("Failed to alloc recon buffers\n");
-
-	for (--i; i >= 0; i--) {
-		if (!inst->secure) {
-			if (!IS_ERR_OR_NULL(
-				client_ctx->recon_buffer_ion_handle[i])) {
-				ion_unmap_iommu(client_ctx->user_ion_client,
-					client_ctx->recon_buffer_ion_handle[i],
-					VIDEO_DOMAIN, VIDEO_MAIN_POOL);
-			}
-		}
-		if (!IS_ERR_OR_NULL(client_ctx->recon_buffer_ion_handle[i])) {
-			ion_unmap_kernel(client_ctx->user_ion_client,
-				client_ctx->recon_buffer_ion_handle[i]);
-				client_ctx->recon_buffer[i].kernel_virtual_addr = NULL;
-				client_ctx->recon_buffer[i].physical_addr = NULL;
-				client_ctx->recon_buffer[i].user_virtual_addr = NULL;
-		}
-		if (!IS_ERR_OR_NULL(client_ctx->recon_buffer_ion_handle[i])) {
-			ion_free(client_ctx->user_ion_client,
-			client_ctx->recon_buffer_ion_handle[i]);
-			client_ctx->recon_buffer_ion_handle[i] = NULL;
-		}
-	}
+	WFD_MSG_ERR("Failed to allo recon buffers\n");
 err:
 	return rc;
 }

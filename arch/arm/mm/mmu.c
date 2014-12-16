@@ -2,10 +2,14 @@
  *  linux/arch/arm/mm/mmu.c
  *
  *  Copyright (C) 1995-2005 Russell King
+ *  Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -307,8 +311,7 @@ static struct mem_type mem_types[] = {
 		.domain    = DOMAIN_KERNEL,
 	},
 	[MT_MEMORY_DMA_READY] = {
-		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-				L_PTE_XN,
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY,
 		.prot_l1   = PMD_TYPE_TABLE,
 		.domain    = DOMAIN_KERNEL,
 	},
@@ -941,6 +944,10 @@ void __init sanity_check_meminfo(void)
 	find_membank0_hole();
 #endif
 
+#if (defined CONFIG_HIGHMEM) && (defined CONFIG_FIX_MOVABLE_ZONE)
+	if (movable_reserved_size && __pa(vmalloc_min) > movable_reserved_start)
+		vmalloc_min = __va(movable_reserved_start);
+#endif
 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
 		struct membank *bank = &meminfo.bank[j];
 		*bank = meminfo.bank[i];

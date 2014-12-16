@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -619,26 +619,10 @@ static struct msmfb_writeback_data_list *get_if_registered(
  register_alloc_fail:
 	return NULL;
 }
-
-static int is_wb_operation_allowed(struct msm_fb_data_type *mfd)
-{
-	int rc = 0;
-	if (unlikely((mfd->panel.type != WRITEBACK_PANEL) ||
-		!(mfd->writeback_initialized)))
-		rc = -EPERM;
-	return rc;
-}
-
 int mdp4_writeback_start(
 		struct fb_info *info)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
-	int rc = 0;
-	rc = is_wb_operation_allowed(mfd);
-	if (rc) {
-		pr_err("\n%s: Unable to start, error = %d", __func__, rc);
-		return rc;
-	}
 	mutex_lock(&mfd->writeback_mutex);
 	mfd->writeback_state = WB_START;
 	mutex_unlock(&mfd->writeback_mutex);
@@ -650,20 +634,14 @@ int mdp4_writeback_queue_buffer(struct fb_info *info, struct msmfb_data *data)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct msmfb_writeback_data_list *node = NULL;
-	int rc = 0;
-
-	rc = is_wb_operation_allowed(mfd);
-	if (rc) {
-		pr_err("\n%s: Unable to queue, error = %d", __func__, rc);
-		return rc;
-	}
+	int rv = 0;
 
 	mutex_lock(&mfd->writeback_mutex);
 	node = get_if_registered(mfd, data);
 	if (!node || node->state == IN_BUSY_QUEUE ||
 		node->state == IN_FREE_QUEUE) {
 		pr_err("memory not registered or Buffer already with us\n");
-		rc = -EINVAL;
+		rv = -EINVAL;
 		goto exit;
 	}
 
@@ -672,7 +650,7 @@ int mdp4_writeback_queue_buffer(struct fb_info *info, struct msmfb_data *data)
 
 exit:
 	mutex_unlock(&mfd->writeback_mutex);
-	return rc;
+	return rv;
 }
 static int is_buffer_ready(struct msm_fb_data_type *mfd)
 {
@@ -688,12 +666,6 @@ int mdp4_writeback_dequeue_buffer(struct fb_info *info, struct msmfb_data *data)
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct msmfb_writeback_data_list *node = NULL;
 	int rc = 0, domain;
-
-	rc = is_wb_operation_allowed(mfd);
-	if (rc) {
-		pr_err("\n%s: Unable to Dequeue, error = %d", __func__, rc);
-		return rc;
-	}
 
 	rc = wait_event_interruptible(mfd->wait_q, is_buffer_ready(mfd));
 	if (rc) {
@@ -746,13 +718,6 @@ static bool is_writeback_inactive(struct msm_fb_data_type *mfd)
 int mdp4_writeback_stop(struct fb_info *info)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
-	int rc = 0;
-
-	rc = is_wb_operation_allowed(mfd);
-	if (rc) {
-		pr_err("\n%s: Unable to stop, error = %d", __func__, rc);
-		return rc;
-	}
 	mutex_lock(&mfd->writeback_mutex);
 	mfd->writeback_state = WB_STOPING;
 	mutex_unlock(&mfd->writeback_mutex);
@@ -767,18 +732,13 @@ int mdp4_writeback_stop(struct fb_info *info)
 int mdp4_writeback_init(struct fb_info *info)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
-
-	if (mfd->panel.type != WRITEBACK_PANEL)
-		return -ENOTSUPP;
-
-	mutex_lock(&mfd->writeback_mutex);
+	mutex_init(&mfd->writeback_mutex);
+	mutex_init(&mfd->unregister_mutex);
 	INIT_LIST_HEAD(&mfd->writeback_free_queue);
 	INIT_LIST_HEAD(&mfd->writeback_busy_queue);
 	INIT_LIST_HEAD(&mfd->writeback_register_queue);
 	mfd->writeback_state = WB_OPEN;
 	init_waitqueue_head(&mfd->wait_q);
-	mfd->writeback_initialized = true;
-	mutex_unlock(&mfd->writeback_mutex);
 	return 0;
 }
 int mdp4_writeback_terminate(struct fb_info *info)
@@ -787,12 +747,6 @@ int mdp4_writeback_terminate(struct fb_info *info)
 	struct msmfb_writeback_data_list *temp;
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	int rc = 0;
-
-	rc = is_wb_operation_allowed(mfd);
-	if (rc) {
-		pr_err("\n%s: Unable to terminate, error = %d", __func__, rc);
-		return rc;
-	}
 
 	mutex_lock(&mfd->unregister_mutex);
 	mutex_lock(&mfd->writeback_mutex);
@@ -815,7 +769,10 @@ int mdp4_writeback_terminate(struct fb_info *info)
 			kfree(temp);
 		}
 	}
-	mfd->writeback_initialized = false;
+	INIT_LIST_HEAD(&mfd->writeback_register_queue);
+	INIT_LIST_HEAD(&mfd->writeback_busy_queue);
+	INIT_LIST_HEAD(&mfd->writeback_free_queue);
+
 
 terminate_err:
 	mutex_unlock(&mfd->writeback_mutex);

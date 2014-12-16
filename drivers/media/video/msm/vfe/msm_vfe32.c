@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -4774,7 +4775,11 @@ static void vfe32_process_output_path_irq_rdi0(
 
 		} else {
 			axi_ctrl->share_ctrl->outpath.out2.frame_drop_cnt++;
+#if defined(CONFIG_SONY_CAM_V4L2)
+			CDBG("path_irq_2 irq - no free buffer for rdi0!\n");
+#else
 			pr_err("path_irq_2 irq - no free buffer for rdi0!\n");
+#endif
 		}
 	}
 }
@@ -6213,6 +6218,9 @@ static struct msm_cam_clk_info vfe32_clk_info[] = {
 	{"vfe_clk", 228570000},
 	{"vfe_pclk", -1},
 	{"csi_vfe_clk", -1},
+#if defined(CONFIG_SONY_CAM_V4L2)
+	{"dfab_clk", 64000000},
+#endif
 };
 
 static int msm_axi_subdev_s_crystal_freq(struct v4l2_subdev *sd,
@@ -7022,13 +7030,13 @@ void axi_stop(struct msm_cam_media_controller *pmctl,
 	if (!rc)
 		pr_err("%s: Timeout while recovery in progress", __func__);
 	CDBG("%s: Done waiting for overflow recovery to complete", __func__);
+	axi_ctrl->share_ctrl->stop_issued = TRUE;
 
 	switch (vfe_params.cmd_type) {
 	case AXI_CMD_PREVIEW:
 	case AXI_CMD_CAPTURE:
 	case AXI_CMD_RAW_CAPTURE:
 	case AXI_CMD_ZSL:
-		axi_ctrl->share_ctrl->stop_issued = TRUE;
 		axi_ctrl->share_ctrl->cmd_type = vfe_params.cmd_type;
 		break;
 	case AXI_CMD_RECORD:

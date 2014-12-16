@@ -30,6 +30,7 @@
  *
  *  Added support for runtime switching of the policy type
  *
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  * Copyright (C) 2008, 2009 NEC Corporation
  * Copyright (C) 2006, 2007 Hewlett-Packard Development Company, L.P.
  * Copyright (C) 2004-2006 Trusted Computer Solutions, Inc.
@@ -38,6 +39,9 @@
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
  *	the Free Software Foundation, version 2.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #include <linux/kernel.h>
 #include <linux/slab.h>

@@ -23,7 +23,6 @@ extern unsigned int user_debug;
 
 extern void disable_hlt(void);
 extern void enable_hlt(void);
-extern int get_hlt(void);
 
 #endif /* !__ASSEMBLY__ */
 
