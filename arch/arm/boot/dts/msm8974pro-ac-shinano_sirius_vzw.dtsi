@@ -1,0 +1,122 @@
+/* arch/arm/boot/dts/msm8974pro-ac-shinano_leo.dtsi
+ *
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
+ *
+ * Author: Kouhei Fujiya <Kouhei.X.Fujiya@sonymobile.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+
+&soc {
+	/* I2C : BLSP6 */
+	i2c@f9928000 {
+		nfc@28 {
+			compatible = "nxp,pn547";
+			reg = <0x28>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <24 0x1>;
+			nxp,pvdd_en = <&pm8941_gpios 34 0x01>;
+			nxp,irq_gpio = <&msmgpio 24 0x00>;
+			nxp,dwld_en = <&msmgpio 57 0x00>;
+			nxp,ven = <&pm8941_mpps 2 0x01>;
+			dynamic_config;
+			configure_gpio = <&pm8941_gpios 33 0x00>;
+			configure_mpp = <&pm8941_mpps 2 0x00>;
+		};
+	};
+
+	/* I2C : BLSP8 */
+	i2c@f9964000 {
+		maxim_max1187x_tsc@48 {
+			report_pen_as_finger = <1>;
+		};
+	};
+};
+
+/* pm8941_chg: Moved from msm8974pro-ab-shinano_sirius_common.dtsi */
+&pm8941_chg {
+	qcom,vddmax-mv = <4350>;
+	qcom,vddsafe-mv = <4400>;
+	qcom,vinmin-mv = <4200>;
+	qcom,ibatmax-ma = <1600>;
+	qcom,ibatterm-ma = <160>;
+	qcom,ibatsafe-ma = <1600>;
+	qcom,maxinput-dc-ma = <700>;
+	qcom,maxinput-dc-mv = <10000>;
+	qcom,maxinput-usb-ma = <1500>;
+	qcom,maxinput-usb-mv = <6500>;
+	qcom,thermal-mitigation = <1600 1600 1100 900 700 500 300 200 100 0>;
+	qcom,cool-bat-mv = <4350>;
+	qcom,ibatmax-warm-ma = <900>;
+	qcom,warm-bat-mv = <4200>;
+	qcom,ibatmax-cool-ma = <900>;
+	qcom,vbatdet-delta-mv = <70>;
+	qcom,tchg-mins = <512>;
+	qcom,enable-wireless-charge;
+	qcom,vbatweak-mv = <3200>;
+	qcom,enable-report-charger-state;
+	qcom,step-thresh-soc = <101>;
+	qcom,ibatmax-ma-under-step = <1600>;
+};
+
+/* pm8941_bms: Moved from msm8974pro-ab-shinano_sirius_common.dtsi */
+&pm8941_bms {
+	qcom,v-cutoff-uv = <3200000>;
+	qcom,max-voltage-uv = <4350000>;
+	qcom,r-conn-mohm = <0>;
+	qcom,low-soc-calculate-soc-threshold = <15>;
+	qcom,low-soc-calculate-soc-ms = <1000>;
+	qcom,calculate-soc-ms = <30000>;
+	qcom,chg-term-ua = <160000>;
+	qcom,use-external-rsense;
+	qcom,batt-type = <3>;
+	qcom,use-ocv-thresholds;
+	qcom,ocv-voltage-high-threshold-uv = <3830000>;
+	qcom,ocv-voltage-low-threshold-uv = <3750000>;
+	qcom,shutdown-soc-valid-limit = <40>;
+	qcom,enable-fcc-learning;
+	qcom,min-fcc-learning-soc = <20>;
+	qcom,min-fcc-ocv-pc = <30>;
+	qcom,min-fcc-learning-samples = <5>;
+	qcom,fcc-resolution = <14>;
+	qcom,clamp-soc-max-count = <2>;
+};
+
+&pm8941_gpios {
+	/* GPIO_36: ACC_COVER_OPEN */
+	gpio@e300 {
+		qcom,src-sel = <0>;		/* GPIO */
+		qcom,mode = <0>;		/* In */
+		qcom,vin-sel = <2>;		/* S3 */
+		qcom,pull = <0>;		/* PU */
+		qcom,master-en = <1>;		/* Enable */
+		status = "ok";
+	};
+};
+
+&spmi_bus {
+	qcom,pm8941@1 {
+		qcom,leds@d000 {
+			qcom,rgb_0 {
+				qcom,pwm-max-value = <304>;
+			};
+			qcom,rgb_2 {
+				qcom,pwm-max-value = <368>;
+			};
+		};
+	};
+};
+
+&pm8941_lsid0 {
+	qcom,power-on@800 {
+		qcom,s3-debounce = <32>;
+	};
+};

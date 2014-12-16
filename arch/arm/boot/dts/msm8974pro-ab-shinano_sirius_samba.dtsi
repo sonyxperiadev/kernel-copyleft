@@ -1,0 +1,94 @@
+/* arch/arm/boot/dts/msm8974pro-ab-shinano_sirius_samba.dtsi
+ *
+ * Copyright (C) 2013 Sony Mobile Communications Inc.
+ *
+ * Author: Shougo Watanabe <Shougo.X.Watanabe@sonymobile.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	/* I2C : BLSP6 */
+	i2c@f9928000 {
+		nfc@28 {
+			compatible = "nxp,pn547";
+			reg = <0x28>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <24 0x1>;
+			nxp,pvdd_en = <&pm8941_gpios 34 0x01>;
+			nxp,irq_gpio = <&msmgpio 24 0x00>;
+			nxp,dwld_en = <&msmgpio 57 0x00>;
+			nxp,ven = <&pm8941_mpps 2 0x01>;
+			dynamic_config;
+			configure_gpio = <&pm8941_gpios 33 0x00>;
+			configure_mpp = <&pm8941_mpps 2 0x00>;
+		};
+	};
+
+	oneseg_tuner: vj180 {
+		compatible = "sony,vj180";
+		gpios = <&msmgpio 14 0>, /* TUNER_POWER */
+			<&msmgpio 13 0>; /* TUNER_RESET */
+	};
+};
+
+/* pm8941_chg: Moved from msm8974pro-ab-shinano_sirius_common.dtsi */
+&pm8941_chg {
+	qcom,vddmax-mv = <4350>;
+	qcom,vddsafe-mv = <4400>;
+	qcom,vinmin-mv = <4200>;
+	qcom,ibatmax-ma = <1500>;
+	qcom,ibatterm-ma = <150>;
+	qcom,ibatsafe-ma = <1500>;
+	qcom,maxinput-dc-ma = <1800>;
+	qcom,maxinput-dc-mv = <6500>;
+	qcom,maxinput-usb-ma = <1500>;
+	qcom,maxinput-usb-mv = <6500>;
+	qcom,thermal-mitigation = <1500 1500 1100 900 700 500 300 200 100 0>;
+	qcom,cool-bat-mv = <4350>;
+	qcom,ibatmax-warm-ma = <900>;
+	qcom,warm-bat-mv = <4200>;
+	qcom,ibatmax-cool-ma = <900>;
+	qcom,vbatdet-delta-mv = <70>;
+	qcom,tchg-mins = <512>;
+	qcom,vbatweak-mv = <3200>;
+	qcom,aging-vddmax-mv = <4350>;
+	qcom,aging-warm-bat-mv = <4200>;
+	qcom,aging-cool-bat-mv = <4350>;
+	qcom,aging-ibatmax-ma = <1500>;
+	qcom,aging-warm-ibatmax-ma = <900>;
+	qcom,aging-cool-ibatmax-ma = <900>;
+};
+
+/* pm8941_bms: Moved from msm8974pro-ab-shinano_sirius_common.dtsi */
+&pm8941_bms {
+	qcom,v-cutoff-uv = <3200000>;
+	qcom,max-voltage-uv = <4350000>;
+	qcom,r-conn-mohm = <0>;
+	qcom,low-soc-calculate-soc-threshold = <5>;
+	qcom,low-soc-calculate-soc-ms = <1000>;
+	qcom,calculate-soc-ms = <30000>;
+	qcom,chg-term-ua = <150000>;
+	qcom,use-external-rsense;
+	qcom,batt-type = <3>;
+	qcom,use-ocv-thresholds;
+	qcom,ocv-voltage-high-threshold-uv = <3800000>;
+	qcom,ocv-voltage-low-threshold-uv = <3750000>;
+	qcom,shutdown-soc-valid-limit = <40>;
+	qcom,enable-fcc-learning;
+	qcom,min-fcc-learning-soc = <20>;
+	qcom,min-fcc-ocv-pc = <30>;
+	qcom,min-fcc-learning-samples = <5>;
+	qcom,fcc-resolution = <14>;
+	qcom,clamp-soc-max-count = <2>;
+	qcom,enable-aging-func;
+	qcom,aging-fcc-threshold = <90>;
+	qcom,aging-max-voltage-uv = <4350000>;
+};

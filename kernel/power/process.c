@@ -32,8 +32,8 @@ static int try_to_freeze_tasks(bool user_only)
 	unsigned int todo;
 	bool wq_busy = false;
 	struct timeval start, end;
-	u64 elapsed_csecs64;
-	unsigned int elapsed_csecs;
+	u64 elapsed_msecs64;
+	unsigned int elapsed_msecs;
 	bool wakeup = false;
 	int sleep_usecs = USEC_PER_MSEC;
 
@@ -91,9 +91,9 @@ static int try_to_freeze_tasks(bool user_only)
 	}
 
 	do_gettimeofday(&end);
-	elapsed_csecs64 = timeval_to_ns(&end) - timeval_to_ns(&start);
-	do_div(elapsed_csecs64, NSEC_PER_SEC / 100);
-	elapsed_csecs = elapsed_csecs64;
+	elapsed_msecs64 = timeval_to_ns(&end) - timeval_to_ns(&start);
+	do_div(elapsed_msecs64, NSEC_PER_MSEC);
+	elapsed_msecs = elapsed_msecs64;
 
 	if (todo) {
 		/* This does not unfreeze processes that are already frozen
@@ -108,10 +108,10 @@ static int try_to_freeze_tasks(bool user_only)
 		}
 		else {
 			printk("\n");
-			printk(KERN_ERR "Freezing of tasks %s after %d.%02d seconds "
+			printk(KERN_ERR "Freezing of tasks %s after %d.%03d seconds "
 			       "(%d tasks refusing to freeze, wq_busy=%d):\n",
 			       wakeup ? "aborted" : "failed",
-			       elapsed_csecs / 100, elapsed_csecs % 100,
+			       elapsed_msecs / 1000, elapsed_msecs % 1000,
 			       todo - wq_busy, wq_busy);
 		}
 
@@ -120,14 +120,14 @@ static int try_to_freeze_tasks(bool user_only)
 			do_each_thread(g, p) {
 				if (p != current && !freezer_should_skip(p)
 				    && freezing(p) && !frozen(p) &&
-				    elapsed_csecs > 100)
+				    elapsed_msecs > 1000)
 					sched_show_task(p);
 			} while_each_thread(g, p);
 			read_unlock(&tasklist_lock);
 		}
 	} else {
-		printk("(elapsed %d.%02d seconds) ", elapsed_csecs / 100,
-			elapsed_csecs % 100);
+		printk("(elapsed %d.%03d seconds) ", elapsed_msecs / 1000,
+			elapsed_msecs % 1000);
 	}
 
 	return todo ? -EBUSY : 0;
