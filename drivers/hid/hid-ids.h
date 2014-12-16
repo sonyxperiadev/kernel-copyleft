@@ -6,6 +6,7 @@
  *  Copyright (c) 2005 Michael Haboustak <mike-@cinci.rr.com> for Concept2, Inc
  *  Copyright (c) 2006-2007 Jiri Kosina
  *  Copyright (c) 2007 Paul Walmsley
+ *  Copyright (c) 2014 Sony Mobile Communications AB.
  */
 
 /*
@@ -653,6 +654,7 @@
 #define USB_VENDOR_ID_SONY			0x054c
 #define USB_DEVICE_ID_SONY_VAIO_VGX_MOUSE	0x024b
 #define USB_DEVICE_ID_SONY_PS3_CONTROLLER	0x0268
+#define USB_DEVICE_ID_SONY_PS4_CONTROLLER	0x05c4
 #define USB_DEVICE_ID_SONY_NAVIGATION_CONTROLLER	0x042f
 
 #define USB_VENDOR_ID_SOUNDGRAPH	0x15c2

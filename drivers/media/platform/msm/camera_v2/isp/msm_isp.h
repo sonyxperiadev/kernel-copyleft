@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -381,6 +382,7 @@ struct msm_vfe_stats_shared_data {
 	atomic_t stats_comp_mask;
 	uint16_t stream_handle_cnt;
 	atomic_t stats_update;
+	uint32_t stats_mask;
 };
 
 struct msm_vfe_tasklet_queue_cmd {
@@ -459,6 +461,9 @@ struct vfe_device {
 	uint8_t vt_enable;
 	void __iomem *p_avtimer_msw;
 	void __iomem *p_avtimer_lsw;
+#if defined(CONFIG_SONY_CAM_V4L2)
+	int timeout;
+#endif
 };
 
 #endif

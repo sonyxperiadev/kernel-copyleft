@@ -45,7 +45,9 @@
  * large value for number of buffer due to data structure corruption
  * we return error to avoid integer overflow. This value may be
  * configured in future*/
-#define MSM_CAMERA_MAX_STREAM_BUF 40
+/* extension begin */
+#define MSM_CAMERA_MAX_STREAM_BUF 96
+/* extension end */
 
 /* featur base */
 #define MSM_CAMERA_FEATURE_BASE     0x00010000
