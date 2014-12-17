@@ -511,7 +511,7 @@ int q6asm_audio_client_buf_alloc(unsigned int dir,
 			return 0;
 		}
 
-		if (bufcnt != FRAME_NUM)
+		if (bufcnt > FRAME_NUM)
 			goto fail;
 		mutex_lock(&ac->cmd_lock);
 		buf = kzalloc(((sizeof(struct audio_buffer))*bufcnt),
