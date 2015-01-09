@@ -144,7 +144,7 @@ struct ion_heap_ops {
 				unsigned long flags);
 	void (*unmap_iommu)(struct ion_iommu_map *data);
 	int (*print_debug)(struct ion_heap *heap, struct seq_file *s,
-			   const struct rb_root *mem_map);
+			   const struct list_head *mem_map);
 	int (*secure_heap)(struct ion_heap *heap, int version, void *data);
 	int (*unsecure_heap)(struct ion_heap *heap, int version, void *data);
 };
@@ -178,7 +178,7 @@ struct ion_heap {
 
 /**
  * struct mem_map_data - represents information about the memory map for a heap
- * @node:		rb node used to store in the tree of mem_map_data
+ * @node:		list node used to store in the list of mem_map_data
  * @addr:		start address of memory region.
  * @addr:		end address of memory region.
  * @size:		size of memory region
@@ -186,7 +186,7 @@ struct ion_heap {
  *
  */
 struct mem_map_data {
-	struct rb_node node;
+	struct list_head node;
 	unsigned long addr;
 	unsigned long addr_end;
 	unsigned long size;
