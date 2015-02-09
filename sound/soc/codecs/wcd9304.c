@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013,2015 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -38,6 +38,7 @@
 #include <linux/wakelock.h>
 #include <linux/suspend.h>
 #include "wcd9304.h"
+#include "wcdcal-hwdep.h"
 
 #define WCD9304_RATES (SNDRV_PCM_RATE_8000|SNDRV_PCM_RATE_16000|\
 			SNDRV_PCM_RATE_32000|SNDRV_PCM_RATE_48000)
@@ -341,6 +342,10 @@ struct sitar_priv {
 
 	bool gpio_irq_resend;
 	struct wake_lock irq_resend_wlock;
+
+	/* cal info for codec */
+	struct fw_info *fw_data;
+	struct firmware_cal *mbhc_cal;
 };
 
 #ifdef CONFIG_DEBUG_FS
@@ -1567,7 +1572,7 @@ static int sitar_codec_enable_anc(struct snd_soc_dapm_widget *w,
 	const char *filename;
 	const struct firmware *fw;
 	int i;
-	int ret;
+	int ret = 0;
 	int num_anc_slots;
 	struct anc_header *anc_head;
 	struct sitar_priv *sitar = snd_soc_codec_get_drvdata(codec);
@@ -1576,6 +1581,9 @@ static int sitar_codec_enable_anc(struct snd_soc_dapm_widget *w,
 	u32 *anc_ptr;
 	u16 reg;
 	u8 mask, val, old_val;
+	size_t cal_size;
+	const void *data;
+	struct firmware_cal *hwdep_cal = NULL;
 
 	pr_debug("%s %d\n", __func__, event);
 	switch (event) {
@@ -1586,38 +1594,54 @@ static int sitar_codec_enable_anc(struct snd_soc_dapm_widget *w,
 		 * WCD9310 and WCD9304
 		 */
 		filename = "wcd9310/wcd9310_anc.bin";
+		hwdep_cal = wcdcal_get_fw_cal(sitar ->fw_data, WCD9XXX_ANC_CAL);
+		if (hwdep_cal) {
+			data = hwdep_cal->data;
+			cal_size = hwdep_cal->size;
+			dev_dbg(codec->dev, "%s: using hwdep calibration\n",
+					__func__);
+		} else {
+			ret = request_firmware(&fw, filename, codec->dev);
+			if (ret != 0) {
+				dev_err(codec->dev, "Failed to acquire ANC data: %d\n",
+					ret);
+				return -ENODEV;
+			}
+			if (!fw) {
+				dev_err(codec->dev, "failed to get anc fw");
+				return -ENODEV;
+			}
+			data = fw->data;
+			cal_size = fw->size;
+			dev_dbg(codec->dev, "%s: using request_firmware calibration\n",
+						__func__);
 
-		ret = request_firmware(&fw, filename, codec->dev);
-		if (ret != 0) {
-			dev_err(codec->dev, "Failed to acquire ANC data: %d\n",
-				ret);
-			return -ENODEV;
 		}
 
-		if (fw->size < sizeof(struct anc_header)) {
+		if (cal_size < sizeof(struct anc_header)) {
 			dev_err(codec->dev, "Not enough data\n");
-			release_firmware(fw);
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto err;
 		}
 
 		/* First number is the number of register writes */
-		anc_head = (struct anc_header *)(fw->data);
-		anc_ptr = (u32 *)((u32)fw->data + sizeof(struct anc_header));
-		anc_size_remaining = fw->size - sizeof(struct anc_header);
+		anc_head = (struct anc_header *)(data);
+		anc_ptr = (u32 *)((u32)data + sizeof(struct anc_header));
+		anc_size_remaining = cal_size - sizeof(struct anc_header);
 		num_anc_slots = anc_head->num_anc_slots;
 
 		if (sitar->anc_slot >= num_anc_slots) {
 			dev_err(codec->dev, "Invalid ANC slot selected\n");
-			release_firmware(fw);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto err;
 		}
 
 		for (i = 0; i < num_anc_slots; i++) {
 
 			if (anc_size_remaining < SITAR_PACKED_REG_SIZE) {
 				dev_err(codec->dev, "Invalid register format\n");
-				release_firmware(fw);
-				return -EINVAL;
+				ret = -EINVAL;
+				goto err;
 			}
 			anc_writes_size = (u32)(*anc_ptr);
 			anc_size_remaining -= sizeof(u32);
@@ -1626,8 +1650,8 @@ static int sitar_codec_enable_anc(struct snd_soc_dapm_widget *w,
 			if (anc_writes_size * SITAR_PACKED_REG_SIZE
 				> anc_size_remaining) {
 				dev_err(codec->dev, "Invalid register format\n");
-				release_firmware(fw);
-				return -ENOMEM;
+				ret = -EINVAL;
+				goto err;
 			}
 
 			if (sitar->anc_slot == i)
@@ -1639,8 +1663,8 @@ static int sitar_codec_enable_anc(struct snd_soc_dapm_widget *w,
 		}
 		if (i == num_anc_slots) {
 			dev_err(codec->dev, "Selected ANC slot not present\n");
-			release_firmware(fw);
-			return -ENOMEM;
+			ret = -EINVAL;
+			goto err;
 		}
 
 		for (i = 0; i < anc_writes_size; i++) {
@@ -1651,7 +1675,8 @@ static int sitar_codec_enable_anc(struct snd_soc_dapm_widget *w,
 				(val & mask));
 		}
 
-		release_firmware(fw);
+		if (!hwdep_cal)
+			release_firmware(fw);
 
 		/* For Sitar, it is required to enable both Feed-forward
 		 * and Feed back clocks to enable ANC
@@ -1666,6 +1691,11 @@ static int sitar_codec_enable_anc(struct snd_soc_dapm_widget *w,
 		break;
 	}
 	return 0;
+err:
+	if (!hwdep_cal)
+		release_firmware(fw);
+	return ret;
+
 }
 
 
@@ -4363,38 +4393,62 @@ void sitar_mbhc_init(struct snd_soc_codec *codec)
 
 }
 
-static bool sitar_mbhc_fw_validate(const struct firmware *fw)
+static bool sitar_mbhc_fw_validate(const void *data, size_t size)
 {
 	u32 cfg_offset;
 	struct sitar_mbhc_imped_detect_cfg *imped_cfg;
 	struct sitar_mbhc_btn_detect_cfg *btn_cfg;
+	struct firmware_cal fw;
 
-	if (fw->size < SITAR_MBHC_CAL_MIN_SIZE)
+	fw.data = (void *)data;
+	fw.size = size;
+	if (fw.size < SITAR_MBHC_CAL_MIN_SIZE)
 		return false;
 
 	/* previous check guarantees that there is enough fw data up
 	 * to num_btn
 	 */
-	btn_cfg = SITAR_MBHC_CAL_BTN_DET_PTR(fw->data);
-	cfg_offset = (u32) ((void *) btn_cfg - (void *) fw->data);
-	if (fw->size < (cfg_offset + SITAR_MBHC_CAL_BTN_SZ(btn_cfg)))
+	btn_cfg = SITAR_MBHC_CAL_BTN_DET_PTR(fw.data);
+	cfg_offset = (u32) ((void *) btn_cfg - (void *) fw.data);
+	if (fw.size < (cfg_offset + SITAR_MBHC_CAL_BTN_SZ(btn_cfg)))
 		return false;
 
 	/* previous check guarantees that there is enough fw data up
 	 * to start of impedance detection configuration
 	 */
-	imped_cfg = SITAR_MBHC_CAL_IMPED_DET_PTR(fw->data);
-	cfg_offset = (u32) ((void *) imped_cfg - (void *) fw->data);
+	imped_cfg = SITAR_MBHC_CAL_IMPED_DET_PTR(fw.data);
+	cfg_offset = (u32) ((void *) imped_cfg - (void *) fw.data);
 
-	if (fw->size < (cfg_offset + SITAR_MBHC_CAL_IMPED_MIN_SZ))
+	if (fw.size < (cfg_offset + SITAR_MBHC_CAL_IMPED_MIN_SZ))
 		return false;
 
-	if (fw->size < (cfg_offset + SITAR_MBHC_CAL_IMPED_SZ(imped_cfg)))
+	if (fw.size < (cfg_offset + SITAR_MBHC_CAL_IMPED_SZ(imped_cfg)))
 		return false;
 
 	return true;
 }
 
+
+static
+struct firmware_cal *get_hwdep_fw_cal(struct snd_soc_codec *codec,
+				enum wcd_cal_type type)
+{
+	struct sitar_priv *sitar;
+	struct firmware_cal *hwdep_cal;
+
+	if (!codec) {
+		pr_err("%s: NULL codec pointer\n", __func__);
+		return NULL;
+	}
+	sitar = snd_soc_codec_get_drvdata(codec);
+	hwdep_cal = wcdcal_get_fw_cal(sitar->fw_data, type);
+	if (!hwdep_cal) {
+		dev_err(codec->dev, "%s: cal not sent by %d\n",
+					__func__, type);
+		return NULL;
+	}
+	return hwdep_cal;
+}
 
 static void sitar_turn_onoff_override(struct snd_soc_codec *codec, bool on)
 {
@@ -5053,6 +5107,8 @@ static void mbhc_fw_read(struct work_struct *work)
 	struct snd_soc_codec *codec;
 	const struct firmware *fw;
 	int ret = -1, retry = 0;
+	struct firmware_cal *fw_data = NULL;
+	bool use_default_cal = false;
 
 	dwork = to_delayed_work(work);
 	sitar = container_of(dwork, struct sitar_priv,
@@ -5061,12 +5117,19 @@ static void mbhc_fw_read(struct work_struct *work)
 
 	while (retry < MBHC_FW_READ_ATTEMPTS) {
 		retry++;
-		pr_info("%s:Attempt %d to request MBHC firmware\n",
-			__func__, retry);
-		ret = request_firmware(&fw, "wcd9310/wcd9310_mbhc.bin",
+		pr_err("%s:Attempt %d to request MBHC firmware\n",
+					__func__, retry);
+		fw_data = get_hwdep_fw_cal(codec,
+					WCD9XXX_MBHC_CAL);
+		if (!fw_data)
+			ret = request_firmware(&fw, "wcd9310/wcd9310_mbhc.bin",
 					codec->dev);
 
-		if (ret != 0) {
+		/*
+		* if request_firmware and hwdep cal both fail then
+		* retry for few times before bailing out
+		*/
+		if ((ret != 0) && !fw_data) {
 			usleep_range(MBHC_FW_READ_TIMEOUT,
 					MBHC_FW_READ_TIMEOUT);
 		} else {
@@ -5075,18 +5138,43 @@ static void mbhc_fw_read(struct work_struct *work)
 		}
 	}
 
-	if (ret != 0) {
+	if (!fw_data)
+		pr_debug("%s: using request_firmware\n", __func__);
+	else
+		pr_debug("%s: using hwdep cal\n", __func__);
+	if (ret != 0 && !fw_data) {
 		pr_err("%s: Cannot load MBHC firmware use default cal\n",
 			__func__);
-	} else if (sitar_mbhc_fw_validate(fw) == false) {
-		pr_err("%s: Invalid MBHC cal data size use default cal\n",
-			 __func__);
-		release_firmware(fw);
-	} else {
-		sitar->calibration = (void *)fw->data;
-		sitar->mbhc_fw = fw;
+		use_default_cal = true;
 	}
+	if (!use_default_cal) {
+		const void *data;
+		size_t size;
+		if (fw_data) {
+			data = fw_data->data;
+			size = fw_data->size;
 
+		} else {
+			data = fw->data;
+			size = fw->size;
+		}
+		if (sitar_mbhc_fw_validate(data, size) == false) {
+			pr_err("%s: Invalid MBHC cal data size use default cal\n",
+					__func__);
+			if (!fw_data)
+				release_firmware(fw);
+		} else {
+				if (fw_data) {
+					sitar->mbhc_cfg.calibration =
+						(void *)fw_data->data;
+					sitar->mbhc_cal = fw_data;
+				} else {
+					sitar->mbhc_cfg.calibration =
+						(void *)fw->data;
+					sitar->mbhc_fw = fw;
+				}
+			}
+		}
 	sitar_mbhc_init_and_calibrate(codec);
 }
 
@@ -5129,12 +5217,20 @@ int sitar_hs_detect(struct snd_soc_codec *codec,
 	INIT_WORK(&sitar->hs_correct_plug_work,
 			  sitar_hs_correct_gpio_plug);
 
-	if (!sitar->mbhc_cfg.read_fw_bin) {
+	if ((!sitar->mbhc_cfg.read_fw_bin) ||
+		(sitar->mbhc_cfg.read_fw_bin && sitar->mbhc_fw) ||
+		(sitar->mbhc_cfg.read_fw_bin && sitar->mbhc_cal)) {
 		rc = sitar_mbhc_init_and_calibrate(codec);
 	} else {
-		schedule_delayed_work(&sitar->mbhc_firmware_dwork,
-					usecs_to_jiffies(MBHC_FW_READ_TIMEOUT));
+		if (!sitar->mbhc_fw || sitar->mbhc_cal)
+			schedule_delayed_work(&sitar ->mbhc_firmware_dwork,
+				usecs_to_jiffies(MBHC_FW_READ_TIMEOUT));
+	else
+		pr_err("%s: Skipping to read mbhc fw, 0x%p 0x%p\n",
+				__func__, sitar ->mbhc_fw, sitar->mbhc_cal);
+
 	}
+
 
 	return rc;
 }
@@ -5936,7 +6032,8 @@ static int sitar_codec_probe(struct snd_soc_codec *codec)
 	sitar = kzalloc(sizeof(struct sitar_priv), GFP_KERNEL);
 	if (!sitar) {
 		dev_err(codec->dev, "Failed to allocate private data\n");
-		return -ENOMEM;
+		goto err_nomem_slimch;
+
 	}
 
 	for (i = 0; i < NUM_DECIMATORS; i++) {
@@ -5987,6 +6084,20 @@ static int sitar_codec_probe(struct snd_soc_codec *codec)
 	if (IS_ERR_VALUE(ret)) {
 		pr_err("%s: bad pdata\n", __func__);
 		goto err_pdata;
+	}
+
+	sitar->fw_data = kzalloc(sizeof(*(sitar ->fw_data)), GFP_KERNEL);
+	if (!sitar ->fw_data) {
+		dev_err(codec->dev, "Failed to allocate fw_data\n");
+		goto err_nomem_slimch;
+	}
+	set_bit(WCD9XXX_ANC_CAL, sitar->fw_data->cal_bit);
+	set_bit(WCD9XXX_MBHC_CAL, sitar->fw_data->cal_bit);
+	ret = wcd_cal_create_hwdep(sitar->fw_data,
+				WCD9XXX_CODEC_HWDEP_NODE, codec);
+	if (ret < 0) {
+		dev_err(codec->dev, "%s hwdep failed %d\n", __func__, ret);
+		goto err_hwdep;
 	}
 
 	snd_soc_add_codec_controls(codec, sitar_snd_controls,
@@ -6125,7 +6236,10 @@ err_potential_irq:
 err_remove_irq:
 	wcd9xxx_free_irq(codec->control_data,
 			SITAR_IRQ_MBHC_INSERTION, sitar);
+err_hwdep:
 err_insert_irq:
+	kfree(sitar->fw_data);
+err_nomem_slimch:
 err_pdata:
 	mutex_destroy(&sitar->codec_resource_lock);
 	kfree(sitar);
@@ -6147,12 +6261,13 @@ static int sitar_codec_remove(struct snd_soc_codec *codec)
 	sitar_codec_disable_clock_block(codec);
 	SITAR_RELEASE_LOCK(sitar->codec_resource_lock);
 	sitar_codec_enable_bandgap(codec, SITAR_BANDGAP_OFF);
-	if (sitar->mbhc_fw)
+	if (sitar->mbhc_fw||sitar->mbhc_cal)
 		release_firmware(sitar->mbhc_fw);
 	for (i = 0; i < ARRAY_SIZE(sitar_dai); i++)
 		kfree(sitar->dai[i].ch_num);
 	mutex_destroy(&sitar->codec_resource_lock);
 	kfree(sitar);
+	kfree(sitar->fw_data);
 	return 0;
 }
 static struct snd_soc_codec_driver soc_codec_dev_sitar = {
