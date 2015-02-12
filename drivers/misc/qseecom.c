@@ -878,9 +878,15 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 					(void *)data->client.app_name,
 					strlen(data->client.app_name))) {
 					found_app = true;
-					if (app_crash || ptr_app->ref_cnt == 1)
+					if (app_crash) {
 						unload = true;
-					break;
+						break;
+					} else {
+						if (ptr_app->ref_cnt == 1) {
+							unload = true;
+							break;
+						}
+					}
 				} else {
 					found_dead_app = true;
 					break;
