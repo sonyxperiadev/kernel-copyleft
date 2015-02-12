@@ -200,8 +200,6 @@ struct qseecom_control {
 	uint32_t          qseos_version;
 	struct device *pdev;
 	struct cdev cdev;
-
-	bool uclient_shutdown_app;
 };
 
 struct qseecom_client_handle {
@@ -836,8 +834,7 @@ static int qseecom_unmap_ion_allocated_memory(struct qseecom_dev_handle *data)
 	return ret;
 }
 
-static int qseecom_unload_app(struct qseecom_dev_handle *data,
-				bool uclient_release)
+static int qseecom_unload_app(struct qseecom_dev_handle *data)
 {
 	unsigned long flags;
 	int ret = 0;
@@ -853,21 +850,14 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 								list) {
 			if (ptr_app->app_id == data->client.app_id) {
 				found_app = true;
-				if ((uclient_release) &&
-					(!qseecom.uclient_shutdown_app)) {
-					ptr_app->ref_cnt = 0;
+				if (ptr_app->ref_cnt == 1) {
 					unload = true;
 					break;
 				} else {
-					if (ptr_app->ref_cnt == 1) {
-						unload = true;
-						break;
-					} else {
-						ptr_app->ref_cnt--;
-						pr_debug("Can't unload app(%d) inuse\n",
+					ptr_app->ref_cnt--;
+					pr_warn("Can't unload app(%d) inuse\n",
 							ptr_app->app_id);
-						break;
-					}
+					break;
 				}
 			}
 		}
@@ -1671,7 +1661,7 @@ int qseecom_shutdown_app(struct qseecom_handle **handle)
 	if (!found_handle)
 		pr_err("Unable to find the handle, exiting\n");
 	else
-		ret = qseecom_unload_app(data, false);
+		ret = qseecom_unload_app(data);
 	if (ret == 0) {
 		kzfree(data);
 		kzfree(*handle);
@@ -2180,8 +2170,7 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 	case QSEECOM_IOCTL_UNLOAD_APP_REQ: {
 		mutex_lock(&app_access_lock);
 		atomic_inc(&data->ioctl_count);
-		qseecom.uclient_shutdown_app = true;
-		ret = qseecom_unload_app(data, false);
+		ret = qseecom_unload_app(data);
 		atomic_dec(&data->ioctl_count);
 		mutex_unlock(&app_access_lock);
 		if (ret)
@@ -2308,7 +2297,7 @@ static int qseecom_release(struct inode *inode, struct file *file)
 			ret = qseecom_unregister_listener(data);
 			break;
 		case QSEECOM_CLIENT_APP:
-			ret = qseecom_unload_app(data, true);
+			ret = qseecom_unload_app(data);
 			break;
 		case QSEECOM_SECURE_SERVICE:
 			ret = qseecom_unmap_ion_allocated_memory(data);
@@ -2320,17 +2309,10 @@ static int qseecom_release(struct inode *inode, struct file *file)
 		case QSEECOM_UNAVAILABLE_CLIENT_APP:
 			break;
 		default:
-			ret = -EINVAL;
 			pr_err("Unsupported clnt_handle_type %d",
 				data->type);
 			break;
 		}
-		if (ret) {
-			pr_err("Close failed\n");
-			kfree(data);
-			return ret;
-		}
-		qseecom.uclient_shutdown_app = false;
 	}
 	if (qseecom.qseos_version == QSEOS_VERSION_13) {
 		mutex_lock(&pil_access_lock);
@@ -2599,7 +2581,7 @@ static int __devinit qseecom_remove(struct platform_device *pdev)
 			goto exit_free_kc_handle;
 
 		list_del(&kclient->list);
-		ret = qseecom_unload_app(kclient->handle->dev, false);
+		ret = qseecom_unload_app(kclient->handle->dev);
 		if (!ret) {
 			kzfree(kclient->handle->dev);
 			kzfree(kclient->handle);
