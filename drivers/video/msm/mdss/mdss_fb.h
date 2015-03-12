@@ -1,4 +1,5 @@
 /* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,8 +20,10 @@
 #include <linux/msm_mdp.h>
 #include <linux/types.h>
 #include <linux/notifier.h>
+#include <linux/workqueue.h>
 
 #include "mdss_panel.h"
+#include "mdss_mdp_splash_logo.h"
 
 #define MSM_FB_DEFAULT_PAGE_SIZE 2
 #define MFD_KEY  0x11161126
@@ -32,8 +35,6 @@
 /* Display op timeout should be greater than total timeout */
 #define WAIT_DISP_OP_TIMEOUT ((WAIT_FENCE_FIRST_TIMEOUT + \
 		WAIT_FENCE_FINAL_TIMEOUT) * MDP_MAX_FENCE_FD)
-
-#define SPLASH_THREAD_WAIT_TIMEOUT 3
 
 #ifndef MAX
 #define  MAX(x, y) (((x) > (y)) ? (x) : (y))
@@ -67,11 +68,6 @@ enum mdp_notify_event {
 	MDP_NOTIFY_FRAME_FLUSHED,
 	MDP_NOTIFY_FRAME_DONE,
 	MDP_NOTIFY_FRAME_TIMEOUT,
-};
-
-enum mdp_splash_event {
-	MDP_CREATE_SPLASH_OV = 0,
-	MDP_REMOVE_SPLASH_OV,
 };
 
 struct disp_info_type_suspend {
@@ -121,8 +117,7 @@ struct msm_mdp_interface {
 	int (*kickoff_fnc)(struct msm_fb_data_type *mfd,
 					struct mdp_display_commit *data);
 	int (*ioctl_handler)(struct msm_fb_data_type *mfd, u32 cmd, void *arg);
-	void (*dma_fnc)(struct msm_fb_data_type *mfd, struct mdp_overlay *req,
-				int image_len, int *pipe_ndx);
+	void (*dma_fnc)(struct msm_fb_data_type *mfd);
 	int (*cursor_update)(struct msm_fb_data_type *mfd,
 				struct fb_cursor *cursor);
 	int (*lut_update)(struct msm_fb_data_type *mfd, struct fb_cmap *cmap);
@@ -131,9 +126,10 @@ struct msm_mdp_interface {
 	int (*update_ad_input)(struct msm_fb_data_type *mfd);
 	int (*panel_register_done)(struct mdss_panel_data *pdata);
 	u32 (*fb_stride)(u32 fb_index, u32 xres, int bpp);
-	int (*splash_fnc) (struct msm_fb_data_type *mfd, int *index, int req);
+	int (*splash_init_fnc)(struct msm_fb_data_type *mfd);
 	struct msm_sync_pt_data *(*get_sync_fnc)(struct msm_fb_data_type *mfd,
 				const struct mdp_buf_sync *buf_sync);
+	void (*check_dsi_status)(struct work_struct *work, uint32_t interval);
 	void *private1;
 };
 
@@ -213,12 +209,13 @@ struct msm_fb_data_type {
 	/* for non-blocking */
 	struct task_struct *disp_thread;
 	atomic_t commits_pending;
+	atomic_t kickoff_pending;
 	wait_queue_head_t commit_wait_q;
 	wait_queue_head_t idle_wait_q;
+	wait_queue_head_t kickoff_wait_q;
 	bool shutdown_pending;
 
-	struct task_struct *splash_thread;
-	bool splash_logo_enabled;
+	struct msm_fb_splash_info splash_info;
 
 	wait_queue_head_t ioctl_q;
 	atomic_t ioctl_ref_cnt;
@@ -229,6 +226,14 @@ struct msm_fb_data_type {
 
 	u32 dcm_state;
 	struct list_head proc_list;
+	u32 wait_for_kickoff;
+
+	/* speed up wakeup */
+	/* do unblank (>150ms) on own kworker
+	 * so we don't starve other works
+	 */
+	struct workqueue_struct *unblank_kworker;
+	struct work_struct unblank_work;
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)
