@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,7 +30,7 @@
 
 
 #define MAX_NETWORKS			15
-#define MAX_IOCTL_DATA			(MAX_NETWORKS * 2)
+#define MAX_IOCTL_DATA			128
 #define MAX_COL_SIZE			324
 
 #define ACDB_BLOCK_SIZE			4096
@@ -84,6 +85,9 @@ struct acdb_data {
 
 	/* Sidetone Cal */
 	struct sidetone_cal		sidetone_cal;
+	/* Sidetone IIR Cal */
+	struct sidetone_iir_cal		sidetone_iir_cal;
+
 
 	/* Allocation information */
 	struct ion_client		*ion_client;
@@ -967,6 +971,46 @@ done:
 	return result;
 }
 
+void store_sidetone_iir_cal(struct sidetone_iir_cal *cal_data)
+{
+	pr_debug("%s,enable:%d, stages:%d, pregain:0x%x\n", __func__,
+		 cal_data->iir_enable,
+		 cal_data->num_biquad_stages,
+		 cal_data->pregain);
+
+	acdb_data.sidetone_iir_cal.iir_enable = cal_data->iir_enable;
+	acdb_data.sidetone_iir_cal.num_biquad_stages =
+					cal_data->num_biquad_stages;
+	acdb_data.sidetone_iir_cal.pregain = cal_data->pregain;
+	memcpy(&acdb_data.sidetone_iir_cal.iir_config,
+	       &cal_data->iir_config,
+	       MAX_SIDETONE_IIR_DATA_SIZE);
+}
+
+int get_sidetone_iir_cal(struct sidetone_iir_cal *cal_data)
+{
+	int result = 0;
+	pr_debug("%s,\n", __func__);
+
+	if (cal_data == NULL) {
+		pr_err("ACDB=> NULL pointer sent to %s\n", __func__);
+		result = -EINVAL;
+		goto done;
+	}
+
+	mutex_lock(&acdb_data.acdb_mutex);
+	cal_data->iir_enable = acdb_data.sidetone_iir_cal.iir_enable;
+	cal_data->num_biquad_stages =
+			acdb_data.sidetone_iir_cal.num_biquad_stages;
+	cal_data->pregain = acdb_data.sidetone_iir_cal.pregain;
+	memcpy(&cal_data->iir_config,
+	       &acdb_data.sidetone_iir_cal.iir_config,
+	       MAX_SIDETONE_IIR_DATA_SIZE);
+	mutex_unlock(&acdb_data.acdb_mutex);
+done:
+	return result;
+}
+
 int get_spk_protection_cfg(struct msm_spk_prot_cfg *prot_cfg)
 {
 	int result = 0;
@@ -1377,8 +1421,8 @@ static long acdb_ioctl(struct file *f,
 	}
 
 	if ((size <= 0) || (size > sizeof(data))) {
-		pr_err("%s: Invalid size sent to driver: %d\n",
-			__func__, size);
+		pr_err("%s: Invalid size sent to driver: %d expected %d\n",
+			__func__, size, sizeof(data));
 		result = -EFAULT;
 		goto done;
 	}
@@ -1408,6 +1452,15 @@ static long acdb_ioctl(struct file *f,
 	if (data == NULL) {
 		pr_err("%s: NULL pointer sent to driver!\n", __func__);
 		result = -EFAULT;
+		goto done;
+	}
+
+	switch (cmd) {
+	case AUDIO_SET_SIDETONE_CAL:
+		store_sidetone_cal((struct sidetone_cal *)data);
+		goto done;
+	case AUDIO_SET_SIDETONE_IIR_CAL:
+		store_sidetone_iir_cal((struct sidetone_iir_cal *)data);
 		goto done;
 	}
 
@@ -1451,9 +1504,6 @@ static long acdb_ioctl(struct file *f,
 		goto done;
 	case AUDIO_SET_VOCPROC_DEV_CFG_CAL:
 		result = store_vocproc_dev_cfg_cal((struct cal_block *)data);
-		goto done;
-	case AUDIO_SET_SIDETONE_CAL:
-		store_sidetone_cal((struct sidetone_cal *)data);
 		goto done;
 	case AUDIO_SET_ANC_CAL:
 		result = store_anc_cal((struct cal_block *)data);

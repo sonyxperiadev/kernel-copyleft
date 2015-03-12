@@ -74,6 +74,16 @@ config SECURITY_SELINUX_AVC_STATS
 	  /selinux/avc/cache_stats, which may be monitored via
 	  tools such as avcstat.
 
+config SECURITY_SELINUX_AVC_EXTRA_INFO
+	bool "SELinux extended log info"
+	depends on SECURITY_SELINUX
+	default n
+	help
+	  This option enables extra log info providing information
+	  about the audit result and the process under audit, such
+	  as thread group and parent pid. Appended log tags are:
+	  "ppid", "pcomm", "tgid", tgcomm" and "op_res".
+
 config SECURITY_SELINUX_CHECKREQPROT_VALUE
 	int "NSA SELinux checkreqprot default value"
 	depends on SECURITY_SELINUX

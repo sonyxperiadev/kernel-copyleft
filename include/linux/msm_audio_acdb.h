@@ -67,6 +67,8 @@
 			(AUDIO_MAX_COMMON_IOCTL_NUM+30), struct hw_delay)
 #define AUDIO_SET_HW_DELAY_TX	_IOW(AUDIO_IOCTL_MAGIC, \
 			(AUDIO_MAX_COMMON_IOCTL_NUM+31), struct hw_delay)
+#define AUDIO_SET_SIDETONE_IIR_CAL		_IOW(AUDIO_IOCTL_MAGIC, \
+			(AUDIO_MAX_COMMON_IOCTL_NUM+32), unsigned)
 #define	AUDIO_MAX_ACDB_IOCTL	(AUDIO_MAX_COMMON_IOCTL_NUM+40)
 
 /* ACDB structures */
@@ -79,6 +81,25 @@ struct sidetone_cal {
 	uint16_t	enable;
 	uint16_t	gain;
 };
+
+#define MAX_SIDETONE_IIR_DATA_SIZE	220
+struct sidetone_iir_cal {
+	uint16_t	iir_enable;
+	uint16_t	num_biquad_stages;
+	uint16_t	pregain;
+	uint8_t		iir_config[MAX_SIDETONE_IIR_DATA_SIZE];
+};
+
+struct sidetone_cal_ioctl_data {
+	int32_t			size;
+	struct sidetone_cal	sidetone_cal;
+};
+
+struct sidetone_iir_cal_ioctl_data {
+	int32_t				size;
+	struct sidetone_iir_cal		sidetone_iir_cal;
+};
+
 
 enum msm_spkr_prot_states {
 	MSM_SPKR_PROT_CALIBRATED,
