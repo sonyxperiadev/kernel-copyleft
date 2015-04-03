@@ -8,6 +8,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 /include/ "skeleton.dtsi"
@@ -300,6 +304,12 @@
 		compatible = "qcom,sharedmem-uio";
 		reg = <0x0fd60000 0x00020000>;
 		reg-names = "rfsa_mdm";
+	};
+
+	smem_sharedmem {
+		compatible = "qcom,sharedmem-uio";
+		reg = <0x0fa00000 0x00200000>;
+		reg-names = "smem";
 	};
 
 	sdcc1: qcom,sdcc@f9824000 {
@@ -822,6 +832,9 @@
 
 		qcom,cdc-mclk-gpios = <&pm8941_gpios 15 0>;
 		qcom,taiko-mclk-clk-freq = <9600000>;
+
+		qcom,hdmi-audio-rx;
+
 		qcom,prim-auxpcm-gpio-clk  = <&msmgpio 65 0>;
 		qcom,prim-auxpcm-gpio-sync = <&msmgpio 66 0>;
 		qcom,prim-auxpcm-gpio-din  = <&msmgpio 67 0>;
@@ -831,6 +844,7 @@
 		qcom,sec-auxpcm-gpio-sync = <&msmgpio 80 0>;
 		qcom,sec-auxpcm-gpio-din  = <&msmgpio 81 0>;
 		qcom,sec-auxpcm-gpio-dout = <&msmgpio 82 0>;
+		qcom,5-pole-jack;
 	};
 
 	spmi_bus: qcom,spmi@fc4c0000 {
@@ -2140,8 +2154,7 @@
 
 	qcom,msm-rtb {
 		compatible = "qcom,msm-rtb";
-		qcom,memory-reservation-type = "EBI1";
-		qcom,memory-reservation-size = <0x100000>; /* 1M EBI1 buffer */
+		qcom,rtb-size = <0x100000>;
 	};
 
 	qcom,msm-contig-mem {
@@ -2531,6 +2544,14 @@
 		reg = <0xfe053008 0x4>,
 			<0xfe05300c 0x4>;
 		reg-names = "avtimer_lsb_addr", "avtimer_msb_addr";
+	};
+
+	sony,ric_info {
+		compatible = "sony_ric";
+		sony,num-partition = <4>;
+		sony,partition-names = "system", "userdata", "cache", "apps_log";
+		sony,mount_paths = "/system", "/data", "/cache", "/mnt/idd";
+		sony,mount-flags = <0x1 0x6 0x6 0xE>;
 	};
 };
 

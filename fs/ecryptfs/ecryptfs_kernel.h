@@ -36,6 +36,9 @@
 #include <linux/scatterlist.h>
 #include <linux/hash.h>
 #include <linux/nsproxy.h>
+#ifdef CONFIG_CRYPTO_DEV_KFIPS
+#include <linux/crypto.h>
+#endif
 #include <linux/backing-dev.h>
 #include <linux/ecryptfs.h>
 
@@ -220,7 +223,11 @@ struct ecryptfs_crypt_stat {
 	size_t extent_shift;
 	unsigned int extent_mask;
 	struct ecryptfs_mount_crypt_stat *mount_crypt_stat;
+#ifdef CONFIG_CRYPTO_DEV_KFIPS
+	struct crypto_ablkcipher *tfm;
+#else
 	struct crypto_blkcipher *tfm;
+#endif
 	struct crypto_hash *hash_tfm; /* Crypto context for generating
 				       * the initialization vectors */
 	unsigned char cipher[ECRYPTFS_MAX_CIPHER_NAME_SIZE];

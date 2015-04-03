@@ -4,6 +4,7 @@
  * Copyright (C) 2005 Phil Chang <pchang23@sbcglobal.net>
  * Copyright (C) 2006 James Painter <jamie.painter@iname.com>
  * Copyright (c) 2002-2003 TiVo Inc.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +19,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 // #define	DEBUG			// error path messages, extra info
@@ -1106,7 +1110,7 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
 	if (dev->driver_info->flags & FLAG_FRAMING_AX) {
 		/* hard_mtu  is still the default - the device does not support
 		   jumbo eth frames */
-		dev->rx_urb_size = 2048;
+		dev->rx_urb_size = 4096;
 	}
 
 	return 0;
@@ -1633,6 +1637,10 @@ static const struct usb_device_id	products [] = {
 }, {
 	// Asus USB Ethernet Adapter
 	USB_DEVICE (0x0b95, 0x7e2b),
+	.driver_info = (unsigned long) &ax88772_info,
+}, {
+	// Lenovo U2L100P 10/100
+	USB_DEVICE(0x17ef, 0x7203),
 	.driver_info = (unsigned long) &ax88772_info,
 },
 	{ },		// END

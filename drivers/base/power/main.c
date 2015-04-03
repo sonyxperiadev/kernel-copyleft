@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2003 Patrick Mochel
  * Copyright (c) 2003 Open Source Development Lab
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This file is released under the GPLv2
  *
@@ -29,6 +30,10 @@
 #include <linux/async.h>
 #include <linux/suspend.h>
 #include <linux/timer.h>
+#ifdef CONFIG_PM_WAKEUP_TIMES
+#include <linux/math64.h>
+#include <linux/wait.h>
+#endif
 
 #include "../base.h"
 #include "power.h"
@@ -52,6 +57,11 @@ LIST_HEAD(dpm_late_early_list);
 LIST_HEAD(dpm_noirq_list);
 
 struct suspend_stats suspend_stats;
+#ifdef CONFIG_PM_WAKEUP_TIMES
+struct suspend_stats_queue suspend_stats_queue;
+static ktime_t suspend_start_time;
+static ktime_t resume_start_time;
+#endif
 static DEFINE_MUTEX(dpm_list_mtx);
 static pm_message_t pm_transition;
 
@@ -62,7 +72,6 @@ struct dpm_drv_wd_data {
 };
 
 static int async_error;
-
 /**
  * device_pm_init - Initialize the PM-related part of a device object.
  * @dev: Device object being initialized.
@@ -376,6 +385,73 @@ static void dpm_show_time(ktime_t starttime, pm_message_t state, char *info)
 		usecs / USEC_PER_MSEC, usecs % USEC_PER_MSEC);
 }
 
+#ifdef CONFIG_PM_WAKEUP_TIMES
+static void dpm_log_wakeup_stats(pm_message_t state, ktime_t *start_time,
+		struct stats_wakeup_time *min_time,
+		struct stats_wakeup_time *max_time,
+		struct stats_wakeup_time *last_time,
+		ktime_t *avg_time)
+{
+	ktime_t end_time, duration, prev_duration, sum;
+	struct stats_wakeup_time prev;
+	u64 avg_ns;
+	char buf[32] = {0};
+	unsigned int nr = 0;
+
+	if (!ktime_to_ns(*start_time))
+		return;
+
+	switch (state.event) {
+	case PM_EVENT_RESUME:
+		snprintf(buf, sizeof(buf), "%s", "resume time:");
+		break;
+	case PM_EVENT_SUSPEND:
+		snprintf(buf, sizeof(buf), "%s", "suspend time:");
+		break;
+	default:
+		return;
+	}
+
+	end_time = ktime_get();
+	prev = *last_time;
+	prev_duration = ktime_sub(prev.end, prev.start);
+	last_time->end = end_time;
+	last_time->start = *start_time;
+	duration = ktime_sub(end_time, *start_time);
+	if (ktime_compare(duration,
+		ktime_sub(max_time->end, max_time->start)) > 0)
+		*max_time = *last_time;
+
+	if (!ktime_to_ns(ktime_sub(min_time->end, min_time->start)))
+		*min_time = *last_time;
+
+	if (ktime_compare(duration,
+		ktime_sub(min_time->end, min_time->start)) < 0)
+		*min_time = *last_time;
+
+	if (ktime_to_ns(prev_duration))
+		nr++;
+
+	if (ktime_to_ns(*avg_time))
+		nr++;
+
+	sum = ktime_add(ktime_add(*avg_time, prev_duration), duration);
+	avg_ns = div_u64(ktime_to_ns(sum), (nr + 1));
+	*avg_time = ktime_set(0, avg_ns);
+	*start_time = ktime_set(0, 0);
+
+	pr_debug("%s\n%s  %llums\n%s  %llums\n %s  %llums\n%s %llums\n", buf,
+			"  min:",
+			ktime_to_ms(ktime_sub(min_time->end, min_time->start)),
+			"  max:",
+			ktime_to_ms(ktime_sub(max_time->end, max_time->start)),
+			"  last:", ktime_to_ms(duration),
+			"  avg:", ktime_to_ms(*avg_time));
+	suspend_stats_queue.resume_done = 1;
+	wake_up(&suspend_stats_queue.wait_queue);
+}
+#endif
+
 static int dpm_run_callback(pm_callback_t cb, struct device *dev,
 			    pm_message_t state, char *info)
 {
@@ -555,6 +631,10 @@ static void dpm_resume_early(pm_message_t state)
  */
 void dpm_resume_start(pm_message_t state)
 {
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	if (state.event == PM_EVENT_RESUME)
+		resume_start_time = ktime_get();
+#endif
 	dpm_resume_noirq(state);
 	dpm_resume_early(state);
 }
@@ -821,6 +901,18 @@ void dpm_resume_end(pm_message_t state)
 {
 	dpm_resume(state);
 	dpm_complete(state);
+
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	if (state.event == PM_EVENT_RESUME) {
+		dpm_log_wakeup_stats(state, &resume_start_time,
+			&suspend_stats.resume_min_time,
+			&suspend_stats.resume_max_time,
+			&suspend_stats.resume_last_time,
+			&suspend_stats.resume_avg_time);
+	} else {
+		resume_start_time = ktime_set(0, 0);
+	}
+#endif
 }
 EXPORT_SYMBOL_GPL(dpm_resume_end);
 
@@ -1026,6 +1118,17 @@ int dpm_suspend_end(pm_message_t state)
 		return error;
 	}
 
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	if (state.event == PM_EVENT_SUSPEND) {
+		dpm_log_wakeup_stats(state, &suspend_start_time,
+			&suspend_stats.suspend_min_time,
+			&suspend_stats.suspend_max_time,
+			&suspend_stats.suspend_last_time,
+			&suspend_stats.suspend_avg_time);
+	} else {
+		suspend_start_time = ktime_set(0, 0);
+	}
+#endif
 	return 0;
 }
 EXPORT_SYMBOL_GPL(dpm_suspend_end);
@@ -1345,6 +1448,10 @@ int dpm_suspend_start(pm_message_t state)
 {
 	int error;
 
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	if (state.event == PM_EVENT_SUSPEND)
+		suspend_start_time = ktime_get();
+#endif
 	error = dpm_prepare(state);
 	if (error) {
 		suspend_stats.failed_prepare++;

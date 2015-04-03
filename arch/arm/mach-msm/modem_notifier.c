@@ -1,4 +1,5 @@
 /* Copyright (c) 2008-2010, 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 /*
  * Modem Restart Notifier -- Provides notification
@@ -61,6 +64,43 @@ void modem_queue_start_reset_notify(void)
 		printk(KERN_ERR "%s\n", __func__);
 }
 EXPORT_SYMBOL(modem_queue_start_reset_notify);
+
+#ifdef CONFIG_SIM_DETECT_FEATURE
+
+static void modem_sim_instert_detect(struct work_struct *work)
+{
+	simstatus_store(1);
+}
+
+static void modem_sim_remove_detect(struct work_struct *work)
+{
+	simstatus_store(0);
+}
+
+static DECLARE_WORK(modem_sim_insert_work, &modem_sim_instert_detect);
+void modem_queue_sim_insert_notify(void)
+{
+	int ret;
+
+	ret = queue_work(modem_notifier_wq, &modem_sim_insert_work);
+
+	if (!ret)
+		printk(KERN_ERR "%s\n", __func__);
+}
+EXPORT_SYMBOL(modem_queue_sim_insert_notify);
+
+static DECLARE_WORK(modem_sim_remove_work, &modem_sim_remove_detect);
+void modem_queue_sim_remove_notify(void)
+{
+	int ret;
+
+	ret = queue_work(modem_notifier_wq, &modem_sim_remove_work);
+
+	if (!ret)
+		printk(KERN_ERR "%s\n", __func__);
+}
+EXPORT_SYMBOL(modem_queue_sim_remove_notify);
+#endif
 
 static void notify_work_end_reset(struct work_struct *work)
 {

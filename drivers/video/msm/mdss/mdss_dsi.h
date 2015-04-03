@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013-2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,6 +21,7 @@
 #include "mdss_panel.h"
 #include "mdss_io_util.h"
 #include "mdss_dsi_cmd.h"
+#include "mdss_fb.h"
 
 #define MMSS_SERDES_BASE_PHY 0x04f01000 /* mmss (De)Serializer CFG */
 
@@ -150,6 +152,7 @@ enum dsi_lane_map_type {
 #define DSI_CMD_TRIGGER_SW		0x04
 #define DSI_CMD_TRIGGER_SW_SEOF		0x05	/* cmd dma only */
 #define DSI_CMD_TRIGGER_SW_TE		0x06
+#define DSI_CMD_TRIGGER_OVER_RANG	0x07
 
 #define DSI_VIDEO_TERM  BIT(16)
 #define DSI_MDP_TERM    BIT(8)
@@ -202,6 +205,15 @@ struct dsi_clk_desc {
 };
 
 
+/* panel DriverIC type */
+enum {
+	PANEL_DRIVER_IC_R63311,
+	PANEL_DRIVER_IC_NT35596,
+	PANEL_DRIVER_IC_SY35590,
+	PANEL_DRIVER_IC_NT71397,
+	PANEL_DRIVER_IC_NONE,
+};
+
 struct dsi_panel_cmds {
 	char *buf;
 	int blen;
@@ -210,11 +222,88 @@ struct dsi_panel_cmds {
 	int link_state;
 };
 
+#define DEFAULT_CMDS	0
+#define DETECTED_CMDS	1
+#define MAX_CMDS	2
+
 struct dsi_kickoff_action {
 	struct list_head act_entry;
 	void (*action) (void *);
 	void *data;
 };
+
+struct mdss_pcc_color_tbl {
+	u32 color_type;
+	u32 area_num;
+	u32 u_min;
+	u32 u_max;
+	u32 v_min;
+	u32 v_max;
+	u32 r_data;
+	u32 g_data;
+	u32 b_data;
+} __packed;
+
+#define PCC_STS_UD	0x01	/* update request */
+
+struct mdss_pcc_data {
+	struct mdss_pcc_color_tbl *color_tbl;
+	u32 tbl_size;
+	u8 tbl_idx;
+	u8 pcc_sts;
+	u32 u_data;
+	u32 v_data;
+	int param_type;
+};
+
+struct mdss_panel_power_seq {
+	int disp_en_pre;
+	int disp_en_post;
+	int seq_num;
+	int *rst_seq;
+	int seq_b_num;
+	int *rst_b_seq;
+};
+
+struct mdss_panel_specific_pdata {
+	bool detected;
+	int driver_ic;
+	int32_t lcd_id;
+	int32_t adc_uv;
+	int disp_on_in_hs;
+	int panel_detect;
+	int wait_time_before_on_cmd;
+	int init_from_begin;
+	int cabc_enabled;
+	int cabc_active;
+
+	struct dsi_panel_cmds cabc_early_on_cmds;
+	struct dsi_panel_cmds cabc_on_cmds;
+	struct dsi_panel_cmds cabc_off_cmds[MAX_CMDS];
+	struct dsi_panel_cmds cabc_late_off_cmds[MAX_CMDS];
+	struct dsi_panel_cmds cabc_deferred_on_cmds;
+
+	struct dsi_panel_cmds einit_cmds;
+	struct dsi_panel_cmds init_cmds;
+	struct dsi_panel_cmds off_cmds[MAX_CMDS];
+	struct dsi_panel_cmds id_read_cmds;
+
+	int (*panel_power_on) (struct mdss_panel_data *pdata, int enable);
+	int (*disp_on) (struct mdss_panel_data *pdata);
+	int (*detect) (struct mdss_panel_data *pdata);
+	int (*update_panel) (struct mdss_panel_data *pdata);
+	int (*update_fps) (struct msm_fb_data_type *mfd);
+	int (*reset) (struct mdss_panel_data *pdata, int enable);
+	struct dsi_panel_cmds pre_uv_read_cmds;
+	struct dsi_panel_cmds uv_read_cmds;
+	struct mdss_pcc_data pcc_data;
+
+	struct mdss_panel_power_seq on_seq;
+	struct mdss_panel_power_seq off_seq;
+	u32 down_period;
+	u32 new_vfp;
+};
+
 
 struct dsi_drv_cm_data {
 	struct regulator *vdd_vreg;
@@ -250,6 +339,7 @@ struct mdss_dsi_ctrl_pdata {
 	int (*check_status) (struct mdss_dsi_ctrl_pdata *pdata);
 	int (*cmdlist_commit)(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp);
 	void (*switch_mode) (struct mdss_panel_data *pdata, int mode);
+	int (*pcc_setup)(struct mdss_panel_data *pdata);
 	struct mdss_panel_data panel_data;
 	unsigned char *ctrl_base;
 	struct dss_io_data ctrl_io;
@@ -286,6 +376,8 @@ struct mdss_dsi_ctrl_pdata {
 	u32 pclk_rate;
 	u32 byte_clk_rate;
 	struct dss_module_power power_data;
+	struct mdss_panel_specific_pdata *spec_pdata;
+	struct work_struct cabc_work;
 	u32 dsi_irq_mask;
 	struct mdss_hw *dsi_hw;
 	struct mdss_panel_recovery *recovery;
@@ -294,6 +386,13 @@ struct mdss_dsi_ctrl_pdata {
 	struct dsi_panel_cmds off_cmds;
 	struct dsi_panel_cmds status_cmds;
 	u32 status_value;
+
+	struct dsi_panel_cmds fps_cmds;
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct dsi_panel_cmds cabc_off_cmds;
+	struct dsi_panel_cmds cabc_late_off_cmds;
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	struct dsi_panel_cmds video2cmd;
 	struct dsi_panel_cmds cmd2video;
@@ -325,6 +424,7 @@ struct dsi_status_data {
 
 int dsi_panel_device_register(struct device_node *pan_node,
 				struct mdss_dsi_ctrl_pdata *ctrl_pdata);
+int mdss_dsi_panel_power_detect(struct platform_device *pdev, int enable);
 
 int mdss_dsi_cmds_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 		struct dsi_cmd_desc *cmds, int cnt);
@@ -375,6 +475,8 @@ void mdss_dsi_cmdlist_kickoff(int intf);
 int mdss_dsi_bta_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
 int mdss_dsi_reg_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
 bool __mdss_dsi_clk_enabled(struct mdss_dsi_ctrl_pdata *ctrl, u8 clk_type);
+
+int mdss_dsi_panel_fps_data_update(struct msm_fb_data_type *mfd);
 
 int mdss_dsi_panel_init(struct device_node *node,
 		struct mdss_dsi_ctrl_pdata *ctrl_pdata,

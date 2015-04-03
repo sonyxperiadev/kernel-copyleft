@@ -26,7 +26,7 @@
 #include <sound/q6afe-v2.h>
 #include <sound/q6audio-v2.h>
 #include <sound/apr_audio-v2.h>
-#include <q6voice.h>
+#include "q6voice.h"
 #include "audio_acdb.h"
 
 

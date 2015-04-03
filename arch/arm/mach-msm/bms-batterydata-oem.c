@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/batterydata-lib.h>
@@ -107,3 +112,6 @@ struct bms_battery_data oem_batt_data = {
 	.default_rbatt_mohm	= 236,
 	.flat_ocv_threshold_uv	= 3800000,
 };
+
+struct bms_battery_data *bms_batt_data = &oem_batt_data;
+int bms_batt_data_num = 1;

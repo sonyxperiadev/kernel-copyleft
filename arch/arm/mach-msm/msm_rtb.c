@@ -9,6 +9,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/atomic.h>
@@ -24,6 +28,7 @@
 #include <linux/atomic.h>
 #include <linux/of.h>
 #include <linux/io.h>
+#include <linux/dma-mapping.h>
 #include <asm-generic/sizes.h>
 #include <mach/memory.h>
 #include <mach/msm_rtb.h>
@@ -245,7 +250,7 @@ static int msm_rtb_probe(struct platform_device *pdev)
 		int size;
 
 		ret = of_property_read_u32((&pdev->dev)->of_node,
-					"qcom,memory-reservation-size",
+					"qcom,rtb-size",
 					&size);
 
 		if (ret < 0)
@@ -257,22 +262,12 @@ static int msm_rtb_probe(struct platform_device *pdev)
 	if (msm_rtb.size <= 0 || msm_rtb.size > SZ_1M)
 		return -EINVAL;
 
-	/*
-	 * The ioremap call is made separately to store the physical
-	 * address of the buffer. This is necessary for cases where
-	 * the only way to access the buffer is a physical address.
-	 */
-	msm_rtb.phys = allocate_contiguous_ebi_nomap(msm_rtb.size, SZ_4K);
+	msm_rtb.rtb = dma_alloc_coherent(&pdev->dev, msm_rtb.size,
+						&msm_rtb.phys,
+						GFP_KERNEL);
 
-	if (!msm_rtb.phys)
+	if (!msm_rtb.rtb)
 		return -ENOMEM;
-
-	msm_rtb.rtb = ioremap(msm_rtb.phys, msm_rtb.size);
-
-	if (!msm_rtb.rtb) {
-		free_contiguous_memory_by_paddr(msm_rtb.phys);
-		return -ENOMEM;
-	}
 
 	msm_rtb.nentries = msm_rtb.size / sizeof(struct msm_rtb_layout);
 
