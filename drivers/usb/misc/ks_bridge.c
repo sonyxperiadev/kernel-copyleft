@@ -517,8 +517,10 @@ static void ksb_rx_cb(struct urb *urb)
 				&& urb->status != -EPROTO)
 			pr_err_ratelimited("%s: urb failed with err:%d",
 					ksb->fs_dev.name, urb->status);
-		ksb_free_data_pkt(pkt);
-		goto done;
+		if (urb->status != -EPROTO) {
+			ksb_free_data_pkt(pkt);
+			goto done;
+		}
 	}
 
 	if (urb->actual_length == 0) {
