@@ -98,7 +98,7 @@ static int msm_hdmi_audio_codec_rx_dai_startup(
 		dev_err(dai->dev,
 			"%s() HDMI cable is not connected (ret val = %d)\n",
 			__func__, rv);
-		rv = -EAGAIN;
+		rv = -ENODEV;
 	}
 
 	return rv;
@@ -129,7 +129,7 @@ static int msm_hdmi_audio_codec_rx_dai_hw_params(
 		dev_err(dai->dev,
 			"%s() HDMI cable is not connected (rv = %d)\n",
 			__func__, rv);
-		return -EAGAIN;
+		return -ENODEV;
 	}
 
 	switch (num_channels) {
@@ -231,6 +231,7 @@ static int msm_hdmi_audio_codec_rx_probe(struct snd_soc_codec *codec)
 		return -ENODEV;
 	}
 
+#ifdef CONFIG_FB_MSM_MDSS_HDMI_PANEL
 	if (msm_hdmi_register_audio_codec(codec_data->hdmi_core_pdev,
 				&codec_data->hdmi_ops)) {
 		dev_err(codec->dev, "%s(): can't register with hdmi core",
@@ -238,6 +239,7 @@ static int msm_hdmi_audio_codec_rx_probe(struct snd_soc_codec *codec)
 		kfree(codec_data);
 		return -ENODEV;
 	}
+#endif
 
 	dev_set_drvdata(codec->dev, codec_data);
 

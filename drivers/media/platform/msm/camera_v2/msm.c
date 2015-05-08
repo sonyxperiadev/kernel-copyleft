@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -519,8 +520,16 @@ int msm_destroy_session(unsigned int session_id)
 		list, session);
 	buf_mgr_subdev = msm_buf_mngr_get_subdev();
 	if (buf_mgr_subdev) {
+#if defined(CONFIG_SONY_CAM_V4L2)
+		struct msm_buf_mngr_info buf_info;
+		memset(&buf_info, 0 , sizeof(struct msm_buf_mngr_info));
+		buf_info.session_id = session_id;
+		v4l2_subdev_call(buf_mgr_subdev, core, ioctl,
+			MSM_SD_SHUTDOWN, &buf_info);
+#else
 		v4l2_subdev_call(buf_mgr_subdev, core, ioctl,
 			MSM_SD_SHUTDOWN, NULL);
+#endif
 	} else
 		pr_err("%s: Buff manger device node is NULL\n", __func__);
 
