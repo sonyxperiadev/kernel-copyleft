@@ -20,6 +20,8 @@
 #include "kgsl_iommu.h"
 #include <mach/ocmem.h>
 
+#include "a3xx_reg.h"
+
 #define DEVICE_3D_NAME "kgsl-3d"
 #define DEVICE_3D0_NAME "kgsl-3d0"
 
@@ -217,6 +219,7 @@ enum adreno_device_flags {
 	ADRENO_DEVICE_PWRON_FIXUP = 1,
 	ADRENO_DEVICE_INITIALIZED = 2,
 	ADRENO_DEVICE_STARTED = 3,
+	ADRENO_DEVICE_HANG_INTR = 4,
 };
 
 #define PERFCOUNTER_FLAG_NONE 0x0
@@ -568,6 +571,8 @@ static inline int adreno_is_a2xx(struct adreno_device *adreno_dev)
 	return (adreno_dev->gpurev <= 299);
 }
 
+bool adreno_hw_isidle(struct kgsl_device *device);
+
 static inline int adreno_is_a3xx(struct adreno_device *adreno_dev)
 {
 	return (adreno_dev->gpurev >= 300);
@@ -712,6 +717,11 @@ static inline int adreno_add_read_cmds(struct kgsl_device *device,
 	*cmds++ = val;
 	*cmds++ = 0xFFFFFFFF;
 	*cmds++ = 0xFFFFFFFF;
+
+	/* WAIT_REG_MEM turns back on protected mode - push it off */
+	*cmds++ = cp_type3_packet(CP_SET_PROTECTED_MODE, 1);
+	*cmds++ = 0;
+
 	cmds += __adreno_add_idle_indirect_cmds(cmds, nop_gpuaddr);
 	return cmds - start;
 }
@@ -893,6 +903,43 @@ adreno_get_rptr(struct adreno_ringbuffer *rb)
 	unsigned int result;
 	adreno_readreg(adreno_dev, ADRENO_REG_CP_RB_RPTR, &result);
 	return result;
+}
+/*
+ * adreno_set_protected_registers() - Protect the specified range of registers
+ * from being accessed by the GPU
+ * @device: pointer to the KGSL device
+ * @index: Pointer to the index of the protect mode register to write to
+ * @reg: Starting dword register to write
+ * @mask_len: Size of the mask to protect (# of registers = 2 ** mask_len)
+ *
+ * Add the range of registers to the list of protected mode registers that will
+ * cause an exception if the GPU accesses them.  There are 16 available
+ * protected mode registers.  Index is used to specify which register to write
+ * to - the intent is to call this function multiple times with the same index
+ * pointer for each range and the registers will be magically programmed in
+ * incremental fashion
+ */
+static inline void adreno_set_protected_registers(struct kgsl_device *device,
+	unsigned int *index, unsigned int reg, int mask_len)
+{
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	unsigned int val;
+
+	/* This function is only for adreno A3XX and beyond */
+	BUG_ON(adreno_is_a2xx(adreno_dev));
+
+	/* There are only 16 registers available */
+	BUG_ON(*index >= 16);
+
+	val = 0x60000000 | ((mask_len & 0x1F) << 24) | ((reg << 2) & 0x1FFFF);
+
+	/*
+	 * Write the protection range to the next available protection
+	 * register
+	 */
+
+	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_0 + *index, val);
+	*index = *index + 1;
 }
 
 #endif /*__ADRENO_H */

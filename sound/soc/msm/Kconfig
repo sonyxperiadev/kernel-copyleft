@@ -173,6 +173,15 @@ config DOLBY_DAP
 	 device, end point dependent post processing parameters and
 	 the various posrt processing parameters
 
+config NOISE_DUMPING_JACK
+	bool "Enable noise damping"
+	depends on SND_SOC_MSM8974
+	help
+	 To add support for noise damping.
+	 This support is to configure headset
+	 detection parameters to adapt audio jack
+	 with noise damping solution.
+
 config SND_SOC_MSM8974
 	tristate "SoC Machine driver for MSM8974 boards"
 	depends on ARCH_MSM8974
