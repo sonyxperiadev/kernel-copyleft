@@ -1,6 +1,7 @@
 /*Qualcomm Secure Execution Environment Communicator (QSEECOM) driver
  *
  * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1114,6 +1115,14 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 
 	if (!memcmp(data->client.app_name, "keymaste", strlen("keymaste"))) {
 		pr_debug("Do not unload keymaster app from tz\n");
+		goto unload_exit;
+	}
+
+	/* tzsuntory has multiple clients that do not call
+	   QSEECom_shutdown_app(), and should never be unloaded in order
+	   to always return same fd to all clients */
+	if (!memcmp(data->client.app_name, "tzsuntory", strlen("tzsuntory"))) {
+		pr_warn("Do not unload tzsuntory app from tz\n");
 		goto unload_exit;
 	}
 
