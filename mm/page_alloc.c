@@ -5,6 +5,7 @@
  *  Note that kmalloc() lives in slab.c
  *
  *  Copyright (C) 1991, 1992, 1993, 1994  Linus Torvalds
+ *  Copyright (C) 2014 Sony Mobile Communications AB.
  *  Swap reorganised 29.12.95, Stephen Tweedie
  *  Support of BIGMEM added by Gerhard Wichert, Siemens AG, July 1999
  *  Reshaped it to be a zoned allocator, Ingo Molnar, Red Hat, 1999
@@ -12,6 +13,9 @@
  *  Zone balancing, Kanoj Sarcar, SGI, Jan 2000
  *  Per cpu hot/cold page lists, bulk allocation, Martin J. Bligh, Sept 2002
  *          (lots of bits borrowed from Ingo Molnar & Andrew Morton)
+ *
+ *  NOTE: This file has been modified by Sony Mobile Communications AB.
+ *  Modifications are licensed under the License.
  */
 
 #include <linux/stddef.h>
@@ -1041,7 +1045,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 	struct free_area * area;
 	int current_order;
 	struct page *page;
-	int migratetype, i;
+	int migratetype, mt = start_migratetype, i;
 
 	/* Find the largest possible block of pages in the other list */
 	for (current_order = MAX_ORDER-1; current_order >= order;
@@ -1104,6 +1108,14 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 			       is_migrate_cma(migratetype)
 			     ? migratetype : start_migratetype);
 
+			if (IS_ENABLED(CONFIG_CMA)) {
+				mt = get_pageblock_migratetype(page);
+				if (!is_migrate_cma(mt) &&
+						mt != MIGRATE_ISOLATE)
+					mt = start_migratetype;
+			}
+			set_page_private(page, mt);
+
 			trace_mm_page_alloc_extfrag(page, order, current_order,
 				start_migratetype, migratetype);
 
@@ -1126,7 +1138,9 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order,
 retry_reserve:
 	page = __rmqueue_smallest(zone, order, migratetype);
 
-	if (unlikely(!page) && migratetype != MIGRATE_RESERVE) {
+	if (likely(page)) {
+		set_page_private(page, migratetype);
+	} else if (migratetype != MIGRATE_RESERVE) {
 		page = __rmqueue_fallback(zone, order, migratetype);
 
 		/*
@@ -1149,13 +1163,18 @@ static struct page *__rmqueue_cma(struct zone *zone, unsigned int order,
 {
 	struct page *page = 0;
 #ifdef CONFIG_CMA
-	if (migratetype == MIGRATE_MOVABLE && !zone->cma_alloc)
+	if (migratetype == MIGRATE_MOVABLE && !zone->cma_alloc) {
 		page = __rmqueue_smallest(zone, order, MIGRATE_CMA);
+		if (page)
+			migratetype = MIGRATE_CMA;
+	}
 	if (!page)
 #endif
 retry_reserve :
 		page = __rmqueue_smallest(zone, order, migratetype);
 
+	if (page)
+		set_page_private(page, migratetype);
 
 	if (unlikely(!page) && migratetype != MIGRATE_RESERVE) {
 		page = __rmqueue_fallback(zone, order, migratetype);
@@ -1184,7 +1203,7 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 			unsigned long count, struct list_head *list,
 			int migratetype, int cold, int cma)
 {
-	int mt = migratetype, i;
+	int i;
 
 	spin_lock(&zone->lock);
 	for (i = 0; i < count; ++i) {
@@ -1209,16 +1228,15 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 			list_add(&page->lru, list);
 		else
 			list_add_tail(&page->lru, list);
+		list = &page->lru;
 		if (IS_ENABLED(CONFIG_CMA)) {
-			mt = get_pageblock_migratetype(page);
+			int mt = get_pageblock_migratetype(page);
 			if (!is_migrate_cma(mt) && mt != MIGRATE_ISOLATE)
 				mt = migratetype;
+			if (is_migrate_cma(mt))
+				__mod_zone_page_state(zone, NR_FREE_CMA_PAGES,
+						      -(1 << order));
 		}
-		set_page_private(page, mt);
-		list = &page->lru;
-		if (is_migrate_cma(mt))
-			__mod_zone_page_state(zone, NR_FREE_CMA_PAGES,
-					      -(1 << order));
 	}
 	__mod_zone_page_state(zone, NR_FREE_PAGES, -(i << order));
 	spin_unlock(&zone->lock);

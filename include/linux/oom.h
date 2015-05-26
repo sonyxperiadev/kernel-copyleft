@@ -40,8 +40,23 @@ enum oom_constraint {
 	CONSTRAINT_MEMCG,
 };
 
-extern void compare_swap_oom_score_adj(int old_val, int new_val);
-extern int test_set_oom_score_adj(int new_val);
+/* Thread is the potential origin of an oom condition; kill first on oom */
+#define OOM_FLAG_ORIGIN		((__force oom_flags_t)0x1)
+
+static inline void set_current_oom_origin(void)
+{
+	current->signal->oom_flags |= OOM_FLAG_ORIGIN;
+}
+
+static inline void clear_current_oom_origin(void)
+{
+	current->signal->oom_flags &= ~OOM_FLAG_ORIGIN;
+}
+
+static inline bool oom_task_origin(const struct task_struct *p)
+{
+	return !!(p->signal->oom_flags & OOM_FLAG_ORIGIN);
+}
 
 extern unsigned int oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 			const nodemask_t *nodemask, unsigned long totalpages);

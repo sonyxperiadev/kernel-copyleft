@@ -1,9 +1,13 @@
 /*
   FUSE: Filesystem in Userspace
   Copyright (C) 2001-2008  Miklos Szeredi <miklos@szeredi.hu>
+  Copyright (C) 2013 Sony Mobile Communications AB.
 
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
+
+  NOTE: This file has been modified by Sony Mobile Communications AB.
+  Modifications are licensed under the License.
 */
 
 #include "fuse_i.h"
@@ -693,6 +697,7 @@ static int fuse_readpages_fill(void *_data, struct page *page)
 		put_page(newpage);
 
 		lru_cache_add_file(newpage);
+
 
 		/* finally release the old page and swap pointers */
 		unlock_page(oldpage);

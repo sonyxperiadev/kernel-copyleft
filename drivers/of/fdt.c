@@ -234,7 +234,7 @@ static unsigned long unflatten_dt_node(struct boot_param_header *blob,
 	}
 	/* process properties */
 	while (1) {
-		u32 sz, noff;
+		u32 sz, noff, name_len;
 		char *pname;
 
 		tag = be32_to_cpup((__be32 *)(*p));
@@ -256,11 +256,13 @@ static unsigned long unflatten_dt_node(struct boot_param_header *blob,
 			pr_info("Can't find property name in list !\n");
 			break;
 		}
+		name_len = strlen(pname);
 		if (strcmp(pname, "name") == 0)
 			has_name = 1;
 		l = strlen(pname) + 1;
-		pp = unflatten_dt_alloc(&mem, sizeof(struct property),
-					__alignof__(struct property));
+		pp = unflatten_dt_alloc(&mem,
+				ALIGN(sizeof(struct property) + name_len + 1, 4)
+				+ sz, __alignof__(struct property));
 		if (allnextpp) {
 			/* We accept flattened tree phandles either in
 			 * ePAPR-style "phandle" properties, or the
@@ -277,9 +279,11 @@ static unsigned long unflatten_dt_node(struct boot_param_header *blob,
 			 * stuff */
 			if (strcmp(pname, "ibm,phandle") == 0)
 				np->phandle = be32_to_cpup((__be32 *)*p);
-			pp->name = pname;
+			pp->name = memcpy(pp + 1, pname, name_len + 1);
 			pp->length = sz;
-			pp->value = (void *)*p;
+			pp->value = memcpy((void *)pp +
+				ALIGN(sizeof(struct property) + name_len + 1, 4),
+				(void *)*p, sz);
 			*prev_pp = pp;
 			prev_pp = &pp->next;
 		}

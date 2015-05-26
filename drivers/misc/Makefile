@@ -16,6 +16,7 @@ obj-$(CONFIG_LKDTM)		+= lkdtm.o
 obj-$(CONFIG_TIFM_CORE)       	+= tifm_core.o
 obj-$(CONFIG_TIFM_7XX1)       	+= tifm_7xx1.o
 obj-$(CONFIG_PHANTOM)		+= phantom.o
+obj-$(CONFIG_NFC_PN547)		+= pn547.o
 obj-$(CONFIG_SENSORS_BH1780)	+= bh1780gli.o
 obj-$(CONFIG_SENSORS_BH1770)	+= bh1770glc.o
 obj-$(CONFIG_SENSORS_APDS990X)	+= apds990x.o
@@ -70,3 +71,6 @@ obj-$(CONFIG_QSEECOM) += qseecom.o
 obj-$(CONFIG_QFP_FUSE) += qfp_fuse.o
 obj-$(CONFIG_TI_DRV2667) += ti_drv2667.o
 obj-$(CONFIG_QPNP_MISC) += qpnp-misc.o
+obj-$(CONFIG_RAMDUMP_TAGS) += rdtags.o
+obj-$(CONFIG_CRASH_LAST_LOGS) += lastlogs.o
+

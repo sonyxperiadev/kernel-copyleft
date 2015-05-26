@@ -976,4 +976,7 @@ config FB_MSM_QPIC_PANEL_DETECT
 if FB_MSM_MDSS
 	source "drivers/video/msm/mdss/Kconfig"
 endif
+
+source "drivers/video/msm/lcd-bias/Kconfig"
+
 endif

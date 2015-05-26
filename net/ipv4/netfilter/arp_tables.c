@@ -6,7 +6,10 @@
  * Some ARP specific bits are:
  *
  * Copyright (C) 2002 David S. Miller (davem@redhat.com)
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <linux/kernel.h>

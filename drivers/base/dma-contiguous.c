@@ -346,7 +346,21 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t *res_base,
 		 * Use __memblock_alloc_base() since
 		 * memblock_alloc_base() panic()s.
 		 */
-		phys_addr_t addr = __memblock_alloc_base(size, alignment, limit);
+		phys_addr_t addr = 0;
+		if (limit == MEMBLOCK_ALLOC_ANYWHERE) {
+#ifdef CONFIG_HIGHMEM
+			addr = memblock_alloc_range(size, alignment,
+					__pa(high_memory - 1) + 1,
+					MEMBLOCK_ALLOC_ANYWHERE);
+#endif
+			if (addr == 0)
+				addr = memblock_alloc_range(size, alignment,
+					0, __pa(high_memory - 1) + 1);
+
+		} else {
+			addr = __memblock_alloc_base(size,
+							alignment, limit);
+		}
 		if (!addr) {
 			ret = -ENOMEM;
 			goto err;

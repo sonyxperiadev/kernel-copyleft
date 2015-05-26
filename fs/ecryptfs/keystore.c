@@ -8,6 +8,7 @@
  *   Author(s): Michael A. Halcrow <mhalcrow@us.ibm.com>
  *              Michael C. Thompson <mcthomps@us.ibm.com>
  *              Trevor S. Highland <trevor.highland@gmail.com>
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -23,6 +24,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/string.h>
@@ -1150,7 +1154,7 @@ decrypt_pki_encrypted_session_key(struct ecryptfs_auth_tok *auth_tok,
 	struct ecryptfs_message *msg = NULL;
 	char *auth_tok_sig;
 	char *payload;
-	size_t payload_len;
+	size_t payload_len = 0;
 	int rc;
 
 	rc = ecryptfs_get_auth_tok_sig(&auth_tok_sig, auth_tok);

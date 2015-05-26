@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
@@ -232,7 +236,8 @@ struct cpr_regulator {
 #define CPR_DEBUG_MASK_IRQ	BIT(0)
 #define CPR_DEBUG_MASK_API	BIT(1)
 
-static int cpr_debug_enable = CPR_DEBUG_MASK_IRQ;
+static int cpr_debug_enable = 0;
+//static int cpr_debug_enable = CPR_DEBUG_MASK_IRQ;
 static int cpr_enable;
 static struct cpr_regulator *the_cpr;
 
@@ -1680,12 +1685,12 @@ static int __devinit cpr_init_cpr_efuse(struct platform_device *pdev,
 	}
 
 	rc = of_property_read_u32_array(of_node, "qcom,cpr-quotient-adjustment",
-				&quot_adjust[1], CPR_FUSE_CORNER_MAX - 1);
+			&quot_adjust[1], CPR_FUSE_CORNER_MAX - 1);
 	if (!rc) {
 		for (i = CPR_FUSE_CORNER_SVS; i < CPR_FUSE_CORNER_MAX; i++) {
 			cpr_vreg->cpr_fuse_target_quot[i] += quot_adjust[i];
 			pr_info("Corner[%d]: adjusted target quot = %d\n",
-				i, cpr_vreg->cpr_fuse_target_quot[i]);
+					i, cpr_vreg->cpr_fuse_target_quot[i]);
 		}
 	}
 

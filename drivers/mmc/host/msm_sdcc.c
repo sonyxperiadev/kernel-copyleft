@@ -4,7 +4,7 @@
  *  Copyright (C) 2007 Google Inc,
  *  Copyright (C) 2003 Deep Blue Solutions, Ltd, All Rights Reserved.
  *  Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
- *
+ *  Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,6 +14,8 @@
  *
  * Author: San Mehat (san@android.com)
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/module.h>
@@ -6141,6 +6143,7 @@ msmsdcc_probe(struct platform_device *pdev)
 	mmc->caps2 |= MMC_CAP2_POWEROFF_NOTIFY;
 	mmc->caps2 |= MMC_CAP2_STOP_REQUEST;
 	mmc->caps2 |= MMC_CAP2_ASYNC_SDIO_IRQ_4BIT_MODE;
+	mmc->caps2 |= MMC_CAP2_INIT_BKOPS;
 
 	if (plat->nonremovable)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;

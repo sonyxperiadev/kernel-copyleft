@@ -4,10 +4,14 @@
  * Author:	Nicolas Pitre
  * Created:	september 8, 2008
  * Copyright:	Marvell Semiconductors Inc.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/cpu.h>
@@ -141,6 +145,7 @@ struct page *kmap_atomic_to_page(const void *ptr)
 static void kmap_remove_unused_cpu(int cpu)
 {
 	int start_idx, idx, type;
+	int need_flush = 0;
 
 	pagefault_disable();
 	type = kmap_atomic_idx();
@@ -151,10 +156,18 @@ static void kmap_remove_unused_cpu(int cpu)
 		pte_t ptep;
 
 		ptep = get_top_pte(vaddr);
-		if (ptep)
+		if (ptep) {
 			set_top_pte(vaddr, __pte(0));
+			need_flush = 1;
+		}
 	}
 	pagefault_enable();
+
+	/* flush the caches and tlb if required */
+	if (need_flush) {
+		local_flush_tlb_all();
+		flush_cache_all();
+	}
 }
 
 static void kmap_remove_unused(void *unused)

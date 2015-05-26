@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2014 Sony Mobile Communications AB.
+ * All rights, including trade secret rights, reserved.
+ */
+
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the BSD Socket
  *		interface as the means of communication with the user level.
@@ -85,12 +90,14 @@ static void __inet_put_port(struct sock *sk)
 	atomic_dec(&hashinfo->bsockets);
 
 	spin_lock(&head->lock);
-	tb = inet_csk(sk)->icsk_bind_hash;
-	__sk_del_bind_node(sk);
-	tb->num_owners--;
-	inet_csk(sk)->icsk_bind_hash = NULL;
-	inet_sk(sk)->inet_num = 0;
-	inet_bind_bucket_destroy(hashinfo->bind_bucket_cachep, tb);
+	if (inet_csk(sk)->icsk_bind_hash) {
+		tb = inet_csk(sk)->icsk_bind_hash;
+		__sk_del_bind_node(sk);
+		tb->num_owners--;
+		inet_csk(sk)->icsk_bind_hash = NULL;
+		inet_sk(sk)->inet_num = 0;
+		inet_bind_bucket_destroy(hashinfo->bind_bucket_cachep, tb);
+	}
 	spin_unlock(&head->lock);
 }
 

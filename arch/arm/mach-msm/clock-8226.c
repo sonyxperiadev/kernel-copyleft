@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/kernel.h>
@@ -221,8 +225,9 @@ DEFINE_CLK_RPM_SMD(gfx3d_clk_src, gfx3d_a_clk_src, RPM_MEM_CLK_TYPE, OXILI_ID,
 
 DEFINE_CLK_RPM_SMD_BRANCH(xo, xo_a_clk,
 				RPM_MISC_CLK_TYPE, CXO_ID, 19200000);
+#ifdef CONFIG_QDSS_CLK
 DEFINE_CLK_RPM_SMD_QDSS(qdss_clk, qdss_a_clk, RPM_MISC_CLK_TYPE, QDSS_ID);
-
+#endif
 DEFINE_CLK_RPM_SMD_XO_BUFFER(cxo_d0, cxo_d0_a, D0_ID);
 DEFINE_CLK_RPM_SMD_XO_BUFFER(cxo_d1, cxo_d1_a, D1_ID);
 DEFINE_CLK_RPM_SMD_XO_BUFFER(cxo_a0, cxo_a0_a, A0_ID);
@@ -3146,10 +3151,14 @@ static struct clk_lookup msm_clocks_8226[] = {
 	CLK_LOOKUP("bus_clk", gcc_mss_q6_bimc_axi_clk.c, "fc880000.qcom,mss"),
 	CLK_LOOKUP("iface_clk",   gcc_mss_cfg_ahb_clk.c, "fc880000.qcom,mss"),
 	CLK_LOOKUP("mem_clk",    gcc_boot_rom_ahb_clk.c, "fc880000.qcom,mss"),
-
+#ifdef CONFIG_NFC_PN547
+	/* NFC */
+	CLK_LOOKUP("nfc_clk",            cxo_d1_pin.c, "2-0028"),
+#else
 	/* NFC */
 	CLK_LOOKUP("ref_clk",            cxo_d1_a_pin.c, ""),
-	CLK_LOOKUP("ref_clk",            cxo_d1_pin.c, "2-000e"),
+        CLK_LOOKUP("ref_clk",            cxo_d1_pin.c, "2-000e"),
+#endif
 
 	/* PIL-PRONTO */
 	CLK_LOOKUP("xo", cxo_pil_pronto_clk.c, "fb21b000.qcom,pronto"),
@@ -3187,7 +3196,7 @@ static struct clk_lookup msm_clocks_8226[] = {
 	CLK_LOOKUP("ocmem_a_clk", ocmemgx_msmbus_a_clk.c, "msm_bus"),
 	CLK_LOOKUP("bus_clk",	mmss_s0_axi_clk.c,	"msm_mmss_noc"),
 	CLK_LOOKUP("bus_a_clk",	mmss_s0_axi_clk.c,	"msm_mmss_noc"),
-
+#ifdef CONFIG_QDSS_CLK
 	/* CoreSight clocks */
 	CLK_LOOKUP("core_clk", qdss_clk.c, "fc322000.tmc"),
 	CLK_LOOKUP("core_clk", qdss_clk.c, "fc318000.tpiu"),
@@ -3266,7 +3275,7 @@ static struct clk_lookup msm_clocks_8226[] = {
 	CLK_LOOKUP("core_a_clk", qdss_a_clk.c, "fc354000.cti"),
 	CLK_LOOKUP("core_a_clk", qdss_a_clk.c, "fc358000.cti"),
 	CLK_LOOKUP("core_a_clk", qdss_a_clk.c, "fd828018.hwevent"),
-
+#endif
 	CLK_LOOKUP("core_mmss_clk", mmss_misc_ahb_clk.c, "fd828018.hwevent"),
 
 	/* HSUSB-OTG Clocks */
@@ -3408,6 +3417,7 @@ static struct clk_lookup msm_clocks_8226[] = {
 	CLK_LOOKUP("cpp_clk", camss_vfe_cpp_clk.c,	"fd8c36a4.qcom,gdsc"),
 	CLK_LOOKUP("core_clk", oxili_gfx3d_clk.c, "fd8c4034.qcom,gdsc"),
 
+#if !defined(CONFIG_SONY_CAM_QCAMERA)
 	/* MM sensor clocks */
 	CLK_LOOKUP("cam_src_clk", mclk0_clk_src.c, "6f.qcom,camera"),
 	CLK_LOOKUP("cam_src_clk", mclk1_clk_src.c, "90.qcom,camera"),
@@ -3425,6 +3435,18 @@ static struct clk_lookup msm_clocks_8226[] = {
 	CLK_LOOKUP("cam_src_clk", mclk0_clk_src.c, "1.qcom,camera"),
 	CLK_LOOKUP("cam_clk", camss_mclk0_clk.c, "0.qcom,camera"),
 	CLK_LOOKUP("cam_clk", camss_mclk0_clk.c, "1.qcom,camera"),
+#else
+	CLK_LOOKUP("cam_src_clk", mclk0_clk_src.c, "20.qcom,camera"),
+	CLK_LOOKUP("cam_clk", camss_mclk0_clk.c, "20.qcom,camera"),
+#if defined(CONFIG_MACH_SONY_TIANCHI) || defined(CONFIG_MACH_SONY_TIANCHI_DSDS)
+	CLK_LOOKUP("cam_src_clk", mclk0_clk_src.c, "6e.qcom,camera"),
+	CLK_LOOKUP("cam_clk", camss_mclk0_clk.c, "6e.qcom,camera"),
+#endif
+#ifdef CONFIG_MACH_SONY_WUKONG
+	CLK_LOOKUP("cam_src_clk", mclk0_clk_src.c, "6c.qcom,camera"),
+	CLK_LOOKUP("cam_clk", camss_mclk0_clk.c, "6c.qcom,camera"),
+#endif
+#endif
 
 	/* eeprom clocks */
 	CLK_LOOKUP("cam_src_clk", mclk0_clk_src.c, "6c.qcom,eeprom"),

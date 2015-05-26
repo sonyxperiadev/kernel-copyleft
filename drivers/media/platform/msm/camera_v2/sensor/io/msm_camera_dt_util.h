@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,6 +18,11 @@
 #include <linux/gpio.h>
 #include <linux/of.h>
 #include "msm_camera_i2c.h"
+
+#if defined(CONFIG_SONY_CAM_QCAMERA) && \
+    (defined(CONFIG_MACH_SONY_TIANCHI) || defined(CONFIG_MACH_SONY_TIANCHI_DSDS))
+extern void msm_eeprom_get_camera_moudle_name(uint8_t id, uint8_t *module_name);
+#endif
 
 int msm_sensor_get_sub_module_index(struct device_node *of_node,
 	struct  msm_sensor_info_t **s_info);

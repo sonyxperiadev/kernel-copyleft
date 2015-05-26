@@ -2,6 +2,7 @@
  *  linux/kernel/printk.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
+ *  Copyright (c) 2014 Sony Mobile Communications Inc.
  *
  * Modified to make sys_syslog() more flexible: added commands to
  * return the last 4k of kernel messages, regardless of whether
@@ -14,6 +15,9 @@
  *     manfred@colorfullife.com
  * Rewrote bits to get rid of console_lock
  *	01Mar01 Andrew Morton
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/kernel.h>
@@ -317,9 +321,10 @@ int log_buf_copy(char *dest, int idx, int len)
 {
 	int ret, max;
 	bool took_lock = false;
+	unsigned long flags;
 
 	if (!oops_in_progress) {
-		raw_spin_lock_irq(&logbuf_lock);
+		raw_spin_lock_irqsave(&logbuf_lock, flags);
 		took_lock = true;
 	}
 
@@ -336,7 +341,7 @@ int log_buf_copy(char *dest, int idx, int len)
 	}
 
 	if (took_lock)
-		raw_spin_unlock_irq(&logbuf_lock);
+		raw_spin_unlock_irqrestore(&logbuf_lock, flags);
 
 	return ret;
 }
@@ -1383,8 +1388,7 @@ again:
 	 * flush, no worries.
 	 */
 	raw_spin_lock(&logbuf_lock);
-	if (con_start != log_end)
-		retry = 1;
+	retry = con_start != log_end;
 	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
 
 	if (retry && console_trylock())

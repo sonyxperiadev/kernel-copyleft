@@ -1,4 +1,5 @@
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 #include "msm_sensor.h"
 
@@ -18,6 +21,62 @@ DEFINE_MSM_MUTEX(ov5648_mut);
 static struct msm_sensor_ctrl_t ov5648_s_ctrl;
 
 static struct msm_sensor_power_setting ov5648_power_setting[] = {
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_STANDBY,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_VIO,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VIO,
+		.config_val = 0,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VANA,
+		.config_val = 0,
+		.delay = 5,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_VIO,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 2,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 10,
+	},
+	{
+		.seq_type = SENSOR_CLK,
+		.seq_val = SENSOR_CAM_MCLK,
+		.config_val = 24000000,
+		.delay = 10,
+	},
+	{
+		.seq_type = SENSOR_I2C_MUX,
+		.seq_val = 0,
+		.config_val = 0,
+		.delay = 2,
+	},
+#else
 	{
 		.seq_type = SENSOR_VREG,
 		.seq_val = CAM_VIO,
@@ -78,6 +137,7 @@ static struct msm_sensor_power_setting ov5648_power_setting[] = {
 		.config_val = 0,
 		.delay = 0,
 	},
+#endif
 };
 
 static struct v4l2_subdev_info ov5648_subdev_info[] = {
@@ -155,16 +215,18 @@ static int32_t ov5648_platform_probe(struct platform_device *pdev)
 static int __init ov5648_init_module(void)
 {
 	int32_t rc = 0;
-
+	pr_info("%s:%d\n", __func__, __LINE__);
 	rc = platform_driver_probe(&ov5648_platform_driver,
 		ov5648_platform_probe);
 	if (!rc)
 		return rc;
+	pr_err("%s:%d rc %d\n", __func__, __LINE__, rc);
 	return i2c_add_driver(&ov5648_i2c_driver);
 }
 
 static void __exit ov5648_exit_module(void)
 {
+	pr_info("%s:%d\n", __func__, __LINE__);
 	if (ov5648_s_ctrl.pdev) {
 		msm_sensor_free_sensor_data(&ov5648_s_ctrl);
 		platform_driver_unregister(&ov5648_platform_driver);

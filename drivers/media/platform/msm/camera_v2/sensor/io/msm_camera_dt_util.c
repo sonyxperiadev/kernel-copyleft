@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 
 #include <mach/gpiomux.h>
@@ -111,6 +115,10 @@ int msm_sensor_get_sub_module_index(struct device_node *of_node,
 	uint32_t *val_array = NULL;
 	struct device_node *src_node = NULL;
 	struct msm_sensor_info_t *sensor_info;
+#if defined(CONFIG_SONY_CAM_QCAMERA) && \
+    (defined(CONFIG_MACH_SONY_TIANCHI) || defined(CONFIG_MACH_SONY_TIANCHI_DSDS))
+	uint8_t camera_module_name[8];
+#endif
 
 	sensor_info = kzalloc(sizeof(*sensor_info), GFP_KERNEL);
 	if (!sensor_info) {
@@ -120,7 +128,17 @@ int msm_sensor_get_sub_module_index(struct device_node *of_node,
 	for (i = 0; i < SUB_MODULE_MAX; i++)
 		sensor_info->subdev_id[i] = -1;
 
+#if defined(CONFIG_SONY_CAM_QCAMERA) && \
+    (defined(CONFIG_MACH_SONY_TIANCHI) || defined(CONFIG_MACH_SONY_TIANCHI_DSDS))
+	msm_eeprom_get_camera_moudle_name(0, camera_module_name);
+	if (!strncmp(camera_module_name, "SOI13BS2", 8)) {
+		src_node = of_parse_phandle(of_node, "qcom,actuator-src1", 0);
+	} else {
+		src_node = of_parse_phandle(of_node, "qcom,actuator-src", 0);
+	}
+#else
 	src_node = of_parse_phandle(of_node, "qcom,actuator-src", 0);
+#endif
 	if (!src_node) {
 		CDBG("%s:%d src_node NULL\n", __func__, __LINE__);
 	} else {
@@ -786,6 +804,26 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 		CDBG("%s qcom,gpio-reset %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY]);
 	}
+
+#ifdef CONFIG_SONY_CAM_QCAMERA
+	if (of_property_read_bool(of_node, "qcom,gpio-vio") == true) {
+		rc = of_property_read_u32(of_node, "qcom,gpio-vio", &val);
+		if (rc < 0) {
+			pr_err("%s:%d read qcom,gpio-vio failed rc %d\n",
+				__func__, __LINE__, rc);
+			goto ERROR;
+		} else if (val >= gpio_array_size) {
+			pr_err("%s:%d qcom,gpio-vio invalid %d\n",
+				__func__, __LINE__, val);
+			goto ERROR;
+		}
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VIO] =
+			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_VIO] = 1;
+		CDBG("%s qcom,gpio-vio %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VIO]);
+	}
+#endif
 
 	if (of_property_read_bool(of_node, "qcom,gpio-flash-en") == true) {
 		rc = of_property_read_u32(of_node, "qcom,gpio-flash-en", &val);

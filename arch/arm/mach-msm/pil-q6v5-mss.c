@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013-2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -57,10 +58,15 @@ struct modem_data {
 
 #define subsys_to_drv(d) container_of(d, struct modem_data, subsys_desc)
 
-static void log_modem_sfr(void)
+static int force_crash_modem_hwwd;
+module_param(force_crash_modem_hwwd, int, S_IWUSR | S_IRUSR);
+MODULE_PARM_DESC(force_crash_modem_hwwd, "Force crash for Modem HWWD");
+
+static void log_modem_sfr(struct modem_data *drv)
 {
 	u32 size;
 	char *smem_reason, reason[MAX_SSR_REASON_LEN];
+	const char hwwd_str[] = "SFR Init: wdog or kernel error suspected.";
 
 	smem_reason = smem_get_entry_no_rlock(SMEM_SSR_REASON_MSS0, &size);
 	if (!smem_reason || !size) {
@@ -73,7 +79,12 @@ static void log_modem_sfr(void)
 	}
 
 	strlcpy(reason, smem_reason, min(size, sizeof(reason)));
+	update_crash_reason(drv->subsys, smem_reason, size);
 	pr_err("modem subsystem failure reason: %s.\n", reason);
+
+	if (0 == strncmp(hwwd_str, reason, sizeof(hwwd_str) - 1) &&
+		force_crash_modem_hwwd != 0)
+		subsys_set_restart_level(drv->subsys, RESET_SOC);
 
 	smem_reason[0] = '\0';
 	wmb();
@@ -81,7 +92,7 @@ static void log_modem_sfr(void)
 
 static void restart_modem(struct modem_data *drv)
 {
-	log_modem_sfr();
+	log_modem_sfr(drv);
 	drv->ignore_errors = true;
 	subsystem_restart_dev(drv->subsys);
 }

@@ -2,6 +2,7 @@
  *  linux/drivers/mmc/host/sdhci.c - Secure Digital Host Controller Interface driver
  *
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
+ *  Copyright (C) 2013 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -11,6 +12,9 @@
  * Thanks to the following companies for their support:
  *
  *     - JMicron (hardware and technical support)
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/delay.h>
@@ -28,6 +32,7 @@
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
+#include <linux/mmc/cd-gpio.h>
 
 #include "sdhci.h"
 
@@ -515,6 +520,9 @@ static int sdhci_pre_dma_transfer(struct sdhci_host *host,
 				  struct sdhci_next *next)
 {
 	int sg_count;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->next_lock, flags);
 
 	if (!next && data->host_cookie &&
 	    data->host_cookie != host->next_data.cookie) {
@@ -536,14 +544,18 @@ static int sdhci_pre_dma_transfer(struct sdhci_host *host,
 		host->next_data.sg_count = 0;
 	}
 
-	if (sg_count == 0)
+	if (sg_count == 0) {
+		spin_unlock_irqrestore(&host->next_lock, flags);
 		return -EINVAL;
+	}
 
 	if (next) {
 		next->sg_count = sg_count;
 		data->host_cookie = ++next->cookie < 0 ? 1 : next->cookie;
 	} else
 		host->sg_count = sg_count;
+
+	spin_unlock_irqrestore(&host->next_lock, flags);
 
 	return sg_count;
 }
@@ -1453,35 +1465,6 @@ static int sdhci_notify_load(struct mmc_host *mmc, enum mmc_load state)
 	return err;
 }
 
-static void sdhci_pre_req(struct mmc_host *mmc, struct mmc_request *mrq,
-			  bool is_first_req)
-{
-	struct sdhci_host *host = mmc_priv(mmc);
-
-	if (mrq->data->host_cookie) {
-		mrq->data->host_cookie = 0;
-		return;
-	}
-
-	if (host->flags & SDHCI_REQ_USE_DMA)
-		if (sdhci_pre_dma_transfer(host, mrq->data, &host->next_data) < 0)
-			mrq->data->host_cookie = 0;
-}
-
-static void sdhci_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
-			   int err)
-{
-	struct sdhci_host *host = mmc_priv(mmc);
-	struct mmc_data *data = mrq->data;
-
-	if (host->flags & SDHCI_REQ_USE_DMA) {
-		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-			     (data->flags & MMC_DATA_WRITE) ?
-			     DMA_TO_DEVICE : DMA_FROM_DEVICE);
-		data->host_cookie = 0;
-	}
-}
-
 static bool sdhci_check_state(struct sdhci_host *host)
 {
 	struct mmc_host *mmc = host->mmc;
@@ -1907,6 +1890,17 @@ static void sdhci_hw_reset(struct mmc_host *mmc)
 
 	if (host->ops && host->ops->hw_reset)
 		host->ops->hw_reset(host);
+}
+
+static int sdhci_get_cd(struct mmc_host *mmc)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	int ret;
+
+	sdhci_runtime_pm_get(host);
+	ret = mmc_cd_get_status(mmc);
+	sdhci_runtime_pm_put(host);
+	return ret;
 }
 
 static int sdhci_get_ro(struct mmc_host *mmc)
@@ -2379,11 +2373,10 @@ static unsigned int sdhci_get_xfer_remain(struct mmc_host *mmc)
 }
 
 static const struct mmc_host_ops sdhci_ops = {
-	.pre_req	= sdhci_pre_req,
-	.post_req	= sdhci_post_req,
 	.request	= sdhci_request,
 	.set_ios	= sdhci_set_ios,
 	.get_ro		= sdhci_get_ro,
+	.get_cd		= sdhci_get_cd,
 	.hw_reset	= sdhci_hw_reset,
 	.enable_sdio_irq = sdhci_enable_sdio_irq,
 	.start_signal_voltage_switch	= sdhci_start_signal_voltage_switch,
@@ -3130,6 +3123,7 @@ struct sdhci_host *sdhci_alloc_host(struct device *dev,
 	host->mmc = mmc;
 
 	spin_lock_init(&host->lock);
+	spin_lock_init(&host->next_lock);
 	mutex_init(&host->ios_mutex);
 
 	return host;
@@ -3330,8 +3324,12 @@ int sdhci_add_host(struct sdhci_host *host)
 	if ((host->version >= SDHCI_SPEC_300) &&
 	    ((host->flags & SDHCI_USE_ADMA) ||
 	     !(host->flags & SDHCI_USE_SDMA))) {
-		host->flags |= SDHCI_AUTO_CMD23;
-		DBG("%s: Auto-CMD23 available\n", mmc_hostname(mmc));
+		if (mmc->caps & MMC_CAP_NONREMOVABLE) {
+			host->flags |= SDHCI_AUTO_CMD23;
+			DBG("%s: Auto-CMD23 available\n", mmc_hostname(mmc));
+		} else {
+			DBG("%s: Auto-CMD23 unavailable\n", mmc_hostname(mmc));
+		}
 	} else {
 		DBG("%s: Auto-CMD23 unavailable\n", mmc_hostname(mmc));
 	}

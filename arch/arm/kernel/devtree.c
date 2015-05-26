@@ -73,6 +73,40 @@ void __init arm_dt_memblock_reserve(void)
 	}
 }
 
+static inline int __init free_area(unsigned long pfn, unsigned long end, char *s)
+{
+	unsigned int pages = 0, size = (end - pfn) << (PAGE_SHIFT - 10);
+
+	for (; pfn < end; pfn++) {
+		struct page *page = pfn_to_page(pfn);
+		ClearPageReserved(page);
+		init_page_count(page);
+		__free_page(page);
+		pages++;
+	}
+
+	if (size && s)
+		printk(KERN_INFO "Freeing %s memory: %dK\n", s, size);
+
+	return pages;
+}
+
+void __init  arm_dt_memblock_free(void)
+{
+	unsigned long start, end, size;
+	unsigned long reclaimed_initrd_mem;
+	if (!initial_boot_params)
+		return;
+
+	size = be32_to_cpu(initial_boot_params->totalsize);
+	start = round_down((unsigned long)initial_boot_params, PAGE_SIZE);
+	end = round_up((unsigned long)initial_boot_params + size, PAGE_SIZE);
+	reclaimed_initrd_mem = free_area(__phys_to_pfn(__pa(start)),
+			__phys_to_pfn(__pa(end)), "fdt");
+	totalram_pages += reclaimed_initrd_mem;
+	memblock_free(__pa(initial_boot_params), size);
+	initial_boot_params = 0;
+}
 /**
  * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
  * @dt_phys: physical address of dt blob

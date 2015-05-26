@@ -892,14 +892,12 @@ static void wcnss_log_iris_regs(void)
 int wcnss_get_mux_control(void)
 {
 	void __iomem *pmu_conf_reg;
-	struct wcnss_wlan_config *cfg;
 	u32 reg = 0;
 
-	cfg = wcnss_get_wlan_config();
-	if (NULL == cfg)
+	if (NULL == penv)
 		return 0;
 
-	pmu_conf_reg = cfg->msm_wcnss_base + PRONTO_PMU_OFFSET;
+	pmu_conf_reg = penv->msm_wcnss_base + PRONTO_PMU_OFFSET;
 	writel_relaxed(0, pmu_conf_reg);
 	reg = readl_relaxed(pmu_conf_reg);
 	reg |= WCNSS_PMU_CFG_GC_BUS_MUX_SEL_TOP;
@@ -944,8 +942,10 @@ void wcnss_reset_intr(void)
 {
 	if (wcnss_hardware_type() == WCNSS_PRONTO_HW) {
 		wcnss_pronto_log_debug_regs();
+#ifdef CONFIG_WCNSS_REGISTER_DUMP_ON_BITE
 		if (wcnss_get_mux_control())
 			wcnss_log_iris_regs();
+#endif
 		wmb();
 		__raw_writel(1 << 16, penv->fiq_reg);
 	} else {

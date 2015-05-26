@@ -146,6 +146,7 @@ int cpu_up(unsigned int cpu);
 void notify_cpu_starting(unsigned int cpu);
 extern void cpu_maps_update_begin(void);
 extern void cpu_maps_update_done(void);
+extern void notify_ext_ovp_fet_enable(bool en);
 
 #else	/* CONFIG_SMP */
 

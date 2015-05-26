@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/module.h>
@@ -924,11 +927,12 @@ int mdss_dsi_cmds_rx(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_cmd_desc *cmds, int rlen)
 {
 	int data_byte, rx_byte, dlen, end;
-	int short_response, diff, pkt_size, ret = 0;
+	int short_response, len, diff, pkt_size, ret = 0;
 	struct dsi_buf *tp, *rp;
 	char cmd;
 	bool ctrl_restore = false, mctrl_restore = false;
 	struct mdss_dsi_ctrl_pdata *mctrl = NULL;
+	int no_max_pkt_size = ctrl->panel_data.panel_info.mipi.no_max_pkt_size;
 
 	/*
 	 * In broadcast mode, the configuration for master controller
@@ -957,32 +961,43 @@ int mdss_dsi_cmds_rx(struct mdss_dsi_ctrl_pdata *ctrl,
 
 	ctrl_restore = __mdss_dsi_cmd_mode_config(ctrl, 1);
 
-	if (rlen <= 2) {
-		short_response = 1;
-		pkt_size = rlen;
-		rx_byte = 4;
-	} else {
-		short_response = 0;
-		data_byte = 8;	/* first read */
-		/*
-		 * add extra 2 padding bytes to have overall
-		 * packet size is multipe by 4. This also make
-		 * sure 4 bytes dcs headerlocates within a
-		 * 32 bits register after shift in.
-		 */
-		pkt_size = data_byte + 2;
-		rx_byte = data_byte + 8; /* 4 header + 2 crc  + 2 padding*/
+	if (no_max_pkt_size) {
+		/* Only support rlen = 4*n */
+		rlen = ALIGN(rlen, 4);
 	}
-
 
 	tp = &ctrl->tx_buf;
 	rp = &ctrl->rx_buf;
 
+	len = rlen;
+	diff = 0;
 	end = 0;
+	data_byte = 0;
+
+	if (len <= 2) {
+		rx_byte = 4;	/* short read */
+		short_response = 1;
+	} else {
+		if (len > MDSS_DSI_LEN) {
+			data_byte = MDSS_DSI_LEN;
+			pkt_size = data_byte + 2;/* 8 bytes +2 padding */
+			rx_byte = data_byte + 8; /* 4 bytes header
+						+ 2 bytes crc + 2 Padding */
+		} else {
+			len = ALIGN(len, 4);
+			data_byte = len;
+			pkt_size = data_byte;
+			rx_byte = data_byte + 6; /* 4 bytes header
+						+ 2 bytes crc*/
+		}
+		short_response = 0;
+	}
+
 	mdss_dsi_buf_init(rp);
+
 	while (!end) {
 		pr_debug("%s:  rlen=%d pkt_size=%d rx_byte=%d\n",
-				__func__, rlen, pkt_size, rx_byte);
+				__func__, len, pkt_size, rx_byte);
 		max_pktsize[0] = pkt_size;
 		mdss_dsi_buf_init(tp);
 		ret = mdss_dsi_cmd_dma_add(tp, &pkt_size_cmd);
@@ -996,6 +1011,7 @@ int mdss_dsi_cmds_rx(struct mdss_dsi_ctrl_pdata *ctrl,
 		mdss_dsi_wait4video_eng_busy(ctrl);
 
 		mdss_dsi_enable_irq(ctrl, DSI_CMD_TERM);
+			/* transmit read comamnd to client */
 		ret = mdss_dsi_cmd_dma_tx(ctrl, tp);
 		if (IS_ERR_VALUE(ret)) {
 			mdss_dsi_disable_irq(ctrl, DSI_CMD_TERM);
@@ -1038,13 +1054,12 @@ int mdss_dsi_cmds_rx(struct mdss_dsi_ctrl_pdata *ctrl,
 
 		if (short_response)
 			break;
-
-		if (rlen <= data_byte) {
-			diff = data_byte - rlen;
+		if (len <= data_byte) {
+			diff = data_byte - len;
 			end = 1;
 		} else {
 			diff = 0;
-			rlen -= data_byte;
+			len -= data_byte;
 		}
 
 		dlen -= 2; /* 2 padding bytes */
@@ -1058,11 +1073,24 @@ int mdss_dsi_cmds_rx(struct mdss_dsi_ctrl_pdata *ctrl,
 			__func__, (int)rp->data, rp->len, dlen, diff);
 	}
 
-	rp->data = rp->start;	/* move back to start position */
+	rp->data = rp->start;
+	if (rlen <= MDSS_DSI_LEN &&
+			!no_max_pkt_size && !short_response) {
+		/*
+		 * remove extra 2 bytes from previous
+		 * rx transaction at shift register
+		 * which was inserted during copy
+		 * shift registers to rx buffer
+		 * rx payload start from long alignment addr
+		 */
+		rp->data += 2;
+	}
+
 	cmd = rp->data[0];
+	pr_debug("%s: Read Response:0x%02X\n", __func__, cmd);
 	switch (cmd) {
 	case DTYPE_ACK_ERR_RESP:
-		pr_debug("%s: rx ACK_ERR_PACLAGE\n", __func__);
+		pr_info("%s: rx ACK_ERR_PACKAGE\n", __func__);
 		rp->len = 0;
 	case DTYPE_GEN_READ1_RESP:
 	case DTYPE_DCS_READ1_RESP:

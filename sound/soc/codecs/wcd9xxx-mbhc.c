@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -120,10 +124,10 @@
 /* RX_HPH_CNP_WG_TIME increases by 0.24ms */
 #define WCD9XXX_WG_TIME_FACTOR_US	240
 
-#define WCD9XXX_V_CS_HS_MAX 500
+#define WCD9XXX_V_CS_HS_MAX 850
 #define WCD9XXX_V_CS_NO_MIC 5
-#define WCD9XXX_MB_MEAS_DELTA_MAX_MV 80
-#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 12
+#define WCD9XXX_MB_MEAS_DELTA_MAX_MV 180
+#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 200
 
 static int impedance_detect_en;
 module_param(impedance_detect_en, int,
@@ -145,6 +149,12 @@ struct wcd9xxx_mbhc_detect {
 	bool _below_v_hs_max;
 	s16 _vdces;
 	enum wcd9xxx_mbhc_plug_type _type;
+};
+
+struct wcd9xxx_register_save_node {
+	struct list_head lh;
+	u16 reg;
+	u16 value;
 };
 
 enum meas_type {
@@ -181,11 +191,8 @@ static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 				    uint32_t *zr);
 static s16 wcd9xxx_get_current_v(struct wcd9xxx_mbhc *mbhc,
 				 const enum wcd9xxx_current_v_idx idx);
-static void wcd9xxx_get_z(struct wcd9xxx_mbhc *mbhc, s16 *dce_z, s16 *sta_z,
-			  struct mbhc_micbias_regs *micb_regs,
-			  bool norel);
 
-static void wcd9xxx_mbhc_calc_thres(struct wcd9xxx_mbhc *mbhc);
+
 
 static bool wcd9xxx_mbhc_polling(struct wcd9xxx_mbhc *mbhc)
 {
@@ -1022,9 +1029,7 @@ static short __wcd9xxx_codec_sta_dce(struct wcd9xxx_mbhc *mbhc, int dce,
 	if (noreldetection)
 		wcd9xxx_turn_onoff_rel_detection(codec, false);
 
-	if (mbhc->mbhc_cfg->do_recalibration)
-		snd_soc_update_bits(codec, WCD9XXX_A_CDC_MBHC_CLK_CTL, 0x2,
-				    0x0);
+
 	/* Turn on the override */
 	if (!override_bypass)
 		snd_soc_update_bits(codec, WCD9XXX_A_CDC_MBHC_B1_CTL, 0x4, 0x4);
@@ -1034,9 +1039,7 @@ static short __wcd9xxx_codec_sta_dce(struct wcd9xxx_mbhc *mbhc, int dce,
 		snd_soc_write(codec, WCD9XXX_A_CDC_MBHC_EN_CTL, 0x4);
 		snd_soc_update_bits(codec, WCD9XXX_A_CDC_MBHC_CLK_CTL, 0x8,
 				    0x0);
-		if (mbhc->mbhc_cfg->do_recalibration)
-			snd_soc_update_bits(codec, WCD9XXX_A_CDC_MBHC_CLK_CTL,
-					    0x2, 0x2);
+
 		usleep_range(mbhc->mbhc_data.t_sta_dce,
 			     mbhc->mbhc_data.t_sta_dce);
 		snd_soc_write(codec, WCD9XXX_A_CDC_MBHC_EN_CTL, 0x4);
@@ -1048,9 +1051,7 @@ static short __wcd9xxx_codec_sta_dce(struct wcd9xxx_mbhc *mbhc, int dce,
 		snd_soc_write(codec, WCD9XXX_A_CDC_MBHC_EN_CTL, 0x2);
 		snd_soc_update_bits(codec, WCD9XXX_A_CDC_MBHC_CLK_CTL, 0x8,
 				    0x0);
-		if (mbhc->mbhc_cfg->do_recalibration)
-			snd_soc_update_bits(codec, WCD9XXX_A_CDC_MBHC_CLK_CTL,
-					    0x2, 0x2);
+
 		usleep_range(mbhc->mbhc_data.t_sta_dce,
 			     mbhc->mbhc_data.t_sta_dce);
 		snd_soc_write(codec, WCD9XXX_A_CDC_MBHC_EN_CTL, 0x2);
@@ -1143,10 +1144,6 @@ static short wcd9xxx_mbhc_setup_hs_polling(struct wcd9xxx_mbhc *mbhc,
 	struct snd_soc_codec *codec = mbhc->codec;
 	short bias_value;
 	u8 cfilt_mode;
-	s16 reg;
-	int change;
-	struct wcd9xxx_mbhc_btn_detect_cfg *btn_det;
-	s16 sta_z = 0, dce_z = 0;
 
 	WCD9XXX_BCL_ASSERT_LOCKED(mbhc->resmgr);
 
@@ -1156,11 +1153,9 @@ static short wcd9xxx_mbhc_setup_hs_polling(struct wcd9xxx_mbhc *mbhc,
 		return -ENODEV;
 	}
 
-	btn_det = WCD9XXX_MBHC_CAL_BTN_DET_PTR(mbhc->mbhc_cfg->calibration);
 	/* Enable external voltage source to micbias if present */
 	if (mbhc->mbhc_cb && mbhc->mbhc_cb->enable_mb_source)
 		mbhc->mbhc_cb->enable_mb_source(codec, true, true);
-
 	/*
 	 * setup internal micbias if codec uses internal micbias for
 	 * headset detection
@@ -1216,50 +1211,12 @@ static short wcd9xxx_mbhc_setup_hs_polling(struct wcd9xxx_mbhc *mbhc,
 	snd_soc_write(codec, mbhc_micb_regs->cfilt_ctl, cfilt_mode);
 	snd_soc_update_bits(codec, WCD9XXX_A_MBHC_HPH, 0x13, 0x00);
 
-	if (mbhc->mbhc_cfg->do_recalibration) {
-		/* recalibrate dce_z and sta_z */
-		reg = snd_soc_read(codec, WCD9XXX_A_CDC_MBHC_B1_CTL);
-		change = snd_soc_update_bits(codec, WCD9XXX_A_CDC_MBHC_B1_CTL,
-					     0x78, btn_det->mbhc_nsc << 3);
-		wcd9xxx_get_z(mbhc, &dce_z, &sta_z, mbhc_micb_regs, true);
-		if (change)
-			snd_soc_write(codec, WCD9XXX_A_CDC_MBHC_B1_CTL, reg);
-		if (dce_z && sta_z) {
-			pr_debug("%s: sta_z 0x%x -> 0x%x, dce_z 0x%x -> 0x%x\n",
-				 __func__,
-				 mbhc->mbhc_data.sta_z, sta_z & 0xffff,
-				 mbhc->mbhc_data.dce_z, dce_z & 0xffff);
-			mbhc->mbhc_data.dce_z = dce_z;
-			mbhc->mbhc_data.sta_z = sta_z;
-			wcd9xxx_mbhc_calc_thres(mbhc);
-			wcd9xxx_calibrate_hs_polling(mbhc);
-		} else {
-			pr_warn("%s: failed get new dce_z/sta_z 0x%x/0x%x\n",
-				__func__, dce_z, sta_z);
-		}
 
-		if (is_cs_enable) {
-			/* recalibrate dce_nsc_cs_z */
-			reg = snd_soc_read(mbhc->codec,
-					   WCD9XXX_A_CDC_MBHC_B1_CTL);
-			snd_soc_update_bits(mbhc->codec,
-					    WCD9XXX_A_CDC_MBHC_B1_CTL,
-					    0x78, WCD9XXX_MBHC_NSC_CS << 3);
-			wcd9xxx_get_z(mbhc, &dce_z, NULL, mbhc_micb_regs,
-				      true);
-			snd_soc_write(mbhc->codec, WCD9XXX_A_CDC_MBHC_B1_CTL,
-				      reg);
-			if (dce_z) {
-				pr_debug("%s: dce_nsc_cs_z 0x%x -> 0x%x\n",
-					 __func__, mbhc->mbhc_data.dce_nsc_cs_z,
-					 dce_z & 0xffff);
-				mbhc->mbhc_data.dce_nsc_cs_z = dce_z;
-			} else {
-				pr_debug("%s: failed get new dce_nsc_cs_z\n",
-					 __func__);
-			}
-		}
-	}
+
+
+
+
+		
 	return bias_value;
 }
 
@@ -2048,7 +2005,7 @@ static int wcd9xxx_enable_hs_detect(struct wcd9xxx_mbhc *mbhc,
 					    0);
 	}
 
-	if (mbhc->resmgr->reg_addr && mbhc->resmgr->reg_addr->micb_4_mbhc)
+	if (mbhc->resmgr->reg_addr->micb_4_mbhc)
 		snd_soc_update_bits(codec, mbhc->resmgr->reg_addr->micb_4_mbhc,
 				    0x3, mbhc->mbhc_cfg->micbias);
 
@@ -3397,7 +3354,6 @@ static void wcd9xxx_get_z(struct wcd9xxx_mbhc *mbhc, s16 *dce_z, s16 *sta_z,
 			  bool norel_detection)
 {
 	s16 reg0, reg1;
-	int change;
 	struct snd_soc_codec *codec = mbhc->codec;
 
 	WCD9XXX_BCL_ASSERT_LOCKED(mbhc->resmgr);
@@ -3408,22 +3364,18 @@ static void wcd9xxx_get_z(struct wcd9xxx_mbhc *mbhc, s16 *dce_z, s16 *sta_z,
 	snd_soc_update_bits(codec, micb_regs->mbhc_reg, 1 << 7, 0);
 
 	/* Disconnect override from micbias */
-	change = snd_soc_update_bits(codec, WCD9XXX_A_MAD_ANA_CTRL, 1 << 4,
-				     1 << 0);
+	snd_soc_update_bits(codec, WCD9XXX_A_MAD_ANA_CTRL, 1 << 4, 1 << 0);
 	usleep_range(1000, 1000 + 1000);
-	if (sta_z) {
 		*sta_z = wcd9xxx_codec_sta_dce(mbhc, 0, norel_detection);
-		pr_debug("%s: sta_z 0x%x\n", __func__, *sta_z & 0xFFFF);
-	}
-	if (dce_z) {
+
 		*dce_z = wcd9xxx_codec_sta_dce(mbhc, 1, norel_detection);
-		pr_debug("%s: dce_z 0x%x\n", __func__, *dce_z & 0xFFFF);
-	}
+                pr_debug("%s: sta_z 0x%x, dce_z 0x%x\n", __func__, *sta_z & 0xFFFF,
+		 *dce_z & 0xFFFF);
+
+
 
 	/* Connect override from micbias */
-	if (change)
-		snd_soc_update_bits(codec, WCD9XXX_A_MAD_ANA_CTRL, 1 << 4,
-				    1 << 4);
+	snd_soc_update_bits(codec, WCD9XXX_A_MAD_ANA_CTRL, 1 << 4, 1 << 4);
 	/* Disable pull down micbias to ground */
 	snd_soc_write(codec, micb_regs->mbhc_reg, reg1);
 	snd_soc_write(codec, micb_regs->ctl_reg, reg0);
@@ -4271,11 +4223,6 @@ ssize_t codec_mbhc_debug_read(struct file *file, char __user *buf,
 		      p->dce_z, wcd9xxx_codec_sta_dce_v(mbhc, 1, p->dce_z));
 	n += scnprintf(buffer + n, size - n, "dce_mb = %x(%dmv)\n",
 		       p->dce_mb, wcd9xxx_codec_sta_dce_v(mbhc, 1, p->dce_mb));
-	n += scnprintf(buffer + n, size - n, "dce_nsc_cs_z = %x(%dmv)\n",
-		      p->dce_nsc_cs_z,
-		      __wcd9xxx_codec_sta_dce_v(mbhc, 1, p->dce_nsc_cs_z,
-						p->dce_nsc_cs_z,
-						VDDIO_MICBIAS_MV));
 	n += scnprintf(buffer + n, size - n, "sta_z = %x(%dmv)\n",
 		       p->sta_z, wcd9xxx_codec_sta_dce_v(mbhc, 0, p->sta_z));
 	n += scnprintf(buffer + n, size - n, "sta_mb = %x(%dmv)\n",
@@ -4772,6 +4719,107 @@ static int wcd9xxx_event_notify(struct notifier_block *self, unsigned long val,
 	return ret;
 }
 
+static int wcd9xxx_soc_update_bits_push(struct snd_soc_codec *codec,
+					struct list_head *list,
+					uint16_t reg, uint8_t mask,
+					uint8_t value)
+{
+	int rc;
+	struct wcd9xxx_register_save_node *node;
+
+	node = kmalloc(sizeof(*node), GFP_KERNEL);
+	if (unlikely(!node)) {
+		pr_err("%s: Not enough memory\n", __func__);
+		return -ENOMEM;
+	}
+	node->reg = reg;
+	node->value = snd_soc_read(codec, reg);
+	list_add(&node->lh, list);
+	if (mask == 0xFF)
+		rc = snd_soc_write(codec, reg, value);
+	else
+		rc = snd_soc_update_bits(codec, reg, mask, value);
+	return rc;
+}
+
+static int wcd9xxx_prepare_static_pa(struct wcd9xxx_mbhc *mbhc,
+				     struct list_head *lh)
+{
+	int i;
+	struct snd_soc_codec *codec = mbhc->codec;
+
+	const struct wcd9xxx_reg_mask_val reg_set_paon[] = {
+		{WCD9XXX_A_RX_HPH_OCP_CTL, 0x18, 0x00},
+		{WCD9XXX_A_RX_HPH_L_TEST, 0x1, 0x0},
+		{WCD9XXX_A_RX_HPH_R_TEST, 0x1, 0x0},
+		{WCD9XXX_A_RX_HPH_BIAS_WG_OCP, 0xff, 0x1A},
+		{WCD9XXX_A_RX_HPH_CNP_WG_CTL, 0xff, 0xDB},
+		{WCD9XXX_A_RX_HPH_CNP_WG_TIME, 0xff, 0x15},
+		{WCD9XXX_A_CDC_RX1_B6_CTL, 0xff, 0x81},
+		{WCD9XXX_A_CDC_CLK_RX_B1_CTL, 0x01, 0x01},
+		{WCD9XXX_A_RX_HPH_CHOP_CTL, 0xff, 0xA4},
+		{WCD9XXX_A_RX_HPH_L_GAIN, 0xff, 0x2C},
+		{WCD9XXX_A_CDC_RX2_B6_CTL, 0xff, 0x81},
+		{WCD9XXX_A_CDC_CLK_RX_B1_CTL, 0x02, 0x02},
+		{WCD9XXX_A_RX_HPH_R_GAIN, 0xff, 0x2C},
+		{WCD9XXX_A_NCP_CLK, 0xff, 0xFC},
+		{WCD9XXX_A_BUCK_CTRL_CCL_3, 0xff, 0x60},
+		{WCD9XXX_A_RX_COM_BIAS, 0xff, 0x80},
+		{WCD9XXX_A_BUCK_MODE_3, 0xff, 0xC6},
+		{WCD9XXX_A_BUCK_MODE_4, 0xff, 0xE6},
+		{WCD9XXX_A_BUCK_MODE_5, 0xff, 0x02},
+		{WCD9XXX_A_BUCK_MODE_1, 0xff, 0xA1},
+		{WCD9XXX_A_NCP_EN, 0xff, 0xFF},
+		{WCD9XXX_A_BUCK_MODE_5, 0xff, 0x7B},
+		{WCD9XXX_A_CDC_CLSH_B1_CTL, 0xff, 0xE6},
+		{WCD9XXX_A_RX_HPH_L_DAC_CTL, 0xff, 0xC0},
+		{WCD9XXX_A_RX_HPH_R_DAC_CTL, 0xff, 0xC0},
+	};
+
+	for (i = 0; i < ARRAY_SIZE(reg_set_paon); i++)
+		wcd9xxx_soc_update_bits_push(codec, lh,
+					     reg_set_paon[i].reg,
+					     reg_set_paon[i].mask,
+					     reg_set_paon[i].val);
+	pr_debug("%s: PAs are prepared\n", __func__);
+
+	return 0;
+}
+
+static void wcd9xxx_restore_registers(struct wcd9xxx_mbhc *mbhc,
+				      struct list_head *lh)
+{
+	struct wcd9xxx_register_save_node *node, *nodetmp;
+	struct snd_soc_codec *codec = mbhc->codec;
+
+	list_for_each_entry_safe(node, nodetmp, lh, lh) {
+		snd_soc_write(codec, node->reg, node->value);
+		list_del(&node->lh);
+		kfree(node);
+	}
+}
+
+static void wcd9xxx_unprepare_static_pa(struct wcd9xxx_mbhc *mbhc,
+					struct list_head *lh)
+{
+	wcd9xxx_restore_registers(mbhc, lh);
+}
+
+static int wcd9xxx_enable_static_pa(struct wcd9xxx_mbhc *mbhc, bool enable)
+{
+	struct snd_soc_codec *codec = mbhc->codec;
+	const int wg_time = snd_soc_read(codec, WCD9XXX_A_RX_HPH_CNP_WG_TIME) *
+			    WCD9XXX_WG_TIME_FACTOR_US;
+
+	snd_soc_update_bits(codec, WCD9XXX_A_RX_HPH_CNP_EN, 0x30,
+			    enable ? 0x30 : 0x0);
+	/* Wait for wave gen time to avoid pop noise */
+	usleep_range(wg_time, wg_time + WCD9XXX_USLEEP_RANGE_MARGIN_US);
+	pr_debug("%s: PAs are %s as static mode (wg_time %d)\n", __func__,
+		 enable ? "enabled" : "disabled", wg_time);
+	return 0;
+}
+
 static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 				    uint32_t *zr)
 {
@@ -4782,8 +4830,17 @@ static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 		&l[0], &r[0], &r[1], &l[1], &l[2], &r[2],
 	};
 	bool override_en;
+	LIST_HEAD(lh);
+	LIST_HEAD(lhpa);
 	struct snd_soc_codec *codec = mbhc->codec;
+	const int ramp_wait_us = 18 * 1000;
 	const int mux_wait_us = 25;
+	const int alphal = 364; /* 0.005555 * 65536 = 364.05 */
+	const int alphar = 364; /* 0.005555 * 65536 = 364.05 */
+	const int beta = 3855; /* 0.011765 * 5 * 65536 = 3855.15 */
+	const int rref = 11333; /* not scaled up */
+	const int shift = 16;
+	int64_t rl, rr = 0; /* milliohm */
 	const struct wcd9xxx_reg_mask_val reg_set_mux[] = {
 		/* Phase 1 */
 		/* Set MBHC_MUX for HPHL without ical */
@@ -4804,11 +4861,6 @@ static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 	pr_debug("%s: enter\n", __func__);
 	WCD9XXX_BCL_ASSERT_LOCKED(mbhc->resmgr);
 
-	if (!mbhc->mbhc_cb || !mbhc->mbhc_cb->setup_zdet ||
-	    !mbhc->mbhc_cb->compute_impedance || !zl ||
-	    !zr)
-		return -EINVAL;
-
 	/*
 	 * Impedance detection is an intrusive function as it mutes RX paths,
 	 * enable PAs and etc.  Therefore codec drvier including ALSA
@@ -4823,47 +4875,96 @@ static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 	if (!override_en)
 		wcd9xxx_turn_onoff_override(mbhc, true);
 	pr_debug("%s: Setting impedance detection\n", __func__);
+	wcd9xxx_prepare_static_pa(mbhc, &lhpa);
+	wcd9xxx_enable_static_pa(mbhc, true);
 
-	/* Codec specific setup for L0, R0, L1 and R1 measurements */
-	mbhc->mbhc_cb->setup_zdet(mbhc, PRE_MEAS);
+	/*
+	 * save old value of registers and write the new value to restore old
+	 * value back, WCD9XXX_A_CDC_PA_RAMP_B{1,2,3,4}_CTL registers don't
+	 * need to be restored as those are solely used by impedance detection.
+	 */
+#define __w(reg, mask, value)						  \
+	do {								  \
+		ret = wcd9xxx_soc_update_bits_push(codec, &lh, reg, mask, \
+						   value);		  \
+		if (ret < 0)						  \
+			return ret;					  \
+	} while (0)
+
+	/* Reset the PA Ramp */
+	snd_soc_write(codec, WCD9XXX_A_CDC_PA_RAMP_B1_CTL, 0x1C);
+	/*
+	 * Connect the PA Ramp to PA chain and release reset with keep it
+	 * connected.
+	 */
+	snd_soc_write(codec, WCD9XXX_A_CDC_PA_RAMP_B1_CTL, 0x1F);
+	snd_soc_write(codec, WCD9XXX_A_CDC_PA_RAMP_B1_CTL, 0x03);
+	/* Program the PA Ramp to FS_48K, L shift 1 and sample num to 24 */
+	snd_soc_write(codec, WCD9XXX_A_CDC_PA_RAMP_B3_CTL, 0x3 << 4 | 0x6);
+	/* 0x56 for 10mv.  0xC0 is for 50mv */
+	snd_soc_write(codec, WCD9XXX_A_CDC_PA_RAMP_B4_CTL, 0xC0);
+	/* Enable MBHC MUX, Set MUX current to 37.5uA and ADC7 */
+	__w(WCD9XXX_A_MBHC_SCALING_MUX_1, 0xFF, 0xC0);
+	__w(WCD9XXX_A_MBHC_SCALING_MUX_2, 0xFF, 0xF0);
+	__w(WCD9XXX_A_TX_7_MBHC_TEST_CTL, 0xFF, 0x78);
+	__w(WCD9XXX_A_TX_7_MBHC_EN, 0xFF, 0x8C);
+	/* Change NSA and NAVG */
+	__w(WCD9XXX_A_CDC_MBHC_TIMER_B4_CTL, 0x4 << 4, 0x4 << 4);
+	__w(WCD9XXX_A_CDC_MBHC_TIMER_B5_CTL, 0xFF, 0x10);
+	/* Reset MBHC and set it up for STA */
+	__w(WCD9XXX_A_CDC_MBHC_CLK_CTL, 0xFF, 0x0A);
+	__w(WCD9XXX_A_CDC_MBHC_EN_CTL, 0xFF, 0x02);
+	__w(WCD9XXX_A_CDC_MBHC_CLK_CTL, 0xFF, 0x02);
+
+	/* Set HPH_MBHC for zdet */
+	__w(WCD9XXX_A_MBHC_HPH, 0xB3, 0x80);
 
 	pr_debug("%s: Performing impedance detection\n", __func__);
+	/* Phase 1 */
 	for (i = 0; i < ARRAY_SIZE(reg_set_mux) - 2; i++) {
-		snd_soc_update_bits(codec, reg_set_mux[i].reg,
-				    reg_set_mux[i].mask,
-				    reg_set_mux[i].val);
-		if (mbhc->mbhc_cb && mbhc->mbhc_cb->enable_mux_bias_block)
-			mbhc->mbhc_cb->enable_mux_bias_block(codec);
-		else
-			snd_soc_update_bits(codec,
-					    WCD9XXX_A_MBHC_SCALING_MUX_1,
-					    0x80, 0x80);
+		__w(reg_set_mux[i].reg, reg_set_mux[i].mask,
+		    reg_set_mux[i].val);
 		/* 25us is required after mux change to settle down */
 		usleep_range(mux_wait_us,
 			     mux_wait_us + WCD9XXX_USLEEP_RANGE_MARGIN_US);
-		*(z[i]) = __wcd9xxx_codec_sta_dce(mbhc, 0, true, false);
+		*(z[i]) = __wcd9xxx_codec_sta_dce(mbhc, 0, false, false);
 	}
 
-	/* Codec specific setup for L2 and R2 measurements */
-	mbhc->mbhc_cb->setup_zdet(mbhc, POST_MEAS);
+	/* Phase 2 */
+	/* Start the PA ramp on HPH L and R */
+	snd_soc_write(codec, WCD9XXX_A_CDC_PA_RAMP_B2_CTL, 0x05);
+	/* Ramp generator takes ~17ms */
+	usleep_range(ramp_wait_us,
+		     ramp_wait_us + WCD9XXX_USLEEP_RANGE_MARGIN_US);
 
+	/* Disable Ical */
+	snd_soc_write(codec, WCD9XXX_A_CDC_PA_RAMP_B2_CTL, 0x00);
+	/* Ramp generator takes ~17ms */
+	usleep_range(ramp_wait_us,
+		     ramp_wait_us + WCD9XXX_USLEEP_RANGE_MARGIN_US);
 	for (; i < ARRAY_SIZE(reg_set_mux); i++) {
-		snd_soc_update_bits(codec, reg_set_mux[i].reg,
-				    reg_set_mux[i].mask,
-				    reg_set_mux[i].val);
-		if (mbhc->mbhc_cb && mbhc->mbhc_cb->enable_mux_bias_block)
-			mbhc->mbhc_cb->enable_mux_bias_block(codec);
-		else
-			snd_soc_update_bits(codec,
-					    WCD9XXX_A_MBHC_SCALING_MUX_1,
-					    0x80, 0x80);
+		__w(reg_set_mux[i].reg, reg_set_mux[i].mask,
+		    reg_set_mux[i].val);
 		/* 25us is required after mux change to settle down */
 		usleep_range(mux_wait_us,
 			     mux_wait_us + WCD9XXX_USLEEP_RANGE_MARGIN_US);
-		*(z[i]) = __wcd9xxx_codec_sta_dce(mbhc, 0, true, false);
+		*(z[i]) = __wcd9xxx_codec_sta_dce(mbhc, 0, false, false);
 	}
 
-	mbhc->mbhc_cb->setup_zdet(mbhc, PA_DISABLE);
+	/* Ramp HPH L & R back to Zero */
+	snd_soc_write(codec, WCD9XXX_A_CDC_PA_RAMP_B2_CTL, 0x0A);
+	/* Ramp generator takes ~17ms */
+	usleep_range(ramp_wait_us,
+		     ramp_wait_us + WCD9XXX_USLEEP_RANGE_MARGIN_US);
+	snd_soc_write(codec, WCD9XXX_A_CDC_PA_RAMP_B2_CTL, 0x00);
+#undef __w
+
+	/* Clean up starts */
+	/* Turn off PA ramp generator */
+	snd_soc_write(codec, WCD9XXX_A_CDC_PA_RAMP_B1_CTL, 0x0);
+	wcd9xxx_enable_static_pa(mbhc, false);
+	wcd9xxx_restore_registers(mbhc, &lh);
+	wcd9xxx_unprepare_static_pa(mbhc, &lhpa);
 
 	mutex_unlock(&codec->mutex);
 
@@ -4871,14 +4972,28 @@ static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 
 	if (!override_en)
 		wcd9xxx_turn_onoff_override(mbhc, false);
-	mbhc->mbhc_cb->compute_impedance(l, r, zl, zr);
+	rl = (int)(l[0] - l[1]) * 1000 / (l[0] - l[2]);
+	rl = rl * rref * alphal;
+	rl = rl >> shift;
+	rl = rl * beta;
+	rl = rl >> shift;
+	*zl = rl;
 
-	pr_debug("%s: L0: 0x%x(%d), L1: 0x%x(%d), L2: 0x%x(%d)\n",
+	rr = (int)(r[0] - r[1]) * 1000 / (r[0] - r[2]);
+	rr = rr * rref  * alphar;
+	rr = rr >> shift;
+	rr = rr * beta;
+	rr = rr >> shift;
+	*zr = rr;
+
+	pr_debug("%s: L0: 0x%x(%d), L1: 0x%x(%d), L2: 0x%x(%d), rl: %lld\n",
 		 __func__,
-		 l[0] & 0xffff, l[0], l[1] & 0xffff, l[1], l[2] & 0xffff, l[2]);
-	pr_debug("%s: R0: 0x%x(%d), R1: 0x%x(%d), R2: 0x%x(%d)\n",
+		 l[0] & 0xffff, l[0], l[1] & 0xffff, l[1], l[2] & 0xffff, l[2],
+		 rl);
+	pr_debug("%s: R0: 0x%x(%d), R1: 0x%x(%d), R2: 0x%x(%d), rr: %lld\n",
 		 __func__,
-		 r[0] & 0xffff, r[0], r[1] & 0xffff, r[1], r[2] & 0xffff, r[2]);
+		 r[0] & 0xffff, r[0], r[1] & 0xffff, r[1], r[2] & 0xffff, r[2],
+		 rr);
 	pr_debug("%s: RL %d milliohm, RR %d milliohm\n", __func__, *zl, *zr);
 	pr_debug("%s: Impedance detection completed\n", __func__);
 

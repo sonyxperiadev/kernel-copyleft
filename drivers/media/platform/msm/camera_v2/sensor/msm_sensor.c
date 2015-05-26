@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 #include <mach/gpiomux.h>
 #include "msm_sensor.h"
@@ -468,6 +472,12 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 	struct msm_camera_slave_info *slave_info;
 	const char *sensor_name;
 
+#if defined(CONFIG_SONY_CAM_QCAMERA) && defined(CONFIG_MACH_SONY_WUKONG)
+	uint16_t vendor_id = 1;
+	int32_t i = 0;
+	char *ov5648 = (char *)(s_ctrl->sensordata->sensor_name);
+#endif
+
 	if (!s_ctrl) {
 		pr_err("%s:%d failed: %p\n",
 			__func__, __LINE__, s_ctrl);
@@ -498,6 +508,60 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("msm_sensor_match_id chip id doesnot match\n");
 		return -ENODEV;
 	}
+
+#if defined(CONFIG_SONY_CAM_QCAMERA) && defined(CONFIG_MACH_SONY_WUKONG)
+	if (chipid == 0x5648) {
+		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
+			s_ctrl->sensor_i2c_client,
+			0x0100,
+			0x01, MSM_CAMERA_I2C_BYTE_DATA);
+
+		for (i = 0; i < 0x10; i++) {
+			rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
+			s_ctrl->sensor_i2c_client,
+			0x3D00+i,
+			0x00, MSM_CAMERA_I2C_BYTE_DATA);
+		}
+
+		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
+			s_ctrl->sensor_i2c_client,
+			0x3D84,
+			0xC0, MSM_CAMERA_I2C_BYTE_DATA);
+		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
+			s_ctrl->sensor_i2c_client,
+			0x3D85,
+			0x00, MSM_CAMERA_I2C_BYTE_DATA);
+		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
+			s_ctrl->sensor_i2c_client,
+			0x3D86,
+			0x0F, MSM_CAMERA_I2C_BYTE_DATA);
+		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
+			s_ctrl->sensor_i2c_client,
+			0x3D81,
+			0x01, MSM_CAMERA_I2C_BYTE_DATA);
+
+		msleep(20);
+
+		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_read(
+			s_ctrl->sensor_i2c_client,
+			0x3D05,
+			&vendor_id, MSM_CAMERA_I2C_BYTE_DATA);
+
+		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
+			s_ctrl->sensor_i2c_client,
+			0x3D81,
+			0x00, MSM_CAMERA_I2C_BYTE_DATA);
+		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
+			s_ctrl->sensor_i2c_client,
+			0x0100,
+			0x00, MSM_CAMERA_I2C_BYTE_DATA);
+
+		if (vendor_id  == 0x01)
+			rc = snprintf(ov5648, 13, "%s", "ov5648_SUNNY");
+		else
+			rc = snprintf(ov5648, 10, "%s", "ov5648_LG");
+	}
+#endif
 	return rc;
 }
 

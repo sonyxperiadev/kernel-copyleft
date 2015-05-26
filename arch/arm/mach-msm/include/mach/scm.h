@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #ifndef __MACH_SCM_H
 #define __MACH_SCM_H
@@ -25,6 +29,7 @@
 #define SCM_SVC_DCVS			0xD
 #define SCM_SVC_ES			0x10
 #define SCM_SVC_TZSCHEDULER		0xFC
+#define SCM_SVC_OEM			0xFE
 
 #define SCM_FUSE_READ			0x7
 

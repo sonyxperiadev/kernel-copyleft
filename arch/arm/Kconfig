@@ -11,6 +11,7 @@ config ARM
 	select SYS_SUPPORTS_APM_EMULATION
 	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
 	select HAVE_ARCH_KGDB
 	select HAVE_KPROBES if !XIP_KERNEL
@@ -2240,6 +2241,13 @@ config KEXEC
 	  is properly shutdown, so do not be surprised if this code does not
 	  initially work for you.  It may help to enable device hotplugging
 	  support.
+
+config CRASH_NOTES
+	bool "Support for storing crash_notes"
+	default n
+	help
+	  Expose crash_notes and fill it with register values at the time of
+	  panic.
 
 config ATAGS_PROC
 	bool "Export atags in procfs"

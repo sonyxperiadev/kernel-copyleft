@@ -1,0 +1,8 @@
+config FB_SOMC_MDSS_LCD_BIAS
+	bool "LCD voltage bias Driver"
+	depends on I2C
+	default n
+	---help---
+	The LCD bias driver provides support for setting the LCD bias voltage
+	for LCD driver IC
+

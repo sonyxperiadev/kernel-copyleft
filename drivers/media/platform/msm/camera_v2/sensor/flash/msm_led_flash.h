@@ -55,15 +55,30 @@ struct msm_led_flash_ctrl_t {
 	struct led_trigger *flash_trigger[MAX_LED_TRIGGERS];
 	uint32_t flash_op_current[MAX_LED_TRIGGERS];
 	uint32_t flash_max_current[MAX_LED_TRIGGERS];
+#if defined(CONFIG_SONY_CAM_QCAMERA) && defined(CONFIG_MACH_SONY_WUKONG)
+	uint32_t front_flash_op_current[MAX_LED_TRIGGERS];
+	uint32_t front_flash_max_current[MAX_LED_TRIGGERS];
+#endif
 	const char *torch_trigger_name;
 	struct led_trigger *torch_trigger;
 	uint32_t torch_op_current;
 	uint32_t torch_max_current;
+#if defined(CONFIG_SONY_CAM_QCAMERA) && defined(CONFIG_MACH_SONY_WUKONG)
+	uint32_t front_torch_op_current;
+	uint32_t front_torch_max_current;
+#endif
 	void *data;
 	uint32_t num_sources;
 	enum msm_camera_device_type_t flash_device_type;
 	uint32_t subdev_id;
 };
+#if defined(CONFIG_SONY_CAM_QCAMERA) && defined(CONFIG_MACH_SONY_WUKONG)
+enum msm_flash_power_seq_gpio_t {
+	FLASH_GPIO_BACK,
+	FLASH_GPIO_FRONT,
+	FLASH_GPIO_MAX,
+};
+#endif
 
 int msm_flash_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *id);

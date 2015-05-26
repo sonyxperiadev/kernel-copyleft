@@ -84,9 +84,21 @@ int msm_gpiomux_write(unsigned gpio, enum msm_gpiomux_setting which,
 }
 EXPORT_SYMBOL(msm_gpiomux_write);
 
-int msm_gpiomux_get(unsigned gpio)
+static bool display_on_in_boot;
+static int __init continous_splash_setup(char *str)
+{
+	if (!str)
+		return 0;
+	if (!strncmp(str, "on", 2))
+		display_on_in_boot = true;
+	return 0;
+}
+__setup("display_status=", continous_splash_setup);
+
+int msm_gpiomux_get(unsigned gpio) /* called by gpio_request() */
 {
 	struct msm_gpiomux_rec *rec = msm_gpiomux_recs + gpio;
+	struct gpiomux_setting temprec;
 	unsigned long irq_flags;
 
 	if (!msm_gpiomux_recs)
@@ -96,8 +108,17 @@ int msm_gpiomux_get(unsigned gpio)
 		return -EINVAL;
 
 	spin_lock_irqsave(&gpiomux_lock, irq_flags);
-	if (rec->ref++ == 0 && rec->sets[GPIOMUX_ACTIVE])
-		__msm_gpiomux_write(gpio, *rec->sets[GPIOMUX_ACTIVE]);
+	if (rec->ref++ == 0 && rec->sets[GPIOMUX_ACTIVE]) {
+		if (display_on_in_boot &&
+			rec->sets[GPIOMUX_ACTIVE]->keep_high_at_request) {
+			temprec = *rec->sets[GPIOMUX_ACTIVE];
+			if (temprec.dir == GPIOMUX_OUT_LOW)
+				temprec.dir = GPIOMUX_OUT_HIGH;
+			__msm_gpiomux_write(gpio, temprec);
+		} else {
+			__msm_gpiomux_write(gpio, *rec->sets[GPIOMUX_ACTIVE]);
+		}
+	}
 	spin_unlock_irqrestore(&gpiomux_lock, irq_flags);
 	return 0;
 }

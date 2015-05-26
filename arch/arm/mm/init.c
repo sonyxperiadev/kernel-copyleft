@@ -938,7 +938,7 @@ void __init mem_init(void)
 #undef MLK
 #undef MLM
 #undef MLK_ROUNDUP
-void free_initmem(void)
+void __init_refok free_initmem(void)
 {
 	unsigned long reclaimed_initmem;
 #ifdef CONFIG_HAVE_TCM
@@ -949,7 +949,7 @@ void free_initmem(void)
 				    __phys_to_pfn(__pa(&__tcm_end)),
 				    "TCM link");
 #endif
-
+	arm_dt_memblock_free();
 #ifdef CONFIG_STRICT_MEMORY_RWX
 	poison_init_mem((char *)__arch_info_begin,
 		__init_end - (char *)__arch_info_begin);
@@ -970,13 +970,17 @@ void free_initmem(void)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 
-static int keep_initrd;
+static int __initdata keep_initrd;
 
-void free_initrd_mem(unsigned long start, unsigned long end)
+void __init free_initrd_mem(unsigned long start, unsigned long end)
 {
 	unsigned long reclaimed_initrd_mem;
 
 	if (!keep_initrd) {
+		if (start == initrd_start)
+			start = round_down(start, PAGE_SIZE);
+		if (end == initrd_end)
+			end = round_up(end, PAGE_SIZE);
 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
 		reclaimed_initrd_mem = free_area(__phys_to_pfn(__pa(start)),
 						 __phys_to_pfn(__pa(end)),

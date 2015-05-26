@@ -74,6 +74,7 @@ struct gpiomux_setting {
 	enum gpiomux_drv  drv;
 	enum gpiomux_pull pull;
 	enum gpiomux_dir  dir;
+	int keep_high_at_request;
 };
 
 /**

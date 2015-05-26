@@ -2,6 +2,7 @@
  *  arch/arm/include/asm/mmu_context.h
  *
  *  Copyright (C) 1996 Russell King.
+ *  Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,6 +10,9 @@
  *
  *  Changelog:
  *   27-06-1996	RMK	Created
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #ifndef __ASM_ARM_MMU_CONTEXT_H
 #define __ASM_ARM_MMU_CONTEXT_H
@@ -19,6 +23,7 @@
 #include <asm/cachetype.h>
 #include <asm/proc-fns.h>
 #include <asm-generic/mm_hooks.h>
+#include <asm/tlbflush.h>
 
 void __check_kvm_seq(struct mm_struct *mm);
 
@@ -124,6 +129,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		*crt_mm = next;
 #endif
 		check_context(next);
+		flush_tlb_all();
 		cpu_switch_mm(next->pgd, next);
 		if (cache_is_vivt())
 			cpumask_clear_cpu(cpu, mm_cpumask(prev));

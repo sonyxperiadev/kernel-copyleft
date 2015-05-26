@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 
 #define SENSOR_DRIVER_I2C "camera"
@@ -224,6 +228,10 @@ static int32_t msm_sensor_fill_actuator_subdevid_by_name(
 	int32_t *actuator_subdev_id;
 	struct  msm_sensor_info_t *sensor_info;
 	struct device_node *of_node = s_ctrl->of_node;
+#if defined(CONFIG_SONY_CAM_QCAMERA) && \
+    (defined(CONFIG_MACH_SONY_TIANCHI) || defined(CONFIG_MACH_SONY_TIANCHI_DSDS))
+	uint8_t camera_module_name[8];
+#endif
 
 	if (!s_ctrl->sensordata->actuator_name || !of_node)
 		return -EINVAL;
@@ -243,7 +251,17 @@ static int32_t msm_sensor_fill_actuator_subdevid_by_name(
 	if (0 == actuator_name_len)
 		return 0;
 
+#if defined(CONFIG_SONY_CAM_QCAMERA) && \
+    (defined(CONFIG_MACH_SONY_TIANCHI) || defined(CONFIG_MACH_SONY_TIANCHI_DSDS))
+	msm_eeprom_get_camera_moudle_name(0, camera_module_name);
+	if (!strncmp(camera_module_name, "SOI13BS2", 8)) {
+		src_node = of_parse_phandle(of_node, "qcom,actuator-src1", 0);
+	} else {
+		src_node = of_parse_phandle(of_node, "qcom,actuator-src", 0);
+	}
+#else
 	src_node = of_parse_phandle(of_node, "qcom,actuator-src", 0);
+#endif
 	if (!src_node) {
 		CDBG("%s:%d src_node NULL\n", __func__, __LINE__);
 	} else {

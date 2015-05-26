@@ -44,6 +44,8 @@ static RAW_NOTIFIER_HEAD(cpu_chain);
  */
 static int cpu_hotplug_disabled;
 
+static atomic_t ext_ovp_fet_enalbe = ATOMIC_INIT(0);
+
 #ifdef CONFIG_HOTPLUG_CPU
 
 static struct {
@@ -276,13 +278,31 @@ out_release:
 	return err;
 }
 
+void __ref notify_ext_ovp_fet_enable(bool en)
+{
+	if (en) {
+		atomic_set(&ext_ovp_fet_enalbe, 1);
+		cpu_up(1);
+		pr_info("Notify EXT_OVP_FET enable!\n");
+	} else {
+		atomic_set(&ext_ovp_fet_enalbe, 0);
+		pr_info("Notify EXT_OVP_FET disable!\n");
+	}
+}
+
 int __ref cpu_down(unsigned int cpu)
 {
 	int err;
 
 	cpu_maps_update_begin();
 
-	if (cpu_hotplug_disabled) {
+	/*
+	 * When EXT_OVP_CTRL(GPIO 4) enabled, we should keep two
+	 * CPUs online at least to maintain the output state of
+	 * GPIO 4, this is a work around for this HW issue.
+	 */
+	if (cpu_hotplug_disabled ||
+		(atomic_read(&ext_ovp_fet_enalbe) && cpu == 1)) {
 		err = -EBUSY;
 		goto out;
 	}

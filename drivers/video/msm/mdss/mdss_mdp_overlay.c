@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
@@ -3129,6 +3132,7 @@ static void __vsync_retire_handle_vsync(struct mdss_mdp_ctl *ctl, ktime_t t)
 {
 	struct msm_fb_data_type *mfd = ctl->mfd;
 	struct mdss_overlay_private *mdp5_data;
+
 
 	if (!mfd || !mfd->mdp.private1) {
 		pr_warn("Invalid handle for vsync\n");

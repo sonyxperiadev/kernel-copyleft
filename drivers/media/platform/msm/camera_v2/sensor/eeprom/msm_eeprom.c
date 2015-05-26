@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/module.h>
@@ -23,6 +27,12 @@
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
 #else
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
+#endif
+
+#if defined(CONFIG_SONY_CAM_QCAMERA) && \
+    (defined(CONFIG_MACH_SONY_TIANCHI) || defined(CONFIG_MACH_SONY_TIANCHI_DSDS))
+#define CAMERA_MODULE_NAME_LEN 8
+static uint8_t camera_module_names[2][CAMERA_MODULE_NAME_LEN];
 #endif
 
 DEFINE_MSM_MUTEX(msm_eeprom_mutex);
@@ -350,6 +360,9 @@ static int read_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl,
 				return rc;
 			}
 		}
+#ifdef CONFIG_SONY_CAM_QCAMERA
+		e_ctrl->i2c_client.cci_client->sid++;
+#endif
 	}
 	return rc;
 }
@@ -904,6 +917,25 @@ static int msm_eeprom_spi_remove(struct spi_device *sdev)
 	return 0;
 }
 
+#if defined(CONFIG_SONY_CAM_QCAMERA) && \
+    (defined(CONFIG_MACH_SONY_TIANCHI) || defined(CONFIG_MACH_SONY_TIANCHI_DSDS))
+static void msm_eeprom_set_camera_moudle_name(uint8_t id, uint8_t *eeprom_data)
+{
+	memcpy(&camera_module_names[id], eeprom_data, CAMERA_MODULE_NAME_LEN);
+
+	CDBG("MODULE NAME: [id] = %x name=%c%c%c%c%c%c%c%c\n",
+		id, camera_module_names[id][0], camera_module_names[id][1],
+		camera_module_names[id][2], camera_module_names[id][3],
+		camera_module_names[id][4], camera_module_names[id][5],
+		camera_module_names[id][6], camera_module_names[id][7]);
+}
+
+void msm_eeprom_get_camera_moudle_name(uint8_t id, uint8_t *module_name)
+{
+	memcpy(module_name, &camera_module_names[id], CAMERA_MODULE_NAME_LEN);
+}
+#endif
+
 static int msm_eeprom_platform_probe(struct platform_device *pdev)
 {
 	int rc = 0;
@@ -1032,6 +1064,12 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 		     e_ctrl->cal_data.mapdata[j]);
 
 	e_ctrl->is_supported |= msm_eeprom_match_crc(&e_ctrl->cal_data);
+
+#if defined(CONFIG_SONY_CAM_QCAMERA) && \
+    (defined(CONFIG_MACH_SONY_TIANCHI) || defined(CONFIG_MACH_SONY_TIANCHI_DSDS))
+	msm_eeprom_set_camera_moudle_name(e_ctrl->subdev_id,
+						e_ctrl->cal_data.mapdata);
+#endif
 
 	rc = msm_camera_power_down(power_info, e_ctrl->eeprom_device_type,
 		&e_ctrl->i2c_client);

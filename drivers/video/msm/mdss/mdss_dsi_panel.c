@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/module.h>
@@ -21,12 +25,47 @@
 #include <linux/leds.h>
 #include <linux/qpnp/pwm.h>
 #include <linux/err.h>
+#include <linux/gpio.h>
 
 #include "mdss_dsi.h"
 
 #define DT_CMD_HDR 6
 
 DEFINE_LED_TRIGGER(bl_led_trigger);
+#define LCD_VSP 22
+#define LCD_VSN 23
+static int lcd_power(bool enable)
+{
+	int rc = 0;
+
+	pr_debug("%s(%d):Entering\n", __func__, enable);
+	if (enable) {
+		rc = gpio_request(LCD_VSP, "lcd_vsp");
+
+		if (rc) {
+			pr_err("Failed to request gpio 22\n");
+			goto error;
+		}
+		rc = gpio_request(LCD_VSN, "lcd_vsn");
+		if (rc) {
+			pr_err("Failed to request gpio 23\n");
+			goto error;
+		}
+
+		gpio_direction_output(LCD_VSP, 1);
+		gpio_direction_output(LCD_VSN, 1);
+		usleep_range(10000, 11000);
+	} else {
+		gpio_set_value(LCD_VSP, 0);
+		gpio_set_value(LCD_VSN, 0);
+		gpio_free(LCD_VSP);
+		gpio_free(LCD_VSN);
+		usleep_range(10000, 11000);
+	}
+error:
+	return rc;
+
+}
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 {
@@ -209,7 +248,8 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mdss_panel_info *pinfo = NULL;
-	int i, rc = 0;
+//	int i; 
+	int rc = 0;
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -240,15 +280,24 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			return rc;
 		}
 		if (!pinfo->panel_power_on) {
+
+		
 			if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 				gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
-
+#if 0
 			for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) {
 				gpio_set_value((ctrl_pdata->rst_gpio),
 					pdata->panel_info.rst_seq[i]);
 				if (pdata->panel_info.rst_seq[++i])
 					usleep(pinfo->rst_seq[i] * 1000);
 			}
+#endif		
+		gpio_set_value(ctrl_pdata->disp_en_gpio, 1);
+		gpio_set_value(ctrl_pdata->rst_gpio, 0);
+		usleep_range(50000, 51000);
+		gpio_set_value(ctrl_pdata->rst_gpio, 1);
+		usleep_range(11000, 12000);
+		
 		}
 
 		if (gpio_is_valid(ctrl_pdata->mode_gpio)) {
@@ -263,8 +312,10 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			ctrl_pdata->ctrl_state &= ~CTRL_STATE_PANEL_INIT;
 			pr_debug("%s: Reset panel done\n", __func__);
 		}
+	
 	} else {
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
+		usleep_range(11000, 12000);
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
 			gpio_free(ctrl_pdata->disp_en_gpio);
 		}
@@ -425,9 +476,10 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	mipi  = &pdata->panel_info.mipi;
 
 	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
-
-	if (ctrl->on_cmds.cmd_cnt)
+	lcd_power(true);
+	if (ctrl->on_cmds.cmd_cnt) {
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
+	}
 
 	pr_debug("%s:-\n", __func__);
 	return 0;
@@ -452,7 +504,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 
 	if (ctrl->off_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds);
-
+	lcd_power(false);
 	pr_debug("%s:-\n", __func__);
 	return 0;
 }

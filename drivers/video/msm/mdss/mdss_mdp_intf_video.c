@@ -118,9 +118,21 @@ int mdss_mdp_video_addr_setup(struct mdss_data_type *mdata,
 	return 0;
 }
 
+static bool display_on_in_boot;
+static int __init continous_splash_setup(char *str)
+{
+	if (!str)
+		return 0;
+	if (!strncmp(str, "on", 2))
+		display_on_in_boot = true;
+	return 0;
+}
+__setup("display_status=", continous_splash_setup);
+
 static int mdss_mdp_video_timegen_setup(struct mdss_mdp_ctl *ctl,
 					struct intf_timing_params *p)
 {
+	static int init = 1;
 	u32 hsync_period, vsync_period;
 	u32 hsync_start_x, hsync_end_x, display_v_start, display_v_end;
 	u32 active_h_start, active_h_end, active_v_start, active_v_end;
@@ -189,26 +201,40 @@ static int mdss_mdp_video_timegen_setup(struct mdss_mdp_ctl *ctl,
 		       (vsync_polarity << 1) | /* VSYNC Polarity */
 		       (hsync_polarity << 0);  /* HSYNC Polarity */
 
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_HSYNC_CTL, hsync_ctl);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_VSYNC_PERIOD_F0,
-			vsync_period * hsync_period);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_VSYNC_PULSE_WIDTH_F0,
-			   p->vsync_pulse_width * hsync_period);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_DISPLAY_HCTL, display_hctl);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_DISPLAY_V_START_F0,
-			   display_v_start);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_DISPLAY_V_END_F0, display_v_end);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_ACTIVE_HCTL, active_hctl);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_ACTIVE_V_START_F0,
-			   active_v_start);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_ACTIVE_V_END_F0, active_v_end);
+	/* for some panel, if write the MDSS_MDP_REG_INTF_VSYNC_PERIOD_F0
+	* then logo will disappear, so delete it from firsttime. */
+	if (!display_on_in_boot || !init) {
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_HSYNC_CTL, hsync_ctl);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_VSYNC_PERIOD_F0,
+				vsync_period * hsync_period);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_VSYNC_PULSE_WIDTH_F0,
+				   p->vsync_pulse_width * hsync_period);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_DISPLAY_HCTL,
+								display_hctl);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_DISPLAY_V_START_F0,
+				   display_v_start);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_DISPLAY_V_END_F0,
+								display_v_end);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_ACTIVE_HCTL,
+								active_hctl);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_ACTIVE_V_START_F0,
+				   active_v_start);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_ACTIVE_V_END_F0,
+								active_v_end);
 
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_BORDER_COLOR, p->border_clr);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_UNDERFLOW_COLOR,
-			   p->underflow_clr);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_HSYNC_SKEW, p->hsync_skew);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_POLARITY_CTL, polarity_ctl);
-	mdp_video_write(ctx, MDSS_MDP_REG_INTF_FRAME_LINE_COUNT_EN, 0x3);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_BORDER_COLOR,
+								p->border_clr);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_UNDERFLOW_COLOR,
+				   p->underflow_clr);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_HSYNC_SKEW,
+								p->hsync_skew);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_POLARITY_CTL,
+								polarity_ctl);
+		mdp_video_write(ctx, MDSS_MDP_REG_INTF_FRAME_LINE_COUNT_EN,
+									0x3);
+	} else {
+		init = 0;
+	}
 
 	return 0;
 }
