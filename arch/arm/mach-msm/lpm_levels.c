@@ -25,6 +25,7 @@
 #include <linux/suspend.h>
 #include <linux/pm_qos.h>
 #include <linux/of_platform.h>
+#include <linux/ratelimit.h>
 #include <mach/mpm.h>
 #include <mach/cpuidle.h>
 #include <mach/event_timer.h>
@@ -203,6 +204,7 @@ static int msm_pm_get_sleep_mode_value(const char *mode_name)
 static int lpm_set_l2_mode(struct lpm_system_state *system_state,
 				int sleep_mode)
 {
+	static DEFINE_RATELIMIT_STATE(rs, DEFAULT_RATELIMIT_INTERVAL, 2);
 	int lpm = sleep_mode;
 	int rc = 0;
 
@@ -213,6 +215,8 @@ static int lpm_set_l2_mode(struct lpm_system_state *system_state,
 
 	switch (sleep_mode) {
 	case MSM_SPM_L2_MODE_POWER_COLLAPSE:
+		if (__ratelimit(&rs))
+			pr_info("Configuring for L2 power collapse\n");
 		msm_pm_set_l2_flush_flag(MSM_SCM_L2_OFF);
 		break;
 	case MSM_SPM_L2_MODE_GDHS:

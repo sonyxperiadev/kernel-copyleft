@@ -2,6 +2,7 @@
  *  Video for Linux Two header file
  *
  *  Copyright (C) 1999-2007 the contributors
+ *  Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -69,7 +70,9 @@
  * Common stuff for both V4L1 and V4L2
  * Moved from videodev.h
  */
-#define VIDEO_MAX_FRAME               32
+/* extension begin */
+#define VIDEO_MAX_FRAME		96
+/* extension end */
 #define VIDEO_MAX_PLANES               8
 
 #ifndef __KERNEL__

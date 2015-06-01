@@ -1,0 +1,29 @@
+#
+# Felica and Sony NFC device
+#
+
+config FELICA_SNFC
+	bool "Enable FeliCa and Sony NFC driver"
+	default n
+	help
+	  This option enables support for FeliCa and Sony NFC.
+	  This driver is used for the combination device of FeliCa
+	  and Sony NFC, and device of FeliCa.
+	  Say Y if you want to able to these devices.
+
+config FELICA_VDEV
+	bool "Enable FeliCa virtual serial device"
+	depends on FELICA_SNFC
+	default n
+	help
+	  This option enables support for FeliCa virtual serial device.
+	  Collision control of FeliCa and SNFC service use this serial
+	  device.
+	  Say Y if you want to use collision control of FeliCa and SNFC.
+
+config CXD2235AGG
+	bool "Sony CXD2235AGG driver for FeliCa and Sony NFC"
+	depends on FELICA_SNFC
+	default n
+	help
+	  This option enables support for Sony CXD2235AGG.
