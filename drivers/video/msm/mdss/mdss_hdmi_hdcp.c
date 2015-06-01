@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/io.h>
 #include <linux/types.h>
@@ -1364,6 +1369,8 @@ int hdmi_hdcp_isr(void *input)
 
 	/* Ignore HDCP interrupts if HDCP is disabled */
 	if (HDCP_STATE_INACTIVE == hdcp_ctrl->hdcp_state) {
+		if (hdcp_int_val)
+			DEV_ERR("%s: HDCP inactive.\n", __func__);
 		DSS_REG_W(io, HDMI_HDCP_INT_CTRL, HDCP_INT_CLR);
 		return 0;
 	}

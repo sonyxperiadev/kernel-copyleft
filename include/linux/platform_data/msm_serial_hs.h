@@ -12,6 +12,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __ASM_ARCH_MSM_SERIAL_HS_H
 #define __ASM_ARCH_MSM_SERIAL_HS_H
@@ -51,6 +56,7 @@ struct msm_serial_hs_platform_data {
 	unsigned bam_rx_ep_pipe_index;
 	bool no_suspend_delay;
 	bool obs;
+	void (*exit_lpm_cb)(struct uart_port *);
 };
 
 /* return true when tx is empty */

@@ -3,7 +3,7 @@
 # These targets are used from top-level makefile
 
 PHONY += oldconfig xconfig gconfig menuconfig config silentoldconfig update-po-config \
-	localmodconfig localyesconfig
+	localmodconfig localyesconfig savediffconfig
 
 ifdef KBUILD_KCONFIG
 Kconfig := $(KBUILD_KCONFIG)
@@ -93,6 +93,12 @@ oldnoconfig: $(obj)/conf
 savedefconfig: $(obj)/conf
 	$< --$@=defconfig $(Kconfig)
 
+savediffconfig:
+ifneq ($(KBUILD_DIFFCONFIG), )
+	$(Q)$(srctree)/scripts/diffconfig -m .config.def .config > diffconfig
+	$(Q)rm -f .config.def
+endif
+
 defconfig: $(obj)/conf
 ifeq ($(KBUILD_DEFCONFIG),)
 	$< --defconfig $(Kconfig)
@@ -101,8 +107,15 @@ else
 	$(Q)$< --defconfig=arch/$(SRCARCH)/configs/$(KBUILD_DEFCONFIG) $(Kconfig)
 endif
 
+PLATFORM=$(shell echo $@ | sed -e "s/_defconfig//")
 %_defconfig: $(obj)/conf
 	$(Q)$< --defconfig=arch/$(SRCARCH)/configs/$@ $(Kconfig)
+ifneq ($(KBUILD_DIFFCONFIG), )
+	$(Q)cp -f .config .config.def
+	$(Q)$(srctree)/$(obj)/merge_config.sh -m .config \
+		$(srctree)/arch/$(SRCARCH)/configs/$(PLATFORM)/$(KBUILD_DIFFCONFIG)
+	$(Q)$< --defconfig=.config $(Kconfig)
+endif
 
 # Help text used by make help
 help:

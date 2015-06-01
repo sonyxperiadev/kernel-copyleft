@@ -362,6 +362,18 @@ config CLD_LL_CORE
 	---help---
 	  Core driver for the Qualcomm QCA6174 Chipset
 
+config SOMC_WIFI_CONTROL
+	bool "Enable/disable SOMC WiFi control function"
+	depends on PCI
+	---help---
+	  A SOMC adaptation for the WLAN driver module
+
+config BCMDHD_DEBUG_PAGEALLOC
+	bool "Enable Memory Pagealloc Debugging Support"
+	depends on SOMC_WIFI_CONTROL
+	---help---
+	  Enable Memory Pagealloc Debugging
+
 source "drivers/net/wireless/ath/Kconfig"
 source "drivers/net/wireless/b43/Kconfig"
 source "drivers/net/wireless/b43legacy/Kconfig"

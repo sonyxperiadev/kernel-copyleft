@@ -9,6 +9,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/err.h>
 #include <linux/slab.h>
@@ -595,8 +600,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 			card->ext_csd.data_tag_unit_size = 0;
 		}
 
-		card->ext_csd.max_packed_writes =
-			ext_csd[EXT_CSD_MAX_PACKED_WRITES];
+		card->ext_csd.max_packed_writes = 8;
 		card->ext_csd.max_packed_reads =
 			ext_csd[EXT_CSD_MAX_PACKED_READS];
 	} else {
@@ -1706,6 +1710,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		}
 	}
 
+	memcpy(&host->cached_ios, &host->ios, sizeof(host->cached_ios));
 	return 0;
 
 free_card:
@@ -1859,28 +1864,53 @@ out:
 	return err;
 }
 
-/*
- * Resume callback from host.
- *
- * This function tries to determine if the same card is still present
- * and, if so, restore all state to it.
- */
-static int mmc_resume(struct mmc_host *host)
+static int mmc_partial_init(struct mmc_host *host)
+{
+	int err = 0;
+	struct mmc_card *card = host->card;
+	u32 tuning_cmd;
+
+	pr_debug("%s: %s: bw: %d timing: %d clock: %d\n", mmc_hostname(host),
+		__func__,  host->cached_ios.bus_width,  host->cached_ios.timing,
+		host->cached_ios.clock);
+
+	mmc_set_bus_width(host, host->cached_ios.bus_width);
+	mmc_set_timing(host, host->cached_ios.timing);
+	mmc_set_clock(host, host->cached_ios.clock);
+
+	if (host->ops->execute_tuning && (mmc_card_hs200(card) ||
+					  mmc_card_hs400(card))) {
+		mmc_host_clk_hold(host);
+
+		if (mmc_card_hs200(card))
+			tuning_cmd = MMC_SEND_TUNING_BLOCK_HS200;
+		else if (mmc_card_hs400(card))
+			tuning_cmd = MMC_SEND_TUNING_BLOCK_HS400;
+
+		err = host->ops->execute_tuning(host,
+				tuning_cmd);
+
+		mmc_host_clk_release(host);
+	}
+	if (err)
+		pr_err("%s: tuning execution failed\n",
+			   mmc_hostname(host));
+	return err;
+}
+
+static int mmc_resume_init_card(struct mmc_host *host)
 {
 	int err;
 	int retries;
 
-	BUG_ON(!host);
-	BUG_ON(!host->card);
-
-	mmc_claim_host(host);
 	retries = 3;
 	while (retries) {
 		err = mmc_init_card(host, host->ocr, host->card);
 
 		if (err) {
-			pr_err("%s: MMC card re-init failed rc = %d (retries = %d)\n",
-			       mmc_hostname(host), err, retries);
+			pr_err(
+			 "%s: MMC card re-init failed rc = %d (retries = %d)\n",
+			 mmc_hostname(host), err, retries);
 			retries--;
 			mmc_power_off(host);
 			usleep_range(5000, 5500);
@@ -1890,6 +1920,47 @@ static int mmc_resume(struct mmc_host *host)
 		}
 		break;
 	}
+	return err;
+}
+
+/*
+ * Resume callback from host.
+ *
+ * This function tries to determine if the same card is still present
+ * and, if so, restore all state to it.
+ */
+static int mmc_resume(struct mmc_host *host)
+{
+	int err;
+
+	BUG_ON(!host);
+	BUG_ON(!host->card);
+
+	mmc_claim_host(host);
+
+	if (host->caps2 & MMC_CAP2_AWAKE_SUPP) {
+		err = mmc_card_awake(host);
+		if (err) {
+			pr_err("%s: %s: failed (%d) awake using CMD5\n",
+			       mmc_hostname(host),  __func__, err);
+
+			err = mmc_resume_init_card(host);
+		} else {
+			err = mmc_partial_init(host);
+			if (!err) {
+				err = mmc_cache_ctrl(host, 1);
+				if (err) {
+					pr_err("%s: %s faild (%d) cache_ctrl\n",
+					    mmc_hostname(host), __func__, err);
+
+					err = mmc_resume_init_card(host);
+				}
+			} else
+				err = mmc_resume_init_card(host);
+		}
+	} else
+		err = mmc_resume_init_card(host);
+
 	mmc_release_host(host);
 
 	/*

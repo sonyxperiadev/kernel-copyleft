@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/slab.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
@@ -37,6 +42,12 @@
 #define ULL_SUPPORTED_BITS_PER_SAMPLE 16
 #define ULL_SUPPORTED_SAMPLE_RATE 48000
 
+/* ENUM for adm_status */
+enum {
+	ADM_STATUS_IDX_CALIBRATION_REQUIRED,
+	ADM_STATUS_IDX_MAX,
+};
+
 struct adm_copp {
 
 	atomic_t id[AFE_MAX_PORTS][MAX_COPPS_PER_PORT];
@@ -52,6 +63,7 @@ struct adm_copp {
 	wait_queue_head_t adm_delay_wait[AFE_MAX_PORTS][MAX_COPPS_PER_PORT];
 	atomic_t adm_delay_stat[AFE_MAX_PORTS][MAX_COPPS_PER_PORT];
 	uint32_t adm_delay[AFE_MAX_PORTS][MAX_COPPS_PER_PORT];
+	unsigned long adm_status[AFE_MAX_PORTS][MAX_COPPS_PER_PORT];
 };
 
 struct adm_ctl {
@@ -811,6 +823,71 @@ dolby_dap_send_param_return:
 	return rc;
 }
 
+int adm_ahc_send_params(int port_id, int copp_idx, char *params,
+			uint32_t params_length)
+{
+	struct adm_cmd_set_pp_params_v5	*adm_params = NULL;
+	int sz, rc = 0;
+	int port_idx;
+
+	pr_debug("%s:\n", __func__);
+	port_id = afe_convert_virtual_to_portid(port_id);
+	port_idx = adm_validate_and_get_port_index(port_id);
+	if (port_idx < 0) {
+		pr_err("%s: Invalid port_id 0x%x\n", __func__, port_id);
+		return -EINVAL;
+	}
+
+	sz = sizeof(struct adm_cmd_set_pp_params_v5) + params_length;
+	adm_params = kzalloc(sz, GFP_KERNEL);
+	if (!adm_params) {
+		pr_err("%s, adm params memory alloc failed", __func__);
+		return -ENOMEM;
+	}
+
+	memcpy(((u8 *)adm_params + sizeof(struct adm_cmd_set_pp_params_v5)),
+			params, params_length);
+	adm_params->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	adm_params->hdr.pkt_size = sz;
+	adm_params->hdr.src_svc = APR_SVC_ADM;
+	adm_params->hdr.src_domain = APR_DOMAIN_APPS;
+	adm_params->hdr.src_port = port_id;
+	adm_params->hdr.dest_svc = APR_SVC_ADM;
+	adm_params->hdr.dest_domain = APR_DOMAIN_ADSP;
+	adm_params->hdr.dest_port =
+			atomic_read(&this_adm.copp.id[port_idx][copp_idx]);
+	adm_params->hdr.token = port_idx << 16 | copp_idx;
+	adm_params->hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+	adm_params->payload_addr_lsw = 0;
+	adm_params->payload_addr_msw = 0;
+	adm_params->mem_map_handle = 0;
+	adm_params->payload_size = params_length;
+
+	atomic_set(&this_adm.copp.stat[port_idx][copp_idx], 0);
+	rc = apr_send_pkt(this_adm.apr, (uint32_t *)adm_params);
+	if (rc < 0) {
+		pr_err("%s: Set params failed port = 0x%x rc %d\n",
+			__func__, port_id, rc);
+		rc = -EINVAL;
+		goto ahc_send_param_return;
+	}
+	/* Wait for the callback */
+	rc = wait_event_timeout(this_adm.copp.wait[port_idx][copp_idx],
+		atomic_read(&this_adm.copp.stat[port_idx][copp_idx]),
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!rc) {
+		pr_err("%s: Set params timed out port = 0x%x\n",
+			 __func__, port_id);
+		rc = -EINVAL;
+		goto ahc_send_param_return;
+	}
+	rc = 0;
+ahc_send_param_return:
+	kfree(adm_params);
+	return rc;
+}
+
 int adm_get_params(int port_id, int copp_idx, uint32_t module_id,
 		   uint32_t param_id, uint32_t params_length, char *params)
 {
@@ -1087,6 +1164,7 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 					    &this_adm.copp.app_type[i][j], 0);
 					atomic_set(
 					   &this_adm.copp.acdb_id[i][j], 0);
+					this_adm.copp.adm_status[i][j] = 0;
 				}
 			}
 			this_adm.apr = NULL;
@@ -1782,7 +1860,7 @@ static int get_cal_path(int path)
 static void send_adm_cal(int port_id, int copp_idx, int path, int perf_mode,
 			 int app_type, int acdb_id, int sample_rate)
 {
-	pr_debug("%s:\n", __func__);
+	pr_debug("%s: port id 0x%x copp_idx %d\n", __func__, port_id, copp_idx);
 
 	send_adm_cal_type(ADM_AUDPROC_CAL, path, port_id, copp_idx, perf_mode,
 			  app_type, acdb_id, sample_rate);
@@ -2009,6 +2087,8 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 				   app_type);
 			atomic_set(&this_adm.copp.acdb_id[port_idx][copp_idx],
 				   acdb_id);
+			set_bit(ADM_STATUS_IDX_CALIBRATION_REQUIRED,
+			(void *)&this_adm.copp.adm_status[port_idx][copp_idx]);
 			if (path != ADM_PATH_COMPRESSED_RX)
 				send_adm_custom_topology();
 		}
@@ -2218,6 +2298,14 @@ int adm_matrix_map(int path, struct route_payload payload_map, int perf_mode)
 		for (i = 0; i < payload_map.num_copps; i++) {
 			port_idx = afe_get_port_index(payload_map.port_id[i]);
 			copp_idx = payload_map.copp_idx[i];
+			if (!test_bit(ADM_STATUS_IDX_CALIBRATION_REQUIRED,
+				(void *)&this_adm.copp.adm_status[port_idx]
+								[copp_idx])) {
+				pr_debug("%s: adm copp[0x%x][%d] already sent",
+						__func__, port_idx, copp_idx);
+				continue;
+			}
+
 			if (atomic_read(
 				&this_adm.copp.topology[port_idx][copp_idx]) ==
 				ADM_CMD_COPP_OPEN_TOPOLOGY_ID_DTS_HPX)
@@ -2234,6 +2322,9 @@ int adm_matrix_map(int path, struct route_payload payload_map, int perf_mode)
 				     payload_map.app_type,
 				     payload_map.acdb_dev_id,
 				     payload_map.sample_rate);
+			/* ADM COPP calibration is already sent */
+			clear_bit(ADM_STATUS_IDX_CALIBRATION_REQUIRED,
+			(void *)&this_adm.copp.adm_status[port_idx][copp_idx]);
 			pr_debug("%s: copp_id: %d\n", __func__,
 				 atomic_read(&this_adm.copp.id[port_idx]
 							      [copp_idx]));
@@ -2340,6 +2431,9 @@ int adm_close(int port_id, int perf_mode, int copp_idx)
 		atomic_set(&this_adm.copp.rate[port_idx][copp_idx], 0);
 		atomic_set(&this_adm.copp.bit_width[port_idx][copp_idx], 0);
 		atomic_set(&this_adm.copp.app_type[port_idx][copp_idx], 0);
+
+		clear_bit(ADM_STATUS_IDX_CALIBRATION_REQUIRED,
+			(void *)&this_adm.copp.adm_status[port_idx][copp_idx]);
 
 		ret = apr_send_pkt(this_adm.apr, (uint32_t *)&close);
 		if (ret < 0) {
@@ -3333,6 +3427,7 @@ static int __init adm_init(void)
 				&this_adm.copp.adm_delay_wait[i][j]);
 			atomic_set(&this_adm.copp.topology[i][j], 0);
 			this_adm.copp.adm_delay[i][j] = 0;
+			this_adm.copp.adm_status[i][j] = 0;
 		}
 	}
 
