@@ -2,6 +2,7 @@
  *  linux/kernel/printk.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
+ *  Copyright (c) 2015 Sony Mobile Communications Inc.
  *
  * Modified to make sys_syslog() more flexible: added commands to
  * return the last 4k of kernel messages, regardless of whether
@@ -317,9 +318,10 @@ int log_buf_copy(char *dest, int idx, int len)
 {
 	int ret, max;
 	bool took_lock = false;
+	unsigned long flags;
 
 	if (!oops_in_progress) {
-		raw_spin_lock_irq(&logbuf_lock);
+		raw_spin_lock_irqsave(&logbuf_lock, flags);
 		took_lock = true;
 	}
 
@@ -336,7 +338,7 @@ int log_buf_copy(char *dest, int idx, int len)
 	}
 
 	if (took_lock)
-		raw_spin_unlock_irq(&logbuf_lock);
+		raw_spin_unlock_irqrestore(&logbuf_lock, flags);
 
 	return ret;
 }
@@ -1201,6 +1203,24 @@ void resume_console(void)
 	console_unlock();
 }
 
+void panic_console(void)
+{
+	/**
+	 * Let's clear lock if it's locked, but only if console is suspended
+	 */
+	if (console_locked && console_suspended) {
+		zap_locks();
+		console_locked = 0;
+	}
+
+	/**
+	 * If suspended, resume console to allow the stored messages to
+	 * be written
+	 */
+	if (console_suspended)
+		resume_console();
+}
+
 static void __cpuinit console_flush(struct work_struct *work)
 {
 	console_lock();
@@ -1386,8 +1406,7 @@ again:
 	 * flush, no worries.
 	 */
 	raw_spin_lock(&logbuf_lock);
-	if (con_start != log_end)
-		retry = 1;
+	retry = con_start != log_end;
 	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
 
 	if (retry && console_trylock())

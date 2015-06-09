@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/module.h>
@@ -24,6 +27,7 @@
 #include <linux/percpu.h>
 #include <linux/interrupt.h>
 #include <linux/reboot.h>
+#include <linux/smp.h>
 #include <asm/fiq.h>
 #include <asm/hardware/gic.h>
 #include <mach/msm_iomap.h>
@@ -103,6 +107,11 @@ module_param(print_all_stacks, int,  S_IRUGO | S_IWUSR);
 
 /* Area for context dump in secure mode */
 static void *scm_regsave;
+
+/* This variable is used by the ramdump.
+ * It holds the physical address to the dump of the CPU registers.
+ */
+unsigned scm_regsave_pa;
 
 static struct msm_watchdog_pdata __percpu **percpu_pdata;
 
@@ -259,6 +268,9 @@ void pet_watchdog(void)
 	if (!enable)
 		return;
 
+	if (smp_processor_id() != 0)
+		return;
+
 	slack = __raw_readl(msm_wdt_base + WDT_STS) >> 3;
 	slack = ((bark_time*WDT_HZ)/1000) - slack;
 	if (slack < min_slack_ticks)
@@ -278,6 +290,19 @@ static void pet_watchdog_work(struct work_struct *work)
 	if (enable)
 		schedule_delayed_work_on(0, &dogwork_struct, delay_time);
 }
+
+static int wdog_init_done;
+
+void touch_nmi_watchdog(void)
+{
+	if (!wdog_init_done)
+		return;
+
+	pet_watchdog();
+
+	touch_softlockup_watchdog();
+}
+EXPORT_SYMBOL(touch_nmi_watchdog);
 
 static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 {
@@ -336,6 +361,9 @@ static void configure_bark_dump(void)
 				pr_err("Setting register save address failed.\n"
 				       "Registers won't be dumped on a dog "
 				       "bite\n");
+			else
+				scm_regsave_pa = cmd_buf.addr;
+
 		} else {
 			pr_err("Allocating register save space failed\n"
 			       "Registers won't be dumped on a dog bite\n");
@@ -409,6 +437,7 @@ static void init_watchdog_work(struct work_struct *work)
 	__raw_writel(1, msm_wdt_base + WDT_EN);
 	__raw_writel(1, msm_wdt_base + WDT_RST);
 	last_pet = sched_clock();
+	wdog_init_done = 1;
 
 	if (!has_vic)
 		enable_percpu_irq(msm_wdog_irq, IRQ_TYPE_EDGE_RISING);

@@ -1,6 +1,7 @@
 /* The industrial I/O core
  *
  * Copyright (c) 2008 Jonathan Cameron
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
@@ -12,6 +13,9 @@
  * Things to look at here.
  * - Better memory allocation techniques?
  * - Alternative access techniques?
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 #include <linux/kernel.h>
 #include <linux/export.h>
@@ -56,6 +60,8 @@ unsigned int iio_buffer_poll(struct file *filp,
 {
 	struct iio_dev *indio_dev = filp->private_data;
 	struct iio_buffer *rb = indio_dev->buffer;
+	if (rb->stufftoread)
+		return POLLIN | POLLRDNORM;
 
 	poll_wait(filp, &rb->pollq, wait);
 	if (rb->stufftoread)
@@ -458,7 +464,9 @@ ssize_t iio_buffer_store_enable(struct device *dev,
 		}
 	} else {
 		if (indio_dev->setup_ops->predisable) {
+			mutex_unlock(&indio_dev->mlock);
 			ret = indio_dev->setup_ops->predisable(indio_dev);
+			mutex_lock(&indio_dev->mlock);
 			if (ret)
 				goto error_ret;
 		}

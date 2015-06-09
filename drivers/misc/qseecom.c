@@ -1248,6 +1248,13 @@ static int __qseecom_send_cmd_req_clean_up(
 		if (req->ifd_data[i].fd > 0) {
 			field = (char *)req->cmd_req_buf +
 					req->ifd_data[i].cmd_buf_offset;
+			if ((req->cmd_req_len < sizeof(uint32_t)) ||
+				(req->ifd_data[i].cmd_buf_offset >
+				req->cmd_req_len - sizeof(uint32_t))) {
+				pr_err("Invalid offset (req len) 0x%x\n",
+					req->ifd_data[i].cmd_buf_offset);
+				return -EINVAL;
+			}
 			update = (uint32_t *) field;
 			*update = 0;
 		}

@@ -5,6 +5,7 @@
  *  SD support Copyright (C) 2004 Ian Molton, All Rights Reserved.
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
  *  MMCv4 support Copyright (C) 2006 Philip Langdale, All Rights Reserved.
+ *  Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -63,6 +64,7 @@ static void mmc_clk_scaling(struct mmc_host *host, bool from_wq);
 #define MMC_FLUSH_REQ_TIMEOUT_MS 30000 /* msec */
 
 static struct workqueue_struct *workqueue;
+static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
 
 /*
  * Enabling software CRCs on the data blocks can be a significant (30%)
@@ -849,13 +851,23 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 	mult = mmc_card_sd(card) ? 100 : 10;
 
 	/*
+	 * eMMC also uses a 100 multiplier because timeout is seen
+	 * with specific eMMC devices.
+	 */
+	if (mmc_card_mmc(card))
+		mult = 100;
+
+	/*
 	 * Scale up the multiplier (and therefore the timeout) by
 	 * the r2w factor for writes.
 	 */
 	if (data->flags & MMC_DATA_WRITE)
 		mult <<= card->csd.r2w_factor;
 
-	data->timeout_ns = card->csd.tacc_ns * mult;
+	if ((unsigned long long)card->csd.tacc_ns * mult > UINT_MAX)
+		data->timeout_ns = UINT_MAX;
+	else
+		data->timeout_ns = card->csd.tacc_ns * mult;
 	data->timeout_clks = card->csd.tacc_clks * mult;
 
 	/*
@@ -1481,6 +1493,9 @@ void mmc_power_up(struct mmc_host *host)
 {
 	int bit;
 
+	if (host->ios.power_mode == MMC_POWER_ON)
+		return;
+
 	mmc_host_clk_hold(host);
 
 	/* If ocr is set, we use it */
@@ -1523,6 +1538,9 @@ void mmc_power_up(struct mmc_host *host)
 
 void mmc_power_off(struct mmc_host *host)
 {
+	if (host->ios.power_mode == MMC_POWER_OFF)
+		return;
+
 	mmc_host_clk_hold(host);
 
 	host->ios.clock = 0;
@@ -2275,6 +2293,22 @@ void mmc_reset_clk_scale_stats(struct mmc_host *host)
 EXPORT_SYMBOL_GPL(mmc_reset_clk_scale_stats);
 
 /**
+ * mmc_get_max_DDR50_frequency() - get max DDR50. frequency supported
+ * @host: pointer to mmc host structure
+ *
+ * Returns max. DDR50 frequency supported by card/host
+ */
+static unsigned long mmc_get_max_DDR50_frequency(struct mmc_host *host)
+{
+	unsigned long freq = UHS_DDR50_MAX_DTR;
+#ifdef CONFIG_MMC_MSM_SDC3_POLLUX_DOWN_CLKRATE
+	if (host->card && mmc_card_sd(host->card))
+		freq = UHS_DDR50_32M_MAX_DTR;
+#endif /* CONFIG_MMC_MSM_SDC3_POLLUX_DOWN_CLKRATE */
+	return freq;
+}
+
+/**
  * mmc_get_max_frequency() - get max. frequency supported
  * @host: pointer to mmc host structure
  *
@@ -2304,7 +2338,7 @@ unsigned long mmc_get_max_frequency(struct mmc_host *host)
 		freq = MMC_HS200_MAX_DTR;
 		break;
 	case MMC_TIMING_UHS_DDR50:
-		freq = UHS_DDR50_MAX_DTR;
+		freq = mmc_get_max_DDR50_frequency(host);
 		break;
 	default:
 		mmc_host_clk_hold(host);
@@ -2347,7 +2381,7 @@ static unsigned long mmc_get_min_frequency(struct mmc_host *host)
 		freq = MMC_HIGH_52_MAX_DTR;
 		break;
 	case MMC_TIMING_UHS_DDR50:
-		freq = UHS_DDR50_MAX_DTR / 2;
+		freq = mmc_get_max_DDR50_frequency(host) / 2;
 		break;
 	default:
 		mmc_host_clk_hold(host);
@@ -2765,8 +2799,12 @@ void mmc_rescan(struct work_struct *work)
 	 */
 	mmc_bus_put(host);
 
-	if (host->ops->get_cd && host->ops->get_cd(host) == 0)
+	if (host->ops->get_cd && host->ops->get_cd(host) == 0) {
+		mmc_claim_host(host);
+		mmc_power_off(host);
+		mmc_release_host(host);
 		goto out;
+	}
 
 	mmc_claim_host(host);
 	if (!mmc_rescan_try_freq(host, host->f_min))
@@ -2786,7 +2824,8 @@ void mmc_rescan(struct work_struct *work)
 
 void mmc_start_host(struct mmc_host *host)
 {
-	mmc_power_off(host);
+	host->f_init = max(freqs[0], host->f_min);
+	mmc_power_up(host);
 	mmc_detect_change(host, 0);
 }
 
@@ -2888,6 +2927,8 @@ int mmc_card_awake(struct mmc_host *host)
 	if (host->bus_ops && !host->bus_dead && host->bus_ops->awake)
 		err = host->bus_ops->awake(host);
 
+	mmc_card_clr_sleep(host->card);
+
 	mmc_bus_put(host);
 
 	return err;
@@ -2903,9 +2944,11 @@ int mmc_card_sleep(struct mmc_host *host)
 
 	mmc_bus_get(host);
 
-	if (host->bus_ops && !host->bus_dead && host->bus_ops->sleep)
+	if (host->bus_ops && !host->bus_dead && host->bus_ops->sleep) {
 		err = host->bus_ops->sleep(host);
-
+		if (!err)
+			mmc_card_set_sleep(host->card);
+	}
 	mmc_bus_put(host);
 
 	return err;

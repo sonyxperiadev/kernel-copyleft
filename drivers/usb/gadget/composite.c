@@ -2,6 +2,7 @@
  * composite.c - infrastructure for Composite USB Gadgets
  *
  * Copyright (C) 2006-2008 David Brownell
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -819,7 +820,8 @@ int usb_remove_config(struct usb_composite_dev *cdev,
 	if (cdev->config == config)
 		reset_config(cdev);
 
-	list_del(&config->list);
+	if (config->list.next != LIST_POISON1)
+		list_del(&config->list);
 
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
@@ -1552,7 +1554,11 @@ composite_suspend(struct usb_gadget *gadget)
 
 	cdev->suspended = 1;
 
-	usb_gadget_vbus_draw(gadget, 2);
+	if (cdev->config
+		&& (cdev->config->bmAttributes & USB_CONFIG_ATT_WAKEUP))
+		usb_gadget_vbus_draw(gadget, 2);
+	else
+		usb_gadget_vbus_draw(gadget, 0);
 }
 
 static void

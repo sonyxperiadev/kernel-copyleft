@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #ifndef _VCD_DDL_CORE_H_
@@ -129,6 +132,7 @@
 	(((val) + (grid) - 1) / (grid) * (grid))
 
 #define VCD_DDL_720P_YUV_BUF_SIZE     ((1280*720*3) >> 1)
+#define VCD_DDL_1080P_YUV_BUF_SIZE     ((1920*1080*3) >> 1)
 #define VCD_DDL_WVGA_BUF_SIZE         (800*480)
 
 #define VCD_DDL_TEST_MAX_WIDTH        (DDL_MAX_FRAME_WIDTH)

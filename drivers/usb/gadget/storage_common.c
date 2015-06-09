@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2003-2008 Alan Stern
  * Copyeight (C) 2009 Samsung Electronics
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  * Author: Michal Nazarewicz (mina86@mina86.com)
  *
  * This program is free software; you can redistribute it and/or modify
@@ -182,6 +183,12 @@ struct interrupt_data {
 #define ASC(x)		((u8) ((x) >> 8))
 #define ASCQ(x)		((u8) (x))
 
+#define RANDOM_WRITE_COUNT_TO_BE_FLUSHED (8)
+#define WRITEBACK_SIZE_TO_BE_FLUSHED	(15*1024*1024)
+/* VPD(Vital product data) Page Name */
+#define VPD_SUPPORTED_VPD_PAGES		0x00
+#define VPD_UNIT_SERIAL_NUMBER		0x80
+#define VPD_DEVICE_IDENTIFICATION	0x83
 
 /*-------------------------------------------------------------------------*/
 
@@ -190,6 +197,12 @@ struct fsg_lun {
 	struct file	*filp;
 	loff_t		file_length;
 	loff_t		num_sectors;
+
+	u8		random_write_count;
+	u8		random_write_count_to_be_flushed;
+	unsigned int	writeback_size;
+	unsigned int	writeback_size_to_be_flushued;
+	loff_t		last_offset;
 
 	unsigned int	initially_ro:1;
 	unsigned int	ro:1;
@@ -207,6 +220,7 @@ struct fsg_lun {
 	unsigned int	blkbits;	/* Bits of logical block size of bound block device */
 	unsigned int	blksize;	/* logical block size of bound block device */
 	struct device	dev;
+	char		*lun_filename;
 #ifdef CONFIG_USB_MSC_PROFILING
 	spinlock_t	lock;
 	struct {
@@ -217,6 +231,11 @@ struct fsg_lun {
 		ktime_t wtime;
 	} perf;
 
+	struct {
+		unsigned int	fsync_time;
+		unsigned int	fsync_random_write_count;
+		unsigned int	fsync_writeback_size;
+	} worst_record[3];
 #endif
 };
 
@@ -739,6 +758,10 @@ out:
 static void fsg_lun_close(struct fsg_lun *curlun)
 {
 	if (curlun->filp) {
+		curlun->last_offset = 0;
+		curlun->random_write_count = 0;
+		curlun->writeback_size = 0;
+
 		LDBG(curlun, "close backing file\n");
 		fput(curlun->filp);
 		curlun->filp = NULL;
@@ -755,10 +778,19 @@ static void fsg_lun_close(struct fsg_lun *curlun)
 static int fsg_lun_fsync_sub(struct fsg_lun *curlun)
 {
 	struct file	*filp = curlun->filp;
+	int rc = 0;
 
 	if (curlun->ro || !filp)
 		return 0;
-	return vfs_fsync(filp, 1);
+
+	rc = vfs_fsync(filp, 1);
+	if (!rc) {
+		curlun->last_offset = 0;
+		curlun->random_write_count = 0;
+		curlun->writeback_size = 0;
+	}
+
+	return rc;
 }
 
 static void store_cdrom_address(u8 *dest, int msf, u32 addr)
@@ -837,6 +869,89 @@ static ssize_t fsg_store_perf(struct device *dev, struct device_attribute *attr,
 
 	return count;
 }
+
+static ssize_t fsg_show_rndwcnt(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct fsg_lun *curlun = fsg_lun_from_dev(dev);
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+			curlun->random_write_count_to_be_flushed);
+}
+static ssize_t fsg_store_rndwcnt(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	unsigned int value;
+	struct fsg_lun *curlun = fsg_lun_from_dev(dev);
+
+	sscanf(buf, "%u", &value);
+	curlun->random_write_count_to_be_flushed = value;
+	LDBG(curlun, "[PROF] random_write_count_to_be_flushed = %u\n",
+		curlun->random_write_count_to_be_flushed);
+	return count;
+}
+static ssize_t fsg_show_wbsize(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct fsg_lun *curlun = fsg_lun_from_dev(dev);
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+			curlun->writeback_size_to_be_flushued / 1024 / 1024);
+}
+static ssize_t fsg_store_wbsize(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	unsigned int value;
+	struct fsg_lun *curlun = fsg_lun_from_dev(dev);
+
+	sscanf(buf, "%u", &value);
+	curlun->writeback_size_to_be_flushued = value * 1024 * 1024;
+	LDBG(curlun, "[PROF] writeback_size_to_be_flushued = %u\n",
+		curlun->writeback_size_to_be_flushued);
+	return count;
+}
+static ssize_t fsg_show_worstrecord(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct fsg_lun *curlun = fsg_lun_from_dev(dev);
+	ssize_t i, n;
+	for (i = 0, n = 0; i < ARRAY_SIZE(curlun->worst_record); i++) {
+		n += snprintf(buf + n, PAGE_SIZE-n, "[%u] %u %u %u\n", i,
+			curlun->worst_record[i].fsync_time,
+			curlun->worst_record[i].fsync_random_write_count,
+			curlun->worst_record[i].fsync_writeback_size);
+	}
+	return n;
+}
+static ssize_t fsg_store_worstrecord(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct fsg_lun *curlun = fsg_lun_from_dev(dev);
+
+	memset(curlun->worst_record, 0, sizeof(curlun->worst_record));
+	LDBG(curlun, "[PROF] worst_record cleared\n");
+	return count;
+}
+static int add_worst_record(struct fsg_lun *curlun, unsigned int fsync_time,
+			unsigned int cnt, unsigned int size)
+{
+	unsigned int i, minimum = (unsigned int)-1, rec_i = 0;
+	for (i = 0; i < ARRAY_SIZE(curlun->worst_record); i++) {
+		if (minimum > curlun->worst_record[i].fsync_time) {
+			minimum = curlun->worst_record[i].fsync_time;
+			rec_i = i;
+		}
+	}
+	if (minimum < fsync_time) {
+		curlun->worst_record[rec_i].fsync_time = fsync_time;
+		curlun->worst_record[rec_i].fsync_random_write_count = cnt;
+		curlun->worst_record[rec_i].fsync_writeback_size = size;
+		return 1;
+	} else
+		return 0;
+}
+
 #endif
 static ssize_t fsg_show_file(struct device *dev, struct device_attribute *attr,
 			     char *buf)
@@ -925,7 +1040,7 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	int		rc = 0;
 
 
-#ifndef CONFIG_USB_ANDROID_MASS_STORAGE
+#ifndef CONFIG_USB_G_ANDROID
 	/* disabled in android because we need to allow closing the backing file
 	 * if the media was removed
 	 */
@@ -944,14 +1059,28 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	if (fsg_lun_is_open(curlun)) {
 		fsg_lun_close(curlun);
 		curlun->unit_attention_data = SS_MEDIUM_NOT_PRESENT;
+		kfree(curlun->lun_filename);
+		curlun->lun_filename = NULL;
 	}
 
 	/* Load new medium */
 	if (count > 0 && buf[0]) {
 		rc = fsg_lun_open(curlun, buf);
-		if (rc == 0)
-			curlun->unit_attention_data =
+		if (rc == 0) {
+			kfree(curlun->lun_filename);
+			curlun->lun_filename = kmalloc(count+1, GFP_KERNEL);
+			if (!curlun->lun_filename) {
+				rc = -ENOMEM;
+				fsg_lun_close(curlun);
+				curlun->unit_attention_data =
+					SS_MEDIUM_NOT_PRESENT;
+			} else {
+				memcpy(curlun->lun_filename, buf, count);
+				curlun->lun_filename[count] = '\0';
+				curlun->unit_attention_data =
 					SS_NOT_READY_TO_READY_TRANSITION;
+			}
+		}
 	}
 	up_write(filesem);
 	return (rc < 0 ? rc : count);
