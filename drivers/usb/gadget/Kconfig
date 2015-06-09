@@ -890,6 +890,14 @@ config USB_ANDROID_RNDIS_DWORD_ALIGNED
 	help
 		Provides dword aligned for DMA controller.
 
+config USB_AUTO_CDROM_EJECTION
+	boolean "Auto Cdrom Ejection"
+	depends on USB_G_ANDROID
+	default n
+	help
+	  This feature provides a automatic cdrom ejection. If multiple cdrom
+	  lun exists, this feature works at only first cdrom lun.
+
 if TTY
 
 config USB_CDC_COMPOSITE
@@ -1118,5 +1126,11 @@ config RMNET_SDIO_SMD_DATA_CHANNEL
        default "DATA40"
        help
 	  Data SMD channel for transferring network data
+
+config USB_MIRRORLINK
+       boolean "Handle MirrorLink USB command"
+       default n
+       help
+         Enabling this option adds support for MirrorLink USB command.
 
 endif # USB_GADGET

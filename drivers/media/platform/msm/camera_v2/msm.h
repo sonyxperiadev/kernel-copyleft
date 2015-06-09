@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _MSM_H
 #define _MSM_H
@@ -30,7 +35,11 @@
 #include <media/videobuf2-msm-mem.h>
 #include <media/msmb_camera.h>
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+#define MSM_POST_EVT_TIMEOUT 4000
+#else
 #define MSM_POST_EVT_TIMEOUT 5000
+#endif
 #define MSM_POST_EVT_NOTIMEOUT 0xFFFFFFFF
 #define MSM_CAMERA_STREAM_CNT_BITS  32
 

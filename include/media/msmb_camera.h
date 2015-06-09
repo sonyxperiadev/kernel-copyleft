@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __LINUX_MSMB_CAMERA_H
 #define __LINUX_MSMB_CAMERA_H
 
@@ -63,7 +68,9 @@
  * large value for number of buffer due to data structure corruption
  * we return error to avoid integer overflow. This value may be
  * configured in future*/
-#define MSM_CAMERA_MAX_STREAM_BUF 40
+/* extension begin */
+#define MSM_CAMERA_MAX_STREAM_BUF 96
+/* extension end */
 
 /* featur base */
 #define MSM_CAMERA_FEATURE_BASE     0x00010000

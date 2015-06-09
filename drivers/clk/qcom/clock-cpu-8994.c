@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -1636,6 +1641,15 @@ static void init_v2_data(void)
 	a53_clk.hw_low_power_ctrl = true;
 }
 
+/* temporary for v1 support */
+static void init_v1_data(void)
+{
+	a57_pll0.masks.post_div_mask = BM(9, 8);
+	a57_pll0.vals.post_div_masked = 0x100;
+	a57_pll1.masks.post_div_mask = BM(9, 8);
+	a57_pll1.vals.post_div_masked = 0x300;
+}
+
 static int a57speedbin;
 struct platform_device *cpu_clock_8994_dev;
 
@@ -1960,6 +1974,9 @@ static int cpu_clock_8994_driver_probe(struct platform_device *pdev)
 
 	if (v2)
 		init_v2_data();
+
+	if (!v2)
+		init_v1_data();
 
 	ret = cpu_clock_8994_resources_init(pdev);
 	if (ret)
