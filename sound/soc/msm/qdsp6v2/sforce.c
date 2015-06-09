@@ -16,7 +16,7 @@
 #include <linux/uaccess.h>
 #include <linux/module.h>
 #include <sound/apr_audio-v2.h>
-#include <../../../../sound/soc/msm/qdsp6v2/sforce.h>
+#include <sforce.h>
 
 
 static struct s_force_tuning_params s_force_coefs[SFORCE_TYPE_MAX];
