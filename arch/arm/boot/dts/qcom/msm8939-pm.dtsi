@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -236,7 +236,7 @@
 		qcom,saw2-pmic-data0 = <0x07030011>;
 		qcom,saw2-pmic-data1 = <0x00030010>;
                 qcom,saw2-spm-cmd-ret = [00 03 00 0f];
-                qcom,saw2-spm-cmd-pc = [00 60 50 11 07 70 01 50
+                qcom,saw2-spm-cmd-pc = [00 60 50 11 07 70 7B 01 50
                                 02 62 72 0f];
 	};
 
@@ -259,8 +259,8 @@
 				qcom,spm-cci-mode = "active";
 				qcom,latency-us = <750>;
 				qcom,ss-power = <575>;
-				qcom,energy-overhead = <1050000>;
-				qcom,time-overhead = <1700>;
+				qcom,energy-overhead = <955000>;
+				qcom,time-overhead = <1540>;
 			};
 
 			qcom,pm-cluster-level@1{
@@ -269,8 +269,8 @@
 				qcom,spm-cci-mode = "retention";
 				qcom,latency-us = <820>;
 				qcom,ss-power = <560>;
-				qcom,energy-overhead = <1330000>;
-				qcom,time-overhead = <1850>;
+				qcom,energy-overhead = <1135000>;
+				qcom,time-overhead = <1800>;
 				qcom,min-child-idx = <1>;
 			};
 
@@ -280,7 +280,7 @@
 				qcom,spm-cci-mode = "pc";
 				qcom,latency-us = <11500>;
 				qcom,ss-power = <530>;
-				qcom,energy-overhead = <2514899>;
+				qcom,energy-overhead = <2470000>;
 				qcom,time-overhead = <3700>;
 				qcom,min-child-idx = <1>;
 				qcom,notify-rpm;
@@ -311,8 +311,8 @@
 					qcom,spm-l2-mode = "pc";
 					qcom,latency-us = <750>;
 					qcom,ss-power = <575>;
-					qcom,energy-overhead = <1050000>;
-					qcom,time-overhead = <1700>;
+					qcom,energy-overhead = <955000>;
+					qcom,time-overhead = <1540>;
 					qcom,min-child-idx = <2>;
 				};
 
@@ -376,8 +376,8 @@
 					qcom,spm-l2-mode = "pc";
 					qcom,latency-us = <600>;
 					qcom,ss-power = <574>;
-					qcom,energy-overhead = <1060000>;
-					qcom,time-overhead = <1400>;
+					qcom,energy-overhead = <970000>;
+					qcom,time-overhead = <1260>;
 					qcom,min-child-idx = <2>;
 				};
 
@@ -580,6 +580,8 @@
 			 <&clock_cpu clk_a53ssmux_lc>,
 			 <&clock_cpu clk_a53ssmux_lc>,
 			 <&clock_cpu clk_a53ssmux_cci>;
+
+		qcom,tz-flushes-cache;
 	};
 
 	qcom,cpu-sleep-status@b088008{

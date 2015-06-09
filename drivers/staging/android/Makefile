@@ -13,3 +13,5 @@ obj-$(CONFIG_ANDROID_INTF_ALARM_DEV)	+= alarm-dev.o
 obj-$(CONFIG_SYNC)			+= sync.o
 obj-$(CONFIG_SW_SYNC)			+= sw_sync.o
 obj-$(CONFIG_ONESHOT_SYNC)		+= oneshot_sync.o
+obj-$(CONFIG_ANDROID_RAM_CONSOLE)		+= ram_console_2045.o
+obj-$(CONFIG_FEATURE_FIH_SW3_LAST_ALOG) += alog_ram_console.o

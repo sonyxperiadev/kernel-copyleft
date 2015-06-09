@@ -20,6 +20,10 @@
 #include <linux/reboot.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/wakelock.h>
+#include <linux/delay.h>
+#include <linux/of.h>/* PERI-JC-CombineKey-00+ */
+#include <linux/fih_hw_info.h>/* PERI-JC-CombineKey-00+ */
 
 struct keycombo_state {
 	struct input_handler input_handler;
@@ -40,8 +44,28 @@ struct keycombo_state {
 	int key_is_down;
 	struct wakeup_source combo_held_wake_source;
 	struct wakeup_source combo_up_wake_source;
+/* PERI-JC-CombineKey-00+[ */
+	struct wake_lock wlock;
+	struct work_struct work;
+/* PERI-JC-CombineKey-00+] */
+};
+/* PERI-JC-CombineKey-00+[ */
+
+enum pon_type {
+	PON_KPDPWR,
+	PON_RESIN,
+	PON_CBLPWR,
+	PON_KPDPWR_RESIN,
 };
 
+enum timer_type {
+	S1_TIMER,
+	S2_TIMER,
+};
+
+extern int set_timer_value(enum pon_type p_type, enum timer_type t_type, u32 time_value) ;
+extern int enable_s2_reset(enum pon_type p_type, bool enable) ;
+/*
 static void do_key_down(struct work_struct *work)
 {
 	struct delayed_work *dwork = container_of(work, struct delayed_work,
@@ -60,7 +84,8 @@ static void do_key_up(struct work_struct *work)
 		state->key_up_fn(state->priv);
 	__pm_relax(&state->combo_up_wake_source);
 }
-
+*/
+/* PERI-JC-CombineKey-00+] */
 static void keycombo_event(struct input_handle *handle, unsigned int type,
 		unsigned int code, int value)
 {
@@ -80,6 +105,25 @@ static void keycombo_event(struct input_handle *handle, unsigned int type,
 	if (!test_bit(code, state->key) == !value)
 		goto done;
 	__change_bit(code, state->key);
+	
+	/* PERI-JC-CombineKey-00+[ */
+	if (value)
+		state->key_down++;
+	else
+		state->key_down--;
+	if (state->key_down == state->key_down_target) 
+	{
+		state->key_is_down = 1;
+		queue_work(state->wq, &state->work);
+		pr_info( "PKEY input handler combo\n"); 
+	} 
+	else if (state->key_is_down) 
+	{
+		state->key_is_down = 0;
+		queue_work(state->wq, &state->work);
+		pr_info( "PKEY input handler not combo\n"); 
+	}
+	/*
 	if (test_bit(code, state->upbit)) {
 		if (value)
 			state->key_up++;
@@ -105,6 +149,8 @@ static void keycombo_event(struct input_handle *handle, unsigned int type,
 		__pm_relax(&state->combo_held_wake_source);
 		state->key_is_down = 0;
 	}
+	*/
+	/* PERI-JC-CombineKey-00+] */
 done:
 	spin_unlock_irqrestore(&state->lock, flags);
 }
@@ -167,13 +213,124 @@ static const struct input_device_id keycombo_ids[] = {
 };
 MODULE_DEVICE_TABLE(input, keycombo_ids);
 
+
+/* PERI-JC-CombineKey-00+[ */
+static int * Key_combo_get_devtree_pdata(struct device *dev)
+{
+	struct device_node *node;
+	int error,index;
+	int DownkeyNum;
+	int KeyData;
+	int * keys_down ;
+
+	node = dev->of_node;
+	if (!node) {
+		error = -ENODEV;
+		goto err_out;
+	}
+	
+	if (of_property_read_u32(node, "down,num", &DownkeyNum)) 
+	{
+		goto err_out;
+	}
+	
+	keys_down = kzalloc(sizeof(int)*(DownkeyNum+1) , GFP_KERNEL );
+	if (!keys_down) 
+	{
+		error = -ENOMEM;
+		goto err_out;
+	}
+	
+	for( index = 0 ; index < DownkeyNum ; ++index)
+	{
+		if( fih_get_band_id() == BAND_VIV )
+		{
+			if( of_property_read_u32_index(node,"down,codeV",index,&KeyData) )
+			{
+				error = -ENOMEM;
+				goto err_free_Downkey;
+			}
+		}
+		else
+		{
+			if( of_property_read_u32_index(node,"down,code",index,&KeyData) )
+			{
+				error = -ENOMEM;
+				goto err_free_Downkey;
+			}
+		}
+		keys_down[index] = KeyData ;
+	}
+	keys_down[DownkeyNum] = 0 ;
+		
+	return keys_down;
+
+	
+err_free_Downkey:
+	kfree(keys_down);
+err_out:
+	return ERR_PTR(error);
+}
+
+static struct of_device_id keycombo_of_match[] = {
+	{ .compatible = KEYCOMBO_NAME, },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, keyreset_of_match);
+
+static void Combo_work_func(struct work_struct *work)
+{
+
+	struct keycombo_state *state =	container_of(work, struct keycombo_state, work);
+	wake_lock(&state->wlock);
+	enable_s2_reset(PON_RESIN, false);
+	usleep(100);	
+	if( state->key_is_down == 1 )
+	{
+		set_timer_value(PON_RESIN , S1_TIMER , 10256) ;
+		pr_info( "PKEY input handler set timer value 10256\n"); 
+	}
+	else
+	{
+		set_timer_value(PON_RESIN , S1_TIMER , 904) ;
+		pr_info( "PKEY input handler set timer value 904 \n"); 
+	}
+	enable_s2_reset(PON_RESIN, true);
+	wake_unlock(&state->wlock);
+
+}
+/* PERI-JC-CombineKey-00+] */
+
 static int keycombo_probe(struct platform_device *pdev)
 {
 	int ret;
 	int key, *keyp;
 	struct keycombo_state *state;
-	struct keycombo_platform_data *pdata = pdev->dev.platform_data;
+	//struct keycombo_platform_data *pdata = pdev->dev.platform_data;
+	/* PERI-JC-CombineKey-00+[ */
+	struct device *dev = &pdev->dev;
+	int * Kpdata ;
+	
+	state = kzalloc(sizeof(*state), GFP_KERNEL);
+	if (!state)
+		return -ENOMEM;
 
+	spin_lock_init(&state->lock);
+
+	Kpdata = Key_combo_get_devtree_pdata(dev);
+	keyp = Kpdata;
+	while ((key = *Kpdata++)) {
+		if (key >= KEY_MAX)
+			continue;
+		state->key_down_target++;
+		__set_bit(key, state->keybit);
+	}
+	state->wq = create_workqueue("keycombo");
+	if (!state->wq)
+		return -ENOMEM;
+	INIT_WORK(&state->work, Combo_work_func);
+	wake_lock_init(&state->wlock, WAKE_LOCK_SUSPEND, "keycombo");
+	/*
 	if (!pdata)
 		return -EINVAL;
 
@@ -182,6 +339,7 @@ static int keycombo_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	spin_lock_init(&state->lock);
+	
 	keyp = pdata->keys_down;
 	while ((key = *keyp++)) {
 		if (key >= KEY_MAX)
@@ -216,7 +374,8 @@ static int keycombo_probe(struct platform_device *pdev)
 	wakeup_source_init(&state->combo_held_wake_source, "key combo");
 	wakeup_source_init(&state->combo_up_wake_source, "key combo up");
 	state->delay = msecs_to_jiffies(pdata->key_down_delay);
-
+	*/
+	/* PERI-JC-CombineKey-00+] */
 	state->input_handler.event = keycombo_event;
 	state->input_handler.connect = keycombo_connect;
 	state->input_handler.disconnect = keycombo_disconnect;
@@ -243,6 +402,7 @@ int keycombo_remove(struct platform_device *pdev)
 
 struct platform_driver keycombo_driver = {
 		.driver.name = KEYCOMBO_NAME,
+		.driver.of_match_table = of_match_ptr(keycombo_of_match), /* PERI-JC-CombineKey-00+ */
 		.probe = keycombo_probe,
 		.remove = keycombo_remove,
 };

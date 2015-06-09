@@ -4,6 +4,7 @@
 
 /* (C) 1999-2001 Paul `Rusty' Russell
  * (C) 2002-2004 Netfilter Core Team <coreteam@netfilter.org>
+ * Copyright (C) 2015 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -111,6 +112,7 @@ static void send_reset(struct sk_buff *oldskb, int hook)
 	if (ip_route_me_harder(nskb, RTN_UNSPEC))
 		goto free_nskb;
 
+	niph = (struct iphdr *)skb_network_header(nskb);  //CONN-EC-NET-MemoryCorruption-01+
 	niph->ttl	= ip4_dst_hoplimit(skb_dst(nskb));
 
 	/* "Never happens" */

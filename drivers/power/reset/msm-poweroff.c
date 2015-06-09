@@ -31,12 +31,28 @@
 #include <soc/qcom/scm.h>
 #include <soc/qcom/restart.h>
 #include <soc/qcom/watchdog.h>
+#include <linux/fih_sw_info.h> /* CORE-EL-power_on_cause-00+ */
 
 #define EMERGENCY_DLOAD_MAGIC1    0x322A4F99
 #define EMERGENCY_DLOAD_MAGIC2    0xC67E4350
 #define EMERGENCY_DLOAD_MAGIC3    0x77777777
 
 #define SCM_IO_DISABLE_PMIC_ARBITER	1
+
+/* CORE-EL-FOTA-00 +[ */
+#define CONFIG_WARMBOOT_FOTA 0x6F656D46
+#define CONFIG_WARMBOOT_S1   0x6F656D53
+/* CORE-EL-FOTA-00 +] */
+
+/* CORE-EL-restart_reason_snoop_switch-00+ */
+#define SNOOP_RESTART_REASON 1 /* %%TODO: enable this after S1 boot integrated */
+
+/* %%TDDO: change the code latter */
+#if (SNOOP_RESTART_REASON == 1)
+static unsigned int debug_ramdump_to_sdcard_enable_temp = 1; /* CORE-EL-power_on_cause-00+ */
+#endif
+
+
 #define SCM_WDOG_DEBUG_BOOT_PART	0x9
 #define SCM_DLOAD_MODE			0X10
 #define SCM_EDLOAD_MODE			0X01
@@ -181,6 +197,22 @@ void msm_set_restart_mode(int mode)
 }
 EXPORT_SYMBOL(msm_set_restart_mode);
 
+//CORE-EL-AdbWriteRestartReason-00 +[
+static int lights_on;
+u32 reboot_reason;
+void msm_write_restart_reason(u32 reason)
+{
+	reboot_reason = reason;
+	lights_on = 1;
+
+	pr_err("ADB write 0x%08x into restart_reason\n", reboot_reason);
+#if (SNOOP_RESTART_REASON == 1)
+	__raw_writel(reboot_reason, restart_reason);
+#endif
+}
+EXPORT_SYMBOL(msm_write_restart_reason);
+//CORE-EL-AdbWriteRestartReason-00 +]
+
 /*
  * Force the SPMI PMIC arbiter to shutdown so that no more SPMI transactions
  * are sent from the MSM to the PMIC.  This is required in order to avoid an
@@ -205,24 +237,40 @@ static void halt_spmi_pmic_arbiter(void)
 	}
 }
 
+extern void * get_hw_wd_virt_addr(void);	/* CORE-EL-power_on_cause-00+ */
+
 static void msm_restart_prepare(const char *cmd)
 {
+	unsigned int *fih_hw_wd_ptr;			/* CORE-EL-power_on_cause-00+ */
+
 #ifdef CONFIG_MSM_DLOAD_MODE
 
 	/* Write download mode flags if we're panic'ing
 	 * Write download mode flags if restart_mode says so
 	 * Kill download mode if master-kill switch is set
 	 */
-
+/* CORE-EL-Reboot_Fail-01*[ */
+#if (SNOOP_RESTART_REASON == 1)
+	set_dload_mode(download_mode && (restart_mode == RESTART_DLOAD));
+#else
 	set_dload_mode(download_mode &&
 			(in_panic || restart_mode == RESTART_DLOAD));
 #endif
+/* CORE-EL-Reboot_Fail-01*] */
+#endif
 
 	/* Hard reset the PMIC unless memory contents must be maintained. */
-	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0'))
+	/* CORE-EL-SwReset-00*[ */
+	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0' && 
+			strncmp(cmd, "hwreset", 8) && strncmp(cmd, "recovery", 9))) {
+		pr_notice("Eric:w\n");
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
-	else
+	}
+	else {
+		pr_notice("Eric:h\n");
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
+	}
+	/* CORE-EL-SwReset-00*] */
 
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
@@ -238,12 +286,57 @@ static void msm_restart_prepare(const char *cmd)
 			if (!ret)
 				__raw_writel(0x6f656d00 | (code & 0xff),
 					     restart_reason);
+#if (SNOOP_RESTART_REASON == 1)
+/* CORE-EL-FOTA-00 +[ */
+		} else if (!strncmp(cmd, "oemS", 5)) {
+			__raw_writel(CONFIG_WARMBOOT_S1, restart_reason);
+		} else if (!strncmp(cmd, "oemF", 5)) {
+			__raw_writel(CONFIG_WARMBOOT_FOTA , restart_reason);
+/* CORE-EL-FOTA-00 +] */
+#endif
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}
+/* CORE-EL-power_on_cause-00+[ */
+#if (SNOOP_RESTART_REASON == 1)
+	} else {
+		__raw_writel(0x77665501, restart_reason);
+#endif		
 	}
+
+#if (SNOOP_RESTART_REASON == 1)
+//CORE-EL-AdbWriteRestartReason-00 +[
+	if (lights_on == 1)
+		__raw_writel(reboot_reason, restart_reason);
+//CORE-EL-AdbWriteRestartReason-00 +]
+	if ((in_panic == 1) && (debug_ramdump_to_sdcard_enable_temp == 1)) {
+		/* Write restart_reason as REBOOT_CRASHDUMP_PANIC */
+		__raw_writel(0xC0DEDEAD, restart_reason);
+		pr_notice("set restart_reason to dead\n");
+	}
+
+	pr_notice("Addr %lx set %x\n", (unsigned long)restart_reason, *((unsigned int *)restart_reason));
+#endif
+	fih_hw_wd_ptr = (unsigned int*) get_hw_wd_virt_addr();
+
+	/* CORE-EL-HWWD-00*[ */
+	if (fih_hw_wd_ptr != NULL) {
+		do {
+			if (cmd != NULL) {
+				if (!strncmp(cmd, "hwwd", 5)) {
+					/* if reset command is "hwwd", don't clean hw wd signature */
+					break;
+				}
+			}
+
+			/* normal path: drop here and clean hw wd signature */
+			*fih_hw_wd_ptr = 0;
+		} while(0);
+	}
+	/* CORE-EL-HWWD-00*] */
+/* CORE-EL-power_on_cause-00+] */
 
 	flush_cache_all();
 
@@ -356,7 +449,11 @@ static int msm_restart_probe(struct platform_device *pdev)
 			pr_err("unable to map imem EDLOAD mode offset\n");
 	}
 
+	/* CORE-EL-Reboot_Fail-01*[ */
+#if (SNOOP_RESTART_REASON == 0)
 	set_dload_mode(download_mode);
+#endif	
+	/* CORE-EL-Reboot_Fail-01*] */
 #endif
 	np = of_find_compatible_node(NULL, NULL,
 				"qcom,msm-imem-restart_reason");

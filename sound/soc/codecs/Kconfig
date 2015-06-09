@@ -363,6 +363,9 @@ config SND_SOC_WCD9320
 
 config SND_SOC_WCD9306
         tristate
+        
+config SND_SOC_TFA9887
+        tristate       
 
 config SND_SOC_WCD9330
         tristate

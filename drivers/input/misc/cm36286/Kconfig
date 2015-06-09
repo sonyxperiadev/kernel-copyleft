@@ -1,0 +1,10 @@
+if INPUT_MISC
+
+config INPUT_CAPELLA_CM36686
+	tristate "CM36686 proximity and light sensor"
+	depends on I2C
+	help
+	  Say Y here to enable the CM36686 Proximity
+	  Sensor with Ambient Light Sensor.
+
+endif

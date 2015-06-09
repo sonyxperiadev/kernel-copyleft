@@ -31,6 +31,9 @@
 #include <linux/spinlock.h>
 #include <linux/pinctrl/consumer.h>
 
+#include <linux/fih_hw_info.h>/* PERI-JC-KEYPAD_BringUp-00+ */
+#include <linux/wakelock.h>
+#include <linux/jiffies.h>
 struct gpio_button_data {
 	const struct gpio_keys_button *button;
 	struct input_dev *input;
@@ -51,6 +54,7 @@ struct gpio_keys_drvdata {
 	struct gpio_button_data data[0];
 };
 
+struct wake_lock key_wake_lock;
 /*
  * SYSFS interface for enabling/disabling keys and switches:
  *
@@ -331,6 +335,12 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
 
+	pr_info( "GKEY %s %s\n", button->desc, (state?"down":"up")); 
+    
+	if( state == 1 && button->code == 766)
+	{
+		wake_lock_timeout( &key_wake_lock, 2*HZ );
+	}
 	if (type == EV_ABS) {
 		if (state)
 			input_event(input, type, button->code, button->value);
@@ -612,7 +622,7 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 	int error;
 	int nbuttons;
 	int i;
-
+	int IgnoreKey; /* PERI-JC-KEYPAD_BringUp-00+ */
 	node = dev->of_node;
 	if (!node) {
 		error = -ENODEV;
@@ -625,6 +635,30 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 		goto err_out;
 	}
 
+	/* PERI-JC-KEYPAD_BringUp-00+[ */
+	IgnoreKey = 0 ;
+	switch( fih_get_product_phase () )
+	{
+		case    PHASE_EVM :
+			pr_info( "GKEY EVM \n"); 
+			IgnoreKey = 1 ;
+			for_each_child_of_node(node, pp) 
+			{
+				if( strcmp(of_get_property(pp, "label", NULL),"volume_up") == 0 )
+				{
+					if( nbuttons > 0 )
+					{
+						--nbuttons;
+					}
+				}
+			}
+			break ;
+		default :
+			pr_info( "GKEY NO EVM \n"); 
+			break ;
+	}
+	/* PERI-JC-KEYPAD_BringUp-00+] */
+	
 	pdata = kzalloc(sizeof(*pdata) + nbuttons * (sizeof *button),
 			GFP_KERNEL);
 	if (!pdata) {
@@ -643,6 +677,14 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 		int gpio;
 		enum of_gpio_flags flags;
 
+		/* PERI-JC-KEYPAD_BringUp-00+[ */
+		if( strcmp(of_get_property(pp, "label", NULL),"volume_up") == 0 && IgnoreKey == 1 )
+		{
+			pr_info( "GKEY Ignore GPIO VolumeUp \n"); 
+			continue;
+		}
+		/* PERI-JC-KEYPAD_BringUp-00+] */
+		
 		if (!of_find_property(pp, "gpios", NULL)) {
 			pdata->nbuttons--;
 			dev_warn(dev, "Found button without gpios\n");
@@ -800,6 +842,7 @@ static int gpio_keys_probe(struct platform_device *pdev)
 			wakeup = 1;
 	}
 
+	wake_lock_init(&key_wake_lock, WAKE_LOCK_SUSPEND, "gpiokey");
 	error = sysfs_create_group(&pdev->dev.kobj, &gpio_keys_attr_group);
 	if (error) {
 		dev_err(dev, "Unable to export keys/switches, error: %d\n",
@@ -819,6 +862,7 @@ static int gpio_keys_probe(struct platform_device *pdev)
 	return 0;
 
  fail3:
+	wake_lock_destroy(&key_wake_lock);
 	sysfs_remove_group(&pdev->dev.kobj, &gpio_keys_attr_group);
  err_pinctrl:
 	if (ddata->key_pinctrl) {
@@ -851,6 +895,7 @@ static int gpio_keys_remove(struct platform_device *pdev)
 	struct input_dev *input = ddata->input;
 	int i;
 
+	wake_lock_destroy(&key_wake_lock);
 	sysfs_remove_group(&pdev->dev.kobj, &gpio_keys_attr_group);
 
 	device_init_wakeup(&pdev->dev, 0);

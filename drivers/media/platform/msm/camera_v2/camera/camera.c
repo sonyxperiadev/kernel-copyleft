@@ -651,7 +651,6 @@ static int camera_v4l2_close(struct file *filep)
 	atomic_set(&pvdev->opened, opn_idx);
 
 	if (atomic_read(&pvdev->opened) == 0) {
-
 		camera_pack_event(filep, MSM_CAMERA_SET_PARM,
 			MSM_CAMERA_PRIV_DEL_STREAM, -1, &event);
 
@@ -682,7 +681,6 @@ static int camera_v4l2_close(struct file *filep)
 
 	camera_v4l2_vb2_q_release(filep);
 	camera_v4l2_fh_release(filep);
-
 	return rc;
 }
 

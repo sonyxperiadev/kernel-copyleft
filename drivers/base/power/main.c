@@ -34,6 +34,28 @@
 #include "../base.h"
 #include "power.h"
 
+/* CORE-EL-DBG_RESUME-00+[ */
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+
+/* When enabled, we show driver resume time */
+enum {
+	DEBUG_ALL_DRIVER = 1U << 0, /* when enable this, print all */
+	DEBUG_BY_DRIVER_NAME = 1U << 1,
+	DEBUG_BY_FUNCTION_NAME = 1U << 2,
+	DEBUG_BY_RESUME_TIME = 1U << 3,
+	DEBUG_TOP_TEN = 1U << 4,
+};
+
+/* the file node will be /sys/module/main/parameters/debug_mask */
+
+// %%TBTA: maybe need to set to 0 at user build
+static uint __read_mostly debug_mask = (DEBUG_ALL_DRIVER | DEBUG_TOP_TEN);
+
+module_param(debug_mask, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(debug_mask, "mask for debugging resume time");
+/* CORE-EL-DBG_RESUME-00+] */
+
 typedef int (*pm_callback_t)(struct device *);
 
 /*
@@ -635,12 +657,82 @@ EXPORT_SYMBOL_GPL(dpm_resume_start);
  * @state: PM transition of the system being carried out.
  * @async: If true, the device is being resumed asynchronously.
  */
+/* CORE-EL-DBG_RESUME-00+[ */
+typedef struct {
+	u64 cost_time;
+	struct device *dev;
+} __TOP_TEN__;
+
+#define TOP_CNT 10
+__TOP_TEN__	top_async[TOP_CNT];
+__TOP_TEN__	top_sync[TOP_CNT];
+
+void init_top_ten(bool async) {
+	if (async)
+		memset(top_async, 0x00, sizeof(top_async));
+	else
+		memset(top_sync, 0x00, sizeof(top_sync));
+}
+
+void print_top_ten(bool async) {
+	int i;
+	__TOP_TEN__ *top_ten = async ? top_async : top_sync;
+
+	pr_info("[PM] start to print %s top ten\n", async ? "A" : "S");
+
+	for (i = 0; i < TOP_CNT; i++) {
+		int usecs;
+
+		if (!top_ten[i].dev)
+			break;
+
+		do_div(top_ten[i].cost_time, NSEC_PER_USEC);
+
+		usecs = top_ten[i].cost_time;
+		dev_info(top_ten[i].dev, "[PM] costs %ld.%03ld ms\n", 
+			usecs / USEC_PER_MSEC , usecs % USEC_PER_MSEC);
+	}
+}
+
+void rec_top_ten(struct device *dev, bool async, u64 usecs64) {
+	int i;
+	__TOP_TEN__ temp_top_ten1, temp_top_ten2;
+	__TOP_TEN__ *top_ten = async ? top_async : top_sync;
+
+	for (i = 0; i < TOP_CNT; i ++) {
+		if (usecs64 > top_ten[i].cost_time) {
+			temp_top_ten1.cost_time = usecs64;
+			temp_top_ten1.dev = dev;
+
+			do {
+				if (i < TOP_CNT) {
+					temp_top_ten2 = top_ten[i];
+					top_ten[i] = temp_top_ten1;
+					temp_top_ten1 = temp_top_ten2;
+				}
+				else 
+					break;
+				i++;
+			} while(1);
+
+			break;
+		}
+	}
+}
+/* CORE-EL-DBG_RESUME-00+] */
+
 static int device_resume(struct device *dev, pm_message_t state, bool async)
 {
 	pm_callback_t callback = NULL;
 	char *info = NULL;
 	int error = 0;
 	struct dpm_watchdog wd;
+/* CORE-EL-DBG_RESUME-00+[ */
+	ktime_t starttime;
+
+	if (debug_mask)
+		starttime = ktime_get();
+/* CORE-EL-DBG_RESUME-00+] */
 
 	TRACE_DEVICE(dev);
 	TRACE_RESUME(0);
@@ -704,6 +796,33 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 
  End:
 	error = dpm_run_callback(callback, dev, state, info);
+
+/* CORE-EL-DBG_RESUME-00+[ */
+	if (debug_mask & DEBUG_ALL_DRIVER) {
+		u64 usecs64;
+		ktime_t endtime = ktime_get();
+
+		usecs64 = ktime_to_ns(ktime_sub(endtime, starttime));
+
+		/* if debugging top ten, don't print it immediately*/
+		if (debug_mask & DEBUG_TOP_TEN) {
+
+			/* to save time, do divide NSEC_PER_USEC here, divide it when print */
+			rec_top_ten(dev, async, usecs64);
+		}
+		else {
+			int usecs;
+
+			do_div(usecs64, NSEC_PER_USEC);
+
+			usecs = usecs64;
+
+			dev_info(dev, "[PM] %s costs %ld.%03ld ms\n",
+				async ? "A" : "S",
+				usecs / USEC_PER_MSEC , usecs % USEC_PER_MSEC);
+		}
+	}
+/* CORE-EL-DBG_RESUME-00+] */
 	dev->power.is_suspended = false;
 
  Unlock:
@@ -753,6 +872,11 @@ void dpm_resume(pm_message_t state)
 	pm_transition = state;
 	async_error = 0;
 
+/* CORE-EL-DBG_RESUME-00+[ */
+	init_top_ten(true);
+	init_top_ten(false);
+/* CORE-EL-DBG_RESUME-00+] */
+
 	list_for_each_entry(dev, &dpm_suspended_list, power.entry) {
 		INIT_COMPLETION(dev->power.completion);
 		if (is_async(dev)) {
@@ -785,6 +909,12 @@ void dpm_resume(pm_message_t state)
 	}
 	mutex_unlock(&dpm_list_mtx);
 	async_synchronize_full();
+/* CORE-EL-DBG_RESUME-00+[ */
+	if (debug_mask & DEBUG_ALL_DRIVER) {
+		print_top_ten(true);
+		print_top_ten(false);
+	}
+/* CORE-EL-DBG_RESUME-00+] */
 	dpm_show_time(starttime, state, NULL);
 }
 

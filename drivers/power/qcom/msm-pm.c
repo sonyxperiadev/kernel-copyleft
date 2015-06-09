@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -53,7 +54,76 @@
 
 #define MAX_BUF_SIZE  1024
 
+//CORE-PK-RPMStatsLog-00+[
+#ifdef CONFIG_FIH_FEATURE_RPM_STATS_LOG
+#include "../../soc/qcom/rpm_stats.h"
+
+extern void msm_rpmstats_get_stats_v2(struct msm_rpmstats_mode_data *rpm_stats);
+extern struct msm_rpmstats_mode_data rpmstats_enter;
+extern struct msm_rpmstats_mode_data rpmstats_exit;
+extern struct msm_rpmstats_mode_data rpmstats_suspend;
+#ifdef CONFIG_FIH_FEATURE_RPM_MASTER_STATS_LOG
+  extern void show_rpm_master_stats(void);
+#endif
+
+void show_rpmstats(void)
+{
+	unsigned long xosd_msec_rem;
+	unsigned long vmin_msec_rem;
+
+	rpmstats_suspend.xosd_count = rpmstats_exit.xosd_count - rpmstats_enter.xosd_count;
+	rpmstats_suspend.xosd_time_since_last_mode = rpmstats_exit.xosd_time_since_last_mode;
+	rpmstats_suspend.xosd_actual_last_sleep = rpmstats_exit.xosd_actual_last_sleep - rpmstats_enter.xosd_actual_last_sleep;
+	rpmstats_suspend.vmin_count = rpmstats_exit.vmin_count - rpmstats_enter.vmin_count;
+	rpmstats_suspend.vmin_time_since_last_mode = rpmstats_exit.vmin_time_since_last_mode;
+	rpmstats_suspend.vmin_actual_last_sleep = rpmstats_exit.vmin_actual_last_sleep - rpmstats_enter.vmin_actual_last_sleep;
+
+	xosd_msec_rem = do_div(rpmstats_suspend.xosd_actual_last_sleep, 1000);
+	vmin_msec_rem = do_div(rpmstats_suspend.vmin_actual_last_sleep, 1000);
+
+	pr_err("[PM] XOSD(cnt:%2u time:%3llu.%lu elapse:%5llu) VMIN(cnt:%4u time:%4llu.%-3lu elapse:%5llu)\n",
+		rpmstats_suspend.xosd_count, rpmstats_suspend.xosd_actual_last_sleep, xosd_msec_rem, rpmstats_suspend.xosd_time_since_last_mode,
+		rpmstats_suspend.vmin_count, rpmstats_suspend.vmin_actual_last_sleep, vmin_msec_rem, rpmstats_suspend.vmin_time_since_last_mode);
+
+	//CORE-PK-Show_rpm_master_stats-00+{
+	#ifdef CONFIG_FIH_FEATURE_RPM_MASTER_STATS_LOG
+	if (rpmstats_suspend.vmin_time_since_last_mode >= 30)
+		show_rpm_master_stats();
+	#endif
+	//CORE-PK-Show_rpm_master_stats-00+}
+}
+#endif
+//CORE-PK-RPMStatsLog-00+]
+
+//CORE-PK-SuspendLog-00+[
+#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+#include "../../arch/arm/mach-msm/clock.h"
+
+extern ktime_t ktime_get_in_suspend(void);
+void show_apss_wakeup_info(int64_t time)
+{
+	char tbuf[50];
+	unsigned tlen;
+	unsigned long long t;
+	unsigned long msec_rem;
+
+	t = time;
+	msec_rem = do_div(t, 1000);
+	tlen = snprintf(tbuf, sizeof(tbuf), "%llu.%03lu ",
+			t,
+			msec_rem);
+
+	pr_err("[PM] APSS PC:%s\n", tbuf);
+}
+#endif
+
+#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+static int msm_pm_debug_mask = 0x1201;
+#else
 static int msm_pm_debug_mask = 1;
+#endif
+//CORE-PK-SuspendLog-00+]
+
 module_param_named(
 	debug_mask, msm_pm_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
 );
@@ -68,6 +138,12 @@ enum {
 	MSM_PM_DEBUG_IDLE = BIT(6),
 	MSM_PM_DEBUG_IDLE_LIMITS = BIT(7),
 	MSM_PM_DEBUG_HOTPLUG = BIT(8),
+	//CORE-PK-SuspendLog-00+[
+	MSM_PM_DEBUG_RPM_SUSPEND_LOG = BIT(9),
+	MSM_PM_DEBUG_RPM_IDLE_LOG = BIT(10),
+	MSM_PM_DEBUG_RPM_IDLE_LOG_ONLY_XOSD_VDDMIN = BIT(11),
+	MSM_PM_DEBUG_NOT_MPM_DETECTION = BIT(12),
+	//CORE-PK-SuspendLog-00+]
 };
 
 enum msm_pc_count_offsets {
@@ -79,6 +155,7 @@ enum msm_pc_count_offsets {
 };
 
 static bool msm_pm_ldo_retention_enabled = true;
+static bool msm_pm_tz_flushes_cache;
 static bool msm_no_ramp_down_pc;
 static struct msm_pm_sleep_status_data *msm_pm_slp_sts;
 DEFINE_PER_CPU(struct clk *, cpu_clks);
@@ -183,10 +260,12 @@ static bool msm_pm_pc_hotplug(void)
 
 	flag = lpm_cpu_pre_pc_cb(cpu);
 
-	if (flag == MSM_SCM_L2_OFF)
-		flush_cache_all();
-	else if (msm_pm_is_L1_writeback())
-		flush_cache_louis();
+	if (!msm_pm_tz_flushes_cache) {
+		if (flag == MSM_SCM_L2_OFF)
+			flush_cache_all();
+		else if (msm_pm_is_L1_writeback())
+			flush_cache_louis();
+	}
 
 	msm_pc_inc_debug_count(cpu, MSM_PC_ENTRY_COUNTER);
 
@@ -214,11 +293,12 @@ int msm_pm_collapse(unsigned long unused)
 
 	flag = lpm_cpu_pre_pc_cb(cpu);
 
-	if (flag == MSM_SCM_L2_OFF)
-		flush_cache_all();
-	else if (msm_pm_is_L1_writeback())
-		flush_cache_louis();
-
+	if (!msm_pm_tz_flushes_cache) {
+		if (flag == MSM_SCM_L2_OFF)
+			flush_cache_all();
+		else if (msm_pm_is_L1_writeback())
+			flush_cache_louis();
+	}
 	msm_pc_inc_debug_count(cpu, MSM_PC_ENTRY_COUNTER);
 
 	if (is_scm_armv8()) {
@@ -376,7 +456,39 @@ static bool msm_pm_power_collapse(bool from_idle)
 	if (cpu_online(cpu) && !msm_no_ramp_down_pc)
 		saved_acpuclk_rate = ramp_down_last_cpu(cpu);
 
+	//CORE-PK-RPMStatsLog-00+[
+	#ifdef CONFIG_FIH_FEATURE_RPM_STATS_LOG
+	if (cpu_online(cpu)) {
+		if (likely(from_idle)) {
+			if (unlikely(msm_pm_debug_mask & MSM_PM_DEBUG_RPM_IDLE_LOG))
+			msm_rpmstats_get_stats_v2(&rpmstats_enter);
+		}
+		else
+			msm_rpmstats_get_stats_v2(&rpmstats_enter);
+	}
+	#endif
+	//CORE-PK-RPMStatsLog-00+]
+
 	collapsed = msm_pm_spm_power_collapse(cpu, from_idle, true);
+
+	//CORE-PK-RPMStatsLog-00+[
+	#ifdef CONFIG_FIH_FEATURE_RPM_STATS_LOG
+	if (cpu_online(cpu)) {
+		if (likely(from_idle)) {
+			if (unlikely(msm_pm_debug_mask & MSM_PM_DEBUG_RPM_IDLE_LOG)) {
+				msm_rpmstats_get_stats_v2(&rpmstats_exit);
+				pr_info("CPU%u:\n", cpu);
+				show_rpmstats();
+			}
+		}
+		else {
+			msm_rpmstats_get_stats_v2(&rpmstats_exit);
+			pr_info("CPU%u:\n", cpu);
+			show_rpmstats();
+		}
+	}
+	#endif
+	//CORE-PK-RPMStatsLog-00+]
 
 	if (cpu_online(cpu) && !msm_no_ramp_down_pc)
 		ramp_up_first_cpu(cpu, saved_acpuclk_rate);
@@ -424,14 +536,52 @@ bool msm_cpu_pm_enter_sleep(enum msm_pm_sleep_mode mode, bool from_idle)
 {
 	bool exit_stat = false;
 	unsigned int cpu = smp_processor_id();
+	//CORE-PK-SuspendLog-00+[
+	#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+	int64_t pc_time;
+	#endif
+	//CORE-PK-SuspendLog-00+]
 
 	if ((!from_idle  && cpu_online(cpu))
 			|| (MSM_PM_DEBUG_IDLE & msm_pm_debug_mask))
 		pr_info("CPU%u:%s mode:%d during %s\n", cpu, __func__,
 				mode, from_idle ? "idle" : "suspend");
 
+	//CORE-PK-SuspendLog-00+[
+	#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+	pc_time = ktime_to_ms(ktime_get_in_suspend());
+	#endif
+	//CORE-PK-SuspendLog-00+]
+
 	if (execute[mode])
 		exit_stat = execute[mode](from_idle);
+
+	//CORE-PK-SuspendLog-00+[
+	#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+	pc_time = ktime_to_ms(ktime_get_in_suspend()) - pc_time;
+
+	if (likely(from_idle))
+	{
+		if (unlikely(msm_pm_debug_mask & MSM_PM_DEBUG_IDLE)) {
+			if (cpu_online(cpu) && exit_stat == 1 &&
+				(mode == MSM_PM_SLEEP_MODE_POWER_COLLAPSE ||
+				 mode == MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE)) {
+					pr_info("CPU%u:\n", cpu);
+					show_apss_wakeup_info(pc_time);
+			}
+		}
+	}
+	else
+	{
+		if (cpu_online(cpu) && exit_stat == 1 &&
+			(mode == MSM_PM_SLEEP_MODE_POWER_COLLAPSE ||
+			 mode == MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE)) {
+				pr_info("CPU%u:\n", cpu);
+				show_apss_wakeup_info(pc_time);
+		}
+	}
+	#endif
+	//CORE-PK-SuspendLog-00+]
 
 	return exit_stat;
 }
@@ -812,6 +962,7 @@ static int msm_cpu_pm_probe(struct platform_device *pdev)
 	struct resource *res = NULL;
 	int ret = 0;
 	void __iomem *msm_pc_debug_counters_imem;
+	char *key;
 	int alloc_size = (MAX_NUM_CLUSTER * MAX_CPUS_PER_CLUSTER
 					* MSM_PC_NUM_COUNTERS
 					* sizeof(*msm_pc_debug_counters));
@@ -845,6 +996,10 @@ static int msm_cpu_pm_probe(struct platform_device *pdev)
 	}
 skip_save_imem:
 	if (pdev->dev.of_node) {
+		key = "qcom,tz-flushes-cache";
+		msm_pm_tz_flushes_cache =
+				of_property_read_bool(pdev->dev.of_node, key);
+
 		ret = msm_pm_clk_init(pdev);
 		if (ret) {
 			pr_info("msm_pm_clk_init returned error\n");

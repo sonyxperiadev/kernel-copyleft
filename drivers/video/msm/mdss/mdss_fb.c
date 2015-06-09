@@ -53,6 +53,7 @@
 
 #include "mdss_fb.h"
 #include "mdss_mdp_splash_logo.h"
+#include "mdss_dsi.h"/* MM-GL-DISPLAY-panel-00+ */
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
@@ -202,12 +203,42 @@ static int mdss_fb_notify_update(struct msm_fb_data_type *mfd,
 
 static int lcd_backlight_registered;
 
+#define MAX_BACKLIGHT_BRIGHTNESS 255/* MM-GL-DISPLAY-panel-00+ */
 static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 				      enum led_brightness value)
 {
 	struct msm_fb_data_type *mfd = dev_get_drvdata(led_cdev->dev->parent);
 	int bl_lvl;
-
+	/* MM-GL-DISPLAY-panel-00+[ */
+    char bkl_lut[MAX_BACKLIGHT_BRIGHTNESS + 1] = {
+		0x00, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13,
+		0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13,
+		0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14,
+		0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14,
+		0x14, 0x14, 0x14, 0x14, 0x14, 0x15, 0x15, 0x15, 0x15, 0x15,
+		0x15, 0x15, 0x15, 0x15, 0x15, 0x15, 0x15, 0x16, 0x16, 0x16,
+		0x16, 0x16, 0x16, 0x16, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17,
+		0x18, 0x18, 0x18, 0x18, 0x18, 0x19, 0x19, 0x19, 0x19, 0x1A,
+		0x1A, 0x1A, 0x1A, 0x1B, 0x1B, 0x1B, 0x1C, 0x1C, 0x1C, 0x1D,
+		0x1D, 0x1D, 0x1E, 0x1E, 0x1E, 0x1F, 0x1F, 0x20, 0x20, 0x20,
+		0x22, 0x22, 0x22, 0x22, 0x23, 0x23, 0x24, 0x24, 0x25, 0x25,
+		0x26, 0x26, 0x27, 0x27, 0x28, 0x28, 0x29, 0x2A, 0x2A, 0x2B,
+		0x2B, 0x2C, 0x2D, 0x2D, 0x2E, 0x2F, 0x2F, 0x30, 0x31, 0x32,
+		0x32, 0x33, 0x34, 0x35, 0x35, 0x36, 0x37, 0x38, 0x39, 0x39,
+		0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x41, 0x42, 0x43,
+		0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D,
+		0x4E, 0x4F, 0x50, 0x51, 0x53, 0x54, 0x55, 0x56, 0x57, 0x59,
+		0x5A, 0x5B, 0x5C, 0x5E, 0x5F, 0x60, 0x62, 0x63, 0x64, 0x66,
+		0x66, 0x69, 0x6A, 0x6C, 0x6D, 0x6E, 0x70, 0x71, 0x73, 0x74,
+		0x76, 0x78, 0x79, 0x7B, 0x7C, 0x7E, 0x80, 0x81, 0x83, 0x85,
+		0x86, 0x88, 0x8A, 0x8C, 0x8D, 0x8F, 0x91, 0x93, 0x95, 0x97,
+		0x97, 0x9A, 0x9C, 0x9E, 0xA0, 0xA2, 0xA4, 0xA6, 0xA8, 0xAA,
+		0xAC, 0xAE, 0xB0, 0xB2, 0xB4, 0xB7, 0xB9, 0xBB, 0xBD, 0xBF,
+		0xC0, 0xC4, 0xC6, 0xC8, 0xCB, 0xCD, 0xCF, 0xD2, 0xD4, 0xD6,
+		0xD9, 0xDB, 0xDE, 0xE0, 0xE2, 0xE5, 0xE7, 0xEA, 0xED, 0xEF,
+		0xF2, 0xF4, 0xF7, 0xFA, 0xFC, 0xFF,
+    };
+	/* MM-GL-DISPLAY-panel-00+] */
 	if (value > mfd->panel_info->brightness_max)
 		value = mfd->panel_info->brightness_max;
 
@@ -216,6 +247,11 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
 				mfd->panel_info->brightness_max);
 
+    /* MM-GL-DISPLAY-panel-00+[ */
+	/*Base on display backlight propert, setup the mapping table
+    and ignore default driver algorithms*/
+    bl_lvl = bkl_lut[value];
+	/* MM-GL-DISPLAY-panel-00+] */
 	if (!bl_lvl && value)
 		bl_lvl = 1;
 
@@ -682,6 +718,7 @@ static void mdss_fb_shutdown(struct platform_device *pdev)
 	mfd->shutdown_pending = true;
 	lock_fb_info(mfd->fbi);
 	mdss_fb_release_all(mfd->fbi, true);
+	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "show_blank_event");
 	unlock_fb_info(mfd->fbi);
 }
 
@@ -720,8 +757,15 @@ static int mdss_fb_probe(struct platform_device *pdev)
 
 	mfd->ext_ad_ctrl = -1;
 	mfd->bl_level = 0;
+	/* MM-GL-DISPLAY-panel-00+[ */
+	if (mfd->index == 0) {
+		mfd->bl_level = pdata->panel_info.bl_max;
+		mfd->unset_bl_level = mfd->bl_level;
+	}
+	/* MM-GL-DISPLAY-panel-00+] */
 	mfd->bl_scale = 1024;
-	mfd->bl_min_lvl = 30;
+	/* MM-GL-DISPLAY-panel-00- *///mfd->bl_min_lvl = 30;
+	mfd->bl_min_lvl = 19;/* MM-GL-DISPLAY-panel-00+ */
 	mfd->ad_bl_level = 0;
 	mfd->fb_imgType = MDP_RGBA_8888;
 
@@ -1068,8 +1112,8 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 		return;
 	}
 
-	if (((mdss_fb_is_power_off(mfd) && mfd->dcm_state != DCM_ENTER)
-		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd) &&
+	if ((((mdss_fb_is_power_off(mfd) && mfd->dcm_state != DCM_ENTER)
+		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd)) ||
 		mfd->panel_info->cont_splash_enabled) {
 		mfd->unset_bl_level = bkl_lvl;
 		return;
@@ -1297,6 +1341,7 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 		pr_debug("blank powerdown called. cur mode=%d, req mode=%d\n",
 			cur_power_state, req_power_state);
 		if (mdss_fb_is_power_on(mfd) && mfd->mdp.off_fnc) {
+			printk("FB_BLANK_POWERDOWN: Power down unblank");/* MM-GL-DISPLAY-panel-00+ */
 			cur_power_state = mfd->panel_power_state;
 
 			mutex_lock(&mfd->update.lock);
@@ -1556,9 +1601,9 @@ static int mdss_fb_fbmem_ion_mmap(struct fb_info *info,
 				vma->vm_page_prot =
 					pgprot_writecombine(vma->vm_page_prot);
 
-			pr_debug("vma=%p, addr=%x len=%ld",
+			pr_debug("vma=%p, addr=%x len=%ld\n",
 					vma, (unsigned int)addr, len);
-			pr_cont("vm_start=%x vm_end=%x vm_page_prot=%ld\n",
+			pr_debug("vm_start=%x vm_end=%x vm_page_prot=%ld\n",
 					(unsigned int)vma->vm_start,
 					(unsigned int)vma->vm_end,
 					(unsigned long int)vma->vm_page_prot);
@@ -1632,13 +1677,21 @@ static int mdss_fb_physical_mmap(struct fb_info *info,
 static int mdss_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
-	int rc = 0;
+	int rc = -EINVAL;
 
-	if (!info->fix.smem_start && !mfd->fb_ion_handle)
+	if (mfd->fb_mmap_type == MDP_FB_MMAP_ION_ALLOC) {
 		rc = mdss_fb_fbmem_ion_mmap(info, vma);
-	else
+	} else if (mfd->fb_mmap_type == MDP_FB_MMAP_PHYSICAL_ALLOC) {
 		rc = mdss_fb_physical_mmap(info, vma);
-
+	} else {
+		if (!info->fix.smem_start && !mfd->fb_ion_handle) {
+			rc = mdss_fb_fbmem_ion_mmap(info, vma);
+			mfd->fb_mmap_type = MDP_FB_MMAP_ION_ALLOC;
+		} else {
+			rc = mdss_fb_physical_mmap(info, vma);
+			mfd->fb_mmap_type = MDP_FB_MMAP_PHYSICAL_ALLOC;
+		}
+	}
 	if (rc < 0)
 		pr_err("fb mmap failed with rc = %d\n", rc);
 
@@ -1744,7 +1797,18 @@ static int mdss_fb_alloc_fbmem(struct msm_fb_data_type *mfd)
 		return -ENOMEM;
 	}
 }
+/* MM-GL-DISPLAY-panel-00+[ */
 
+static ssize_t mdss_manufactory_id_show(struct device *dev,
+               struct device_attribute *attr, char *buf)
+{
+       unsigned char manufactoryID = mdss_manufacture_id_read();
+
+       return snprintf(buf, PAGE_SIZE, "%x\n", manufactoryID);
+}
+
+static DEVICE_ATTR(manufactory_id, 0644, mdss_manufactory_id_show, NULL);
+/* MM-GL-DISPLAY-panel-00+] */
 static int mdss_fb_register(struct msm_fb_data_type *mfd)
 {
 	int ret = -ENODEV;
@@ -1768,16 +1832,16 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 	fix->mmio_len = 0;	/* No MMIO Address */
 	fix->accel = FB_ACCEL_NONE;/* FB_ACCEL_MSM needes to be added in fb.h */
 
-	var->xoffset = 0,	/* Offset from virtual to visible */
-	var->yoffset = 0,	/* resolution */
-	var->grayscale = 0,	/* No graylevels */
-	var->nonstd = 0,	/* standard pixel format */
-	var->activate = FB_ACTIVATE_VBL,	/* activate it at vsync */
-	var->height = -1,	/* height of picture in mm */
-	var->width = -1,	/* width of picture in mm */
-	var->accel_flags = 0,	/* acceleration flags */
-	var->sync = 0,	/* see FB_SYNC_* */
-	var->rotate = 0,	/* angle we rotate counter clockwise */
+	var->xoffset = 0;	/* Offset from virtual to visible */
+	var->yoffset = 0;	/* resolution */
+	var->grayscale = 0;	/* No graylevels */
+	var->nonstd = 0;	/* standard pixel format */
+	var->activate = FB_ACTIVATE_VBL;	/* activate it at vsync */
+	var->height = -1;	/* height of picture in mm */
+	var->width = -1;	/* width of picture in mm */
+	var->accel_flags = 0;	/* acceleration flags */
+	var->sync = 0;	/* see FB_SYNC_* */
+	var->rotate = 0;	/* angle we rotate counter clockwise */
 	mfd->op_enable = false;
 
 	switch (mfd->fb_imgType) {
@@ -1969,8 +2033,21 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 
 	pr_info("FrameBuffer[%d] %dx%d registered successfully!\n", mfd->index,
 					fbi->var.xres, fbi->var.yres);
+	/* MM-GL-DISPLAY-panel-00+[ */
+	if (mfd->index == 0) {
+		// File node: /sys/class/graphics/fb?/manufactory_id //
 
-	return 0;
+		ret = device_create_file(fbi->dev, &dev_attr_manufactory_id);
+		if (ret) {
+			printk(KERN_ERR "[DISPLAY]%s: create dev_attr_manufactory_id failed, ret <%d>\n",
+				__func__, ret);
+		}
+	}
+
+	ret = 0;
+	return ret;
+	/* MM-GL-DISPLAY-panel-00+] */
+	/* MM-GL-DISPLAY-panel-00- *///return 0;
 }
 
 /**
@@ -2480,6 +2557,9 @@ static int mdss_fb_pan_idle(struct msm_fb_data_type *mfd)
 static int mdss_fb_wait_for_kickoff(struct msm_fb_data_type *mfd)
 {
 	int ret = 0;
+
+	if (!mfd->wait_for_kickoff)
+		return mdss_fb_pan_idle(mfd);
 
 	ret = wait_event_timeout(mfd->kickoff_wait_q,
 			(!atomic_read(&mfd->kickoff_pending) ||

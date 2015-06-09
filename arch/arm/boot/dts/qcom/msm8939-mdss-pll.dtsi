@@ -17,11 +17,12 @@
 		cell-index = <0>;
 		#clock-cells = <1>;
 
-		reg = <0x1a98300 0xd4>;
-		reg-names = "pll_base";
+		reg = <0x1a98300 0xd4>, <0x0184d074 0x8>;
+		reg-names = "pll_base", "gdsc_base";
 
 		gdsc-supply = <&gdsc_mdss>;
-		vddio-supply = <&pm8916_l6>;
+		/* MM-VH-DISPLAY-00* */
+		vddio-supply = <&pm8916_l16>;
 
 		clocks = <&clock_gcc clk_gcc_mdss_ahb_clk>;
 		clock-names = "iface_clk";

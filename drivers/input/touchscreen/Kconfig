@@ -1022,6 +1022,9 @@ config TOUCHSCREEN_GT9XX
 
 source "drivers/input/touchscreen/gt9xx/Kconfig"
 
+source "drivers/input/touchscreen/cypress-gen4/Kconfig"
+source "drivers/input/touchscreen/cypress-gen5/Kconfig"
+
 config TOUCHSCREEN_BU21150
 	tristate "JDI AFE BU21150"
 	depends on SPI_MASTER

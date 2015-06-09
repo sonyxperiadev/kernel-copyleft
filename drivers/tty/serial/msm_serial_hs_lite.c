@@ -53,6 +53,15 @@
 #include <linux/msm-bus.h>
 #include "msm_serial_hs_hwreg.h"
 
+/* FIH-CORE-TH-DebugToolPorting-00+[ */
+//CORE-KH-WO_S1BOOT-00-m[ 
+#if defined(CONFIG_FIH_REMOVE_SERIAL_DYNAMICALLY)
+//CORE-KH-WO_S1BOOT-00-d extern unsigned int fih_get_s1_boot(void);
+//CORE-KH-WO_S1BOOT-00-m]
+extern unsigned int debug_uartmsg_enable;
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00+] */
+
 /*
  * There are 3 different kind of UART Core available on MSM.
  * High Speed UART (i.e. Legacy HSUART), GSBI based HSUART
@@ -1963,6 +1972,16 @@ static int __init msm_serial_hsl_init(void)
 {
 	int ret;
 
+/* FIH-CORE-TH-DebugToolPorting-00+[ */
+#if defined(CONFIG_FIH_REMOVE_SERIAL_DYNAMICALLY)   //CORE-KH-WO_S1BOOT-00-m
+	if(!debug_uartmsg_enable) //CORE-KH-WO_S1BOOT-01-m
+	{
+		pr_info("%s(): Disable UART console\n", __func__);
+		return 0;
+	}
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00+] */
+
 	ret = uart_register_driver(&msm_hsl_uart_driver);
 	if (unlikely(ret))
 		return ret;
@@ -1982,6 +2001,16 @@ static int __init msm_serial_hsl_init(void)
 
 static void __exit msm_serial_hsl_exit(void)
 {
+
+/* FIH-CORE-TH-DebugToolPorting-00+[ */
+#if defined(CONFIG_FIH_REMOVE_SERIAL_DYNAMICALLY)   //CORE-KH-WO_S1BOOT-00-m
+	if(!debug_uartmsg_enable) //CORE-KH-WO_S1BOOT-01-m
+	{
+        return;
+    }
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00+] */
+
 	debugfs_remove_recursive(debug_base);
 #ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
 	unregister_console(&msm_hsl_console);
