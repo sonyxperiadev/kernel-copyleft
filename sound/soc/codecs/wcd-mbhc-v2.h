@@ -26,6 +26,7 @@ enum wcd_mbhc_plug_type {
 	MBHC_PLUG_TYPE_HEADPHONE,
 	MBHC_PLUG_TYPE_HIGH_HPH,
 	MBHC_PLUG_TYPE_GND_MIC_SWAP,
+	MBHC_PLUG_TYPE_NOT_SUPPORT,  /* MM-NC-MBHC_NonCTIA-00 */
 };
 
 enum pa_dac_ack_flags {
@@ -257,5 +258,7 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 		      const struct wcd_mbhc_cb *mbhc_cb,
 		      const struct wcd_mbhc_intr *mbhc_cdc_intr_ids,
 		      bool impedance_det_en);
+int wcd_mbhc_get_impedance(struct wcd_mbhc *mbhc, uint32_t *zl,
+			   uint32_t *zr);
 void wcd_mbhc_deinit(struct wcd_mbhc *mbhc);
 #endif /* __WCD_MBHC_V2_H__ */

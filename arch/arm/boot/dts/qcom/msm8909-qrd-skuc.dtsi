@@ -66,3 +66,38 @@
 		qcom,y-offset = <0>;
 	};
 };
+
+&pm8909_chg {
+	qcom,batt-hot-percentage = <35>;
+	qcom,batt-cold-percentage = <70>;
+	qcom,tchg-mins = <360>;
+	status = "okay";
+};
+
+/ {
+	qrd_batterydata: qcom,battery-data {
+		qcom,rpull-up-kohm = <0>;
+		qcom,vref-batt-therm = <1800000>;
+
+		#include "batterydata-qrd-skuc-4v2-2000mah.dtsi"
+	};
+};
+
+&pm8909_bms {
+	status = "okay";
+	qcom,battery-data = <&qrd_batterydata>;
+};
+
+&sdc2_cd_on {
+	/delete-property/  bias-pull-up;
+	bias-disable;
+};
+
+&sdhc_2 {
+	qcom,vdd-always-on;
+	qcom,vdd-lpm-sup;
+
+	qcom,vdd-current-level = <4000 400000>;
+
+	cd-gpios = <&msm_gpio 38 0x0>;
+};

@@ -345,7 +345,7 @@ static int ci13xxx_msm_probe(struct platform_device *pdev)
 	struct ci13xxx_platform_data *pdata = pdev->dev.platform_data;
 	bool is_l1_supported = false;
 
-	dev_dbg(&pdev->dev, "ci13xxx_msm_probe\n");
+	dev_info(&pdev->dev, "ci13xxx_msm_probe\n");/*CONN-EH-USBPORTING-00+*/
 
 	if (pdata) {
 		/* Acceptable values for nz_itc are: 0,1,2,4,8,16,32,64 */

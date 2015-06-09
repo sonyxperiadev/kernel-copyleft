@@ -64,6 +64,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/unistd.h>
+#include <linux/fih_sw_info.h> /* MTD-CORE-EL-AddPocForSwReset-00+ */
 
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a,b)	(-EINVAL)
@@ -326,11 +327,19 @@ void emergency_restart(void)
 }
 EXPORT_SYMBOL_GPL(emergency_restart);
 
+/* CORE-EL-wk_POC_reboot_lag-00* */
+extern int is_power_off_charging(void);
+
 void kernel_restart_prepare(char *cmd)
 {
 	blocking_notifier_call_chain(&reboot_notifier_list, SYS_RESTART, cmd);
 	system_state = SYSTEM_RESTART;
-	usermodehelper_disable();
+	
+	/* CORE-EL-wk_POC_reboot_lag-00*[ */
+	if (!is_power_off_charging())
+		usermodehelper_disable();
+	/* CORE-EL-wk_POC_reboot_lag-00*] */    
+
 	device_shutdown();
 }
 
@@ -364,6 +373,7 @@ int unregister_reboot_notifier(struct notifier_block *nb)
 	return blocking_notifier_chain_unregister(&reboot_notifier_list, nb);
 }
 EXPORT_SYMBOL(unregister_reboot_notifier);
+extern void write_pwron_cause (int pwron_cause); /* MTD-CORE-EL-AddPocForSwReset-00+ */
 
 /* Add backwards compatibility for stable trees. */
 #ifndef PF_NO_SETAFFINITY
@@ -401,6 +411,16 @@ void kernel_restart(char *cmd)
 	kernel_restart_prepare(cmd);
 	migrate_to_reboot_cpu();
 	syscore_shutdown();
+/* CORE-EL-SwReset-00*[ */
+	if (cmd == NULL || cmd[0] == '\0')	{
+		cmd = "swreset";
+		printk(KERN_EMERG "snoop cmd with %s\n", cmd);
+	}
+	
+	printk(KERN_EMERG "Software Reset. Let's note!\n");
+	/* %%TODO: enable me later */
+	write_pwron_cause(SOFTWARE_RESET);
+/* CORE-EL-SwReset-00*] */
 	if (!cmd)
 		printk(KERN_EMERG "Restarting system.\n");
 	else
@@ -415,7 +435,12 @@ static void kernel_shutdown_prepare(enum system_states state)
 	blocking_notifier_call_chain(&reboot_notifier_list,
 		(state == SYSTEM_HALT)?SYS_HALT:SYS_POWER_OFF, NULL);
 	system_state = state;
-	usermodehelper_disable();
+	
+	/* CORE-EL-wk_POC_reboot_lag-00*[ */
+	if (!is_power_off_charging())
+		usermodehelper_disable();
+	/* CORE-EL-wk_POC_reboot_lag-00*] */    
+	
 	device_shutdown();
 }
 /**

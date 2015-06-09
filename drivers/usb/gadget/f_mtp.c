@@ -3,6 +3,8 @@
  *
  * Copyright (C) 2010 Google, Inc.
  * Author: Mike Lockwood <lockwood@android.com>
+ * Copyright (C) 2011 Sony Ericsson Mobile Communications AB.
+ * Copyright (C) 2012-2013 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -13,6 +15,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Ericsson Mobile Communications AB /
+ * Sony Mobile Communications AB. Modifications are licensed under the License.
  */
 
 /* #define DEBUG */
@@ -48,11 +52,16 @@
 #define STATE_BUSY                  2   /* processing userspace calls */
 #define STATE_CANCELED              3   /* transaction canceled by host */
 #define STATE_ERROR                 4   /* error from completion routine */
+#define STATE_RESET                 5   /* reset the device */
 
 /* number of tx and rx requests to allocate */
 #define MTP_TX_REQ_MAX 8
 #define RX_REQ_MAX 2
 #define INTR_REQ_MAX 5
+
+/* vendor code */
+#define MSOS_VENDOR_CODE	0x08
+#define MSOS_GOOGLE_VENDOR_CODE	0x01
 
 /* ID for Microsoft MTP OS String */
 #define MTP_OS_STRING_ID   0xEE
@@ -298,11 +307,12 @@ static u8 mtp_os_string[] = {
 	/* Signature field: "MSFT100" */
 	'M', 0, 'S', 0, 'F', 0, 'T', 0, '1', 0, '0', 0, '0', 0,
 	/* vendor code */
-	1,
+	MSOS_GOOGLE_VENDOR_CODE,
 	/* padding */
 	0
 };
-
+/*CONN-EH-MTPFORXP-00*{*/
+#if 0
 /* Microsoft Extended Configuration Descriptor Header Section */
 struct mtp_ext_config_desc_header {
 	__le32	dwLength;
@@ -320,7 +330,26 @@ struct mtp_ext_config_desc_function {
 	__u8	subCompatibleID[8];
 	__u8	reserved[6];
 };
+#else
+struct ms_ext_compatID_desc_head {
+	unsigned int dwLength;
+	unsigned short bcdVersion;
+	unsigned short wIndex;
+	unsigned char bCount;
+	unsigned char reserved[7];
+};
 
+/* extend compat ID descriptor(data section) */
+struct ms_ext_compatID_desc_data{
+	unsigned char bFirstInterfaceNumber;
+	unsigned char reserved1;
+	unsigned char compatibleID[8];
+	unsigned char subCompatibleID[8];
+	unsigned char reserved2[6];
+};
+#endif
+
+#if 0
 /* MTP Extended Configuration Descriptor */
 struct {
 	struct mtp_ext_config_desc_header	header;
@@ -338,7 +367,8 @@ struct {
 		.compatibleID = { 'M', 'T', 'P' },
 	},
 };
-
+#endif
+/*CONN-EH-MTPFORXP-00*}*/
 struct mtp_device_status {
 	__le16	wLength;
 	__le16	wCode;
@@ -356,7 +386,7 @@ struct mtp_data_header {
 };
 
 /* temporary variable used between mtp_open() and mtp_gadget_bind() */
-static struct mtp_dev *_mtp_dev;
+static struct mtp_dev *_mtp_dev = NULL;
 
 static inline struct mtp_dev *func_to_mtp(struct usb_function *f)
 {
@@ -435,7 +465,7 @@ static void mtp_complete_in(struct usb_ep *ep, struct usb_request *req)
 {
 	struct mtp_dev *dev = _mtp_dev;
 
-	if (req->status != 0)
+	if (req->status != 0 && dev->state == STATE_BUSY)
 		dev->state = STATE_ERROR;
 
 	mtp_req_put(dev, &dev->tx_idle, req);
@@ -574,6 +604,9 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 	int len;
 	int ret = 0;
 
+	if ((!dev) || (!cdev))
+		return -EINVAL;
+
 	DBG(cdev, "mtp_read(%zu)\n", count);
 
 	len = ALIGN(count, dev->ep_out->maxpacket);
@@ -595,6 +628,12 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 		dev->state = STATE_READY;
 		spin_unlock_irq(&dev->lock);
 		return -ECANCELED;
+	} else if (dev->state == STATE_RESET) {
+		/* report a reset state to userspace */
+		dev->state = STATE_READY;
+		spin_unlock_irq(&dev->lock);
+		DBG(cdev, "mtp_read DEVICE RESET. State: %d.\n", dev->state);
+		return -ECONNRESET;
 	}
 	dev->state = STATE_BUSY;
 	spin_unlock_irq(&dev->lock);
@@ -624,7 +663,7 @@ requeue_req:
 		spin_unlock_irq(&dev->lock);
 		goto done;
 	}
-	if (ret < 0) {
+	if (ret < 0 || !dev->rx_done) {
 		r = ret;
 		usb_ep_dequeue(dev->ep_out, req);
 		goto done;
@@ -646,6 +685,8 @@ done:
 	spin_lock_irq(&dev->lock);
 	if (dev->state == STATE_CANCELED)
 		r = -ECANCELED;
+	else if (dev->state == STATE_RESET)
+		r = -ECONNRESET;
 	else if (dev->state != STATE_OFFLINE)
 		dev->state = STATE_READY;
 	spin_unlock_irq(&dev->lock);
@@ -809,7 +850,10 @@ static void send_file_work(struct work_struct *data)
 		if (hdr_size) {
 			/* prepend MTP data header */
 			header = (struct mtp_data_header *)req->buf;
-			header->length = __cpu_to_le32(count);
+			if (count >= 0xFFFFFFFF)
+				header->length = __cpu_to_le32(0xFFFFFFFF);
+			else
+				header->length = __cpu_to_le32(count);
 			header->type = __cpu_to_le16(2); /* data packet */
 			header->command = __cpu_to_le16(dev->xfer_command);
 			header->transaction_id =
@@ -921,6 +965,21 @@ static void receive_file_work(struct work_struct *data)
 					usb_ep_dequeue(dev->ep_out, read_req);
 				break;
 			}
+			if (dev->state == STATE_OFFLINE) {
+				r = -ENODEV;
+				if (!dev->rx_done)
+					usb_ep_dequeue(dev->ep_out, read_req);
+				break;
+			}
+			if (dev->state == STATE_RESET) {
+				DBG(cdev, "%s: DEVICE RESET\n", __func__);
+				r = -ECONNRESET;
+				if (!dev->rx_done) {
+					DBG(cdev, "dequeue in DEVICE RESET\n");
+					usb_ep_dequeue(dev->ep_out, read_req);
+				}
+				break;
+			}
 			/* Check if we aligned the size due to MTU constraint */
 			if (count < read_req->length)
 				read_req->actual = (read_req->actual > count ?
@@ -1000,6 +1059,14 @@ static long mtp_send_receive_ioctl(struct file *fp, unsigned code,
 		ret = -ECANCELED;
 		goto out;
 	}
+	if (dev->state == STATE_RESET) {
+		/* report reset to userspace */
+		DBG(dev->cdev, "report reset to user space\n");
+		dev->state = STATE_READY;
+		spin_unlock_irq(&dev->lock);
+		ret = -ECONNRESET;
+		goto out;
+	}
 	if (dev->state == STATE_OFFLINE) {
 		spin_unlock_irq(&dev->lock);
 		ret = -ENODEV;
@@ -1050,6 +1117,8 @@ fail:
 	spin_lock_irq(&dev->lock);
 	if (dev->state == STATE_CANCELED)
 		ret = -ECANCELED;
+	else if (dev->state == STATE_RESET)
+		ret = -ECONNRESET;
 	else if (dev->state != STATE_OFFLINE)
 		dev->state = STATE_READY;
 	spin_unlock_irq(&dev->lock);
@@ -1168,6 +1237,10 @@ fail:
 static int mtp_open(struct inode *ip, struct file *fp)
 {
 	printk(KERN_INFO "mtp_open\n");
+
+	if (!_mtp_dev)
+		return -EINVAL;
+
 	if (mtp_lock(&_mtp_dev->open_excl))
 		return -EBUSY;
 
@@ -1182,6 +1255,9 @@ static int mtp_open(struct inode *ip, struct file *fp)
 static int mtp_release(struct inode *ip, struct file *fp)
 {
 	printk(KERN_INFO "mtp_release\n");
+
+	if (!_mtp_dev)
+		return -EINVAL;
 
 	mtp_unlock(&_mtp_dev->open_excl);
 	return 0;
@@ -1232,17 +1308,71 @@ static int mtp_ctrlrequest(struct usb_composite_dev *cdev,
 		memcpy(cdev->req->buf, mtp_os_string, value);
 	} else if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_VENDOR) {
 		/* Handle MTP OS descriptor */
-		DBG(cdev, "vendor request: %d index: %d value: %d length: %d\n",
+		DBG(cdev, "vendor request:%d index:%d value:%d length:%d\n",
 			ctrl->bRequest, w_index, w_value, w_length);
 
-		if (ctrl->bRequest == 1
-				&& (ctrl->bRequestType & USB_DIR_IN)
-				&& (w_index == 4 || w_index == 5)) {
+
+		if (((ctrl->bRequest == MSOS_GOOGLE_VENDOR_CODE) ||
+			(ctrl->bRequest == MSOS_VENDOR_CODE)) &&
+			(ctrl->bRequestType & USB_DIR_IN) && (w_index == 4)) {
+			/*CONN-EH-MTPFORXP-00*{*/
+			#if 0
 			value = (w_length < sizeof(mtp_ext_config_desc) ?
 					w_length : sizeof(mtp_ext_config_desc));
 			memcpy(cdev->req->buf, &mtp_ext_config_desc, value);
+			#else
+			int total = 0;
+			int func_num = 0;
+			int interface_num = 0;
+			struct ms_ext_compatID_desc_head *head;
+			struct ms_ext_compatID_desc_data *data;
+			struct usb_configuration        *cfg;
+			struct usb_function *f;
+
+			head = (struct ms_ext_compatID_desc_head *) cdev->req->buf;
+			data = (struct ms_ext_compatID_desc_data *)(head + 1);
+
+			/* zero clear */
+			memset( cdev->req->buf, 0x00, cdev->bufsiz);
+
+			list_for_each_entry(cfg, &cdev->configs, list)	{
+
+				list_for_each_entry(f, &cfg->functions, list)	{
+					/*CONN-EH-COVERITY63949-00-*/ // if (!f)
+					/*CONN-EH-COVERITY63949-00-*/ //	break;
+
+					interface_num++;
+					data->bFirstInterfaceNumber = func_num;
+					printk(KERN_INFO"usb:%s MTP interface bFirstInterfaceNumber: %d\n", __func__,  data->bFirstInterfaceNumber);
+					data->reserved1 = 1;
+					if (!strcmp(f->name, "mtp"))	{
+						memcpy(data->compatibleID, "MTP", 3);
+						VDBG(cdev, "MTP interface found. Interface_num: %d.\n", interface_num );
+					}
+					data++;
+					func_num++;
+				}
+			}
+
+			total = sizeof(*head) + (sizeof(*data) * func_num);
+
+			/* header section */
+			if (w_length < total &&
+				w_length >= (sizeof(*head) + sizeof(*data))) {
+				total = w_length;
+				func_num = (total - sizeof(*head)) /
+					sizeof(*data);
+			}
+			head->dwLength = total;
+			head->bcdVersion = __constant_cpu_to_le16(0x0100);
+			head->wIndex = __constant_cpu_to_le16(4);
+			head->bCount = func_num;
+			value = min_t(u16, w_length, total);
+			#endif
+			/*CONN-EH-MTPFORXP-00*}*/
 		}
-	} else if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_CLASS) {
+	}
+	if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_CLASS) {
 		DBG(cdev, "class request: %d index: %d value: %d length: %d\n",
 			ctrl->bRequest, w_index, w_value, w_length);
 
@@ -1263,6 +1393,23 @@ static int mtp_ctrlrequest(struct usb_composite_dev *cdev,
 			 * the contents.
 			 */
 			value = w_length;
+		} else if (ctrl->bRequest == MTP_REQ_RESET && w_index == 0
+			&& w_value == 0) {
+			DBG(cdev, "MTP_REQ_RESET\n");
+
+			spin_lock_irqsave(&dev->lock, flags);
+			/* Flushing the buffers as mentioned in MTP spec */
+			usb_ep_fifo_flush(dev->ep_out);
+			dev->state = STATE_RESET;
+			wake_up(&dev->read_wq);
+			wake_up(&dev->write_wq);
+			spin_unlock_irqrestore(&dev->lock, flags);
+
+			/* We need to queue a request to read the remaining
+			 *  bytes, but we don't actually need to look at
+			 * the contents.
+			 */
+			value = w_length;
 		} else if (ctrl->bRequest == MTP_REQ_GET_DEVICE_STATUS
 				&& w_index == 0 && w_value == 0) {
 			struct mtp_device_status *status = cdev->req->buf;
@@ -1274,12 +1421,16 @@ static int mtp_ctrlrequest(struct usb_composite_dev *cdev,
 			/* device status is "busy" until we report
 			 * the cancelation to userspace
 			 */
-			if (dev->state == STATE_CANCELED)
+			if (dev->state == STATE_CANCELED) {
 				status->wCode =
 					__cpu_to_le16(MTP_RESPONSE_DEVICE_BUSY);
-			else
+			} else if (dev->state == STATE_RESET) {
 				status->wCode =
 					__cpu_to_le16(MTP_RESPONSE_OK);
+			} else {
+				status->wCode =
+					__cpu_to_le16(MTP_RESPONSE_OK);
+			}
 			spin_unlock_irqrestore(&dev->lock, flags);
 			value = sizeof(*status);
 		}

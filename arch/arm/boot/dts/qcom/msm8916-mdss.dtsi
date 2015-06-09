@@ -122,6 +122,7 @@
 		vdda-supply = <&pm8916_l2>;
 		vdd-supply = <&pm8916_l17>;
 		vddio-supply = <&pm8916_l6>;
+		vddio1-supply = <&pm8916_l16>;/* MM-GL-DISPLAY-panel-00+ */
 		clocks = <&clock_gcc clk_gcc_mdss_mdp_clk>,
                          <&clock_gcc clk_gcc_mdss_ahb_clk>,
                          <&clock_gcc clk_gcc_mdss_axi_clk>,
@@ -132,7 +133,8 @@
                                 "byte_clk", "pixel_clk", "core_clk";
 		qcom,platform-strength-ctrl = [ff 06];
 		qcom,platform-bist-ctrl = [00 00 b1 ff 00 00];
-		qcom,platform-regulator-settings = [07 09 03 00 20 00 01];
+		/* MM-GL-DISPLAY-panel-00- *///qcom,platform-regulator-settings = [07 09 03 00 20 00 01];
+		qcom,platform-regulator-settings = [04 09 03 00 20 00 01];/* MM-GL-DISPLAY-panel-00+ */
 		qcom,platform-lane-config = [00 00 00 00 00 00 00 01 97
 			00 00 00 00 05 00 00 01 97
 			00 00 00 00 0a 00 00 01 97
@@ -204,6 +206,11 @@
 	};
 };
 
-#include "dsi-panel-sim-video.dtsi"
-#include "dsi-panel-sim-cmd.dtsi"
-
+/* MM-GL-DISPLAY-panel-00- *///#include "dsi-panel-sim-video.dtsi"
+/* MM-GL-DISPLAY-panel-00+[ */
+#include "dsi-panel-nt35521-720p-video-truly.dtsi"
+#include "dsi-panel-nt35521-720p-video-jdi.dtsi"
+#include "dsi-panel-nt35521-720p-video-innolux.dtsi"
+#include "dsi-panel-otm1284a-720p-video-innolux.dtsi"
+#include "dsi-panel-otm1284a-720p-video-truly.dtsi"
+/* MM-GL-DISPLAY-panel-00+] */

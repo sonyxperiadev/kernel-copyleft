@@ -2,7 +2,7 @@
  * drivers/mmc/host/sdhci-msm.c - Qualcomm MSM SDHCI Platform
  * driver source file
  *
- * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,6 +41,9 @@
 #include <linux/iopoll.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/msm-bus.h>
+/* BSP-AlwaysChen-Enable_ExSD-01+[ */
+#include <linux/fih_hw_info.h>
+/* BSP-AlwaysChen-Enable_ExSD-01]+ */
 
 #include "sdhci-pltfm.h"
 
@@ -202,6 +205,9 @@ enum sdc_mpm_pin_state {
 
 #define NUM_TUNING_PHASES		16
 #define MAX_DRV_TYPES_SUPPORTED_HS200	3
+
+/* Timeout value to avoid infinite waiting for pwr_irq */
+#define MSM_PWR_IRQ_TIMEOUT_MS 5000
 
 static const u32 tuning_block_64[] = {
 	0x00FF0FFF, 0xCCC3CCFF, 0xFFCC3CC3, 0xEFFEFFFE,
@@ -1475,6 +1481,23 @@ static void sdhci_msm_populate_affinity_type(struct sdhci_msm_pltfm_data *pdata,
 }
 #endif
 
+/* BSP-AlwaysChen-Enable_ExSD-01+[ */
+static bool sdhci_msm_check_active_high(void)
+{
+        int phase = fih_get_product_phase();
+        switch (phase) {
+               case PHASE_EVM2:
+               case PHASE_EVM3:
+               case PHASE_PD1:
+               case PHASE_PD2:
+               case PHASE_PD4:
+                       return false;
+               default:
+                       return true;
+                }
+}
+/* BSP-AlwaysChen-Enable_ExSD-01+] */
+
 /* Parse platform data */
 static struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev)
 {
@@ -1494,8 +1517,12 @@ static struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev)
 	}
 
 	pdata->status_gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
-	if (gpio_is_valid(pdata->status_gpio) & !(flags & OF_GPIO_ACTIVE_LOW))
+        /* BSP-AlwaysChen-Enable_ExSD-01*[ */
+       /*if (gpio_is_valid(pdata->status_gpio) & !(flags & OF_GPIO_ACTIVE_LOW))*/
+       /*if (gpio_is_valid(pdata->status_gpio) & (!(flags & OF_GPIO_ACTIVE_LOW) | (fih_get_product_phase() == PHASE_EVM)))*/
+       if (gpio_is_valid(pdata->status_gpio) & (!(flags & OF_GPIO_ACTIVE_LOW) | sdhci_msm_check_active_high()))
 		pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+        /* BSP-AlwaysChen-Enable_ExSD-01*] */
 
 	of_property_read_u32(np, "qcom,bus-width", &bus_width);
 	if (bus_width == 8)
@@ -2350,8 +2377,10 @@ static void sdhci_msm_check_power_status(struct sdhci_host *host, u32 req_type)
 	 */
 	if (done)
 		init_completion(&msm_host->pwr_irq_completion);
-	else
-		wait_for_completion(&msm_host->pwr_irq_completion);
+	else if (!wait_for_completion_timeout(&msm_host->pwr_irq_completion,
+				msecs_to_jiffies(MSM_PWR_IRQ_TIMEOUT_MS)))
+		__WARN_printf("%s: request(%d) timed out waiting for pwr_irq\n",
+					mmc_hostname(host->mmc), req_type);
 
 	pr_debug("%s: %s: request %d done\n", mmc_hostname(host->mmc),
 			__func__, req_type);
@@ -3280,6 +3309,11 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 		 */
 		sdhci_msm_setup_pins(msm_host->pdata, true);
 
+		/*
+		 * This delay is needed for stabilizing the card detect GPIO
+		 * line after changing the pull configs.
+		 */
+		usleep_range(100000, 105000);
 		ret = mmc_gpio_request_cd(msm_host->mmc,
 				msm_host->pdata->status_gpio);
 		if (ret) {

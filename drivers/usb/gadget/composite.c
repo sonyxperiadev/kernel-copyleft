@@ -2,6 +2,7 @@
  * composite.c - infrastructure for Composite USB Gadgets
  *
  * Copyright (C) 2006-2008 David Brownell
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -991,7 +992,8 @@ void usb_remove_config(struct usb_composite_dev *cdev,
 	if (cdev->config == config)
 		reset_config(cdev);
 
-	list_del(&config->list);
+	if (config->list.next != LIST_POISON1)
+		list_del(&config->list);
 
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
@@ -1764,6 +1766,8 @@ static void update_unchanged_dev_desc(struct usb_device_descriptor *new,
 		new->iManufacturer = iManufacturer;
 	if (iProduct)
 		new->iProduct = iProduct;
+
+	printk(KERN_DEBUG "USB:.....  bcdDevice %x \r\n",new->bcdDevice);
 }
 
 int composite_dev_prepare(struct usb_composite_driver *composite,
@@ -1788,6 +1792,7 @@ int composite_dev_prepare(struct usb_composite_driver *composite,
 	cdev->req->complete = composite_setup_complete;
 	gadget->ep0->driver_data = cdev;
 
+	cdev->bufsiz = USB_COMP_EP0_BUFSIZ;/*CONN-EH-MTPFORXP-00+*/
 	cdev->driver = composite;
 
 	/*

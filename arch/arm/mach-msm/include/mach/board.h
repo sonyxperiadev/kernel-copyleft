@@ -191,9 +191,11 @@ struct msm_gpio_set_tbl {
 	uint32_t delay;
 };
 
+/* The SENSOR_GPIO_MAX value needs sync enum msm_sensor_power_seq_gpio_t in msm_cam_sensor.h*/
+#define SENSOR_GPIO_MAX 12/* MM-MC-BringUpImx214CameraSensor-00+ */
 struct msm_camera_gpio_num_info {
-	uint16_t gpio_num[10];
-	uint8_t valid[10];
+	uint16_t gpio_num[SENSOR_GPIO_MAX];
+	uint8_t valid[SENSOR_GPIO_MAX];
 };
 
 struct msm_camera_gpio_conf {

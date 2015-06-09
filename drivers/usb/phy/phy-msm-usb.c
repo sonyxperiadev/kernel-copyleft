@@ -52,6 +52,11 @@
 
 #include <linux/msm-bus.h>
 
+#undef pr_debug
+#define pr_debug pr_info
+#undef dev_dbg
+#define dev_dbg dev_info
+
 #define MSM_USB_BASE	(motg->regs)
 #define MSM_USB_PHY_CSR_BASE (motg->phy_csr_regs)
 
@@ -93,7 +98,7 @@ module_param(lpm_disconnect_thresh , uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(lpm_disconnect_thresh,
 	"Delay before entering LPM on USB disconnect");
 
-static bool floated_charger_enable;
+static bool floated_charger_enable = 1;
 module_param(floated_charger_enable , bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(floated_charger_enable,
 	"Whether to enable floated charger");
@@ -1707,7 +1712,7 @@ static int msm_otg_notify_chg_type(struct msm_otg *motg)
 		return -EINVAL;
 	}
 
-	pr_debug("setting usb power supply type %d\n", charger_type);
+	printk(KERN_INFO "msm_otg_notify_chg_type  charger_type= %d\n", charger_type);/*CONN-EH-USBPORTING-00+*/
 	power_supply_set_supply_type(psy, charger_type);
 	return 0;
 }
@@ -1725,7 +1730,7 @@ static int msm_otg_notify_power_supply(struct msm_otg *motg, unsigned mA)
 			goto psy_error;
 		if (power_supply_set_current_limit(psy, 1000*mA))
 			goto psy_error;
-	} else if (motg->cur_power > 0 && (mA == 0 || mA == 2)) {
+	} else if (motg->cur_power >= 0 && (mA == 0 || mA == 2)) {
 		/* Disable charging */
 		if (power_supply_set_online(psy, false))
 			goto psy_error;
@@ -2667,6 +2672,7 @@ static const char *chg_to_string(enum usb_chg_type chg_type)
 	}
 }
 
+static int report_chg_type = 0; //CORE-DL-ImplementChgAlg-00
 #define MSM_CHG_DCD_TIMEOUT		(750 * HZ/1000) /* 750 msec */
 #define MSM_CHG_DCD_POLL_TIME		(50 * HZ/1000) /* 50 msec */
 #define MSM_CHG_PRIMARY_DET_TIME	(50 * HZ/1000) /* TVDPSRC_ON */
@@ -2765,8 +2771,12 @@ static void msm_chg_detect_work(struct work_struct *w)
 				motg->chg_type = USB_PROPRIETARY_CHARGER;
 			else if (!dcd && floated_charger_enable)
 				motg->chg_type = USB_FLOATED_CHARGER;
-			else
+			//CORE-DL-ImplementChgAlg-00 +[
+			else {
 				motg->chg_type = USB_SDP_CHARGER;
+				report_chg_type = USB_SDP_CHARGER;
+			}
+			//CORE-DL-ImplementChgAlg-00 +]
 
 			motg->chg_state = USB_CHG_STATE_DETECTED;
 			delay = 0;
@@ -2774,10 +2784,13 @@ static void msm_chg_detect_work(struct work_struct *w)
 		break;
 	case USB_CHG_STATE_PRIMARY_DONE:
 		vout = msm_chg_check_secondary_det(motg);
-		if (vout)
+		//CORE-DL-ImplementChgAlg-00 +[
+		if (vout) {
 			motg->chg_type = USB_DCP_CHARGER;
-		else
+			report_chg_type = USB_DCP_CHARGER;
+		} else
 			motg->chg_type = USB_CDP_CHARGER;
+		//CORE-DL-ImplementChgAlg-00 +]
 		motg->chg_state = USB_CHG_STATE_SECONDARY_DONE;
 		/* fall through */
 	case USB_CHG_STATE_SECONDARY_DONE:
@@ -2818,6 +2831,14 @@ static void msm_chg_detect_work(struct work_struct *w)
 
 	queue_delayed_work(system_nrt_wq, &motg->chg_work, delay);
 }
+
+//CORE-DL-ImplementChgAlg-00 +[
+int get_chg_type(void)
+{
+	return report_chg_type;
+}
+EXPORT_SYMBOL(get_chg_type);
+//CORE-DL-ImplementChgAlg-00 +]
 
 #define VBUS_INIT_TIMEOUT	msecs_to_jiffies(5000)
 
@@ -4197,7 +4218,8 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_TYPE:
 		psy->type = val->intval;
-
+		if (motg->chg_state == USB_CHG_STATE_DETECTED)
+			break;
 		switch (psy->type) {
 		case POWER_SUPPLY_TYPE_USB:
 			motg->chg_type = USB_SDP_CHARGER;
@@ -5679,3 +5701,6 @@ module_platform_driver(msm_otg_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MSM USB transceiver driver");
+
+#undef pr_debug
+#undef dev_dbg

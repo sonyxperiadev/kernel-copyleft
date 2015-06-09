@@ -64,6 +64,7 @@ struct ncp6335d_info {
 	unsigned int mode_bit;
 	int curr_voltage;
 	int slew_rate;
+	bool is_suspend;
 
 	unsigned int step_size;
 	unsigned int min_voltage;
@@ -72,6 +73,7 @@ struct ncp6335d_info {
 	unsigned int peek_poke_address;
 
 	struct dentry *debug_root;
+	struct mutex ncp_mutex;
 };
 
 static int delay_array[] = {10, 20, 30, 40, 50};
@@ -173,6 +175,7 @@ static int ncp6335d_disable(struct regulator_dev *rdev)
 	int rc;
 	struct ncp6335d_info *dd = rdev_get_drvdata(rdev);
 
+	dev_info(dd->dev, "Disable ncp6335d regualtor\n"); //CORE-DL-FixDeviceCanNotPowerON-00
 	rc = ncp6335x_update_bits(dd, dd->vsel_reg,
 					NCP6335D_ENABLE, 0);
 	if (rc)
@@ -189,6 +192,13 @@ static int ncp6335d_get_voltage(struct regulator_dev *rdev)
 	int rc;
 	struct ncp6335d_info *dd = rdev_get_drvdata(rdev);
 
+	mutex_lock(&dd->ncp_mutex);
+	if (dd->is_suspend) {
+		rc = dd->curr_voltage;
+		dev_dbg(dd->dev, "Get voltage after suspend, (%d)\n", rc);
+		goto out;
+	}
+
 	rc = ncp6335x_read(dd, dd->vsel_reg, &val);
 	if (rc) {
 		dev_err(dd->dev, "Unable to get volatge rc(%d)", rc);
@@ -196,16 +206,19 @@ static int ncp6335d_get_voltage(struct regulator_dev *rdev)
 	}
 	dd->curr_voltage = ((val & NCP6335D_VOUT_SEL_MASK) * dd->step_size) +
 				dd->min_voltage;
+	rc = dd->curr_voltage;
 
 	dump_registers(dd, dd->vsel_reg, __func__);
 
-	return dd->curr_voltage;
+out:
+	mutex_unlock(&dd->ncp_mutex);
+	return rc;
 }
 
 static int ncp6335d_set_voltage(struct regulator_dev *rdev,
 			int min_uV, int max_uV, unsigned *selector)
 {
-	int rc, set_val, new_uV;
+	int rc = 0, set_val, new_uV;
 	struct ncp6335d_info *dd = rdev_get_drvdata(rdev);
 
 	set_val = DIV_ROUND_UP(min_uV - dd->min_voltage, dd->step_size);
@@ -214,6 +227,13 @@ static int ncp6335d_set_voltage(struct regulator_dev *rdev,
 		dev_err(dd->dev, "Unable to set volatge (%d %d)\n",
 							min_uV, max_uV);
 		return -EINVAL;
+	}
+
+	mutex_lock(&dd->ncp_mutex);
+	if (dd->is_suspend) {
+		dev_info(dd->dev, "Ignore voltage setting after suspend: %d\n",
+					new_uV);
+		goto out;
 	}
 
 	rc = ncp6335x_update_bits(dd, dd->vsel_reg,
@@ -227,7 +247,8 @@ static int ncp6335d_set_voltage(struct regulator_dev *rdev,
 	}
 
 	dump_registers(dd, dd->vsel_reg, __func__);
-
+out:
+	mutex_unlock(&dd->ncp_mutex);
 	return rc;
 }
 
@@ -316,6 +337,20 @@ static int ncp6335d_restore_working_reg(struct device_node *node,
 	int ret;
 	unsigned int val;
 
+	//CORE-DL-AddLog-00 +[
+	/* Check register first */
+	ret = ncp6335x_read(dd, dd->vsel_reg, &val);
+	if (ret < 0) {
+		dev_err(dd->dev, "Failed to get data from reg %x, ret = %d\n",
+			dd->vsel_reg, ret);
+		return ret;
+	} else if (val & NCP6335D_ENABLE) {
+		dev_info(dd->dev, "NCP6335D WAS NORMAL reg=%x, ret=%x\n", dd->vsel_reg, val);
+	} else {
+		dev_err(dd->dev, "NCP6335D WAS DISABLE!! reg=%x, ret=%x\n", dd->vsel_reg, val);
+	}
+	//CORE-DL-AddLog-00 +]
+
 	/* Restore register from back up register */
 	ret = ncp6335x_read(dd, dd->vsel_backup_reg, &val);
 	if (ret < 0) {
@@ -324,8 +359,18 @@ static int ncp6335d_restore_working_reg(struct device_node *node,
 		return ret;
 	}
 
+	//CORE-DL-FixDeviceCanNotPowerON-00 +[
+	if (val & NCP6335D_ENABLE)
+		dev_info(dd->dev, "enable NCP6335D\n");
+	else
+		dev_err(dd->dev, "enable bit is not set! force enable NCP6335D\n");
+
+	val |= NCP6335D_ENABLE;
 	ret = ncp6335x_update_bits(dd, dd->vsel_reg,
-					NCP6335D_VOUT_SEL_MASK, val);
+					//NCP6335D_VOUT_SEL_MASK, val);
+					0xff, val);
+	//CORE-DL-FixDeviceCanNotPowerON-00 +]
+
 	if (ret < 0) {
 		dev_err(dd->dev, "Failed to update working reg %d, ret = %d\n",
 			dd->vsel_reg,  ret);
@@ -654,6 +699,7 @@ static int ncp6335d_regulator_probe(struct i2c_client *client,
 	dd->init_data = pdata->init_data;
 	dd->dev = &client->dev;
 	i2c_set_clientdata(client, dd);
+	mutex_init(&dd->ncp_mutex);
 
 	rc = ncp6335d_init(client, dd, pdata);
 	if (rc) {
@@ -712,6 +758,35 @@ static int ncp6335d_regulator_remove(struct i2c_client *client)
 	return 0;
 }
 
+static int ncp6335d_suspend_noirq(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct ncp6335d_info *dd = i2c_get_clientdata(client);
+
+	mutex_lock(&dd->ncp_mutex);
+	dd->is_suspend = true;
+	mutex_unlock(&dd->ncp_mutex);
+
+	return 0;
+}
+
+static int ncp6335d_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct ncp6335d_info *dd = i2c_get_clientdata(client);
+
+	mutex_lock(&dd->ncp_mutex);
+	dd->is_suspend = false;
+	mutex_unlock(&dd->ncp_mutex);
+
+	return 0;
+}
+
+static const struct dev_pm_ops ncp6335d_pm_ops = {
+	.suspend_noirq = ncp6335d_suspend_noirq,
+	.resume = ncp6335d_resume,
+};
+
 static struct of_device_id ncp6335d_match_table[] = {
 	{ .compatible = "onnn,ncp6335d-regulator", },
 	{},
@@ -728,6 +803,7 @@ static struct i2c_driver ncp6335d_regulator_driver = {
 		.name = "ncp6335d-regulator",
 		.owner = THIS_MODULE,
 		.of_match_table = ncp6335d_match_table,
+		.pm = &ncp6335d_pm_ops,
 	},
 	.probe = ncp6335d_regulator_probe,
 	.remove = ncp6335d_regulator_remove,

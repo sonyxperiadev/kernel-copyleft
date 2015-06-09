@@ -169,7 +169,8 @@ static void mdss_dsi_28nm_phy_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 
 	/* LDO ctrl */
 	if (pd->reg_ldo_mode)
-		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x1dc, 0x25);
+		/* MM-GL-DISPLAY-panel-00- *///MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x1dc, 0x25);
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x1dc, 0x15);/* MM-GL-DISPLAY-panel-00+ */
 	else
 		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x1dc, 0x00);
 

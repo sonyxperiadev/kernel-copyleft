@@ -109,6 +109,7 @@ struct msm_camera_power_ctrl_t {
 	struct msm_pinctrl_info pinctrl_info;
 	uint8_t cam_pinctrl_status;
 	uint16_t clk_info_size;
+	uint32_t is_msm8916;/* MM-MC-BringUpCamerForMSM8936-00+ */
 };
 
 enum msm_camera_actuator_name {

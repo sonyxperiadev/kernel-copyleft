@@ -30,14 +30,26 @@
 		interrupts = <62 8>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&smb_int_default>;
-		qcom,charging-disabled;
-		qcom,empty-soc-disabled;
+		//qcom,charging-disabled; //CORE-DL-ImplementChgAlg-00
 		qcom,chg-inhibit-disabled;
-		qcom,float-voltage-mv = <4200>;
-		qcom,iterm-ma = <200>;
-		qcom,recharge-thresh-mv = <100>;
 		qcom,thermal-mitigation = <1500 700 600 0>;
 		regulator-name = "smb1360_otg_vreg";
+		//CORE-DL-ImplementChgAlg-00 +[
+		qcom,float-voltage-mv = <4350>;
+		qcom,iterm-ma = <100>;
+		qcom,recharge-thresh-mv = <200>;
+		qcom,batt-profile-select;
+		qcom,smb1360-vadc = <&pm8916_vadc>;
+		qcom,batt-id-vref-uv = <1800000>;
+		qcom,batt-id-rpullup-kohm = <100>;
+		qcom,profile-a-rid-kohm = <324>;
+		qcom,profile-b-rid-kohm = <181>;
+		qcom,shdn-after-pwroff;
+		//qcom,fg-reset-at-pon;
+		//qcom,fg-reset-thresold-mv = <25>;
+		qcom,empty-soc-disabled; //CORE-DL-DisableEmptySoc-00
+		qcom,fg-auto-recharge-soc = <99>;
+		//CORE-DL-ImplementChgAlg-00 +]
 	};
 };
 
@@ -52,7 +64,7 @@
 };
 
 &usb_otg {
-	qcom,hsusb-otg-mode = <3>;
+	qcom,hsusb-otg-mode = <1>;
 	qcom,usbid-gpio = <&msm_gpio 110 0>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&usbid_default>;

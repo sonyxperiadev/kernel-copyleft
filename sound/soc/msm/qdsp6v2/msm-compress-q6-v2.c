@@ -546,6 +546,7 @@ static void compr_event_handler(uint32_t opcode,
 		snd_compr_fragment_elapsed(cstream);
 		prtd->copied_total = prtd->bytes_received;
 		atomic_set(&prtd->error, 1);
+		wake_up(&prtd->drain_wait);
 		spin_unlock_irqrestore(&prtd->lock, flags);
 		break;
 	default:
@@ -737,10 +738,6 @@ static int msm_compr_init_pp_params(struct snd_compr_stream *cstream,
 			pr_err("%s: Send SoftVolume2 Param failed ret=%d\n",
 			__func__, ret);
 
-		ret = msm_compr_set_volume(cstream, 0, 0);
-		if (ret < 0)
-			pr_err("%s : Set Volume failed : %d", __func__, ret);
-
 	case ASM_STREAM_POSTPROC_TOPO_ID_DTS_HPX:
 
 		msm_dts_eagle_init_pre(ac);
@@ -752,10 +749,6 @@ static int msm_compr_init_pp_params(struct snd_compr_stream *cstream,
 		if (ret < 0)
 			pr_err("%s: Send SoftVolume Param failed ret=%d\n",
 			__func__, ret);
-
-		ret = msm_compr_set_volume(cstream, 0, 0);
-		if (ret < 0)
-			pr_err("%s : Set Volume failed : %d", __func__, ret);
 
 		break;
 	}
@@ -771,6 +764,17 @@ static int msm_compr_configure_dsp(struct snd_compr_stream *cstream)
 	int dir = IN, ret = 0;
 	struct audio_client *ac = prtd->audio_client;
 	uint32_t stream_index;
+	struct asm_softpause_params softpause = {
+		.enable = SOFT_PAUSE_ENABLE,
+		.period = SOFT_PAUSE_PERIOD,
+		.step = SOFT_PAUSE_STEP,
+		.rampingcurve = SOFT_PAUSE_CURVE_LINEAR,
+	};
+	struct asm_softvolume_params softvol = {
+		.period = SOFT_VOLUME_PERIOD,
+		.step = SOFT_VOLUME_STEP,
+		.rampingcurve = SOFT_VOLUME_CURVE_LINEAR,
+	};
 
 	pr_debug("%s: stream_id %d\n", __func__, ac->stream_id);
 	if (prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S24_LE)
@@ -818,9 +822,20 @@ static int msm_compr_configure_dsp(struct snd_compr_stream *cstream)
 			pr_err("%s: stream reg failed:%d\n", __func__, ret);
 			return ret;
 		}
-
-		msm_compr_init_pp_params(cstream, ac);
 	}
+
+	ret = msm_compr_set_volume(cstream, 0, 0);
+	if (ret < 0)
+		pr_err("%s : Set Volume failed : %d", __func__, ret);
+
+	ret = q6asm_set_softpause(ac, &softpause);
+	if (ret < 0)
+		pr_err("%s: Send SoftPause Param failed ret=%d\n",
+				__func__, ret);
+	ret = q6asm_set_softvolume(ac, &softvol);
+	if (ret < 0)
+		pr_err("%s: Send SoftVolume Param failed ret=%d\n",
+				__func__, ret);
 
 	ret = q6asm_set_io_mode(ac, (COMPRESSED_STREAM_IO | ASYNC_IO_MODE));
 	if (ret < 0) {
@@ -1233,13 +1248,18 @@ static int msm_compr_drain_buffer(struct msm_compr_audio *prtd,
 	rc = wait_event_interruptible(prtd->drain_wait,
 					prtd->drain_ready ||
 					prtd->cmd_interrupt ||
-					atomic_read(&prtd->xrun));
+					atomic_read(&prtd->xrun) ||
+					atomic_read(&prtd->error));
 	pr_debug("%s: out of buffer drain wait with ret %d\n", __func__, rc);
 	spin_lock_irqsave(&prtd->lock, *flags);
 	if (prtd->cmd_interrupt) {
 		pr_debug("%s: buffer drain interrupted by flush)\n", __func__);
 		rc = -EINTR;
 		prtd->cmd_interrupt = 0;
+	}
+	if (atomic_read(&prtd->error)) {
+		pr_err("%s: Got RESET EVENTS notification, return\n", __func__);
+		rc = -ENETRESET;
 	}
 	return rc;
 }
@@ -1314,21 +1334,26 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 	spin_unlock_irqrestore(&prtd->lock, flags);
 
 	switch (cmd) {
+       /* MM-UW-fix mp3 pop noise-00+{ */  
 	case SNDRV_PCM_TRIGGER_START:
 		pr_debug("%s: SNDRV_PCM_TRIGGER_START\n", __func__);
 		atomic_set(&prtd->start, 1);
-		q6asm_run_nowait(prtd->audio_client, 0, 0, 0);
-
-		msm_compr_set_volume(cstream, 0, 0);
+        
+		/* set volume for the stream before RUN */
+              rc = msm_compr_init_pp_params(cstream, ac);
 		if (rc)
 			pr_err("%s : Set Volume (0,0) failed : %d\n",
 				__func__, rc);
 
 		msm_compr_set_volume(cstream, volume[0], volume[1]);
 		if (rc)
-			pr_err("%s : Set Volume failed : %d\n",
+			pr_err("%s : init PP params failed : %d\n",
 				__func__, rc);
+
+              /* issue RUN command for the stream */
+              q6asm_run_nowait(prtd->audio_client, 0, 0, 0);
 		break;
+       /* MM-UW-fix mp3 pop noise-00+} */  
 	case SNDRV_PCM_TRIGGER_STOP:
 		spin_lock_irqsave(&prtd->lock, flags);
 		pr_debug("%s: SNDRV_PCM_TRIGGER_STOP transition %d\n", __func__,
@@ -2610,8 +2635,6 @@ static struct snd_soc_platform_driver msm_soc_platform = {
 
 static int msm_compr_dev_probe(struct platform_device *pdev)
 {
-	if (pdev->dev.of_node)
-		dev_set_name(&pdev->dev, "%s", "msm-compress-dsp");
 
 	pr_debug("%s: dev name %s\n", __func__, dev_name(&pdev->dev));
 	return snd_soc_register_platform(&pdev->dev,

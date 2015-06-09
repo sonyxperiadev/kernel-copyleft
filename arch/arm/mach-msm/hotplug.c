@@ -123,6 +123,7 @@ int msm_platform_secondary_init(unsigned int cpu)
 
 	if (!(*warm_boot)) {
 		*warm_boot = 1;
+		if (cpu)
 		return 0;
 	}
 	msm_jtag_restore_state();

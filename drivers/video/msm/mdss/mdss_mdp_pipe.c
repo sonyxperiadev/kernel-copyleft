@@ -511,13 +511,7 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 	if (rc)
 		return rc;
 
-	/*
-	 * Don't want to allow SMP changes for backend composition pipes
-	 * inorder to preserve SMPs as much as possible.
-	 * On the contrary for non backend composition pipes we should
-	 * allow SMP allocations to prevent composition failures.
-	 */
-	force_alloc = !(pipe->flags & MDP_BACKEND_COMPOSITION);
+	force_alloc = pipe->flags & MDP_SMP_FORCE_ALLOC;
 
 	mutex_lock(&mdss_mdp_smp_lock);
 	if (!is_unused_smp_allowed()) {
@@ -1307,6 +1301,7 @@ static int mdss_mdp_image_setup(struct mdss_mdp_pipe *pipe,
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 	struct mdss_rect sci, dst, src;
 	bool rotation = false;
+	u32 panel_orientation = 0;
 
 	pr_debug("ctl: %d pnum=%d wh=%dx%d src={%d,%d,%d,%d} dst={%d,%d,%d,%d}\n",
 			pipe->mixer_left->ctl->num, pipe->num,
@@ -1360,6 +1355,15 @@ static int mdss_mdp_image_setup(struct mdss_mdp_pipe *pipe,
 			src.y = pipe->src.y + (pipe->src.y + pipe->src.h)
 				- (src.y + src.h);
 		}
+	}
+
+	if (!(pipe->mixer_left->rotator_mode)) {
+		panel_orientation = pipe->mixer_left->ctl->mfd->panel_orientation;
+		if (panel_orientation & MDP_FLIP_LR)
+			dst.x =  pipe->mixer_left->ctl->roi.w - dst.x - dst.w;
+
+		if (panel_orientation & MDP_FLIP_UD)
+			dst.y =  pipe->mixer_left->ctl->roi.h - dst.y - dst.h;
 	}
 
 	src_size = (src.h << 16) | src.w;
@@ -1735,7 +1739,7 @@ int mdss_mdp_pipe_is_staged(struct mdss_mdp_pipe *pipe)
 static inline void __mdss_mdp_pipe_program_pixel_extn_helper(
 	struct mdss_mdp_pipe *pipe, u32 plane, u32 off)
 {
-	u32 src_h = pipe->src.h >> pipe->vert_deci;
+	u32 src_h = (pipe->src.h + (1 << pipe->vert_deci) - 1) >> pipe->vert_deci;
 	u32 mask = 0xFF;
 
 	/*

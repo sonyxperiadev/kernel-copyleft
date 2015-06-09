@@ -21,6 +21,12 @@
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
+/* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+{ */
+/* Main: 0, Second: 1 */
+uint8_t g_main_cam_sensor_source = 0;
+uint8_t g_front_cam_sensor_source = 0;
+/* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+} */
+
 DEFINE_MSM_MUTEX(msm_eeprom_mutex);
 #ifdef CONFIG_COMPAT
 static struct v4l2_file_operations msm_eeprom_v4l2_subdev_fops;
@@ -958,6 +964,13 @@ static int msm_eeprom_config32(struct msm_eeprom_ctrl_t *e_ctrl,
 		memcpy(cdata->cfg.eeprom_name,
 			e_ctrl->eboard_info->eeprom_name,
 			sizeof(cdata->cfg.eeprom_name));
+
+        /* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+{ */
+        cdata->main_cam_sensor_source = g_main_cam_sensor_source;
+        cdata->front_cam_sensor_source = g_front_cam_sensor_source;
+        printk("%s cdata->cam_main_sensor_source = %d \n", __func__, cdata->main_cam_sensor_source);
+        printk("%s cdata->cam_front_sensor_source = %d \n", __func__, cdata->front_cam_sensor_source);
+        /* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+} */
 		break;
 	case CFG_EEPROM_GET_CAL_DATA:
 		CDBG("%s E CFG_EEPROM_GET_CAL_DATA\n", __func__);
@@ -1171,7 +1184,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 		msm_eeprom_subdev_fops_ioctl32;
 	e_ctrl->msm_sd.sd.devnode->fops = &msm_eeprom_v4l2_subdev_fops;
 #endif
-
+    
 	e_ctrl->is_supported = (e_ctrl->is_supported << 1) | 1;
 	CDBG("%s X\n", __func__);
 	return rc;

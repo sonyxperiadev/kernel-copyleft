@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -411,7 +412,15 @@ static int msm_voice_mute_put(struct snd_kcontrol *kcontrol,
 done:
 	return ret;
 }
-
+/*MM-UW-Add AM-00+ */
+static int msm_voice_tx_device_mute_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] =
+		voc_get_tx_device_mute(voc_get_session_id(VOICE_SESSION_NAME));
+	return 0;
+}
+/*MM-UW-Add AM-00- */
 static int msm_voice_tx_device_mute_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
@@ -437,6 +446,40 @@ static int msm_voice_tx_device_mute_put(struct snd_kcontrol *kcontrol,
 done:
 	return ret;
 }
+/*MM-UW-Add AM-00+ */
+static int msm_volte_tx_device_mute_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] =
+		voc_get_tx_device_mute(voc_get_session_id(VOLTE_SESSION_NAME));
+	return 0;
+}
+
+static int msm_volte_tx_device_mute_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	int ret = 0;
+	int mute = ucontrol->value.integer.value[0];
+	uint32_t session_id = ucontrol->value.integer.value[1];
+	int ramp_duration = ucontrol->value.integer.value[2];
+
+	if ((mute < 0) || (mute > 1) || (ramp_duration < 0)
+		|| (ramp_duration > MAX_RAMP_DURATION)) {
+		pr_err(" %s Invalid arguments", __func__);
+
+		ret = -EINVAL;
+		goto done;
+	}
+
+	pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
+		mute, session_id, ramp_duration);
+
+	voc_set_device_mute(session_id, VSS_IVOLUME_DIRECTION_TX,
+			    mute, ramp_duration);
+
+done:
+	return ret;
+}
 
 static int msm_voice_rx_device_mute_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
@@ -454,9 +497,6 @@ static int msm_voice_rx_device_mute_put(struct snd_kcontrol *kcontrol,
 		goto done;
 	}
 
-	pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
-		 mute, session_id, ramp_duration);
-
 	voc_set_device_mute(session_id, VSS_IVOLUME_DIRECTION_RX,
 			    mute, ramp_duration);
 
@@ -464,7 +504,74 @@ done:
 	return ret;
 }
 
+static int msm_voice2_tx_device_mute_get(struct snd_kcontrol *kcontrol,
+					 struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] =
+		voc_get_tx_device_mute(voc_get_session_id(VOICE2_SESSION_NAME));
+	return 0;
+}
+ 
+static int msm_voice2_tx_device_mute_put(struct snd_kcontrol *kcontrol,
+					 struct snd_ctl_elem_value *ucontrol)
+{
+	int ret = 0;
+	int mute = ucontrol->value.integer.value[0];
+	uint32_t session_id = ucontrol->value.integer.value[1];
+	int ramp_duration = ucontrol->value.integer.value[2];
 
+	if ((mute < 0) || (mute > 1) || (ramp_duration < 0)
+		|| (ramp_duration > MAX_RAMP_DURATION)) {
+		pr_err(" %s Invalid arguments", __func__);
+
+		ret = -EINVAL;
+		goto done;
+	}
+
+	pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
+		mute, session_id, ramp_duration);
+
+	voc_set_device_mute(session_id, VSS_IVOLUME_DIRECTION_TX,
+			    mute, ramp_duration);
+
+done:
+	return ret;
+}
+
+static int msm_volte_rx_device_mute_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] =
+		voc_get_rx_device_mute(voc_get_session_id(VOLTE_SESSION_NAME));
+	return 0;
+}
+
+static int msm_volte_rx_device_mute_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	int ret = 0;
+	int mute = ucontrol->value.integer.value[0];
+	uint32_t session_id = ucontrol->value.integer.value[1];
+	int ramp_duration = ucontrol->value.integer.value[2];
+
+	if ((mute < 0) || (mute > 1) || (ramp_duration < 0)
+		|| (ramp_duration > MAX_RAMP_DURATION)) {
+		pr_err(" %s Invalid arguments", __func__);
+
+		ret = -EINVAL;
+		goto done;
+	}
+
+	pr_debug("%s: mute=%d session_id=%#x ramp_duration=%d\n", __func__,
+		mute, session_id, ramp_duration);
+
+	voc_set_device_mute(session_id, VSS_IVOLUME_DIRECTION_RX,
+			    mute, ramp_duration);
+
+done:
+	return ret;
+}
+/*MM-UW-Add AM-00- */
 
 static const char const *tty_mode[] = {"OFF", "HCO", "VCO", "FULL"};
 static const struct soc_enum msm_tty_mode_enum[] = {
@@ -590,6 +697,20 @@ static struct snd_kcontrol_new msm_voice_controls[] = {
 				msm_voice_tty_mode_put),
 	SOC_SINGLE_MULTI_EXT("Slowtalk Enable", SND_SOC_NOPM, 0, VSID_MAX, 0, 2,
 				NULL, msm_voice_slowtalk_put),
+	/*MM-UW-Add AM-00+ */			
+	SOC_SINGLE_MULTI_EXT("Voice Tx Device Mute", SND_SOC_NOPM, 0, VSID_MAX,
+				0, 3, msm_voice_tx_device_mute_get,
+				msm_voice_tx_device_mute_put),
+  SOC_SINGLE_MULTI_EXT("VoLTE Rx Device Mute", SND_SOC_NOPM, 0, VSID_MAX,
+				0, 3, msm_volte_rx_device_mute_get,
+				msm_volte_rx_device_mute_put),
+	SOC_SINGLE_MULTI_EXT("VoLTE Tx Device Mute", SND_SOC_NOPM, 0, VSID_MAX,
+				0, 3, msm_volte_tx_device_mute_get,
+				msm_volte_tx_device_mute_put),
+	SOC_SINGLE_MULTI_EXT("Voice2 Tx Device Mute", SND_SOC_NOPM, 0, VSID_MAX,
+				0, 3, msm_voice2_tx_device_mute_get,
+				msm_voice2_tx_device_mute_put),
+	/*MM-UW-Add AM-00- */			
 	SOC_SINGLE_MULTI_EXT("Voice Topology Disable", SND_SOC_NOPM, 0,
 			     VSID_MAX, 0, 2, NULL,
 			     msm_voice_topology_disable_put),
@@ -666,8 +787,6 @@ static int msm_pcm_probe(struct platform_device *pdev)
 		       __func__, rc);
 	}
 
-	if (pdev->dev.of_node)
-		dev_set_name(&pdev->dev, "%s", "msm-pcm-voice");
 	pr_debug("%s: dev name %s\n",
 			__func__, dev_name(&pdev->dev));
 	destroy_cvd = of_property_read_bool(pdev->dev.of_node,

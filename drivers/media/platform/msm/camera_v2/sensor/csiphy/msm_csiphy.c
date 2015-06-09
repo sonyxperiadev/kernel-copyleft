@@ -25,7 +25,7 @@
 #include "include/msm_csiphy_3_1_hwreg.h"
 #include "include/msm_csiphy_3_2_hwreg.h"
 
-#define DBG_CSIPHY 0
+#define DBG_CSIPHY 1/* MM-MC-EnableCsiphyLogForCameraDaemonDied-00* */
 
 #define V4L2_IDENT_CSIPHY                        50003
 #define CSIPHY_VERSION_V22                        0x01

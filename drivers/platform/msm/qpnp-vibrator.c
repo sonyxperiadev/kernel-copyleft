@@ -67,6 +67,8 @@ struct qpnp_vib {
 	struct mutex lock;
 };
 
+int vib_Level; /* PERI-JC-VIBRATOR_Add_level_file_node-00+ */
+
 static int qpnp_vib_read_u8(struct qpnp_vib *vib, u8 *data, u16 reg)
 {
 	int rc;
@@ -150,6 +152,17 @@ static int qpnp_vib_set(struct qpnp_vib *vib, int on)
 		if (vib->mode != QPNP_VIB_MANUAL)
 			pwm_enable(vib->pwm_info.pwm_dev);
 		else {
+
+			/* PERI-JC-VIBRATOR_Add_level_file_node-00+ */
+			val = vib->reg_vtg_ctl;
+			val &= ~QPNP_VIB_VTG_SET_MASK;
+			val |= (vib->vtg_level & QPNP_VIB_VTG_SET_MASK);
+			rc = qpnp_vib_write_u8(vib, &val, QPNP_VIB_VTG_CTL(vib->base));
+			if (rc < 0)
+				return rc;
+			vib->reg_vtg_ctl = val;
+			/* PERI-JC-VIBRATOR_Add_level_file_node-00+ */
+
 			val = vib->reg_en_ctl;
 			val |= QPNP_VIB_EN;
 			rc = qpnp_vib_write_u8(vib, &val,
@@ -183,6 +196,11 @@ static void qpnp_vib_enable(struct timed_output_dev *dev, int value)
 	mutex_lock(&vib->lock);
 	hrtimer_cancel(&vib->vib_timer);
 
+	/* PERI-JC-VIBRATOR_Add_level_file_node-00+[ */
+	vib->vtg_level = vib_Level;
+    	pr_info("qpnp_vib_enable level: %d, value: %d.\n", vib->vtg_level, value);
+    	/* PERI-JC-VIBRATOR_Add_level_file_node-00+] */
+		
 	if (value == 0)
 		vib->state = 0;
 	else {
@@ -226,6 +244,45 @@ static enum hrtimer_restart qpnp_vib_timer_func(struct hrtimer *timer)
 
 	return HRTIMER_NORESTART;
 }
+
+/* PERI-JC-VIBRATOR_Add_level_file_node-00+[ */
+static ssize_t vib_level_show(struct device *dev,
+								struct device_attribute *attr, char *buf)
+{
+	dev_info(dev, "vib_level_show %d.\n", vib_Level);
+	return snprintf(buf, PAGE_SIZE, "%d\n", vib_Level);
+}
+
+static ssize_t vib_level_store(struct device *dev,
+								struct device_attribute *attr,
+								const char *buf, size_t size)
+{
+	int Level;
+
+	Level = simple_strtoul(buf, NULL, 10);
+
+	dev_info(dev, "vib_level_store %d.\n", Level);
+
+	if (Level > 0) {
+		vib_Level = Level / 100;
+		if (vib_Level < QPNP_VIB_MIN_LEVEL)
+			vib_Level = QPNP_VIB_MIN_LEVEL;
+		else if (vib_Level > QPNP_VIB_MAX_LEVEL)
+			vib_Level = QPNP_VIB_MAX_LEVEL;
+	}
+    
+	return sizeof(Level);
+}
+
+static struct device_attribute dev_attr_level = {
+	.attr = {
+		.name = "level",
+		.mode = 0664,
+	},
+	.show   = vib_level_show,
+	.store  = vib_level_store,
+};
+/* PERI-JC-VIBRATOR_Add_level_file_node-00+] */
 
 #ifdef CONFIG_PM
 static int qpnp_vibrator_suspend(struct device *dev)
@@ -371,7 +428,19 @@ static int qpnp_vibrator_probe(struct spmi_device *spmi)
 	rc = timed_output_dev_register(&vib->timed_dev);
 	if (rc < 0)
 		return rc;
-
+	
+	/* PERI-JC-VIBRATOR_Add_level_file_node-00+[ */
+	vib_Level = vib->vtg_level;
+    	pr_info("qpnp_vibrator_probe default vib_Level %d \n", vib_Level);
+    
+   	 /* Set voltage parameter of vibrator(corresponding to the file node /sys/class/timed_output/vibrator/level) */
+    	rc = device_create_file(vib->timed_dev.dev, &dev_attr_level);   
+	if (rc) {
+		pr_err("qpnp_vibrator_probe dev_attr_level device_create_file failed\n");
+		device_remove_file(vib->timed_dev.dev, &dev_attr_level);
+	}
+	/* PERI-JC-VIBRATOR_Add_level_file_node-00+] */
+	
 	return rc;
 }
 

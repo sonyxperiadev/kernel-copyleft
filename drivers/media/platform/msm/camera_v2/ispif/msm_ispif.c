@@ -61,8 +61,8 @@ static void msm_ispif_io_dump_reg(struct ispif_device *ispif)
 static inline int msm_ispif_is_intf_valid(uint32_t csid_version,
 	uint8_t intf_type)
 {
-	return (csid_version <= CSID_VERSION_V22 && intf_type != VFE0) ?
-		false : true;
+        return ((csid_version <= CSID_VERSION_V22 && intf_type != VFE0) ||
+                (intf_type >= VFE_MAX)) ? false : true;
 }
 
 static struct msm_cam_clk_info ispif_8626_reset_clk_info[] = {
@@ -593,6 +593,11 @@ static int msm_ispif_config(struct ispif_device *ispif,
 
 	for (i = 0; i < params->num; i++) {
 		vfe_intf = params->entries[i].vfe_intf;
+		if (vfe_intf >= VFE_MAX) {
+			pr_err("%s: %d invalid i %d vfe_intf %d\n", __func__,
+				__LINE__, i, vfe_intf);
+			return -EINVAL;
+		}
 		if (!msm_ispif_is_intf_valid(ispif->csid_version,
 				vfe_intf)) {
 			pr_err("%s: invalid interface type\n", __func__);
@@ -801,6 +806,8 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 	uint32_t vfe_mask = 0;
 	uint32_t intf_addr;
 	struct clk *reset_clk[ARRAY_SIZE(ispif_8974_reset_clk_info)];
+	struct clk *reset_clk1[ARRAY_SIZE(ispif_8626_reset_clk_info)];
+	ispif->clk_idx = 0;
 
 	if (ispif->ispif_state != ISPIF_POWER_UP) {
 		pr_err("%s: ispif invalid state %d\n", __func__,
@@ -818,9 +825,19 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 		ispif_8974_reset_clk_info, reset_clk,
 		ARRAY_SIZE(ispif_8974_reset_clk_info), 1);
 	if (rc < 0) {
-		pr_err("%s: cannot enable clock, error = %d",
-			__func__, rc);
-			goto end;
+		rc = msm_cam_clk_enable(&ispif->pdev->dev,
+			ispif_8626_reset_clk_info, reset_clk1,
+			ARRAY_SIZE(ispif_8626_reset_clk_info), 1);
+		if (rc < 0) {
+			pr_err("%s: cannot enable clock, error = %d",
+				__func__, rc);
+		} else {
+			/* This is set when device is 8x26 */
+			ispif->clk_idx = 2;
+		}
+	} else {
+		/* This is set when device is 8974 */
+		ispif->clk_idx = 1;
 	}
 
 	if (vfe_mask & (1 << VFE0)) {
@@ -859,15 +876,28 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 	}
 
 	pr_info("%s: ISPIF reset hw done", __func__);
-	rc = msm_cam_clk_enable(&ispif->pdev->dev,
-		ispif_8974_reset_clk_info, reset_clk,
-		ARRAY_SIZE(ispif_8974_reset_clk_info), 0);
-	if (rc < 0) {
-		pr_err("%s: cannot enable clock, error = %d",
-			__func__, rc);
+
+	if (ispif->clk_idx == 1) {
+		rc = msm_cam_clk_enable(&ispif->pdev->dev,
+			ispif_8974_reset_clk_info, reset_clk,
+			ARRAY_SIZE(ispif_8974_reset_clk_info), 0);
+		if (rc < 0) {
+			pr_err("%s: cannot disable clock, error = %d",
+				__func__, rc);
 			goto end;
+		}
 	}
 
+	if (ispif->clk_idx == 2) {
+		rc = msm_cam_clk_enable(&ispif->pdev->dev,
+			ispif_8626_reset_clk_info, reset_clk1,
+			ARRAY_SIZE(ispif_8626_reset_clk_info), 0);
+		if (rc < 0) {
+			pr_err("%s: cannot disable clock, error = %d",
+				__func__, rc);
+			goto end;
+		}
+	}
 
 	for (i = 0; i < params->num; i++) {
 		intftype = params->entries[i].intftype;
@@ -920,8 +950,12 @@ disable_clk:
 		ispif_8974_reset_clk_info, reset_clk,
 		ARRAY_SIZE(ispif_8974_reset_clk_info), 0);
 	if (rc < 0) {
-		pr_err("%s: cannot enable clock, error = %d",
-		__func__, rc);
+		rc = msm_cam_clk_enable(&ispif->pdev->dev,
+			ispif_8626_reset_clk_info, reset_clk1,
+			ARRAY_SIZE(ispif_8626_reset_clk_info), 0);
+		if (rc < 0)
+			pr_err("%s: cannot enable clock, error = %d",
+				__func__, rc);
 	}
 
 	return -ETIMEDOUT;

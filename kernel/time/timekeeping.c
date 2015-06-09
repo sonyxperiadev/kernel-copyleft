@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *  linux/kernel/time/timekeeping.c
  *
  *  Kernel timekeeping code and accessor functions
@@ -350,6 +351,28 @@ ktime_t ktime_get(void)
 	return ktime_add_ns(ktime_set(secs, 0), nsecs);
 }
 EXPORT_SYMBOL_GPL(ktime_get);
+
+//CORE-PK-SuspendLog-00+[
+ktime_t ktime_get_in_suspend(void)
+{
+	struct timekeeper *tk = &timekeeper;
+	unsigned int seq;
+	s64 secs, nsecs;
+
+	do {
+		seq = read_seqcount_begin(&timekeeper_seq);
+		secs = tk->xtime_sec + tk->wall_to_monotonic.tv_sec;
+		nsecs = timekeeping_get_ns(tk) + tk->wall_to_monotonic.tv_nsec;
+
+	} while (read_seqcount_retry(&timekeeper_seq, seq));
+	/*
+	 * Use ktime_set/ktime_add_ns to create a proper ktime on
+	 * 32-bit architectures without CONFIG_KTIME_SCALAR.
+	 */
+	return ktime_add_ns(ktime_set(secs, 0), nsecs);
+}
+EXPORT_SYMBOL_GPL(ktime_get_in_suspend);
+//CORE-PK-SuspendLog-00+]
 
 /**
  * ktime_get_ts - get the monotonic clock in timespec format

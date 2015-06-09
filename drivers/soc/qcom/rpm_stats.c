@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -70,6 +71,17 @@ struct msm_rpm_stats_data_v2 {
 
 static struct dentry *heap_dent;
 
+//CORE-PK-RPMStatsLog-00+[
+#ifdef CONFIG_FIH_FEATURE_RPM_STATS_LOG
+struct msm_rpmstats_platform_data rpmstats_pdata;
+struct msm_rpmstats_private_data *rpmstats_prvdata = NULL;
+struct msm_rpmstats_mode_data rpmstats;
+struct msm_rpmstats_mode_data rpmstats_enter;
+struct msm_rpmstats_mode_data rpmstats_exit;
+struct msm_rpmstats_mode_data rpmstats_suspend;
+#endif
+//CORE-PK-RPMStatsLog-00+]
+
 static inline u64 get_time_in_sec(u64 counter)
 {
 	do_div(counter, MSM_ARCH_TIMER_FREQ);
@@ -78,8 +90,14 @@ static inline u64 get_time_in_sec(u64 counter)
 
 static inline u64 get_time_in_msec(u64 counter)
 {
+	//CORE-PK-RPMStatsLog-00*[
+	#ifdef CONFIG_FIH_FEATURE_RPM_STATS_LOG
+	do_div(counter, MSM_ARCH_TIMER_FREQ/MSEC_PER_SEC);
+	#else
 	do_div(counter, MSM_ARCH_TIMER_FREQ);
 	counter *= MSEC_PER_SEC;
+	#endif
+	//CORE-PK-RPMStatsLog-00+]
 	return counter;
 }
 
@@ -99,6 +117,31 @@ static inline int msm_rpmstats_append_data_to_buf(char *buf,
 	time_since_last_mode = arch_counter_get_cntpct() - data->last_exited_at;
 	time_since_last_mode = get_time_in_sec(time_since_last_mode);
 	actual_last_sleep = get_time_in_msec(data->accumulated);
+	//CORE-PK-RPMStatsLog-00+[
+	#ifdef CONFIG_FIH_FEATURE_RPM_STATS_LOG
+	if (!strncmp(stat_type,"xosd",4))
+	{
+		rpmstats.xosd_count = data->count;
+		rpmstats.xosd_time_in_last_mode = time_in_last_mode;
+		rpmstats.xosd_time_since_last_mode = time_since_last_mode;
+		rpmstats.xosd_actual_last_sleep = actual_last_sleep;
+	}
+	else if (!strncmp(stat_type,"vmin",4))
+	{
+		rpmstats.vmin_count = data->count;
+		rpmstats.vmin_time_in_last_mode = time_in_last_mode;
+		rpmstats.vmin_time_since_last_mode = time_since_last_mode;
+		rpmstats.vmin_actual_last_sleep = actual_last_sleep;
+	}
+	else
+	{
+		rpmstats.vmin_count = 0;
+		rpmstats.vmin_time_in_last_mode = 0;
+		rpmstats.vmin_time_since_last_mode = 0;
+		rpmstats.vmin_actual_last_sleep = 0;
+	}
+	#endif
+	//CORE-PK-RPMStatsLog-00+]
 
 	return  snprintf(buf , buflength,
 		"RPM Mode:%s\n\t count:%d\ntime in last mode(msec):%llu\n"
@@ -371,7 +414,12 @@ static int msm_rpmstats_probe(struct platform_device *pdev)
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 							"phys_addr_base");
 	if (!res)
+	//CORE-PK-FixCoverity#94179-00*[
+	{
+		kfree(pdata);
 		return -EINVAL;
+	}
+	//CORE-PK-FixCoverity#94179-00*]
 
 	offset = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 							"offset_addr");
@@ -415,6 +463,39 @@ static int msm_rpmstats_probe(struct platform_device *pdev)
 		kfree(pdata);
 		return -EINVAL;
 	}
+
+	//CORE-PK-RPMStatsLog-01*[
+	#ifdef CONFIG_FIH_FEATURE_RPM_STATS_LOG
+	rpmstats_pdata.phys_addr_base = pdata->phys_addr_base;
+	rpmstats_pdata.phys_size = pdata->phys_size;
+	rpmstats_pdata.version = pdata->version;
+
+	rpmstats_prvdata = kmalloc(sizeof(struct msm_rpmstats_private_data), GFP_KERNEL);
+
+	if (!rpmstats_prvdata)
+	{
+		pr_err("%s: ERROR to allocate msm_rpmstats_private_data\n", __func__);
+	}
+	else
+	{
+		rpmstats_prvdata->reg_base = ioremap_nocache(rpmstats_pdata.phys_addr_base,	rpmstats_pdata.phys_size);
+
+		if (!rpmstats_prvdata->reg_base)
+		{
+			kfree(rpmstats_prvdata);
+			rpmstats_prvdata = NULL;
+			pr_err("%s: ERROR could not ioremap start=%p, len=%u\n",
+				__func__, (void *)rpmstats_pdata.phys_addr_base, rpmstats_pdata.phys_size);
+		}
+		else
+		{
+			rpmstats_prvdata->platform_data = &rpmstats_pdata;
+			if (rpmstats_pdata.version == 2)
+				rpmstats_prvdata->num_records = 2;
+		}
+	}
+	#endif
+	//CORE-PK-RPMStatsLog-01*]
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 						"heap_phys_addrbase");
@@ -468,6 +549,38 @@ static void __exit msm_rpmstats_exit(void)
 {
 	platform_driver_unregister(&msm_rpmstats_driver);
 }
+
+//CORE-PK-RPMStatsLog-00+[
+#ifdef CONFIG_FIH_FEATURE_RPM_STATS_LOG
+void msm_rpmstats_get_stats_v2(struct msm_rpmstats_mode_data *rpm_stats)
+{
+	if (rpmstats_prvdata)
+	{
+		rpmstats_prvdata->read_idx = rpmstats_prvdata->len = 0;
+
+		msm_rpmstats_copy_stats_v2(rpmstats_prvdata);
+
+		rpm_stats->xosd_count = rpmstats.xosd_count;
+		rpm_stats->xosd_time_since_last_mode = rpmstats.xosd_time_since_last_mode;
+		rpm_stats->xosd_actual_last_sleep = rpmstats.xosd_actual_last_sleep;
+		rpm_stats->vmin_count = rpmstats.vmin_count;
+		rpm_stats->vmin_time_since_last_mode = rpmstats.vmin_time_since_last_mode;
+		rpm_stats->vmin_actual_last_sleep = rpmstats.vmin_actual_last_sleep;
+	}
+	else
+	{
+		rpm_stats->xosd_count = 0;
+		rpm_stats->xosd_time_since_last_mode = 0;
+		rpm_stats->xosd_actual_last_sleep = 0;
+		rpm_stats->vmin_count = 0;
+		rpm_stats->vmin_time_since_last_mode = 0;
+		rpm_stats->vmin_actual_last_sleep = 0;
+	}
+}
+EXPORT_SYMBOL(msm_rpmstats_get_stats_v2);
+#endif
+//CORE-PK-RPMStatsLog-00+]
+
 module_init(msm_rpmstats_init);
 module_exit(msm_rpmstats_exit);
 

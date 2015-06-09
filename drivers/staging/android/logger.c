@@ -37,6 +37,12 @@
 #define CONFIG_LOGCAT_SIZE 256
 #endif
 
+/*CORE-KH-DebugToolPorting-00-m[ */
+#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
+#include "alog_ram_console.h" 
+#endif
+/*CORE-KH-DebugToolPorting-00-m] */
+
 /**
  * struct logger_log - represents a specific log, such as 'main' or 'radio'
  * @buffer:	The actual ring buffer
@@ -342,6 +348,8 @@ out:
 	return ret;
 }
 
+//CORE-BH-LastAlogL64-00-[
+#if 0
 /*
  * get_next_entry - return the offset of the first valid entry at least 'len'
  * bytes after 'off'.
@@ -463,6 +471,8 @@ static ssize_t do_write_log_from_user(struct logger_log *log,
 
 	return count;
 }
+#endif
+//CORE-BH-LastAlogL64-00-]
 
 /*
  * logger_aio_write - our write method, implementing support for write(),
@@ -475,17 +485,26 @@ static ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	struct logger_log *log = file_get_log(iocb->ki_filp);
 	size_t orig;
 	struct logger_entry header;
+	struct user_logger_entry_compat header_v1; //FIH-CORE-TH-DebugToolPorting-00+
 	struct timespec now;
 	ssize_t ret = 0;
+/* FIH-CORE-TH-DebugToolPorting-01+[ */
+#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
+	LogType log_type = LOG_TYPE_NUM;
+	int overrun=0;
+#endif	
+/* FIH-CORE-TH-DebugToolPorting-01-] */
 
 	now = current_kernel_time();
 
-	header.pid = current->tgid;
-	header.tid = current->pid;
-	header.sec = now.tv_sec;
-	header.nsec = now.tv_nsec;
+	/* FIH-CORE-TH-DebugToolPorting-01+[ */
+	header_v1.pid = header.pid = current->tgid;
+	header_v1.tid = header.tid = current->pid;
+	header_v1.sec = header.sec = now.tv_sec;
+	header_v1.nsec = header.nsec = now.tv_nsec;
+	/* FIH-CORE-TH-DebugToolPorting-1-] */
 	header.euid = current_euid();
-	header.len = min_t(size_t, iocb->ki_left, LOGGER_ENTRY_MAX_PAYLOAD);
+	header_v1.len = header.len = min_t(size_t, iocb->ki_left, LOGGER_ENTRY_MAX_PAYLOAD); /* FIH-CORE-TH-DebugToolPorting-01+ */
 	header.hdr_size = sizeof(struct logger_entry);
 
 	/* null writes succeed, return zero */
@@ -502,9 +521,55 @@ static ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	 * because if we partially fail, we can end up with clobbered log
 	 * entries that encroach on readable buffer.
 	 */
-	fix_up_readers(log, sizeof(struct logger_entry) + header.len);
+	//fix_up_readers(log, sizeof(struct logger_entry) + header.len); //CORE-BH-LastAlogL64-00-
 
-	do_write_log(log, &header, sizeof(struct logger_entry));
+/* FIH-CORE-TH-DebugToolPorting-01+[ */
+#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
+
+	/* Kernel log may also put into android log buffer, but we don't
+	 * want to see them in last_alog, so we need to wipe it out.
+	 */
+	/* This API is heavily dependent on a user space assumption
+	 * that the full log entry comprising 3 vectors will be passed
+	 * to it in the format:
+	 * (from user space logger file -
+	 * system/core/liblog/logd_write.c):
+	 *    vec[0].iov_base  = (unsigned char *) &prio;
+	 *    vec[0].iov_len    = 1;
+	 *    vec[1].iov_base   = (void *) tag;
+	 *    vec[1].iov_len    = strlen(tag) + 1;
+	 *    vec[2].iov_base   = (void *) msg;
+	 *    vec[2].iov_len    = strlen(msg) + 1;
+	 * Note: vec in userspace is "iov" here.
+	 * Since this driver supplies a function for aio_write, there
+	 * is no aio queueing or retry done. Once we are here we
+	 * consume all of what is passed to us, with or without error.
+	 * That means that no partial vector sets should ever be passed
+	 * in.
+	 */
+	
+//CORE-KH-DebugToolPorting-02-m[
+		if (strncmp(log->misc.name, LOGGER_LOG_MAIN, 8)==0) 
+			log_type = LOG_TYPE_MAIN;
+		else if (strncmp(log->misc.name, LOGGER_LOG_RADIO, 9)==0)
+			log_type = LOG_TYPE_RADIO;
+		else if (strncmp(log->misc.name, LOGGER_LOG_EVENTS, 10)==0)
+			log_type = LOG_TYPE_EVENTS;
+//CORE-KH-DbgCfgTool-Combine_LastCrash-00-d
+////CORE-KH-DbgCfgTool-LogcatCrashCmd-00-a[
+//		else if (strncmp(log->misc.name, LOGGER_LOG_CRASH, 9)==0){
+//			log_type = LOG_TYPE_CRASH;
+////forTest			pr_err("[LastAlog] Last_alog_crash data is writing!!\n");	//CORE-KH-DbgCfgTool-LogcatCrashCmd-01-a
+//		}
+////CORE-KH-DbgCfgTool-LogcatCrashCmd-00-a]
+		else
+			log_type = LOG_TYPE_SYSTEM;
+//CORE-KH-DebugToolPorting-02-m]
+	overrun += alog_ram_console_write_log(log_type, NULL, (char *)&header_v1, (int)sizeof(struct user_logger_entry_compat)); //MTD-KERNEL-BH-last_alog-01*//MTD-KERNEL-BH-FixLastAlogForLoggerV2-00+
+#endif
+
+/* FIH-CORE-TH-DebugToolPorting-01-] */
+	//do_write_log(log, &header, sizeof(struct logger_entry)); //CORE-BH-LastAlogL64-00-
 
 	while (nr_segs-- > 0) {
 		size_t len;
@@ -514,7 +579,13 @@ static ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 		len = min_t(size_t, iov->iov_len, header.len - ret);
 
 		/* write out this segment's payload */
-		nr = do_write_log_from_user(log, iov->iov_base, len);
+/* FIH-CORE-TH-DebugToolPorting-01+[ */
+#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
+		overrun += alog_ram_console_write_log(log_type, iov->iov_base, NULL, len); //MTD-KERNEL-BH-last_alog-01*
+#endif
+/* FIH-CORE-TH-DebugToolPorting-01-] */
+		//nr = do_write_log_from_user(log, iov->iov_base, len); //CORE-BH-LastAlogL64-00-
+
 		if (unlikely(nr < 0)) {
 			log->w_off = orig;
 			mutex_unlock(&log->mutex);
@@ -524,6 +595,13 @@ static ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 		iov++;
 		ret += nr;
 	}
+
+/* FIH-CORE-TH-DebugToolPorting-01+[ */
+#ifdef CONFIG_FEATURE_FIH_SW3_LAST_ALOG
+	if (overrun)
+		alog_ram_console_sync_time(log_type, SYNC_AFTER);
+#endif
+/* FIH-CORE-TH-DebugToolPorting-01-] */
 
 	mutex_unlock(&log->mutex);
 
@@ -828,6 +906,12 @@ static int __init logger_init(void)
 	if (unlikely(ret))
 		goto out;
 
+//CORE-KH-DbgCfgTool-Combine_LastCrash-00-d
+////CORE-KH-DbgCfgTool-LogcatCrashCmd-00-a[
+//	ret = create_log(LOGGER_LOG_CRASH, CONFIG_LOGCAT_SIZE*1024);
+//	if (unlikely(ret))
+//		goto out;
+////CORE-KH-DbgCfgTool-LogcatCrashCmd-00-a]
 out:
 	return ret;
 }
