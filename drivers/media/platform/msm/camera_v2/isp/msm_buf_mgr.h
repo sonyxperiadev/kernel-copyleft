@@ -129,8 +129,7 @@ struct msm_isp_buf_ops {
 		uint32_t bufq_handle, uint32_t *buf_src);
 
 	int (*get_buf) (struct msm_isp_buf_mgr *buf_mgr, uint32_t id,
-		uint32_t bufq_handle, struct msm_isp_buffer **buf_info,
-		uint32_t *buf_cnt);
+		uint32_t bufq_handle, struct msm_isp_buffer **buf_info);
 
 	int (*get_buf_by_index) (struct msm_isp_buf_mgr *buf_mgr,
 		uint32_t bufq_handle, uint32_t buf_index,
