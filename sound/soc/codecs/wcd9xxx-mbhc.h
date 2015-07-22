@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __WCD9XXX_MBHC_H__
 #define __WCD9XXX_MBHC_H__
 
@@ -100,6 +105,7 @@ enum wcd9xxx_mbhc_plug_type {
 	PLUG_TYPE_HIGH_HPH,
 	PLUG_TYPE_GND_MIC_SWAP,
 	PLUG_TYPE_ANC_HEADPHONE,
+	PLUG_TYPE_STEREO_MICROPHONE,
 };
 
 enum wcd9xxx_mbhc_micbias_type {
@@ -119,6 +125,18 @@ enum hw_jack_type {
 	FOUR_POLE_JACK = 0,
 	FIVE_POLE_JACK,
 	SIX_POLE_JACK,
+};
+
+enum wcd9xxx_insert_detect_plug_type {
+	DETECT_NC_PLUG_TYPE = 0,
+	DETECT_NO_PLUG_TYPE,
+};
+
+enum wcd9xxx_insert_detect_comp_vth_type {
+	MBHC_COMP_OFF = 0,
+	MBHC_COMP_V_0P9_VDD,
+	MBHC_COMP_V_0P875_VDD,
+	MBHC_COMP_V_0P925_VDD,
 };
 
 enum wcd9xx_mbhc_micbias_enable_bits {
@@ -275,6 +293,8 @@ struct wcd9xxx_mbhc_config {
 	bool use_vddio_meas;
 	bool enable_anc_mic_detect;
 	enum hw_jack_type hw_jack_type;
+	enum wcd9xxx_insert_detect_plug_type insert_detect_plug_type;
+	enum wcd9xxx_insert_detect_comp_vth_type insert_detect_comp_vth;
 };
 
 struct wcd9xxx_cfilt_mode {
@@ -319,6 +339,8 @@ struct wcd9xxx_mbhc_cb {
 	void (*micbias_pulldown_ctrl) (struct wcd9xxx_mbhc *, bool);
 	int (*codec_rco_ctrl) (struct snd_soc_codec *, bool);
 	void (*hph_auto_pulldown_ctrl) (struct snd_soc_codec *, bool);
+	int (*codec_enable_ldo_h) (struct snd_soc_codec *);
+	int (*codec_disable_ldo_h) (struct snd_soc_codec *);
 	struct firmware_cal * (*get_hwdep_fw_cal) (struct snd_soc_codec *,
 				enum wcd_cal_type);
 };
@@ -413,6 +435,9 @@ struct wcd9xxx_mbhc {
 #endif
 
 	struct mutex mbhc_lock;
+	struct mutex impedl_lock;
+	struct mutex impedr_lock;
+	struct mutex mclk_lock;
 };
 
 #define WCD9XXX_MBHC_CAL_SIZE(buttons, rload) ( \
