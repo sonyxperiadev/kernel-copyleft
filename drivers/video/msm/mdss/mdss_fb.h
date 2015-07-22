@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef MDSS_FB_H
 #define MDSS_FB_H
@@ -52,6 +57,13 @@
 
 #define MDP_PP_AD_BL_LINEAR	0x0
 #define MDP_PP_AD_BL_LINEAR_INV	0x1
+
+/* Enables Sonys feature Early Unblank for quick wakeup */
+#define SOMC_FEATURE_EARLY_UNBLANK
+
+#ifdef SOMC_FEATURE_EARLY_UNBLANK
+#include <linux/workqueue.h>
+#endif /* SOMC_FEATURE_EARLY_UNBLANK */
 
 /**
  * enum mdp_notify_event - Different frame events to indicate frame update state
@@ -180,6 +192,7 @@ struct msm_mdp_interface {
 	int (*lut_update)(struct msm_fb_data_type *mfd, struct fb_cmap *cmap);
 	int (*do_histogram)(struct msm_fb_data_type *mfd,
 				struct mdp_histogram *hist);
+	int (*stop_histogram)(struct msm_fb_data_type *mfd);
 	int (*ad_calc_bl)(struct msm_fb_data_type *mfd, int bl_in,
 		int *bl_out, bool *bl_out_notify);
 	int (*panel_register_done)(struct mdss_panel_data *pdata);
@@ -303,6 +316,20 @@ struct msm_fb_data_type {
 	u32 thermal_level;
 
 	int fb_mmap_type;
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	bool suspend_avoided;
+#endif
+
+#ifdef SOMC_FEATURE_EARLY_UNBLANK
+	/* speed up wakeup */
+	/* do unblank (>150ms) on own kworker
+	 * so we don't starve other works
+	 */
+	struct workqueue_struct *unblank_kworker;
+	struct work_struct unblank_work;
+	bool early_unblank_completed;
+#endif /* SOMC_FEATURE_EARLY_UNBLANK */
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)
