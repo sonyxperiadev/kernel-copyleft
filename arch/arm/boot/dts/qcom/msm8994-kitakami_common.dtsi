@@ -782,6 +782,8 @@
 	qcom,battery-data = <&kitakami_batterydata>;
 	qcom,vbat-estimate-diff-mv = <200>;
 	qcom,fg-chg-iterm-ma = <150>;
+	qcom,cl-max-increment-deciperc = <0>;
+	qcom,cl-max-decrement-deciperc = <50>;
 };
 
 &slim_msm {
