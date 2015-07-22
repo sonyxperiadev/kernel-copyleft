@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -72,6 +73,7 @@ enum {
 	MSM_FRONTEND_DAI_MULTIMEDIA7,
 	MSM_FRONTEND_DAI_MULTIMEDIA8,
 	MSM_FRONTEND_DAI_MULTIMEDIA9,
+	MSM_FRONTEND_DAI_MULTIMEDIA10,
 	MSM_FRONTEND_DAI_CS_VOICE,
 	MSM_FRONTEND_DAI_VOIP,
 	MSM_FRONTEND_DAI_AFE_RX,
@@ -93,8 +95,8 @@ enum {
 	MSM_FRONTEND_DAI_MAX,
 };
 
-#define MSM_FRONTEND_DAI_MM_SIZE (MSM_FRONTEND_DAI_MULTIMEDIA9 + 1)
-#define MSM_FRONTEND_DAI_MM_MAX_ID MSM_FRONTEND_DAI_MULTIMEDIA9
+#define MSM_FRONTEND_DAI_MM_SIZE (MSM_FRONTEND_DAI_MULTIMEDIA10 + 1)
+#define MSM_FRONTEND_DAI_MM_MAX_ID MSM_FRONTEND_DAI_MULTIMEDIA10
 
 enum {
 	MSM_BACKEND_DAI_PRI_I2S_RX = 0,
