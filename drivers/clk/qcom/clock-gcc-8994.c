@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -596,6 +601,7 @@ static struct clk_freq_tbl ftbl_blsp1_qup6_spi_apps_clk_src[] = {
 	F(  19200000,         gcc_xo,    1,    0,     0),
 	F(  24000000, gpll0_out_main, 12.5,    1,     2),
 	F(  25000000, gpll0_out_main,   12,    1,     2),
+	F(  27906976, gpll0_out_main,    1,    2,    43),
 	F(  41380000, gpll0_out_main, 14.5,    0,     0),
 	F(  42860000, gpll0_out_main,   14,    0,     0),
 	F_END

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __MSM_VFE_H__
 #define __MSM_VFE_H__
@@ -609,6 +614,9 @@ struct vfe_device {
 	struct msm_isp_ub_info *ub_info;
 	uint32_t vfe_ub_policy;
 	uint8_t reset_pending;
+#if defined(CONFIG_SONY_CAM_V4L2)
+	int timeout;
+#endif
 };
 
 #endif

@@ -9,11 +9,18 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef QPNP_PON_H
 #define QPNP_PON_H
 
 #include <linux/errno.h>
+
+#define SOMC_PON_ORG_IMPL
 
 /**
  * enum pon_trigger_source: List of PON trigger sources
@@ -52,6 +59,9 @@ int qpnp_pon_system_pwr_off(enum pon_power_off_type type);
 int qpnp_pon_is_warm_reset(void);
 int qpnp_pon_trigger_config(enum pon_trigger_source pon_src, bool enable);
 int qpnp_pon_wd_config(bool enable);
+#ifdef SOMC_PON_ORG_IMPL
+int qpnp_pon_dvdd_shutdown(void);
+#endif /* SOMC_PON_ORG_IMPL */
 #else
 static int qpnp_pon_system_pwr_off(enum pon_power_off_type type)
 {
@@ -67,6 +77,12 @@ int qpnp_pon_wd_config(bool enable)
 {
 	return -ENODEV;
 }
+#ifdef SOMC_PON_ORG_IMPL
+int qpnp_pon_dvdd_shutdown(void)
+{
+	return -ENODEV;
+}
+#endif /* SOMC_PON_ORG_IMPL */
 #endif
 
 #endif
