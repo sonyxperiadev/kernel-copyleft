@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 &soc {
 	qcom,spm@f9065000 {
@@ -557,6 +562,7 @@
 			<0xff 298>,  /* msm_iommu_nonsecure_irq */
 			<0xff 302>,  /* coresight-tmc-etr */
 			<0xff 303>,  /* int_msi */
+			<0xff 304>,  /* int_a */
 			<0xff 310>,  /* int_pls_err */
 			<0xff 311>,  /* int_aer_legacy */
 			<0xff 313>,  /* int_pls_link_down */
