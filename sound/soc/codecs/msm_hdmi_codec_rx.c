@@ -98,7 +98,7 @@ static int msm_hdmi_audio_codec_rx_dai_startup(
 		dev_err(dai->dev,
 			"%s() HDMI cable is not connected (ret val = %d)\n",
 			__func__, rv);
-		rv = -EAGAIN;
+		rv = -ENODEV;
 	}
 
 	return rv;
@@ -129,7 +129,7 @@ static int msm_hdmi_audio_codec_rx_dai_hw_params(
 		dev_err(dai->dev,
 			"%s() HDMI cable is not connected (rv = %d)\n",
 			__func__, rv);
-		return -EAGAIN;
+		return -ENODEV;
 	}
 
 	switch (num_channels) {

@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2003 Patrick Mochel
  * Copyright (c) 2003 Open Source Development Lab
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This file is released under the GPLv2
  *
@@ -15,9 +16,22 @@
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
-#include <linux/hrtimer.h>
+#include <linux/wakelock.h>
+#ifdef CONFIG_PM_WAKEUP_TIMES
+#include <linux/poll.h>
+#endif
 
 #include "power.h"
+
+/*
+ * suspend back-off default values
+ */
+#define SBO_SLEEP_MSEC 1100
+#define SBO_TIME 10000
+#define SBO_CNT 10
+
+static unsigned suspend_short_count;
+static struct wake_lock suspend_backoff_lock;
 
 #define MAX_BUF 100
 
@@ -293,6 +307,51 @@ static int suspend_stats_show(struct seq_file *s, void *unused)
 				suspend_stats.failed_steps[index]));
 	}
 
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	seq_printf(s,	"%s\n%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms\n",
+		"suspend time:",
+		"  min:", ktime_to_ms(ktime_sub(
+			suspend_stats.suspend_min_time.end,
+			suspend_stats.suspend_min_time.start)),
+		"start:", ktime_to_ms(suspend_stats.suspend_min_time.start),
+		"end:", ktime_to_ms(suspend_stats.suspend_min_time.end),
+		"  max:", ktime_to_ms(ktime_sub(
+			suspend_stats.suspend_max_time.end,
+			suspend_stats.suspend_max_time.start)),
+		"start:", ktime_to_ms(suspend_stats.suspend_max_time.start),
+		"end:", ktime_to_ms(suspend_stats.suspend_max_time.end),
+		"  last:", ktime_to_ms(ktime_sub(
+			suspend_stats.suspend_last_time.end,
+			suspend_stats.suspend_last_time.start)),
+		"start:", ktime_to_ms(suspend_stats.suspend_last_time.start),
+		"end:", ktime_to_ms(suspend_stats.suspend_last_time.end),
+		"  avg:", ktime_to_ms(suspend_stats.suspend_avg_time));
+
+	seq_printf(s,	"%s\n%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms\n",
+		"resume time:",
+		"  min:", ktime_to_ms(ktime_sub(
+			suspend_stats.resume_min_time.end,
+			suspend_stats.resume_min_time.start)),
+		"start:", ktime_to_ms(suspend_stats.resume_min_time.start),
+		"end:", ktime_to_ms(suspend_stats.resume_min_time.end),
+		"  max:", ktime_to_ms(ktime_sub(
+			suspend_stats.resume_max_time.end,
+			suspend_stats.resume_max_time.start)),
+		"start:", ktime_to_ms(suspend_stats.resume_max_time.start),
+		"end:", ktime_to_ms(suspend_stats.resume_max_time.end),
+		"  last:", ktime_to_ms(ktime_sub(
+			suspend_stats.resume_last_time.end,
+			suspend_stats.resume_last_time.start)),
+		"start:", ktime_to_ms(suspend_stats.resume_last_time.start),
+		"end:", ktime_to_ms(suspend_stats.resume_last_time.end),
+		"  avg:", ktime_to_ms(suspend_stats.resume_avg_time));
+#endif
 	return 0;
 }
 
@@ -301,10 +360,29 @@ static int suspend_stats_open(struct inode *inode, struct file *file)
 	return single_open(file, suspend_stats_show, NULL);
 }
 
+#ifdef CONFIG_PM_WAKEUP_TIMES
+static unsigned int suspend_stats_poll(struct file *filp,
+			struct poll_table_struct *wait)
+{
+	unsigned int mask = 0;
+
+	poll_wait(filp, &suspend_stats_queue.wait_queue, wait);
+	if (suspend_stats_queue.resume_done) {
+		mask |= (POLLIN | POLLRDNORM);
+		suspend_stats_queue.resume_done = 0;
+	}
+
+	return mask;
+}
+#endif
+
 static const struct file_operations suspend_stats_operations = {
 	.open           = suspend_stats_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	.poll           = suspend_stats_poll,
+#endif
 	.release        = single_release,
 };
 
@@ -312,6 +390,9 @@ static int __init pm_debugfs_init(void)
 {
 	debugfs_create_file("suspend_stats", S_IFREG | S_IRUGO,
 			NULL, NULL, &suspend_stats_operations);
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	init_waitqueue_head(&suspend_stats_queue.wait_queue);
+#endif
 	return 0;
 }
 
@@ -383,10 +464,21 @@ static suspend_state_t decode_state(const char *buf, size_t n)
 	return PM_SUSPEND_ON;
 }
 
+static void
+suspend_backoff(void)
+{
+	pr_info("suspend: too many immediate wakeups, back off\n");
+	wake_lock_timeout(&suspend_backoff_lock,
+		msecs_to_jiffies(SBO_TIME));
+}
+
 static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 			   const char *buf, size_t n)
 {
 	suspend_state_t state;
+	struct timespec ts_entry, ts_exit;
+	u64 elapsed_msecs64;
+	u32 elapsed_msecs32;
 	int error;
 
 	error = pm_autosleep_lock();
@@ -399,9 +491,31 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 	}
 
 	state = decode_state(buf, n);
-	if (state < PM_SUSPEND_MAX)
+	if (state < PM_SUSPEND_MAX) {
+		/*
+		 * We want to prevent system from frequent periodic wake-ups
+		 * when sleeping time is less or equival certain interval.
+		 * It's done in order to save power in certain cases, one of
+		 * the examples is GPS tracking, but not only.
+		 */
+		getnstimeofday(&ts_entry);
 		error = pm_suspend(state);
-	else if (state == PM_SUSPEND_MAX)
+		getnstimeofday(&ts_exit);
+
+		elapsed_msecs64 = timespec_to_ns(&ts_exit) -
+			timespec_to_ns(&ts_entry);
+		do_div(elapsed_msecs64, NSEC_PER_MSEC);
+		elapsed_msecs32 = elapsed_msecs64;
+
+		if (elapsed_msecs32 <= SBO_SLEEP_MSEC) {
+			if (suspend_short_count == SBO_CNT)
+				suspend_backoff();
+			else
+				suspend_short_count++;
+		} else {
+			suspend_short_count = 0;
+		}
+	} else if (state == PM_SUSPEND_MAX)
 		error = hibernate();
 	else
 		error = -EINVAL;
@@ -672,6 +786,10 @@ static int __init pm_init(void)
 	error = sysfs_create_group(power_kobj, &attr_group);
 	if (error)
 		return error;
+
+	wake_lock_init(&suspend_backoff_lock, WAKE_LOCK_SUSPEND,
+			"suspend_backoff");
+
 	return pm_autosleep_init();
 }
 

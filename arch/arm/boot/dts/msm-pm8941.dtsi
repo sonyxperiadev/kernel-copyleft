@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -57,14 +58,11 @@
 
 		qcom,pon_1 {
 			qcom,pon-type = <0>;
-			qcom,support-reset = <1>;
 			qcom,pull-up = <1>;
-			qcom,s1-timer = <10256>;
-			qcom,s2-timer = <2000>;
-			qcom,s2-type = <1>;
 			linux,code = <116>;
 		};
-
+		/* Disable RESIN shutdown here, we set it in boot code */
+/*
 		qcom,pon_2 {
 			qcom,pon-type = <1>;
 			qcom,support-reset = <1>;
@@ -75,7 +73,7 @@
 			linux,code = <114>;
 			qcom,use-bark;
 		};
-
+*/
 		qcom,pon_3 {
 			qcom,pon-type = <3>;
 			qcom,support-reset = <1>;
@@ -219,7 +217,6 @@
 		qcom,chg-vadc = <&pm8941_vadc>;
 		qcom,chg-iadc = <&pm8941_iadc>;
 		qcom,chg-adc_tm = <&pm8941_adc_tm>;
-		qcom,ibat-calibration-enabled;
 
 		pm8941_chg_chgr: qcom,chgr@1000 {
 			status = "disabled";
@@ -838,6 +835,13 @@
 		chan@0 {
 			label = "internal_rsense";
 			reg = <0>;
+			qcom,decimation = <0>;
+			qcom,fast-avg-setup = <0>;
+		};
+
+		chan@1 {
+			label = "external_rsense";
+			reg = <1>;
 			qcom,decimation = <0>;
 			qcom,fast-avg-setup = <0>;
 		};
