@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -62,6 +63,7 @@ int get_vocproc_cal(struct acdb_cal_block *cal_block);
 int get_vocstrm_cal(struct acdb_cal_block *cal_block);
 int get_vocvol_cal(struct acdb_cal_block *cal_block);
 int get_sidetone_cal(struct sidetone_cal *cal_data);
+int get_sidetone_iir_cal(struct sidetone_iir_cal *cal_data);
 int get_spk_protection_cfg(struct msm_spk_prot_cfg *prot_cfg);
 int get_aanc_cal(struct acdb_cal_block *cal_block);
 int get_hw_delay(int32_t path, struct hw_delay_entry *delay_info);
