@@ -183,6 +183,7 @@ dtb-$(CONFIG_ARCH_APQ8084) += apq8084-v1.0-old-pwr-grid-liquid.dtb \
 	apq8084-v1.1-old-pwr-grid-mdm9x35-alt-cdp.dtb \
 	apq8084-v1.1-mdm9x35-alt-cdp.dtb \
 	apq8084-v1.1-sbc.dtb
+ifneq ($(CONFIG_ARCH_SONY_KITAKAMI),y)
 dtb-$(CONFIG_ARCH_MSM8994) += msm8994-v1-sim.dtb \
 	msm8994-rumi.dtb \
 	msm8994-v1-cdp.dtb \
@@ -219,6 +220,29 @@ dtb-$(CONFIG_ARCH_MSM8994) += msm8994-v1-sim.dtb \
 	apq8094-v2.1-liquid.dtb \
 	apq8094-v2.1-fluid.dtb \
 	apq8094-v2.1-dragonboard.dtb
+else
+dtb-$(CONFIG_MACH_SONY_IVY) += msm8994-v1-kitakami_ivy_generic.dtb \
+	msm8994-v2.0-kitakami_ivy_generic.dtb \
+	msm8994-v2.1-kitakami_ivy_generic.dtb
+dtb-$(CONFIG_MACH_SONY_IVY_DCM) += msm8994-v1-kitakami_ivy_dcm.dtb \
+	msm8994-v2.0-kitakami_ivy_dcm.dtb \
+	msm8994-v2.1-kitakami_ivy_dcm.dtb
+dtb-$(CONFIG_MACH_SONY_IVY_DSDS) += msm8994-v1-kitakami_ivy_dsds.dtb \
+	msm8994-v2.0-kitakami_ivy_dsds.dtb \
+	msm8994-v2.1-kitakami_ivy_dsds.dtb
+dtb-$(CONFIG_MACH_SONY_KARIN) += msm8994-v1-kitakami_karin_generic.dtb \
+	msm8994-v2.0-kitakami_karin_generic.dtb \
+	msm8994-v2.1-kitakami_karin_generic.dtb
+dtb-$(CONFIG_MACH_SONY_KARIN_DCM) += msm8994-v1-kitakami_karin_dcm.dtb \
+	msm8994-v2.0-kitakami_karin_dcm.dtb \
+	msm8994-v2.1-kitakami_karin_dcm.dtb
+dtb-$(CONFIG_MACH_SONY_KARIN_WINDY) += apq8094-v1-kitakami_karin_windy.dtb \
+	apq8094-v2.0-kitakami_karin_windy.dtb \
+	apq8094-v2.1-kitakami_karin_windy.dtb
+dtb-$(CONFIG_MACH_SONY_KARIN_KDDI) += msm8994-v1-kitakami_karin_kddi.dtb \
+	msm8994-v2.0-kitakami_karin_kddi.dtb \
+	msm8994-v2.1-kitakami_karin_kddi.dtb
+endif
 
 dtb-$(CONFIG_ARCH_MSM8992) += msm8992-sim.dtb \
 	msm8992-rumi.dtb \

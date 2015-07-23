@@ -254,4 +254,10 @@ config QMP_CORE
 	help
 		This option enables Qualcomm Malware Protection Sphinx component
 		to log on-device software API activity.
+
+config PON_SOMC_ORG
+	bool "SoMC specific power on interface"
+	help
+		This option enables SoMC specific power on interface.
+
 endmenu

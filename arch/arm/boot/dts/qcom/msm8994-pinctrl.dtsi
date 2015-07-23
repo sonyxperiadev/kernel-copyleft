@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 &soc {
 	tlmm_pinmux: pinctrl@fd510000 {
@@ -91,19 +96,6 @@
 				drive-strength = <2>; /* 2 mA */
 				bias-pull-down; /* pull down */
 				input-debounce = <0>;
-			};
-		};
-
-		pmx_hdmi_cec: pmx_hdmi_cec {
-			qcom,pin-func = <1>;
-			label = "hdmi-cec-pins";
-			mdss_hdmi_cec_active: cec_active {
-				drive-strength = <2>;
-				bias-pull-up;
-			};
-			mdss_hdmi_cec_suspend: cec_suspend {
-				drive-strength = <2>;
-				bias-pull-down;
 			};
 		};
 
@@ -1274,12 +1266,14 @@
 			/* default state */
 			pcie1_wake_default: pcie1_wake_default {
 				drive-strength = <2>;
-				bias-pull-down;
+				/*bias-pull-down;*/
+				bias-pull-up;	/* PULL UP for SOMC products */
 			};
 
 			pcie1_wake_sleep: pcie1_wake_sleep {
 				drive-strength = <2>;
-				bias-disable;
+				/*bias-disable;*/
+				bias-pull-up;	/* PULL UP for SOMC products */
 			};
 		};
 

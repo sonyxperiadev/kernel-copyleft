@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "MSM-CPP %s:%d " fmt, __func__, __LINE__
 
@@ -873,7 +878,11 @@ static int cpp_init_hardware(struct cpp_device *cpp_dev)
 			__func__, rc);
 		goto req_irq_fail;
 	}
+#if defined(CONFIG_SONY_CAM_V4L2)
+	pr_debug("stream_cnt:%d\n", cpp_dev->stream_cnt);
+#else
 	pr_err("stream_cnt:%d\n", cpp_dev->stream_cnt);
+#endif
 	cpp_dev->stream_cnt = 0;
 	if (cpp_dev->is_firmware_loaded == 1) {
 		disable_irq(cpp_dev->irq->start);
@@ -1948,6 +1957,10 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 				k_stream_buff_info.identity & 0xFFFF);
 
 		if (buff_queue_info == NULL) {
+#if defined(CONFIG_SONY_CAM_V4L2)
+			if (cmd == VIDIOC_MSM_CPP_DELETE_STREAM_BUFF)
+				goto STREAM_BUFF_END;
+#endif
 			rc = msm_cpp_add_buff_queue_entry(cpp_dev,
 				((k_stream_buff_info.identity >> 16) & 0xFFFF),
 				(k_stream_buff_info.identity & 0xFFFF));
