@@ -1,0 +1,125 @@
+/* arch/arm/boot/dts/msm8974pro-ab-shinano_canopus_kddi.dtsi
+ *
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
+ *
+ * Author: Kouhei Fujiya <Kouhei.X.Fujiya@sonymobile.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	/* UART : BLSP6 */
+	serial@f9922000 {
+		compatible = "qcom,msm-lsuart-v14";
+		reg = <0xf9922000 0x1000>;
+		interrupts = <0 112 0>;
+		status = "ok";
+	};
+
+	/* I2C : BLSP6 */
+	i2c@f9928000 {
+		status = "disabled";
+	};
+
+	felica_nfc: cxd2235agg {
+		compatible = "sony,cxd2235agg";
+		gpios = <&pm8941_mpps 2 0>,   /* LOCK */
+			<&pm8941_gpios 33 0>, /* FF */
+			<&pm8941_gpios 23 0>, /* PON */
+			<&pm8941_gpios 24 0>, /* LDO EN */
+			<&pm8941_gpios 35 0>, /* INTU */
+			<&msmgpio 57 0>,      /* HSEL */
+			<&msmgpio 77 0>,      /* RFS */
+			<&msmgpio 24 0>,      /* INT */
+			<&pm8941_gpios 34 0>, /* PVDD */
+			<&msmgpio 76 0>,      /* KOTO_PWR */
+			<&msmgpio 27 0>,      /* TX */
+			<&msmgpio 28 0>;      /* RX */
+	};
+
+	isdbt_tuner: ej113 {
+		compatible = "sony,ej113";
+		interrupt-parent = <&msmgpio>;
+		interrupts = <68 0>;
+		gpios = <&pm8941_gpios 26 0>, /* ANT_POWER */
+			<&pm8941_gpios 32 0>, /* ANT_SWITCH */
+			<&msmgpio 14 0>, /* TUNER_POWER */
+			<&msmgpio 13 0>, /* TUNER_RESET */
+			<&msmgpio 68 0>; /* TUNER_INT */
+	};
+};
+
+&pm8941_gpios {
+	/* GPIO_23: FELICA_PON */
+	gpio@d600 {
+		qcom,src-sel = <0>;		/* GPIO */
+		qcom,mode = <1>;		/* Out */
+		qcom,output-type = <0>;		/* CMOS */
+		qcom,vin-sel = <2>;		/* S3 */
+		qcom,out-strength = <1>;	/* Low */
+		qcom,invert = <0>;		/* Low */
+		qcom,master-en = <1>;		/* Enable */
+		status = "ok";
+	};
+
+	/* GPIO_24: FELICA_EXT_LDO_EN */
+	gpio@d700 {
+		qcom,src-sel = <0>;		/* GPIO */
+		qcom,mode = <1>;		/* Out */
+		qcom,output-type = <0>;		/* CMOS */
+		qcom,vin-sel = <0>;		/* VPH */
+		qcom,out-strength = <1>;	/* Low */
+		qcom,invert = <0>;		/* Low */
+		qcom,master-en = <1>;		/* Enable */
+		status = "ok";
+	};
+
+	/* GPIO_33: FELICA_FF */
+	gpio@e000 {
+		qcom,src-sel = <0>;		/* GPIO */
+		qcom,mode = <1>;		/* Out */
+		qcom,output-type = <0>;		/* CMOS */
+		qcom,vin-sel = <0>;		/* VPH */
+		qcom,out-strength = <1>;	/* Low */
+		qcom,invert = <0>;		/* Low */
+		qcom,master-en = <1>;		/* Enable */
+		status = "ok";
+	};
+
+	/* GPIO_34: NFC_FELICA_PVDD_EN */
+	gpio@e100 {
+		qcom,src-sel = <0>;		/* GPIO */
+		qcom,mode = <1>;		/* Out */
+		qcom,output-type = <0>;		/* CMOS */
+		qcom,vin-sel = <2>;		/* S3 */
+		qcom,out-strength = <1>;	/* Low */
+		qcom,invert = <0>;		/* Low */
+		qcom,master-en = <1>;		/* Enable */
+		status = "ok";
+	};
+
+	/* GPIO_35: S_COMBO_INTU */
+	gpio@e200 {
+		qcom,src-sel = <0>;		/* GPIO */
+		qcom,mode = <0>;		/* In */
+		qcom,vin-sel = <2>;		/* S3 */
+		qcom,pull = <4>;		/* PD */
+		qcom,master-en = <1>;		/* Enable */
+		status = "ok";
+	};
+};
+
+&pm8941_mpps {
+	/* MPP_2: NFC_VEN */
+	mpp@a100 {
+		qcom,master-en = <0>;		/* Disable */
+		status = "ok";
+	};
+};

@@ -1,4 +1,5 @@
 /* Copyright (c) 2008-2010, 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
  */
 /*
  * Modem Restart Notifier API
@@ -31,5 +34,11 @@ extern void modem_queue_start_reset_notify(void);
 extern void modem_queue_end_reset_notify(void);
 extern void modem_queue_smsm_init_notify(void);
 extern int __init msm_init_modem_notifier_list(void);
+
+#ifdef CONFIG_SIM_DETECT_FEATURE
+extern int simstatus_store(long status);
+extern void modem_queue_sim_remove_notify(void);
+extern void modem_queue_sim_insert_notify(void);
+#endif
 
 #endif /* _MODEM_NOTIFIER_H */

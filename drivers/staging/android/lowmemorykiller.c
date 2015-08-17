@@ -27,7 +27,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ * Copyright (C) 2015 Sony Mobile Communications Inc.
  */
 
 #include <linux/module.h>
@@ -41,6 +41,9 @@
 #include <linux/delay.h>
 #include <linux/swap.h>
 #include <linux/fs.h>
+
+#define CREATE_TRACE_POINTS
+#include <trace/events/lmk.h>
 
 #ifdef CONFIG_HIGHMEM
 #define _ZONE ZONE_HIGHMEM
@@ -242,8 +245,10 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	unsigned long nr_to_scan = sc->nr_to_scan;
 
 	if (nr_to_scan > 0) {
-		if (mutex_lock_interruptible(&scan_mutex) < 0)
+		if (mutex_lock_interruptible(&scan_mutex) < 0) {
+			trace_lmk_remain_scan(0, nr_to_scan, sc->gfp_mask);
 			return 0;
+		};
 	}
 
 	other_free = global_page_state(NR_FREE_PAGES);
@@ -284,6 +289,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		if (nr_to_scan > 0)
 			mutex_unlock(&scan_mutex);
 
+		trace_lmk_remain_scan(rem, nr_to_scan, sc->gfp_mask);
 		return rem;
 	}
 	selected_oom_score_adj = min_score_adj;
@@ -306,6 +312,8 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 				/* give the system time to free up the memory */
 				msleep_interruptible(20);
 				mutex_unlock(&scan_mutex);
+				trace_lmk_remain_scan(rem, nr_to_scan,
+						      sc->gfp_mask);
 				return 0;
 			}
 		}
@@ -345,6 +353,9 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		set_tsk_thread_flag(selected, TIF_MEMDIE);
 		rem -= selected_tasksize;
 		rcu_read_unlock();
+		trace_lmk_sigkill(selected->pid, selected->comm,
+				 selected_oom_score_adj, selected_tasksize,
+				 sc->gfp_mask);
 		/* give the system time to free up the memory */
 		msleep_interruptible(20);
 	} else
@@ -353,6 +364,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	lowmem_print(4, "lowmem_shrink %lu, %x, return %d\n",
 		     nr_to_scan, sc->gfp_mask, rem);
 	mutex_unlock(&scan_mutex);
+	trace_lmk_remain_scan(rem, nr_to_scan, sc->gfp_mask);
 	return rem;
 }
 

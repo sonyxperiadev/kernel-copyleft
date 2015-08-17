@@ -187,8 +187,9 @@ static inline struct kgsl_cmdbatch *adreno_dispatcher_get_cmdbatch(
 		 * events
 		 */
 
-		spin_lock(&cmdbatch->lock);
+		spin_lock_bh(&cmdbatch->lock);
 		pending = list_empty(&cmdbatch->synclist) ? 0 : 1;
+		spin_unlock_bh(&cmdbatch->lock);
 
 		/*
 		 * If changes are pending and the canary timer hasn't been
@@ -201,13 +202,11 @@ static inline struct kgsl_cmdbatch *adreno_dispatcher_get_cmdbatch(
 			 */
 			if (!timer_pending(&cmdbatch->timer))
 				mod_timer(&cmdbatch->timer, jiffies + (5 * HZ));
-			spin_unlock(&cmdbatch->lock);
 		} else {
 			/*
 			 * Otherwise, delete the timer to make sure it is good
 			 * and dead before queuing the buffer
 			 */
-			spin_unlock(&cmdbatch->lock);
 			del_timer_sync(&cmdbatch->timer);
 		}
 

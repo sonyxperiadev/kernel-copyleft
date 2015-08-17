@@ -790,7 +790,7 @@ int mem_cgroup_count_swap_user(swp_entry_t ent, struct page **pagep)
 	p = swap_info_get(ent);
 	if (p) {
 		count += swap_count(p->swap_map[swp_offset(ent)]);
-		spin_unlock(&swap_lock);
+		spin_unlock(&p->lock);
 	}
 
 	*pagep = page;
@@ -1606,7 +1606,6 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	struct address_space *mapping;
 	struct inode *inode;
 	char *pathname;
-	int oom_score_adj;
 	int i, type, prev;
 	int err;
 
@@ -1669,9 +1668,9 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	spin_unlock(&p->lock);
 	spin_unlock(&swap_lock);
 
-	oom_score_adj = test_set_oom_score_adj(OOM_SCORE_ADJ_MAX);
+	set_current_oom_origin();
 	err = try_to_unuse(type);
-	compare_swap_oom_score_adj(OOM_SCORE_ADJ_MAX, oom_score_adj);
+	clear_current_oom_origin();
 
 	if (err) {
 		/*
