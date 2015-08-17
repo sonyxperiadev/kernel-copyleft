@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "%s:%s " fmt, KBUILD_MODNAME, __func__
 
@@ -320,6 +325,7 @@ static int bcl_access_monitor_enable(bool enable)
 {
 	int ret = 0, i = 0;
 	struct bcl_peripheral_data *perph_data = NULL;
+	enum bcl_monitor_state curr_state;
 
 	mutex_lock(&bcl_enable_mutex);
 	if (enable == bcl_perph->enabled)
@@ -339,8 +345,13 @@ static int bcl_access_monitor_enable(bool enable)
 				break;
 			}
 			perph_data->state = BCL_PARAM_MONITOR;
+			mutex_unlock(&perph_data->state_trans_lock);
 		} else {
-			switch (perph_data->state) {
+			curr_state = perph_data->state;
+			perph_data->state = BCL_PARAM_INACTIVE;
+			mutex_unlock(&perph_data->state_trans_lock);
+
+			switch (curr_state) {
 			case BCL_PARAM_MONITOR:
 				disable_irq(perph_data->irq_num);
 				/* Fall through to clear the poll work */
@@ -352,9 +363,7 @@ static int bcl_access_monitor_enable(bool enable)
 			default:
 				break;
 			}
-			perph_data->state = BCL_PARAM_INACTIVE;
 		}
-		mutex_unlock(&perph_data->state_trans_lock);
 	}
 	bcl_perph->enabled = enable;
 

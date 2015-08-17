@@ -74,6 +74,16 @@ config SECURITY_SELINUX_AVC_STATS
 	  /selinux/avc/cache_stats, which may be monitored via
 	  tools such as avcstat.
 
+config SECURITY_SELINUX_AVC_EXTRA_INFO
+	bool "SELinux extended log info"
+	depends on SECURITY_SELINUX
+	default n
+	help
+	  This option enables extra log info providing information
+	  about the audit result and the process under audit, such
+	  as thread group and parent pid. Appended log tags are:
+	  "ppid", "pcomm", "pgid", pgcomm" and "op_res".
+
 config SECURITY_SELINUX_CHECKREQPROT_VALUE
 	int "NSA SELinux checkreqprot default value"
 	depends on SECURITY_SELINUX
@@ -131,3 +141,12 @@ config SECURITY_SELINUX_POLICYDB_VERSION_MAX_VALUE
 	  installed under /etc/selinux/$SELINUXTYPE/policy, where
 	  SELINUXTYPE is defined in your /etc/selinux/config.
 
+
+config SECURITY_SELINUX_TRAP
+	bool "SELinux error trap support"
+	depends on SECURITY_SELINUX
+	default n
+	help
+	  This option enables the trap feature for SELinux errors.
+	  User process will get SIGABRT so that system can generate core file
+	  for more further invesitaion of SELinux errors.

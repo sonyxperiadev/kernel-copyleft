@@ -14,6 +14,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2011 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef	__LINUX_USB_ANDROID_H
 #define	__LINUX_USB_ANDROID_H
 
@@ -38,6 +43,7 @@ struct android_usb_platform_data {
 	int  streaming_func_count;
 	u8 uicc_nluns;
 	bool cdrom;
+	char can_stall;
 };
 
 #ifndef CONFIG_TARGET_CORE
