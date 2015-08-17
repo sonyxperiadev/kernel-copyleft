@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -3531,6 +3532,7 @@ static void msm_comm_generate_sys_error(struct msm_vidc_inst *inst)
 int msm_comm_kill_session(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
 
 	if (!inst || !inst->core || !inst->core->device) {
 		dprintk(VIDC_ERR, "%s: invalid input parameters", __func__);
@@ -3565,6 +3567,10 @@ int msm_comm_kill_session(struct msm_vidc_inst *inst)
 			dprintk(VIDC_ERR,
 					"%s: Wait interrupted or timed out [%p]: %d\n",
 					__func__, inst, abort_completion);
+			snprintf(crash_reason, sizeof(crash_reason),
+				"%s: Wait interrupted or timed out [%p]: %d",
+				 __func__, inst, abort_completion);
+			subsystem_crash_reason("venus", crash_reason);
 			msm_comm_generate_sys_error(inst);
 		} else {
 			change_inst_state(inst, MSM_VIDC_CLOSE_DONE);
