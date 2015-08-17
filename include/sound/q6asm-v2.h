@@ -408,4 +408,7 @@ int q6asm_send_meta_data(struct audio_client *ac, uint32_t initial_samples,
 int q6asm_stream_send_meta_data(struct audio_client *ac, uint32_t stream_id,
 		uint32_t initial_samples, uint32_t trailing_samples);
 
+/* SOMC added: Send tuning parameter for Sony effect*/
+int sony_hweffect_send_tuning_params(unsigned int effect_id, void *client);
+
 #endif /* __Q6_ASM_H__ */
