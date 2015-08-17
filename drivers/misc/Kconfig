@@ -567,6 +567,13 @@ config HAPTIC_ISA1200
 	help
 	  The ISA1200 is a high performance enhanced haptic driver.
 
+config PMI8994_FLASH
+	tristate "Flash support for PMI8994"
+	depends on SPMI && OF_SPMI
+	help
+	  This option enables device driver support for the flash
+	  on PMI8994.
+
 config QSEECOM
 	tristate "Qualcomm Secure Execution Communicator driver"
 	help
@@ -590,6 +597,16 @@ config QPNP_MISC
 	  peripheral. The MISC peripheral holds the USB ID interrupt
 	  and the driver provides an API to check if this interrupt
 	  is available on the current PMIC chip.
+
+config NFC_PN547
+	tristate "NFC driver for PN547"
+	depends on I2C
+	default n
+	help
+	  This option enables device driver for PN547.
+	  GPIO, and PMIC GPIO configurations are controlled.
+	  The sysfs files provides the interface to send and receive
+	  the data, response and notification.
 
 config USB_HSIC_SMSC_HUB
 	tristate "Support for HSIC based MSM on-chip SMSC3503 HUB"
@@ -619,6 +636,125 @@ config QCOM_LIQUID_DOCK
 	  This option enables support for the USB and Ethernet ports found on
 	  the docking station of various models of Qualcomm Technology's
 	  LiQUID Mobile Development Platforms.
+
+config RAMDUMP_TAGS
+	bool "Ramdump tags to communicate between kernel and ramdump"
+	default n
+	depends on !RAMDUMP_CRASH_LOGS
+	help
+	  This option enables a driver which can be interacted with to
+	  supply the ramdumper with more information about the current
+	  state of the crashing kernel such as build info, HWWD registers,
+	  additional CPU registers not stored in crash_notes, crashing
+	  application info etc. A small amount of memory will be set
+	  aside to hold the information which will later be used by
+	  the ramdump application.
+
+config POWERKEY_FORCECRASH
+	tristate "Force a crash on powerkey long press"
+	default n
+	help
+	  Say Y here if you want force crash functionality through power
+	  key. Triggers panic if power key is hold for more than 10secs.
+
+config RAMDUMP_MEMDESC
+	bool "Ramdump memory descriptors"
+	default n
+	help
+	  This is a ramdump_mem_desc driver which adds the
+	  memory descriptors in Normal mode into a piece of debug memory
+	  and split the contents and exports it as /proc/mem_desc
+	  in Ramdump mode to support ramdump functionality
+
+config CRASH_LAST_LOGS
+	bool "export last kernel logs in procfs"
+	default n
+	depends on RAMDUMP_TAGS
+	help
+	  This driver will export last kernel log in proc fs.
+	  they can be found in files /proc/last_kmsg.
+
+config BCM_WLAN_RAMDUMP
+	bool "Subsystem ramdump for broadcomm wlan device"
+	default n
+	depends on DEBUG_FS && MSM_SUBSYSTEM_RESTART
+	help
+	  This module create a bcm_wlan ramdump device via
+	  qcom subsystem ramdump and also creates the debugfs entry
+	  to collect the wlan subsystem crash information.
+	  This module causes panic if the ssr feature is not enabled.
+	  The userspace will collect the ramdump info via registred
+	  file operations.
+
+config BD7602_POWER_IC
+	bool "BD7602 Power IC control"
+	depends on I2C
+	default n
+	help
+	  This option enables device driver support for BD7602 Power IC
+	  control device.
+
+config CXD224X_NFC
+	bool "CXD224X driver for FeliCa and NFC"
+	depends on I2C
+	default n
+	help
+	  This option enables device driver support for Sony CXD224X
+	  series. This driver enables the control of CXD224X series
+	  device by using I2C. Furthermore, this driver enables the
+	  control of PON using device file.
+
+config LDO_VIBRATOR
+	tristate "LDO Vibrator"
+	default n
+	help
+	  This option enables device driver support for the vibrator
+	  on the LDO line. The vibrator is controlled using the
+	  timed output class.
+
+config AD7146
+	tristate "AD7146 proximity driver"
+	depends on I2C
+	default n
+	help
+	  If you say yes here you get support for the AD7146 chip.
+	  This is used as a proximity sensor.
+
+config ONESEG_TUNER_SMTVJ19X
+	tristate "ONESEG tuner driver for SMT-VJ19x"
+	default n
+	depends on I2C
+	help
+	  Select this module to enable 1seg Tuner Driver which supports
+	  1seg contents viewing.
+	  This module controls power switching and reset switching of
+	  SMT-VJ19x.
+
+config ISDBT_TUNER_SMTEJ12X
+	tristate "ISDB-T/Tmm tuner driver for SMT-EJ12x"
+	default n
+	depends on I2C
+	help
+	  Select this module to enable ISDB-T/Tmm Tuner Driver which
+	  supports ISDB-T/Tmm contents viewing(1seg, Fullseg, Nottv).
+	  This module controls power switching and reset switching of
+	  SMT-EJ12x.
+
+config SIM_DETECT
+	tristate "SIM_DETECT driver support"
+	default n
+	help
+	  Say Y here
+	  if you want to support SIM_DETECT as detection device.
+	  This driver can be used for sending notifications via
+	  switch_class when sim card is inserted or removed.
+
+config TRAY_SHARED_INTERRUPT_DETECT
+	bool "Combo tray detect with shared interrupt support"
+	default n
+	help
+	  Say Y here if you want to support detection of UIM and
+	  SD card with shared interrupt.
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
