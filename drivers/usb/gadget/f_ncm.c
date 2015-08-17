@@ -14,6 +14,11 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2012 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/device.h>
@@ -71,9 +76,8 @@ struct f_ncm {
 	u8				notify_state;
 	bool				is_open;
 
-	const struct ndp_parser_opts	*parser_opts;
+	struct ndp_parser_opts		*parser_opts;
 	bool				is_crc;
-	u32				ndp_sign;
 
 	/*
 	 * for notification, it is accessed from both
@@ -105,7 +109,7 @@ static inline unsigned ncm_bitrate(struct usb_gadget *g)
  * because it's used by default by the current linux host driver
  */
 #define NTB_DEFAULT_IN_SIZE	USB_CDC_NCM_NTB_MIN_IN_SIZE
-#define NTB_OUT_SIZE		16384
+#define NTB_OUT_SIZE		(32768 + 512)
 
 /*
  * skbs of size less than that will not be aligned
@@ -477,8 +481,8 @@ struct ndp_parser_opts {
 		.next_fp_index = 2,				\
 	}
 
-static const struct ndp_parser_opts ndp16_opts = INIT_NDP16_OPTS;
-static const struct ndp_parser_opts ndp32_opts = INIT_NDP32_OPTS;
+static struct ndp_parser_opts ndp16_opts = INIT_NDP16_OPTS;
+static struct ndp_parser_opts ndp32_opts = INIT_NDP32_OPTS;
 
 static inline void put_ncm(__le16 **p, unsigned size, unsigned val)
 {
@@ -521,7 +525,6 @@ static inline unsigned get_ncm(__le16 **p, unsigned size)
 static inline void ncm_reset_values(struct f_ncm *ncm)
 {
 	ncm->parser_opts = &ndp16_opts;
-	ncm->ndp_sign = ncm->parser_opts->ndp_sign;
 	ncm->is_crc = false;
 	ncm->port.cdc_filter = DEFAULT_FILTER;
 
@@ -820,7 +823,8 @@ static int ncm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 		default:
 			goto invalid;
 		}
-		ncm->ndp_sign = ncm->parser_opts->ndp_sign | ndp_hdr_crc;
+		ncm->parser_opts->ndp_sign &= ~NCM_NDP_HDR_CRC_MASK;
+		ncm->parser_opts->ndp_sign |= ndp_hdr_crc;
 		value = 0;
 		break;
 	}
@@ -962,7 +966,7 @@ static struct sk_buff *ncm_wrap_ntb(struct gether *port,
 	int		ndp_align;
 	int		ndp_pad;
 	unsigned	max_size = ncm->port.fixed_in_len;
-	const struct ndp_parser_opts *opts = ncm->parser_opts;
+	struct ndp_parser_opts *opts = ncm->parser_opts;
 	unsigned	crc_len = ncm->is_crc ? sizeof(uint32_t) : 0;
 
 	div = le16_to_cpu(ntb_parameters.wNdpInDivisor);
@@ -1008,7 +1012,7 @@ static struct sk_buff *ncm_wrap_ntb(struct gether *port,
 	tmp = (void *)tmp + ndp_pad;
 
 	/* NDP */
-	put_unaligned_le32(ncm->ndp_sign, tmp); /* dwSignature */
+	put_unaligned_le32(opts->ndp_sign, tmp); /* dwSignature */
 	tmp += 2;
 	/* wLength */
 	put_unaligned_le16(ncb_len - opts->nth_size - pad, tmp++);
@@ -1052,7 +1056,7 @@ static int ncm_unwrap_ntb(struct gether *port,
 	struct sk_buff	*skb2;
 	int		ret = -EINVAL;
 	unsigned	max_size = le32_to_cpu(ntb_parameters.dwNtbOutMaxSize);
-	const struct ndp_parser_opts *opts = ncm->parser_opts;
+	struct ndp_parser_opts *opts = ncm->parser_opts;
 	unsigned	crc_len = ncm->is_crc ? sizeof(uint32_t) : 0;
 	int		dgram_counter;
 
@@ -1089,7 +1093,7 @@ static int ncm_unwrap_ntb(struct gether *port,
 
 	/* walk through NDP */
 	tmp = ((void *)skb->data) + index;
-	if (get_unaligned_le32(tmp) != ncm->ndp_sign) {
+	if (get_unaligned_le32(tmp) != opts->ndp_sign) {
 		INFO(port->func.config->cdev, "Wrong NDP SIGN\n");
 		goto err;
 	}
