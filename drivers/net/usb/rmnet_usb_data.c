@@ -29,6 +29,11 @@
 #define RMNET_HEADROOM			sizeof(struct QMI_QOS_ALIGNED_HDR_S)
 #define RMNET_TAILROOM			MAX_PAD_BYTES(4);
 
+static unsigned long int msm_rmnet_bam_headroom_check_failure;
+module_param(msm_rmnet_bam_headroom_check_failure, ulong, S_IRUGO);
+MODULE_PARM_DESC(msm_rmnet_bam_headroom_check_failure,
+		 "Number of packets with insufficient headroom");
+
 static unsigned int no_rmnet_devs = 1;
 module_param(no_rmnet_devs, uint, S_IRUGO | S_IWUSR);
 
@@ -354,10 +359,32 @@ static struct sk_buff *rmnet_usb_data_mux(struct sk_buff *skb, unsigned int id)
 	return skb;
 }
 
+static struct sk_buff *_rmnet_add_headroom(struct sk_buff **skb,
+					   struct net_device *dev)
+{
+	struct sk_buff *skbn;
+
+	if (skb_headroom(*skb) < (dev->needed_headroom+8)) {
+		msm_rmnet_bam_headroom_check_failure++;
+		skbn = skb_realloc_headroom(*skb, (dev->needed_headroom+8));
+		kfree_skb(*skb);
+		*skb = skbn;
+	} else {
+		skbn = *skb;
+	}
+
+	return skbn;
+}
+
 static struct sk_buff *rmnet_usb_tx_fixup(struct usbnet *dev,
 		struct sk_buff *skb, gfp_t flags)
 {
 	struct QMI_QOS_HDR_S	*qmih;
+
+	if (unlikely(!_rmnet_add_headroom(&skb, dev->net))) {
+		dev->net->stats.tx_dropped++;
+		return NETDEV_TX_OK;
+	}
 
 	if (test_bit(RMNET_MODE_QOS, &dev->data[0])) {
 		if (test_bit(RMNET_MODE_ALIGNED_QOS, &dev->data[0])) {

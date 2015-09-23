@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, Linux Foundation. All rights reserved.
+* Copyright (C) 2013 Sony Mobile Communications AB.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 * GNU General Public License for more details.
 *
+* NOTE: This file has been modified by Sony Mobile Communications AB.
+* Modifications are licensed under the License.
 */
 
 #include <media/v4l2-subdev.h>
@@ -988,7 +991,7 @@ static long venc_set_bitrate_mode(struct video_client_ctx *client_ctx,
 		rate_control.rate_control = VCD_RATE_CONTROL_VBR_VFR;
 		break;
 	case V4L2_MPEG_VIDEO_BITRATE_MODE_CBR:
-		rate_control.rate_control = VCD_RATE_CONTROL_CBR_VFR;
+		rate_control.rate_control = VCD_RATE_CONTROL_CBR_CFR;
 		break;
 	default:
 		WFD_MSG_ERR("unknown bitrate mode %d", mode);

@@ -3,12 +3,16 @@
  *
  *  Copyright (C) 2008 Google, All Rights Reserved.
  *  Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
  * - Based on mmci.h
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #ifndef _MSM_SDCC_H
@@ -214,10 +218,11 @@
 #define NR_SG		128
 
 #define MSM_MMC_DEFAULT_IDLE_TIMEOUT	5000 /* msecs */
+#define MSM_MMC_SDCARD_DEFAULT_IDLE_TIMEOUT	50000 /* msecs */
 #define MSM_MMC_CLK_GATE_DELAY	200 /* msecs */
 
-/* Set the request timeout to 10secs */
-#define MSM_MMC_REQ_TIMEOUT	10000 /* msecs */
+/* Set the request timeout to 30 secs */
+#define MSM_MMC_REQ_TIMEOUT	30000 /* msecs */
 
 /*
  * Controller HW limitations

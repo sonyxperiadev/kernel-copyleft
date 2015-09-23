@@ -1,4 +1,5 @@
 /* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/kernel.h>
@@ -136,26 +139,7 @@ EXPORT_SYMBOL(msm_dcvs_scm_set_algo_params);
 
 int msm_mpd_scm_set_algo_params(struct msm_mpd_algo_param *param)
 {
-	int ret = 0;
-	struct scm_algo algo;
-	struct msm_algo_param *p = NULL;
-
-	p = kzalloc(PAGE_ALIGN(sizeof(struct msm_algo_param)), GFP_KERNEL);
-	if (!p)
-		return -ENOMEM;
-
-	p->type = MSM_DCVS_ALGO_MPD_PARAM;
-	memcpy(&p->u.mpd_param, param, sizeof(struct msm_mpd_algo_param));
-
-	algo.core_id = 0;
-	algo.algo_phy = virt_to_phys(p);
-
-	ret = scm_call(SCM_SVC_DCVS, DCVS_CMD_SET_ALGO_PARAM,
-			&algo, sizeof(algo), NULL, 0);
-
-	kfree(p);
-
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL(msm_mpd_scm_set_algo_params);
 

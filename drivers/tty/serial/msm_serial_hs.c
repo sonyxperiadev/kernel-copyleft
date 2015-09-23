@@ -1284,6 +1284,7 @@ static void flip_insert_work(struct work_struct *work)
 		if (hs_serial_debug_mask)
 			printk(KERN_ERR "Error: No buffer pending in %s",
 			       __func__);
+		spin_unlock_irqrestore(&msm_uport->uport.lock, flags);
 		return;
 	}
 	if (msm_uport->rx.buffer_pending & FIFO_OVERRUN) {
