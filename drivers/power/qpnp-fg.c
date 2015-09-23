@@ -1950,9 +1950,6 @@ static enum power_supply_property fg_power_props[] = {
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 };
 
-#ifdef CONFIG_QPNP_FG_EXTENSION
-#define CHARGE_FULL_PERCENT_INCREASE	11
-#endif
 static int fg_power_get_property(struct power_supply *psy,
 				       enum power_supply_property psp,
 				       union power_supply_propval *val)
@@ -2021,13 +2018,7 @@ static int fg_power_get_property(struct power_supply *psy,
 		val->intval = chip->nom_cap_uah;
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL:
-#ifdef CONFIG_QPNP_FG_EXTENSION
-		val->intval = min((int)chip->learning_data.learned_cc_uah *
-				CHARGE_FULL_PERCENT_INCREASE / 10,
-				chip->nom_cap_uah);
-#else
 		val->intval = chip->learning_data.learned_cc_uah;
-#endif
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_NOW:
 		val->intval = chip->learning_data.cc_uah;
@@ -2274,8 +2265,15 @@ static void fg_cap_learning_post_process(struct fg_chip *chip)
 	int max_inc_val, min_dec_val;
 	int64_t old_cap;
 
+#ifdef CONFIG_QPNP_FG_EXTENSION
+	max_inc_val = chip->learning_data.max_increment ?
+			chip->learning_data.learned_cc_uah
+			* (1000 + chip->learning_data.max_increment) / 1000 :
+			chip->nom_cap_uah;
+#else
 	max_inc_val = chip->learning_data.learned_cc_uah
 			* (1000 + chip->learning_data.max_increment) / 1000;
+#endif
 	min_dec_val = chip->learning_data.learned_cc_uah
 			* (1000 - chip->learning_data.max_decrement) / 1000;
 
@@ -2288,6 +2286,10 @@ static void fg_cap_learning_post_process(struct fg_chip *chip)
 		chip->learning_data.learned_cc_uah =
 			chip->learning_data.cc_uah;
 
+#ifdef CONFIG_QPNP_FG_EXTENSION
+	if (chip->learning_data.learned_cc_uah > chip->nom_cap_uah)
+		chip->learning_data.learned_cc_uah = chip->nom_cap_uah;
+#endif
 	fg_cap_learning_save_data(chip);
 	if (fg_debug_mask & FG_AGING)
 		pr_info("final cc_uah = %lld, learned capacity %lld -> %lld uah\n",
