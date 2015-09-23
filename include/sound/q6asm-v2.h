@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __Q6_ASM_V2_H__
 #define __Q6_ASM_V2_H__
 
@@ -454,5 +459,7 @@ int q6asm_send_mtmx_strtr_window(struct audio_client *ac,
 		struct asm_session_mtmx_strtr_param_window_v2_t *window_param,
 		uint32_t param_id);
 
+/* SOMC added: Send tuning parameter for Sony effect*/
+int sony_hweffect_send_tuning_params(unsigned int effect_id, void *client);
 
 #endif /* __Q6_ASM_H__ */

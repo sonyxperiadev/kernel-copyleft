@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -57,6 +62,7 @@
 #define QPNP_WLED_ILIM_MAX_MA		1980
 #define QPNP_WLED_ILIM_STEP_MA		280
 #define QPNP_WLED_DFLT_ILIM_MA		980
+#define QPNP_WLED_ILIM_OVERWRITE	0x80
 #define QPNP_WLED_BOOST_DUTY_MASK	0xFC
 #define QPNP_WLED_BOOST_DUTY_STEP_NS	52
 #define QPNP_WLED_BOOST_DUTY_MIN_NS	26
@@ -170,6 +176,9 @@
 #define QPNP_WLED_MIN_MSLEEP		20
 #define QPNP_WLED_SC_DLY_MS		20
 
+#define QPNP_WLED_CURR_SCALE_MAX	100
+#define QPNP_WLED_BL_SCALE_MAX	1000
+#define QPNP_WLED_BUFF_SIZE	50
 /* output feedback mode */
 enum qpnp_wled_fdbk_op {
 	QPNP_WLED_FDBK_AUTO,
@@ -283,9 +292,25 @@ struct qpnp_wled {
 	bool ibb_bias_active;
 	bool lab_fast_precharge;
 	bool en_ext_pfet_sc_pro;
+	int init_br;
+	bool calc_curr;
+	int curr_scale;
+	bool bl_scale_enabled;
+	int bl_scale;
 };
 
 static struct qpnp_wled *gwled;
+
+static bool bl_on_in_boot;
+static int __init continous_splash_setup(char *str)
+{
+	if (!str)
+		return 0;
+	if (!strncmp(str, "on", 2))
+		bl_on_in_boot = true;
+	return 0;
+}
+__setup("display_status=", continous_splash_setup);
 
 /* helper to read a pmic register */
 static int qpnp_wled_read_reg(struct qpnp_wled *wled, u8 *data, u16 addr)
@@ -336,6 +361,16 @@ static int qpnp_wled_set_level(struct qpnp_wled *wled, int level)
 	int i, rc;
 	u8 reg;
 
+	if (wled->calc_curr &&
+		wled->curr_scale != QPNP_WLED_CURR_SCALE_MAX)
+		level = (level * wled->curr_scale) / QPNP_WLED_CURR_SCALE_MAX;
+
+	if (wled->bl_scale_enabled && (wled->bl_scale > 0) &&
+		(wled->bl_scale < QPNP_WLED_BL_SCALE_MAX))
+		level = (level * wled->bl_scale) / QPNP_WLED_BL_SCALE_MAX;
+
+	pr_debug("%s: brightness=%d level=%d\n",
+			__func__, wled->cdev.brightness, level);
 	/* set brightness registers */
 	for (i = 0; i < wled->num_strings; i++) {
 		reg = level & QPNP_WLED_BRIGHT_LSB_MASK;
@@ -723,6 +758,46 @@ static ssize_t qpnp_wled_fs_curr_ua_store(struct device *dev,
 	return count;
 }
 
+static ssize_t qpnp_wled_bl_scale_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct qpnp_wled *wled = dev_get_drvdata(dev);
+	if (!wled->bl_scale_enabled)
+		wled->bl_scale = QPNP_WLED_BL_SCALE_MAX;
+	dev_dbg(&wled->spmi->dev, "%s: bl_scale = %d\n", __func__, wled->bl_scale);
+
+	return snprintf(buf, QPNP_WLED_BUFF_SIZE, "%u\n", wled->bl_scale);
+}
+
+static ssize_t qpnp_wled_bl_scale_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct qpnp_wled *wled = dev_get_drvdata(dev);
+	unsigned long scale = 0;
+	ssize_t ret = -EINVAL;
+
+	if (!wled->bl_scale_enabled) {
+		wled->bl_scale = QPNP_WLED_BL_SCALE_MAX;
+		dev_err(&wled->spmi->dev, "Sysfs bl_scale is not enabled\n");
+		goto exit;
+	}
+
+	ret = kstrtoul(buf, 10, &scale);
+	if (!ret) {
+		ret = size;
+		if (scale > QPNP_WLED_BL_SCALE_MAX)
+			scale = QPNP_WLED_BL_SCALE_MAX;
+		wled->bl_scale = scale;
+		dev_dbg(&wled->spmi->dev, "%s: bl_scale = %d\n", __func__, wled->bl_scale);
+	} else {
+		dev_err(&wled->spmi->dev, "Failure to set sysfs bl_scale\n");
+		ret = -EINVAL;
+	}
+
+exit:
+	return ret;
+}
+
 /* sysfs attributes exported by wled */
 static struct device_attribute qpnp_wled_attrs[] = {
 	__ATTR(dump_regs, (S_IRUGO | S_IWUSR | S_IWGRP),
@@ -743,6 +818,9 @@ static struct device_attribute qpnp_wled_attrs[] = {
 	__ATTR(ramp_step, (S_IRUGO | S_IWUSR | S_IWGRP),
 			qpnp_wled_ramp_step_show,
 			qpnp_wled_ramp_step_store),
+	__ATTR(bl_scale, (S_IRUGO | S_IWUSR | S_IWGRP),
+			qpnp_wled_bl_scale_show,
+			qpnp_wled_bl_scale_store),
 };
 
 /* worker for setting wled brightness */
@@ -920,12 +998,16 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 			QPNP_WLED_ILIM_REG(wled->ctrl_base));
 	if (rc < 0)
 		return rc;
-	reg &= QPNP_WLED_ILIM_MASK;
-	reg |= (wled->ilim_ma / QPNP_WLED_ILIM_STEP_MA);
-	rc = qpnp_wled_write_reg(wled, &reg,
+	temp = wled->ilim_ma / QPNP_WLED_ILIM_STEP_MA;
+	if (temp != (reg & ~QPNP_WLED_ILIM_MASK)) {
+		reg &= QPNP_WLED_ILIM_MASK;
+		reg |= temp;
+		reg |= QPNP_WLED_ILIM_OVERWRITE;
+		rc = qpnp_wled_write_reg(wled, &reg,
 			QPNP_WLED_ILIM_REG(wled->ctrl_base));
-	if (rc)
-		return rc;
+		if (rc)
+			return rc;
+	}
 
 	/* Configure the MAX BOOST DUTY register */
 	if (wled->boost_duty_ns < QPNP_WLED_BOOST_DUTY_MIN_NS)
@@ -1131,7 +1213,13 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 		if (rc < 0)
 			return rc;
 		reg &= QPNP_WLED_FS_CURR_MASK;
-		temp = wled->fs_curr_ua / QPNP_WLED_FS_CURR_STEP_UA;
+		if (wled->calc_curr)
+			temp = (wled->fs_curr_ua +
+				(QPNP_WLED_FS_CURR_STEP_UA - 1)) /
+					QPNP_WLED_FS_CURR_STEP_UA;
+		else
+			temp = wled->fs_curr_ua /
+					QPNP_WLED_FS_CURR_STEP_UA;
 		reg |= temp;
 		rc = qpnp_wled_write_reg(wled, &reg,
 				QPNP_WLED_FS_CURR_REG(wled->sink_base,
@@ -1275,6 +1363,27 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 		}
 	}
 
+	return 0;
+}
+
+static int qpnp_wled_set_scale(struct qpnp_wled *wled)
+{
+	u8 reg = 0;
+	int rc, curr;
+
+	wled->curr_scale = QPNP_WLED_CURR_SCALE_MAX;
+	rc = qpnp_wled_read_reg(wled, &reg,
+			QPNP_WLED_FS_CURR_REG(wled->sink_base,
+				wled->strings[0]));
+	if (rc)
+		return rc;
+	reg &= ~QPNP_WLED_FS_CURR_MASK;
+	curr = (reg * QPNP_WLED_FS_CURR_STEP_UA);
+	if (curr > wled->fs_curr_ua)
+		wled->curr_scale = (wled->fs_curr_ua *
+			QPNP_WLED_CURR_SCALE_MAX) / curr;
+	pr_debug("%s: curr=%d fs_curr_ua=%d curr_scale=%d\n", __func__,
+				curr, wled->fs_curr_ua, wled->curr_scale);
 	return 0;
 }
 
@@ -1432,6 +1541,11 @@ static int qpnp_wled_parse_dt(struct qpnp_wled *wled)
 		return rc;
 	}
 
+	wled->calc_curr = of_property_read_bool(spmi->dev.of_node,
+			"somc,calc-curr");
+	wled->bl_scale_enabled = of_property_read_bool(spmi->dev.of_node,
+			"somc,bl-scale-enabled");
+
 	wled->en_9b_dim_res = of_property_read_bool(spmi->dev.of_node,
 			"qcom,en-9b-dim-res");
 	wled->en_phase_stag = of_property_read_bool(spmi->dev.of_node,
@@ -1478,6 +1592,15 @@ static int qpnp_wled_parse_dt(struct qpnp_wled *wled)
 	wled->en_ext_pfet_sc_pro = of_property_read_bool(spmi->dev.of_node,
 					"qcom,en-ext-pfet-sc-pro");
 
+	wled->init_br = LED_OFF;
+	rc = of_property_read_u32(spmi->dev.of_node,
+					"somc,init-br", &temp_val);
+	if (!rc) {
+		wled->init_br = temp_val;
+	} else if (rc != -EINVAL) {
+		dev_err(&spmi->dev, "Unable to read init brigtness\n");
+		return rc;
+	}
 	return 0;
 }
 
@@ -1543,6 +1666,14 @@ static int qpnp_wled_probe(struct spmi_device *spmi)
 		return rc;
 	}
 
+	if (wled->calc_curr) {
+		rc = qpnp_wled_set_scale(wled);
+		if (rc) {
+			dev_err(&spmi->dev, "wled config failed\n");
+			return rc;
+		}
+	}
+
 	mutex_init(&wled->lock);
 	INIT_WORK(&wled->work, qpnp_wled_work);
 	wled->ramp_ms = QPNP_WLED_RAMP_DLY_MS;
@@ -1573,6 +1704,8 @@ static int qpnp_wled_probe(struct spmi_device *spmi)
 
 	gwled = wled;
 
+	if (wled->init_br && !bl_on_in_boot)
+		qpnp_wled_set(&wled->cdev, wled->init_br);
 	return 0;
 
 sysfs_fail:

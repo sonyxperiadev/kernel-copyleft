@@ -322,26 +322,34 @@ static bool fw_read_file_contents(struct file *file, struct firmware_buf *fw_buf
 	char *buf;
 
 	size = fw_file_size(file);
-	if (size <= 0)
+	if (size <= 0){
+		printk("@@%s:%d size less than zero\n",__func__,__LINE__);			
 		return false;
+	}
 	if (fw_buf->dest_size > 0 && fw_buf->dest_size < size)
+	{
+		printk("@@%s:%d Incorrect size passed to read \n",__func__,__LINE__);
 		return false;
-
+	}
 	if (fw_buf->dest_addr)
 		buf = fw_buf->map_fw_mem(fw_buf->dest_addr,
 					   fw_buf->dest_size, fw_buf->map_data);
 	else
 		buf = vmalloc(size);
-	if (!buf)
+	if (!buf) {
+		printk("@@%s:%d could not alloc requested size\n",__func__,__LINE__);
 		return false;
+	}
 	if (kernel_read(file, 0, buf, size) != size) {
 		if (fw_buf->dest_addr)
 			fw_buf->unmap_fw_mem(buf, fw_buf->dest_size,
 							fw_buf->map_data);
 		else
 			vfree(buf);
+		printk("@@%s:%d kernel could not read requested size data.\n",__func__,__LINE__);
 		return false;
 	}
+	
 	fw_buf->data = buf;
 	fw_buf->size = size;
 	if (fw_buf->dest_addr)
@@ -365,14 +373,18 @@ static bool fw_get_filesystem_firmware(struct device *device,
 			continue;
 
 		snprintf(path, PATH_MAX, "%s/%s", fw_path[i], buf->fw_id);
-
+		printk("@@%s:%d system_state=%d file=%s\n",__func__,__LINE__,system_state,path);
 		file = filp_open(path, O_RDONLY, 0);
 		if (IS_ERR(file))
 			continue;
 		success = fw_read_file_contents(file, buf);
 		fput(file);
-		if (success)
+		if (success) {
+			 printk("SUCCESS:@@%s:%d system_state=%d file=%s\n",__func__,__LINE__,system_state,path);
 			break;
+		}
+		else
+			 printk("FAILED:@@%s:%d system_state=%d file=%s\n",__func__,__LINE__,system_state,path);
 	}
 	__putname(path);
 

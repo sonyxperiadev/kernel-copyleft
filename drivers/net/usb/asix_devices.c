@@ -19,6 +19,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "asix.h"
 
@@ -488,7 +493,7 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
 	if (dev->driver_info->flags & FLAG_FRAMING_AX) {
 		/* hard_mtu  is still the default - the device does not support
 		   jumbo eth frames */
-		dev->rx_urb_size = 2048;
+		dev->rx_urb_size = 4096;
 	}
 
 	dev->driver_priv = kzalloc(sizeof(struct asix_common_private), GFP_KERNEL);
