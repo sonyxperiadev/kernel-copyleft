@@ -2,6 +2,7 @@
  * xfrm algorithm interface
  *
  * Copyright (c) 2002 James Morris <jmorris@intercode.com.au>
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -203,7 +204,11 @@ static struct xfrm_algo_desc aalg_list[] = {
 
 	.uinfo = {
 		.auth = {
+#ifdef CONFIG_XFRM_RFC_4868_TRUNCATION
+			.icv_truncbits = 128,
+#else
 			.icv_truncbits = 96,
+#endif
 			.icv_fullbits = 256,
 		}
 	},

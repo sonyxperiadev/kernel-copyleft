@@ -4,6 +4,7 @@
  * Copyright (C) 2001 WireX Communications, Inc <chris@wirex.com>
  * Copyright (C) 2001-2002 Greg Kroah-Hartman <greg@kroah.com>
  * Copyright (C) 2001 Networks Associates Technology, Inc <ssmalley@nai.com>
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -21,6 +22,9 @@
 #include <linux/evm.h>
 #include <linux/fsnotify.h>
 #include <net/flow.h>
+#if defined(CONFIG_SECURITY_SONY_RIC) && !defined(CONFIG_DEFAULT_SECURITY_SONY)
+#include "sony/ric.h"
+#endif
 
 #define MAX_LSM_EVM_XATTR	2
 
@@ -283,6 +287,13 @@ int security_sb_statfs(struct dentry *dentry)
 int security_sb_mount(char *dev_name, struct path *path,
                        char *type, unsigned long flags, void *data)
 {
+#if defined(CONFIG_SECURITY_SONY_RIC) && !defined(CONFIG_DEFAULT_SECURITY_SONY)
+	int ret;
+
+	ret = sony_ric_mount(dev_name, path, type, flags, data);
+	if (ret)
+		return ret;
+#endif
 	return security_ops->sb_mount(dev_name, path, type, flags, data);
 }
 

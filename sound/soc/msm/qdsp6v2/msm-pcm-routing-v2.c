@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,7 +18,10 @@
 #include <linux/platform_device.h>
 #include <linux/bitops.h>
 #include <linux/mutex.h>
+#include <linux/delay.h>
 #include <linux/of_device.h>
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
@@ -1576,10 +1580,66 @@ static const struct soc_enum msm_route_ext_ec_ref_rx_enum[] = {
 	SOC_ENUM_SINGLE_EXT(5, ext_ec_ref_rx),
 };
 
+
 static const struct snd_kcontrol_new voc_ext_ec_mux =
 	SOC_DAPM_ENUM_EXT("VOC_EXT_EC MUX Mux", msm_route_ext_ec_ref_rx_enum[0],
 			  msm_routing_ext_ec_get, msm_routing_ext_ec_put);
 
+static int msm_routing_get_hw_id(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct device_node *node;
+	int gpio_count;
+	int hw_id;
+	int i;
+
+	node = of_find_node_by_name(of_find_node_by_path("/"), "gpio_hw_ids");
+	if (!node) {
+		pr_err("%s: node \"gpio_hw_ids\" does not exist.\n",
+				__func__);
+		return -EINVAL;
+	}
+
+	gpio_count = of_gpio_count(node);
+	if (!gpio_count) {
+		pr_err("%s: GPIO is not assigned.\n", __func__);
+		return -EINVAL;
+	}
+
+	hw_id = 0;
+	for (i = 0; i < gpio_count; i++) {
+		int gpio;
+		int ret;
+
+		gpio = of_get_gpio(node, i);
+		if (!gpio) {
+			pr_err("%s: Failed to get gpio hw_id_%d.\n",
+					__func__, i);
+			return -EINVAL;
+		}
+
+		ret = gpio_request(gpio, NULL);
+		if (ret) {
+			pr_err("%s: Failed to request gpio hw_id_%d.\n",
+					__func__, i);
+			return -EINVAL;
+		}
+
+		ret = gpio_get_value(gpio);
+		gpio_free(gpio);
+		hw_id |= ret << i;
+	}
+	pr_info("%s: hw_id=0x%04x\n", __func__, hw_id);
+	ucontrol->value.integer.value[0] = hw_id;
+
+	return 0;
+}
+
+static int msm_routing_put_hw_id(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	return 0;
+}
 
 static const struct snd_kcontrol_new pri_i2s_rx_mixer_controls[] = {
 	SOC_SINGLE_EXT("MultiMedia1", MSM_BACKEND_DAI_PRI_I2S_RX ,
@@ -3213,6 +3273,13 @@ static const struct snd_kcontrol_new eq_coeff_mixer_controls[] = {
 	msm_routing_put_eq_band_audio_mixer),
 };
 
+static const struct snd_kcontrol_new hw_id_controls[] = {
+	SOC_SINGLE_EXT("HW ID", SND_SOC_NOPM,
+	SND_SOC_NOPM, 1, 0,
+	msm_routing_get_hw_id,
+	msm_routing_put_hw_id),
+};
+
 static int spkr_prot_put_vi_lch_port(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
@@ -4544,6 +4611,9 @@ static int msm_routing_probe(struct snd_soc_platform *platform)
 
 	snd_soc_add_platform_controls(platform, msm_voc_session_controls,
 				      ARRAY_SIZE(msm_voc_session_controls));
+
+	snd_soc_add_platform_controls(platform, hw_id_controls,
+				      ARRAY_SIZE(hw_id_controls));
 
 	return 0;
 }

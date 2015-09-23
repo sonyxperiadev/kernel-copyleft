@@ -2431,23 +2431,16 @@ static int tapan_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 }
 
 /* called under codec_resource_lock acquisition */
-static int tapan_enable_mbhc_micbias(struct snd_soc_codec *codec, bool enable,
-				     enum wcd9xxx_micbias_num micb_num)
+static int tapan_enable_mbhc_micbias(struct snd_soc_codec *codec, bool enable)
 {
 	int rc;
-	const char *micbias;
-
-	if (micb_num == MBHC_MICBIAS2)
-		micbias = DAPM_MICBIAS2_EXTERNAL_STANDALONE;
-	else
-		return -EINVAL;
 
 	if (enable)
 		rc = snd_soc_dapm_force_enable_pin(&codec->dapm,
-						   micbias);
+					     DAPM_MICBIAS2_EXTERNAL_STANDALONE);
 	else
 		rc = snd_soc_dapm_disable_pin(&codec->dapm,
-					      micbias);
+					     DAPM_MICBIAS2_EXTERNAL_STANDALONE);
 	if (!rc)
 		snd_soc_dapm_sync(&codec->dapm);
 	pr_debug("%s: leave ret %d\n", __func__, rc);
@@ -5737,7 +5730,7 @@ static void tapan_codec_specific_cal_setup(struct snd_soc_codec *codec,
 					   struct wcd9xxx_mbhc *mbhc)
 {
 	snd_soc_update_bits(codec, WCD9XXX_A_CDC_MBHC_B1_CTL,
-			    0x04, 0x04);
+			    0x0C, 0x04);
 	snd_soc_update_bits(codec, WCD9XXX_A_TX_7_MBHC_EN, 0xE0, 0xE0);
 }
 

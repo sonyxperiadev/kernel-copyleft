@@ -26,8 +26,18 @@
 #include <linux/syscore_ops.h>
 #include <linux/rtc.h>
 #include <trace/events/power.h>
+#include <linux/wakelock.h>
 
 #include "power.h"
+
+/*
+ * suspend back-off default values
+ */
+#define SBO_SLEEP_MSEC 1100
+#define SBO_TIME_MSEC 10000
+#define SBO_CNT 10
+
+static struct wake_lock suspend_backoff_lock;
 
 const char *const pm_states[PM_SUSPEND_MAX] = {
 #ifdef CONFIG_EARLYSUSPEND
@@ -316,6 +326,17 @@ static void pm_suspend_marker(char *annotation)
 		tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
 }
 
+void pm_suspend_backoff_init(void)
+{
+	wake_lock_init(&suspend_backoff_lock, WAKE_LOCK_SUSPEND, "suspend_backoff");
+}
+
+static void pm_suspend_backoff(void)
+{
+	 pr_info("suspend: too many immediate wakeups, back off\n");
+	 wake_lock_timeout(&suspend_backoff_lock, msecs_to_jiffies(SBO_TIME_MSEC));
+}
+
 /**
  * pm_suspend - Externally visible function for suspending the system.
  * @state: System sleep state to enter.
@@ -326,18 +347,39 @@ static void pm_suspend_marker(char *annotation)
 int pm_suspend(suspend_state_t state)
 {
 	int error;
+	static unsigned suspend_short_count = 0;
+	struct timespec ts_entry, ts_exit;
+	u64 elapsed_nsecs;
+	u32 elapsed_msecs;
 
 	if (state <= PM_SUSPEND_ON || state >= PM_SUSPEND_MAX)
 		return -EINVAL;
 
 	pm_suspend_marker("entry");
+
+	getnstimeofday(&ts_entry);
 	error = enter_state(state);
+	getnstimeofday(&ts_exit);
+
 	if (error) {
 		suspend_stats.fail++;
 		dpm_save_failed_errno(error);
 	} else {
 		suspend_stats.success++;
 	}
+
+	elapsed_nsecs = timespec_to_ns(&ts_exit) - timespec_to_ns(&ts_entry);
+	do_div(elapsed_nsecs, NSEC_PER_MSEC);
+	elapsed_msecs = elapsed_nsecs;
+	if (elapsed_msecs <= SBO_SLEEP_MSEC) {
+		if (suspend_short_count == SBO_CNT)
+			pm_suspend_backoff();
+		else
+			suspend_short_count++;
+	} else {
+		suspend_short_count = 0;
+	}
+
 	pm_suspend_marker("exit");
 	return error;
 }

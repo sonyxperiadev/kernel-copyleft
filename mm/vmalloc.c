@@ -6,6 +6,10 @@
  *  SMP-safe vmalloc/vfree/ioremap, Tigran Aivazian <tigran@veritas.com>, May 2000
  *  Major rework to support vmap/vunmap, Christoph Hellwig, SGI, August 2002
  *  Numa awareness, Christoph Lameter, SGI, June 2005
+ *
+ *  NOTE: This file has been modified by Sony Mobile Communications Inc.
+ *  Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ *  and licensed under the license of the file.
  */
 
 #include <linux/vmalloc.h>
@@ -485,10 +489,12 @@ overflow:
 		purged = 1;
 		goto retry;
 	}
-	if (printk_ratelimit())
+	if (printk_ratelimit()) {
 		printk(KERN_WARNING
 			"vmap allocation for size %lu failed: "
 			"use vmalloc=<size> to increase size.\n", size);
+		WARN_ON(1);
+	}
 	kfree(va);
 	return ERR_PTR(-EBUSY);
 }

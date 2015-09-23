@@ -450,7 +450,6 @@ adm_get_param_return:
 	return rc;
 }
 
-
 static void adm_callback_debug_print(struct apr_client_data *data)
 {
 	uint32_t *payload;

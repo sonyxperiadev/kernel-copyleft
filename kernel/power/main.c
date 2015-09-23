@@ -672,6 +672,9 @@ static int __init pm_init(void)
 	error = sysfs_create_group(power_kobj, &attr_group);
 	if (error)
 		return error;
+
+	pm_suspend_backoff_init();
+
 	return pm_autosleep_init();
 }
 

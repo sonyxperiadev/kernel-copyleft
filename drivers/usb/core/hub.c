@@ -5,6 +5,10 @@
  * (C) Copyright 1999 Johannes Erdfelt
  * (C) Copyright 1999 Gregory P. Smith
  * (C) Copyright 2001 Brad Hards (bhards@bigpond.net.au)
+ * Copyright (C) 2013 Sony Mobile Communications AB.
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications AB.
+ * Modifications are licensed under the License.
  *
  */
 
@@ -1706,6 +1710,12 @@ void usb_disconnect(struct usb_device **pdev)
 {
 	struct usb_device	*udev = *pdev;
 	int			i;
+
+	/* when the device is disconnected from root hub,
+	 * set the ocp mode default.
+	 */
+	if (udev->level == 1)
+		usb_set_ocp_mode(USB_OCP_MODE_DEFAULT);
 
 	/* mark the device as inactive, so any further urb submissions for
 	 * this device (and any of its children) will fail immediately.

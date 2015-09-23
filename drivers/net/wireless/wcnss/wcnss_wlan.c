@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2013,2015 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2015 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -945,8 +946,11 @@ void wcnss_reset_intr(void)
 {
 	if (wcnss_hardware_type() == WCNSS_PRONTO_HW) {
 		wcnss_pronto_log_debug_regs();
+#ifdef CONFIG_WCNSS_REGISTER_DUMP_ON_BITE
 		if (wcnss_get_mux_control())
 			wcnss_log_iris_regs();
+
+#endif
 		wmb();
 		__raw_writel(1 << 16, penv->fiq_reg);
 	} else {
