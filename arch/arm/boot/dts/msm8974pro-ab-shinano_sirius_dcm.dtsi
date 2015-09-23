@@ -62,6 +62,19 @@
 
 &pm8941_chg {
 	qcom,maxinput-dc-ma = <1800>;
+	qcom,ibatterm-ma = <150>;
+	qcom,ibatsafe-ma = <2200>;
+	qcom,maxinput-usb-mv = <13000>;
+	qcom,thermal-mitigation = <2200 1600 1100 900 700 500 300 200 100 0>;
+	qcom,vbatdet-delta-mv = <60>;
+	qcom,step-thresh-soc = <60>;
+	qcom,ibatmax-ma-over-step = <1600>;
+	qcom,ibatmax-ma-under-step = <2200>;
+};
+
+&pm8941_bms {
+	qcom,low-soc-calculate-soc-threshold = <5>;
+	qcom,chg-term-ua = <150000>;
 };
 
 &pm8941_gpios {
