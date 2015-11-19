@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -626,6 +626,8 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 		ctx->pp_timeout_report_cnt = 0;
 	}
 
+	cancel_work_sync(&ctx->pp_done_work);
+
 	/* signal any pending ping pong done events */
 	while (atomic_add_unless(&ctx->pp_done_cnt, -1, 0))
 		mdss_mdp_ctl_notify(ctx->ctl, MDP_NOTIFY_FRAME_DONE);
@@ -679,9 +681,25 @@ static int mdss_mdp_cmd_set_partial_roi(struct mdss_mdp_ctl *ctl)
 	if (!ctl->panel_data->panel_info.partial_update_enabled)
 		return rc;
 
-	/* set panel col and page addr */
-	rc = mdss_mdp_ctl_intf_event(ctl,
+	if (ctl->roi.w && ctl->roi.h && ctl->roi_changed) {
+		if (ctl->mfd && (ctl->mfd->panel_orientation & MDP_FLIP_LR))
+			ctl->panel_data->panel_info.roi.x =
+				ctl->mixer_left->width -
+					(ctl->roi.x + ctl->roi.w);
+		else
+			ctl->panel_data->panel_info.roi.x = ctl->roi.x;
+		if (ctl->mfd && (ctl->mfd->panel_orientation & MDP_FLIP_UD))
+			ctl->panel_data->panel_info.roi.y =
+				ctl->mixer_left->height -
+					(ctl->roi.y + ctl->roi.h);
+		else
+			ctl->panel_data->panel_info.roi.y = ctl->roi.y;
+		ctl->panel_data->panel_info.roi.w = ctl->roi.w;
+		ctl->panel_data->panel_info.roi.h = ctl->roi.h;
+
+		rc = mdss_mdp_ctl_intf_event(ctl,
 			MDSS_EVENT_ENABLE_PARTIAL_ROI, NULL);
+	}
 	return rc;
 }
 
@@ -948,19 +966,20 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 {
 	struct mdss_mdp_cmd_ctx *ctx = ctl->priv_data;
 	struct mdss_mdp_ctl *sctl = mdss_mdp_get_split_ctl(ctl);
-	int ret;
+	int ret = 0;
 
 	if (!ctx) {
 		pr_err("invalid ctx\n");
 		return -ENODEV;
 	}
 
+	mutex_lock(&ctl->offlock);
 	if (ctx->panel_power_state != panel_power_state) {
 		ret = mdss_mdp_cmd_stop_sub(ctl, panel_power_state);
 		if (IS_ERR_VALUE(ret)) {
 			pr_err("%s: unable to stop interface: %d\n",
 					__func__, ret);
-			return ret;
+			goto end;
 		}
 
 		if (sctl) {
@@ -968,7 +987,7 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 			if (IS_ERR_VALUE(ret)) {
 				pr_err("%s: unable to stop slave intf: %d\n",
 						__func__, ret);
-				return ret;
+				goto end;
 			}
 		}
 
@@ -998,9 +1017,10 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 end:
 	MDSS_XLOG(ctl->num, atomic_read(&ctx->koff_cnt), ctx->clk_enabled,
 				ctx->rdptr_enabled, XLOG_FUNC_EXIT);
+	mutex_unlock(&ctl->offlock);
 	pr_debug("%s:-\n", __func__);
 
-	return 0;
+	return ret;
 }
 
 static int mdss_mdp_cmd_intfs_setup(struct mdss_mdp_ctl *ctl,

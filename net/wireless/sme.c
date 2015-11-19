@@ -3,6 +3,7 @@
  *
  * Copyright 2009	Johannes Berg <johannes@sipsolutions.net>
  * Copyright (C) 2009   Intel Corporation. All rights reserved.
+ * Copyright (C) 2015 Foxconn International Holdings, Ltd. All rights reserved.
  */
 
 #include <linux/etherdevice.h>
@@ -460,7 +461,7 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
 			       struct cfg80211_bss *bss)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
-	const u8 *country_ie;
+//CONN-EC-WIFI-REGDOMAIN-01-	const u8 *country_ie;
 #ifdef CONFIG_CFG80211_WEXT
 	union iwreq_data wrqu;
 #endif
@@ -544,6 +545,8 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
 	wdev->sme_state = CFG80211_SME_CONNECTED;
 	cfg80211_upload_connect_keys(wdev);
 
+//CONN-EC-WIFI-REGDOMAIN-01-[
+#if 0
 	rcu_read_lock();
 	country_ie = ieee80211_bss_get_ie(bss, WLAN_EID_COUNTRY);
 	if (!country_ie) {
@@ -565,6 +568,8 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
 	regulatory_hint_11d(wdev->wiphy, bss->channel->band,
 			    country_ie + 2, country_ie[1]);
 	kfree(country_ie);
+#endif
+//CONN-EC-WIFI-REGDOMAIN-01-]
 }
 
 void cfg80211_connect_result(struct net_device *dev, const u8 *bssid,

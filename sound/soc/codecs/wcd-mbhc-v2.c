@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -47,14 +47,42 @@
 #define OCP_ATTEMPT 1
 #define HS_DETECT_PLUG_TIME_MS (3 * 1000)
 #define SPECIAL_HS_DETECT_TIME_MS (2 * 1000)
-#define MBHC_BUTTON_PRESS_THRESHOLD_MIN 250
+#define MBHC_BUTTON_PRESS_THRESHOLD_MIN 256 /* MM-UW-fix button detect-00+{ */
 #define GND_MIC_SWAP_THRESHOLD 4
 #define WCD_FAKE_REMOVAL_MIN_PERIOD_MS 100
+/* MM-UW-fix TTY detect-00+{ */
+/* MM-UW-fix HS detect-01+{ */
 #define HS_VREF_MIN_VAL 1400
+/* MM-UW-fix HS detect-01+} */
+/* MM-UW-fix TTY detect-00+} */
 #define FW_READ_ATTEMPTS 15
 #define FW_READ_TIMEOUT 4000000
 
 static int det_extn_cable_en;
+
+/* MM-UW-modify for DP-00+{ */ 
+extern unsigned int phase_id;
+ 
+enum{
+  PHASE_EVM  = 0x00,
+  PHASE_EVM2 = 0x01,
+  PHASE_EVM3 = 0x02,
+  PHASE_PD1  = 0x10,
+  PHASE_PD2  = 0x11,
+  PHASE_PD3  = 0x12,
+  PHASE_PD4  = 0x13,
+  PHASE_DP   = 0x20,
+  PHASE_Pre_SP=0x29,
+  PHASE_SP   = 0x30,
+  PHASE_AP   = 0x40,
+  PHASE_TP   = 0x50,
+  PHASE_PQ   = 0x60,
+  PHASE_MP   = 0x70,
+  PHASE_END  = 0xFE,
+  PHASE_MAX  = 0XFF,
+};
+/* MM-UW-modify for DP-00+} */ 
+
 module_param(det_extn_cable_en, int,
 		S_IRUGO | S_IWUSR | S_IWGRP);
 MODULE_PARM_DESC(det_extn_cable_en, "enable/disable extn cable detect");
@@ -204,12 +232,13 @@ static void wcd_program_btn_threshold(const struct wcd_mbhc *mbhc, bool micbias)
 
 		reg_val = (course << 5) | (fine << 2);
 		snd_soc_update_bits(codec, reg_addr, 0xFC, reg_val);
-		pr_err("%s: course: %d fine: %d reg_addr: %x reg_val: %x\n",
+		pr_debug("%s: course: %d fine: %d reg_addr: %x reg_val: %x\n",
 				__func__, course, fine, reg_addr, reg_val);
 		reg_addr++;
 	}
 }
 
+/* MM-UW-fix btn abnormal trigger-00+{ */
 static void wcd_enable_curr_micbias(const struct wcd_mbhc *mbhc,
 				const enum wcd_mbhc_cs_mb_en_flag cs_mb_en)
 {
@@ -218,6 +247,7 @@ static void wcd_enable_curr_micbias(const struct wcd_mbhc *mbhc,
 	pr_debug("%s: enter, cs_mb_en: %d\n", __func__, cs_mb_en);
 
 	switch (cs_mb_en) {
+#if 0
 	case WCD_MBHC_EN_CS:
 		snd_soc_update_bits(codec,
 			MSM8X16_WCD_A_ANALOG_MICB_2_EN,
@@ -228,6 +258,7 @@ static void wcd_enable_curr_micbias(const struct wcd_mbhc *mbhc,
 		/* Program Button threshold registers as per CS */
 		wcd_program_btn_threshold(mbhc, false);
 		break;
+#endif
 	case WCD_MBHC_EN_MB:
 		snd_soc_update_bits(codec,
 			MSM8X16_WCD_A_ANALOG_MBHC_FSM_CTL,
@@ -240,6 +271,7 @@ static void wcd_enable_curr_micbias(const struct wcd_mbhc *mbhc,
 		wcd_program_btn_threshold(mbhc, true);
 		break;
 	case WCD_MBHC_EN_PULLUP:
+	case WCD_MBHC_EN_CS:
 		snd_soc_update_bits(codec,
 			MSM8X16_WCD_A_ANALOG_MBHC_FSM_CTL,
 			0xB0, 0xB0);
@@ -264,6 +296,7 @@ static void wcd_enable_curr_micbias(const struct wcd_mbhc *mbhc,
 
 	pr_debug("%s: exit\n", __func__);
 }
+/* MM-UW-fix btn abnormal trigger-00+} */
 
 static int wcd_event_notify(struct notifier_block *self, unsigned long val,
 				void *data)
@@ -672,6 +705,18 @@ exit:
 	pr_debug("%s: Impedance detection completed\n", __func__);
 }
 
+int wcd_mbhc_get_impedance(struct wcd_mbhc *mbhc, uint32_t *zl,
+			uint32_t *zr)
+{
+	*zl = mbhc->zl;
+	*zr = mbhc->zr;
+
+	if (*zl && *zr)
+		return 0;
+	else
+		return -EINVAL;
+}
+
 static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				enum snd_jack_types jack_type)
 {
@@ -776,6 +821,17 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				    mbhc->hph_status, WCD_MBHC_JACK_MASK);
 		wcd_mbhc_clr_and_turnon_hph_padac(mbhc);
 	}
+       /* MM-UW-fix btn trigger when remove_insert-00+{ */
+       if(mbhc->current_plug == MBHC_PLUG_TYPE_NONE){
+              snd_soc_update_bits(codec,
+		MSM8X16_WCD_A_ANALOG_MBHC_DBNC_TIMER,
+		0xF0, 0xC0);
+       }else{
+              snd_soc_update_bits(codec,
+		MSM8X16_WCD_A_ANALOG_MBHC_DBNC_TIMER,
+		0xF0, 0x20);  
+       }
+       /* MM-UW-fix btn trigger when remove_insert-00+} */
 	pr_debug("%s: leave hph_status %x\n", __func__, mbhc->hph_status);
 }
 
@@ -799,6 +855,11 @@ static void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 				MSM8X16_WCD_A_ANALOG_MBHC_FSM_CTL, 0x30, 0x30);
 		wcd_mbhc_report_plug(mbhc, 1, SND_JACK_HEADPHONE);
 	} else if (plug_type == MBHC_PLUG_TYPE_GND_MIC_SWAP) {
+			if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADPHONE)
+				wcd_mbhc_report_plug(mbhc, 0,
+						SND_JACK_HEADPHONE);
+			if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET)
+				wcd_mbhc_report_plug(mbhc, 0, SND_JACK_HEADSET);
 		wcd_mbhc_report_plug(mbhc, 1, SND_JACK_UNSUPPORTED);
 	} else if (plug_type == MBHC_PLUG_TYPE_HEADSET) {
 		/*
@@ -833,6 +894,10 @@ static void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 		} else {
 			wcd_mbhc_report_plug(mbhc, 1, SND_JACK_LINEOUT);
 		}
+        /* MM-NC-MBHC_NonCTIA-00-[+ */
+        } else if(plug_type == MBHC_PLUG_TYPE_NOT_SUPPORT) {
+		wcd_mbhc_report_plug(mbhc, 1, SND_JACK_UNSUPPORTED);
+        /* MM-NC-MBHC_NonCTIA-00-]- */
 	} else {
 		WARN(1, "Unexpected current plug_type %d, plug_type %d\n",
 		     mbhc->current_plug, plug_type);
@@ -843,7 +908,7 @@ static void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 /* To determine if cross connection occured */
 static bool wcd_check_cross_conn(struct wcd_mbhc *mbhc)
 {
-	u16 result1, swap_res;
+	u16 swap_res;
 	struct snd_soc_codec *codec = mbhc->codec;
 	enum wcd_mbhc_plug_type plug_type = mbhc->current_plug;
 	s16 reg1;
@@ -854,8 +919,6 @@ static bool wcd_check_cross_conn(struct wcd_mbhc *mbhc)
 	 * Micbias and schmitt trigger (HPHL-HPHR)
 	 * needs to be enabled.
 	 */
-	result1 = snd_soc_read(codec, MSM8X16_WCD_A_ANALOG_MBHC_BTN_RESULT);
-	/* Make sure micbias is enabled now */
 	wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
 	snd_soc_update_bits(codec,
 			MSM8X16_WCD_A_ANALOG_MBHC_DET_CTL_2,
@@ -864,7 +927,7 @@ static bool wcd_check_cross_conn(struct wcd_mbhc *mbhc)
 	swap_res = snd_soc_read(codec,
 			MSM8X16_WCD_A_ANALOG_MBHC_ZDET_ELECT_RESULT);
 	pr_debug("%s: swap_res %x\n", __func__, swap_res);
-	if (!result1 && !(swap_res & 0x0C)) {
+	if (!(swap_res & 0x0C)) {
 		plug_type = MBHC_PLUG_TYPE_GND_MIC_SWAP;
 		pr_debug("%s: Cross connection identified\n", __func__);
 	} else {
@@ -927,6 +990,7 @@ static bool wcd_is_special_headset(struct wcd_mbhc *mbhc)
 		ret = true;
 	}
 	snd_soc_update_bits(codec, MSM8X16_WCD_A_ANALOG_MICB_1_CTL, 0x60, 0x00);
+
 	if (mbhc->mbhc_cb && mbhc->mbhc_cb->set_micbias_value)
 		mbhc->mbhc_cb->set_micbias_value(codec);
 	if (mbhc->mbhc_cb && mbhc->mbhc_cb->set_auto_zeroing)
@@ -960,6 +1024,7 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 		if (mbhc->hs_detect_work_stop) {
 			pr_debug("%s: stop requested: %d\n", __func__,
 					mbhc->hs_detect_work_stop);
+                     wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_NONE); /*MM-UW-fix DMS06416437-00+ */
 			goto exit;
 		}
 		/* allow sometime and re-check stop requested again */
@@ -967,6 +1032,7 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 		if (mbhc->hs_detect_work_stop) {
 			pr_debug("%s: stop requested: %d\n", __func__,
 					mbhc->hs_detect_work_stop);
+                     wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_NONE);/*MM-UW-fix DMS06416437-00+ */
 			goto exit;
 		}
 		result1 = snd_soc_read(codec,
@@ -1152,6 +1218,11 @@ static void wcd_mbhc_detect_plug_type(struct wcd_mbhc *mbhc)
 	result2 = snd_soc_read(codec,
 			MSM8X16_WCD_A_ANALOG_MBHC_ZDET_ELECT_RESULT);
 
+        /* MM-NC-MBHC_NonCTIA-00-[+ */
+        pr_debug("%s: result1 %x, result2 %x\n", __func__,
+        	    result1, result2);
+        /* MM-NC-MBHC_NonCTIA-00-]- */
+
 	if (!timeout_result) {
 		pr_debug("%s No btn press interrupt\n", __func__);
 		/*
@@ -1159,8 +1230,8 @@ static void wcd_mbhc_detect_plug_type(struct wcd_mbhc *mbhc)
 		 * Micbias and schmitt trigger (HPHL-HPHR)
 		 * needs to be enabled.
 		 */
-		pr_debug("%s: result1 %x, result2 %x\n", __func__,
-						result1, result2);
+//		pr_debug("%s: result1 %x, result2 %x\n", __func__,
+//						result1, result2);
 		if (!(result2 & 0x01)) {
 			/*
 			 * Cross connection result is not reliable
@@ -1185,6 +1256,10 @@ static void wcd_mbhc_detect_plug_type(struct wcd_mbhc *mbhc)
 		result2 = snd_soc_read(codec,
 			  MSM8X16_WCD_A_ANALOG_MBHC_ZDET_ELECT_RESULT);
 
+/* MM-NC-MBHC_NonCTIA-00-[+ */
+		pr_info("%s: read again, result1 %x, result2 %x\n", __func__,
+						result1, result2);
+/* MM-NC-MBHC_NonCTIA-00-]- */
 		if (!result1 && !(result2 & 0x01))
 			plug_type = MBHC_PLUG_TYPE_HEADSET;
 		else if (!result1 && (result2 & 0x01))
@@ -1196,18 +1271,26 @@ static void wcd_mbhc_detect_plug_type(struct wcd_mbhc *mbhc)
 	} else {
 		if (!result1 && !(result2 & 0x01))
 			plug_type = MBHC_PLUG_TYPE_HEADPHONE;
+/* MM-NC-MBHC_NonCTIA-01-[+ */
+		else if ((result1 != 0x0) && !(result2 & 0x01))
+			plug_type = MBHC_PLUG_TYPE_NOT_SUPPORT;
+/* MM-NC-MBHC_NonCTIA-01-]- */
 		else {
 			plug_type = MBHC_PLUG_TYPE_INVALID;
 			goto exit;
 		}
 	}
 exit:
-	pr_debug("%s: Valid plug found, plug type is %d\n",
+	pr_info("%s: Valid plug found, plug type is %d\n",
 			 __func__, plug_type);
 	if (plug_type == MBHC_PLUG_TYPE_HEADSET ||
 			plug_type == MBHC_PLUG_TYPE_HEADPHONE) {
 		wcd_mbhc_find_plug_and_report(mbhc, plug_type);
 		wcd_schedule_hs_detect_plug(mbhc, &mbhc->correct_plug_swch);
+/* MM-NC-MBHC_NonCTIA-00-[+ */
+	} else if (plug_type == MBHC_PLUG_TYPE_NOT_SUPPORT) {
+		wcd_mbhc_find_plug_and_report(mbhc, plug_type);
+/* MM-NC-MBHC_NonCTIA-00-]- */
 	} else {
 		wcd_schedule_hs_detect_plug(mbhc, &mbhc->correct_plug_swch);
 	}
@@ -1369,19 +1452,24 @@ static int wcd_mbhc_get_button_mask(u16 btn)
 	switch (btn) {
 	case 0:
 		mask = SND_JACK_BTN_0;
+		printk("SND_JACK_BTN_0\n"); 
 		break;
 	case 1:
 		mask = SND_JACK_BTN_1;
+		printk("SND_JACK_BTN_1\n");   
 		break;
 	case 3:
 		mask = SND_JACK_BTN_2;
+		printk("SND_JACK_BTN_2\n"); 
 		break;
 	case 7:
 		mask = SND_JACK_BTN_3;
+		printk("SND_JACK_BTN_3\n"); 
 		break;
-	case 15:
+	/*case 15:
 		mask = SND_JACK_BTN_4;
-		break;
+		printk("SND_JACK_BTN_4\n"); 
+		break;*/
 	default:
 		break;
 	}
@@ -1657,6 +1745,7 @@ irqreturn_t wcd_mbhc_btn_press_handler(int irq, void *data)
 	}
 	result1 = snd_soc_read(codec, MSM8X16_WCD_A_ANALOG_MBHC_BTN_RESULT);
 	mask = wcd_mbhc_get_button_mask(result1);
+	pr_info("%s: result1 = %d\n", __func__, result1);  /* MM-NC-MultiButton-01 */
 	mbhc->buttons_pressed |= mask;
 	wcd9xxx_spmi_lock_sleep();
 	if (schedule_delayed_work(&mbhc->mbhc_btn_dwork,
@@ -1807,7 +1896,10 @@ static int wcd_mbhc_initialise(struct wcd_mbhc *mbhc)
 	snd_soc_update_bits(codec, MSM8X16_WCD_A_ANALOG_MBHC_DET_CTL_2,
 			0x01, 0x01);
 
-	snd_soc_write(codec, MSM8X16_WCD_A_ANALOG_MBHC_DBNC_TIMER, 0x98);
+	/* MM-UW-insert debounce time-00+{ */
+       /* insert debounce 256->768ms, btn debounce 8->32ms*/
+	snd_soc_write(codec, MSM8X16_WCD_A_ANALOG_MBHC_DBNC_TIMER, 0xCC);
+       /* MM-UW-insert debounce time-00+} */
 
 	/* enable MBHC clock */
 	snd_soc_update_bits(codec,
@@ -1940,6 +2032,7 @@ EXPORT_SYMBOL(wcd_mbhc_start);
 void wcd_mbhc_stop(struct wcd_mbhc *mbhc)
 {
 	pr_debug("%s: enter\n", __func__);
+	mbhc->current_plug = MBHC_PLUG_TYPE_NONE;
 	wcd9xxx_spmi_disable_irq(mbhc->intr_ids->hph_left_ocp);
 	wcd9xxx_spmi_disable_irq(mbhc->intr_ids->hph_right_ocp);
 
@@ -1975,12 +2068,20 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 
 	pr_debug("%s: enter\n", __func__);
 
-	ret = of_property_read_u32(card->dev->of_node, hph_switch, &hph_swh);
-	if (ret) {
-		dev_err(card->dev,
-			"%s: missing %s in dt node\n", __func__, hph_switch);
-		goto err;
-	}
+       /* MM-UW-modify for DP-00+{ */ 
+       pr_debug("%s : phase_id =%d\n", __func__, phase_id);
+
+       if((phase_id >= PHASE_DP) || (phase_id == PHASE_EVM)){
+        	ret = of_property_read_u32(card->dev->of_node, hph_switch, &hph_swh);
+        	if (ret) {
+        		dev_err(card->dev,
+        			"%s: missing %s in dt node\n", __func__, hph_switch);
+        		goto err;
+        	}
+       }else{
+            hph_swh = 0;
+       }
+       /* MM-UW-modify for DP-00+} */   
 
 	ret = of_property_read_u32(card->dev->of_node, gnd_switch, &gnd_swh);
 	if (ret) {
@@ -2038,7 +2139,61 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 				__func__);
 			return ret;
 		}
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_1,
+				       KEY_VOICECOMMAND);
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-1:%d\n",
+					__func__, ret);
+			return ret;
+		}
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_2,
+				       KEY_VOLUMEUP);
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-2:%d\n",
+				__func__, ret);
+			return ret;
+		}
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_3,
+				       KEY_VOLUMEDOWN);
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-3:%d\n",
+				__func__, ret);
+			return ret;
+		}
 
+		/* MM-UW-MultiButton-00-[+ */
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_1,
+				       BTN_1);
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-1\n",
+				__func__);
+			return ret;
+		}
+
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_2,
+				       BTN_2);
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-2\n",
+				__func__);
+			return ret;
+		}
+
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_3,
+				       BTN_3); //Please add wake key, you can define this key code
+		if (ret) {
+			pr_err("%s: Failed to set code for btn-3\n",
+				__func__);
+			return ret;
+		}
+
+		/* MM-UW-MultiButton-00-]+ */
+		
 		INIT_DELAYED_WORK(&mbhc->mbhc_firmware_dwork,
 				  wcd_mbhc_fw_read);
 		INIT_DELAYED_WORK(&mbhc->mbhc_btn_dwork, wcd_btn_lpress_fn);

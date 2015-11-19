@@ -207,8 +207,10 @@ static int __init omap_serial_early_init(void)
 					uart_name, uart->num);
 			}
 
-			if (cmdline_find_option("no_console_suspend"))
-				no_console_suspend = true;
+			/*FIH-CORE-TH-Enable_no_console_suspend+[	*/
+			//if (cmdline_find_option("no_console_suspend"))
+			//	no_console_suspend = true;
+			/*FIH-CORE-TH-Enable_no_console_suspend+]*/
 
 			/*
 			 * omap-uart can be used for earlyprintk logs

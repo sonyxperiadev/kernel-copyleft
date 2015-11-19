@@ -475,9 +475,15 @@ int dmesg_restrict = 1;
 #else
 int dmesg_restrict;
 #endif
+extern unsigned int debug_dmesg_restrict;	//CORE-KH-DbgCfgTool-klogd-00-a
 
 static int syslog_action_restricted(int type)
 {
+	//CORE-KH-DbgCfgTool-klogd-00-a[
+	if (debug_dmesg_restrict == 0 && dmesg_restrict)
+		dmesg_restrict = 0;
+	//CORE-KH-DbgCfgTool-klogd-00-a]
+	
 	if (dmesg_restrict)
 		return 1;
 	/*
@@ -485,6 +491,9 @@ static int syslog_action_restricted(int type)
 	 * for everybody.
 	 */
 	return type != SYSLOG_ACTION_READ_ALL &&
+    //FIH-CORE-TH-DebugToolPorting-00-a[
+           type != SYSLOG_ACTION_READ &&
+    //FIH-CORE-TH-DebugToolPorting-00-a]
 	       type != SYSLOG_ACTION_SIZE_BUFFER;
 }
 
@@ -2162,7 +2171,10 @@ int update_console_cmdline(char *name, int idx, char *name_new, int idx_new, cha
 	return -1;
 }
 
+/*FIH-CORE-TH-DebugToolPorting-00+*/
 bool console_suspend_enabled = 1;
+/*FIH-CORE-TH-DebugToolPorting-00-*/
+
 EXPORT_SYMBOL(console_suspend_enabled);
 
 static int __init console_suspend_disable(char *str)

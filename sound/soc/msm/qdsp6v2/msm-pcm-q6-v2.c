@@ -1234,9 +1234,11 @@ static int msm_pcm_probe(struct platform_device *pdev)
 	else
 		pdata->perf_mode = LEGACY_PCM_MODE;
 
+	// pr_info("%s: forcing perf_mode to LEGACY_PCM_MODE", __func__);
+	// pdata->perf_mode=LEGACY_PCM_MODE;
+
 	dev_set_drvdata(&pdev->dev, pdata);
 
-	dev_set_name(&pdev->dev, "%s.%d", "msm-pcm-dsp", id);
 
 	dev_dbg(&pdev->dev, "%s: dev name %s\n",
 				__func__, dev_name(&pdev->dev));

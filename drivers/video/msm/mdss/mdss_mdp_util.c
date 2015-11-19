@@ -613,6 +613,7 @@ static int mdss_mdp_map_buffer(struct mdss_mdp_img_data *data)
 {
 	int ret = -EINVAL;
 	struct ion_client *iclient = mdss_get_ionclient();
+	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
 	if (data->addr && data->len)
 		return 0;
@@ -624,6 +625,9 @@ static int mdss_mdp_map_buffer(struct mdss_mdp_img_data *data)
 				domain = MDSS_IOMMU_DOMAIN_SECURE;
 			else
 				domain = MDSS_IOMMU_DOMAIN_UNSECURE;
+
+			if (domain == MDSS_IOMMU_DOMAIN_SECURE)
+				__mdss_restore_sec_cfg(mdata);
 
 			ret = ion_map_iommu(iclient, data->srcp_ihdl,
 						mdss_get_iommu_domain(domain),
@@ -714,9 +718,10 @@ void mdss_mdp_data_free(struct mdss_mdp_data *data)
 {
 	int i;
 
+	mdss_iommu_ctrl(1); 
 	for (i = 0; i < data->num_planes && data->p[i].len; i++)
 		mdss_mdp_put_img(&data->p[i]);
-
+	mdss_iommu_ctrl(0); 
 	data->num_planes = 0;
 }
 

@@ -386,6 +386,7 @@ static inline struct usb_composite_driver *to_cdriver(
 struct usb_composite_dev {
 	struct usb_gadget		*gadget;
 	struct usb_request		*req;
+	unsigned                        bufsiz;/*CONN-EH-MTPFORXP-00+*/
 
 	struct usb_configuration	*config;
 

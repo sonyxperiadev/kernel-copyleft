@@ -18,7 +18,7 @@
 / {
 	model = "Qualcomm Technologies, Inc. MSM 8916 SMB1360 MTP";
 	compatible = "qcom,msm8916-mtp", "qcom,msm8916", "qcom,mtp";
-	qcom,board-id = <8 1>;
+	qcom,board-id = <8 0>;
 };
 
 &soc {
@@ -34,17 +34,28 @@
 
 			qcom,empty-soc-disabled;
 			qcom,chg-inhibit-disabled;
-			qcom,float-voltage-mv = <4200>;
+			qcom,float-voltage-mv = <4350>; //CORE-DL-ImplementChgAlg-00
 			qcom,iterm-ma = <200>;
-			qcom,charging-disabled;
-			qcom,recharge-thresh-mv = <100>;
+			//qcom,charging-disabled;
+			qcom,recharge-thresh-mv = <200>; //CORE-DL-ImplementChgAlg-00
 			qcom,thermal-mitigation = <1500 700 600 0>;
+			//CORE-DL-ImplementChgAlg-00 +[
+			qcom,batt-profile-select;
+			qcom,smb1360-vadc = <&pm8916_vadc>;
+			qcom,batt-id-vref-uv = <1800000>;
+			qcom,batt-id-rpullup-kohm = <100>;
+			qcom,profile-a-rid-kohm = <324>;
+			qcom,profile-b-rid-kohm = <181>;
+			qcom,shdn-after-pwroff;
+			qcom,fg-reset-at-pon;
+			qcom,fg-reset-thresold-mv = <25>;
+			//CORE-DL-ImplementChgAlg-00 +]
 		};
 	};
 };
 
 &usb_otg {
-	qcom,hsusb-otg-mode = <3>;
+	qcom,hsusb-otg-mode = <1>;
 	qcom,usbid-gpio = <&msm_gpio 110 0>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&usbid_default>;

@@ -479,6 +479,9 @@ int __init reserve_bootmem(unsigned long addr, unsigned long size,
 
 	start = PFN_DOWN(addr);
 	end = PFN_UP(addr + size);
+    /* CORE-KH-DebugToolPorting-01*[ */
+	printk(KERN_INFO "Memory reserve start 0x%08X size 0x%08X flag %d", (int)addr, (int)size, flags);
+    /* CORE-KH-DebugToolPorting-01*] */
 
 	return mark_bootmem(start, end, 1, flags);
 }

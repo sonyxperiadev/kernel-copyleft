@@ -860,114 +860,165 @@ struct kgsl_process_private *kgsl_process_private_find(pid_t pid)
 	return private;
 }
 
-/**
- * kgsl_process_private_new() - Helper function to search for process private
- * Returns: Pointer to the found/newly created private struct
- */
-static struct kgsl_process_private *kgsl_process_private_new(void)
+static struct kgsl_process_private *kgsl_process_private_new(
+		struct kgsl_device *device)
 {
 	struct kgsl_process_private *private;
+	pid_t tgid = task_tgid_nr(current);
 
 	/* Search in the process list */
-	mutex_lock(&kgsl_driver.process_mutex);
 	list_for_each_entry(private, &kgsl_driver.process_list, list) {
-		if (private->pid == task_tgid_nr(current)) {
+		if (private->pid == tgid) {
 			if (!kgsl_process_private_get(private))
-				private = NULL;
-			goto done;
+				private = ERR_PTR(-EINVAL);
+			return private;
 		}
 	}
 
-	/* no existing process private found for this dev_priv, create one */
+	/* Create a new object */
 	private = kzalloc(sizeof(struct kgsl_process_private), GFP_KERNEL);
 	if (private == NULL)
-		goto done;
+		return ERR_PTR(-ENOMEM);
 
 	kref_init(&private->refcount);
 
-	private->pid = task_tgid_nr(current);
+	private->pid = tgid;
+	get_task_comm(private->comm, current->group_leader);
+	private->mem_rb = RB_ROOT;
+
 	spin_lock_init(&private->mem_lock);
-	mutex_init(&private->process_private_mutex);
-	/* Add the newly created process struct obj to the process list */
-	list_add(&private->list, &kgsl_driver.process_list);
-done:
-	mutex_unlock(&kgsl_driver.process_mutex);
+	spin_lock_init(&private->syncsource_lock);
+
+	idr_init(&private->mem_idr);
+	idr_init(&private->syncsource_idr);
+
+	/* Allocate a pagetable for the new process object */
+	if (kgsl_mmu_enabled()) {
+		private->pagetable = kgsl_mmu_getpagetable(&device->mmu, tgid);
+		if (private->pagetable == NULL) {
+			idr_destroy(&private->mem_idr);
+			idr_destroy(&private->syncsource_idr);
+
+			kfree(private);
+			private = ERR_PTR(-ENOMEM);
+		}
+	}
+
 	return private;
 }
 
-/**
- * kgsl_detach_process_private() - Remove a process private from the process
- * private list and free things in the process private that relate to
- * the process id in order to allow next open from same process create
- * a new process private
- * @private: Pointer to process private to detach
- */
-static void kgsl_detach_process_private(struct kgsl_process_private *private)
+static void process_release_memory(struct kgsl_device_private *dev_priv,
+		struct kgsl_process_private *private)
 {
-	mutex_lock(&kgsl_driver.process_mutex);
-	list_del(&private->list);
-	mutex_unlock(&kgsl_driver.process_mutex);
+	struct kgsl_mem_entry *entry;
+	int next = 0;
 
-	if (private->kobj.state_in_sysfs)
-		kgsl_process_uninit_sysfs(private);
-	debugfs_remove_recursive(private->debug_root);
+	while (1) {
+		spin_lock(&private->mem_lock);
+		entry = idr_get_next(&private->mem_idr, &next);
+		if (entry == NULL) {
+			spin_unlock(&private->mem_lock);
+			break;
+		}
+		/*
+		 * If the free pending flag is not set it means that user space
+		 * did not free it's reference to this entry, in that case
+		 * free a reference to this entry, other references are from
+		 * within kgsl so they will be freed eventually by kgsl
+		 */
+		if (entry->dev_priv == dev_priv && !entry->pending_free) {
+			entry->pending_free = 1;
+			spin_unlock(&private->mem_lock);
+			kgsl_mem_entry_put(entry);
+		} else {
+			spin_unlock(&private->mem_lock);
+		}
+		next = next + 1;
+	}
 }
 
-/**
- * kgsl_get_process_private() - Used to find the process private structure
- * @cur_dev_priv: Current device pointer
- * Finds or creates a new porcess private structire and initializes its members
- * Returns: Pointer to the private process struct obj found/created or
- * NULL if pagetable creation for this process private obj failed.
- */
-static struct kgsl_process_private *
-kgsl_get_process_private(struct kgsl_device *device)
+static void process_release_sync_sources(struct kgsl_process_private *private)
+{
+	struct kgsl_syncsource *syncsource;
+	int next = 0;
+
+	while (1) {
+		spin_lock(&private->syncsource_lock);
+		syncsource = idr_get_next(&private->syncsource_idr, &next);
+		spin_unlock(&private->syncsource_lock);
+
+		if (syncsource == NULL)
+			break;
+
+		kgsl_syncsource_put(syncsource);
+		next = next + 1;
+	}
+}
+
+static void kgsl_process_private_close(struct kgsl_device_private *dev_priv,
+		struct kgsl_process_private *private)
+{
+	mutex_lock(&kgsl_driver.process_mutex);
+
+	/*
+	 * If this is the last file on the process take down the debug
+	 * directories and garbage collect any outstanding resources
+	 */
+
+	if (--private->fd_count == 0) {
+		kgsl_process_uninit_sysfs(private);
+		debugfs_remove_recursive(private->debug_root);
+
+		process_release_memory(dev_priv, private);
+		process_release_sync_sources(private);
+
+		/* Remove the process struct from the master list */
+		list_del(&private->list);
+	}
+
+	kgsl_process_private_put(private);
+	mutex_unlock(&kgsl_driver.process_mutex);
+}
+
+
+static struct kgsl_process_private *kgsl_process_private_open(
+		struct kgsl_device *device)
 {
 	struct kgsl_process_private *private;
 
-	private = kgsl_process_private_new();
+	mutex_lock(&kgsl_driver.process_mutex);
+	private = kgsl_process_private_new(device);
 
-	if (!private)
-		return NULL;
-
-	mutex_lock(&private->process_private_mutex);
-
-	if (test_bit(KGSL_PROCESS_INIT, &private->priv))
+	if (IS_ERR(private))
 		goto done;
 
-	get_task_comm(private->comm, current->group_leader);
+	/*
+	 * If this is a new process create the debug directories and add it to
+	 * the process list
+	 */
 
-	private->mem_rb = RB_ROOT;
-	idr_init(&private->mem_idr);
+	if (private->fd_count++ == 0) {
+		int ret = kgsl_process_init_sysfs(device, private);
+		if (ret) {
+			kgsl_process_private_put(private);
+			private = ERR_PTR(ret);
+			goto done;
+		}
 
-	idr_init(&private->syncsource_idr);
+		ret = kgsl_process_init_debugfs(private);
+		if (ret) {
+			kgsl_process_uninit_sysfs(private);
+			kgsl_process_private_put(private);
+			private = ERR_PTR(ret);
+			goto done;
+		}
 
-	if ((!private->pagetable) && kgsl_mmu_enabled()) {
-		unsigned long pt_name;
-
-		pt_name = task_tgid_nr(current);
-		private->pagetable =
-			kgsl_mmu_getpagetable(&device->mmu, pt_name);
-		if (private->pagetable == NULL)
-			goto error;
+		list_add(&private->list, &kgsl_driver.process_list);
 	}
 
-	if (kgsl_process_init_sysfs(device, private))
-		goto error;
-	if (kgsl_process_init_debugfs(private))
-		goto error;
-
-	set_bit(KGSL_PROCESS_INIT, &private->priv);
-
 done:
-	mutex_unlock(&private->process_private_mutex);
+	mutex_unlock(&kgsl_driver.process_mutex);
 	return private;
-
-error:
-	mutex_unlock(&private->process_private_mutex);
-	kgsl_detach_process_private(private);
-	kgsl_process_private_put(private);
-	return NULL;
 }
 
 static int kgsl_close_device(struct kgsl_device *device)
@@ -992,30 +1043,12 @@ static int kgsl_close_device(struct kgsl_device *device)
 
 }
 
-static int kgsl_release(struct inode *inodep, struct file *filep)
+static void device_release_contexts(struct kgsl_device_private *dev_priv)
 {
-	int result = 0;
-	struct kgsl_device_private *dev_priv = filep->private_data;
-	struct kgsl_process_private *private = dev_priv->process_priv;
 	struct kgsl_device *device = dev_priv->device;
 	struct kgsl_context *context;
-	struct kgsl_syncsource *syncsource;
-	struct kgsl_mem_entry *entry;
 	int next = 0;
 
-	filep->private_data = NULL;
-
-	next = 0;
-	while (1) {
-		syncsource = idr_get_next(&private->syncsource_idr, &next);
-
-		if (syncsource == NULL)
-			break;
-		kgsl_syncsource_put(syncsource);
-		next = next + 1;
-	}
-
-	next = 0;
 	while (1) {
 		read_lock(&device->context_lock);
 		context = idr_get_next(&device->context_idr, &next);
@@ -1038,39 +1071,27 @@ static int kgsl_release(struct inode *inodep, struct file *filep)
 
 		next = next + 1;
 	}
-	next = 0;
-	while (1) {
-		spin_lock(&private->mem_lock);
-		entry = idr_get_next(&private->mem_idr, &next);
-		if (entry == NULL) {
-			spin_unlock(&private->mem_lock);
-			break;
-		}
-		/*
-		 * If the free pending flag is not set it means that user space
-		 * did not free it's reference to this entry, in that case
-		 * free a reference to this entry, other references are from
-		 * within kgsl so they will be freed eventually by kgsl
-		 */
-		if (entry->dev_priv == dev_priv && !entry->pending_free) {
-			entry->pending_free = 1;
-			spin_unlock(&private->mem_lock);
-			kgsl_mem_entry_put(entry);
-		} else {
-			spin_unlock(&private->mem_lock);
-		}
-		next = next + 1;
-	}
+}
 
-	result = kgsl_close_device(device);
+static int kgsl_release(struct inode *inodep, struct file *filep)
+{
+	struct kgsl_device_private *dev_priv = filep->private_data;
+	struct kgsl_device *device = dev_priv->device;
+	int result;
+
+	filep->private_data = NULL;
+
+	/* Release the contexts for the file */
+	device_release_contexts(dev_priv);
+
+	/* Close down the process wide resources for the file */
+	kgsl_process_private_close(dev_priv, dev_priv->process_priv);
 
 	kfree(dev_priv);
 
-	kgsl_detach_process_private(private);
-
-	kgsl_process_private_put(private);
-
+	result = kgsl_close_device(device);
 	pm_runtime_put(&device->pdev->dev);
+
 	return result;
 }
 
@@ -1150,10 +1171,10 @@ static int kgsl_open(struct inode *inodep, struct file *filep)
 	 * after the first start so that the global pagetable mappings
 	 * are set up before we create the per-process pagetable.
 	 */
-	dev_priv->process_priv = kgsl_get_process_private(device);
-	if (dev_priv->process_priv ==  NULL) {
+	dev_priv->process_priv = kgsl_process_private_open(device);
+	if (IS_ERR(dev_priv->process_priv)) {
+		result = PTR_ERR(dev_priv->process_priv);
 		kgsl_close_device(device);
-		result = -ENOMEM;
 		goto err;
 	}
 
@@ -1546,6 +1567,7 @@ static void _kgsl_cmdbatch_timer(unsigned long data)
 	if (cmdbatch == NULL || cmdbatch->context == NULL)
 		return;
 
+	/* We are in timer context, this can be non-bh */
 	spin_lock(&cmdbatch->lock);
 	if (list_empty(&cmdbatch->synclist))
 		goto done;
@@ -1643,9 +1665,13 @@ static void kgsl_cmdbatch_sync_expire(struct kgsl_device *device,
 	struct kgsl_cmdbatch_sync_event *e, *tmp;
 	int sched = 0;
 	int removed = 0;
-	unsigned long flags;
 
-	spin_lock_irqsave(&event->cmdbatch->lock, flags);
+	/*
+	 * We may have cmdbatch timer running, which also uses same lock,
+	 * take a lock with software interrupt disabled (bh) to avoid
+	 * spin lock recursion.
+	 */
+	spin_lock_bh(&event->cmdbatch->lock);
 
 	/*
 	 * sync events that are contained by a cmdbatch which has been
@@ -1661,7 +1687,7 @@ static void kgsl_cmdbatch_sync_expire(struct kgsl_device *device,
 	}
 
 	sched = list_empty(&event->cmdbatch->synclist) ? 1 : 0;
-	spin_unlock_irqrestore(&event->cmdbatch->lock, flags);
+	spin_unlock_bh(&event->cmdbatch->lock);
 
 	/* If the list is empty delete the canary timer */
 	if (sched)
@@ -1727,6 +1753,7 @@ void kgsl_cmdbatch_destroy(struct kgsl_cmdbatch *cmdbatch)
 	/* Zap the canary timer */
 	del_timer_sync(&cmdbatch->timer);
 
+	/* non-bh because we just destroyed timer */
 	spin_lock(&cmdbatch->lock);
 
 	/* Empty the synclist before canceling events */
@@ -1818,7 +1845,6 @@ static int kgsl_cmdbatch_add_sync_fence(struct kgsl_device *device,
 {
 	struct kgsl_cmd_syncpoint_fence *sync = priv;
 	struct kgsl_cmdbatch_sync_event *event;
-	unsigned long flags;
 
 	event = kzalloc(sizeof(*event), GFP_KERNEL);
 
@@ -1846,9 +1872,11 @@ static int kgsl_cmdbatch_add_sync_fence(struct kgsl_device *device,
 	 */
 
 	kref_get(&event->refcount);
-	spin_lock_irqsave(&cmdbatch->lock, flags);
+
+	/* non-bh because, we haven't started cmdbatch timer yet */
+	spin_lock(&cmdbatch->lock);
 	list_add(&event->node, &cmdbatch->synclist);
-	spin_unlock_irqrestore(&cmdbatch->lock, flags);
+	spin_unlock(&cmdbatch->lock);
 
 	/*
 	 * Increment the reference count for the async callback.
@@ -1868,9 +1896,9 @@ static int kgsl_cmdbatch_add_sync_fence(struct kgsl_device *device,
 		kgsl_cmdbatch_sync_event_put(event);
 
 		/* Remove event from the synclist */
-		spin_lock_irqsave(&cmdbatch->lock, flags);
+		spin_lock(&cmdbatch->lock);
 		list_del(&event->node);
-		spin_unlock_irqrestore(&cmdbatch->lock, flags);
+		spin_unlock(&cmdbatch->lock);
 		kgsl_cmdbatch_sync_event_put(event);
 
 		/* Event no longer needed by this function */
@@ -1961,6 +1989,7 @@ static int kgsl_cmdbatch_add_sync_timestamp(struct kgsl_device *device,
 	kref_init(&event->refcount);
 	kref_get(&event->refcount);
 
+	/* non-bh because, we haven't started cmdbatch timer yet */
 	spin_lock(&cmdbatch->lock);
 	list_add(&event->node, &cmdbatch->synclist);
 	spin_unlock(&cmdbatch->lock);

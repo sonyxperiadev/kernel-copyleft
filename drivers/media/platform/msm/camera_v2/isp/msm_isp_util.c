@@ -172,8 +172,8 @@ int msm_isp_update_bandwidth(enum msm_isp_hw_client client,
 	path =
 		&(msm_isp_bus_client_pdata.usecase[
 		  isp_bandwidth_mgr.bus_vector_active_idx]);
-	path->vectors[0].ab = MSM_ISP_MIN_AB;
-	path->vectors[0].ib = MSM_ISP_MIN_IB;
+	path->vectors[0].ab = 0;
+	path->vectors[0].ib = 0;
 	for (i = 0; i < MAX_ISP_CLIENT; i++) {
 		if (isp_bandwidth_mgr.client_info[i].active) {
 			path->vectors[0].ab +=
@@ -861,6 +861,20 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 	}
 	switch (reg_cfg_cmd->cmd_type) {
 	case VFE_WRITE: {
+		if (reg_cfg_cmd->u.rw_info.reg_offset <
+			resource_size(vfe_dev->vfe_mem)) {
+			uint32_t diff = 0;
+			diff = resource_size(vfe_dev->vfe_mem) -
+				reg_cfg_cmd->u.rw_info.reg_offset;
+			if (diff < reg_cfg_cmd->u.rw_info.len) {
+				pr_err("%s: VFE_WRITE: Invalid length\n",
+					__func__);
+				return -EINVAL;
+			}
+		} else {
+			pr_err("%s: VFE_WRITE: Invalid length\n", __func__);
+			return -EINVAL;
+		}
 		if (resource_size(vfe_dev->vfe_mem) <
 			(reg_cfg_cmd->u.rw_info.reg_offset +
 			reg_cfg_cmd->u.rw_info.len)) {
@@ -1011,7 +1025,7 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 			vfe_dev->axi_data.src_info[VFE_PIX_0].last_updt_frm_id;
 		if (vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id != *cfg_data
 			|| update_id == *cfg_data) {
-			pr_err("%s hw update lock failed acq %d, cur id %u, last id %u\n",
+			ISP_DBG("%s hw update lock failed acq %d, cur id %u, last id %u\n",
 				__func__,
 				*cfg_data,
 				vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id,
@@ -1023,7 +1037,7 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 	case VFE_HW_UPDATE_UNLOCK: {
 		if (vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id
 			!= *cfg_data) {
-			pr_err("hw update across frame boundary,begin id %u, end id %d\n",
+			ISP_DBG("hw update across frame boundary,begin id %u, end id %d\n",
 				*cfg_data,
 				vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id);
 		}

@@ -1908,7 +1908,20 @@ sched_set_cpu_cstate(int cpu, int cstate, int wakeup_energy, int wakeup_latency)
 #endif
 
 #ifdef CONFIG_SCHED_HMP
+
 extern int sched_set_boost(int enable);
+extern int sched_set_cpu_mostly_idle_load(int cpu, int mostly_idle_pct);
+extern int sched_get_cpu_mostly_idle_load(int cpu);
+extern int sched_set_cpu_mostly_idle_nr_run(int cpu, int nr_run);
+extern int sched_get_cpu_mostly_idle_nr_run(int cpu);
+/*CORE-TH-Patch_CurrentConsumption-00+*/
+extern int sched_set_cpu_mostly_occupied_load(int cpu, int mostly_occupied_pct);
+extern int sched_get_cpu_mostly_occupied_load(int cpu);
+/*CORE-TH-Patch_CurrentConsumption-00-*/
+extern int
+sched_set_cpu_mostly_idle_freq(int cpu, unsigned int mostly_idle_freq);
+extern unsigned int sched_get_cpu_mostly_idle_freq(int cpu);
+
 #else
 static inline int sched_set_boost(int enable)
 {

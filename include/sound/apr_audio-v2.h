@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+*  Copyright (C) 2013 Sony Mobile Communications AB.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -6962,18 +6963,19 @@ struct afe_spkr_prot_calib_get_resp {
 #define SRS_TRUMEDIA_PARAMS_WOWHD			0x10005012
 #define SRS_TRUMEDIA_PARAMS_CSHP			0x10005013
 #define SRS_TRUMEDIA_PARAMS_HPF				0x10005014
-#define SRS_TRUMEDIA_PARAMS_PEQ				0x10005015
+#define SRS_TRUMEDIA_PARAMS_AEQ				0x10005015
 #define SRS_TRUMEDIA_PARAMS_HL				0x10005016
+#define SRS_TRUMEDIA_PARAMS_GEQ				0x10005017
 
 #define SRS_ID_GLOBAL	0x00000001
 #define SRS_ID_WOWHD	0x00000002
 #define SRS_ID_CSHP	0x00000003
 #define SRS_ID_HPF	0x00000004
-#define SRS_ID_PEQ	0x00000005
-#define SRS_ID_HL	0x00000006
+#define SRS_ID_AEQ	0x00000005
+#define SRS_ID_HL		0x00000006
+#define SRS_ID_GEQ	0x00000007
 
 #define SRS_CMD_UPLOAD		0x7FFF0000
-#define SRS_PARAM_INDEX_MASK	0x80000000
 #define SRS_PARAM_OFFSET_MASK	0x3FFF0000
 #define SRS_PARAM_VALUE_MASK	0x0000FFFF
 
@@ -6986,6 +6988,7 @@ struct srs_trumedia_params_GLOBAL {
 	uint8_t                  v6;
 	uint8_t                  v7;
 	uint8_t                  v8;
+	uint16_t                 v9;
 } __packed;
 
 struct srs_trumedia_params_WOWHD {
@@ -7002,56 +7005,67 @@ struct srs_trumedia_params_WOWHD {
 	uint16_t				v10;
 	uint16_t				v11;
 	uint32_t				v12[16];
+	uint32_t	v13[16];
+	uint32_t	v14[16];
+	uint32_t	v15[16];
+	uint32_t	v16;
+	uint16_t	v17;
+	uint16_t	v18;
 } __packed;
 
 struct srs_trumedia_params_CSHP {
-	uint32_t				v1;
-	uint16_t				v2;
-	uint16_t				v3;
-	uint16_t				v4;
-	uint16_t				v5;
-	uint16_t				v6;
-	uint16_t				v____A1;
-	uint32_t				v7;
-	uint16_t				v8;
-	uint16_t				v9;
-	uint32_t				v10[16];
+	uint32_t		v1;
+	uint16_t		v2;
+	uint16_t		v3;
+	uint16_t		v4;
+	uint16_t		v5;
+	uint16_t		v6;
+	uint16_t		v____A1;
+	uint32_t		v7;
+	uint16_t		v8;
+	uint16_t		v9;
+	uint32_t		v10[16];
 } __packed;
 
 struct srs_trumedia_params_HPF {
-	uint32_t				v1;
-	uint32_t				v2[26];
+	uint32_t		v1;
+	uint32_t		v2[26];
 } __packed;
 
-struct srs_trumedia_params_PEQ {
-	uint32_t				v1;
-	uint16_t				v2;
-	uint16_t				v3;
-	uint16_t				v4;
-	uint16_t				v____A1;
-	uint32_t				v5[26];
-	uint32_t				v6[26];
+struct srs_trumedia_params_AEQ {
+	uint32_t		v1;
+	uint16_t		v2;
+	uint16_t		v3;
+	uint16_t		v4;
+	uint16_t		v____A1;
+	uint32_t	v5[74];
+	uint32_t	v6[74];
+	uint16_t	v7[2048];
 } __packed;
 
 struct srs_trumedia_params_HL {
-	uint16_t				v1;
-	uint16_t				v2;
-	uint16_t				v3;
-	uint16_t				v____A1;
-	int32_t					v4;
-	uint32_t				v5;
-	uint16_t				v6;
-	uint16_t				v____A2;
-	uint32_t				v7;
+	uint16_t		v1;
+	uint16_t		v2;
+	uint16_t		v3;
+	uint16_t		v____A1;
+	int32_t			v4;
+	uint32_t		v5;
+	uint16_t		v6;
+	uint16_t		v____A2;
+	uint32_t		v7;
 } __packed;
 
+struct srs_trumedia_params_GEQ {
+	int16_t		v1[10];
+} __packed;
 struct srs_trumedia_params {
 	struct srs_trumedia_params_GLOBAL	global;
 	struct srs_trumedia_params_WOWHD	wowhd;
 	struct srs_trumedia_params_CSHP		cshp;
 	struct srs_trumedia_params_HPF		hpf;
-	struct srs_trumedia_params_PEQ		peq;
+	struct srs_trumedia_params_AEQ		aeq;
 	struct srs_trumedia_params_HL		hl;
+	struct srs_trumedia_params_GEQ		geq;
 } __packed;
 /* SRS TruMedia end */
 
@@ -7196,6 +7210,84 @@ struct afe_param_id_clip_bank_sel {
 
 	uint32_t bank_map[AFE_CLIP_MAX_BANKS];
 } __packed;
+
+/* SOMC effect start */
+#define SONY_ADM_PAYLOAD_SIZE	(4 * sizeof(uint32_t))
+
+struct sony_popp_effect_set_params_command {
+	struct apr_hdr	hdr;
+	struct asm_stream_cmd_set_pp_params_v2 params;
+	struct asm_stream_param_data_v2 data;
+} __packed;
+
+/* Module/Parameter IDs */
+#define ADM_MODULE_ID_XLOUD			0x10002010
+#define ADM_MODULE_ID_CP			0x10002020
+#define ASM_MODULE_ID_DN			0x10002040
+#define ASM_MODULE_ID_CA_VPT			0x10002050
+#define ASM_MODULE_ID_VPT51			0x10002060
+#define ASM_MODULE_ID_S_FORCE		0x10002070
+
+#define PARAM_ID_SONY_EFFECT			0x10002001
+#define PARAM_ID_SONY_EFFECT_TUNING		0x10002002
+
+#define ASM_STREAM_POSTPROC_TOPO_ID_SONY	0x10002101
+
+#define ADM_COPP_TOPO_ID_SONY 0x10002100
+
+struct xloud_params {
+	uint16_t	enable;
+	uint16_t	reserved;
+} __packed;
+
+struct clearphase_params {
+	uint16_t	enable;
+	uint16_t	reserved;
+} __packed;
+
+struct clearaudio_vpt_params {
+	uint16_t	enable;
+	uint16_t	reserved;
+	int32_t		chsep_coef;
+	int16_t		eq_coef[6];
+	uint16_t	vpt_mode;
+	uint16_t	reserved2;
+} __packed;
+
+struct vpt_params {
+	uint16_t	enable;
+	uint16_t	mode;
+} __packed;
+
+struct dynamicnormalizer_params {
+	uint16_t	enable;
+	uint16_t	reserved;
+} __packed;
+
+struct s_force_params {
+	uint16_t	enable;
+	uint16_t	reserved;
+} __packed;
+
+struct s_force_tuning_params {
+	unsigned char	coefs[1016];
+} __packed;
+
+int sony_copp_effect_topology_init(int port_id, int copp_idx);
+
+int sony_copp_effect_topology_deinit(int port_id);
+
+int sony_copp_effect_set(int port_id, void *params,
+				uint32_t param_size, uint32_t module_id);
+int sony_copp_effect_get(int port_id, void *params,
+				uint32_t param_size, uint32_t module_id);
+int sony_popp_effect_set(void *client, void *params,
+		uint32_t param_size, uint32_t module_id, uint32_t param_id);
+void sony_vol_module_update(void *client, uint32_t module);
+void sony_send_max_vol(void *client);
+void sony_send_s_force_param(int type, void *client);
+
+/* SOMC effect end */
 
 /* ERROR CODES */
 /* Success. The operation completed with no errors. */

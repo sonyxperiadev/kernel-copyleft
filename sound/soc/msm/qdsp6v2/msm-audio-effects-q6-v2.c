@@ -682,6 +682,13 @@ int msm_audio_effects_popless_eq_handler(struct audio_client *ac,
 				goto invalid_config;
 			}
 			for (j = 0; j < eq->config.num_bands; j++) {
+                            /*MM-UW-Check for array index-00+{ */
+                		if (idx >= MAX_EQ_BANDS) {
+                                pr_err("EQ_CONFIG:invalid band index\n");
+                                rc = -EINVAL;                
+                                goto invalid_config;
+                            }
+                            /*MM-UW-Check for array index-00+} */
 				idx = *values++;
 				eq->per_band_cfg[idx].band_idx = idx;
 				eq->per_band_cfg[idx].filter_type = *values++;

@@ -1111,6 +1111,14 @@ static int32_t msm_sensor_driver_get_dt_data(struct msm_sensor_ctrl_t *s_ctrl)
 	CDBG("%s qcom,mclk-23880000 = %d\n", __func__,
 		s_ctrl->set_mclk_23880000);
 
+    /* MM-MC-BringUpCamerForMSM8936-01+ */
+    if(of_machine_is_compatible("qcom,msm8916"))
+        sensordata->power_info.is_msm8916 = 1;
+    else
+        sensordata->power_info.is_msm8916 = 0;
+    pr_err("%s sensordata->power_info.is_msm8916 = %d\n", __func__, sensordata->power_info.is_msm8916);
+    /* MM-MC-BringUpCamerForMSM8936-01+ */
+
 	return rc;
 
 FREE_VREG_DATA:

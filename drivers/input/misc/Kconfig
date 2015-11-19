@@ -830,5 +830,7 @@ config SENSORS_BMI058
 	 If you say yes here, you get support for Bosch Sensortec's
 	 sensor driver of BMI058.
 
+source "drivers/input/misc/cm36286/Kconfig"
+
 endif
 
