@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1763,7 +1764,7 @@ int afe_loopback_gain(u16 port_id, u16 volume)
 	set_param.pdata.param_size =
 	    (set_param.param.payload_size -
 	     sizeof(struct afe_port_param_data_v2));
-	set_param.rx_port_id = port_id;
+	set_param.rx_port_id = AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX;
 	set_param.gain = volume;
 
 	ret = afe_apr_send_pkt(&set_param, &this_afe.wait[index]);
@@ -2811,24 +2812,123 @@ fail_cmd:
 	return ret;
 }
 
-int afe_sidetone(u16 tx_port_id, u16 rx_port_id, u16 enable, uint16_t gain)
+static int afe_sidetone_iir(u16 tx_port_id, u16 rx_port_id, bool enable)
 {
-	struct afe_loopback_cfg_v1 cmd_sidetone;
+	struct afe_loopback_iir_cfg_v2 iir_sidetone;
+	struct sidetone_iir_cal cal_data = {0};
 	int ret = 0;
 	int index = 0;
+	uint16_t size = 0;
 
-	pr_info("%s: tx_port_id:%d rx_port_id:%d enable:%d gain:%d\n", __func__,
-					tx_port_id, rx_port_id, enable, gain);
+	pr_debug("%s: tx_port_id:%d rx_port_id:%d\n", __func__,
+		 tx_port_id, rx_port_id);
+
 	index = q6audio_get_port_index(rx_port_id);
 	if (q6audio_validate_port(rx_port_id) < 0)
 		return -EINVAL;
+
+	iir_sidetone.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	iir_sidetone.hdr.pkt_size = sizeof(iir_sidetone);
+	iir_sidetone.hdr.src_port = 0;
+	iir_sidetone.hdr.dest_port = 0;
+	iir_sidetone.hdr.token = index;
+	iir_sidetone.hdr.opcode = AFE_PORT_CMD_SET_PARAM_V2;
+	/* should it be rx or tx port id ?? , bharath*/
+	iir_sidetone.param.port_id = tx_port_id;
+	iir_sidetone.param.payload_address_lsw = 0x00;
+	iir_sidetone.param.payload_address_msw = 0x00;
+	iir_sidetone.param.mem_map_handle = 0x00;
+	/* size of data param & payload */
+
+	get_sidetone_iir_cal(&cal_data);
+
+	/* calculate the actual size of payload based on no of stages
+	 * enabled in calibration
+	 */
+	size = (MAX_SIDETONE_IIR_DATA_SIZE / MAX_NO_IIR_FILTER_STAGE) *
+		cal_data.num_biquad_stages;
+
+	/* For an odd number of stages, 2 bytes of padding are
+	 * required at the end of the payload.
+	 */
+	if (cal_data.num_biquad_stages % 2) {
+		pr_debug("%s: adding 2 to size:%d\n", __func__, size);
+		size = size + 2;
+	}
+
+	/* Calculate the payload size for the setparams command*/
+	iir_sidetone.param.payload_size = (sizeof(iir_sidetone) -
+				sizeof(struct apr_hdr) -
+				sizeof(struct afe_port_cmd_set_param_v2) -
+				(MAX_SIDETONE_IIR_DATA_SIZE - size));
+
+	pr_debug("%s: payload size :%d\n", __func__,
+		 iir_sidetone.param.payload_size);
+
+	/* Setup IIR enable params*/
+	iir_sidetone.st_iir_enable_pdata.module_id =
+				AFE_MODULE_SIDETONE_IIR_FILTER;
+	iir_sidetone.st_iir_enable_pdata.param_id =
+				AFE_PARAM_ID_ENABLE;
+	iir_sidetone.st_iir_enable_pdata.param_size =
+				sizeof(iir_sidetone.st_iir_mode_enable_data);
+	iir_sidetone.st_iir_mode_enable_data.enable =
+				((enable == true) ? cal_data.iir_enable : 0);
+
+	/* Setup IIR filter config params*/
+	iir_sidetone.st_iir_filter_config_pdata.module_id =
+				AFE_MODULE_SIDETONE_IIR_FILTER;
+	iir_sidetone.st_iir_filter_config_pdata.param_id =
+				AFE_PARAM_ID_SIDETONE_IIR_FILTER_CONFIG;
+	iir_sidetone.st_iir_filter_config_pdata.param_size =
+	sizeof(iir_sidetone.st_iir_filter_config_data.num_biquad_stages) +
+	sizeof(iir_sidetone.st_iir_filter_config_data.pregain) +
+	size;
+	iir_sidetone.st_iir_filter_config_pdata.reserved = 0;
+	iir_sidetone.st_iir_filter_config_data.num_biquad_stages =
+				cal_data.num_biquad_stages;
+	iir_sidetone.st_iir_filter_config_data.pregain = cal_data.pregain;
+	memcpy(&iir_sidetone.st_iir_filter_config_data.iir_config,
+	       &cal_data.iir_config,
+	       sizeof(iir_sidetone.st_iir_filter_config_data.iir_config));
+
+	pr_debug("%s: enable:%d no_of_stages:%d pregain:%x payload size:%d\n",
+		 __func__,
+		iir_sidetone.st_iir_mode_enable_data.enable,
+		iir_sidetone.st_iir_filter_config_data.num_biquad_stages,
+		iir_sidetone.st_iir_filter_config_data.pregain,
+		iir_sidetone.st_iir_filter_config_pdata.param_size);
+
+	ret = afe_apr_send_pkt(&iir_sidetone, &this_afe.wait[index]);
+	if (ret)
+		pr_err("%s: AFE sidetone failed for tx_port:%d rx_port:%d\n",
+			__func__, tx_port_id, rx_port_id);
+	return ret;
+}
+
+static int afe_sidetone(u16 tx_port_id, u16 rx_port_id, u16 enable)
+{
+	struct afe_st_loopback_cfg_v1 cmd_sidetone;
+	struct sidetone_cal sidetone_cal_data;
+	int ret = 0;
+	int index = 0;
+
+	pr_info("%s: tx_port_id:%d rx_port_id:%d\n", __func__,
+		tx_port_id, rx_port_id);
+
+	index = q6audio_get_port_index(rx_port_id);
+	if (q6audio_validate_port(rx_port_id) < 0)
+		return -EINVAL;
+
+	get_sidetone_cal(&sidetone_cal_data);
 
 	cmd_sidetone.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
 				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
 	cmd_sidetone.hdr.pkt_size = sizeof(cmd_sidetone);
 	cmd_sidetone.hdr.src_port = 0;
 	cmd_sidetone.hdr.dest_port = 0;
-	cmd_sidetone.hdr.token = 0;
+	cmd_sidetone.hdr.token = index;
 	cmd_sidetone.hdr.opcode = AFE_PORT_CMD_SET_PARAM_V2;
 	/* should it be rx or tx port id ?? , bharath*/
 	cmd_sidetone.param.port_id = tx_port_id;
@@ -2839,22 +2939,61 @@ int afe_sidetone(u16 tx_port_id, u16 rx_port_id, u16 enable, uint16_t gain)
 	cmd_sidetone.param.payload_address_lsw = 0x00;
 	cmd_sidetone.param.payload_address_msw = 0x00;
 	cmd_sidetone.param.mem_map_handle = 0x00;
-	cmd_sidetone.pdata.module_id = AFE_MODULE_LOOPBACK;
-	cmd_sidetone.pdata.param_id = AFE_PARAM_ID_LOOPBACK_CONFIG;
-	/* size of actual payload only */
-	cmd_sidetone.pdata.param_size =  cmd_sidetone.param.payload_size -
-				sizeof(struct afe_port_param_data_v2);
 
-	cmd_sidetone.loopback_cfg_minor_version =
+
+	cmd_sidetone.gain_pdata.module_id = AFE_MODULE_LOOPBACK;
+	cmd_sidetone.gain_pdata.param_id = AFE_PARAM_ID_LOOPBACK_GAIN_PER_PATH;
+	/* size of actual payload only */
+	cmd_sidetone.gain_pdata.param_size =
+				    sizeof(struct afe_loopback_sidetone_gain);
+	cmd_sidetone.gain_data.rx_port_id = rx_port_id;
+	cmd_sidetone.gain_data.gain = sidetone_cal_data.gain;
+
+	cmd_sidetone.cfg_pdata.module_id = AFE_MODULE_LOOPBACK;
+	cmd_sidetone.cfg_pdata.param_id = AFE_PARAM_ID_LOOPBACK_CONFIG;
+	/* size of actual payload only */
+	cmd_sidetone.cfg_pdata.param_size =  sizeof(struct loopback_cfg_data);
+	cmd_sidetone.cfg_data.loopback_cfg_minor_version =
 					AFE_API_VERSION_LOOPBACK_CONFIG;
-	cmd_sidetone.dst_port_id = rx_port_id;
-	cmd_sidetone.routing_mode = LB_MODE_SIDETONE;
-	cmd_sidetone.enable = enable;
+	cmd_sidetone.cfg_data.dst_port_id = rx_port_id;
+	cmd_sidetone.cfg_data.routing_mode = LB_MODE_SIDETONE;
+	cmd_sidetone.cfg_data.enable =
+				((enable == 1) ? sidetone_cal_data.enable : 0);
+
+	pr_debug("%s: tx_port_id:%d rx_port_id:%d enable:%d, gain:%x\n",
+		 __func__, tx_port_id, rx_port_id,
+		 cmd_sidetone.cfg_data.enable,
+		 cmd_sidetone.gain_data.gain);
 
 	ret = afe_apr_send_pkt(&cmd_sidetone, &this_afe.wait[index]);
 	if (ret)
 		pr_err("%s: AFE sidetone failed for tx_port:%d rx_port:%d\n",
-					__func__, tx_port_id, rx_port_id);
+			__func__, tx_port_id, rx_port_id);
+	return ret;
+}
+
+int afe_sidetone_enable(u16 tx_port_id, u16 rx_port_id, bool enable)
+{
+	int ret = 0;
+
+	pr_debug("%s: tx_id:0x%x, rx_id:0x%x enable:%d\n",
+		 __func__, tx_port_id, rx_port_id, enable);
+
+	ret = afe_sidetone_iir(tx_port_id, rx_port_id, enable);
+	if (ret) {
+		pr_err("%s: Failed to set AFE sidetone IIR config, err=%d\n",
+			__func__, ret);
+		goto done;
+	}
+
+	afe_sidetone(tx_port_id, rx_port_id, enable);
+	if (ret) {
+		pr_err("%s: Failed to enable AFE sidetone, err=%d\n",
+			__func__, ret);
+		goto done;
+	}
+
+done:
 	return ret;
 }
 

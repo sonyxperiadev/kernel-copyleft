@@ -1,4 +1,5 @@
 /*  Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2013 Sony Mobile Communications Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -4393,6 +4394,12 @@ int voc_disable_cvp(uint32_t session_id)
 	mutex_lock(&v->lock);
 
 	if (v->voc_state == VOC_RUN) {
+
+		if (v->dev_tx.port_id != RT_PROXY_PORT_001_TX &&
+		    v->dev_rx.port_id != RT_PROXY_PORT_001_RX)
+			afe_sidetone_enable(v->dev_tx.port_id,
+				     v->dev_rx.port_id, false);
+
 		rtac_remove_voice(voice_get_cvs_handle(v));
 		/* send cmd to dsp to disable vocproc */
 		ret = voice_send_disable_vocproc_cmd(v);
@@ -4477,6 +4484,15 @@ int voc_enable_cvp(uint32_t session_id)
 		} else {
 			pr_debug("%s: Mute commands not sent for lch_mode=%d\n",
 				 __func__, v->lch_mode);
+		}
+
+		if (v->dev_tx.port_id != RT_PROXY_PORT_001_TX &&
+		    v->dev_rx.port_id != RT_PROXY_PORT_001_RX) {
+			ret = afe_sidetone_enable(v->dev_tx.port_id,
+					   v->dev_rx.port_id, true);
+
+			if (ret < 0)
+				pr_err("AFE command sidetone failed\n");
 		}
 
 		ret = voice_send_enable_vocproc_cmd(v);
@@ -4566,6 +4582,60 @@ int voc_set_tx_mute(uint32_t session_id, uint32_t dir, uint32_t mute,
 			break;
 		}
 	}
+
+	return ret;
+}
+
+int voc_set_tx_device_mute(uint32_t session_id, uint32_t mute,
+					uint32_t ramp_duration)
+{
+	struct voice_data *v = NULL;
+	int ret = 0;
+	struct voice_session_itr itr;
+
+	voice_itr_init(&itr, session_id);
+	while (voice_itr_get_next_session(&itr, &v)) {
+		if (v != NULL) {
+			mutex_lock(&v->lock);
+			v->dev_tx.dev_mute = mute;
+			v->dev_tx.dev_mute_ramp_duration_ms =
+							ramp_duration;
+			if (((v->voc_state == VOC_RUN) ||
+				(v->voc_state == VOC_STANDBY)) &&
+				(v->lch_mode == 0))
+				ret = voice_send_device_mute_cmd(v,
+						VSS_IVOLUME_DIRECTION_TX,
+						v->dev_tx.dev_mute,
+						ramp_duration);
+			mutex_unlock(&v->lock);
+		} else {
+			pr_err("%s: invalid session_id 0x%x\n", __func__,
+				session_id);
+
+			ret = -EINVAL;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+int voc_get_tx_device_mute(uint32_t session_id)
+{
+	struct voice_data *v = voice_get_session(session_id);
+	int ret = 0;
+
+	if (v == NULL) {
+		pr_err("%s: invalid session_id 0x%x\n", __func__, session_id);
+
+		return -EINVAL;
+	}
+
+	mutex_lock(&v->lock);
+
+	ret = v->dev_tx.dev_mute;
+
+	mutex_unlock(&v->lock);
 
 	return ret;
 }
@@ -4839,6 +4909,11 @@ int voc_end_voice_call(uint32_t session_id)
 
 		pr_debug("%s: VOC_STATE: %d\n", __func__, v->voc_state);
 
+		if (v->dev_tx.port_id != RT_PROXY_PORT_001_TX &&
+		    v->dev_rx.port_id != RT_PROXY_PORT_001_RX)
+			afe_sidetone_enable(v->dev_tx.port_id,
+				     v->dev_rx.port_id, false);
+
 		ret = voice_destroy_vocproc(v);
 		if (ret < 0)
 			pr_err("%s:  destroy voice failed\n", __func__);
@@ -4866,11 +4941,11 @@ int voc_standby_voice_call(uint32_t session_id)
 	u16 mvm_handle;
 	int ret = 0;
 
-	pr_debug("%s: voc state=%d", __func__, v->voc_state);
 	if (v == NULL) {
 		pr_err("%s: v is NULL\n", __func__);
 		return -EINVAL;
 	}
+	pr_debug("%s: voc state=%d", __func__, v->voc_state);
 	if (v->voc_state == VOC_RUN) {
 		apr_mvm = common.apr_q6_mvm;
 		if (!apr_mvm) {
@@ -5055,6 +5130,14 @@ int voc_start_voice_call(uint32_t session_id)
 		if (ret < 0) {
 			pr_err("start voice failed\n");
 			goto fail;
+		}
+
+		if (v->dev_tx.port_id != RT_PROXY_PORT_001_TX &&
+		    v->dev_rx.port_id != RT_PROXY_PORT_001_RX) {
+			ret = afe_sidetone_enable(v->dev_tx.port_id,
+					   v->dev_rx.port_id, true);
+			if (ret < 0)
+				pr_err("AFE command sidetone failed\n");
 		}
 
 		v->voc_state = VOC_RUN;

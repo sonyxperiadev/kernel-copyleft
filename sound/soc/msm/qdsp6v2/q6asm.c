@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -40,9 +41,10 @@
 #include <sound/apr_audio-v2.h>
 #include <sound/q6asm-v2.h>
 #include <sound/q6audio-v2.h>
+#include "sforce.h"
+#include "clearphase_hp.h"
 
 #include "audio_acdb.h"
-
 
 #define TRUE        0x01
 #define FALSE       0x00
@@ -63,6 +65,28 @@ struct asm_buffer_node {
 	uint32_t  buf_addr_lsw;
 	uint32_t  mmap_hdl;
 };
+
+/* SOMC effect control start */
+#define INVALID_SESSION -1
+struct sony_volume_control {
+	uint32_t module;
+	unsigned volume;
+};
+
+struct sony_volume_control volume_control[] = {
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+	{ASM_MODULE_ID_VOL_CTRL, 0x20002000},
+};
+
+/* SOMC effect control end */
+
 static int32_t q6asm_srvc_callback(struct apr_client_data *data, void *priv);
 static int32_t q6asm_callback(struct apr_client_data *data, void *priv);
 static void q6asm_add_hdr(struct audio_client *ac, struct apr_hdr *hdr,
@@ -362,6 +386,294 @@ static void config_debug_fs_init(void)
 #endif
 
 
+/* SOMC effect control start */
+int sony_popp_effect_set(void *client, void *params,
+		uint32_t param_size, uint32_t module_id, uint32_t param_id)
+{
+	struct sony_popp_effect_set_params_command *cmd = NULL;
+	uint32_t cmd_size =
+		sizeof(struct sony_popp_effect_set_params_command);
+	uint32_t data_size = sizeof(struct asm_stream_param_data_v2);
+	struct audio_client *ac = NULL;
+	void *param_ptr = NULL;
+	int rc = 0, sz = 0;
+
+	pr_debug("%s\n", __func__);
+	if (client == NULL) {
+		pr_err("%s: audio client is NULL\n", __func__);
+		return -EINVAL;
+	}
+	ac = (struct audio_client *)client;
+
+	if (params == NULL) {
+		pr_err("%s: effect param pointer is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	sz = cmd_size + param_size;
+	cmd = kzalloc(sz, GFP_KERNEL);
+	if (cmd == NULL) {
+		pr_err("%s: allocate cmd failed\n", __func__);
+		return -ENOMEM;
+	}
+
+	cmd->params.data_payload_addr_lsw = 0;
+	cmd->params.data_payload_addr_msw = 0;
+	cmd->params.mem_map_handle = 0;
+	cmd->params.data_payload_size = data_size + param_size;
+
+	cmd->data.reserved = 0;
+	cmd->data.module_id = module_id;
+	cmd->data.param_id = param_id;
+	cmd->data.param_size = param_size;
+
+	param_ptr = (void *)((u8 *)cmd + cmd_size);
+	memcpy(param_ptr, params, param_size);
+
+	q6asm_add_hdr_async(ac, &cmd->hdr, sz, TRUE);
+	cmd->hdr.opcode = ASM_STREAM_CMD_SET_PP_PARAMS_V2;
+	atomic_set(&ac->cmd_state, 1);
+
+	pr_info("%s: send effect param(0x%08x,0x%08x) to APR, param size %d\n",
+				__func__, module_id, param_id, param_size);
+	rc = apr_send_pkt(ac->apr, (uint32_t *) cmd);
+	if (rc < 0) {
+		pr_err("%s: Send popp effect param failed\n",
+				__func__);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	rc = wait_event_timeout(ac->cmd_wait,
+			(atomic_read(&ac->cmd_state) == 0), 5*HZ);
+	if (!rc) {
+		pr_err("%s: Setting popp effect param(0x%08x) failed\n",
+			__func__, module_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	rc = 0;
+
+fail_cmd:
+	kfree(cmd);
+	return rc;
+}
+
+static int sony_set_volume(struct audio_client *ac, int volume)
+{
+	struct asm_volume_ctrl_master_gain vol;
+	int sz = 0;
+	int rc  = 0;
+
+	sz = sizeof(struct asm_volume_ctrl_master_gain);
+	q6asm_add_hdr_async(ac, &vol.hdr, sz, TRUE);
+	atomic_set(&ac->cmd_state, 1);
+	vol.hdr.opcode = ASM_STREAM_CMD_SET_PP_PARAMS_V2;
+	vol.param.data_payload_addr_lsw = 0;
+	vol.param.data_payload_addr_msw = 0;
+
+
+	vol.param.mem_map_handle = 0;
+	vol.param.data_payload_size = sizeof(vol) -
+				sizeof(vol.hdr) - sizeof(vol.param);
+	vol.data.module_id = ASM_MODULE_ID_SONYBUNDLE;
+	vol.data.param_id = ASM_PARAM_ID_VOL_CTRL_MASTER_GAIN;
+	vol.data.param_size = vol.param.data_payload_size - sizeof(vol.data);
+	vol.data.reserved = 0;
+	vol.master_gain = volume;
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &vol);
+	if (rc < 0) {
+		pr_err("%s: set-params send failed paramid[0x%x]\n", __func__,
+						vol.data.param_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	rc = wait_event_timeout(ac->cmd_wait,
+			(atomic_read(&ac->cmd_state) == 0), 5*HZ);
+	if (!rc) {
+		pr_err("%s: timeout, set-params paramid[0x%x]\n", __func__,
+						vol.data.param_id);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	rc = 0;
+
+fail_cmd:
+	return rc;
+}
+
+void sony_vol_module_update(void *client, uint32_t module)
+{
+	int rc = 0;
+	struct audio_client *ac = NULL;
+	int left_vol = 0;
+	int right_vol = 0;
+
+	pr_debug("%s\n", __func__);
+	if (client == NULL) {
+		pr_err("%s: audio client is NULL\n", __func__);
+		return;
+	}
+	ac = (struct audio_client *)client;
+	if (ac->session != INVALID_SESSION &&
+		volume_control[ac->session].module != module) {
+		volume_control[ac->session].module = module;
+		left_vol = ((volume_control[ac->session].volume >> 16) & 0xFFFF);
+		right_vol = (volume_control[ac->session].volume & 0xFFFF);
+		if (left_vol != right_vol)
+			rc = q6asm_set_lrgain(ac, left_vol, right_vol);
+		else
+			rc = q6asm_set_volume(ac, left_vol);
+		if (rc < 0) {
+			pr_err("%s: Send Volume command failed rc=%d\n",
+						__func__, rc);
+		}
+	}
+}
+
+void sony_send_max_vol(void *client)
+{
+	struct audio_client *ac = NULL;
+	struct asm_volume_ctrl_lr_chan_gain lrgain;
+	struct asm_volume_ctrl_master_gain vol;
+	int sz = 0;
+	int rc  = 0;
+	int left_vol = 0;
+	int right_vol = 0;
+
+	pr_debug("%s\n", __func__);
+	if (client == NULL) {
+		pr_err("%s: audio client is NULL\n", __func__);
+		return;
+	}
+	ac = (struct audio_client *)client;
+
+	left_vol =
+		((volume_control[ac->session].volume >> 16) & 0xFFFF);
+	right_vol = (volume_control[ac->session].volume & 0xFFFF);
+
+	if (left_vol != right_vol) {
+		sz = sizeof(struct asm_volume_ctrl_lr_chan_gain);
+		q6asm_add_hdr_async(ac, &lrgain.hdr, sz, TRUE);
+		atomic_set(&ac->cmd_state, 1);
+		lrgain.hdr.opcode = ASM_STREAM_CMD_SET_PP_PARAMS_V2;
+		lrgain.param.data_payload_addr_lsw = 0;
+		lrgain.param.data_payload_addr_msw = 0;
+		lrgain.param.mem_map_handle = 0;
+		lrgain.param.data_payload_size = sizeof(lrgain) -
+			sizeof(lrgain.hdr) - sizeof(lrgain.param);
+		lrgain.data.module_id = ASM_MODULE_ID_VOL_CTRL;
+		lrgain.data.param_id = ASM_PARAM_ID_VOL_CTRL_LR_CHANNEL_GAIN;
+		lrgain.data.param_size = lrgain.param.data_payload_size -
+					sizeof(lrgain.data);
+		lrgain.data.reserved = 0;
+		lrgain.l_chan_gain = 0x2000;
+		lrgain.r_chan_gain = 0x2000;
+		rc = apr_send_pkt(ac->apr, (uint32_t *) &lrgain);
+		if (rc < 0) {
+			pr_err("%s: set-params send failed paramid[0x%x]\n",
+				__func__, lrgain.data.param_id);
+			return;
+		}
+
+		rc = wait_event_timeout(ac->cmd_wait,
+				(atomic_read(&ac->cmd_state) == 0), 5*HZ);
+		if (!rc) {
+			pr_err("%s: timeout, set-params paramid[0x%x]\n",
+				__func__, lrgain.data.param_id);
+		}
+	} else {
+		sz = sizeof(struct asm_volume_ctrl_master_gain);
+		q6asm_add_hdr_async(ac, &vol.hdr, sz, TRUE);
+		atomic_set(&ac->cmd_state, 1);
+		vol.hdr.opcode = ASM_STREAM_CMD_SET_PP_PARAMS_V2;
+		vol.param.data_payload_addr_lsw = 0;
+		vol.param.data_payload_addr_msw = 0;
+		vol.param.mem_map_handle = 0;
+		vol.param.data_payload_size = sizeof(vol) -
+					sizeof(vol.hdr) - sizeof(vol.param);
+		vol.data.module_id = ASM_MODULE_ID_VOL_CTRL;
+		vol.data.param_id = ASM_PARAM_ID_VOL_CTRL_MASTER_GAIN;
+		vol.data.param_size =
+			vol.param.data_payload_size - sizeof(vol.data);
+		vol.data.reserved = 0;
+		vol.master_gain = 0x2000;
+
+		rc = apr_send_pkt(ac->apr, (uint32_t *) &vol);
+		if (rc < 0) {
+			pr_err("%s: set-params send failed paramid[0x%x]\n",
+				__func__, vol.data.param_id);
+			return;
+		}
+
+		rc = wait_event_timeout(ac->cmd_wait,
+				(atomic_read(&ac->cmd_state) == 0), 5*HZ);
+		if (!rc) {
+			pr_err("%s: timeout, set-params paramid[0x%x]\n",
+				__func__, vol.data.param_id);
+			rc = -EINVAL;
+		}
+	}
+}
+
+void sony_send_s_force_param(int type, void *client)
+{
+	int rc = 0x00;
+	void *param = NULL;
+
+	pr_debug("%s: type=%d\n", __func__, type);
+	if (client == NULL) {
+		pr_err("%s: audio client is NULL\n", __func__);
+		return;
+	}
+
+	if (type >= 0 && type < SFORCE_TYPE_MAX) {
+		param = sforce_getparam(type);
+		if (param == NULL) {
+			pr_err("%s: sforce param is NULL\n", __func__);
+			return;
+		}
+	} else {
+		pr_err("%s: invalid type: %d\n", __func__, type);
+		return;
+	}
+
+	rc = sony_popp_effect_set(client, param,
+		sizeof(struct s_force_tuning_params),
+		ASM_MODULE_ID_S_FORCE,
+		PARAM_ID_SONY_EFFECT_TUNING);
+	if (rc < 0)
+		pr_err("%s: set-param failed rc[%d]\n", __func__, rc);
+}
+
+void sony_send_clearphase_hp_param(void *client)
+{
+	int rc = 0x00;
+	void *param = NULL;
+
+	if (client == NULL) {
+		pr_err("%s: audio client is NULL\n", __func__);
+		return;
+	}
+
+	param = clearphase_hp_getparam();
+	if (param == NULL) {
+		pr_err("%s: clearphase_hp param is NULL\n", __func__);
+		return;
+	}
+
+	rc = sony_popp_effect_set(client, param,
+		sizeof(struct clearphase_hp_tuning_params),
+		ASM_MODULE_ID_SONYBUNDLE,
+		PARAM_ID_CP_HP_TUNING);
+	if (rc < 0)
+		pr_err("%s: set-param failed rc[%d]\n", __func__, rc);
+}
+
+/* SOMC effect control end */
+
 static int q6asm_session_alloc(struct audio_client *ac)
 {
 	int n;
@@ -445,7 +757,7 @@ void send_asm_custom_topology(struct audio_client *ac)
 	q6asm_add_hdr_custom_topology(ac, &asm_top.hdr,
 				      APR_PKT_SIZE(APR_HDR_SIZE,
 					sizeof(asm_top)), TRUE);
-	atomic_set(&ac->cmd_state, 1);
+	atomic_set(&ac->mem_state, 1);
 	asm_top.hdr.opcode = ASM_CMD_ADD_TOPOLOGIES;
 	asm_top.payload_addr_lsw = cal_block.cal_paddr;
 	asm_top.payload_addr_msw = 0;
@@ -463,8 +775,8 @@ void send_asm_custom_topology(struct audio_client *ac)
 		goto err_unmap;
 	}
 
-	result = wait_event_timeout(ac->cmd_wait,
-			(atomic_read(&ac->cmd_state) == 0), 5*HZ);
+	result = wait_event_timeout(ac->mem_wait,
+			(atomic_read(&ac->mem_state) == 0), 5*HZ);
 	if (!result) {
 		pr_err("%s: Set topologies failed after timedout payload = 0x%x\n",
 			__func__, cal_block.cal_paddr);
@@ -879,6 +1191,7 @@ struct audio_client *q6asm_audio_client_alloc(app_cb cb, void *priv)
 
 	init_waitqueue_head(&ac->cmd_wait);
 	init_waitqueue_head(&ac->time_wait);
+	init_waitqueue_head(&ac->mem_wait);
 	atomic_set(&ac->time_flag, 1);
 	INIT_LIST_HEAD(&ac->port[0].mem_map_handle);
 	INIT_LIST_HEAD(&ac->port[1].mem_map_handle);
@@ -890,6 +1203,7 @@ struct audio_client *q6asm_audio_client_alloc(app_cb cb, void *priv)
 	}
 	atomic_set(&ac->cmd_state, 0);
 	atomic_set(&ac->nowait_cmd_cnt, 0);
+	atomic_set(&ac->mem_state, 0);
 
 	send_asm_custom_topology(ac);
 
@@ -945,7 +1259,7 @@ int q6asm_audio_client_buf_alloc(unsigned int dir,
 	pr_debug("%s: session[%d]bufsz[%d]bufcnt[%d]\n", __func__, ac->session,
 		bufsz, bufcnt);
 
-	if (ac->session <= 0 || ac->session > 8)
+	if (ac->session <= 0 || ac->session > 8 || bufsz <= 0)
 		goto fail;
 
 	if (ac->io_mode & SYNC_IO_MODE) {
@@ -967,7 +1281,7 @@ int q6asm_audio_client_buf_alloc(unsigned int dir,
 		while (cnt < bufcnt) {
 			if (bufsz > 0) {
 				if (!buf[cnt].data) {
-					msm_audio_ion_alloc("audio_client",
+					rc = msm_audio_ion_alloc("audio_client",
 					&buf[cnt].client, &buf[cnt].handle,
 					      bufsz,
 					      (ion_phys_addr_t *)&buf[cnt].phys,
@@ -1173,10 +1487,8 @@ static int32_t q6asm_srvc_callback(struct apr_client_data *data, void *priv)
 					__func__, payload[0], payload[1], sid);
 			}
 
-			if (atomic_read(&ac->cmd_state)) {
-				atomic_set(&ac->cmd_state, 0);
-				wake_up(&ac->cmd_wait);
-			}
+			if (atomic_cmpxchg(&ac->mem_state, 1, 0))
+				wake_up(&ac->mem_wait);
 			pr_debug("%s:Payload = [0x%x] status[0x%x]\n",
 					__func__, payload[0], payload[1]);
 			break;
@@ -1196,10 +1508,9 @@ static int32_t q6asm_srvc_callback(struct apr_client_data *data, void *priv)
 		pr_debug("%s:PL#0[0x%x]PL#1 [0x%x] dir=%x s_id=%x\n",
 				__func__, payload[0], payload[1], dir, sid);
 		spin_lock_irqsave(&port->dsp_lock, dsp_flags);
-		if (atomic_read(&ac->cmd_state)) {
+		if (atomic_cmpxchg(&ac->mem_state, 1, 0)) {
 			ac->port[dir].tmp_hdl = payload[0];
-			atomic_set(&ac->cmd_state, 0);
-			wake_up(&ac->cmd_wait);
+			wake_up(&ac->mem_wait);
 		}
 		spin_unlock_irqrestore(&port->dsp_lock, dsp_flags);
 		break;
@@ -1208,10 +1519,8 @@ static int32_t q6asm_srvc_callback(struct apr_client_data *data, void *priv)
 		pr_debug("%s:PL#0[0x%x]PL#1 [0x%x]\n",
 					__func__, payload[0], payload[1]);
 		spin_lock_irqsave(&port->dsp_lock, dsp_flags);
-		if (atomic_read(&ac->cmd_state)) {
-			atomic_set(&ac->cmd_state, 0);
-			wake_up(&ac->cmd_wait);
-		}
+		if (atomic_cmpxchg(&ac->mem_state, 1, 0))
+			wake_up(&ac->mem_wait);
 		spin_unlock_irqrestore(&port->dsp_lock, dsp_flags);
 
 		break;
@@ -1331,7 +1640,6 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 		case ASM_STREAM_CMD_OPEN_LOOPBACK_V2:
 		case ASM_DATA_CMD_MEDIA_FMT_UPDATE_V2:
 		case ASM_STREAM_CMD_SET_ENCDEC_PARAM:
-		case ASM_CMD_ADD_TOPOLOGIES:
 		case ASM_DATA_CMD_REMOVE_INITIAL_SILENCE:
 		case ASM_DATA_CMD_REMOVE_TRAILING_SILENCE:
 		case ASM_SESSION_CMD_REGISTER_FOR_RX_UNDERFLOW_EVENTS:
@@ -1340,6 +1648,17 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 			if (atomic_read(&ac->cmd_state) && wakeup_flag) {
 				atomic_set(&ac->cmd_state, 0);
 				wake_up(&ac->cmd_wait);
+			}
+			if (ac->cb)
+				ac->cb(data->opcode, data->token,
+					(uint32_t *)data->payload, ac->priv);
+			break;
+		case ASM_CMD_ADD_TOPOLOGIES:
+			pr_debug("%s:Payload = [0x%x]stat[0x%x]\n",
+				__func__, payload[0], payload[1]);
+			if (atomic_read(&ac->mem_state) && wakeup_flag) {
+				atomic_set(&ac->mem_state, 0);
+				wake_up(&ac->mem_wait);
 			}
 			if (ac->cb)
 				ac->cb(data->opcode, data->token,
@@ -1875,7 +2194,8 @@ static int __q6asm_open_write(struct audio_client *ac, uint32_t format,
 	open.sink_endpointype = ASM_END_POINT_DEVICE_MATRIX;
 	open.bits_per_sample = bits_per_sample;
 
-	open.postprocopo_id = get_asm_topology();
+	open.postprocopo_id = ASM_STREAM_POSTPROC_TOPO_ID_SONY;
+
 	if (open.postprocopo_id == 0)
 		open.postprocopo_id = ASM_STREAM_POSTPROC_TOPO_ID_NONE;
 
@@ -3090,7 +3410,7 @@ int q6asm_memory_map(struct audio_client *ac, uint32_t buf_add, int dir,
 							mmap_region_cmd;
 	q6asm_add_mmaphdr(ac, &mmap_regions->hdr, cmd_size,
 			TRUE, ((ac->session << 8) | dir));
-	atomic_set(&ac->cmd_state, 1);
+	atomic_set(&ac->mem_state, 1);
 	mmap_regions->hdr.opcode = ASM_CMD_SHARED_MEM_MAP_REGIONS;
 	mmap_regions->mem_pool_id = ADSP_MEMORY_MAP_SHMEM8_4K_POOL;
 	mmap_regions->num_regions = bufcnt & 0x00ff;
@@ -3117,8 +3437,8 @@ int q6asm_memory_map(struct audio_client *ac, uint32_t buf_add, int dir,
 		goto fail_cmd;
 	}
 
-	rc = wait_event_timeout(ac->cmd_wait,
-			(atomic_read(&ac->cmd_state) == 0 &&
+	rc = wait_event_timeout(ac->mem_wait,
+			(atomic_read(&ac->mem_state) == 0 &&
 			 ac->port[dir].tmp_hdl), 5*HZ);
 	if (!rc) {
 		pr_err("timeout. waited for memory_map\n");
@@ -3154,7 +3474,7 @@ int q6asm_memory_unmap(struct audio_client *ac, uint32_t buf_add, int dir)
 	q6asm_add_mmaphdr(ac, &mem_unmap.hdr,
 			sizeof(struct avs_cmd_shared_mem_unmap_regions),
 			TRUE, ((ac->session << 8) | dir));
-	atomic_set(&ac->cmd_state, 1);
+	atomic_set(&ac->mem_state, 1);
 	mem_unmap.hdr.opcode = ASM_CMD_SHARED_MEM_UNMAP_REGIONS;
 	list_for_each_safe(ptr, next, &ac->port[dir].mem_map_handle) {
 		buf_node = list_entry(ptr, struct asm_buffer_node,
@@ -3175,8 +3495,8 @@ int q6asm_memory_unmap(struct audio_client *ac, uint32_t buf_add, int dir)
 		goto fail_cmd;
 	}
 
-	rc = wait_event_timeout(ac->cmd_wait,
-			(atomic_read(&ac->cmd_state) == 0), 5 * HZ);
+	rc = wait_event_timeout(ac->mem_wait,
+			(atomic_read(&ac->mem_state) == 0), 5 * HZ);
 	if (!rc) {
 		pr_err("timeout. waited for memory_unmap\n");
 		rc = -EINVAL;
@@ -3252,7 +3572,7 @@ static int q6asm_memory_map_regions(struct audio_client *ac, int dir,
 							mmap_region_cmd;
 	q6asm_add_mmaphdr(ac, &mmap_regions->hdr, cmd_size, TRUE,
 					((ac->session << 8) | dir));
-	atomic_set(&ac->cmd_state, 1);
+	atomic_set(&ac->mem_state, 1);
 	pr_debug("mmap_region=0x%p token=0x%x\n",
 		mmap_regions, ((ac->session << 8) | dir));
 
@@ -3285,8 +3605,8 @@ static int q6asm_memory_map_regions(struct audio_client *ac, int dir,
 		goto fail_cmd;
 	}
 
-	rc = wait_event_timeout(ac->cmd_wait,
-			(atomic_read(&ac->cmd_state) == 0)
+	rc = wait_event_timeout(ac->mem_wait,
+			(atomic_read(&ac->mem_state) == 0)
 			 , 5*HZ);
 	if (!rc) {
 		pr_err("timeout. waited for memory_map\n");
@@ -3334,7 +3654,7 @@ static int q6asm_memory_unmap_regions(struct audio_client *ac, int dir)
 	cmd_size = sizeof(struct avs_cmd_shared_mem_unmap_regions);
 	q6asm_add_mmaphdr(ac, &mem_unmap.hdr, cmd_size,
 			TRUE, ((ac->session << 8) | dir));
-	atomic_set(&ac->cmd_state, 1);
+	atomic_set(&ac->mem_state, 1);
 	port = &ac->port[dir];
 	buf_add = (uint32_t)port->buf->phys;
 	mem_unmap.hdr.opcode = ASM_CMD_SHARED_MEM_UNMAP_REGIONS;
@@ -3357,8 +3677,8 @@ static int q6asm_memory_unmap_regions(struct audio_client *ac, int dir)
 		goto fail_cmd;
 	}
 
-	rc = wait_event_timeout(ac->cmd_wait,
-			(atomic_read(&ac->cmd_state) == 0), 5*HZ);
+	rc = wait_event_timeout(ac->mem_wait,
+			(atomic_read(&ac->mem_state) == 0), 5*HZ);
 	if (!rc) {
 		pr_err("timeout. waited for memory_unmap\n");
 		goto fail_cmd;
@@ -3388,6 +3708,18 @@ int q6asm_set_lrgain(struct audio_client *ac, int left_gain, int right_gain)
 		pr_err("%s: APR handle NULL\n", __func__);
 		rc = -EINVAL;
 		goto fail_cmd;
+	}
+
+	volume_control[ac->session].volume = ((left_gain << 16) | right_gain);
+	if (volume_control[ac->session].module == ASM_MODULE_ID_SONYBUNDLE) {
+		/* Send average volume to SonyBundle module */
+		rc = sony_set_volume(ac, (left_gain + right_gain) / 2);
+		if (rc < 0) {
+			pr_err("%s: Send volume failed for CA\n",
+					__func__);
+			rc = -EINVAL;
+		}
+		return rc;
 	}
 
 	sz = sizeof(struct asm_volume_ctrl_lr_chan_gain);
@@ -3487,6 +3819,17 @@ int q6asm_set_volume(struct audio_client *ac, int volume)
 		goto fail_cmd;
 	}
 
+	volume_control[ac->session].volume = ((volume << 16) | volume);
+	if (volume_control[ac->session].module == ASM_MODULE_ID_SONYBUNDLE) {
+		rc = sony_set_volume(ac, volume);
+		if (rc < 0) {
+			pr_err("%s: Send volume failed for CA\n",
+					__func__);
+			rc = -EINVAL;
+		}
+		return rc;
+	}
+
 	sz = sizeof(struct asm_volume_ctrl_master_gain);
 	q6asm_add_hdr_async(ac, &vol.hdr, sz, TRUE);
 	atomic_set(&ac->cmd_state, 1);
@@ -3519,6 +3862,7 @@ int q6asm_set_volume(struct audio_client *ac, int volume)
 		goto fail_cmd;
 	}
 	rc = 0;
+
 fail_cmd:
 	return rc;
 }
@@ -4583,6 +4927,7 @@ static int __init q6asm_init(void)
 	common_client.port[1].buf = &common_buf[1];
 	init_waitqueue_head(&common_client.cmd_wait);
 	init_waitqueue_head(&common_client.time_wait);
+	init_waitqueue_head(&common_client.mem_wait);
 	atomic_set(&common_client.time_flag, 1);
 	INIT_LIST_HEAD(&common_client.port[0].mem_map_handle);
 	INIT_LIST_HEAD(&common_client.port[1].mem_map_handle);
@@ -4593,6 +4938,7 @@ static int __init q6asm_init(void)
 	}
 	atomic_set(&common_client.cmd_state, 0);
 	atomic_set(&common_client.nowait_cmd_cnt, 0);
+	atomic_set(&common_client.mem_state, 0);
 
 	config_debug_fs_init();
 

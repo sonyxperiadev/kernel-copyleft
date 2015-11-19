@@ -47,5 +47,6 @@ Example:
 Optional properties
 - qcom,panel-lpg-channel :		LPG channel for backlight.
 - qcom,panel-pwm-period :		PWM period in microseconds.
-
+- qcom,mdss-brightness-max-level:	Specifies the max brightness level supported.
+					255 = default value.
 

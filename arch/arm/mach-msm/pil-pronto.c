@@ -277,7 +277,7 @@ static void pronto_stop(const struct subsys_desc *desc)
 	pil_shutdown(&drv->desc);
 }
 
-static void log_wcnss_sfr(void)
+static void log_wcnss_sfr(struct pronto_data *drv)
 {
 	char *smem_reset_reason;
 	unsigned smem_reset_size;
@@ -294,6 +294,8 @@ static void log_wcnss_sfr(void)
 	} else {
 		pr_err("wcnss subsystem failure reason: %.81s\n",
 				smem_reset_reason);
+		update_crash_reason(drv->subsys, smem_reset_reason,
+							smem_reset_size);
 		memset(smem_reset_reason, 0, smem_reset_size);
 		wmb();
 	}
@@ -301,7 +303,7 @@ static void log_wcnss_sfr(void)
 
 static void restart_wcnss(struct pronto_data *drv)
 {
-	log_wcnss_sfr();
+	log_wcnss_sfr(drv);
 	subsystem_restart_dev(drv->subsys);
 }
 
