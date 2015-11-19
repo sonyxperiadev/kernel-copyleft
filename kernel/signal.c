@@ -9,6 +9,11 @@
  *		Changes to use preallocated sigqueue structures
  *		to allow signals to be sent reliably.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/export.h>

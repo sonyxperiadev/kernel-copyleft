@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/firmware.h>
@@ -87,8 +92,10 @@ static char wcd9xxx_event_string[][64] = {
 	"WCD9XXX_EVENT_POST_CFILT_3_ON",
 
 	"WCD9XXX_EVENT_PRE_HPHL_PA_ON",
+	"WCD9XXX_EVENT_PRE_HPHL_PA_OFF",
 	"WCD9XXX_EVENT_POST_HPHL_PA_OFF",
 	"WCD9XXX_EVENT_PRE_HPHR_PA_ON",
+	"WCD9XXX_EVENT_PRE_HPHR_PA_OFF",
 	"WCD9XXX_EVENT_POST_HPHR_PA_OFF",
 
 	"WCD9XXX_EVENT_POST_RESUME",

@@ -16,6 +16,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2011 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -35,6 +40,17 @@
 #include <linux/qcom/diag_dload.h>
 
 #include "gadget_chips.h"
+
+/* Wait time (ms) before sending CONFIGURED uevent */
+#define WAIT_TIME_BEFORE_SENDING_CONFIGURED		(50)
+
+#ifdef CONFIG_USB_AUTO_CDROM_EJECTION
+#define USB_AUTO_CDROM_EJECTION_TIME	30000
+static int eject_cdrom_timer_start(int msec);
+static void eject_cdrom_timer_stop(void);
+static int eject_cdrom_reload(void);
+static void eject_cdrom_timer_work(struct work_struct *w);
+#endif /* CONFIG_USB_AUTO_CDROM_EJECTION */
 
 #include "f_fs.c"
 #ifdef CONFIG_SND_PCM
@@ -455,12 +471,19 @@ static void android_work(struct work_struct *data)
 		 * a chance to wakeup userspace threads and notify disconnect
 		 */
 		if (uevent_envp == configured)
-			msleep(50);
+			msleep(WAIT_TIME_BEFORE_SENDING_CONFIGURED);
 
 		/* Do not notify on suspend / resume */
 		if (next_state != USB_SUSPENDED && next_state != USB_RESUMED) {
 			kobject_uevent_env(&dev->dev->kobj, KOBJ_CHANGE,
 					   uevent_envp);
+#ifdef CONFIG_USB_AUTO_CDROM_EJECTION
+			if (next_state == USB_DISCONNECTED &&
+					last_uevent != USB_CONNECTED)
+				eject_cdrom_timer_stop();
+			else if (next_state == USB_CONNECTED)
+				eject_cdrom_reload();
+#endif /* CONFIG_USB_AUTO_CDROM_EJECTION */
 			last_uevent = next_state;
 		}
 		pr_info("%s: sent uevent %s\n", __func__, uevent_envp[0]);
@@ -2406,6 +2429,9 @@ static char lun_info[MAX_LUN_STR_LEN] = {'\0'};
 struct mass_storage_function_config {
 	struct fsg_config fsg;
 	struct fsg_common *common;
+#ifdef CONFIG_USB_AUTO_CDROM_EJECTION
+	struct delayed_work eject_work;
+#endif /* CONFIG_USB_AUTO_CDROM_EJECTION */
 };
 
 #define MAX_LUN_NAME 8
@@ -2439,6 +2465,23 @@ static int mass_storage_function_init(struct android_usb_function *f,
 		config->fsg.nluns++;
 	}
 
+	if (config->fsg.nluns > FSG_MAX_LUNS)
+		config->fsg.nluns = FSG_MAX_LUNS;
+
+	config->fsg.cdrom_nluns = 1;
+	if (config->fsg.cdrom_nluns > FSG_MAX_LUNS - config->fsg.nluns)
+		config->fsg.cdrom_nluns = FSG_MAX_LUNS - config->fsg.nluns;
+
+	for (i = 0; i < config->fsg.cdrom_nluns; i++) {
+		n = config->fsg.nluns + i;
+		/* CD-ROM lun */
+		config->fsg.luns[n].ro = 1;
+		config->fsg.luns[n].cdrom = 1;
+		config->fsg.luns[n].removable = 1;
+	}
+	if (dev->pdata)
+		config->fsg.can_stall = dev->pdata->can_stall;
+
 	if (uicc_nluns > FSG_MAX_LUNS - config->fsg.nluns) {
 		uicc_nluns = FSG_MAX_LUNS - config->fsg.nluns;
 		pr_debug("limiting uicc luns to %d\n", uicc_nluns);
@@ -2467,6 +2510,9 @@ static int mass_storage_function_init(struct android_usb_function *f,
 
 	config->common = common;
 	f->config = config;
+#ifdef CONFIG_USB_AUTO_CDROM_EJECTION
+	INIT_DELAYED_WORK(&config->eject_work, eject_cdrom_timer_work);
+#endif /* CONFIG_USB_AUTO_CDROM_EJECTION */
 	return 0;
 error:
 	for (; i > 0; i--)
@@ -2583,6 +2629,9 @@ static int mass_storage_function_bind_config(struct android_usb_function *f,
 	struct mass_storage_function_config *config = f->config;
 	int ret;
 
+	config->common->storage_mode = STORAGE_MODE_MSC;
+	fsg_common_setup_luns(config->common);
+
 	ret = fsg_bind_config(c->cdev, c, config->common);
 	if (ret)
 		pr_err("fsg_bind_config failed. ret:%x\n", ret);
@@ -2605,9 +2654,10 @@ static ssize_t mass_storage_inquiry_store(struct device *dev,
 	struct mass_storage_function_config *config = f->config;
 	if (size >= sizeof(config->common->inquiry_string))
 		return -EINVAL;
-	if (sscanf(buf, "%28s", config->common->inquiry_string) != 1)
-		return -EINVAL;
-	return size;
+	return snprintf(config->common->inquiry_string,
+			sizeof(config->common->inquiry_string),
+			"%28s",
+			buf);
 }
 
 static DEVICE_ATTR(inquiry_string, S_IRUGO | S_IWUSR,
@@ -2647,6 +2697,132 @@ static struct android_usb_function mass_storage_function = {
 	.enable		= mass_storage_function_enable,
 };
 
+static int cdrom_function_init(struct android_usb_function *f,
+				struct usb_composite_dev *cdev)
+{
+	int err;
+	struct mass_storage_function_config *config;
+	struct fsg_common *common;
+
+	f->config = mass_storage_function.config;
+	config = f->config;
+	common = config->common;
+
+	err = sysfs_create_link(&f->dev->kobj,
+				&common->luns[config->fsg.nluns].dev.kobj,
+				"lun");
+	if (err) {
+		pr_err("%s: Failed to create link: err %d\n",
+			__func__, err);
+		return err;
+	}
+
+	return 0;
+}
+
+static int cdrom_function_bind_config(struct android_usb_function *f,
+					struct usb_configuration *c)
+{
+	struct mass_storage_function_config *config = f->config;
+
+	config->common->storage_mode = STORAGE_MODE_CDROM;
+	fsg_common_setup_luns(config->common);
+
+	return fsg_bind_config(c->cdev, c, config->common);
+}
+
+static ssize_t cdrom_inquiry_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	return snprintf(buf, PAGE_SIZE, "%s\n",
+			config->common->cdrom_inquiry_string);
+}
+
+static ssize_t cdrom_inquiry_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	if (size >= sizeof(config->common->cdrom_inquiry_string))
+		return -EINVAL;
+	return snprintf(config->common->cdrom_inquiry_string,
+			sizeof(config->common->inquiry_string),
+			"%28s",
+			buf);
+}
+
+static DEVICE_ATTR(cdrom_inquiry_string, S_IRUGO | S_IWUSR,
+					cdrom_inquiry_show,
+					cdrom_inquiry_store);
+
+static struct device_attribute *cdrom_function_attributes[] = {
+	&dev_attr_cdrom_inquiry_string,
+	NULL
+};
+
+static struct android_usb_function cdrom_function = {
+	.name		= "cdrom",
+	.init		= cdrom_function_init,
+	.bind_config	= cdrom_function_bind_config,
+	.attributes	= cdrom_function_attributes,
+};
+
+#ifdef CONFIG_USB_AUTO_CDROM_EJECTION
+static void eject_cdrom_timer_work(struct work_struct *w)
+{
+	struct mass_storage_function_config *config =
+			container_of(w, struct mass_storage_function_config,
+							eject_work.work);
+	struct fsg_common *common = config->common;
+
+	do_eject(common, &common->luns_all[common->msc_nluns]);
+}
+
+static int eject_cdrom_timer_start(int msec)
+{
+	struct mass_storage_function_config *config;
+	struct fsg_common *common;
+
+	config = cdrom_function.config;
+	if (!config)
+		return -EINVAL;
+
+	common = config->common;
+	if (fsg_lun_is_open(&common->luns_all[common->msc_nluns]))
+		schedule_delayed_work(&config->eject_work,
+							msecs_to_jiffies(msec));
+	else
+		pr_debug("%s: iso image is not loaded!\n", __func__);
+
+	return 0;
+}
+
+static void eject_cdrom_timer_stop(void)
+{
+	struct mass_storage_function_config *config;
+
+	config = cdrom_function.config;
+	if (!config)
+		return;
+
+	cancel_delayed_work_sync(&config->eject_work);
+}
+
+static int eject_cdrom_reload(void)
+{
+	struct mass_storage_function_config *config;
+	struct fsg_common *common;
+
+	config = cdrom_function.config;
+	if (!config)
+		return -EINVAL;
+
+	common = config->common;
+	return do_reload(common, &common->luns_all[common->msc_nluns]);
+}
+#endif /* CONFIG_USB_AUTO_CDROM_EJECTION */
 
 static int accessory_function_init(struct android_usb_function *f,
 					struct usb_composite_dev *cdev)
@@ -2812,6 +2988,7 @@ static struct android_usb_function *supported_functions[] = {
 	&ecm_function,
 	&ncm_function,
 	&mass_storage_function,
+	&cdrom_function,
 	&accessory_function,
 #ifdef CONFIG_SND_PCM
 	&audio_source_function,
@@ -3435,6 +3612,64 @@ static struct device_attribute *android_usb_attributes[] = {
 	NULL
 };
 
+#ifdef CONFIG_USB_MIRRORLINK
+static struct miscdevice mirrorlink_device = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "usb_mirrorlink",
+};
+
+struct work_struct _ncm_wq;
+
+/* MirrorLink NCM control request handling */
+static int mirrorlink_ctrlrequest(struct usb_composite_dev *cdev,
+				  const struct usb_ctrlrequest *ctrl)
+{
+	int value = -EOPNOTSUPP;
+	u8 b_requestType = ctrl->bRequestType;
+	u8 b_request = ctrl->bRequest;
+
+	if (b_requestType == (USB_DIR_OUT | USB_TYPE_VENDOR)) {
+		if (b_request == 0xF0) {
+			pr_debug("ml_ctrlrequest: found request\n");
+			schedule_work(&_ncm_wq);
+			value = 0;
+			/* response to USB MirrorLink command */
+			cdev->req->zero = 0;
+			cdev->req->length = value;
+			value = usb_ep_queue(cdev->gadget->ep0,
+					     cdev->req, GFP_ATOMIC);
+			if (value < 0)
+				pr_err("%s setup response queue error\n",
+				       __func__);
+		}
+	}
+	return value;
+}
+
+static void mirrorlink_work(struct work_struct *data)
+{
+	char *envp[2] = { "MIRRORLINK=START", NULL };
+
+	/* Wait for CONFIGURED uevnet send out */
+	msleep(WAIT_TIME_BEFORE_SENDING_CONFIGURED);
+
+	kobject_uevent_env(&mirrorlink_device.this_device->kobj,
+			   KOBJ_CHANGE, envp);
+}
+
+static int mirrorlink_init(void)
+{
+	misc_register(&mirrorlink_device);
+	INIT_WORK(&_ncm_wq, mirrorlink_work);
+	return 0;
+}
+
+static void mirrorlink_cleanup(void)
+{
+	misc_deregister(&mirrorlink_device);
+}
+#endif
+
 /*-------------------------------------------------------------------------*/
 /* Composite driver */
 
@@ -3511,6 +3746,7 @@ static int android_bind(struct usb_composite_dev *cdev)
 		return id;
 	strings_dev[STRING_SERIAL_IDX].id = id;
 	device_desc.iSerialNumber = id;
+	device_desc.bcdDevice = get_default_bcdDevice();
 
 	if (gadget_is_otg(cdev->gadget))
 		list_for_each_entry(conf, &dev->configs, list_item)
@@ -3579,6 +3815,13 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	 */
 	if (value < 0)
 		value = acc_ctrlrequest(cdev, c);
+
+#ifdef CONFIG_USB_MIRRORLINK
+	/* Also handle the control request to enable CDC NCM mode
+	 * for MirrorLink. */
+	if (value < 0)
+		value = mirrorlink_ctrlrequest(cdev, c);
+#endif
 
 	if (value < 0)
 		value = composite_setup_func(gadget, c);
@@ -3912,6 +4155,14 @@ static int android_probe(struct platform_device *pdev)
 		goto err_probe;
 	}
 
+#ifdef CONFIG_USB_MIRRORLINK
+	ret = mirrorlink_init();
+	if (ret) {
+		pr_err("%s(): mirrorlink_init failed\n", __func__);
+		goto err_probe;
+	}
+#endif
+
 	/* pm qos request to prevent apps idle power collapse */
 	android_dev->curr_pm_qos_state = NO_USB_VOTE;
 	if (pdata && pdata->pm_qos_latency[0]) {
@@ -3948,6 +4199,10 @@ static int android_remove(struct platform_device *pdev)
 
 	if (pdata)
 		usb_core_id = pdata->usb_core_id;
+
+#ifdef CONFIG_USB_MIRRORLINK
+	mirrorlink_cleanup();
+#endif
 
 	/* Find the android dev from the list */
 	list_for_each_entry(dev, &android_dev_list, list_item) {

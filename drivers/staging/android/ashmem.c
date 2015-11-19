@@ -15,6 +15,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "ashmem: " fmt
 
@@ -376,7 +381,7 @@ static int ashmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		loff_t start = range->pgstart * PAGE_SIZE;
 		loff_t end = (range->pgend + 1) * PAGE_SIZE;
 
-		do_fallocate(range->asma->file,
+		range->asma->file->f_op->fallocate(range->asma->file,
 				FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
 				start, end - start);
 		range->purged = ASHMEM_WAS_PURGED;

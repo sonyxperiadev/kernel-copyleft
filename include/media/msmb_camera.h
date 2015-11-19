@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __LINUX_MSMB_CAMERA_H
 #define __LINUX_MSMB_CAMERA_H
 
@@ -64,7 +69,9 @@
  * we return error to avoid integer overflow. Group processing
  * can have max of 9 groups of 8 bufs each. This value may be
  * configured in future*/
-#define MSM_CAMERA_MAX_STREAM_BUF 72
+/* extension begin */
+#define MSM_CAMERA_MAX_STREAM_BUF 96
+/* extension end */
 
 /* Max batch size of processing */
 #define MSM_CAMERA_MAX_USER_BUFF_CNT 16

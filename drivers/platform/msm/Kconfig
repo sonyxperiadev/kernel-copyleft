@@ -264,4 +264,10 @@ config SEEMP_CORE
 	help
 		This option enables malware protection component
 		to log on-device software API activity.
+
+config PON_SOMC_ORG
+	bool "SoMC specific power on interface"
+	help
+		This option enables SoMC specific power on interface.
+
 endmenu

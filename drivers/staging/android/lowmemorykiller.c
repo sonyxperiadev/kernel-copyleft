@@ -29,6 +29,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -259,6 +264,19 @@ void tune_lmk_param(int *other_free, int *other_file, struct shrink_control *sc)
 		lowmem_print(4, "lowmem_shrink tunning for others ofree %d, "
 			     "%d\n", *other_free, *other_file);
 	}
+#ifdef CONFIG_ANDROID_LOW_MEMORY_KILLER_CONSIDER_SWAP
+	if (zone_watermark_ok(preferred_zone, 0,
+			  low_wmark_pages(preferred_zone), 0, 0)) {
+		struct sysinfo si;
+		si_swapinfo(&si);
+		if (si.freeswap > *other_free) {
+			*other_free = si.freeswap;
+			lowmem_print(4, "lowmem_shrink tunning for swap "
+				     "ofree %d, %d\n",
+				     *other_free, *other_file);
+		}
+	}
+#endif
 }
 
 static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
@@ -334,6 +352,10 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 
 		/* if task no longer has any memory ignore it */
 		if (test_task_flag(tsk, TIF_MM_RELEASED))
+			continue;
+
+		/* Ignore task if coredump in progress */
+		if (tsk->mm && tsk->mm->core_state)
 			continue;
 
 		if (time_before_eq(jiffies, lowmem_deathpending_timeout)) {

@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "cpu-boost: " fmt
 
@@ -438,6 +443,12 @@ static void cpuboost_input_disconnect(struct input_handle *handle)
 }
 
 static const struct input_device_id cpuboost_ids[] = {
+	/* touch activity */
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_SWBIT,
+		.evbit = { BIT_MASK(EV_SW) },
+		.swbit = { BIT_MASK(SW_TOUCH_ACTIVITY) },
+	},
 	/* multi-touch touchscreen */
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |

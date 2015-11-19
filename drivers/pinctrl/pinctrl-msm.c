@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/err.h>
 #include <linux/irqdomain.h>
@@ -131,11 +136,13 @@ static int msm_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
 	return 0;
 }
 
+#ifndef CONFIG_PINCTRL_SOMC
 static void msm_pmx_disable(struct pinctrl_dev *pctldev,
 					unsigned selector, unsigned group)
 {
 	msm_pmx_prg_fn(pctldev, selector, group, false);
 }
+#endif
 
 /* Enable gpio function for a pin */
 static int msm_pmx_gpio_request(struct pinctrl_dev *pctldev,
@@ -159,7 +166,9 @@ static struct pinmux_ops msm_pmxops = {
 	.get_function_name	= msm_pmx_get_fname,
 	.get_function_groups	= msm_pmx_get_groups,
 	.enable			= msm_pmx_enable,
+#ifndef CONFIG_PINCTRL_SOMC
 	.disable		= msm_pmx_disable,
+#endif
 	.gpio_request_enable	= msm_pmx_gpio_request,
 };
 
