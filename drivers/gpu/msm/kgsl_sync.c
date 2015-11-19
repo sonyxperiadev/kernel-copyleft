@@ -170,9 +170,16 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 	if (context == NULL)
 		goto unlock;
 
+	/* MM-GL-DISPLAY-panel-13+[ */
+	if (test_bit(KGSL_CONTEXT_PRIV_INVALID, &context->priv)) {
+		goto unlock;
+	}
+	/* MM-GL-DISPLAY-panel-13+] */
+
 	pt = kgsl_sync_pt_create(context->timeline, context, timestamp);
 	if (pt == NULL) {
-		KGSL_DRV_ERR(device, "kgsl_sync_pt_create failed\n");
+		/* MM-GL-DISPLAY-panel-13- *///KGSL_DRV_ERR(device, "kgsl_sync_pt_create failed\n");
+		KGSL_DRV_CRIT_RATELIMIT(device, "kgsl_sync_pt_create failed\n");/* MM-GL-DISPLAY-panel-13+ */
 		ret = -ENOMEM;
 		goto unlock;
 	}
@@ -186,14 +193,19 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 	if (fence == NULL) {
 		/* only destroy pt when not added to fence */
 		kgsl_sync_pt_destroy(pt);
-		KGSL_DRV_ERR(device, "sync_fence_create failed\n");
+		/* MM-GL-DISPLAY-panel-13- *///KGSL_DRV_ERR(device, "sync_fence_create failed\n");
+		KGSL_DRV_CRIT_RATELIMIT(device, "sync_fence_create failed\n");/* MM-GL-DISPLAY-panel-13+ */
 		ret = -ENOMEM;
 		goto unlock;
 	}
 
 	priv.fence_fd = get_unused_fd_flags(0);
 	if (priv.fence_fd < 0) {
-		KGSL_DRV_ERR(device, "Unable to get a file descriptor: %d\n",
+		/* MM-GL-DISPLAY-panel-13- *///KGSL_DRV_ERR(device, "Unable to get a file descriptor: %d\n",
+		/* MM-GL-DISPLAY-panel-13+[ */
+		KGSL_DRV_CRIT_RATELIMIT(device,
+			"Unable to get a file descriptor: %d\n",
+		/* MM-GL-DISPLAY-panel-13+] */
 			priv.fence_fd);
 		ret = priv.fence_fd;
 		goto unlock;
@@ -465,8 +477,12 @@ long kgsl_ioctl_syncsource_create(struct kgsl_device_private *dev_priv,
 		goto out;
 	}
 
-	mutex_lock(&private->process_private_mutex);
-	id = idr_alloc(&private->syncsource_idr, syncsource, 1, 0, GFP_KERNEL);
+	idr_preload(GFP_KERNEL);
+	spin_lock(&private->syncsource_lock);
+	id = idr_alloc(&private->syncsource_idr, syncsource, 1, 0, GFP_NOWAIT);
+	spin_unlock(&private->syncsource_lock);
+	idr_preload_end();
+
 	if (id > 0) {
 		kref_init(&syncsource->refcount);
 		syncsource->id = id;
@@ -477,7 +493,7 @@ long kgsl_ioctl_syncsource_create(struct kgsl_device_private *dev_priv,
 	} else {
 		ret = id;
 	}
-	mutex_unlock(&private->process_private_mutex);
+
 out:
 	if (ret) {
 		if (syncsource && syncsource->oneshot)
@@ -494,13 +510,13 @@ kgsl_syncsource_get(struct kgsl_process_private *private, int id)
 	int result = 0;
 	struct kgsl_syncsource *syncsource = NULL;
 
-	mutex_lock(&private->process_private_mutex);
+	spin_lock(&private->syncsource_lock);
 
 	syncsource = idr_find(&private->syncsource_idr, id);
 	if (syncsource)
 		result = kref_get_unless_zero(&syncsource->refcount);
 
-	mutex_unlock(&private->process_private_mutex);
+	spin_unlock(&private->syncsource_lock);
 
 	return result ? syncsource : NULL;
 }
@@ -513,13 +529,13 @@ static void kgsl_syncsource_destroy(struct kref *kref)
 
 	struct kgsl_process_private *private = syncsource->private;
 
-	mutex_lock(&private->process_private_mutex);
+	spin_lock(&private->syncsource_lock);
 	if (syncsource->id != 0) {
 		idr_remove(&private->syncsource_idr, syncsource->id);
 		syncsource->id = 0;
 	}
 	oneshot_timeline_destroy(syncsource->oneshot);
-	mutex_unlock(&private->process_private_mutex);
+	spin_unlock(&private->syncsource_lock);
 
 	kfree(syncsource);
 }
@@ -545,10 +561,10 @@ long kgsl_ioctl_syncsource_destroy(struct kgsl_device_private *dev_priv,
 
 	private = syncsource->private;
 
-	mutex_lock(&private->process_private_mutex);
+	spin_lock(&private->syncsource_lock);
 	idr_remove(&private->syncsource_idr, param->id);
 	syncsource->id = 0;
-	mutex_unlock(&private->process_private_mutex);
+	spin_unlock(&private->syncsource_lock);
 
 	/* put reference from syncsource creation */
 	kgsl_syncsource_put(syncsource);

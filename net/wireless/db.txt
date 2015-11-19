@@ -56,7 +56,8 @@ country AR:
 	(2402 - 2482 @ 40), (N/A, 20)
 	(5170 - 5250 @ 80), (6, 24)
 	(5250 - 5330 @ 80), (6, 24), DFS
-	(5490 - 5730 @ 80), (6, 24), DFS
+	(5490 - 5590 @ 80), (6, 24), DFS
+	(5650 - 5730 @ 80), (6, 24), DFS
 	(5735 - 5835 @ 80), (6, 30)
 
 country AS:
@@ -68,8 +69,8 @@ country AS:
 
 country AT: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -78,7 +79,8 @@ country AU:
 	(2402 - 2482 @ 40), (N/A, 20)
 	(5170 - 5250 @ 80), (6, 24)
 	(5250 - 5330 @ 80), (6, 24), DFS
-	(5490 - 5730 @ 80), (6, 24), DFS
+	(5490 - 5590 @ 80), (6, 24), DFS
+	(5650 - 5730 @ 80), (6, 24), DFS
 	(5735 - 5835 @ 80), (6, 30)
 
 country AW:
@@ -112,8 +114,8 @@ country BD:
 
 country BE: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -127,8 +129,8 @@ country BF:
 
 country BG: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -195,9 +197,10 @@ country BZ:
 
 country CA:
 	(2402 - 2472 @ 40), (N/A, 30)
-	(5170 - 5250 @ 80), (6, 24)
-	(5250 - 5330 @ 80), (6, 23), DFS
-	(5490 - 5730 @ 80), (6, 23), DFS
+	(5170 - 5250 @ 80), (6, 24), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (6, 24), DFS
+	(5490 - 5590 @ 80), (6, 24), DFS
+	(5650 - 5730 @ 80), (6, 24), DFS
 	(5735 - 5835 @ 80), (6, 30)
 
 country CF:
@@ -209,8 +212,8 @@ country CF:
 
 country CH:
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 
 country CI:
@@ -228,10 +231,9 @@ country CL:
 
 country CN:
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5150 - 5250 @ 80), (6,	23)
-	(5250 - 5350 @ 80), (6,	23), DFS
-	(5725 - 5850 @ 80), (6,	30)
-	(5735 - 5835 @ 80), (N/A, 30)
+	(5170 - 5250 @ 80), (6, 23)
+	(5250 - 5330 @ 80), (6, 23), DFS
+	(5735 - 5835 @ 80), (6, 30)
 	# 60 gHz band channels 1,4: 28dBm, channels 2,3: 44dBm
 	# ref: http://www.miit.gov.cn/n11293472/n11505629/n11506593/n11960250/n11960606/n11960700/n12330791.files/n12330790.pdf
 	(57240 - 59400 @ 2160), (N/A, 28)
@@ -261,8 +263,8 @@ country CX:
 
 country CY: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -273,8 +275,8 @@ country CY: DFS-ETSI
 # implemented.
 country CZ: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -294,16 +296,16 @@ country CZ: DFS-ETSI
 country DE: DFS-ETSI
 	# entries 279004 and 280006
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
 
 country DK: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -335,8 +337,8 @@ country EC:
 
 country EE: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -347,10 +349,10 @@ country EG:
 	(5250 - 5330 @ 40), (N/A, 20), DFS
 
 country ES: DFS-ETSI
-	(2402 - 2482 @ 40),(N/A, 20)
-	(5170 - 5250 @ 80),(N/A, 20)
-	(5250 - 5330 @ 80),(N/A, 20), DFS
-	(5490 - 5710 @ 80),(N/A, 27), DFS
+	(2402 - 2482 @ 40), (N/A, 20)
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
 
@@ -362,8 +364,8 @@ country ET: DFS-ETSI
 
 country FI: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -377,8 +379,8 @@ country FM:
 
 country FR: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -398,8 +400,8 @@ country GE:
 
 country GB: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -426,8 +428,8 @@ country GP:
 
 country GR: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -486,8 +488,8 @@ country HT:
 
 country HU: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -499,8 +501,8 @@ country ID:
 
 country IE: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -518,8 +520,8 @@ country IN:
 
 country IS: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -530,8 +532,8 @@ country IR:
 
 country IT: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -585,7 +587,7 @@ country KR:
 	(2402 - 2482 @ 40), (N/A, 20)
 	(5170 - 5250 @ 80), (6, 20)
 	(5250 - 5330 @ 80), (6, 20), DFS
-	(5490 - 5710 @ 80), (6, 30), DFS
+	(5490 - 5630 @ 80), (6, 30), DFS
 	(5735 - 5815 @ 80), (6, 30)
 
 country KW:
@@ -612,8 +614,8 @@ country LC:
 
 country LI: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 
 country LK:
@@ -631,24 +633,24 @@ country LS: DFS-ETSI
 
 country LT: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
 
 country LU: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
 
 country LV: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -717,8 +719,8 @@ country MN:
 
 country MT: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -781,16 +783,16 @@ country NI:
 
 country NL: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
 
 country NO: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -853,8 +855,8 @@ country PK:
 
 country PL: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -867,8 +869,8 @@ country PM: DFS-ETSI
 
 country PT: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -906,8 +908,8 @@ country RE:
 
 country RO: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -928,7 +930,6 @@ country RU:
 	(5170 - 5250 @ 40), (N/A, 20)
 	(5250 - 5330 @ 40), (N/A, 20), DFS
 	(5650 - 5710 @ 40), (N/A, 30), DFS
-	(5735 - 5835 @ 40), (N/A, 30)
 
 country RW:
 	(2402 - 2482 @ 40), (N/A, 20)
@@ -945,8 +946,8 @@ country SA:
 
 country SE: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -960,16 +961,16 @@ country SG:
 
 country SI: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
 
 country SK: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -1043,8 +1044,8 @@ country TN:
 
 country TR: DFS-ETSI
 	(2402 - 2482 @ 40), (N/A, 20)
-	(5170 - 5250 @ 80), (N/A, 20)
-	(5250 - 5330 @ 80), (N/A, 20), DFS
+	(5170 - 5250 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
+	(5250 - 5330 @ 80), (N/A, 20), PASSIVE-SCAN, NO-IBSS
 	(5490 - 5710 @ 80), (N/A, 27), DFS
 	# 60 gHz band channels 1-4, ref: Etsi En 302 567
 	(57240 - 65880 @ 2160), (N/A, 40), NO-OUTDOOR
@@ -1093,9 +1094,6 @@ country US: DFS-FCC
 country PS:
 	(2402 - 2472 @ 40), (N/A, 30)
 	(4940 - 4990 @ 40), (6, 33)
-	(5170 - 5250 @ 80), (6, 17)
-	(5250 - 5330 @ 80), (6, 24), DFS
-	(5735 - 5835 @ 80), (6, 30)
 
 country UY:
 	(2402 - 2482 @ 40), (N/A, 20)
@@ -1154,6 +1152,10 @@ country WS: DFS-ETSI
 	(5170 - 5250 @ 40), (N/A, 20)
 	(5250 - 5330 @ 40), (N/A, 20), DFS
 	(5490 - 5710 @ 40), (N/A, 27), DFS
+
+country XA:
+	(2402 - 2482 @ 20), (N/A, 30)
+	(5735 - 5815 @ 20), (N/A, 30)
 
 country YE:
 	(2402 - 2482 @ 40), (N/A, 20)

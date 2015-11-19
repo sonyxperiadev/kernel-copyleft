@@ -1,4 +1,5 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright(C) 2012-2014 Foxconn International Holdings, Ltd. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,6 +25,9 @@
 #include <linux/input.h>
 #include <linux/log2.h>
 #include <linux/qpnp/power-on.h>
+
+#include <linux/fih_sw_info.h>	/* PERI-JC-KEYPAD_BringUp-00+ */
+#include <soc/qcom/smem.h> /* CORE-EL-power_on_cause-01+ */
 
 #define PMIC_VER_8941           0x01
 #define PMIC_VERSION_REG        0x0105
@@ -117,6 +121,17 @@
 #define QPNP_PON_BUFFER_SIZE			9
 
 #define QPNP_POFF_REASON_UVLO			13
+/* CORE-EL-power_on_cause-02 */
+static int is_warmboot = 0;
+/* CORE-TH-Force_Trigger_Panic-00+[ */
+#ifdef CONFIG_FIH_FORCE_TRIGGER_PANIC
+#define FORCE_TRIGGER_PANIC_TIMEOUT_MS 30 * 1000 /*CORE-HC-Force_Trigger_Panic-01+*/
+
+struct delayed_work detect_release_work;
+extern unsigned int debug_force_trigger_panic_enable;
+static unsigned int has_delayed_work = 0;
+#endif
+/* CORE-TH-Force_Trigger_Panic-00+] */
 
 enum pon_type {
 	PON_KPDPWR,
@@ -539,15 +554,50 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	/* simulate press event in case release event occured
 	 * without a press event
 	 */
-	if (!cfg->old_state && !key_status) {
-		input_report_key(pon->pon_input, cfg->key_code, 1);
+	/* CORE-EL-press_reset_hang_00*[ */
+	if (cfg->key_code != 174) {
+		if (!cfg->old_state && !key_status) {
+			input_report_key(pon->pon_input, cfg->key_code, 1);
+			input_sync(pon->pon_input);
+		}
+	}
+	
+	pr_info( "PKEY pon_type:%d, key_code:%d %s\n", cfg->pon_type, cfg->key_code, (key_status?"down":"up")); 
+
+	if (cfg->key_code == 174) {
+		if (key_status)
+			pm_stay_awake(&pon->spmi->dev);
+		else
+			pm_relax(&pon->spmi->dev);
+	}
+	else {
+		input_report_key(pon->pon_input, cfg->key_code, key_status);
 		input_sync(pon->pon_input);
 	}
-
-	input_report_key(pon->pon_input, cfg->key_code, key_status);
-	input_sync(pon->pon_input);
+	/* CORE-EL-press_reset_hang_00*] */
 
 	cfg->old_state = !!key_status;
+/* CORE-TH-Force_Trigger_Panic-00+[ */
+#ifdef CONFIG_FIH_FORCE_TRIGGER_PANIC
+
+	if (cfg->pon_type == PON_KPDPWR)
+	{
+		if ( (pon_rt_sts & pon_rt_bit) && debug_force_trigger_panic_enable) /* Power key down */
+		{
+			schedule_delayed_work(&detect_release_work, msecs_to_jiffies(FORCE_TRIGGER_PANIC_TIMEOUT_MS));
+			has_delayed_work = 1;
+			pr_info("%s : schedule_delayed_work\n", __func__);
+		}
+		else if (!(pon_rt_sts & pon_rt_bit) && has_delayed_work) /* Power key up */
+		{
+			cancel_delayed_work(&detect_release_work);
+			has_delayed_work = 0;
+			pr_info("%s : cancel_delayed_work_sync\n", __func__);
+		}
+	}
+
+#endif
+/* CORE-TH-Force_Trigger_Panic-00+] */
 
 	return 0;
 }
@@ -678,8 +728,12 @@ static void bark_work_func(struct work_struct *work)
 
 	if (!(pon_rt_sts & QPNP_PON_RESIN_BARK_N_SET)) {
 		/* report the key event and enable the bark IRQ */
-		input_report_key(pon->pon_input, cfg->key_code, 0);
-		input_sync(pon->pon_input);
+/* CORE-EL-press_reset_hang_00*[ */		
+		if (cfg->key_code != 174) {
+			input_report_key(pon->pon_input, cfg->key_code, 0);
+			input_sync(pon->pon_input);
+		}
+/* CORE-EL-press_reset_hang_00*] */		
 		enable_irq(cfg->bark_irq);
 	} else {
 		/* disable reset */
@@ -722,8 +776,12 @@ static irqreturn_t qpnp_resin_bark_irq(int irq, void *_pon)
 	}
 
 	/* report the key event */
-	input_report_key(pon->pon_input, cfg->key_code, 1);
-	input_sync(pon->pon_input);
+/* CORE-EL-press_reset_hang_00*[ */	
+	if (cfg->key_code != 174) {
+		input_report_key(pon->pon_input, cfg->key_code, 1);
+		input_sync(pon->pon_input);
+	}
+/* CORE-EL-press_reset_hang_00*] */	
 	/* schedule work to check the bark status for key-release */
 	schedule_delayed_work(&pon->bark_work, QPNP_KEY_STATUS_DELAY);
 err_exit:
@@ -836,6 +894,215 @@ qpnp_config_reset(struct qpnp_pon *pon, struct qpnp_pon_config *cfg)
 
 	return 0;
 }
+
+enum timer_type {
+	S1_TIMER,
+	S2_TIMER,
+};
+
+/* %%ATTENTION: after s2 timer disabled, you must usleep(100) before setting timer value */
+int set_timer_value(enum pon_type p_type, enum timer_type t_type, u32 time_value) {
+	u8 i = 0;
+	struct qpnp_pon *pon = sys_reset_dev;
+	struct qpnp_pon_config *cfg = qpnp_get_cfg(pon, p_type);
+	u16 time_addr = 0;
+	int rc = 0;
+
+	if (t_type == S1_TIMER) {
+		switch (cfg->pon_type) {
+		case PON_KPDPWR:
+			time_addr = QPNP_PON_KPDPWR_S1_TIMER(pon->base);
+			break;
+		case PON_RESIN:
+			time_addr = QPNP_PON_RESIN_S1_TIMER(pon->base);
+			break;
+		case PON_KPDPWR_RESIN:
+			time_addr = QPNP_PON_KPDPWR_RESIN_S1_TIMER(pon->base);
+			break;
+		default:
+			return -EINVAL;
+			break;
+		}
+	}
+	else {
+		switch (cfg->pon_type) {
+		case PON_KPDPWR:
+			time_addr = QPNP_PON_KPDPWR_S2_TIMER(pon->base);
+			break;
+		case PON_RESIN:
+			time_addr = QPNP_PON_RESIN_S2_TIMER(pon->base);
+			break;
+		case PON_KPDPWR_RESIN:
+			time_addr = QPNP_PON_KPDPWR_RESIN_S2_TIMER(pon->base);
+			break;
+		default:
+			return -EINVAL;
+			break;;
+		}
+	}
+	
+	if (t_type == S1_TIMER) {
+		for (i = 0; i < PON_S1_COUNT_MAX + 1; i++) {
+			if (time_value <= s1_delay[i])
+				break;
+		}
+		rc = qpnp_pon_masked_write(pon, time_addr,
+					QPNP_PON_S1_TIMER_MASK, i);
+		if (rc) {
+			dev_err(&pon->spmi->dev, "Unable to configure S1 timer\n");
+			return rc;
+		}
+
+	}
+	else {
+		if (time_value) {
+			i = time_value / 10;
+			i = ilog2(i + 1);
+		}
+		
+		rc = qpnp_pon_masked_write(pon, time_addr,
+					QPNP_PON_S2_TIMER_MASK, i);
+		if (rc) {
+			dev_err(&pon->spmi->dev, "Unable to configure S2 timer\n");
+			return rc;
+		}
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL(set_timer_value);
+
+int enable_s2_reset(enum pon_type p_type, bool enable) {
+	struct qpnp_pon *pon = sys_reset_dev;
+	struct qpnp_pon_config *cfg = qpnp_get_cfg(pon, p_type);
+	int rc = 0;
+
+	/* disable S2 reset */
+	if (enable) {
+		rc = qpnp_pon_masked_write(pon, cfg->s2_cntl2_addr,
+					QPNP_PON_S2_CNTL_EN, QPNP_PON_S2_CNTL_EN);
+		if (rc) {
+			dev_err(&pon->spmi->dev, "Unable to configure S2 enable\n");
+			return rc;
+		}
+	}
+	else {
+		rc = qpnp_pon_masked_write(pon, cfg->s2_cntl2_addr,
+					QPNP_PON_S2_CNTL_EN, 0);
+		if (rc) {
+			dev_err(&pon->spmi->dev, "Unable to configure S2 enable\n");
+			return rc;
+		}
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL(enable_s2_reset);
+
+#define PON_STR_CNT 4
+static int set_pon(const char *val, struct kernel_param *kp)
+{
+	const char *settimer_str = "settimer";
+	const char *s2enable_str = "s2enable";
+	const char *kpr_str = "kpr";
+	const char *res_str = "res";
+	const char *s1_str = "s1";
+	const char *s2_str = "s2";
+	char *str[PON_STR_CNT] = {0};
+	char *c = (char*) val;
+	enum pon_type p_type;
+	enum timer_type t_type;
+	u32 time_value;
+	bool enable;
+	int i = 0, str_n = 0;
+	bool head = true;
+	// settimer:kpr|res:s1|s2:<timer_value>
+	// s2enable:kpr|res:<0>|<1>
+
+	do {
+		if (c[i] == 0)
+			break;
+
+		if (head) {
+			
+			if(str_n > PON_STR_CNT)
+				break;
+			
+			str[str_n ++] = &c[i];
+			head = false;
+		}
+		else {
+			if (c[i] == ':' || c[i] =='\n') {
+				c[i] = 0;
+				head = true;
+			}
+		}
+
+		i ++;
+	} while(1);
+
+	printk("Eric: %s | %s | %s | %s\n", str[0], str[1], str[2], str[3] ? str[3] : "");
+
+	/* get pon_type */
+	if (strncmp(str[1], kpr_str, strlen(kpr_str)) == 0) {
+		p_type = PON_KPDPWR_RESIN;
+	}
+	else if (strncmp(str[1], res_str, strlen(res_str)) == 0) {
+		p_type = PON_RESIN;
+	}
+	else {
+		// %%TODO: show something......		
+	}
+
+	if (strncmp(str[0], settimer_str, strlen(settimer_str)) == 0) {
+		if (strncmp(str[2], s1_str, strlen(s1_str)) == 0) {
+			t_type = S1_TIMER;
+		}
+		else if (strncmp(str[2], s2_str, strlen(s2_str)) == 0) {
+			t_type = S2_TIMER;
+		}
+		else {
+			// %%TODO: show something...... 	
+		}
+
+		sscanf(str[3], "%d", &time_value);
+
+		set_timer_value(p_type, t_type, time_value);
+	}
+	else if (strncmp(str[0], s2enable_str, strlen(s2enable_str)) == 0){
+		if(strncmp(str[2], "1", 1) == 0) 
+			enable = true;
+		else 
+			enable = false;
+
+		enable_s2_reset(p_type, enable);
+	}
+	else {
+		// %%TODO: show something......
+	}
+
+	return 0;
+}
+
+static int get_pon(char *buffer, struct kernel_param *kp)
+{
+	int cnt = 0;
+#if 0
+	for (i = 0; i < ARRAY_SIZE(policy_str); i++)
+		if (i == aspm_policy)
+			cnt += sprintf(buffer + cnt, "[%s] ", policy_str[i]);
+		else
+			cnt += sprintf(buffer + cnt, "%s ", policy_str[i]);
+#endif		
+	return cnt;
+}
+
+
+// settimer:cbl|kpr:s1|s2:<timer_value>
+// s2enable:cbl|kpr:<enable>|<diable>
+module_param_call(pon, set_pon, get_pon,
+	NULL, 0644);
+
 
 static int
 qpnp_pon_request_irqs(struct qpnp_pon *pon, struct qpnp_pon_config *cfg)
@@ -1283,6 +1550,165 @@ free_input_dev:
 	return rc;
 }
 
+/* CORE-EL-power_on_cause-01+[ */
+void * get_pwron_cause_virt_addr(void);
+void * get_hw_wd_virt_addr(void);
+
+unsigned int fih_power_on_cause; /* CORE-EL-HWWD-00* */
+
+/* CORE-TH-Force_Trigger_Panic-00+[ */
+#ifdef CONFIG_FIH_FORCE_TRIGGER_PANIC
+static void detect_release_request(struct work_struct *work)
+{
+	unsigned int *pwron_cause_ptr; 	/*CORE-TH-manual_crash-00+*/
+	
+	/*CORE-TH-manual_crash-00+*/
+	pwron_cause_ptr = (unsigned int*) get_pwron_cause_virt_addr();
+	if (pwron_cause_ptr != NULL){
+		*pwron_cause_ptr |= MTD_PWR_ON_EVENT_FORCE_TRIGGER_PANIC;
+	}
+	/*CORE-TH-manual_crash-00-*/
+	pr_err("FORCE TRIGGER PANIC !!\n");
+	panic("force_trigger_panic");
+}
+#endif
+/* CORE-TH-Force_Trigger_Panic-00+] */
+
+// CORE-EL-dbg_power_on_reason-00+[
+#ifdef CONFIG_FIH_USER_DEBUG_FLAG
+extern int spmi_dfs_readdata(u32 cnt, u32 addr);
+#endif
+// CORE-EL-dbg_power_on_reason-00+]
+
+void show_startup_reason(void)
+{
+	unsigned long long*		pSmemPon = NULL;
+	unsigned int 				bsize;
+	pSmemPon = (unsigned long long* )smem_get_entry(SMEM_POWER_ON_STATUS_INFO, 
+		&bsize, 0, SMEM_ANY_HOST_FLAG);
+
+	if (pSmemPon)
+		printk(KERN_ERR "Qualcomm - power on cause = 0x%08llx\n", *pSmemPon);
+	else
+		printk(KERN_ERR "Qualcomm - power on cause = unknown\n");
+}
+
+/* CORE-EL-power_on_cause-02+[ */
+#define S1_BOOT_POWERON_SIG (0x19761105)
+static unsigned int s1_poweron_reason  = S1_BOOT_POWERON_SIG;
+static unsigned int s1_warmboot_reason;
+
+static int __init startup_reason_setup(char *param)
+{
+	sscanf(param, "%x", &s1_poweron_reason);
+	return 0;
+}
+early_param("startup", startup_reason_setup);
+
+static int __init warmboot_reason_setup(char *param)
+{
+	sscanf(param, "%x", &s1_warmboot_reason);
+	if (s1_warmboot_reason != 0)
+		is_warmboot = 1;
+	return 0;
+}
+early_param("warmboot", warmboot_reason_setup);
+/* CORE-EL-power_on_cause-02+] */
+/* CORE-EL-handle_SSR-00+ */
+extern unsigned int latest_modem_err; 
+
+void fih_parse_power_on_cause (void)
+{
+	unsigned int *pwron_cause_ptr;
+	unsigned int *hw_wd_ptr;
+
+/* CORE-EL-power_on_cause-02*[ */
+	/* if this is not S1 boot */
+	if (s1_poweron_reason == S1_BOOT_POWERON_SIG) {
+		is_warmboot = qpnp_pon_is_warm_reset();
+	
+		/* if < 0, something wrong, treat it as warm boot */
+		if (is_warmboot < 0)
+			printk(KERN_ERR "read warm reset error %d\n", is_warmboot);
+	}
+	/* CORE-EL-power_on_cause-02*] */
+
+	/* if this is S1 boot */
+	if (s1_poweron_reason != S1_BOOT_POWERON_SIG) {
+		printk(KERN_ERR "S1 boot - power on cause = 0x%08x \n", s1_poweron_reason);
+		printk(KERN_ERR "S1 boot - warmboot reason = 0x%08x \n", s1_warmboot_reason);
+	}
+	// CORE-EL-dbg_power_on_reason-00+[
+#ifdef CONFIG_FIH_USER_DEBUG_FLAG
+	spmi_dfs_readdata(0x100, 0x800);
+#endif
+	// CORE-EL-dbg_power_on_reason-00+]
+
+	pwron_cause_ptr = (unsigned int*) get_pwron_cause_virt_addr();
+	hw_wd_ptr = (unsigned int*) get_hw_wd_virt_addr();
+	if ( (pwron_cause_ptr != NULL) && (hw_wd_ptr != NULL) ) {
+		if (is_warmboot != 0) {
+
+			/* CORE-EL-handle_SSR-00+ */
+			latest_modem_err = *pwron_cause_ptr;
+			
+			if (*hw_wd_ptr == FIH_HW_WD_SIGNATURE)
+				*pwron_cause_ptr |= MTD_PWR_ON_EVENT_HW_WD_RESET;
+
+			/* CORE-EL-AddPocForRPM-00+[ */
+			if (*pwron_cause_ptr & MTD_PWR_ON_EVENT_RPM_WD_RESET)
+				printk(KERN_ERR "System was reset by RPM Watchdog Reset!\r\n");
+			/* CORE-EL-AddPocForRPM-00+] */
+
+			fih_power_on_cause |= *pwron_cause_ptr;
+			if ((*pwron_cause_ptr == MTD_PWR_ON_EVENT_CLEAN_DATA) ||
+				(*pwron_cause_ptr == MTD_PWR_ON_EVENT_SOFTWARE_RESET) || 
+				(*pwron_cause_ptr == MTD_PWR_ON_EVENT_PWR_OFF_CHG_REBOOT)) {
+				printk(KERN_ERR "System was GOOD! No news is good news.\r\n");
+			} else {
+				fih_power_on_cause |= MTD_PWR_ON_EVENT_ABNORMAL_RESET;
+				printk(KERN_ERR "System was NOT GOOD! Please check the power on cause.\r\n");
+			}
+		} else {
+			printk(KERN_ERR "Cold boot!\r\n");
+		}
+		/* Clean the signature */
+		*pwron_cause_ptr = MTD_PWR_ON_EVENT_CLEAN_DATA;
+		/* We will clean the signature when we reset device properly */
+		*hw_wd_ptr = FIH_HW_WD_SIGNATURE;
+	}
+}
+
+unsigned int fih_get_power_on_cause(void)
+{
+	return fih_power_on_cause;
+}
+EXPORT_SYMBOL(fih_get_power_on_cause);
+module_param_named(poweron_cause, fih_power_on_cause, int, S_IRUGO);
+/* CORE-EL-power_on_cause-01+] */
+
+//CORE-EL-AdbWriteRestartReason-00 +[
+u32 reason;
+void msm_write_restart_reason(u32 reason);
+static int write_restart_reason(const char *val, struct kernel_param *kp)
+{
+	int ret;
+
+	ret = param_set_uint(val, kp);
+	if (ret) {
+		pr_err("error setting value %d\n", ret);
+		return ret;
+	}
+
+	if (reason)
+		msm_write_restart_reason(reason);
+
+	return 0;
+}
+module_param_call(restart_reason, write_restart_reason, NULL,
+					&reason, 0644);
+//CORE-EL-AdbWriteRestartReason-00 +]
+
 static bool dload_on_uvlo;
 
 static int qpnp_pon_debugfs_uvlo_dload_get(char *buf,
@@ -1415,6 +1841,13 @@ static void qpnp_pon_debugfs_remove(struct spmi_device *spmi)
 {}
 #endif
 
+/* CORE-EL-power_off_charging_00+[ */
+static int enter_power_off_mode;
+int is_power_off_charging(void) {
+	return enter_power_off_mode;
+}
+/* CORE-EL-power_off_charging_00+] */
+
 static int qpnp_pon_probe(struct spmi_device *spmi)
 {
 	struct qpnp_pon *pon;
@@ -1426,6 +1859,11 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 	u16 poff_sts = 0;
 	const char *s3_src;
 	u8 s3_src_reg;
+/* CORE-TH-Force_Trigger_Panic-00+[ */
+#ifdef CONFIG_FIH_FORCE_TRIGGER_PANIC
+	INIT_DELAYED_WORK(&detect_release_work, detect_release_request);
+#endif
+/* CORE-TH-Force_Trigger_Panic-00+] */
 
 	pon = devm_kzalloc(&spmi->dev, sizeof(struct qpnp_pon),
 							GFP_KERNEL);
@@ -1485,6 +1923,11 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 
 	index = ffs(pon_sts) - 1;
 	cold_boot = !qpnp_pon_is_warm_reset();
+
+	/* CORE-EL-power_off_charging_00+ */
+	if ((index == 4) && cold_boot) 
+		enter_power_off_mode = 1;
+		
 	if (index >= ARRAY_SIZE(qpnp_pon_reason) || index < 0) {
 		dev_info(&pon->spmi->dev,
 			"PMIC@SID%d Power-on reason: Unknown and '%s' boot\n",
@@ -1622,6 +2065,11 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 	}
 
 	qpnp_pon_debugfs_init(spmi);
+	/* CORE-EL-power_on_cause-01+[ */
+	show_startup_reason();
+	fih_parse_power_on_cause ();
+	printk(KERN_EMERG "FIH kernel - power on cause = 0x%08x \r\n", fih_power_on_cause);
+	/* CORE-EL-power_on_cause-01+] */
 	return rc;
 }
 

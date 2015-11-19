@@ -290,6 +290,8 @@ config ARCH_RANDOM
 
 source "init/Kconfig"
 
+source "init/Kconfig_FXN_32"
+
 source "kernel/Kconfig.freezer"
 
 menu "System Type"
@@ -307,8 +309,9 @@ config MMU
 #
 choice
 	prompt "ARM system type"
-	default ARCH_VERSATILE if !MMU
-	default ARCH_MULTIPLATFORM if MMU
+        default ARCH_MSM
+	#default ARCH_VERSATILE if !MMU
+	#default ARCH_MULTIPLATFORM if MMU
 
 config ARCH_MULTIPLATFORM
 	bool "Allow multiple platforms to be selected"

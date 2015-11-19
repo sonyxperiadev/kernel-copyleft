@@ -172,7 +172,7 @@ struct msm_camera_i2c_read_config {
 	uint16_t slave_addr;
 	uint16_t reg_addr;
 	enum msm_camera_i2c_data_type data_type;
-	uint16_t *data;
+	uint16_t data;
 };
 
 struct msm_camera_csi2_params {
@@ -271,6 +271,8 @@ struct eeprom_get_cmm_t {
 struct msm_eeprom_cfg_data {
 	enum eeprom_cfg_type_t cfgtype;
 	uint8_t is_supported;
+    uint8_t main_cam_sensor_source;/* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+ */
+    uint8_t front_cam_sensor_source;/* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+ */
 	union {
 		char eeprom_name[MAX_SENSOR_NAME];
 		struct eeprom_get_t get_data;

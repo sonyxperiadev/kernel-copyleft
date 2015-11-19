@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2007-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -33,7 +34,14 @@ static LIST_HEAD(clk_list);
 static DEFINE_MUTEX(clk_list_lock);
 
 static struct dentry *debugfs_base;
+
+//CORE-PK-SuspendLog-00*[
+#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+static u32 debug_suspend = 0x1; //default show clock info when suspend
+#else
 static u32 debug_suspend;
+#endif
+//CORE-PK-SuspendLog-00*]
 
 static int clock_debug_rate_set(void *data, u64 val)
 {

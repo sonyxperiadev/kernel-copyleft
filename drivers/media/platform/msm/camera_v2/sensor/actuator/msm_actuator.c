@@ -37,6 +37,61 @@ static struct msm_actuator *actuators[] = {
 	&msm_hvcm_actuator_table,
 };
 
+/* MM-MC-ControlActuatorDacByAdb-00+{ */
+bool g_bypass_hal_ctrl = false;
+struct msm_actuator_ctrl_t *g_a_ctrl = NULL;
+
+static ssize_t set_af_dac(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    uint16_t i2c_byte1 = 0, i2c_byte2 = 0;
+    uint16_t value = 0;
+    int32_t rc = -EFAULT;
+    int dac_val = 0;
+        
+    g_bypass_hal_ctrl = true;
+	if (sscanf(buf, "%d\n", &dac_val) != 1)
+    {
+        g_bypass_hal_ctrl = false;
+        pr_err("set_af_dac: ERR: sscanf() failed !\n");
+		return -EINVAL;
+    }
+    
+    if (dac_val < 0 || dac_val > 1024)
+    {
+        g_bypass_hal_ctrl = false;
+        pr_err("set_af_dac: g_bypass_hal_ctrl = false !\n");
+    }
+    printk("set_af_dac: dac_val = %d = 0x%x\n", dac_val, dac_val);
+
+    value = dac_val<<4;
+    i2c_byte1 = (value & 0xFF00) >> 8;
+    i2c_byte2 = value & 0xFF;
+    //printk("set_af_dac: i2c_byte1:0x%x, i2c_byte2:0x%x\n", i2c_byte1, i2c_byte2);
+
+    rc = g_a_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+            &g_a_ctrl->i2c_client,
+            i2c_byte1,
+            i2c_byte2,
+            MSM_CAMERA_I2C_BYTE_DATA);
+    if (rc<0)
+    {
+        pr_err("set_af_dac: ERR: i2c_write() failed !\n");
+    }
+
+	return count;
+}
+static DEVICE_ATTR(dac, 0644, NULL, set_af_dac);
+
+static struct attribute *af_attr[] = {
+	&dev_attr_dac.attr,
+	NULL,
+};
+
+static struct attribute_group af_attr_group = {
+	.attrs = af_attr,
+};
+/* MM-MC-ControlActuatorDacByAdb-00+} */
+
 static int32_t msm_actuator_piezo_set_default_focus(
 	struct msm_actuator_ctrl_t *a_ctrl,
 	struct msm_actuator_move_params_t *move_params)
@@ -134,6 +189,7 @@ static int32_t msm_actuator_init_focus(struct msm_actuator_ctrl_t *a_ctrl,
 	int32_t i = 0;
 	enum msm_camera_i2c_reg_addr_type save_addr_type;
 	CDBG("Enter\n");
+    g_a_ctrl = a_ctrl;/* MM-MC-ControlActuatorDacByAdb-00+ */
 
 	save_addr_type = a_ctrl->i2c_client.addr_type;
 	for (i = 0; i < size; i++) {
@@ -351,6 +407,16 @@ static int32_t msm_actuator_move_focus(
 	reg_setting.reg_setting = a_ctrl->i2c_reg_tbl;
 	reg_setting.data_type = a_ctrl->i2c_data_type;
 	reg_setting.size = a_ctrl->i2c_tbl_index;
+    
+    /* MM-MC-ControlActuatorDacByAdb-00+{ */
+    if (g_bypass_hal_ctrl == true)
+    {
+        a_ctrl->i2c_tbl_index = 0;
+        CDBG("Exit, g_bypass_hal_ctrl = true\n");
+        return rc;
+    }
+    /* MM-MC-ControlActuatorDacByAdb-00+} */
+    
 	rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write_table_w_microdelay(
 		&a_ctrl->i2c_client, &reg_setting);
 	if (rc < 0) {
@@ -1153,6 +1219,7 @@ static int32_t msm_actuator_i2c_probe(struct i2c_client *client,
 	act_ctrl_t->msm_sd.sd.entity.group_id = MSM_CAMERA_SUBDEV_ACTUATOR;
 	act_ctrl_t->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x2;
 	msm_sd_register(&act_ctrl_t->msm_sd);
+	msm_actuator_v4l2_subdev_fops = v4l2_subdev_fops;
 
 #ifdef CONFIG_COMPAT
 	msm_actuator_v4l2_subdev_fops.compat_ioctl32 =
@@ -1261,6 +1328,16 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 #endif
 	msm_actuator_t->msm_sd.sd.devnode->fops =
 		&msm_actuator_v4l2_subdev_fops;
+    /* MM-MC-ControlActuatorDacByAdb-00+{ */
+    rc = sysfs_create_group(&pdev->dev.kobj, &af_attr_group);
+	if (rc)
+    {   
+	    pr_err("msm_actuator_platform_probe: ERR: sysfs_create_group() failed !\n");
+        return -EINVAL;
+    }
+    else
+        CDBG("msm_actuator_platform_probe: sysfs = /sys/bus/platform/drivers/qcom,actuator/0.qcom,actuator/dac .\n");
+    /* MM-MC-ControlActuatorDacByAdb-00+} */
 
 	CDBG("Exit\n");
 	return rc;

@@ -8,3 +8,12 @@ config STRICT_MEMORY_RWX
 	  2M boundaries (because their permissions are different and
 	  splitting the 2M pages into 4K ones causes TLB performance
 	  problems), wasting memory.
+
+config SONY_SSM
+       bool "Support Super Stamina Mode"
+       default n
+       help
+         This enables support for power mode notifications, required by Super
+         Stamina Mode. The driver will let a user space application register
+         for notifications when the device is ready to switch into a new
+         power mode.

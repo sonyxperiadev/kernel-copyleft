@@ -190,7 +190,13 @@ int pm_wake_lock(const char *buf)
 	int ret = 0;
 
 	if (!capable(CAP_BLOCK_SUSPEND))
+	//CORE-BH-WakeLockInfo-01*[	
+	{
+		if (*buf)
+			pr_err("[PM] %s, %s is no CAP_BLOCK_SUSPEND!\n", __FUNCTION__, buf);
 		return -EPERM;
+	}
+	//CORE-BH-WakeLockInfo-01*]
 
 	while (*str && !isspace(*str))
 		str++;

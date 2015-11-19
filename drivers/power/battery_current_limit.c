@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,6 +26,8 @@
 #include <linux/qpnp/qpnp-adc.h>
 #include <linux/cpu.h>
 #include <linux/msm_bcl.h>
+#include <linux/power_supply.h>
+#include <linux/cpumask.h>
 
 #define BCL_DEV_NAME "battery_current_limit"
 #define BCL_NAME_LENGTH 20
@@ -185,33 +187,50 @@ enum bcl_threshold_state {
 
 static struct bcl_context *gbcl;
 static enum bcl_threshold_state bcl_vph_state = BCL_THRESHOLD_DISABLED,
-		bcl_ibat_state = BCL_THRESHOLD_DISABLED;
+		bcl_ibat_state = BCL_THRESHOLD_DISABLED,
+		bcl_soc_state = BCL_THRESHOLD_DISABLED;
 static DEFINE_MUTEX(bcl_notify_mutex);
-static uint32_t bcl_hotplug_request, bcl_hotplug_mask;
+static uint32_t bcl_hotplug_request, bcl_hotplug_mask, bcl_soc_hotplug_mask;
+static uint32_t bcl_frequency_mask;
 static struct work_struct bcl_hotplug_work;
 static DEFINE_MUTEX(bcl_hotplug_mutex);
 static bool bcl_hotplug_enabled;
+static uint32_t battery_soc_val = 100;
+static uint32_t soc_low_threshold;
+static struct power_supply bcl_psy;
+static const char bcl_psy_name[] = "bcl";
+static cpumask_var_t bcl_cpu_online_mask;
+
+static void bcl_update_online_mask(void)
+{
+	get_online_cpus();
+	cpumask_copy(bcl_cpu_online_mask, cpu_online_mask);
+	put_online_cpus();
+	pr_debug("BCL online Mask tracked %u\n",
+				cpumask_weight(bcl_cpu_online_mask));
+}
 
 #ifdef CONFIG_SMP
 static void __ref bcl_handle_hotplug(struct work_struct *work)
 {
 	int ret = 0, _cpu = 0;
-	uint32_t prev_hotplug_request = 0;
 
 	mutex_lock(&bcl_hotplug_mutex);
-	prev_hotplug_request = bcl_hotplug_request;
+	if (cpumask_empty(bcl_cpu_online_mask))
+		bcl_update_online_mask();
 
-	if (bcl_vph_state == BCL_LOW_THRESHOLD
-		&& bcl_ibat_state == BCL_HIGH_THRESHOLD)
+	if  (bcl_soc_state == BCL_LOW_THRESHOLD
+		|| bcl_vph_state == BCL_LOW_THRESHOLD)
+		bcl_hotplug_request = bcl_soc_hotplug_mask;
+	else if (bcl_ibat_state == BCL_HIGH_THRESHOLD)
 		bcl_hotplug_request = bcl_hotplug_mask;
 	else
 		bcl_hotplug_request = 0;
 
-	if (bcl_hotplug_request == prev_hotplug_request)
-		goto handle_hotplug_exit;
-
 	for_each_possible_cpu(_cpu) {
-		if (!(bcl_hotplug_mask & BIT(_cpu)))
+		if ((!(bcl_hotplug_mask & BIT(_cpu))
+			&& !(bcl_soc_hotplug_mask & BIT(_cpu)))
+			|| !(cpumask_test_cpu(_cpu, bcl_cpu_online_mask)))
 			continue;
 
 		if (bcl_hotplug_request & BIT(_cpu)) {
@@ -235,7 +254,6 @@ static void __ref bcl_handle_hotplug(struct work_struct *work)
 		}
 	}
 
-handle_hotplug_exit:
 	mutex_unlock(&bcl_hotplug_mutex);
 	return;
 }
@@ -252,8 +270,10 @@ static int __ref bcl_cpu_ctrl_callback(struct notifier_block *nfb,
 	uint32_t cpu = (uintptr_t)hcpu;
 
 	if (action == CPU_UP_PREPARE || action == CPU_UP_PREPARE_FROZEN) {
-		if ((bcl_hotplug_mask & BIT(cpu))
-			&& (bcl_hotplug_request & BIT(cpu))) {
+		if (!cpumask_test_and_set_cpu(cpu, bcl_cpu_online_mask))
+			pr_debug("BCL online Mask: %u\n",
+				cpumask_weight(bcl_cpu_online_mask));
+		if (bcl_hotplug_request & BIT(cpu)) {
 			pr_info("preventing CPU%d from coming online\n", cpu);
 			return NOTIFY_BAD;
 		} else {
@@ -274,18 +294,22 @@ static int bcl_cpufreq_callback(struct notifier_block *nfb,
 	struct cpufreq_policy *policy = data;
 	uint32_t max_freq = UINT_MAX;
 
+	if (!(bcl_frequency_mask & BIT(policy->cpu)))
+		return NOTIFY_OK;
+
 	switch (event) {
 	case CPUFREQ_INCOMPATIBLE:
 		if (bcl_vph_state == BCL_LOW_THRESHOLD
-			&& bcl_ibat_state == BCL_HIGH_THRESHOLD) {
+			|| bcl_ibat_state == BCL_HIGH_THRESHOLD
+			|| bcl_soc_state == BCL_LOW_THRESHOLD) {
 			max_freq = (gbcl->bcl_monitor_type
 				== BCL_IBAT_MONITOR_TYPE) ? gbcl->btm_freq_max
 				: gbcl->bcl_p_freq_max;
-			pr_debug("Requesting Max freq:%d for CPU%d\n",
-				max_freq, policy->cpu);
-			cpufreq_verify_within_limits(policy, 0,
-				max_freq);
 		}
+		pr_debug("Requesting Max freq:%u for CPU%d\n",
+			max_freq, policy->cpu);
+		cpufreq_verify_within_limits(policy, 0,
+			max_freq);
 		break;
 	}
 
@@ -302,12 +326,46 @@ static void update_cpu_freq(void)
 
 	get_online_cpus();
 	for_each_online_cpu(cpu) {
-		ret = cpufreq_update_policy(cpu);
-		if (ret)
-			pr_err("Error updating policy for CPU%d. ret:%d\n",
+		if (bcl_frequency_mask & BIT(cpu)) {
+			ret = cpufreq_update_policy(cpu);
+			if (ret)
+				pr_err(
+				"Error updating policy for CPU%d. ret:%d\n",
 				cpu, ret);
+		}
 	}
 	put_online_cpus();
+}
+
+static void power_supply_callback(struct power_supply *psy)
+{
+	static struct power_supply *bms_psy;
+	union power_supply_propval ret = {0,};
+	int battery_percentage;
+	enum bcl_threshold_state prev_soc_state;
+
+	if (gbcl->bcl_mode != BCL_DEVICE_ENABLED) {
+		pr_debug("BCL is not enabled\n");
+		return;
+	}
+
+	if (!bms_psy)
+		bms_psy = power_supply_get_by_name("bms");
+	if (bms_psy) {
+		battery_percentage = bms_psy->get_property(bms_psy,
+				POWER_SUPPLY_PROP_CAPACITY, &ret);
+		battery_percentage = ret.intval;
+		battery_soc_val = battery_percentage;
+		pr_debug("Battery SOC reported:%d", battery_soc_val);
+		prev_soc_state = bcl_soc_state;
+		bcl_soc_state = (battery_soc_val <= soc_low_threshold) ?
+					BCL_LOW_THRESHOLD : BCL_HIGH_THRESHOLD;
+		if (bcl_soc_state == prev_soc_state)
+			return;
+		if (bcl_hotplug_enabled)
+			schedule_work(&bcl_hotplug_work);
+		update_cpu_freq();
+	}
 }
 
 static int bcl_get_battery_voltage(int *vbatt_mv)
@@ -621,6 +679,11 @@ static void bcl_periph_mode_set(enum bcl_device_mode mode)
 	int ret = 0;
 
 	if (mode == BCL_DEVICE_ENABLED) {
+		ret = power_supply_register(gbcl->dev, &bcl_psy);
+		if (ret < 0) {
+			pr_err("Unable to register bcl_psy rc = %d\n", ret);
+			return;
+		}
 		ret = msm_bcl_set_threshold(BCL_PARAM_CURRENT, BCL_HIGH_TRIP,
 			&gbcl->ibat_high_thresh);
 		if (ret) {
@@ -656,14 +719,17 @@ static void bcl_periph_mode_set(enum bcl_device_mode mode)
 		}
 		gbcl->btm_mode = BCL_VPH_MONITOR_MODE;
 	} else {
+		power_supply_unregister(&bcl_psy);
 		ret = msm_bcl_disable();
 		if (ret) {
 			pr_err("Error disabling BCL\n");
 			return;
 		}
 		gbcl->btm_mode = BCL_MONITOR_DISABLED;
+		bcl_soc_state = BCL_THRESHOLD_DISABLED;
 		bcl_vph_notify(BCL_HIGH_THRESHOLD);
 		bcl_ibat_notify(BCL_LOW_THRESHOLD);
+		bcl_hotplug_request = 0;
 	}
 }
 
@@ -826,6 +892,7 @@ show_bcl(freq_limit, gbcl->thermal_freq_limit, "%u\n")
 show_bcl(vph_state, bcl_vph_state, "%d\n")
 show_bcl(ibat_state, bcl_ibat_state, "%d\n")
 show_bcl(hotplug_mask, bcl_hotplug_mask, "%d\n")
+show_bcl(hotplug_soc_mask, bcl_soc_hotplug_mask, "%d\n")
 show_bcl(hotplug_status, bcl_hotplug_request, "%d\n")
 
 static ssize_t
@@ -846,12 +913,17 @@ mode_store(struct device *dev, struct device_attribute *attr,
 	if (!gbcl)
 		return -EPERM;
 
-	if (!strcmp(buf, "enable"))
+	if (!strcmp(buf, "enable")) {
 		bcl_mode_set(BCL_DEVICE_ENABLED);
-	else if (!strcmp(buf, "disable"))
+		bcl_update_online_mask();
+		pr_info("bcl enabled\n");
+	} else if (!strcmp(buf, "disable")) {
 		bcl_mode_set(BCL_DEVICE_DISABLED);
-	else
+		cpumask_clear(bcl_cpu_online_mask);
+		pr_info("bcl disabled\n");
+	} else {
 		return -EINVAL;
+	}
 
 	return count;
 }
@@ -1143,18 +1215,41 @@ static ssize_t hotplug_mask_store(struct device *dev,
 {
 	int ret = 0, val = 0;
 
-	if (!bcl_hotplug_enabled)
-		return -ENODEV;
-
 	ret = convert_to_int(buf, &val);
 	if (ret)
 		return ret;
 
 	bcl_hotplug_mask = val;
+	pr_info("bcl hotplug mask updated to %d\n", bcl_hotplug_mask);
+
+	if (!bcl_hotplug_mask && !bcl_soc_hotplug_mask)
+		bcl_hotplug_enabled = false;
+	else
+		bcl_hotplug_enabled = true;
 
 	return count;
 }
 
+static ssize_t hotplug_soc_mask_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	int ret = 0, val = 0;
+
+	ret = convert_to_int(buf, &val);
+	if (ret)
+		return ret;
+
+	bcl_soc_hotplug_mask = val;
+	pr_info("bcl soc hotplug mask updated to %d\n", bcl_soc_hotplug_mask);
+
+	if (!bcl_hotplug_mask && !bcl_soc_hotplug_mask)
+		bcl_hotplug_enabled = false;
+	else
+		bcl_hotplug_enabled = true;
+
+	return count;
+}
 /*
  * BCL device attributes
  */
@@ -1195,6 +1290,8 @@ static struct device_attribute btm_dev_attr[] = {
 	__ATTR(thermal_freq_limit, 0444, freq_limit_show, NULL),
 	__ATTR(hotplug_status, 0444, hotplug_status_show, NULL),
 	__ATTR(hotplug_mask, 0644, hotplug_mask_show, hotplug_mask_store),
+	__ATTR(hotplug_soc_mask, 0644, hotplug_soc_mask_show,
+		hotplug_soc_mask_store),
 };
 
 static int create_bcl_sysfs(struct bcl_context *bcl)
@@ -1424,6 +1521,8 @@ static int probe_bcl_periph_prop(struct bcl_context *bcl)
 		bcl->vbat_high_thresh.trip_value, ibat_probe_exit);
 	BCL_FETCH_DT_U32(ibat_node, key, "qcom,vph-low-threshold-uv", ret,
 		bcl->vbat_low_thresh.trip_value, ibat_probe_exit);
+	BCL_FETCH_DT_U32(ibat_node, key, "qcom,soc-low-threshold", ret,
+		soc_low_threshold, ibat_probe_exit);
 	bcl->vbat_high_thresh.trip_notify
 		= bcl->vbat_low_thresh.trip_notify = bcl_periph_vbat_notify;
 	bcl->vbat_high_thresh.trip_data
@@ -1554,12 +1653,47 @@ btm_probe_exit:
 	return ret;
 }
 
+static int bcl_battery_get_property(struct power_supply *psy,
+				enum power_supply_property prop,
+				union power_supply_propval *val)
+{
+	return 0;
+}
+static int bcl_battery_set_property(struct power_supply *psy,
+				enum power_supply_property prop,
+				const union power_supply_propval *val)
+{
+	return 0;
+}
+
+static uint32_t get_mask_from_core_handle(struct platform_device *pdev,
+						const char *key)
+{
+	struct device_node *core_phandle = NULL;
+	int i = 0, cpu = 0;
+	uint32_t mask = 0;
+
+	core_phandle = of_parse_phandle(pdev->dev.of_node,
+			key, i++);
+	while (core_phandle) {
+		for_each_possible_cpu(cpu) {
+			if (of_get_cpu_node(cpu, NULL) == core_phandle) {
+				mask |= BIT(cpu);
+				break;
+			}
+		}
+		core_phandle = of_parse_phandle(pdev->dev.of_node,
+			key, i++);
+	}
+
+	return mask;
+}
+
 static int bcl_probe(struct platform_device *pdev)
 {
 	struct bcl_context *bcl = NULL;
-	int ret = 0, i = 0, cpu = 0;
+	int ret = 0;
 	enum bcl_device_mode bcl_mode = BCL_DEVICE_DISABLED;
-	struct device_node *core_phandle = NULL;
 
 	bcl = devm_kzalloc(&pdev->dev, sizeof(struct bcl_context), GFP_KERNEL);
 	if (!bcl) {
@@ -1592,19 +1726,17 @@ static int bcl_probe(struct platform_device *pdev)
 	else
 		bcl->bcl_no_bms = false;
 
-	core_phandle = of_parse_phandle(pdev->dev.of_node,
-			"qcom,bcl-hotplug-list", i++);
-	while (core_phandle) {
-		bcl_hotplug_enabled = true;
-		for_each_possible_cpu(cpu) {
-			if (of_get_cpu_node(cpu, NULL) == core_phandle)
-				bcl_hotplug_mask |= BIT(cpu);
-		}
-		core_phandle = of_parse_phandle(pdev->dev.of_node,
-			"qcom,bcl-hotplug-list", i++);
-	}
-	if (!bcl_hotplug_mask)
+	bcl_frequency_mask = get_mask_from_core_handle(pdev,
+					 "qcom,bcl-freq-control-list");
+	bcl_hotplug_mask = get_mask_from_core_handle(pdev,
+					 "qcom,bcl-hotplug-list");
+	bcl_soc_hotplug_mask = get_mask_from_core_handle(pdev,
+					 "qcom,bcl-soc-hotplug-list");
+
+	if (!bcl_hotplug_mask && !bcl_soc_hotplug_mask)
 		bcl_hotplug_enabled = false;
+	else
+		bcl_hotplug_enabled = true;
 
 	if (of_property_read_bool(pdev->dev.of_node,
 		"qcom,bcl-framework-interface"))
@@ -1620,6 +1752,13 @@ static int bcl_probe(struct platform_device *pdev)
 		pr_err("Cannot create bcl sysfs\n");
 		return ret;
 	}
+	cpumask_clear(bcl_cpu_online_mask);
+	bcl_psy.name = bcl_psy_name;
+	bcl_psy.type = POWER_SUPPLY_TYPE_BMS;
+	bcl_psy.get_property     = bcl_battery_get_property;
+	bcl_psy.set_property     = bcl_battery_set_property;
+	bcl_psy.num_properties = 0;
+	bcl_psy.external_power_changed = power_supply_callback;
 
 	gbcl = bcl;
 	platform_set_drvdata(pdev, bcl);

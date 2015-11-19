@@ -1,0 +1,500 @@
+menuconfig FIH_CONFIG_GROUP
+    bool "FIH Configurations Group"
+    default y
+    help
+        Turn on this group to enable FIH's configurations menu
+ 
+if FIH_CONFIG_GROUP
+    comment "FIH Project Flags for FIH_CONFIG_GROUP"
+
+    choice
+        prompt "Select a project name"
+        default FIH_PROJECT_TULIP_SS
+
+        config FIH_PROJECT_TULIP_SS
+            bool "01. FIH_PROJECT_TULIP_SS"
+            help
+                Enable the support for FIH_PROJECT_TULIP_SS flag
+
+        config FIH_PROJECT_TULIP_DS
+            bool "01. FIH_PROJECT_TULIP_DS"
+            help
+                Enable the support for FIH_PROJECT_TULIP_DS flag
+
+        config FIH_PROJECT_TULIP_C2K
+            bool "01. FIH_PROJECT_TULIP_C2K"
+            help
+                Enable the support for FIH_PROJECT_TULIP_C2K flag
+    endchoice
+
+    # --- FIH_PROJECT_TULIP_SS{-------------------------------------------------- START
+    # ***********************************************************    
+    # Project configurations for FIH_PROJECT_TULIP_SS
+    # ***********************************************************
+    menu "Configurations for FIH_PROJECT_TULIP_SS"
+        depends on FIH_PROJECT_TULIP_SS
+        config FIH_FTM
+            bool "FIH_FTM"
+            default n
+            help
+                Enable/Disable the build flag FIH_FTM.
+
+        config FIH_MACH_TULIP_SS
+            bool "FIH_MACH_TULIP_SS"
+            depends on FIH_PROJECT_TULIP_SS
+            default y
+            help
+                Enable/Disable the build flag FIH_MACH_TULIP_SS.
+
+	config PN544_I2C_NFC
+		tristate "PN544 NFC driver"
+		depends on I2C
+		select CRC_CCITT
+		default n
+		---help---
+	 	Say yes if you want PN544(PN547) Near Field Communication driver.
+		This is for i2c connected version. If unsure, say N here.
+		To compile this driver as a module, choose m here. The module will
+		be called pn544(PN547).
+
+    # MM-UW-SMART AMP-00+[  
+        config SND_SOC_TFA9887
+        	tristate "SND_SOC_TFA9887"
+          default y
+          help
+                TFA9887 Smart amp Driver implemented by NXP.
+    # MM-UW-SMART AMP-00+]  
+
+	#CORE-EL-PMSWakelockInfo-00+[
+	config FIH_DUMP_WAKELOCK
+		bool "FIH DUMP WAKELOCK"
+		depends on FIH_CONFIG_GROUP
+		default n
+		help
+			Enable to dump wakelock if it active.  
+    
+    # PERI-BJ-SENSOR-00+[
+        config SENSORS_BMA2X2
+            tristate "BMA255/BMA250E/BMA222E/BMA280 acceleration sensor support"
+            depends on I2C=y
+            default y
+            help
+                If you say yes here you get support for Bosch Sensortec's
+                acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
+
+        config SENSORS_BMA2X2_ENABLE_INT1
+            tristate "BMA2X2 acceleration sensor interrupt INT1 support"
+            depends on SENSORS_BMA2X2
+            default y
+            help
+                If you say yes here, you get INT1 support for Bosch Sensortec
+                acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
+                Select it will disable interrupt INT2 support
+
+        config SENSORS_BMM050
+            tristate "BMM050 Magnetic Sensor Driver"
+            depends on I2C
+            default y
+            help
+                BMM050 Magnetic Sensor Driver implemented by Bosch-Sensortec.
+
+        config SENSORS_BMG
+            tristate "Bosch Gyroscope Sensor Driver"
+            depends on I2C
+            default y
+            help
+                If you say yes here, you get support for Bosch Sensortec's
+                gyroscope sensor drivers of BMG160/BMI055/BMI058 e.t.c.
+
+        config SENSORS_BMG_FIFO
+            tristate "Bosch Gyroscope FIFO Support"
+            depends on SENSORS_BMG
+            default y
+            help
+                If you say yes here, you get support for Gyroscope sensor FIFO operations.
+    # PERI-BJ-SENSOR-00+]
+			
+    #CORE-KH-DbgCfgToolPorting-01-a[
+	config ANDROID_RAM_CONSOLE
+	    bool "Android RAM buffer console"
+	    default y
+
+        # FIH-SW3-KERNEL-TH-add_last_alog-00+[
+        config FEATURE_FIH_SW3_LAST_ALOG
+            bool "RAM console for last alog"
+            depends on FIH_CONFIG_GROUP
+            default y
+            help
+                Enable RAM console for last alog
+        # FIH-SW3-KERNEL-TH-add_last_alog-00+]
+    #CORE-KH-DbgCfgToolPorting-01-a]
+        # FIH-KERNEL-HC-dynamically_disable_UART-00+[
+        config FIH_REMOVE_SERIAL_DYNAMICALLY
+            bool "turn off serial port dynamically"
+            default n
+            help
+                turn off serial port dynamically
+        # FIH-KERNEL-HC-dynamically_disable_UART-00+]
+
+    # FIH-KERNEL-HC-Force_Trigger_Panic-00+[
+        config FIH_FORCE_TRIGGER_PANIC
+            bool "Force trigger panic"
+            default n
+            help
+                Say Y here if you want to trigger panic 
+                by pressing power key more than 15s.
+    # FIH-KERNEL-HC-Force_Trigger_Panic-00+]
+    #CORE-KH-DbgCfgToolPorting_forL-00-a[
+        config FIH_USER_DEBUG_FLAG
+            bool "User debug build"
+            default n
+            help
+                Say Y here in user debug build 
+    #CORE-KH-DbgCfgToolPorting_forL-00-a]
+
+	# CORE-PK-RPMStatsLog-00+[
+        config FIH_FEATURE_RPM_STATS_LOG
+            bool "FIH RPM STATS LOG"
+            default n
+            help
+             Enable to show RPM Stats log after device resume from suspend.
+
+        config FIH_FEATURE_RPM_MASTER_STATS_LOG
+            bool "FIH RPM MASTER STATS LOG"
+            depends on FIH_FEATURE_RPM_STATS_LOG
+            default n
+            help
+             Enable to show RPM Master Stats log after device resume from suspend.
+   
+    # CORE-EL-sleep-func-00+[
+        config FIH_HR_MSLEEP
+            bool "High Resolution Sleep"
+            default y
+            help
+                Enable High Resolution Sleep
+    # CORE-EL-sleep-func-00+]
+
+        config FIH_SUSPEND_RESUME_LOG
+            bool "FIH LOG about SUSPEND/RESUME"
+            default n
+            help
+                Enable suspend and resume log support
+	# CORE-PK-RPMStatsLog-00+]
+
+    endmenu
+    # --- FIH_PROJECT_TULIP_SS}-------------------------------------------------- END
+	
+    # --- FIH_PROJECT_TULIP_DS{-------------------------------------------------- START
+    # ***********************************************************    
+    # Project configurations for FIH_PROJECT_TULIP_DS
+    # ***********************************************************
+    menu "Configurations for FIH_PROJECT_TULIP_DS"
+        depends on FIH_PROJECT_TULIP_DS
+        config FIH_FTM
+            bool "FIH_FTM"
+            default n
+            help
+                Enable/Disable the build flag FIH_FTM.
+
+        config FIH_MACH_TULIP_DS
+            bool "FIH_MACH_TULIP_DS"
+            depends on FIH_PROJECT_TULIP_DS
+            default y
+            help
+                Enable/Disable the build flag FIH_MACH_TULIP_DS.
+
+	config PN544_I2C_NFC
+		tristate "PN544 NFC driver"
+		depends on I2C
+		select CRC_CCITT
+		default n
+		---help---
+	 	Say yes if you want PN544(PN547) Near Field Communication driver.
+		This is for i2c connected version. If unsure, say N here.
+		To compile this driver as a module, choose m here. The module will
+		be called pn544(PN547).
+
+    # MM-UW-SMART AMP-00+[  
+        config SND_SOC_TFA9887
+        	tristate "SND_SOC_TFA9887"
+          default y
+          help
+                TFA9887 Smart amp Driver implemented by NXP.
+    # MM-UW-SMART AMP-00+]  
+	
+    # PERI-BJ-SENSOR-00+[
+        config SENSORS_BMA2X2
+            tristate "BMA255/BMA250E/BMA222E/BMA280 acceleration sensor support"
+            depends on I2C=y
+            default y
+            help
+                If you say yes here you get support for Bosch Sensortec's
+                acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
+
+        config SENSORS_BMA2X2_ENABLE_INT1
+            tristate "BMA2X2 acceleration sensor interrupt INT1 support"
+            depends on SENSORS_BMA2X2
+            default y
+            help
+                If you say yes here, you get INT1 support for Bosch Sensortec
+                acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
+                Select it will disable interrupt INT2 support
+
+        config SENSORS_BMM050
+            tristate "BMM050 Magnetic Sensor Driver"
+            depends on I2C
+            default y
+            help
+                BMM050 Magnetic Sensor Driver implemented by Bosch-Sensortec.
+
+        config SENSORS_BMG
+            tristate "Bosch Gyroscope Sensor Driver"
+            depends on I2C
+            default y
+            help
+                If you say yes here, you get support for Bosch Sensortec's
+                gyroscope sensor drivers of BMG160/BMI055/BMI058 e.t.c.
+
+        config SENSORS_BMG_FIFO
+            tristate "Bosch Gyroscope FIFO Support"
+            depends on SENSORS_BMG
+            default y
+            help
+                If you say yes here, you get support for Gyroscope sensor FIFO operations.
+    # PERI-BJ-SENSOR-00+]
+
+    # CORE-EL-sleep-func-00+[
+        config FIH_HR_MSLEEP
+            bool "High Resolution Sleep"
+            default y
+            help
+                Enable High Resolution Sleep
+    # CORE-EL-sleep-func-00+]
+
+        config FIH_SUSPEND_RESUME_LOG
+            bool "FIH LOG about SUSPEND/RESUME"
+            default n
+            help
+                Enable suspend and resume log support
+
+	#CORE-EL-PMSWakelockInfo-00+[
+	config FIH_DUMP_WAKELOCK
+		bool "FIH DUMP WAKELOCK"
+		depends on FIH_CONFIG_GROUP
+		default n
+		help
+			Enable to dump wakelock if it active.  
+		
+    #CORE-KH-DbgCfgToolPorting-01-a[
+	config ANDROID_RAM_CONSOLE
+	    bool "Android RAM buffer console"
+	    default y
+
+        # FIH-SW3-KERNEL-TH-add_last_alog-00+[
+        config FEATURE_FIH_SW3_LAST_ALOG
+            bool "RAM console for last alog"
+            depends on FIH_CONFIG_GROUP
+            default y
+            help
+                Enable RAM console for last alog
+        # FIH-SW3-KERNEL-TH-add_last_alog-00+]
+    #CORE-KH-DbgCfgToolPorting-01-a]
+        # FIH-KERNEL-HC-dynamically_disable_UART-00+[
+        config FIH_REMOVE_SERIAL_DYNAMICALLY
+            bool "turn off serial port dynamically"
+            default n
+            help
+                turn off serial port dynamically
+        # FIH-KERNEL-HC-dynamically_disable_UART-00+]
+
+    # FIH-KERNEL-HC-Force_Trigger_Panic-00+[
+        config FIH_FORCE_TRIGGER_PANIC
+            bool "Force trigger panic"
+            default n
+            help
+                Say Y here if you want to trigger panic 
+                by pressing power key more than 15s.
+    # FIH-KERNEL-HC-Force_Trigger_Panic-00+]
+    #CORE-KH-DbgCfgToolPorting_forL-00-a[
+        config FIH_USER_DEBUG_FLAG
+            bool "User debug build"
+            default n
+            help
+                Say Y here in user debug build 
+    #CORE-KH-DbgCfgToolPorting_forL-00-a]
+
+	# CORE-PK-RPMStatsLog-00+[
+        config FIH_FEATURE_RPM_STATS_LOG
+            bool "FIH RPM STATS LOG"
+            default n
+            help
+             Enable to show RPM Stats log after device resume from suspend.
+
+        config FIH_FEATURE_RPM_MASTER_STATS_LOG
+            bool "FIH RPM MASTER STATS LOG"
+            depends on FIH_FEATURE_RPM_STATS_LOG
+            default n
+            help
+             Enable to show RPM Master Stats log after device resume from suspend.
+	# CORE-PK-RPMStatsLog-00+]
+	
+    endmenu
+    # --- FIH_PROJECT_TULIP_DS}-------------------------------------------------- END
+	
+    # --- FIH_PROJECT_TULIP_C2K{-------------------------------------------------- START
+    # ***********************************************************    
+    # Project configurations for FIH_PROJECT_TULIP_C2K
+    # ***********************************************************
+    menu "Configurations for FIH_PROJECT_TULIP_C2K"
+        depends on FIH_PROJECT_TULIP_C2K
+        config FIH_FTM
+            bool "FIH_FTM"
+            default n
+            help
+                Enable/Disable the build flag FIH_FTM.
+
+        config FIH_MACH_TULIP_C2K
+            bool "FIH_MACH_TULIP_C2K"
+            depends on FIH_PROJECT_TULIP_C2K
+            default y
+            help
+                Enable/Disable the build flag FIH_MACH_TULIP_C2K.
+
+	config PN544_I2C_NFC
+		tristate "PN544 NFC driver"
+		depends on I2C
+		select CRC_CCITT
+		default n
+		---help---
+	 	Say yes if you want PN544(PN547) Near Field Communication driver.
+		This is for i2c connected version. If unsure, say N here.
+		To compile this driver as a module, choose m here. The module will
+		be called pn544(PN547).
+
+    # PERI-BJ-SENSOR-00+[
+        config SENSORS_BMA2X2
+            tristate "BMA255/BMA250E/BMA222E/BMA280 acceleration sensor support"
+            depends on I2C=y
+            default y
+            help
+                If you say yes here you get support for Bosch Sensortec's
+                acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
+
+        config SENSORS_BMA2X2_ENABLE_INT1
+            tristate "BMA2X2 acceleration sensor interrupt INT1 support"
+            depends on SENSORS_BMA2X2
+            default y
+            help
+                If you say yes here, you get INT1 support for Bosch Sensortec
+                acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
+                Select it will disable interrupt INT2 support
+
+        config SENSORS_BMM050
+            tristate "BMM050 Magnetic Sensor Driver"
+            depends on I2C
+            default y
+            help
+                BMM050 Magnetic Sensor Driver implemented by Bosch-Sensortec.
+
+        config SENSORS_BMG
+            tristate "Bosch Gyroscope Sensor Driver"
+            depends on I2C
+            default y
+            help
+                If you say yes here, you get support for Bosch Sensortec's
+                gyroscope sensor drivers of BMG160/BMI055/BMI058 e.t.c.
+
+        config SENSORS_BMG_FIFO
+            tristate "Bosch Gyroscope FIFO Support"
+            depends on SENSORS_BMG
+            default y
+            help
+                If you say yes here, you get support for Gyroscope sensor FIFO operations.
+    # PERI-BJ-SENSOR-00+]
+
+    # CORE-EL-sleep-func-00+[
+        config FIH_HR_MSLEEP
+            bool "High Resolution Sleep"
+            default y
+            help
+                Enable High Resolution Sleep
+    # CORE-EL-sleep-func-00+]
+
+        config FIH_SUSPEND_RESUME_LOG
+            bool "FIH LOG about SUSPEND/RESUME"
+            default n
+            help
+                Enable suspend and resume log support
+     
+    # MM-UW-SMART AMP-00+[  
+        config SND_SOC_TFA9887
+        	tristate "SND_SOC_TFA9887"
+          default y
+          help
+                TFA9887 Smart amp Driver implemented by NXP.
+    # MM-UW-SMART AMP-00+]  
+	#CORE-EL-PMSWakelockInfo-00+[
+	config FIH_DUMP_WAKELOCK
+		bool "FIH DUMP WAKELOCK"
+		depends on FIH_CONFIG_GROUP
+		default n
+		help
+			Enable to dump wakelock if it active.  
+		
+    #CORE-KH-DbgCfgToolPorting-01-a[
+	config ANDROID_RAM_CONSOLE
+	    bool "Android RAM buffer console"
+	    default y
+
+        # FIH-SW3-KERNEL-TH-add_last_alog-00+[
+        config FEATURE_FIH_SW3_LAST_ALOG
+            bool "RAM console for last alog"
+            depends on FIH_CONFIG_GROUP
+            default y
+            help
+                Enable RAM console for last alog
+        # FIH-SW3-KERNEL-TH-add_last_alog-00+]
+    #CORE-KH-DbgCfgToolPorting-01-a]
+        # FIH-KERNEL-HC-dynamically_disable_UART-00+[
+        config FIH_REMOVE_SERIAL_DYNAMICALLY
+            bool "turn off serial port dynamically"
+            default n
+            help
+                turn off serial port dynamically
+        # FIH-KERNEL-HC-dynamically_disable_UART-00+]
+
+    # FIH-KERNEL-HC-Force_Trigger_Panic-00+[
+        config FIH_FORCE_TRIGGER_PANIC
+            bool "Force trigger panic"
+            default n
+            help
+                Say Y here if you want to trigger panic 
+                by pressing power key more than 15s.
+    # FIH-KERNEL-HC-Force_Trigger_Panic-00+]
+    #CORE-KH-DbgCfgToolPorting_forL-00-a[
+        config FIH_USER_DEBUG_FLAG
+            bool "User debug build"
+            default n
+            help
+                Say Y here in user debug build 
+    #CORE-KH-DbgCfgToolPorting_forL-00-a]
+
+	# CORE-PK-RPMStatsLog-00+[
+        config FIH_FEATURE_RPM_STATS_LOG
+            bool "FIH RPM STATS LOG"
+            default n
+            help
+             Enable to show RPM Stats log after device resume from suspend.
+
+        config FIH_FEATURE_RPM_MASTER_STATS_LOG
+            bool "FIH RPM MASTER STATS LOG"
+            depends on FIH_FEATURE_RPM_STATS_LOG
+            default n
+            help
+             Enable to show RPM Master Stats log after device resume from suspend.
+	# CORE-PK-RPMStatsLog-00+]
+
+    endmenu
+    # --- FIH_PROJECT_TULIP_C2K}-------------------------------------------------- END
+endif
+

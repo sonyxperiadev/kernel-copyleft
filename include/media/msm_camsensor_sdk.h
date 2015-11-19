@@ -5,7 +5,7 @@
 
 #define KVERSION 0x1
 
-#define MAX_POWER_CONFIG      12
+#define MAX_POWER_CONFIG      15
 #define GPIO_OUT_LOW          (0 << 1)
 #define GPIO_OUT_HIGH         (1 << 1)
 #define CSI_EMBED_DATA        0x12
@@ -95,6 +95,8 @@ enum msm_sensor_power_seq_gpio_t {
 	SENSOR_GPIO_FL_RESET,
 	SENSOR_GPIO_CUSTOM1,
 	SENSOR_GPIO_CUSTOM2,
+	SENSOR_GPIO_F_RESET,/* MM-MC-BringUpImx214CameraSensor-00+ */
+	SENSOR_GPIO_F_PWDN,/* MM-MC-BringUpImx214CameraSensor-00+ */
 	SENSOR_GPIO_MAX,
 };
 

@@ -17,6 +17,7 @@
 #include <linux/err.h>
 #include <linux/rbtree.h>
 #include <linux/sched.h>
+#include <linux/delay.h> //CORE-DL-AddRetry-00
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/regmap.h>
@@ -1417,10 +1418,14 @@ static int _regmap_bus_read(void *context, unsigned int reg,
 	return ret;
 }
 
+//CORE-DL-AddRetry-00 +[
+#define REG_NCP6335D_PROGVSEL0      0x11
+#define NCP6335D_ENABLE             BIT(7)
+//CORE-DL-AddRetry-00 +]
 static int _regmap_read(struct regmap *map, unsigned int reg,
 			unsigned int *val)
 {
-	int ret;
+	int ret, num = 0; //CORE-DL-AddRetry-00
 	void *context = _regmap_map_get_context(map);
 
 	WARN_ON(!map->reg_read);
@@ -1435,6 +1440,24 @@ static int _regmap_read(struct regmap *map, unsigned int reg,
 		return -EBUSY;
 
 	ret = map->reg_read(context, reg, val);
+	//CORE-DL-AddRetry-00 +[
+	if (reg == REG_NCP6335D_PROGVSEL0 && !(*val & NCP6335D_ENABLE)) {
+		do {
+			if (!num)
+				pr_err("ncp6335d: BAD VALUE! reg=%x val=%x ret=%d\n",
+					reg, *val, ret);
+			ret = map->reg_read(context, reg, val);
+			pr_info("ncp6335d: RETRY[%d] reg_read reg=%x val=%x ret=%d\n",
+				num, reg, *val, ret);
+			msleep(10);
+			num++;
+		} while (!(*val & NCP6335D_ENABLE) && num < 500);
+                if (!(*val & NCP6335D_ENABLE)) {
+                        panic("NCP6335D_ENABLE is gone");
+                        return ret;
+                }
+	}
+	//CORE-DL-AddRetry-00 +]
 	if (ret == 0) {
 #ifdef LOG_DEVICE
 		if (strcmp(dev_name(map->dev), LOG_DEVICE) == 0)

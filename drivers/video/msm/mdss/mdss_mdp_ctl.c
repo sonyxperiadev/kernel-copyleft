@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -687,6 +687,10 @@ static void mdss_mdp_perf_calc_mixer(struct mdss_mdp_mixer *mixer,
 		if (!pinfo)	/* perf for bus writeback */
 			perf->bw_overlap =
 				fps * mixer->width * mixer->height * 3;
+		/* for command mode, run as fast as the link allows us */
+		else if ((pinfo->type == MIPI_CMD_PANEL) &&
+			 (pinfo->mipi.dsi_pclk_rate > perf->mdp_clk_rate))
+			perf->mdp_clk_rate = pinfo->mipi.dsi_pclk_rate;
 	}
 
 	/*
@@ -847,28 +851,6 @@ static u32 mdss_mdp_get_vbp_factor_max(struct mdss_mdp_ctl *ctl)
 	return vbp_max;
 }
 
-static bool mdss_mdp_video_mode_intf_connected(struct mdss_mdp_ctl *ctl)
-{
-	int i;
-	struct mdss_data_type *mdata;
-
-	if (!ctl || !ctl->mdata)
-		return 0;
-
-	mdata = ctl->mdata;
-	for (i = 0; i < mdata->nctl; i++) {
-		struct mdss_mdp_ctl *ctl = mdata->ctl_off + i;
-
-		if (ctl->is_video_mode && mdss_mdp_ctl_is_power_on(ctl)) {
-			pr_debug("video interface connected ctl:%d\n",
-				ctl->num);
-			return true;
-		}
-	}
-
-	return false;
-}
-
 static void __mdss_mdp_perf_calc_ctl_helper(struct mdss_mdp_ctl *ctl,
 		struct mdss_mdp_perf_params *perf,
 		struct mdss_mdp_pipe **left_plist, int left_cnt,
@@ -1022,12 +1004,15 @@ static void mdss_mdp_perf_calc_ctl(struct mdss_mdp_ctl *ctl,
 	__mdss_mdp_perf_calc_ctl_helper(ctl, perf,
 		left_plist, left_cnt, right_plist, right_cnt, 0);
 
-	if (ctl->is_video_mode || mdss_mdp_video_mode_intf_connected(ctl)) {
+	if (ctl->is_video_mode) {
 		perf->bw_ctl =
 			max(apply_fudge_factor(perf->bw_overlap,
 				&mdss_res->ib_factor_overlap),
 			apply_fudge_factor(perf->bw_prefill,
 				&mdss_res->ib_factor));
+	} else if (ctl->intf_num != MDSS_MDP_NO_INTF) {
+		perf->bw_ctl = apply_fudge_factor(perf->bw_ctl,
+				&mdss_res->ib_factor_cmd);
 	}
 	pr_debug("ctl=%d clk_rate=%u\n", ctl->num, perf->mdp_clk_rate);
 	pr_debug("bw_overlap=%llu bw_prefill=%llu prefill_bytes=%d\n",
@@ -1458,6 +1443,7 @@ static struct mdss_mdp_ctl *mdss_mdp_ctl_alloc(struct mdss_data_type *mdata,
 			ctl->ref_cnt++;
 			ctl->mdata = mdata;
 			mutex_init(&ctl->lock);
+			mutex_init(&ctl->offlock);
 			spin_lock_init(&ctl->spin_lock);
 			BLOCKING_INIT_NOTIFIER_HEAD(&ctl->notifier_head);
 			pr_debug("alloc ctl_num=%d\n", ctl->num);

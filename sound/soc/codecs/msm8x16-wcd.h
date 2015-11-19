@@ -61,6 +61,9 @@ enum codec_versions {
 	UNSUPPORTED,
 };
 
+extern int vdd_spkr_gpio; /*MM-UW-AddNewDevices-00+{ */
+extern int vdd_rcv_gpio;  /*MM-UW-AddNewDevices-01+{ */
+
 enum msm8x16_wcd_pid_current {
 	MSM8X16_WCD_PID_MIC_2P5_UA,
 	MSM8X16_WCD_PID_MIC_5_UA,
@@ -235,6 +238,7 @@ struct msm8x16_wcd_priv {
 	/* cal info for codec */
 	struct fw_info *fw_data;
 	struct blocking_notifier_head notifier;
+	unsigned long status_mask;
 
 };
 

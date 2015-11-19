@@ -17,6 +17,7 @@
 #include <linux/io.h>
 #include <linux/mmc/host.h>
 #include <linux/pm_qos.h>
+#include <linux/ratelimit.h>
 
 struct sdhci_next {
 	unsigned int sg_count;
@@ -25,7 +26,21 @@ struct sdhci_next {
 
 enum sdhci_power_policy {
 	SDHCI_PERFORMANCE_MODE,
+	SDHCI_PERFORMANCE_MODE_INIT,
 	SDHCI_POWER_SAVE_MODE,
+};
+
+struct sdhci_host_qos {
+	unsigned int *cpu_dma_latency_us;
+	unsigned int cpu_dma_latency_tbl_sz;
+	struct pm_qos_request pm_qos_req_dma;
+};
+
+enum sdhci_host_qos_policy {
+	SDHCI_QOS_READ_WRITE,
+	SDHCI_QOS_READ,
+	SDHCI_QOS_WRITE,
+	SDHCI_QOS_MAX_POLICY,
 };
 
 struct sdhci_host {
@@ -262,10 +277,13 @@ struct sdhci_host {
 #define SDHCI_TUNING_MODE_1	0
 	struct timer_list	tuning_timer;	/* Timer for tuning */
 
-	unsigned int cpu_dma_latency_us;
-	struct pm_qos_request pm_qos_req_dma;
-	unsigned int pm_qos_timeout_us;         /* timeout for PM QoS request */
-	struct device_attribute pm_qos_tout;
+	struct sdhci_host_qos host_qos[SDHCI_QOS_MAX_POLICY];
+	enum sdhci_host_qos_policy last_qos_policy;
+
+	bool host_use_default_qos;
+	unsigned int pm_qos_dbg_tracer;         /* dbg tracer for PM QoS request */
+	struct device_attribute pm_qos_dbg;
+	struct delayed_work pm_qos_work;
 
 	struct sdhci_next next_data;
 	ktime_t data_start_time;
@@ -276,6 +294,7 @@ struct sdhci_host {
 	bool async_int_supp;  /* async support to rxv int, when clks are off */
 	bool disable_sdio_irq_deferred; /* status of disabling sdio irq */
 	u32 auto_cmd_err_sts;
+	struct ratelimit_state dbg_dump_rs;
 	unsigned long private[0] ____cacheline_aligned;
 };
 #endif /* LINUX_MMC_SDHCI_H */

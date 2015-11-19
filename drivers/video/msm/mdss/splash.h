@@ -12,11 +12,18 @@
  */
 #ifndef __SPLASH_H_
 #define __SPLASH_H_
-
+/* MM-GL-DISPLAY-panel-00-[
 #define SPLASH_IMAGE_WIDTH	113
 #define SPLASH_IMAGE_HEIGHT	124
 #define SPLASH_IMAGE_FORMAT	MDP_BGR_888
 #define SPLASH_IMAGE_BPP	3
+MM-GL-DISPLAY-panel-00-] */
+/* MM-GL-DISPLAY-panel-00+[ */
+#define SPLASH_IMAGE_WIDTH	720
+#define SPLASH_IMAGE_HEIGHT	1280
+#define SPLASH_IMAGE_FORMAT	MDP_RGBA_8888
+#define SPLASH_IMAGE_BPP	4
+/* MM-GL-DISPLAY-panel-00+] */
 
 char splash_bgr888_image[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -36,6 +36,11 @@
 #include "pil-q6v5.h"
 #include "pil-msa.h"
 
+/* CORE-EL-power_on_cause-01*[ */
+#include <linux/fih_sw_info.h> 
+extern void write_pwron_cause (int pwron_cause); 
+/* CORE-EL-power_on_cause-01*] */
+
 #define MAX_VDD_MSS_UV		1150000
 #define PROXY_TIMEOUT_MS	10000
 #define MAX_SSR_REASON_LEN	81U
@@ -50,6 +55,13 @@ static void log_modem_sfr(void)
 
 	smem_reason = smem_get_entry_no_rlock(SMEM_SSR_REASON_MSS0, &size, 0,
 							SMEM_ANY_HOST_FLAG);
+	/* CORE-EL-AddInitStringForMtbf-01+[ */
+	if (!smem_reason || !size)
+		log_ss_failure_reason("modem", 0, "unknown, smem_get_entry_no_rlock failed");
+	else if (!smem_reason[0]) 
+		log_ss_failure_reason("modem", 0, "unknown, empty string found");
+	/* CORE-EL-AddInitStringForMtbf-01+] */
+	
 	if (!smem_reason || !size) {
 		pr_err("modem subsystem failure reason: (unknown, smem_get_entry_no_rlock failed).\n");
 		return;
@@ -60,6 +72,9 @@ static void log_modem_sfr(void)
 	}
 
 	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
+	/* CORE-EL-AddInitStringForMtbf-01* */
+	log_ss_failure_reason("modem", min(size, MAX_SSR_REASON_LEN), smem_reason);
+	
 	pr_err("modem subsystem failure reason: %s.\n", reason);
 
 	smem_reason[0] = '\0';
@@ -80,6 +95,11 @@ static irqreturn_t modem_err_fatal_intr_handler(int irq, void *dev_id)
 	/* Ignore if we're the one that set the force stop GPIO */
 	if (drv->crash_shutdown)
 		return IRQ_HANDLED;
+
+/* CORE-EL-power_on_cause-00+[ */
+	pr_err("Modem Fatal Error. Let's note!\n");
+	write_pwron_cause(MODEM_FATAL_ERR);
+/* CORE-EL-power_on_cause-00+] */
 
 	pr_err("Fatal error on the modem.\n");
 	subsys_set_crash_status(drv->subsys, true);
@@ -186,6 +206,12 @@ static irqreturn_t modem_wdog_bite_intr_handler(int irq, void *dev_id)
 	struct modem_data *drv = subsys_to_drv(dev_id);
 	if (drv->ignore_errors)
 		return IRQ_HANDLED;
+
+	/* CORE-EL-power_on_cause-01*[ */	
+	pr_err("Modem WDOG timeout. Let's note! %d\n", irq);
+	write_pwron_cause(MODEM_SW_WDOG_EXPIRED);
+	/* CORE-EL-power_on_cause-01*] */	
+	
 	pr_err("Watchdog bite received from modem software!\n");
 	subsys_set_crash_status(drv->subsys, true);
 	restart_modem(drv);

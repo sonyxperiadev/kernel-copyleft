@@ -1428,6 +1428,24 @@ unsigned int cpufreq_quick_get(unsigned int cpu)
 }
 EXPORT_SYMBOL(cpufreq_quick_get);
 
+/* CORE-EL-CPU_Freq-00+[ */
+void cpufreq_quick_get_infos(unsigned int cpu, unsigned int *min, unsigned int *max, unsigned int *cur)
+{
+	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+
+	if (policy) {
+		if (min)
+			*min = policy->min;
+		if (max)
+			*max = policy->max;
+		if (cur)
+			*cur = policy->cur;
+		cpufreq_cpu_put(policy);
+	}
+}
+EXPORT_SYMBOL(cpufreq_quick_get_infos);
+/* CORE-EL-CPU_Freq-00+] */
+
 /**
  * cpufreq_quick_get_max - get the max reported CPU frequency for this CPU
  * @cpu: CPU number

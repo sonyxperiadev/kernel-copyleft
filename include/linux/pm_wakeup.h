@@ -79,6 +79,20 @@ static inline bool device_may_wakeup(struct device *dev)
 	return dev->power.can_wakeup && !!dev->power.wakeup;
 }
 
+//CORE-BH-PMSWakelockInfo-00*[
+#ifdef CONFIG_FIH_DUMP_WAKELOCK
+struct pms_wake_lock {
+	struct list_head	link;
+	char				*pid;
+	char				*tag;
+	ktime_t				acquire_time; //CORE-BH-PMSWakelockInfo-02+
+};
+
+ void add_pms_wakelock_info(char *pid, char * tag);
+ void remove_pms_wakelock_info(char *pid, char * tag); //CORE-BH-PMSWakelockInfo-02*
+ #endif
+//CORE-BH-PMSWakelockInfo-00*]
+
 /* drivers/base/power/wakeup.c */
 extern void wakeup_source_prepare(struct wakeup_source *ws, const char *name);
 extern struct wakeup_source *wakeup_source_create(const char *name);

@@ -1346,8 +1346,7 @@ static void usb_debugfs_init(struct gs_port *ui_dev, int port_num)
 
 	debugfs_create_file("readstatus", 0444, gs_dent, ui_dev,
 			&debug_adb_ops);
-	debugfs_create_file("reset", S_IRUGO | S_IWUSR,
-			gs_dent, ui_dev, &debug_rst_ops);
+	debugfs_create_file("reset", 0640, gs_dent, ui_dev, &debug_rst_ops);/*CONN-EH-USBPORTING-00**/
 }
 
 static void usb_debugfs_remove(void)
