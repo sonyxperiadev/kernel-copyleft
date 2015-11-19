@@ -60,13 +60,6 @@ struct mux_clk {
 	void		*priv;
 
 	struct clk	c;
-
-	uint32_t mode_val;
-	uint32_t l_val;
-	uint32_t user_ctl_val;
-	uint32_t config_ctl_val;
-	uint32_t pll_status_val;
-	u32	reg_val;
 };
 
 static inline struct mux_clk *to_mux_clk(struct clk *c)

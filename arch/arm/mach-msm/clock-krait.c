@@ -29,17 +29,12 @@
 
 static DEFINE_SPINLOCK(kpss_clock_reg_lock);
 
-static uint32_t pll_bases[4] = {0xF908A000, 0xF909A000, 0xF90AA000, 0xF90BA000};
-
 #define LPL_SHIFT	8
 static void __kpss_mux_set_sel(struct mux_clk *mux, int sel)
 {
 	unsigned long flags;
 	u32 regval;
-	void __iomem *pll_base;
-	int cpu = smp_processor_id();
 
-	pll_base = ioremap(pll_bases[cpu], 0x30);
 	spin_lock_irqsave(&kpss_clock_reg_lock, flags);
 	regval = get_l2_indirect_reg(mux->offset);
 	regval &= ~(mux->mask << mux->shift);
@@ -48,19 +43,12 @@ static void __kpss_mux_set_sel(struct mux_clk *mux, int sel)
 		regval &= ~(mux->mask << (mux->shift + LPL_SHIFT));
 		regval |= (sel & mux->mask) << (mux->shift + LPL_SHIFT);
 	}
-	mux->mode_val = readl_relaxed(pll_base + 0x0);
-	mux->l_val = readl_relaxed(pll_base + 0x4);
-	mux->user_ctl_val = readl_relaxed(pll_base + 0x10);
-	mux->config_ctl_val = readl_relaxed(pll_base + 0x14);
-	mux->pll_status_val = readl_relaxed(pll_base + 0x1C);
-	mux->reg_val = regval;
 	set_l2_indirect_reg(mux->offset, regval);
 	spin_unlock_irqrestore(&kpss_clock_reg_lock, flags);
 
 	/* Wait for switch to complete. */
 	mb();
 	udelay(1);
-	iounmap(pll_base);
 }
 static int kpss_mux_set_sel(struct mux_clk *mux, int sel)
 {
