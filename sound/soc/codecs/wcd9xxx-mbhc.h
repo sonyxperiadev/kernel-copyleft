@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -80,6 +81,7 @@ enum wcd9xxx_mbhc_plug_type {
 	PLUG_TYPE_HIGH_HPH,
 	PLUG_TYPE_GND_MIC_SWAP,
 	PLUG_TYPE_ANC_HEADPHONE,
+	PLUG_TYPE_STEREO_MICROPHONE,
 };
 
 enum wcd9xxx_mbhc_micbias_type {
@@ -364,8 +366,8 @@ struct wcd9xxx_mbhc {
 	u32 rco_clk_rate;
 
 	bool update_z;
-
 	u8   scaling_mux_in;
+
 	/* Holds codec specific interrupt mapping */
 	const struct wcd9xxx_mbhc_intr *intr_ids;
 
@@ -375,6 +377,9 @@ struct wcd9xxx_mbhc {
 #endif
 
 	struct mutex mbhc_lock;
+	struct mutex impedl_lock;
+	struct mutex impedr_lock;
+	struct mutex mclk_lock;
 };
 
 #define WCD9XXX_MBHC_CAL_SIZE(buttons, rload) ( \

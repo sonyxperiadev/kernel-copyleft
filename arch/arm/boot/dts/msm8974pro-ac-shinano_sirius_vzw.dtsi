@@ -1,0 +1,89 @@
+/* arch/arm/boot/dts/msm8974pro-ac-shinano_leo.dtsi
+ *
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
+ *
+ * Author: Kouhei Fujiya <Kouhei.X.Fujiya@sonymobile.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ *
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are licensed under the License.
+ */
+
+
+&soc {
+	/* I2C : BLSP6 */
+	i2c@f9928000 {
+		nfc@28 {
+			compatible = "nxp,pn547";
+			reg = <0x28>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <24 0x1>;
+			nxp,pvdd_en = <&pm8941_gpios 34 0x01>;
+			nxp,irq_gpio = <&msmgpio 24 0x00>;
+			nxp,dwld_en = <&msmgpio 57 0x00>;
+			nxp,ven = <&pm8941_mpps 2 0x01>;
+			dynamic_config;
+			configure_gpio = <&pm8941_gpios 33 0x00>;
+			configure_mpp = <&pm8941_mpps 2 0x00>;
+		};
+	};
+
+	/* I2C : BLSP8 */
+	i2c@f9964000 {
+		maxim_max1187x_tsc@48 {
+			report_pen_as_finger = <1>;
+		};
+	};
+};
+
+&pm8941_chg {
+	qcom,maxinput-dc-ma = <700>;
+	qcom,enable-wireless-charge;
+	qcom,enable-report-charger-state;
+};
+
+&pm8941_gpios {
+	/* GPIO_36: ACC_COVER_OPEN */
+	gpio@e300 {
+		qcom,src-sel = <0>;		/* GPIO */
+		qcom,mode = <0>;		/* In */
+		qcom,vin-sel = <2>;		/* S3 */
+		qcom,pull = <0>;		/* PU */
+		qcom,master-en = <1>;		/* Enable */
+		status = "ok";
+	};
+};
+
+&spmi_bus {
+	qcom,pm8941@1 {
+		qcom,leds@d800 {
+			qcom,wled_0 {
+				qcom,full-scale-seg@0 {
+					threshold = <1023>;
+					curr = <5>;
+					coef = <4>;
+				};
+				qcom,full-scale-seg@1 {
+					threshold = <2047>;
+					curr = <10>;
+					coef = <2>;
+				};
+			};
+		};
+	};
+};
+
+&pm8941_lsid0 {
+	qcom,power-on@800 {
+		qcom,s3-debounce = <32>;
+	};
+};

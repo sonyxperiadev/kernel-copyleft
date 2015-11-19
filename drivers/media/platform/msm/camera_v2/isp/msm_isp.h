@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -494,6 +495,9 @@ struct vfe_device {
 	uint8_t ignore_error;
 	struct msm_isp_statistics *stats;
 	uint32_t vfe_ub_size;
+#if defined(CONFIG_SONY_CAM_V4L2)
+	int timeout;
+#endif
 };
 
 #endif

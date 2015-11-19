@@ -1,4 +1,5 @@
 /* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,6 +20,7 @@
 #include <linux/msm_mdp.h>
 #include <linux/types.h>
 #include <linux/notifier.h>
+#include <linux/workqueue.h>
 
 #include "mdss_panel.h"
 #include "mdss_mdp_splash_logo.h"
@@ -195,8 +197,7 @@ struct msm_fb_data_type {
 	u32 bl_min_lvl;
 	u32 unset_bl_level;
 	u32 bl_updated;
-	u32 bl_level_scaled;
-	u32 bl_level_prev_scaled;
+	u32 bl_level_old;
 	struct mutex bl_lock;
 
 	struct platform_device *pdev;
@@ -234,6 +235,12 @@ struct msm_fb_data_type {
 	u32 wait_for_kickoff;
 	struct ion_client *fb_ion_client;
 	struct ion_handle *fb_ion_handle;
+	/* speed up wakeup */
+	/* do unblank (>150ms) on own kworker
+	 * so we don't starve other works
+	 */
+	struct workqueue_struct *unblank_kworker;
+	struct work_struct unblank_work;
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)

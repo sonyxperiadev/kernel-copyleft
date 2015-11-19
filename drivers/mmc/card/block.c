@@ -3,6 +3,7 @@
  *
  * Copyright 2002 Hewlett-Packard Company
  * Copyright 2005-2008 Pierre Ossman
+ * Copyright (C) 2013 Sony Mobile Communications Inc.
  *
  * Use consistent with the GNU GPL is permitted,
  * provided that this copyright notice is
@@ -1402,10 +1403,13 @@ static int mmc_blk_issue_sanitize_rq(struct mmc_queue *mq,
 					EXT_CSD_SANITIZE_START, 1,
 					MMC_SANITIZE_REQ_TIMEOUT);
 
-	if (err)
+	if (err) {
 		pr_err("%s: %s - mmc_switch() with "
 		       "EXT_CSD_SANITIZE_START failed. err=%d\n",
 		       mmc_hostname(card->host), __func__, err);
+		if (err == -ETIMEDOUT)
+			mmc_interrupt_hpi(card);
+	}
 
 	pr_debug("%s: %s - SANITIZE COMPLETED\n", mmc_hostname(card->host),
 					     __func__);
@@ -1472,6 +1476,13 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
 	 R1_CC_ERROR |		/* Card controller error */		\
 	 R1_ERROR)		/* General/unknown error */
 
+#define EXE_ERRORS \
+	(R1_OUT_OF_RANGE |   /* Command argument out of range */ \
+	 R1_ADDRESS_ERROR |   /* Misaligned address */ \
+	 R1_WP_VIOLATION |    /* Tried to write to protected block */ \
+	 R1_CARD_ECC_FAILED | /* ECC error */ \
+	 R1_ERROR)            /* General/unknown error */
+
 static int mmc_blk_err_check(struct mmc_card *card,
 			     struct mmc_async_req *areq)
 {
@@ -1516,13 +1527,26 @@ static int mmc_blk_err_check(struct mmc_card *card,
 		return MMC_BLK_ABORT;
 	}
 
+	/* Check execution mode errors. If stop cmd was sent, these
+	 * errors would be reported in response to it. In this case
+	 * the execution is retried using single-block read. */
+	if (brq->stop.resp[0] & EXE_ERRORS) {
+		pr_err("%s: error during r/w command, stop response %#x\n",
+		       req->rq_disk->disk_name, brq->stop.resp[0]);
+		return MMC_BLK_RETRY_SINGLE;
+	}
+
 	/*
 	 * Everything else is either success, or a data error of some
 	 * kind.  If it was a write, we may have transitioned to
 	 * program mode, which we have to wait for it to complete.
+	 * If pre defined block count (CMD23) was used, no stop
+	 * cmd was sent and we need to read status to check
+	 * for errors during cmd execution.
 	 */
-	if (!mmc_host_is_spi(card->host) && rq_data_dir(req) != READ) {
-		u32 status;
+	if (!mmc_host_is_spi(card->host) &&
+	    (rq_data_dir(req) != READ || brq->sbc.opcode == MMC_SET_BLOCK_COUNT)) {
+		u32 status, first_status = 0;
 		unsigned long timeout;
 
 		timeout = jiffies + msecs_to_jiffies(MMC_BLK_TIMEOUT_MS);
@@ -1533,6 +1557,8 @@ static int mmc_blk_err_check(struct mmc_card *card,
 				       req->rq_disk->disk_name, err);
 				return MMC_BLK_CMD_ERR;
 			}
+			if (!first_status)
+				first_status = status;
 
 			/* Timeout if the device never becomes ready for data
 			 * and never leaves the program state.
@@ -1551,6 +1577,14 @@ static int mmc_blk_err_check(struct mmc_card *card,
 			 */
 		} while (!(status & R1_READY_FOR_DATA) ||
 			 (R1_CURRENT_STATE(status) == R1_STATE_PRG));
+
+		/* Check for errors during cmd execution. In this case
+		 * the execution was terminated. */
+		if (first_status & EXE_ERRORS) {
+			pr_err("%s: error during r/w command, err status %#x, status %#x\n",
+			       req->rq_disk->disk_name, first_status, status);
+			return MMC_BLK_ABORT;
+		}
 	}
 
 	if (brq->data.error) {
@@ -2561,6 +2595,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 				goto cmd_abort;
 			/* Fall through */
 		}
+		case MMC_BLK_RETRY_SINGLE:
 		case MMC_BLK_ECC_ERR:
 			if (brq->data.blocks > 1) {
 				/* Redo read one sector at a time */
@@ -2656,16 +2691,16 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 
 	if (req && !mq->mqrq_prev->req) {
 		mmc_rpm_hold(host, &card->dev);
-#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
-	if (mmc_bus_needs_resume(card->host)) {
-		mmc_resume_bus(card->host);
-	}
-#endif
 		/* claim host only for the first request */
 		mmc_claim_host(card->host);
 		if (card->ext_csd.bkops_en)
 			mmc_stop_bkops(card);
 	}
+
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	if (mmc_bus_needs_resume(card->host))
+		mmc_resume_bus(card->host);
+#endif
 
 	ret = mmc_blk_part_switch(card, md);
 	if (ret) {
@@ -2823,9 +2858,12 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 	blk_queue_logical_block_size(md->queue.queue, 512);
 	set_capacity(md->disk, size);
 
-	card->bkops_info.size_percentage_to_queue_delayed_work = percentage;
-	card->bkops_info.min_sectors_to_queue_delayed_work =
-		((unsigned int)size * percentage) / 100;
+	if (area_type & MMC_BLK_DATA_AREA_MAIN) {
+		card->bkops_info.size_percentage_to_queue_delayed_work =
+			percentage;
+		card->bkops_info.min_sectors_to_queue_delayed_work =
+			((unsigned int)size * percentage) / 100;
+	}
 
 	if (mmc_host_cmd23(card->host)) {
 		if (mmc_card_mmc(card) ||
@@ -3154,7 +3192,8 @@ static int mmc_blk_probe(struct mmc_card *card)
 	mmc_fixup_device(card, blk_fixups);
 
 #ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
-	mmc_set_bus_resume_policy(card->host, 1);
+	if (mmc_card_sd(card))
+		mmc_set_bus_resume_policy(card->host, 1);
 #endif
 	if (mmc_add_disk(md))
 		goto out;
@@ -3204,13 +3243,22 @@ static void mmc_blk_shutdown(struct mmc_card *card)
 		}
 	}
 
+#ifdef CONFIG_MMC_CACHE_FEATURE
+	mmc_claim_host(card->host);
+	/* send cache off control */
+	rc = mmc_cache_ctrl(card->host, 0);
+	mmc_release_host(card->host);
+	if (rc)
+		goto cache_off_error;
+#endif
+
 	/* send power off notification */
 	if (mmc_card_mmc(card)) {
 		mmc_rpm_hold(card->host, &card->dev);
 		mmc_claim_host(card->host);
 		mmc_stop_bkops(card);
 		mmc_release_host(card->host);
-		mmc_send_long_pon(card);
+		mmc_send_pon(card);
 		mmc_rpm_release(card->host, &card->dev);
 	}
 	return;
@@ -3218,6 +3266,13 @@ static void mmc_blk_shutdown(struct mmc_card *card)
 suspend_error:
 	pr_err("%s: mmc_queue_suspend returned error = %d",
 			mmc_hostname(card->host), rc);
+#ifdef CONFIG_MMC_CACHE_FEATURE
+	return;
+
+cache_off_error:
+	pr_err("%s: mmc_cache_ctrl returned error = %d",
+			mmc_hostname(card->host), rc);
+#endif
 }
 
 #ifdef CONFIG_PM

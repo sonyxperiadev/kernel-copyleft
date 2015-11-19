@@ -1,0 +1,47 @@
+#
+# Felica and Sony NFC device
+#
+
+config FELICA_SNFC
+	bool "Enable FeliCa and Sony NFC driver"
+	default n
+	help
+	  This option enables support for FeliCa and Sony NFC.
+	  This driver is used for the combination device of FeliCa
+	  and Sony NFC, and device of FeliCa.
+	  Say Y if you want to able to these devices.
+
+config FELICA_VDEV
+	bool "Enable FeliCa virtual serial device"
+	depends on FELICA_SNFC
+	default n
+	help
+	  This option enables support for FeliCa virtual serial device.
+	  Collision control of FeliCa and SNFC service use this serial
+	  device.
+	  Say Y if you want to use collision control of FeliCa and SNFC.
+
+config CXD2235AGG
+	bool "Sony CXD2235AGG driver for FeliCa and Sony NFC"
+	depends on FELICA_SNFC
+	default n
+	help
+	  This option enables support for Sony CXD2235AGG.
+
+config CXD224X_NFC
+	bool "CXD224X driver for FeliCa and NFC"
+	depends on I2C
+	default n
+	help
+	  This option enables device driver support for Sony CXD224X
+	  series. This driver enables the control of CXD224X series
+	  device by using I2C. Furthermore, this driver enables the
+	  control of PON using device file.
+
+config BD7602_POWER_IC
+	bool "BD7602 Power IC control"
+	depends on I2C
+	default n
+	help
+	  This option enables device driver support for BD7602 Power IC
+          control device.

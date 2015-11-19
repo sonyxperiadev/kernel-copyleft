@@ -1,4 +1,5 @@
 /* Copyright (c) 2002,2007-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2742,49 +2743,6 @@ static int adreno_getproperty(struct kgsl_device *device,
 	return status;
 }
 
-static int adreno_set_constraint(struct kgsl_device *device,
-				struct kgsl_context *context,
-				struct kgsl_device_constraint *constraint)
-{
-	int status = 0;
-
-	switch (constraint->type) {
-	case KGSL_CONSTRAINT_PWRLEVEL: {
-		struct kgsl_device_constraint_pwrlevel pwr;
-
-		if (constraint->size != sizeof(pwr)) {
-			status = -EINVAL;
-			break;
-		}
-
-		if (copy_from_user(&pwr,
-				(void __user *)constraint->data,
-				sizeof(pwr))) {
-			status = -EFAULT;
-			break;
-		}
-		if (pwr.level >= KGSL_CONSTRAINT_PWR_MAXLEVELS) {
-			status = -EINVAL;
-			break;
-		}
-
-		context->pwr_constraint.type =
-				KGSL_CONSTRAINT_PWRLEVEL;
-		context->pwr_constraint.sub_type = pwr.level;
-		}
-		break;
-	case KGSL_CONSTRAINT_NONE:
-		context->pwr_constraint.type = KGSL_CONSTRAINT_NONE;
-		break;
-
-	default:
-		status = -EINVAL;
-		break;
-	}
-
-	return status;
-}
-
 static int adreno_setproperty(struct kgsl_device_private *dev_priv,
 				enum kgsl_property_type type,
 				void *value,
@@ -2833,28 +2791,7 @@ static int adreno_setproperty(struct kgsl_device_private *dev_priv,
 		}
 		break;
 	case KGSL_PROP_PWR_CONSTRAINT: {
-			struct kgsl_device_constraint constraint;
-			struct kgsl_context *context;
-
-			if (sizebytes != sizeof(constraint))
-				break;
-
-			if (copy_from_user(&constraint, value,
-				sizeof(constraint))) {
-				status = -EFAULT;
-				break;
-			}
-
-			context = kgsl_context_get_owner(dev_priv,
-							constraint.context_id);
-
-			if (context == NULL)
-				break;
-
-			status = adreno_set_constraint(device, context,
-								&constraint);
-
-			kgsl_context_put(context);
+			status = 0;
 		}
 		break;
 	default:

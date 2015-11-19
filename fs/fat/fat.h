@@ -88,6 +88,8 @@ struct msdos_sb_info {
 
 	spinlock_t inode_hash_lock;
 	struct hlist_head inode_hashtable[FAT_HASH_SIZE];
+
+	unsigned int dirty;           /* fs state before mount */
 };
 
 #define FAT_CACHE_VALID	0	/* special case for valid cache */

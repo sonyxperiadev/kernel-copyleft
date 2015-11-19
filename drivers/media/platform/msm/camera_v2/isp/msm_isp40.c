@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -368,8 +369,6 @@ static void msm_vfe40_process_reset_irq(struct vfe_device *vfe_dev,
 static void msm_vfe40_process_halt_irq(struct vfe_device *vfe_dev,
 	uint32_t irq_status0, uint32_t irq_status1)
 {
-	if (irq_status1 & (1 << 8))
-		complete(&vfe_dev->halt_complete);
 }
 
 static void msm_vfe40_process_camif_irq(struct vfe_device *vfe_dev,
@@ -621,7 +620,11 @@ static void msm_vfe40_reg_update(struct vfe_device *vfe_dev)
 static uint32_t msm_vfe40_reset_values[ISP_RST_MAX] =
 {
 	0x1FF, /* ISP_RST_HARD reset everything */
+#if defined(CONFIG_SONY_CAM_V4L2)
+	0x1FF /* ISP_RST_SOFT all modules without registers */
+#else
 	0x1EF /* ISP_RST_SOFT all modules without registers */
+#endif
 };
 
 
@@ -1194,9 +1197,10 @@ static long msm_vfe40_axi_halt(struct vfe_device *vfe_dev,
 	uint32_t blocking)
 {
 	long rc = 0;
+	uint32_t axi_busy_flag = true;
 	/* Keep only restart mask and halt mask*/
 	msm_camera_io_w(BIT(31), vfe_dev->vfe_base + 0x28);
-	msm_camera_io_w(BIT(8), vfe_dev->vfe_base + 0x2C);
+	msm_camera_io_w(BIT(8),  vfe_dev->vfe_base + 0x2C);
 	/* Clear IRQ Status*/
 	msm_camera_io_w(0x7FFFFFFF, vfe_dev->vfe_base + 0x30);
 	msm_camera_io_w(0xFEFFFEFF, vfe_dev->vfe_base + 0x34);
@@ -1206,12 +1210,13 @@ static long msm_vfe40_axi_halt(struct vfe_device *vfe_dev,
 		/* Halt AXI Bus Bridge */
 		msm_camera_io_w_mb(0x1, vfe_dev->vfe_base + 0x2C0);
 		atomic_set(&vfe_dev->error_info.overflow_state, NO_OVERFLOW);
-		rc = wait_for_completion_interruptible_timeout(
-			&vfe_dev->halt_complete, msecs_to_jiffies(500));
-	} else {
-		/* Halt AXI Bus Bridge */
-		msm_camera_io_w_mb(0x1, vfe_dev->vfe_base + 0x2C0);
+		while (axi_busy_flag) {
+			if (msm_camera_io_r(
+				vfe_dev->vfe_base + 0x2E4) & 0x1)
+				axi_busy_flag = false;
+		}
 	}
+	msm_camera_io_w_mb(0x0, vfe_dev->vfe_base + 0x2C0);
 	return rc;
 }
 

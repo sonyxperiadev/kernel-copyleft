@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -145,6 +145,27 @@ static int fault_detect_read_compare(struct kgsl_device *device)
 	return ret;
 }
 
+static int _check_context_queue(struct adreno_context *drawctxt)
+{
+	int ret;
+
+	spin_lock(&drawctxt->lock);
+
+	/*
+	 * Wake up if there is room in the context or if the whole thing got
+	 * invalidated while we were asleep
+	 */
+
+	if (drawctxt->state == ADRENO_CONTEXT_STATE_INVALID)
+		ret = 1;
+	else
+		ret = drawctxt->queued < _context_cmdqueue_size ? 1 : 0;
+
+	spin_unlock(&drawctxt->lock);
+
+	return ret;
+}
+
 /**
  * adreno_dispatcher_get_cmdbatch() - Get a new command from a context queue
  * @drawctxt: Pointer to the adreno draw context
@@ -166,8 +187,9 @@ static inline struct kgsl_cmdbatch *adreno_dispatcher_get_cmdbatch(
 		 * events
 		 */
 
-		spin_lock(&cmdbatch->lock);
+		spin_lock_bh(&cmdbatch->lock);
 		pending = list_empty(&cmdbatch->synclist) ? 0 : 1;
+		spin_unlock_bh(&cmdbatch->lock);
 
 		/*
 		 * If changes are pending and the canary timer hasn't been
@@ -180,13 +202,11 @@ static inline struct kgsl_cmdbatch *adreno_dispatcher_get_cmdbatch(
 			 */
 			if (!timer_pending(&cmdbatch->timer))
 				mod_timer(&cmdbatch->timer, jiffies + (5 * HZ));
-			spin_unlock(&cmdbatch->lock);
 		} else {
 			/*
 			 * Otherwise, delete the timer to make sure it is good
 			 * and dead before queuing the buffer
 			 */
-			spin_unlock(&cmdbatch->lock);
 			del_timer_sync(&cmdbatch->timer);
 		}
 
@@ -448,12 +468,11 @@ static int dispatcher_context_sendcmds(struct adreno_device *adreno_dev,
 	}
 
 	/*
-	 * If the context successfully submitted commands there will be room
-	 * in the context queue so wake up any snoozing threads that want to
-	 * submit commands
+	 * Wake up any snoozing threads if we have consumed any real commands
+	 * or marker commands and we have room in the context queue.
 	 */
 
-	if (count)
+	if (_check_context_queue(drawctxt))
 		wake_up_all(&drawctxt->wq);
 
 	/*
@@ -572,27 +591,6 @@ int adreno_dispatcher_issuecmds(struct adreno_device *adreno_dev)
 	mutex_lock(&dispatcher->mutex);
 	ret = _adreno_dispatcher_issuecmds(adreno_dev);
 	mutex_unlock(&dispatcher->mutex);
-
-	return ret;
-}
-
-static int _check_context_queue(struct adreno_context *drawctxt)
-{
-	int ret;
-
-	spin_lock(&drawctxt->lock);
-
-	/*
-	 * Wake up if there is room in the context or if the whole thing got
-	 * invalidated while we were asleep
-	 */
-
-	if (drawctxt->state == ADRENO_CONTEXT_STATE_INVALID)
-		ret = 1;
-	else
-		ret = drawctxt->queued < _context_cmdqueue_size ? 1 : 0;
-
-	spin_unlock(&drawctxt->lock);
 
 	return ret;
 }
