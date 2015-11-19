@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _LINUX_SCHED_H
 #define _LINUX_SCHED_H
 
@@ -1929,6 +1934,8 @@ extern int sched_set_cpu_mostly_idle_load(int cpu, int mostly_idle_pct);
 extern int sched_get_cpu_mostly_idle_load(int cpu);
 extern int sched_set_cpu_mostly_idle_nr_run(int cpu, int nr_run);
 extern int sched_get_cpu_mostly_idle_nr_run(int cpu);
+extern int sched_set_cpu_mostly_occupied_load(int cpu, int mostly_occupied_pct);
+extern int sched_get_cpu_mostly_occupied_load(int cpu);
 extern int
 sched_set_cpu_mostly_idle_freq(int cpu, unsigned int mostly_idle_freq);
 extern unsigned int sched_get_cpu_mostly_idle_freq(int cpu);

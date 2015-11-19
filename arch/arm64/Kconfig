@@ -243,6 +243,60 @@ config ARCH_XGENE
 	help
 	  This enables support for AppliedMicro X-Gene SOC Family
 
+config ARCH_SONY_KITAKAMI
+    bool "Sony Mobile kitakami platform"
+    depends on ARCH_MSM8994
+    help
+      Support for the SONY Mobile Kitakami platform
+      which is based on QCOM MSM8994 chipset.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_SUMIRE
+    bool "Sony Mobile Sumire"
+    depends on ARCH_SONY_KITAKAMI
+    help
+      Support for the SONY Mobile Sumire device
+      which is based on SONY Kitakami R2 platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_SUMIRE_DSDS
+    bool "Sony Mobile Sumire Dsds"
+    depends on ARCH_SONY_KITAKAMI
+    help
+      Support for the SONY Mobile Sumire Dsds device
+      which is based on SONY Kitakami R2 platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_SUZURAN
+    bool "Sony Mobile Suzuran"
+    depends on ARCH_SONY_KITAKAMI
+    help
+      Support for the SONY Mobile Suzuran device
+      which is based on SONY Kitakami R2 platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_SATSUKI
+    bool "Sony Mobile Satsuki"
+    depends on ARCH_SONY_KITAKAMI
+    help
+      Support for the SONY Mobile Satsuki device
+      which is based on SONY Kitakami R2 platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_SATSUKI_DSDS
+    bool "Sony Mobile Satsuki Dsds"
+    depends on ARCH_SONY_KITAKAMI
+    help
+      Support for the SONY Mobile Satsuki Dsds device
+      which is based on SONY Kitakami R2 platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
 endmenu
 
 menu "Bus support"
@@ -591,6 +645,14 @@ config EFI
           clock, and platform reset). A UEFI stub is also provided to
 	  allow the kernel to be booted as an EFI application. This
 	  is only useful on systems that have UEFI firmware.
+
+config CRASH_NOTES
+	bool "Support storing crash notes at panic"
+	depends on !KEXEC
+	help
+	  Generate kdump style crash notes at the time of a panic and fill it
+	  with the crashed context to support analysis of the memory dump with
+	  tools like Redhat CRASH.
 
 endmenu
 

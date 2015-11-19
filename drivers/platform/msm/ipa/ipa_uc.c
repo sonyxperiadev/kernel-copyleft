@@ -242,7 +242,7 @@ int ipa_uc_state_check(void)
 		return -EFAULT;
 	}
 
-	if (!ipa_ctx->uc_ctx.uc_loaded) {
+	if (!atomic_read(&ipa_ctx->uc_ctx.uc_loaded)) {
 		IPAERR("uC is not loaded\n");
 		return -EFAULT;
 	}
@@ -384,7 +384,7 @@ static void ipa_uc_response_hdlr(enum ipa_irq_type interrupt,
 	/* General handling */
 	if (ipa_ctx->uc_ctx.uc_sram_mmio->responseOp ==
 			IPA_HW_2_CPU_RESPONSE_INIT_COMPLETED) {
-		ipa_ctx->uc_ctx.uc_loaded = true;
+		atomic_set(&ipa_ctx->uc_ctx.uc_loaded, 1);
 		IPAERR("IPA uC loaded\n");
 		for (i = 0; i < IPA_HW_NUM_FEATURES; i++) {
 			if (uc_hdlrs[i].ipa_uc_loaded_hdlr)

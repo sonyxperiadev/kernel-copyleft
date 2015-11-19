@@ -13,6 +13,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -488,7 +493,7 @@ int mdss_mdp_irq_enable(u32 intr_type, u32 intf_num)
 
 	spin_lock_irqsave(&mdp_lock, irq_flags);
 	if (mdata->mdp_irq_mask & irq) {
-		pr_warn("MDSS MDP IRQ-0x%x is already set, mask=%x\n",
+		pr_debug("MDSS MDP IRQ-0x%x is already set, mask=%x\n",
 				irq, mdata->mdp_irq_mask);
 		ret = -EBUSY;
 	} else {

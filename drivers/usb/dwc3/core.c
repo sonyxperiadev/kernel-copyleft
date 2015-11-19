@@ -35,6 +35,11 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -102,6 +107,9 @@ void dwc3_set_mode(struct dwc3 *dwc, u32 mode)
 			dwc3_writel(dwc->regs, DWC3_GFLADJ, reg);
 		}
 	}
+
+	/* Set hsphy init params */
+	usb_phy_set_params(dwc->usb2_phy);
 }
 
 /**

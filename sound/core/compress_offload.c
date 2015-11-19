@@ -22,6 +22,11 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #define FORMAT(fmt) "%s: %d: " fmt, __func__, __LINE__
 #define pr_fmt(fmt) KBUILD_MODNAME ": " FORMAT(fmt)
 
@@ -168,7 +173,7 @@ static int snd_compr_update_tstamp(struct snd_compr_stream *stream,
 	err = stream->ops->pointer(stream, tstamp);
 	if (err)
 		return err;
-	pr_debug("dsp consumed till %d total %d bytes\n",
+	pr_debug("dsp consumed till %d total %llu bytes\n",
 		tstamp->byte_offset, tstamp->copied_total);
 	if (stream->direction == SND_COMPRESS_PLAYBACK)
 		stream->runtime->total_bytes_transferred = tstamp->copied_total;

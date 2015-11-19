@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __KERNEL_PRINTK__
 #define __KERNEL_PRINTK__
 
@@ -145,6 +150,9 @@ extern int kptr_restrict;
 extern void wake_up_klogd(void);
 
 void log_buf_kexec_setup(void);
+#ifdef CONFIG_RAMDUMP_TAGS
+int log_buf_ramdump_setup(void);
+#endif
 void __init setup_log_buf(int early);
 void dump_stack_set_arch_desc(const char *fmt, ...);
 void dump_stack_print_info(const char *log_lvl);
@@ -182,6 +190,13 @@ static inline void wake_up_klogd(void)
 static inline void log_buf_kexec_setup(void)
 {
 }
+
+#ifdef CONFIG_RAMDUMP_TAGS
+static inline int log_buf_ramdump_setup(void)
+{
+	return 0;
+}
+#endif
 
 static inline void setup_log_buf(int early)
 {

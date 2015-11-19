@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/mutex.h>
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
@@ -975,10 +980,17 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 				(reg_cfg_cmd->u.dmi_info.hi_tbl_offset -
 				reg_cfg_cmd->u.dmi_info.lo_tbl_offset !=
 				(sizeof(uint32_t)))) {
+#if defined(CONFIG_SONY_CAM_V4L2)
+				pr_err("%s:%d hi %d lo %d\n",
+					__func__, __LINE__,
+					reg_cfg_cmd->u.dmi_info.hi_tbl_offset,
+					reg_cfg_cmd->u.dmi_info.lo_tbl_offset);
+#else
 				pr_err("%s:%d hi %d lo %d\n",
 					__func__, __LINE__,
 					reg_cfg_cmd->u.dmi_info.hi_tbl_offset,
 					reg_cfg_cmd->u.dmi_info.hi_tbl_offset);
+#endif
 				return -EINVAL;
 			}
 			if (reg_cfg_cmd->u.dmi_info.len <= sizeof(uint32_t)) {
@@ -1930,6 +1942,10 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	iommu_set_fault_handler(vfe_dev->buf_mgr->iommu_domain,
 		msm_vfe_iommu_fault_handler, vfe_dev);
 	vfe_dev->buf_mgr->pagefault_debug = 0;
+#if defined(CONFIG_SONY_CAM_V4L2)
+	vfe_dev->timeout = VFE_MAX_CFG_TIMEOUT;
+#endif
+
 	mutex_unlock(&vfe_dev->core_mutex);
 	mutex_unlock(&vfe_dev->realtime_mutex);
 	return 0;

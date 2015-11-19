@@ -9,6 +9,11 @@
  *
  *  You may use this code as per GPL version 2
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __LINUX_POWER_SUPPLY_H__
 #define __LINUX_POWER_SUPPLY_H__
@@ -150,6 +155,8 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_TEMP_ALERT_MAX,
 	POWER_SUPPLY_PROP_COOL_TEMP,
 	POWER_SUPPLY_PROP_WARM_TEMP,
+	POWER_SUPPLY_PROP_COLD_TEMP,
+	POWER_SUPPLY_PROP_HOT_TEMP,
 	POWER_SUPPLY_PROP_TEMP_AMBIENT,
 	POWER_SUPPLY_PROP_TEMP_AMBIENT_ALERT_MIN,
 	POWER_SUPPLY_PROP_TEMP_AMBIENT_ALERT_MAX,
@@ -176,6 +183,16 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_CHARGE_DONE,
 	POWER_SUPPLY_PROP_FLASH_ACTIVE,
 	POWER_SUPPLY_PROP_ALLOW_DETECTION,
+	POWER_SUPPLY_PROP_USBIN_DET,
+	POWER_SUPPLY_PROP_WIRELESS_DET,
+	POWER_SUPPLY_PROP_INVALID_CHARGER,
+	POWER_SUPPLY_PROP_ENABLE_SHUTDOWN_AT_LOW_BATTERY,
+	POWER_SUPPLY_PROP_ENABLE_LLK,
+	POWER_SUPPLY_PROP_LLK_SOCMAX,
+	POWER_SUPPLY_PROP_LLK_SOCMIN,
+	POWER_SUPPLY_PROP_STOP_USB_HOST_FUNCTION,
+	POWER_SUPPLY_PROP_FV_CFG,
+	POWER_SUPPLY_PROP_FV_CMP_CFG,
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT,
 	/* Properties of type `const char *' */
@@ -183,6 +200,7 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_MANUFACTURER,
 	POWER_SUPPLY_PROP_SERIAL_NUMBER,
 	POWER_SUPPLY_PROP_BATTERY_TYPE,
+	POWER_SUPPLY_PROP_CHARGER_TYPE,
 };
 
 enum power_supply_type {
@@ -199,6 +217,7 @@ enum power_supply_type {
 	POWER_SUPPLY_TYPE_BMS,		/* Battery Monitor System */
 	POWER_SUPPLY_TYPE_USB_PARALLEL,		/* USB Parallel Path */
 	POWER_SUPPLY_TYPE_WIPOWER,		/* Wipower */
+	POWER_SUPPLY_TYPE_DUAL_WIRELESS,	/* WPC PMA Dual Charger */
 };
 
 union power_supply_propval {

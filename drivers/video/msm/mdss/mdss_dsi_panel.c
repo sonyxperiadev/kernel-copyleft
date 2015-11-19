@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/interrupt.h>
@@ -1615,6 +1620,7 @@ static int mdss_dsi_panel_parse_display_timings(struct device_node *np,
 	timings_np = of_get_child_by_name(np, "qcom,mdss-dsi-display-timings");
 	if (!timings_np) {
 		struct dsi_panel_timing pt;
+		memset(&pt, 0, sizeof(struct dsi_panel_timing));
 
 		/*
 		 * display timings node is not available, fallback to reading
@@ -1908,10 +1914,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		pinfo->mode_gpio_state = MODE_GPIO_NOT_VALID;
 	}
 
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-framerate", &tmp);
-	pinfo->mipi.frame_rate = (!rc ? tmp : 60);
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-clockrate", &tmp);
-	pinfo->clk_rate = (!rc ? tmp : 0);
 	rc = of_property_read_u32(np, "qcom,mdss-mdp-transfer-time-us", &tmp);
 	pinfo->mdp_transfer_time_us = (!rc ? tmp : DEFAULT_MDP_TRANSFER_TIME);
 

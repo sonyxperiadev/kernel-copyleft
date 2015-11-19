@@ -9,6 +9,11 @@
  *		Changes to use preallocated sigqueue structures
  *		to allow signals to be sent reliably.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/export.h>
@@ -1151,6 +1156,28 @@ static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
 			int group)
 {
 	int from_ancestor_ns = 0;
+
+	/*
+	 * Print log when SIGKILL is sent to the process whose attribute of
+	 * comm is "main". Suppose these works as Zygote process is killed.
+	 */
+	if (sig == SIGKILL) {
+		if (group == 1) {
+			struct task_struct *p;
+			for_each_process(p) {
+				if (t->tgid == p->tgid &&
+					strcmp(p->comm, "main") == 0) {
+					pr_info("%s/%d -> %s/%d: sending signal..%d.\n",
+						current->comm, current->pid, p->comm, p->pid, sig);
+				}
+			}
+		} else if (group == 0) {
+			if (strcmp(t->comm, "main") == 0) {
+				pr_info("%s/%d -> %s/%d: sending signal..%d.\n",
+					current->comm, current->pid, t->comm, t->pid, sig);
+			}
+		}
+	}
 
 #ifdef CONFIG_PID_NS
 	from_ancestor_ns = si_fromuser(info) &&

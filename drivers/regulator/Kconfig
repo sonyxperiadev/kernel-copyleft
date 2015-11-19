@@ -619,5 +619,15 @@ config REGULATOR_CPR
 	  suggestions in efuse as initial settings. It converts corner vote
 	  to voltage value before writing to a voltage regulator API, such as
 	  that provided by spm-regulator driver.
+
+config REGULATOR_FPF2495
+	bool "Load switch FPF2495 regulator driver"
+	help
+	  Enable support for the FAIRCHILD FPF2495 regulator driver.
+
+config SOMC_LCD_OCP_ENABLED
+	bool "enable SoMC LCD OCP function"
+	help
+	  Select this to enable SoMC LCD Over current protection function.
 endif
 
