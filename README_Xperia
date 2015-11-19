@@ -5,7 +5,6 @@ Configuration files can be found in arch/arm/configs.
     Xperia Z2a D6563                       => shinano_canopus_defconfig
     Xperia Z2 Tablet SGP511/SGP512         => shinano_castor_windy_defconfig
     Xperia Z2 Tablet SGP521/SGP541         => shinano_castor_defconfig
-    Xperia Z2 Tablet SO-05F                => shinano_castor_dcm_defconfig
     Xperia Z3 D6603/D6653/D6643            => shinano_leo_defconfig
     Xperia Z3 SO-01G                       => shinano_leo_dcm_defconfig
     Xperia Z3 Tablet Compact SGP611/SGP612 => shinano_scorpion_windy_defconfig

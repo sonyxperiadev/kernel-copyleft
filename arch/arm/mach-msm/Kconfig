@@ -1166,15 +1166,6 @@ config MACH_SONY_CASTOR
 	  If you enable this config,
 	  Please use SONY Mobile source tree.
 
-config MACH_SONY_CASTOR_DCM
-	depends on ARCH_MSM8974
-	bool "Sony Mobile Castor Docomo"
-	help
-	  Support for the SONY Mobile Castor Docomo device.
-	  It is based on QCOM MSM8974 AB chipset.
-	  If you enable this config,
-	  Please use SONY Mobile source tree.
-
 config MACH_SONY_CASTOR_WINDY
 	depends on ARCH_MSM8974
 	bool "Sony Mobile Castor Windy"

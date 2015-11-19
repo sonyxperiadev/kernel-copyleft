@@ -60,3 +60,7 @@
 	qcom,battery-vendor-adc-max = <1550 1430 1330 1210 1060>;
 	qcom,battery-vendor-select = <0 1 0 0 0>;
 };
+
+&pm8941_chg {
+	qcom,enable-llk-fake-capacity;
+};

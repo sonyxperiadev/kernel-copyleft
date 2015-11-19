@@ -50,7 +50,6 @@ endif
    dtb-$(CONFIG_MACH_SONY_SIRIUS)	+= msm8974pro-ab-shinano_sirius.dtb
    dtb-$(CONFIG_MACH_SONY_SIRIUS_DCM)	+= msm8974pro-ab-shinano_sirius_dcm.dtb
    dtb-$(CONFIG_MACH_SONY_CASTOR)	+= msm8974pro-ab-shinano_castor.dtb
-   dtb-$(CONFIG_MACH_SONY_CASTOR_DCM)	+= msm8974pro-ab-shinano_castor_dcm.dtb
    dtb-$(CONFIG_MACH_SONY_CASTOR_WINDY)	+= apq8074pro-ab-shinano_castor_windy.dtb
    dtb-$(CONFIG_MACH_SONY_CANOPUS)	+= msm8974pro-ab-shinano_canopus.dtb
    dtb-$(CONFIG_MACH_SONY_LEO)		+= msm8974pro-ac-shinano_leo.dtb
