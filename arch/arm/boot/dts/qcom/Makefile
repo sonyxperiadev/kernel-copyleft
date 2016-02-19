@@ -269,18 +269,8 @@ dtb-$(CONFIG_ARCH_MSM8992) += msm8992-sim.dtb \
 	msm8992-pmi8994-pm8004-cdp.dtb \
 	msm8992-pmi8994-pm8004-mtp.dtb
 else
-dtb-$(CONFIG_MACH_SONY_SUMIRE) += msm8994-v2.0-kitakami_sumire_generic.dtb \
-	msm8994-v2.1-kitakami_sumire_generic.dtb
-dtb-$(CONFIG_MACH_SONY_SUMIRE_DCM) += msm8994-v2.0-kitakami_sumire_dcm.dtb \
-	msm8994-v2.1-kitakami_sumire_dcm.dtb
-dtb-$(CONFIG_MACH_SONY_SUMIRE_DSDS) += msm8994-v2.0-kitakami_sumire_dsds.dtb \
-	msm8994-v2.1-kitakami_sumire_dsds.dtb
-dtb-$(CONFIG_MACH_SONY_SUZURAN) += msm8994-v2.0-kitakami_suzuran_generic.dtb \
-	msm8994-v2.1-kitakami_suzuran_generic.dtb
-dtb-$(CONFIG_MACH_SONY_SATSUKI) += msm8994-v2.0-kitakami_satsuki_generic.dtb \
-	msm8994-v2.1-kitakami_satsuki_generic.dtb
-dtb-$(CONFIG_MACH_SONY_SATSUKI_DSDS) += msm8994-v2.0-kitakami_satsuki_dsds.dtb \
-	msm8994-v2.1-kitakami_satsuki_dsds.dtb
+dtb-$(CONFIG_MACH_SONY_SUZURAN_DCM) += msm8994-v2.0-kitakami_suzuran_dcm.dtb \
+	msm8994-v2.1-kitakami_suzuran_dcm.dtb
 endif
 
 DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES))

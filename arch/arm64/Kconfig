@@ -252,56 +252,11 @@ config ARCH_SONY_KITAKAMI
       If you enable this config,
       please use SONY Mobile device tree.
 
-config MACH_SONY_SUMIRE
-    bool "Sony Mobile Sumire"
+config MACH_SONY_SUZURAN_DCM
+    bool "Sony Mobile Suzuran Docomo"
     depends on ARCH_SONY_KITAKAMI
     help
-      Support for the SONY Mobile Sumire device
-      which is based on SONY Kitakami R2 platform.
-      If you enable this config,
-      please use SONY Mobile device tree.
-
-config MACH_SONY_SUMIRE_DCM
-    bool "Sony Mobile Sumire Docomo"
-    depends on ARCH_SONY_KITAKAMI
-    help
-      Support for the SONY Mobile Sumire Docomo device
-      which is based on SONY Kitakami R2 platform.
-      If you enable this config,
-      please use SONY Mobile device tree.
-
-config MACH_SONY_SUMIRE_DSDS
-    bool "Sony Mobile Sumire Dsds"
-    depends on ARCH_SONY_KITAKAMI
-    help
-      Support for the SONY Mobile Sumire Dsds device
-      which is based on SONY Kitakami R2 platform.
-      If you enable this config,
-      please use SONY Mobile device tree.
-
-config MACH_SONY_SUZURAN
-    bool "Sony Mobile Suzuran"
-    depends on ARCH_SONY_KITAKAMI
-    help
-      Support for the SONY Mobile Suzuran device
-      which is based on SONY Kitakami R2 platform.
-      If you enable this config,
-      please use SONY Mobile device tree.
-
-config MACH_SONY_SATSUKI
-    bool "Sony Mobile Satsuki"
-    depends on ARCH_SONY_KITAKAMI
-    help
-      Support for the SONY Mobile Satsuki device
-      which is based on SONY Kitakami R2 platform.
-      If you enable this config,
-      please use SONY Mobile device tree.
-
-config MACH_SONY_SATSUKI_DSDS
-    bool "Sony Mobile Satsuki Dsds"
-    depends on ARCH_SONY_KITAKAMI
-    help
-      Support for the SONY Mobile Satsuki Dsds device
+      Support for the SONY Mobile Suzuran Docomo device
       which is based on SONY Kitakami R2 platform.
       If you enable this config,
       please use SONY Mobile device tree.

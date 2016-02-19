@@ -3902,12 +3902,16 @@ wait:
 	}
 
 done:
+#ifdef CONFIG_QPNP_FG_EXTENSION
+	chip->first_profile_loaded = true;
+#else
 	if (fg_batt_type)
 		chip->batt_type = fg_batt_type;
 	else
 		chip->batt_type = batt_type_str;
 	chip->first_profile_loaded = true;
 	chip->profile_loaded = true;
+#endif
 	chip->battery_missing = is_battery_missing(chip);
 	update_cc_cv_setpoint(chip);
 	update_chg_iterm(chip);
@@ -3921,6 +3925,11 @@ done:
 					chip->learning_data.learned_cc_uah,
 					chip->nom_cap_uah,
 					settings[FG_MEM_RESUME_SOC].value);
+	if (fg_batt_type)
+		chip->batt_type = fg_batt_type;
+	else
+		chip->batt_type = batt_type_str;
+	chip->profile_loaded = true;
 #endif
 	estimate_battery_age(chip, &chip->actual_cap_uah);
 	schedule_work(&chip->status_change_work);
