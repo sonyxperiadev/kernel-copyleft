@@ -1599,8 +1599,8 @@
 		somc,change-fps-suspend-resume-mode;
 		somc,change-fps-command =
 				[39 01 00 00 00 00 06 F0 55 AA 52 08 00
-				 39 01 00 00 00 00 10 BD 00 B4 0C 0C 00 01 6A 09 09 01 0E 0C 0C 00 B4];
-		somc,display-clock = <42000000>;
+				 39 01 00 00 00 00 10 BD 00 AC 0C 0C 00 01 58 09 09 01 0E 0C 0C 00 B4];
+		somc,display-clock = <40000000>;
 		somc,driver-ic-vbp = <6>;
 		somc,driver-ic-vfp = <6>;
 		somc,change-fps-rtn-adj;
