@@ -35,10 +35,10 @@
 #endif
 
 #define DRV_VER_MAJOR		6
-#define DRV_VER_MINOR		4
+#define DRV_VER_MINOR		7
 
 #define DRIVER_VERSION		((DRV_VER_MAJOR << 8) | DRV_VER_MINOR)
-#define DRIVER_RELEASE		"April 21, 2015"
+#define DRIVER_RELEASE		"July 21, 2015"
 #define DRIVER_PROTOCOL		0x0103
 
 /****************************************************************************\
@@ -349,6 +349,7 @@ struct maxim_sti_pdata {
 				struct maxim_sti_pdata *pdata, bool init);
 	void      (*reset)(struct maxim_sti_pdata *pdata, int value);
 	int       (*irq)(struct maxim_sti_pdata *pdata);
+	u32       stylus_support;
 	u32       wakeup_gesture_support;
 };
 #endif

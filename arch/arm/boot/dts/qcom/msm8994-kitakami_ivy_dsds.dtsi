@@ -167,7 +167,6 @@
 
 &sdhc_2 {
 	cd-gpios = <&pm8994_gpios 8 0x1>;
-	/delete-property/ qcom,nonremovable;
 };
 
 &pmi8994_charger {

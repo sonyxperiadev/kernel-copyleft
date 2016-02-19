@@ -2014,7 +2014,14 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
 
 	host->card_clock_off = false;
 	/* Wait for at least 1 ms according to spec */
+#ifndef CONFIG_MMC_SUPPORT_SVS_INTERVAL
 	mmc_delay(1);
+#else
+	if (host->caps & MMC_CAP_NONREMOVABLE)
+		mmc_delay(1);
+	else
+		mmc_delay(40);
+#endif
 
 	/*
 	 * Failure to switch is indicated by the card holding

@@ -94,6 +94,7 @@
 			pinctrl-1 = <&msm_gpio_42_sus>;
 			pinctrl-2 = <&msm_gpio_109_act>;
 			pinctrl-3 = <&msm_gpio_109_sus>;
+			stylus_support = <0>;
 			wakeup_gesture_support = <1>;
 			wakeup_gesture {
 				double_tap {

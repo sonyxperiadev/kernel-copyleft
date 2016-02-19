@@ -48,3 +48,9 @@ config MMC_DISABLE_SD_SDR104
 	help
 	  If you say N here, the SD layer uses a speed bus mode
 	  of SDR104.
+
+config MMC_SUPPORT_SVS_INTERVAL
+	bool "Support Signal Voltage Switch interval"
+	help
+	  If you say Y here, the signal voltage switch interval
+	  is supported for to relieve Team's SD card.
