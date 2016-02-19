@@ -4,7 +4,10 @@ Configuration files can be found in arch/arm64/configs.
     kitakami_defconfig
 
   diffconfigs for each product:
+    Xperia Z5 SO-01H                   => sumire_dcm_diffconfig
     Xperia Z5 Compact(SO-02H)          => suzuran_dcm_diffconfig
+    Xperia Z5 Premium(SO-03H)          => satsuki_dcm_diffconfig
+
 
 How to build your kernel:
 
