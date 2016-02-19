@@ -529,6 +529,7 @@ struct tomtom_priv {
 	s32 dmic_5_6_clk_cnt;
 	s32 ldo_h_users;
 	s32 micb_2_users;
+	s32 micb_3_users;
 
 	u32 anc_slot;
 	bool anc_func;
@@ -3602,6 +3603,11 @@ static int tomtom_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 			}
 			pr_debug("%s: micb_2_users %d\n", __func__,
 				 tomtom->micb_2_users);
+		} else if (micb_ctl_reg == TOMTOM_A_MICB_3_CTL) {
+			if (++tomtom->micb_3_users == 1)
+				snd_soc_update_bits(codec, micb_ctl_reg,
+						    1 << w->shift,
+						    1 << w->shift);
 		} else {
 			snd_soc_update_bits(codec, micb_ctl_reg, 1 << w->shift,
 					    1 << w->shift);
@@ -3631,6 +3637,15 @@ static int tomtom_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 			WARN(tomtom->micb_2_users < 0,
 			     "Unexpected micbias users %d\n",
 			     tomtom->micb_2_users);
+		} else if (micb_ctl_reg == TOMTOM_A_MICB_3_CTL) {
+			if (--tomtom->micb_3_users == 0)
+				snd_soc_update_bits(codec, micb_ctl_reg,
+						    1 << w->shift, 0);
+			pr_debug("%s: micb_3_users %d\n", __func__,
+				 tomtom->micb_3_users);
+			WARN(tomtom->micb_3_users < 0,
+			     "Unexpected micbias-3 users %d\n",
+			     tomtom->micb_3_users);
 		} else {
 			snd_soc_update_bits(codec, micb_ctl_reg, 1 << w->shift,
 					    0);
@@ -7641,10 +7656,10 @@ static const struct wcd9xxx_reg_mask_val tomtom_1_0_reg_defaults[] = {
 	TOMTOM_REG_VAL(TOMTOM_A_RX_LINE_2_TEST, 0x2),
 	TOMTOM_REG_VAL(TOMTOM_A_RX_LINE_3_TEST, 0x2),
 	TOMTOM_REG_VAL(TOMTOM_A_RX_LINE_4_TEST, 0x2),
-	TOMTOM_REG_VAL(TOMTOM_A_SPKR_DRV1_OCP_CTL, 0x97),
+	TOMTOM_REG_VAL(TOMTOM_A_SPKR_DRV1_OCP_CTL, 0x94),
 	TOMTOM_REG_VAL(TOMTOM_A_SPKR_DRV1_CLIP_DET, 0x1),
 	TOMTOM_REG_VAL(TOMTOM_A_SPKR_DRV1_IEC, 0x0),
-	TOMTOM_REG_VAL(TOMTOM_A_SPKR_DRV2_OCP_CTL, 0x97),
+	TOMTOM_REG_VAL(TOMTOM_A_SPKR_DRV2_OCP_CTL, 0x94),
 	TOMTOM_REG_VAL(TOMTOM_A_SPKR_DRV2_CLIP_DET, 0x1),
 	TOMTOM_REG_VAL(TOMTOM_A_CDC_TX1_MUX_CTL, 0x4A),
 	TOMTOM_REG_VAL(TOMTOM_A_CDC_TX2_MUX_CTL, 0x4A),
@@ -8856,6 +8871,7 @@ static int tomtom_codec_probe(struct snd_soc_codec *codec)
 	tomtom->aux_r_gain = 0x1F;
 	tomtom->ldo_h_users = 0;
 	tomtom->micb_2_users = 0;
+	tomtom->micb_3_users = 0;
 	tomtom_update_reg_defaults(codec);
 	pr_debug("%s: MCLK Rate = %x\n", __func__, wcd9xxx->mclk_rate);
 	if (wcd9xxx->mclk_rate == TOMTOM_MCLK_CLK_12P288MHZ)
