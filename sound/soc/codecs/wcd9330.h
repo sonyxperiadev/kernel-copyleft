@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef WCD9330_H
 #define WCD9330_H
 
@@ -37,7 +42,33 @@
 #define WCD9330_DMIC_CLK_DIV_6 0x03
 #define WCD9330_DMIC_CLK_DIV_16 0x04
 
+#define WCD9330_HDRIVE_DMIC_CLK_I_2MA 0x0
+#define WCD9330_HDRIVE_DMIC_CLK_I_4MA 0x1
+#define WCD9330_HDRIVE_DMIC_CLK_I_6MA 0x2
+#define WCD9330_HDRIVE_DMIC_CLK_I_8MA 0x3
+#define WCD9330_HDRIVE_DMIC_CLK_I_10MA 0x4
+#define WCD9330_HDRIVE_DMIC_CLK_I_12MA 0x5
+#define WCD9330_HDRIVE_DMIC_CLK_I_14MA 0x6
+#define WCD9330_HDRIVE_DMIC_CLK_I_16MA 0x7
+
 #define TOMTOM_ZDET_SUPPORTED true
+
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_0P0_A	0x0
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_0P375_A 0x1
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_0P750_A 0x2
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_1P125_A 0x3
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_1P500_A 0x4
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_1P875_A 0x5
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_2P250_A 0x6
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_2P625_A 0x7
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_3P000_A 0x8
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_3P375_A 0x9
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_3P750_A 0xA
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_4P125_A 0xB
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_4P500_A 0xC
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_4P875_A 0xD
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_5P250_A 0xE
+#define WCD9330_SPKDRV_OCP_CURR_LIMIT_I_5P625_A 0xF
 
 extern const u8 tomtom_reg_readable[TOMTOM_CACHE_SIZE];
 extern const u8 tomtom_reset_reg_defaults[TOMTOM_CACHE_SIZE];
@@ -107,7 +138,7 @@ enum {
 };
 
 extern int tomtom_mclk_enable(struct snd_soc_codec *codec, int mclk_enable,
-			     bool dapm);
+			     bool bg_clk_locked);
 extern int tomtom_hs_detect(struct snd_soc_codec *codec,
 			   struct wcd9xxx_mbhc_config *mbhc_cfg);
 extern void tomtom_hs_detect_exit(struct snd_soc_codec *codec);
@@ -120,8 +151,10 @@ extern void tomtom_event_register(
 	struct snd_soc_codec *codec);
 extern void tomtom_register_ext_clk_cb(
 	int (*codec_ext_clk_en)(struct snd_soc_codec *codec,
-				int enable, bool dapm),
+				int enable, bool bg_clk_locked),
 	int (*get_ext_clk_cnt) (void),
 	struct snd_soc_codec *codec);
 extern int tomtom_enable_qfuse_sensing(struct snd_soc_codec *codec);
+extern void tomtom_codec_bg_clk_lock_cntl(struct snd_soc_codec *codec,
+	bool acquire);
 #endif

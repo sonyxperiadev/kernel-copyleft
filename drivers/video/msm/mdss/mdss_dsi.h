@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef MDSS_DSI_H
 #define MDSS_DSI_H
@@ -22,6 +27,7 @@
 
 #include "mdss_panel.h"
 #include "mdss_dsi_cmd.h"
+#include "mdss_fb.h"
 
 #define MMSS_SERDES_BASE_PHY 0x04f01000 /* mmss (De)Serializer CFG */
 
@@ -258,15 +264,108 @@ struct dsi_panel_timing {
 	/* DSI_CLKOUT_TIMING_CTRL */
 	char t_clk_post;
 	char t_clk_pre;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct dsi_panel_cmds einit_cmds;
+	struct dsi_panel_cmds init_cmds;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	struct dsi_panel_cmds on_cmds;
 	struct dsi_panel_cmds switch_cmds;
 };
+
+#define DEFAULT_CMDS	0
+#define DETECTED_CMDS	1
+#define MAX_CMDS	2
 
 struct dsi_kickoff_action {
 	struct list_head act_entry;
 	void (*action) (void *);
 	void *data;
 };
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+struct mdss_pcc_color_tbl {
+	u32 color_type;
+	u32 area_num;
+	u32 u_min;
+	u32 u_max;
+	u32 v_min;
+	u32 v_max;
+	u32 r_data;
+	u32 g_data;
+	u32 b_data;
+} __packed;
+
+#define PCC_STS_UD	0x01	/* update request */
+
+struct mdss_pcc_data {
+	struct mdss_pcc_color_tbl *color_tbl;
+	u32 tbl_size;
+	u8 tbl_idx;
+	u8 pcc_sts;
+	u32 u_data;
+	u32 v_data;
+	int param_type;
+};
+
+struct mdss_panel_power_seq {
+	int disp_dcdc_en_pre;
+	int disp_dcdc_en_post;
+	int disp_en_pre;
+	int disp_en_post;
+	int seq_num;
+	int *rst_seq;
+	bool rst_b_seq;
+};
+
+struct esd_reg_status_ctrl {
+	u8 reg;
+	u8 correct_val;
+	int nbr_bytes_to_read;
+	struct dsi_cmd_desc dsi;
+};
+
+struct poll_ctrl {
+	bool enable;
+	int intervals;
+	struct delayed_work poll_working;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata;
+
+	struct esd_reg_status_ctrl esd;
+};
+
+struct mdss_panel_specific_pdata {
+	int driver_ic;
+	int32_t lcd_id;
+	int32_t adc_uv;
+	int disp_dcdc_en_gpio;
+
+	struct dsi_panel_cmds einit_cmds;
+	struct dsi_panel_cmds init_cmds;
+	struct dsi_panel_cmds id_read_cmds;
+
+	int (*disp_on) (struct mdss_panel_data *pdata);
+	int (*update_fps) (struct msm_fb_data_type *mfd);
+	bool pcc_enable;
+	struct dsi_panel_cmds pre_uv_read_cmds;
+	struct dsi_panel_cmds uv_read_cmds;
+	struct mdss_pcc_data pcc_data;
+
+	struct mdss_panel_power_seq on_seq;
+	struct mdss_panel_power_seq off_seq;
+	u32 down_period;
+	u32 new_vfp;
+	u32 lab_output_voltage;
+	u32 ibb_output_voltage;
+	u32 lab_current_max;
+	u32 ibb_current_max;
+	bool lab_current_max_enable;
+	bool ibb_current_max_enable;
+	int (*vreg_ctrl) (struct mdss_dsi_ctrl_pdata *ctrl, int enable);
+
+	struct poll_ctrl polling;
+};
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+
 
 struct dsi_drv_cm_data {
 	struct dss_io_data phy_regulator_io;
@@ -318,6 +417,7 @@ struct mdss_dsi_ctrl_pdata {
 	int (*check_read_status) (struct mdss_dsi_ctrl_pdata *pdata);
 	int (*cmdlist_commit)(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp);
 	void (*switch_mode) (struct mdss_panel_data *pdata, int mode);
+	int (*pcc_setup)(struct mdss_panel_data *pdata);
 	struct mdss_panel_data panel_data;
 	unsigned char *ctrl_base;
 	u32 hw_rev;
@@ -375,6 +475,7 @@ struct mdss_dsi_ctrl_pdata {
 	u32 byte_clk_rate;
 	bool refresh_clk_rate; /* flag to recalculate clk_rate */
 	struct dss_module_power power_data[DSI_MAX_PM];
+	struct mdss_panel_specific_pdata *spec_pdata;
 	u32 dsi_irq_mask;
 	struct mdss_hw *dsi_hw;
 	struct mdss_intf_recovery *recovery;
@@ -382,6 +483,11 @@ struct mdss_dsi_ctrl_pdata {
 	struct dsi_panel_cmds on_cmds;
 	struct dsi_panel_cmds post_dms_on_cmds;
 	struct dsi_panel_cmds off_cmds;
+
+	struct dsi_panel_cmds lock_cmds;
+	struct dsi_panel_cmds unlock_cmds;
+	struct dsi_panel_cmds fps_cmds;
+
 	struct dsi_panel_cmds status_cmds;
 	u32 status_cmds_rlen;
 	u32 *status_value;
@@ -519,6 +625,14 @@ int mdss_panel_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
 int mdss_dsi_register_recovery_handler(struct mdss_dsi_ctrl_pdata *ctrl,
 		struct mdss_intf_recovery *recovery);
 
+int mdss_dsi_pinctrl_set_state(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
+					bool active);
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+int mdss_dsi_panel_disp_en(struct mdss_panel_data *pdata, int enable);
+int mdss_dsi_panel_poll_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+
 static inline const char *__mdss_dsi_pm_name(enum dsi_pm_type module)
 {
 	switch (module) {
@@ -587,6 +701,21 @@ static inline struct mdss_dsi_ctrl_pdata *mdss_dsi_get_ctrl_by_index(int ndx)
 
 	return ctrl_list[ndx];
 }
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+static inline struct mdss_dsi_ctrl_pdata *mdss_dsi_get_master_ctrl(
+					struct mdss_panel_data *pdata)
+{
+	int dsi_master = DSI_CTRL_0;
+
+	if (pdata->panel_info.dsi_master == DISPLAY_2)
+		dsi_master = DSI_CTRL_1;
+	else
+		dsi_master = DSI_CTRL_0;
+
+	return mdss_dsi_get_ctrl_by_index(dsi_master);
+}
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 static inline bool mdss_dsi_is_ctrl_clk_slave(struct mdss_dsi_ctrl_pdata *ctrl)
 {

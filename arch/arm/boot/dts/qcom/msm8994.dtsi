@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /memreserve/ 0x00000000 0x00001000;
 /memreserve/ 0xac1c0000 0x00001000;
@@ -290,6 +295,15 @@
 			linux,reserve-region;
 			reg = <0 0 0 0x614000>;
 			label = "audio_mem";
+		};
+
+		debug_region: debug_region@0 {
+			compatible = "qcom,debug_region";
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			linux,remove-completely;
+			reg = <0 0x06200000 0 0x100000>;
+			label = "debug_mem";
 		};
 
 		removed_regions: removed_regions@0 {
@@ -592,9 +606,6 @@
 				1 &intc 0 239 0
 				2 &msm_gpio 46 0>;
 
-		qcom,inject-rx-on-wakeup;
-		qcom,rx-char-to-inject = <0xFD>;
-
 		qcom,bam-tx-ep-pipe-index = <2>;
 		qcom,bam-rx-ep-pipe-index = <3>;
 		qcom,master-id = <84>;
@@ -890,6 +901,11 @@
 		download_mode@0 {
 			compatible = "qcom,msm-imem-download_mode";
 			reg = <0x0 8>;
+		};
+
+		debug_base@c {
+			compatible = "qcom,msm-imem-debug_base";
+			reg = <0xc 8>;
 		};
 
 		mem_dump_table@10 {
@@ -1469,8 +1485,10 @@
 			qcom,cdc-slim-ifd = "tomtom-slim-ifd";
 			qcom,cdc-slim-ifd-elemental-addr = [00 00 30 01 17 02];
 			qcom,cdc-dmic-sample-rate = <4800000>;
+			qcom,cdc-dmic_clk_drv_strength = <4>;
 			qcom,cdc-mad-dmic-rate = <600000>;
 			qcom,cdc-variant = "WCD9330";
+			qcom,cdc-spkdrv-ocp-curr-limit-mA = <2625>;
 		};
 	};
 

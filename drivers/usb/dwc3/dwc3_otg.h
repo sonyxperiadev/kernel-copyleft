@@ -12,18 +12,28 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __LINUX_USB_DWC3_OTG_H
 #define __LINUX_USB_DWC3_OTG_H
 
 #include <linux/workqueue.h>
 #include <linux/power_supply.h>
+#include <linux/regulator/consumer.h>
+#include <linux/wakelock.h>
+#include <linux/notifier.h>
 
 #include <linux/usb/otg.h>
 #include "power.h"
 
 #define DWC3_IDEV_CHG_MAX 1500
 #define DWC3_HVDCP_CHG_MAX 1800
+#define DWC3_1000MA_CHG_MAX 1000
+#define DWC3_500MA_CHG_MAX 500
 
 /*
  * Module param to override current drawn for DCP charger
@@ -52,11 +62,18 @@ struct dwc3_otg {
 #define ID		 0
 #define B_SESS_VLD	 1
 #define DWC3_OTG_SUSPEND 2
+#define A_VBUS_DROP_DET	 3
 	unsigned long inputs;
 	struct power_supply	*psy;
 	struct completion	dwc3_xcvr_vbus_init;
 	int			charger_retry_count;
 	int			vbus_retry_count;
+	struct wake_lock	host_wakelock;
+	struct notifier_block	usbdev_nb;
+	int			device_count;
+	struct delayed_work	no_device_work;
+	unsigned int		retry_count;
+	bool			no_device_timeout_enabled;
 };
 
 /**
@@ -78,6 +95,8 @@ enum dwc3_chg_type {
 	DWC3_DCP_CHARGER,
 	DWC3_CDP_CHARGER,
 	DWC3_PROPRIETARY_CHARGER,
+	DWC3_PROPRIETARY_1000MA,
+	DWC3_PROPRIETARY_500MA,
 	DWC3_FLOATED_CHARGER,
 };
 
@@ -114,6 +133,7 @@ enum dwc3_id_state {
 struct dwc3_ext_xceiv {
 	enum dwc3_id_state	id;
 	bool			bsv;
+	bool			ocp;
 
 	/* to notify OTG about LPM exit event, provided by OTG */
 	void	(*notify_ext_events)(struct usb_otg *otg,
@@ -121,6 +141,8 @@ struct dwc3_ext_xceiv {
 	/* for block reset USB core */
 	void	(*ext_block_reset)(struct dwc3_ext_xceiv *ext_xceiv,
 					bool core_reset);
+	/* to register ocp_notification */
+	struct regulator_ocp_notification ext_ocp_notification;
 };
 
 /* for external transceiver driver */

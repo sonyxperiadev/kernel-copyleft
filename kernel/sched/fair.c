@@ -19,6 +19,11 @@
  *  Adaptive scheduling granularity, math enhancements by Peter Zijlstra
  *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra <pzijlstr@redhat.com>
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/latencytop.h>
 #include <linux/sched.h>
@@ -1430,8 +1435,10 @@ int sched_get_cpu_prefer_idle(int cpu)
 int sched_set_cpu_mostly_idle_load(int cpu, int mostly_idle_pct)
 {
 	struct rq *rq = cpu_rq(cpu);
+	int mostly_occupied_pct = real_to_pct(rq->mostly_occupied_load);
 
-	if (mostly_idle_pct < 0 || mostly_idle_pct > 100)
+	if (mostly_idle_pct < 0 || mostly_idle_pct > 100 ||
+	    mostly_idle_pct >= mostly_occupied_pct)
 		return -EINVAL;
 
 	rq->mostly_idle_load = pct_to_real(mostly_idle_pct);
@@ -1449,6 +1456,30 @@ int sched_set_cpu_mostly_idle_freq(int cpu, unsigned int mostly_idle_freq)
 	rq->mostly_idle_freq = mostly_idle_freq;
 
 	return 0;
+}
+
+int sched_set_cpu_mostly_occupied_load(int cpu, int mostly_occupied_pct)
+{
+	struct rq *rq = cpu_rq(cpu);
+	int mostly_idle_pct = real_to_pct(rq->mostly_idle_load);
+
+	if (mostly_occupied_pct < 0 || mostly_occupied_pct > 100 ||
+	    mostly_occupied_pct <= mostly_idle_pct)
+		return -EINVAL;
+
+	rq->mostly_occupied_load = pct_to_real(mostly_occupied_pct);
+
+	return 0;
+}
+
+int sched_get_cpu_mostly_occupied_load(int cpu)
+{
+	struct rq *rq = cpu_rq(cpu);
+	int mostly_occupied_pct;
+
+	mostly_occupied_pct = real_to_pct(rq->mostly_occupied_load);
+
+	return mostly_occupied_pct;
 }
 
 unsigned int sched_get_cpu_mostly_idle_freq(int cpu)
@@ -1616,11 +1647,24 @@ static DEFINE_MUTEX(boost_mutex);
 
 static void boost_kick_cpus(void)
 {
+	u32 nr_running;
 	int i;
 
 	for_each_online_cpu(i) {
-		if (cpu_rq(i)->capacity != max_capacity)
-			boost_kick(i);
+		/*
+		 * kick only "small" cluster
+		 */
+		if (cpu_rq(i)->capacity != max_capacity) {
+			nr_running = ACCESS_ONCE(cpu_rq(i)->nr_running);
+
+			/*
+			 * make sense to interrupt CPU if its runqueue
+			 * has something running in order to check for
+			 * migration afterwards, otherwise skip it.
+			 */
+			if (nr_running)
+				boost_kick(i);
+		}
 	}
 }
 
@@ -1704,7 +1748,7 @@ static int task_will_fit(struct task_struct *p, int cpu)
 	if (rq->capacity == max_capacity)
 		return 1;
 
-	if (sched_boost()) {
+	if (sched_boost() && task_sched_boost(p)) {
 		if (rq->capacity > prev_rq->capacity)
 			return 1;
 	} else {
@@ -1952,12 +1996,12 @@ static int skip_cpu(struct task_struct *p, int cpu, int reason)
  * Select a single cpu in cluster as target for packing, iff cluster frequency
  * is less than a threshold level
  */
-static int select_packing_target(struct task_struct *p, int best_cpu)
+static int select_packing_target(struct task_struct *p, int best_cpu, int sync)
 {
 	struct rq *rq = cpu_rq(best_cpu);
 	struct cpumask search_cpus;
 	int i;
-	int min_cost = INT_MAX;
+	u64 min_aggregate = ULLONG_MAX;
 	int target = best_cpu;
 
 	if (rq->cur_freq >= rq->mostly_idle_freq)
@@ -1972,11 +2016,38 @@ static int select_packing_target(struct task_struct *p, int best_cpu)
 
 	/* Pick the first lowest power cpu as target */
 	for_each_cpu(i, &search_cpus) {
-		int cost = power_cost(p, i);
+		u64 load = cpu_load_sync(i, sync);
+		u64 anticipated_load = scale_load_to_cpu(task_load(p), i) +
+					load;
 
-		if (cost < min_cost && !sched_cpu_high_irqload(i)) {
-			target = i;
-			min_cost = cost;
+		if (likely(anticipated_load <= rq->mostly_occupied_load)) {
+			int high_irqload = sched_cpu_high_irqload(i);
+			int cstate = cpu_rq(i)->cstate;
+			u64 aggregate;
+			int cost;
+
+			/*
+			 * Skip CPU with high IRQ load.
+			 */
+			if (unlikely(high_irqload))
+				continue;
+
+			cost = power_cost(p, i);
+
+			/*
+			 * Here we try to find CPU with least power cost,
+			 * after that fall down to CPUs with the lowest C-state
+			 * (0 -> active state), finally select least loaded CPU.
+			 *
+			 * aggregate: |------32b------|--8b--|----24b----|
+			 */
+			aggregate = ((u64) cost << 32) | ((u32) cstate << 24) |
+				((u32) load & (UINT_MAX >> 8));
+
+			if (aggregate < min_aggregate) {
+				min_aggregate = aggregate;
+				target = i;
+			}
 		}
 	}
 
@@ -2030,7 +2101,10 @@ static int select_best_cpu(struct task_struct *p, int target, int reason,
 		sync = 0;
 	}
 
-	if (small_task && !boost) {
+	if (boost && task_sched_boost(p))
+		small_task = 0;
+
+	if (small_task) {
 		best_cpu = best_small_task_cpu(p, sync);
 		prefer_idle = 0;	/* For sched_task_load tracepoint */
 		goto done;
@@ -2172,7 +2246,7 @@ done:
 	}
 
 	if (cpu_rq(best_cpu)->mostly_idle_freq && !prefer_idle_override)
-		best_cpu = select_packing_target(p, best_cpu);
+		best_cpu = select_packing_target(p, best_cpu, sync);
 
 	/*
 	 * prefer_idle is initialized towards middle of function. Leave this
@@ -2702,7 +2776,7 @@ static inline int migration_needed(struct rq *rq, struct task_struct *p)
 	if (task_will_be_throttled(p))
 		return 0;
 
-	if (sched_boost()) {
+	if (sched_boost() && task_sched_boost(p)) {
 		if (rq->capacity != max_capacity)
 			return UP_MIGRATION;
 
@@ -4834,6 +4908,10 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	if (!se) {
 		update_rq_runnable_avg(rq, rq->nr_running);
 		inc_nr_running(rq);
+
+		if (unlikely(p->nr_cpus_allowed == 1))
+			rq->nr_pinned_tasks++;
+
 		inc_rq_hmp_stats(rq, p, 1);
 	}
 	hrtick_update(rq);
@@ -4897,6 +4975,10 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se) {
 		dec_nr_running(rq);
+
+		if (unlikely(p->nr_cpus_allowed == 1))
+			rq->nr_pinned_tasks--;
+
 		update_rq_runnable_avg(rq, 1);
 		dec_rq_hmp_stats(rq, p, 1);
 	}
@@ -8036,6 +8118,22 @@ static inline int _nohz_kick_needed_hmp(struct rq *rq, int cpu, int *type)
 		rq->nr_running > rq->mostly_idle_nr_run ||
 		cpu_load(cpu) > rq->mostly_idle_load)) {
 
+		if (unlikely(rq->nr_pinned_tasks > 0)) {
+			int delta = rq->nr_running - rq->nr_pinned_tasks;
+
+			/*
+			 * Check if it is possible to "unload" this CPU in case
+			 * of having pinned/affine tasks. Do not disturb idle core
+			 * if one of the below condition is true:
+			 *
+			 * - there is one pinned task and it is not "current"
+			 * - all tasks are pinned to this CPU
+			 */
+			if (delta < 2)
+				if (current->nr_cpus_allowed > 1 || !delta)
+					return 0;
+		}
+
 		if (rq->capacity == max_capacity)
 			return 1;
 
@@ -8432,6 +8530,24 @@ static void task_move_group_fair(struct task_struct *p, int on_rq)
 	}
 }
 
+static void set_cpus_allowed_fair(struct task_struct *p, const struct cpumask *new_mask)
+{
+	int nr_cpus_allowed;
+	struct rq *rq;
+
+	if (p->on_rq) {
+		nr_cpus_allowed = cpumask_weight(new_mask);
+		rq = task_rq(p);
+
+		if (nr_cpus_allowed == 1 && p->nr_cpus_allowed > 1)
+			rq->nr_pinned_tasks++;
+		else if (nr_cpus_allowed > 1 && p->nr_cpus_allowed == 1)
+			rq->nr_pinned_tasks--;
+	}
+
+	/* 'new_mask' is applied in core.c */
+}
+
 void free_fair_sched_group(struct task_group *tg)
 {
 	int i;
@@ -8642,6 +8758,7 @@ const struct sched_class fair_sched_class = {
 	.inc_hmp_sched_stats	= inc_hmp_sched_stats_fair,
 	.dec_hmp_sched_stats	= dec_hmp_sched_stats_fair,
 #endif
+	.set_cpus_allowed	= set_cpus_allowed_fair,
 };
 
 #ifdef CONFIG_SCHED_DEBUG

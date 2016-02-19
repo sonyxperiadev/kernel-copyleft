@@ -14,6 +14,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __ASM_ARCH_MSM_HSUSB_H
 #define __ASM_ARCH_MSM_HSUSB_H
@@ -655,6 +660,8 @@ struct msm_hsic_peripheral_platform_data {
  */
 struct usb_ext_notification {
 	int (*notify)(void *, int, void (*)(void *, int online), void *);
+	bool (*check_vbus)(void *);
+	void (*vbus_control)(void *, bool);
 	void *ctxt;
 };
 #ifdef CONFIG_USB_BAM

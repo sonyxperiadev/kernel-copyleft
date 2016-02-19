@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __MFD_TABLA_PDATA_H__
 
@@ -85,7 +90,36 @@
 #define WCD9XXX_DMIC_SAMPLE_RATE_4P096MHZ 4096000
 #define WCD9XXX_DMIC_SAMPLE_RATE_6P144MHZ 6144000
 
+/* DMIC_CLK Drive Strength */
+#define WCD9XXX_DMIC_CLK_DRV_STRENGTH_I_2MA 2
+#define WCD9XXX_DMIC_CLK_DRV_STRENGTH_I_4MA 4
+#define WCD9XXX_DMIC_CLK_DRV_STRENGTH_I_6MA 6
+#define WCD9XXX_DMIC_CLK_DRV_STRENGTH_I_8MA 8
+#define WCD9XXX_DMIC_CLK_DRV_STRENGTH_I_10MA 10
+#define WCD9XXX_DMIC_CLK_DRV_STRENGTH_I_12MA 12
+#define WCD9XXX_DMIC_CLK_DRV_STRENGTH_I_14MA 14
+#define WCD9XXX_DMIC_CLK_DRV_STRENGTH_I_16MA 16
+
 #define WCD9XXX_DMIC_SAMPLE_RATE_UNDEFINED 0
+#define WCD9XXX_DMIC_CLK_DRV_STRENGTH_UNDEFINED 0
+
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_0P0_A	0
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_0P375_A 375
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_0P750_A 750
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_1P125_A 1125
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_1P500_A 1500
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_1P875_A 1875
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_2P250_A 2250
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_2P625_A 2625
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_3P000_A 3000
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_3P375_A 3375
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_3P750_A 3750
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_4P125_A 4125
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_4P500_A 4500
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_4P875_A 4875
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_5P250_A 5250
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_I_5P625_A 5625
+#define WCD9XXX_SPKDRV_OCP_CURR_LIMIT_UNDEFINED (-1)
 
 struct wcd9xxx_amic {
 	/*legacy mode, txfe_enable and txfe_buff take 7 input
@@ -143,9 +177,10 @@ struct wcd9xxx_ocp_setting {
 	unsigned int	run_time:4; /* in duty cycle */
 	unsigned int	wait_time:4; /* in duty cycle */
 	unsigned int	hph_ocp_limit:3; /* Headphone OCP current limit */
+	unsigned int	spkdrv_ocp_curr_limit;
 };
 
-#define WCD9XXX_MAX_REGULATOR	9
+#define WCD9XXX_MAX_REGULATOR	10
 /*
  *      format : TABLA_<POWER_SUPPLY_PIN_NAME>_CUR_MAX
  *
@@ -162,6 +197,7 @@ struct wcd9xxx_ocp_setting {
 
 #define WCD9XXX_VDD_SPKDRV_NAME "cdc-vdd-spkdrv"
 #define WCD9XXX_VDD_SPKDRV2_NAME "cdc-vdd-spkdrv-2"
+#define WCD9XXX_VDD_ANC_HPH_NAME "cdc-vdd-anc-hph"
 
 struct wcd9xxx_regulator {
 	const char *name;
@@ -184,6 +220,7 @@ struct wcd9xxx_pdata {
 	struct wcd9xxx_regulator regulator[WCD9XXX_MAX_REGULATOR];
 	u32 mclk_rate;
 	u32 dmic_sample_rate;
+	u32 dmic_clk_drv_strength;
 	u32 mad_dmic_sample_rate;
 	enum codec_variant cdc_variant;
 	u16 use_pinctrl;

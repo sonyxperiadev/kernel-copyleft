@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -43,10 +48,19 @@
 
 #define subsys_to_drv(d) container_of(d, struct modem_data, subsys_desc)
 
-static void log_modem_sfr(void)
+static int force_crash_modem_hwwd;
+module_param(force_crash_modem_hwwd, int, S_IWUSR | S_IRUSR);
+MODULE_PARM_DESC(force_crash_modem_hwwd, "Force crash for Modem HWWD");
+
+static void log_modem_sfr(struct modem_data *drv)
 {
 	u32 size;
 	char *smem_reason, reason[MAX_SSR_REASON_LEN];
+	const char hwwd_str[] = "SFR Init: wdog or kernel error suspected.";
+
+	/* This is added due to tracking issue Case01984677 and shall be removed
+	after issue is reproduced and full dump provided to QC */
+	const char force_str[] = "mcpm_resrc_modem_clk.c";
 
 	smem_reason = smem_get_entry_no_rlock(SMEM_SSR_REASON_MSS0, &size, 0,
 							SMEM_ANY_HOST_FLAG);
@@ -60,7 +74,21 @@ static void log_modem_sfr(void)
 	}
 
 	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
+	update_crash_reason(drv->subsys, smem_reason, size);
 	pr_err("modem subsystem failure reason: %s.\n", reason);
+
+	if (0 == strncmp(hwwd_str, reason, sizeof(hwwd_str) - 1) &&
+		force_crash_modem_hwwd != 0)
+		/* Crash system like a subsystem crash due to specific handing
+		   in error reporting */
+		subsys_set_restart_level(drv->subsys, RESET_SOC);
+
+	/* This is added due to tracking issue Case01984677 and shall be removed
+	after issue is reproduced and full dump provided to QC */
+	if (0 == strncmp(force_str, reason, sizeof(force_str) - 1))
+		/* Crash system like a subsystem crash due to specific handing
+		in error reporting */
+		subsys_set_restart_level(drv->subsys, RESET_SOC);
 
 	smem_reason[0] = '\0';
 	wmb();
@@ -68,7 +96,7 @@ static void log_modem_sfr(void)
 
 static void restart_modem(struct modem_data *drv)
 {
-	log_modem_sfr();
+	log_modem_sfr(drv);
 	drv->ignore_errors = true;
 	subsystem_restart_dev(drv->subsys);
 }
