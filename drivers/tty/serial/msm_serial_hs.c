@@ -263,7 +263,7 @@ struct msm_hs_port {
 	atomic_t ioctl_count;
 	bool obs; /* out of band sleep flag */
 	atomic_t client_req_state;
-	atomic_t wakeup_irq_disabled_in_isr;
+	atomic_t wakeup_irq_disabled;
 };
 
 static struct of_device_id msm_hs_match_table[] = {
@@ -2160,7 +2160,6 @@ void toggle_wakeup_interrupt(struct msm_hs_port *msm_uport)
 {
 	unsigned long flags;
 	struct uart_port *uport = &(msm_uport->uport);
-	int disabled;
 
 	if (!is_use_low_power_wakeup(msm_uport))
 		return;
@@ -2171,18 +2170,20 @@ void toggle_wakeup_interrupt(struct msm_hs_port *msm_uport)
 		spin_lock_irqsave(&uport->lock, flags);
 		msm_uport->wakeup.ignore = 1;
 		MSM_HS_DBG("%s(): Enable Wakeup IRQ", __func__);
-		atomic_set(&msm_uport->wakeup_irq_disabled_in_isr, 0);
+		atomic_set(&msm_uport->wakeup_irq_disabled, 0);
 		enable_irq(msm_uport->wakeup.irq);
 		disable_irq(uport->irq);
 		msm_uport->wakeup.enabled = true;
 		spin_unlock_irqrestore(&uport->lock, flags);
 	} else {
 		spin_lock_irqsave(&uport->lock, flags);
-		disabled = atomic_read(&msm_uport->wakeup_irq_disabled_in_isr);
-		if (!disabled)
+		if (!atomic_read(&msm_uport->wakeup_irq_disabled)) {
 			disable_irq_nosync(msm_uport->wakeup.irq);
-		else if (disabled != 1)
-			panic("wakeup irq has been disabled multiple times!");
+			atomic_inc(&msm_uport->wakeup_irq_disabled);
+		} else {
+			MSM_HS_DBG("%s(): wakeup irq has already been disabled",
+				__func__);
+		}
 		spin_unlock_irqrestore(&uport->lock, flags);
 
 		enable_irq(uport->irq);
@@ -2278,8 +2279,13 @@ static irqreturn_t msm_hs_wakeup_isr(int irq, void *dev)
 	struct uart_port *uport = &msm_uport->uport;
 
 	spin_lock_irqsave(&uport->lock, flags);
-	disable_irq_nosync(msm_uport->wakeup.irq);
-	atomic_inc(&msm_uport->wakeup_irq_disabled_in_isr);
+	if (!atomic_read(&msm_uport->wakeup_irq_disabled)) {
+		disable_irq_nosync(msm_uport->wakeup.irq);
+		atomic_inc(&msm_uport->wakeup_irq_disabled);
+	} else {
+		MSM_HS_WARN("%s(): wakeup irq has already been disabled",
+			__func__);
+	}
 	spin_unlock_irqrestore(&uport->lock, flags);
 
 	schedule_work(&msm_uport->wakeup.resume_work);
@@ -2658,7 +2664,7 @@ static int msm_hs_startup(struct uart_port *uport)
 	spin_lock_irqsave(&uport->lock, flags);
 	atomic_set(&msm_uport->ioctl_count, 0);
 	atomic_set(&msm_uport->client_req_state, 0);
-	atomic_set(&msm_uport->wakeup_irq_disabled_in_isr, 0);
+	atomic_set(&msm_uport->wakeup_irq_disabled, 0);
 	msm_hs_start_rx_locked(uport);
 
 	spin_unlock_irqrestore(&uport->lock, flags);
