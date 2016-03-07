@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -596,6 +601,7 @@ static struct clk_freq_tbl ftbl_blsp1_qup6_spi_apps_clk_src[] = {
 	F(  19200000,         gcc_xo,    1,    0,     0),
 	F(  24000000, gpll0_out_main, 12.5,    1,     2),
 	F(  25000000, gpll0_out_main,   12,    1,     2),
+	F(  27906976, gpll0_out_main,    1,    2,    43),
 	F(  41380000, gpll0_out_main, 14.5,    0,     0),
 	F(  42860000, gpll0_out_main,   14,    0,     0),
 	F_END
@@ -1261,6 +1267,35 @@ static struct clk_freq_tbl ftbl_sdcc2_4_apps_clk_src[] = {
 	F_END
 };
 
+#ifdef CONFIG_MSM_CLK_SDCC2_CLK_SRC_40MHZ
+static struct clk_freq_tbl ftbl_sdcc2_apps_clk_src[] = {
+	F(    144000,         gcc_xo,   16,    3,    25),
+	F(    400000,         gcc_xo,   12,    1,     4),
+	F(  20000000, gpll0_out_main,   15,    1,     2),
+	F(  25000000, gpll0_out_main,   12,    1,     2),
+	F(  40000000, gpll0_out_main,   15,    0,     0),
+	F(  50000000, gpll0_out_main,   12,    0,     0),
+	F(  80000000, gpll0_out_main,  7.5,    0,     0),
+	F( 100000000, gpll0_out_main,    6,    0,     0),
+	F( 200000000, gpll0_out_main,    3,    0,     0),
+	F_END
+};
+
+static struct rcg_clk sdcc2_apps_clk_src = {
+	.cmd_rcgr_reg = SDCC2_APPS_CMD_RCGR,
+	.set_rate = set_rate_mnd,
+	.freq_tbl = ftbl_sdcc2_apps_clk_src,
+	.current_freq = &rcg_dummy_freq,
+	.base = &virt_base,
+	.c = {
+		.dbg_name = "sdcc2_apps_clk_src",
+		.ops = &clk_ops_rcg_mnd,
+		VDD_DIG_FMAX_MAP3(LOWER, 50000000, LOW, 100000000,
+				  NOMINAL, 200000000),
+		CLK_INIT(sdcc2_apps_clk_src.c),
+	},
+};
+#else
 static struct rcg_clk sdcc2_apps_clk_src = {
 	.cmd_rcgr_reg = SDCC2_APPS_CMD_RCGR,
 	.set_rate = set_rate_mnd,
@@ -1275,6 +1310,7 @@ static struct rcg_clk sdcc2_apps_clk_src = {
 		CLK_INIT(sdcc2_apps_clk_src.c),
 	},
 };
+#endif
 
 static struct rcg_clk sdcc3_apps_clk_src = {
 	.cmd_rcgr_reg = SDCC3_APPS_CMD_RCGR,

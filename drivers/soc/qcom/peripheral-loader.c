@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/string.h>
@@ -41,6 +46,9 @@
 #include <asm-generic/io-64-nonatomic-lo-hi.h>
 
 #include "peripheral-loader.h"
+#ifdef CONFIG_RAMDUMP_MEMDESC
+#include <linux/ramdump_mem_desc.h>
+#endif
 
 #define pil_err(desc, fmt, ...)						\
 	dev_err(desc->dev, "%s: " fmt, desc->name, ##__VA_ARGS__)
@@ -634,6 +642,37 @@ static int pil_parse_devicetree(struct pil_desc *desc)
 	return 0;
 }
 
+#ifdef CONFIG_RAMDUMP_MEMDESC
+/* Tag the subsystem information in rdtags */
+static void add_mem_desc_subsys_info(const struct pil_priv *priv)
+{
+	unsigned int i;
+	u64 addr, size;
+	struct pil_priv priv_region;
+	struct subsys {
+		char *subsys_tag;
+		char *subsys_cust;
+	};
+	struct subsys info[] = {
+			{ "modem", "amsscore" },
+			{ "adsp", "adspcore" },
+			{ "venus", "venuscore" },
+			{ "wcnss", "wcnsscore" },
+	};
+
+	memcpy_fromio(&priv_region, priv, sizeof(struct pil_priv));
+	addr = priv_region.region_start;
+	size = priv_region.region_end - priv_region.region_start;
+	for (i = 0; i < ARRAY_SIZE(info); i++) {
+		if (strncmp(info[i].subsys_tag, priv_region.info->name,
+				sizeof(priv_region.info->name)) == 0) {
+			ramdump_add_mem_desc(addr, size, info[i].subsys_cust);
+		}
+	}
+}
+
+#endif
+
 /* Synchronize request_firmware() with suspend */
 static DECLARE_RWSEM(pil_pm_rwsem);
 
@@ -722,6 +761,10 @@ int pil_boot(struct pil_desc *desc)
 		goto err_deinit_image;
 	}
 
+#ifdef CONFIG_RAMDUMP_MEMDESC
+	add_mem_desc_subsys_info(priv);
+#endif
+
 	list_for_each_entry(seg, &desc->priv->segs, list) {
 		ret = pil_load_seg(desc, seg);
 		if (ret)
@@ -781,6 +824,10 @@ void pil_shutdown(struct pil_desc *desc)
 		pil_proxy_unvote(desc, 1);
 	else
 		flush_delayed_work(&priv->proxy);
+
+	/* Defer freeing the region to the completion of ramdump */
+	if (!desc->dump_in_progress)
+		pil_free_memory(desc);
 }
 EXPORT_SYMBOL(pil_shutdown);
 

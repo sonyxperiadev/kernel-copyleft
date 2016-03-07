@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef MDSS_DSI_CMD_H
 #define MDSS_DSI_CMD_H
@@ -94,7 +99,11 @@ struct dsi_cmd_desc {
 	char *payload;
 };
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+#define CMD_REQ_MAX     6
+#else
 #define CMD_REQ_MAX     4
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 #define CMD_REQ_RX      0x0001
 #define CMD_REQ_COMMIT  0x0002
 #define CMD_CLK_CTRL    0x0004
