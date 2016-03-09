@@ -19,6 +19,11 @@
  *  Copyright (c) 2010      Canonical, Ltd.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  * This program is free software; you can redistribute it and/or modify it
@@ -408,6 +413,14 @@ static void mt_pen_report(struct hid_device *hid, struct hid_report *report)
 	struct hid_field *field = report->field[0];
 
 	input_sync(field->hidinput->input);
+}
+
+static void mt_generic_report(struct hid_device *hid, struct hid_report *report)
+{
+	struct hid_input *hidinput;
+
+	list_for_each_entry(hidinput, &hid->inputs, list)
+		input_sync(hidinput->input);
 }
 
 static void mt_pen_input_configured(struct hid_device *hdev,
@@ -821,7 +834,7 @@ static int mt_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 	if (field->application != HID_DG_TOUCHSCREEN &&
 	    field->application != HID_DG_PEN &&
 	    field->application != HID_DG_TOUCHPAD)
-		return -1;
+		return 0;
 
 	if (field->physical == HID_DG_STYLUS)
 		return mt_pen_input_mapping(hdev, hi, field, usage, bit, max);
@@ -833,6 +846,11 @@ static int mt_input_mapped(struct hid_device *hdev, struct hid_input *hi,
 		struct hid_field *field, struct hid_usage *usage,
 		unsigned long **bit, int *max)
 {
+	if (field->application != HID_DG_TOUCHSCREEN &&
+	    field->application != HID_DG_PEN &&
+	    field->application != HID_DG_TOUCHPAD)
+		return 0;
+
 	if (field->physical == HID_DG_STYLUS)
 		return mt_pen_input_mapped(hdev, hi, field, usage, bit, max);
 
@@ -850,8 +868,8 @@ static int mt_event(struct hid_device *hid, struct hid_field *field,
 	if (field->report->id == td->pen_report_id)
 		return mt_pen_event(hid, field, usage, value);
 
-	/* ignore other reports */
-	return 1;
+	/* let hid-input handle it */
+	return 0;
 }
 
 static void mt_report(struct hid_device *hid, struct hid_report *report)
@@ -866,6 +884,10 @@ static void mt_report(struct hid_device *hid, struct hid_report *report)
 
 	if (report->id == td->pen_report_id)
 		mt_pen_report(hid, report);
+
+	if ((report->id != td->mt_report_id) &&
+	    (report->id != td->pen_report_id))
+		mt_generic_report(hid, report);
 }
 
 static void mt_set_input_mode(struct hid_device *hdev)

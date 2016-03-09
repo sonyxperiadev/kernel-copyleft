@@ -224,6 +224,7 @@ dtb-$(CONFIG_ARCH_APQ8084) += apq8084-v1.0-old-pwr-grid-liquid.dtb \
 	apq8084-v1.1-old-pwr-grid-mdm9x35-alt-cdp.dtb \
 	apq8084-v1.1-mdm9x35-alt-cdp.dtb \
 	apq8084-v1.1-sbc.dtb
+ifneq ($(CONFIG_ARCH_SONY_KITAKAMI),y)
 dtb-$(CONFIG_ARCH_MSM8994) += msm8994-v1-sim.dtb \
 	msm8994-rumi.dtb \
 	msm8994-v1-cdp.dtb \
@@ -267,6 +268,30 @@ dtb-$(CONFIG_ARCH_MSM8992) += msm8992-sim.dtb \
 	msm8992-mtp.dtb \
 	msm8992-pmi8994-pm8004-cdp.dtb \
 	msm8992-pmi8994-pm8004-mtp.dtb
+else
+dtb-$(CONFIG_MACH_SONY_IVY) += msm8994-v1-kitakami_ivy_generic.dtb \
+	msm8994-v2.0-kitakami_ivy_generic.dtb \
+	msm8994-v2.1-kitakami_ivy_generic.dtb
+dtb-$(CONFIG_MACH_SONY_IVY_DSDS) += msm8994-v1-kitakami_ivy_dsds.dtb \
+	msm8994-v2.0-kitakami_ivy_dsds.dtb \
+	msm8994-v2.1-kitakami_ivy_dsds.dtb
+dtb-$(CONFIG_MACH_SONY_KARIN) += msm8994-v1-kitakami_karin_generic.dtb \
+	msm8994-v2.0-kitakami_karin_generic.dtb \
+	msm8994-v2.1-kitakami_karin_generic.dtb
+dtb-$(CONFIG_MACH_SONY_KARIN_WINDY) += apq8094-v1-kitakami_karin_windy.dtb \
+	apq8094-v2.0-kitakami_karin_windy.dtb \
+	apq8094-v2.1-kitakami_karin_windy.dtb
+dtb-$(CONFIG_MACH_SONY_SUMIRE) += msm8994-v2.0-kitakami_sumire_generic.dtb \
+	msm8994-v2.1-kitakami_sumire_generic.dtb
+dtb-$(CONFIG_MACH_SONY_SUMIRE_DSDS) += msm8994-v2.0-kitakami_sumire_dsds.dtb \
+	msm8994-v2.1-kitakami_sumire_dsds.dtb
+dtb-$(CONFIG_MACH_SONY_SUZURAN) += msm8994-v2.0-kitakami_suzuran_generic.dtb \
+	msm8994-v2.1-kitakami_suzuran_generic.dtb
+dtb-$(CONFIG_MACH_SONY_SATSUKI) += msm8994-v2.0-kitakami_satsuki_generic.dtb \
+	msm8994-v2.1-kitakami_satsuki_generic.dtb
+dtb-$(CONFIG_MACH_SONY_SATSUKI_DSDS) += msm8994-v2.0-kitakami_satsuki_dsds.dtb \
+	msm8994-v2.1-kitakami_satsuki_dsds.dtb
+endif
 
 DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES))
 ifneq ($(DTB_NAMES),)
@@ -279,9 +304,19 @@ targets += dtbs
 targets += $(addprefix ../, $(DTB_LIST))
 endif
 
+ifeq ($(CONFIG_ARM64),y)
+always          := $(dtb-y)
+subdir-y        := $(dts-dirs)
+$(obj)/%.dtb: $(src)/%.dts FORCE
+	$(call if_changed_dep,dtc)
+
+dtbs: $(addprefix $(obj)/,$(DTB_LIST))
+else
+targets += $(addprefix ../, $(dtb-y))
+
 $(obj)/../%.dtb: $(src)/%.dts FORCE
 	$(call if_changed_dep,dtc)
 
 dtbs: $(addprefix $(obj)/../,$(DTB_LIST))
-
+endif
 clean-files := *.dtb

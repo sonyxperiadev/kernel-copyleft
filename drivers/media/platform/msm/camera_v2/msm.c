@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/of.h>
 #include <linux/module.h>
@@ -738,8 +743,13 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 
 	if (timeout < 0) {
 		mutex_unlock(&session->lock);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		pr_debug("%s : timeout cannot be negative Line %d\n",
+				__func__, __LINE__);
+#else
 		pr_err("%s : timeout cannot be negative Line %d\n",
 				__func__, __LINE__);
+#endif
 		return rc;
 	}
 

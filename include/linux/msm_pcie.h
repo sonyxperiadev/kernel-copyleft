@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __MSM_PCIE_H
 #define __MSM_PCIE_H
@@ -116,6 +121,17 @@ int msm_pcie_recover_config(struct pci_dev *dev);
  * Return: 0 on success, negative value on error
  */
 int msm_pcie_enumerate(u32 rc_idx);
+
+/**
+ * msm_pcie_enumerate_locked - enumerate Endpoints with lock.
+ * @rc_idx:	RC that Endpoints connect to.
+ *
+ * This function enumerates Endpoints connected to RC.
+ * This is a version with mutex_lock.
+ *
+ * Return: 0 on success, negative value on error
+ */
+int msm_pcie_enumerate_locked(u32 rc_idx);
 
 /**
  * msm_pcie_recover_config - recover config space.

@@ -1,0 +1,52 @@
+Configuration files can be found in arch/arm64/configs.
+
+  defconfig using in common:
+    msm8994-perf_defconfig
+
+  diffconfigs for each product:
+    Xperia Z3+ E6553              => ivy_diffconfig
+    Xperia Z3+ Dual E6533         => ivy_dsds_diffconfig
+    Xperia Z4 Tablet SGP771       => karin_diffconfig
+    Xperia Z4 Tablet SGP712       => karin_windy_diffconfig
+    Xperia Z5 Compact E5803/E5823 => suzuran_diffconfig
+    Xperia Z5 E6653               => sumire_diffconfig
+    Xperia Z5 Dual E6683          => sumire_dsds_diffconfig
+    Xperia Z5 Premium E6853       => satsuki_diffconfig
+    Xperia Z5 Premium Dual E6883  => satsuki_dsds_diffconfig
+
+
+How to build your kernel:
+  Prerequisites:
+    * ramdisk.img - root fs
+    * mkbootimg - boot.img generator
+    * The ARM cross-compiler
+      You can use prebuild executable binary which is included in
+      standard Android repository. Please visit to external site.
+      In case of this platform, we recommend to use gcc 4.9 or later
+      such as aarch64-linux-android-4.9 to avoid known issues.
+
+  Step 1: Build Your Kernel
+    $ cd kernel
+    $ export ARCH=arm64
+    $ export PATH=<path-to-cross-compiler-executables>:$PATH
+      NOTE: Please set the location of the ARM cross-compiler.
+    $ export CROSS_COMPILE=<toolchain-prefix>
+      NOTE: Please set the prefix of the ARM cross-compiler.
+            ex) aarch64-linux-android-
+    $ export KBUILD_DIFFCONFIG=sumire_diffconfig
+      NOTE: Please set a configuration file you want to build.
+    $ make msm8994-perf_defconfig
+    $ make
+    You can see arch/arm64/boot/Image.gz-dtb if you succeed in building.
+
+  Step 2: Assembling the boot.img
+    (In the Linux Kernel directory)
+    $ mkbootimg \
+      --kernel arch/arm64/boot/Image.gz-dtb \
+      --ramdisk ramdisk.img \
+      --cmdline "androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x237 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 boot_cpus=0-5 dwc3_msm.prop_chg_detect=Y coherent_pool=2M dwc3_msm.hvdcp_max_current=1500" \
+      --base 0x00000000 \
+      --pagesize 4096 \
+      --ramdisk_offset 0x02000000 \
+      --tags_offset 0x01E00000 \
+      --output boot.img
