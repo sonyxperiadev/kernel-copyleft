@@ -134,14 +134,18 @@ static void enter_lpm_work(struct work_struct *data)
 	pr_debug("Bluetooth device sleep\n");
 
 	mutex_lock(&bt_lpm.mutex);
-	bt_lpm.wake = 0;
-	gpio_set_value(bcm43xx_my_data->gpios[BT_DEV_WAKE_PIN], 0);
+	if (hrtimer_active(&bt_lpm.enter_lpm_timer) == 0) {
+		bt_lpm.wake = 0;
+		gpio_set_value(bcm43xx_my_data->gpios[BT_DEV_WAKE_PIN], 0);
+	}
 	mutex_unlock(&bt_lpm.mutex);
 }
 
 void bcm_bt_lpm_exit_lpm_locked(struct uart_port *uport)
 {
 	pr_debug("Bluetooth device exit lpm\n");
+
+	mutex_lock(&bt_lpm.mutex);
 
 	bt_lpm.uport = uport;
 
@@ -152,6 +156,8 @@ void bcm_bt_lpm_exit_lpm_locked(struct uart_port *uport)
 
 	hrtimer_start(&bt_lpm.enter_lpm_timer, bt_lpm.enter_lpm_delay,
 		HRTIMER_MODE_REL);
+
+	mutex_unlock(&bt_lpm.mutex);
 }
 EXPORT_SYMBOL(bcm_bt_lpm_exit_lpm_locked);
 
