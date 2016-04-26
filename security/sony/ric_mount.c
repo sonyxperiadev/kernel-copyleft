@@ -148,7 +148,8 @@ static struct ric_part_info *find_matching_bdev_mountpoint(struct path *path)
 		if (ret)
 			continue;
 
-		if (path->dentry == mnt_path.dentry) {
+		if ((path->dentry == mnt_path.dentry) ||
+		     is_subdir(path->dentry, mnt_path.dentry)) {
 			match = 1;
 			path_put(&mnt_path);
 			break;
@@ -237,19 +238,21 @@ int sony_ric_mount(const char *dev_name, struct path *path,
 	if (!sony_ric_enabled())
 		return 0;
 
-	/* Ignore change type mounts */
-	if (flags & (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE))
-		return 0;
+	/* Check for remounts */
+	if (flags & MS_REMOUNT)
+		return sony_ric_remount(path, flags);
 
 	/* Check for bind mounts */
 	if (flags & (MS_BIND | MS_MOVE))
 		return sony_ric_bind_mount(dev_name, flags);
 
-	/* Check for remounts */
-	if (flags & MS_REMOUNT)
-		return sony_ric_remount(path, flags);
+	/* Ignore change type mounts */
+	if (flags & (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE))
+		return 0;
 
-	fstype = get_fs_type(type);
+	if (type)
+		fstype = get_fs_type(type);
+
 	if (!fstype) {
 		pr_err("RIC: unknown filesystem\n");
 		return -ENODEV;
