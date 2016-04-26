@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -55,7 +60,7 @@
 #define I2S_PCM_SEL_I2S       0
 #define I2S_PCM_SEL_OFFSET    1
 
-#define WCD9XXX_MBHC_DEF_BUTTONS    8
+#define WCD9XXX_MBHC_DEF_BUTTONS    5
 #define WCD9XXX_MBHC_DEF_RLOADS     5
 #define TOMTOM_EXT_CLK_RATE         9600000
 #define ADSP_STATE_READY_TIMEOUT_MS    3000
@@ -87,6 +92,7 @@ struct msm8994_asoc_mach_data {
 	int mclk_gpio;
 	u32 mclk_freq;
 	int us_euro_gpio;
+	int ear_en_gpio;
 	struct msm_pinctrl_info pinctrl_info;
 	void __iomem *pri_mux;
 	void __iomem *sec_mux;
@@ -110,9 +116,9 @@ static int msm_btsco_rate = SAMPLING_RATE_8KHZ;
 static int msm_hdmi_rx_ch = 2;
 static int msm_proxy_rx_ch = 2;
 static int hdmi_rx_sample_rate = SAMPLING_RATE_48KHZ;
+static int pm8994_ear_enable_states;
 static int msm_pri_mi2s_tx_ch = 2;
 
-static struct mutex cdc_mclk_mutex;
 static struct clk *codec_clk;
 static int clk_users;
 static atomic_t prim_auxpcm_rsc_ref;
@@ -154,6 +160,7 @@ static const char *const proxy_rx_ch_text[] = {"One", "Two", "Three", "Four",
 
 static char const *hdmi_rx_sample_rate_text[] = {"KHZ_48", "KHZ_96",
 					"KHZ_192"};
+static const char *const pm8994_ear_enable_states_text[] = {"Disable", "Enable"};
 static const char *const btsco_rate_text[] = {"8000", "16000"};
 static const struct soc_enum msm_btsco_enum[] = {
 	SOC_ENUM_SINGLE_EXT(2, btsco_rate_text),
@@ -167,24 +174,21 @@ static const struct soc_enum msm8994_auxpcm_enum[] = {
 static void *adsp_state_notifier;
 static void *def_codec_mbhc_cal(void);
 static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec,
-					int enable, bool dapm);
+					int enable, bool bg_clk_locked);
 
 static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.read_fw_bin = false,
 	.calibration = NULL,
 	.micbias = MBHC_MICBIAS2,
-	.anc_micbias = MBHC_MICBIAS2,
+	.anc_micbias = MBHC_MICBIAS3,
 	.mclk_cb_fn = msm_snd_enable_codec_ext_clk,
 	.mclk_rate = TOMTOM_EXT_CLK_RATE,
-	.gpio_level_insert = 1,
+	.gpio_level_insert = 0,
 	.detect_extn_cable = true,
 	.micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET,
 	.insert_detect = true,
 	.swap_gnd_mic = NULL,
-	.cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING |
-			    1 << MBHC_CS_ENABLE_INSERTION |
-			    1 << MBHC_CS_ENABLE_REMOVAL |
-			    1 << MBHC_CS_ENABLE_DET_ANC),
+	.cs_enable_flags = 0,
 	.do_recalibration = true,
 	.use_vddio_meas = true,
 	.enable_anc_mic_detect = false,
@@ -193,10 +197,16 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.key_code[1] = KEY_VOICECOMMAND,
 	.key_code[2] = KEY_VOLUMEUP,
 	.key_code[3] = KEY_VOLUMEDOWN,
-	.key_code[4] = 0,
+	.key_code[4] = BTN_4,
 	.key_code[5] = 0,
 	.key_code[6] = 0,
 	.key_code[7] = 0,
+	.insert_detect_plug_type = DETECT_NO_PLUG_TYPE,
+#ifdef CONFIG_PLUG_DET_TH_MID
+	.insert_detect_comp_vth = MBHC_COMP_V_0P875_VDD,
+#else
+	.insert_detect_comp_vth = MBHC_COMP_V_0P9_VDD,
+#endif /* CONFIG_PLUG_DET_TH_MID */
 };
 
 static struct afe_clk_cfg mi2s_tx_clk = {
@@ -617,13 +627,15 @@ static int msm_ext_ultrasound_event(struct snd_soc_dapm_widget *w,
 }
 
 static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec, int enable,
-					bool dapm)
+					bool bg_clk_locked)
 {
 	int ret = 0;
 	pr_debug("%s: enable = %d clk_users = %d\n",
 		__func__, enable, clk_users);
 
-	mutex_lock(&cdc_mclk_mutex);
+	if (!bg_clk_locked)
+		tomtom_codec_bg_clk_lock_cntl(codec, true);
+
 	if (enable) {
 		if (!codec_clk) {
 			dev_err(codec->dev, "%s: did not get codec MCLK\n",
@@ -642,12 +654,12 @@ static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec, int enable,
 			clk_users--;
 			goto exit;
 		}
-		tomtom_mclk_enable(codec, 1, dapm);
+		tomtom_mclk_enable(codec, 1, bg_clk_locked);
 	} else {
 		if (clk_users > 0) {
 			clk_users--;
 			if (clk_users == 0) {
-				tomtom_mclk_enable(codec, 0, dapm);
+				tomtom_mclk_enable(codec, 0, bg_clk_locked);
 				clk_disable_unprepare(codec_clk);
 			}
 		} else {
@@ -657,7 +669,8 @@ static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec, int enable,
 		}
 	}
 exit:
-	mutex_unlock(&cdc_mclk_mutex);
+	if (!bg_clk_locked)
+		tomtom_codec_bg_clk_lock_cntl(codec, false);
 	return ret;
 }
 
@@ -668,12 +681,32 @@ static int msm8994_mclk_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-		return msm_snd_enable_codec_ext_clk(w->codec, 1, true);
+		return msm_snd_enable_codec_ext_clk(w->codec, 1, false);
 	case SND_SOC_DAPM_POST_PMD:
-		return msm_snd_enable_codec_ext_clk(w->codec, 0, true);
+		return msm_snd_enable_codec_ext_clk(w->codec, 0, false);
 	}
 	return 0;
 }
+
+static const struct snd_soc_dapm_widget kitakami_msm8994_dapm_widgets[] = {
+
+	SND_SOC_DAPM_SUPPLY("MCLK",  SND_SOC_NOPM, 0, 0,
+	msm8994_mclk_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_MIC("Handset Mic", NULL),
+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("AHC VSNS", NULL),
+	SND_SOC_DAPM_MIC("AHC ISNS", NULL),
+
+	SND_SOC_DAPM_MIC("Digital Mic1", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic2", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic3", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic4", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic5", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic6", NULL),
+};
 
 static const struct snd_soc_dapm_widget msm8994_dapm_widgets[] = {
 
@@ -1083,6 +1116,61 @@ static int hdmi_rx_sample_rate_put(struct snd_kcontrol *kcontrol,
 
 	pr_debug("%s: hdmi_rx_sample_rate = %d\n", __func__,
 			hdmi_rx_sample_rate);
+
+	return 0;
+}
+
+static int pm8994_ear_enable_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int gpio_state = 0;
+
+	switch (pm8994_ear_enable_states) {
+	case 1:
+		gpio_state = 1;
+		break;
+	case 0:
+	default:
+		gpio_state = 0;
+		break;
+	}
+
+	ucontrol->value.integer.value[0] = gpio_state;
+	pr_debug("%s: pm8994_ear_enable_states = %d\n", __func__,
+			pm8994_ear_enable_states);
+
+	return 0;
+}
+
+static int pm8994_ear_enable_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int ret;
+	struct snd_soc_card *card = platform_get_drvdata(spdev);
+	struct msm8994_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+
+	pr_debug("%s: ucontrol value = %ld\n", __func__,
+			ucontrol->value.integer.value[0]);
+
+	if (pdata->ear_en_gpio >= 0) {
+		ret = gpio_request(pdata->ear_en_gpio, "ear_en_gpio");
+		if (ret) {
+			pr_err("%s: request ear_en_gpio failed, ret:%d\n",
+				__func__, ret);
+			return ret;
+		}
+		switch (ucontrol->value.integer.value[0]) {
+		case 1:
+			gpio_set_value(pdata->ear_en_gpio, 1);
+			break;
+		case 0:
+		default:
+			gpio_set_value(pdata->ear_en_gpio, 0);
+			break;
+		}
+		gpio_free(pdata->ear_en_gpio);
+		pm8994_ear_enable_states = ucontrol->value.integer.value[0];
+	}
 
 	return 0;
 }
@@ -1699,6 +1787,7 @@ static const struct soc_enum msm_snd_enum[] = {
 	SOC_ENUM_SINGLE_EXT(8, proxy_rx_ch_text),
 	SOC_ENUM_SINGLE_EXT(3, hdmi_rx_sample_rate_text),
 	SOC_ENUM_SINGLE_EXT(2, vi_feed_ch_text),
+	SOC_ENUM_SINGLE_EXT(2, pm8994_ear_enable_states_text),
 };
 
 static const struct snd_kcontrol_new msm_snd_controls[] = {
@@ -1730,6 +1819,9 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 			slim0_tx_bit_format_get, slim0_tx_bit_format_put),
 	SOC_ENUM_EXT("SLIM_0_TX SampleRate", msm_snd_enum[5],
 			slim0_tx_sample_rate_get, slim0_tx_sample_rate_put),
+	SOC_ENUM_EXT("PM8994_Ear_Enable_States", msm_snd_enum[9],
+		pm8994_ear_enable_get,
+		pm8994_ear_enable_put),
 };
 
 static bool msm8994_swap_gnd_mic(struct snd_soc_codec *codec)
@@ -1887,8 +1979,8 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		return err;
 	}
 
-	snd_soc_dapm_new_controls(dapm, msm8994_dapm_widgets,
-				ARRAY_SIZE(msm8994_dapm_widgets));
+	snd_soc_dapm_new_controls(dapm, kitakami_msm8994_dapm_widgets,
+				ARRAY_SIZE(kitakami_msm8994_dapm_widgets));
 
 	snd_soc_dapm_enable_pin(dapm, "Lineout_1 amp");
 	snd_soc_dapm_enable_pin(dapm, "Lineout_3 amp");
@@ -1904,6 +1996,8 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "Headset Mic");
 	snd_soc_dapm_ignore_suspend(dapm, "ANCRight Headset Mic");
 	snd_soc_dapm_ignore_suspend(dapm, "ANCLeft Headset Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "AHC VSNS");
+	snd_soc_dapm_ignore_suspend(dapm, "AHC ISNS");
 	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic1");
 	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic2");
 	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic3");
@@ -2063,8 +2157,8 @@ static void *def_codec_mbhc_cal(void)
 	S(t_ins_retry, 200);
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_PLUG_TYPE_PTR(codec_cal)->X) = (Y))
-	S(v_no_mic, 30);
-	S(v_hs_max, 2400);
+	S(v_no_mic, 50);
+	S(v_hs_max, 2450);
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_BTN_DET_PTR(codec_cal)->X) = (Y))
 	S(c[0], 62);
@@ -2075,29 +2169,23 @@ static void *def_codec_mbhc_cal(void)
 	S(n_btn_meas, 1);
 	S(n_btn_con, 2);
 	S(num_btn, WCD9XXX_MBHC_DEF_BUTTONS);
-	S(v_btn_press_delta_sta, 100);
-	S(v_btn_press_delta_cic, 50);
+	S(v_btn_press_delta_sta, 0);
+	S(v_btn_press_delta_cic, 0);
 #undef S
 	btn_cfg = WCD9XXX_MBHC_CAL_BTN_DET_PTR(codec_cal);
 	btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_V_BTN_LOW);
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
-	btn_low[0] = -50;
-	btn_high[0] = 90;
-	btn_low[1] = 130;
-	btn_high[1] = 220;
-	btn_low[2] = 235;
-	btn_high[2] = 335;
-	btn_low[3] = 375;
-	btn_high[3] = 655;
-	btn_low[4] = 656;
-	btn_high[4] = 660;
-	btn_low[5] = 661;
-	btn_high[5] = 670;
-	btn_low[6] = 671;
-	btn_high[6] = 680;
-	btn_low[7] = 681;
-	btn_high[7] = 690;
+	btn_low[0] = -30;
+	btn_high[0] = 106;
+	btn_low[1] = 107;
+	btn_high[1] = 202;
+	btn_low[2] = 203;
+	btn_high[2] = 347;
+	btn_low[3] = 348;
+	btn_high[3] = 759;
+	btn_low[4] = 760;
+	btn_high[4] = 1207;
 	n_ready = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_N_READY);
 	n_ready[0] = 80;
 	n_ready[1] = 68;
@@ -2910,6 +2998,22 @@ static struct snd_soc_dai_link msm8994_common_dai_links[] = {
 		.ignore_pmdown_time = 1,
 		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA3,
 	},
+	/* High-Res Audio Playback */
+	{
+		.name = "MSM8994 Media17",
+		.stream_name = "MultiMedia17",
+		.cpu_dai_name   = "MultiMedia17",
+		.platform_name  = "msm-pcm-dsp.3",
+		.dynamic = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			    SND_SOC_DPCM_TRIGGER_POST},
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+		.ignore_suspend = 1,
+		/* this dainlink has playback support */
+		.ignore_pmdown_time = 1,
+		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA17,
+	},
 	/* End of FE DAI LINK */
 	/* Backend FM DAI Links */
 	{
@@ -3440,7 +3544,6 @@ static int msm8994_asoc_machine_probe(struct platform_device *pdev)
 		card->dai_link	= msm8994_common_dai_links;
 		card->num_links	= ARRAY_SIZE(msm8994_common_dai_links);
 	}
-	mutex_init(&cdc_mclk_mutex);
 	atomic_set(&prim_auxpcm_rsc_ref, 0);
 	atomic_set(&sec_auxpcm_rsc_ref, 0);
 	spdev = pdev;
@@ -3509,6 +3612,14 @@ static int msm8994_asoc_machine_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "msm8994_prepare_us_euro failed (%d)\n",
 			ret);
 
+	/* Parse EAR_EN info for NX5L2750C */
+	pdata->ear_en_gpio = of_get_named_gpio(pdev->dev.of_node,
+				"qcom,ear-en-gpios", 0);
+	if (pdata->ear_en_gpio < 0)
+		dev_info(&pdev->dev, "property %s not detected in node %s",
+			"qcom,ear-en-gpios",
+			pdev->dev.of_node->full_name);
+
 	/* Parse pinctrl info from devicetree */
 	ret = msm_get_pinctrl(pdev);
 	if (!ret) {
@@ -3542,6 +3653,11 @@ err:
 			__func__, pdata->us_euro_gpio);
 		gpio_free(pdata->us_euro_gpio);
 		pdata->us_euro_gpio = 0;
+	}
+	if (pdata->ear_en_gpio > 0) {
+		dev_dbg(&pdev->dev, "%s initialize ear_en gpio %d\n",
+			__func__, pdata->ear_en_gpio);
+		pdata->ear_en_gpio = 0;
 	}
 	devm_kfree(&pdev->dev, pdata);
 	return ret;

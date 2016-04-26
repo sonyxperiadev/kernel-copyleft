@@ -1,0 +1,43 @@
+FPF2495 Voltage regulators
+
+Required properties:
+- compatible: Must be "fairchild,fpf2495-regulator";
+
+Optional properties:
+- gpio_en: gpio to use for enable control
+- startup-delay-us: startup time in microseconds
+- gpio_en-active_low: Polarity of gpio_en is Active low
+If this property is missing, the default assumed is Active high.
+- vin-supply: Input supply name.
+- gpio_flag: gpio to use for receive a signel of flag pin.
+- gpio_flag-active_high: Polarity of gpio_flag is Active high
+If this property is missing, the default assumed is Active low.
+- flag_pull-supply: Supply name to pull the flag pin.
+- oc-delay-ms: dead time for inrush current on Vout.
+
+Any property defined as part of the core regulator
+binding, defined in regulator.txt, can also be used.
+However a fixed voltage regulator is expected to have the
+regulator-min-microvolt and regulator-max-microvolt
+to be the same.
+
+These property does not work on this driver below:
+  regulator-microvolt-offset
+  regulator-boot-on
+  regulator-always-on
+  regulator-min-microamp
+  regulator-max-microamp
+
+Example:
+
+	fpf2495_reg: fpf2495_reg {
+		compatible = "fairchild,fpf2495-regulator";
+		regulator-name = "fpf2495-reg";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		gpio_en = <&gpio1 16 0>;
+		vin-supply = <&parent_reg>;
+		flag_pull-supply = <&pull_reg>;
+		gpio_flag = <&gpio5 3 0>;
+		oc-delay-ms = <300>;
+	};
