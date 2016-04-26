@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef MDSS_PANEL_H
 #define MDSS_PANEL_H
@@ -224,7 +229,32 @@ enum mdss_intf_events {
 	MDSS_EVENT_DSI_RECONFIG_CMD,
 	MDSS_EVENT_DSI_RESET_WRITE_PTR,
 	MDSS_EVENT_PANEL_TIMING_SWITCH,
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	MDSS_EVENT_DISP_ON,
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 };
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+struct change_fps_rtn_pos {
+	int num;
+	int *pos;
+};
+
+struct change_fps {
+	bool enable;
+	u32 disp_clk;
+	u32 dric_vbp;
+	u32 dric_vfp;
+	bool rtn_adj;
+	struct change_fps_rtn_pos rtn_pos;
+	bool te_c_update;
+	u32 threshold;
+	u32 te_c_60fps[2];
+	u32 te_c_45fps[2];
+	u32 te_c_pos[2];
+	bool susres_mode;
+};
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 struct lcd_panel_info {
 	u32 h_back_porch;
@@ -246,6 +276,9 @@ struct lcd_panel_info {
 	u32 yres_pad;
 	u32 h_polarity;
 	u32 v_polarity;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct change_fps chg_fps;
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 };
 
 
@@ -331,6 +364,8 @@ struct mipi_panel_info {
 
 	char lp11_init;
 	u32  init_delay;
+
+	int input_fpks;
 };
 
 struct edp_panel_info {
@@ -465,9 +500,16 @@ struct mdss_panel_info {
 	struct mipi_panel_info mipi;
 	struct lvds_panel_info lvds;
 	struct edp_panel_info edp;
+	const char *panel_id_name;
 
 	/* debugfs structure for the panel */
 	struct mdss_panel_debugfs_info *debugfs_info;
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	int dsi_master;
+	int disp_on_in_hs;
+	int wait_time_before_on_cmd;
+#endif
 };
 
 struct mdss_panel_timing {
@@ -501,6 +543,13 @@ struct mdss_panel_data {
 	struct mdss_panel_info panel_info;
 	void (*set_backlight) (struct mdss_panel_data *pdata, u32 bl_level);
 	unsigned char *mmss_cc_base;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct platform_device *panel_pdev;
+	void (*crash_counter_reset) (void);
+	void (*blackscreen_det) (struct mdss_panel_data *pdata);
+	void (*fff_time_update) (struct mdss_panel_data *pdata);
+	bool resume_started;
+#endif
 
 	/**
 	 * event_handler() - callback handler for MDP core events
@@ -755,5 +804,15 @@ static inline void mdss_panel_info_from_timing(struct mdss_panel_timing *pt,
 static inline struct mdss_panel_timing *mdss_panel_get_timing_by_name(
 		struct mdss_panel_data *pdata,
 		const char *name) { return NULL; };
+#endif
+
+struct msm_fb_data_type;
+#if defined(CONFIG_DEBUG_FS) && defined(CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL)
+void mipi_dsi_panel_create_debugfs(struct msm_fb_data_type *mfd);
+#else
+static inline void mipi_dsi_panel_create_debugfs(struct msm_fb_data_type *mfd)
+{
+	/* empty */
+}
 #endif
 #endif /* MDSS_PANEL_H */

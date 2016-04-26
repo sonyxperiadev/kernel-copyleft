@@ -9,6 +9,11 @@
 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 * GNU General Public License for more details.
 */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 
 #ifndef _APR_AUDIO_V2_H_
@@ -617,6 +622,7 @@ struct adm_session_copp_gain_v5 {
 
 /*  Payload of the #ADM_CMD_MATRIX_MUTE_V5 command*/
 struct adm_cmd_matrix_mute_v5 {
+	struct apr_hdr	hdr;
 	u32                  matrix_id;
 /* Specifies whether the matrix ID is Audio Rx (0) or Audio Tx (1).
  * Use the ADM_MATRIX_ID_AUDIO_RX or  ADM_MATRIX_ID_AUDIOX
@@ -5108,6 +5114,8 @@ struct asm_stream_cmd_open_read_compressed {
 								0x0001070F
 #define ADM_CMD_COPP_OPENOPOLOGY_ID_SPEAKER_MCH_PEAK_VOL \
 								0x0001031B
+#define ADM_CMD_COPP_OPENOPOLOGY_ID_SPEAKER_STEREO_AUDIO_COPP_SOMC_HP \
+								0x11000006
 #define ADM_CMD_COPP_OPENOPOLOGY_ID_MIC_MONO_AUDIO_COPP  0x00010315
 #define ADM_CMD_COPP_OPENOPOLOGY_ID_MIC_STEREO_AUDIO_COPP 0x00010316
 #define AUDPROC_COPPOPOLOGY_ID_MCHAN_IIR_AUDIO           0x00010715
@@ -6377,6 +6385,18 @@ struct asm_iir_filter_config_params {
 #define ASM_PARAM_ID_MBDRC_CONFIG_PARAMS_IMPROVED_FILTBANK_V2 \
 								0x0001070C
 
+/* audio_pp_module_ids
+ * ID of the MMBDRC module version 3 pre/postprocessing block.
+ * This module differs from MBDRCv2 (#ASM_MODULE_ID_MBDRCV2) in
+ * that it supports both 16- and 24-bit data.
+ * This module supports the following parameter ID:
+ * - #ASM_PARAM_ID_MBDRC_ENABLE
+ * - #ASM_PARAM_ID_MBDRC_CONFIG_PARAMS
+ * - #ASM_PARAM_ID_MBDRC_CONFIG_PARAMS_V3
+ * - #ASM_PARAM_ID_MBDRC_FILTER_XOVER_FREQS
+ */
+#define ASM_MODULE_ID_MBDRCV3                                0x0001090B
+
 /* Structure for the enable parameter for an MBDRC module. */
 
 
@@ -7246,6 +7266,45 @@ struct afe_param_id_clip_bank_sel {
 
 	uint32_t bank_map[AFE_CLIP_MAX_BANKS];
 } __packed;
+
+/* SOMC effect start */
+/* Module/Parameter IDs */
+#define ASM_MODULE_ID_SONYBUNDLE            0x10002010
+
+#define PARAM_ID_SB_COMMON_USER_PARAM       0x10002011
+#define PARAM_ID_SB_DYNAMICNORMALIZER_USER_PARAM 0x10002012
+#define PARAM_ID_SB_SFORCE_USER_PARAM       0x10002013
+#define PARAM_ID_SB_VPT20_USER_PARAM        0x10002014
+#define PARAM_ID_SB_CLEARPHASE_HP_USER_PARAM 0x10002015
+#define PARAM_ID_SB_CLEARAUDIO_USER_PARAM   0x10002016
+#define PARAM_ID_SB_CLEARAUDIO_VOLUME_PARAM 0x10002017
+#define PARAM_ID_SB_CLEARPHASE_SP_USER_PARAM 0x10002018
+#define PARAM_ID_SB_XLOUD_USER_PARAM        0x10002019
+
+#define PARAM_ID_SB_CLEARPHASE_HP_TUNING    0x1000201A
+#define PARAM_ID_SB_SFORCE_TUNING           0x1000201B
+#define PARAM_ID_SB_CLEARPHASE_SP_TUNING    0x1000201C
+#define PARAM_ID_SB_XLOUD_TUNING            0x1000201D
+
+#define ASM_STREAM_POSTPROC_TOPO_ID_SONY    0x10002101
+
+struct clearphase_hp_tuning_params {
+	unsigned char coefs[2064];
+} __packed;
+
+struct s_force_tuning_params {
+	unsigned char coefs[1016];
+} __packed;
+
+struct clearphase_sp_tuning_params {
+	unsigned char coefs[2360];
+} __packed;
+
+struct xloud_tuning_params {
+	unsigned int level;
+	unsigned char coefs[512];
+} __packed;
+/* SOMC effect end */
 
 /* ERROR CODES */
 /* Success. The operation completed with no errors. */

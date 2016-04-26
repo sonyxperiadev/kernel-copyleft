@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
 #include <asm/div64.h>
@@ -269,8 +274,13 @@ static uint32_t msm_isp_axi_get_plane_size(
 			size = plane_cfg[plane_idx].output_height *
 				plane_cfg[plane_idx].output_width;
 		else
+#if defined(CONFIG_SONY_CAM_V4L2)
+			size = plane_cfg[plane_idx].output_height *
+				plane_cfg[plane_idx].output_width / 2;
+#else
 			size = plane_cfg[plane_idx].output_height *
 				plane_cfg[plane_idx].output_width;
+#endif
 		break;
 	case V4L2_PIX_FMT_NV14:
 	case V4L2_PIX_FMT_NV41:
@@ -1013,6 +1023,12 @@ void msm_isp_axi_stream_update(struct vfe_device *vfe_dev,
 			axi_data->stream_info[i].state =
 				axi_data->stream_info[i].state ==
 				START_PENDING ? STARTING : STOPPING;
+#if defined(CONFIG_SONY_CAM_V4L2)
+				if (axi_data->stream_info[i].state == STOPPING) {
+					axi_data->stream_info[i].state = INACTIVE;
+					vfe_dev->axi_data.stream_update[frame_src] = 1;
+				}
+#endif
 		} else if (axi_data->stream_info[i].state == STARTING ||
 			axi_data->stream_info[i].state == STOPPING) {
 			axi_data->stream_info[i].state =
@@ -1676,9 +1692,15 @@ static int msm_isp_axi_wait_for_cfg_done(struct vfe_device *vfe_dev,
 		vfe_dev->axi_data.pipeline_update = camif_update;
 	}
 	spin_unlock_irqrestore(&vfe_dev->shared_data_lock, flags);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	rc = wait_for_completion_timeout(
+		&vfe_dev->stream_config_complete,
+		msecs_to_jiffies(vfe_dev->timeout));
+#else
 	rc = wait_for_completion_timeout(
 		&vfe_dev->stream_config_complete,
 		msecs_to_jiffies(VFE_MAX_CFG_TIMEOUT));
+#endif
 	if (rc == 0) {
 		for (i = 0; i < VFE_SRC_MAX; i++) {
 			if (src_mask & (1 << i)) {
@@ -1690,6 +1712,9 @@ static int msm_isp_axi_wait_for_cfg_done(struct vfe_device *vfe_dev,
 			}
 		}
 		pr_err("%s: wait timeout\n", __func__);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		vfe_dev->timeout = 100;
+#endif
 		rc = -EBUSY;
 	} else {
 		rc = 0;

@@ -29,6 +29,11 @@
  * always be lost. RTS will be asserted even while the UART is off in this mode
  * of operation. See msm_serial_hs_platform_data.rx_wakeup_irq.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 
@@ -61,11 +66,13 @@
 #include <linux/ipc_logging.h>
 #include <asm/irq.h>
 #include <linux/kthread.h>
+#include <linux/delay.h>
 
 #include <linux/msm-sps.h>
 #include <linux/platform_data/msm_serial_hs.h>
 #include <linux/msm-bus.h>
 
+#include <linux/bcm43xx_bt_lpm.h>
 #include "msm_serial_hs_hwreg.h"
 #define UART_SPS_CONS_PERIPHERAL 0
 #define UART_SPS_PROD_PERIPHERAL 1
@@ -208,6 +215,7 @@ struct msm_hs_wakeup {
 	unsigned char rx_to_inject;
 	bool enabled;
 	bool freed;
+	struct work_struct resume_work;
 };
 
 struct msm_hs_port {
@@ -220,6 +228,8 @@ struct msm_hs_port {
 	atomic_t clk_count;
 	struct msm_hs_wakeup wakeup;
 	struct wakeup_source ws;
+
+	void (*exit_lpm_cb)(struct uart_port *);
 
 	struct dentry *loopback_dir;
 	struct work_struct clock_off_w; /* work for actual clock off */
@@ -246,11 +256,14 @@ struct msm_hs_port {
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *gpio_state_active;
 	struct pinctrl_state *gpio_state_suspend;
+	struct pinctrl_state *gpio_wake_irq_state_active;
+	struct pinctrl_state *gpio_wake_irq_state_suspend;
 	bool flow_control;
 	enum msm_hs_pm_state pm_state;
 	atomic_t ioctl_count;
 	bool obs; /* out of band sleep flag */
 	atomic_t client_req_state;
+	atomic_t wakeup_irq_disabled_in_isr;
 };
 
 static struct of_device_id msm_hs_match_table[] = {
@@ -1758,6 +1771,10 @@ static void msm_hs_start_tx_locked(struct uart_port *uport)
 		return;
 	}
 
+	if (msm_uport->exit_lpm_cb) {
+		msm_uport->exit_lpm_cb(uport);
+	}
+
 	if (!tx->dma_in_flight) {
 		tx->dma_in_flight = true;
 		queue_kthread_work(&msm_uport->tx.kworker,
@@ -2143,6 +2160,7 @@ void toggle_wakeup_interrupt(struct msm_hs_port *msm_uport)
 {
 	unsigned long flags;
 	struct uart_port *uport = &(msm_uport->uport);
+	int disabled;
 
 	if (!is_use_low_power_wakeup(msm_uport))
 		return;
@@ -2153,12 +2171,20 @@ void toggle_wakeup_interrupt(struct msm_hs_port *msm_uport)
 		spin_lock_irqsave(&uport->lock, flags);
 		msm_uport->wakeup.ignore = 1;
 		MSM_HS_DBG("%s(): Enable Wakeup IRQ", __func__);
+		atomic_set(&msm_uport->wakeup_irq_disabled_in_isr, 0);
 		enable_irq(msm_uport->wakeup.irq);
 		disable_irq(uport->irq);
 		msm_uport->wakeup.enabled = true;
 		spin_unlock_irqrestore(&uport->lock, flags);
 	} else {
-		disable_irq_nosync(msm_uport->wakeup.irq);
+		spin_lock_irqsave(&uport->lock, flags);
+		disabled = atomic_read(&msm_uport->wakeup_irq_disabled_in_isr);
+		if (!disabled)
+			disable_irq_nosync(msm_uport->wakeup.irq);
+		else if (disabled != 1)
+			panic("wakeup irq has been disabled multiple times!");
+		spin_unlock_irqrestore(&uport->lock, flags);
+
 		enable_irq(uport->irq);
 		spin_lock_irqsave(&uport->lock, flags);
 		msm_uport->wakeup.enabled = false;
@@ -2247,43 +2273,64 @@ EXPORT_SYMBOL(msm_hs_request_clock_on);
 
 static irqreturn_t msm_hs_wakeup_isr(int irq, void *dev)
 {
-	unsigned int wakeup = 0;
 	unsigned long flags;
 	struct msm_hs_port *msm_uport = (struct msm_hs_port *)dev;
 	struct uart_port *uport = &msm_uport->uport;
+
+	spin_lock_irqsave(&uport->lock, flags);
+	disable_irq_nosync(msm_uport->wakeup.irq);
+	atomic_inc(&msm_uport->wakeup_irq_disabled_in_isr);
+	spin_unlock_irqrestore(&uport->lock, flags);
+
+	schedule_work(&msm_uport->wakeup.resume_work);
+	return IRQ_HANDLED;
+}
+
+static void msm_hs_wakeup_resume_work(struct work_struct *work)
+{
+	unsigned int wakeup = 0;
+	unsigned long flags;
+	struct msm_hs_port *msm_uport =
+			container_of(work, struct msm_hs_port,
+					wakeup.resume_work);
+	struct uart_port *uport = &msm_uport->uport;
 	struct tty_struct *tty = NULL;
 
-	msm_hs_resource_vote(msm_uport);
-	spin_lock_irqsave(&uport->lock, flags);
+	if (pm_runtime_enabled(uport->dev)) {
+		msm_hs_resource_vote(msm_uport);
+		spin_lock_irqsave(&uport->lock, flags);
 
-	MSM_HS_DBG("%s(): ignore %d\n", __func__,
-			msm_uport->wakeup.ignore);
-	if (msm_uport->wakeup.ignore)
-		msm_uport->wakeup.ignore = 0;
-	else
-		wakeup = 1;
+		MSM_HS_DBG("%s(): ignore %d\n", __func__,
+				msm_uport->wakeup.ignore);
+		if (msm_uport->wakeup.ignore)
+			msm_uport->wakeup.ignore = 0;
+		else
+			wakeup = 1;
 
-	if (wakeup) {
-		/*
-		 * Port was clocked off during rx, wake up and
-		 * optionally inject char into tty rx
-		 */
-		if (msm_uport->wakeup.inject_rx) {
-			tty = uport->state->port.tty;
-			tty_insert_flip_char(tty->port,
-					     msm_uport->wakeup.rx_to_inject,
-					     TTY_NORMAL);
-			MSM_HS_DBG("%s(): Inject 0x%x", __func__,
-				msm_uport->wakeup.rx_to_inject);
+		if (wakeup) {
+			/*
+			 * Port was clocked off during rx, wake up and
+			 * optionally inject char into tty rx
+			 */
+			if (msm_uport->wakeup.inject_rx) {
+				tty = uport->state->port.tty;
+				tty_insert_flip_char(tty->port,
+						msm_uport->wakeup.rx_to_inject,
+						TTY_NORMAL);
+				MSM_HS_DBG("%s(): Inject 0x%x", __func__,
+					msm_uport->wakeup.rx_to_inject);
+			}
 		}
+
+		spin_unlock_irqrestore(&uport->lock, flags);
+		msm_hs_resource_unvote(msm_uport);
+
+		if (wakeup && msm_uport->wakeup.inject_rx)
+			tty_flip_buffer_push(tty->port);
+	} else {
+		usleep(100);
+		schedule_work(&msm_uport->wakeup.resume_work);
 	}
-
-	spin_unlock_irqrestore(&uport->lock, flags);
-	msm_hs_resource_unvote(msm_uport);
-
-	if (wakeup && msm_uport->wakeup.inject_rx)
-		tty_flip_buffer_push(tty->port);
-	return IRQ_HANDLED;
 }
 
 static const char *msm_hs_type(struct uart_port *port)
@@ -2300,8 +2347,14 @@ static void msm_hs_unconfig_uart_gpios(struct uart_port *uport)
 	struct platform_device *pdev = to_platform_device(uport->dev);
 	const struct msm_serial_hs_platform_data *pdata =
 					pdev->dev.platform_data;
+	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 
-	if (pdata) {
+	if (!IS_ERR_OR_NULL(msm_uport->pinctrl)) {
+		pinctrl_select_state(msm_uport->pinctrl,
+				msm_uport->gpio_state_suspend);
+		pinctrl_select_state(msm_uport->pinctrl,
+				msm_uport->gpio_wake_irq_state_suspend);
+	} else if (pdata) {
 		if (gpio_is_valid(pdata->uart_tx_gpio))
 			gpio_free(pdata->uart_tx_gpio);
 		if (gpio_is_valid(pdata->uart_rx_gpio))
@@ -2330,6 +2383,8 @@ static int msm_hs_config_uart_gpios(struct uart_port *uport)
 		MSM_HS_DBG("%s(): Using Pinctrl", __func__);
 		msm_uport->use_pinctrl = true;
 		ret = pinctrl_select_state(msm_uport->pinctrl,
+				msm_uport->gpio_wake_irq_state_active);
+		ret |= pinctrl_select_state(msm_uport->pinctrl,
 				msm_uport->gpio_state_active);
 		if (ret)
 			MSM_HS_ERR("%s(): Failed to pinctrl set_state",
@@ -2431,6 +2486,30 @@ static void msm_hs_get_pinctrl_configs(struct uart_port *uport)
 		MSM_HS_DBG("%s(): Pinctrl state sleep %p\n", __func__,
 			set_state);
 		msm_uport->gpio_state_suspend = set_state;
+
+		set_state = pinctrl_lookup_state(msm_uport->pinctrl,
+						"wake_irq_default");
+		if (IS_ERR_OR_NULL(set_state)) {
+			dev_err(uport->dev,
+				"pinctrl lookup failed for wakeup irq default state");
+			goto pinctrl_fail;
+		}
+
+		MSM_HS_DBG("%s(): Pinctrl wake-irq state active %p\n", __func__,
+			set_state);
+		msm_uport->gpio_wake_irq_state_active = set_state;
+
+		set_state = pinctrl_lookup_state(msm_uport->pinctrl,
+						"wake_irq_sleep");
+		if (IS_ERR_OR_NULL(set_state)) {
+			dev_err(uport->dev,
+				"pinctrl lookup failed for wakeup irq sleep state");
+			goto pinctrl_fail;
+		}
+
+		MSM_HS_DBG("%s(): Pinctrl wake-irq state sleep %p\n", __func__,
+			set_state);
+		msm_uport->gpio_wake_irq_state_suspend = set_state;
 		return;
 	}
 pinctrl_fail:
@@ -2466,7 +2545,7 @@ static int msm_hs_startup(struct uart_port *uport)
 	if (is_use_low_power_wakeup(msm_uport)) {
 		ret = request_threaded_irq(msm_uport->wakeup.irq, NULL,
 					msm_hs_wakeup_isr,
-					IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+					IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
 					"msm_hs_wakeup", msm_uport);
 		if (unlikely(ret)) {
 			MSM_HS_ERR("%s():Err getting uart wakeup_irq\n",
@@ -2579,6 +2658,7 @@ static int msm_hs_startup(struct uart_port *uport)
 	spin_lock_irqsave(&uport->lock, flags);
 	atomic_set(&msm_uport->ioctl_count, 0);
 	atomic_set(&msm_uport->client_req_state, 0);
+	atomic_set(&msm_uport->wakeup_irq_disabled_in_isr, 0);
 	msm_hs_start_rx_locked(uport);
 
 	spin_unlock_irqrestore(&uport->lock, flags);
@@ -2744,6 +2824,8 @@ struct msm_serial_hs_platform_data
 		MSM_HS_ERR("Error: Invalid UART BAM RX EP Pipe Index.\n");
 		return ERR_PTR(-EINVAL);
 	}
+
+	pdata->exit_lpm_cb = bcm_bt_lpm_exit_lpm_locked;
 
 	MSM_HS_DBG("tx_ep_pipe_index:%d rx_ep_pipe_index:%d\n"
 		"tx_gpio:%d rx_gpio:%d rfr_gpio:%d cts_gpio:%d",
@@ -3102,7 +3184,7 @@ static void  msm_serial_hs_rt_init(struct uart_port *uport)
 
 	MSM_HS_INFO("%s(): Enabling runtime pm", __func__);
 	pm_runtime_set_suspended(uport->dev);
-	pm_runtime_set_autosuspend_delay(uport->dev, 100);
+	pm_runtime_set_autosuspend_delay(uport->dev, 5000);
 	pm_runtime_use_autosuspend(uport->dev);
 	mutex_lock(&msm_uport->mtx);
 	msm_uport->pm_state = MSM_HS_PM_SUSPENDED;
@@ -3252,12 +3334,21 @@ static int msm_hs_probe(struct platform_device *pdev)
 	msm_uport->wakeup.inject_rx = pdata->inject_rx_on_wakeup;
 	msm_uport->wakeup.rx_to_inject = pdata->rx_to_inject;
 	msm_uport->obs = pdata->obs;
+	INIT_WORK(&msm_uport->wakeup.resume_work, msm_hs_wakeup_resume_work);
 
 	msm_uport->bam_tx_ep_pipe_index =
 			pdata->bam_tx_ep_pipe_index;
 	msm_uport->bam_rx_ep_pipe_index =
 			pdata->bam_rx_ep_pipe_index;
 	msm_uport->wakeup.enabled = true;
+
+	if (pdata == NULL) {
+		dev_warn(&pdev->dev, "msm_hs_probe() pdata is null\n");
+		msm_uport->exit_lpm_cb = NULL;
+	} else {
+		dev_dbg(&pdev->dev, "msm_hs_probe() set exit_lpm_cb\n");
+		msm_uport->exit_lpm_cb = pdata->exit_lpm_cb;
+	}
 
 	uport->iotype = UPIO_MEM;
 	uport->fifosize = 64;
@@ -3445,6 +3536,7 @@ static void msm_hs_shutdown(struct uart_port *uport)
 				__func__);
 	}
 
+	cancel_work_sync(&msm_uport->wakeup.resume_work);
 	cancel_delayed_work_sync(&msm_uport->rx.flip_insert_work);
 	flush_workqueue(msm_uport->hsuart_wq);
 
