@@ -4,11 +4,7 @@ Configuration files can be found in arch/arm64/configs.
     kitakami_defconfig
 
   diffconfigs for each product:
-    Xperia Z3+ E6553        => ivy_diffconfig
-    Xperia Z3+ Dual E6533   => ivy_dsds_diffconfig
     Xperia Z4 SO-03G        => ivy_dcm_diffconfig
-    Xperia Z4 Tablet SGP771 => karin_diffconfig
-    Xperia Z4 Tablet SGP712 => karin_windy_diffconfig
     Xperia Z4 Tablet SO-05G => karin_dcm_diffconfig
 
 
@@ -43,7 +39,7 @@ How to build your kernel:
       NOTE: Please set the prefix of the ARM cross-compiler.
             ex) aarch64-linux-android-
 
-    $ export KBUILD_DIFFCONFIG=ivy_diffconfig
+    $ export KBUILD_DIFFCONFIG=ivy_dcm_diffconfig
       NOTE: Please set a configuration file you want to build.
 
     $ make kitakami_defconfig

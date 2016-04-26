@@ -884,6 +884,9 @@ static int get_prop_batt_capacity(struct smbchg_chip *chip)
 		pr_smb(PR_STATUS, "Couldn't get capacity rc = %d\n", rc);
 		capacity = DEFAULT_BATT_CAPACITY;
 	}
+#ifdef CONFIG_QPNP_SMBCHARGER_EXTENSION
+	capacity = somc_llk_get_capacity(&chip->somc_params, capacity);
+#endif
 	return capacity;
 }
 
@@ -4527,12 +4530,6 @@ static int smbchg_hw_init(struct smbchg_chip *chip)
 	int rc, i;
 	u8 reg, mask;
 
-#ifdef CONFIG_QPNP_SMBCHARGER_EXTENSION
-	rc = somc_chg_apsd_wait_rerun(chip->dev, chip->misc_base,
-			chip->usb_chgpth_base);
-	if (rc)
-		dev_err(chip->dev, "APSD rerun error rc=%d\n", rc);
-#endif
 	rc = smbchg_read(chip, chip->revision,
 			chip->misc_base + REVISION1_REG, 4);
 	if (rc < 0) {

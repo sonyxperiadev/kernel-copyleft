@@ -173,7 +173,8 @@ struct somc_limit_charge {
 	int			enable_llk;
 	int			llk_socmax;
 	int			llk_socmin;
-	bool		llk_socmax_flg;
+	bool			llk_socmax_flg;
+	bool			llk_fake_capacity;
 };
 
 struct chg_somc_params {
@@ -304,6 +305,7 @@ int somc_chg_shutdown_lowbatt(struct power_supply *bms_psy);
 int somc_chg_usb_en_usr(struct device *dev, bool enable);
 int somc_chg_dc_en_usr(struct device *dev, bool enable);
 enum somc_charge_type somc_llk_check(struct chg_somc_params *params);
+int somc_llk_get_capacity(struct chg_somc_params *params, int capacity);
 void somc_llk_usbdc_present_chk(struct chg_somc_params *params);
 void somc_chg_usbin_notify_changed(struct chg_somc_params *params,
 			bool usb_present);

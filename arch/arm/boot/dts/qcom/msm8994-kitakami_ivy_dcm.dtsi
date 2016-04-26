@@ -76,3 +76,7 @@
 &somc_pinctrl {
 	pinctrl-2 = <&msm_gpio_49_def &msm_gpio_50_def &msm_gpio_51_def &msm_gpio_121_def &msm_gpio_124_def>;
 };
+
+&pmi8994_charger {
+	somc,enable-llk-fake-capacity;
+};

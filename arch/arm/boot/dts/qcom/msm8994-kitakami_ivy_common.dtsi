@@ -531,8 +531,8 @@
 };
 
 &sdhc_2 {
-	qcom,nonremovable;
-	/delete-property/ cd-gpios;
+	interrupt-map-mask = <0x3>;
+	cd-gpios = <&msm_gpio 100 0x0>;
 };
 
 &somc_pinctrl {

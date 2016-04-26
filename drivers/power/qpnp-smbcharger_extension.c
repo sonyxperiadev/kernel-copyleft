@@ -2253,6 +2253,9 @@ int somc_chg_smb_parse_dt(struct device *dev,
 	params->enable_sdp_cdp_weak_notification = of_property_read_bool(node,
 				"somc,enable-sdp-cdp-weak-notification");
 
+	params->limit_charge.llk_fake_capacity = of_property_read_bool(node,
+					"somc,enable-llk-fake-capacity");
+
 	return 0;
 }
 
@@ -2286,6 +2289,26 @@ int somc_chg_shutdown_lowbatt(struct power_supply *bms_psy)
 		}
 	}
 	return 0;
+}
+
+#define FULL_CAPACITY		100
+#define DECIMAL_CEIL		100
+int somc_llk_get_capacity(struct chg_somc_params *params, int capacity)
+{
+	int ceil, magni;
+
+	if (params->limit_charge.llk_fake_capacity &&
+	    params->limit_charge.enable_llk &&
+	    params->limit_charge.llk_socmax) {
+		magni = FULL_CAPACITY * DECIMAL_CEIL /
+					params->limit_charge.llk_socmax;
+		capacity *= magni;
+		ceil = (capacity % DECIMAL_CEIL) ? 1 : 0;
+		capacity = capacity / DECIMAL_CEIL + ceil;
+		if (capacity > FULL_CAPACITY)
+			capacity = FULL_CAPACITY;
+	}
+	return capacity;
 }
 
 void somc_llk_usbdc_present_chk(struct chg_somc_params *params)

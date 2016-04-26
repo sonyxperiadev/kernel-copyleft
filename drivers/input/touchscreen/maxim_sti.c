@@ -1124,6 +1124,14 @@ static int maxim_parse_dt(struct device *dev, struct maxim_sti_pdata *pdata)
 	}
 	pdata->fw_name = (char *)str;
 
+	ret = of_property_read_u32(np, "stylus_support", &val);
+	if (ret) {
+		dev_err(dev, "%s: unable to read stylus_support (%d)\n",
+								__func__, ret);
+		goto fail;
+	}
+	pdata->stylus_support = (u16)val;
+
 	ret = of_property_read_u32(np, "wakeup_gesture_support", &val);
 	if (ret) {
 		dev_err(dev, "%s: unable to read wakeup_gesture_support (%d)\n",
@@ -1591,7 +1599,8 @@ nl_process_driver_msg(struct dev_data *dd, u16 msg_id, u16 msg_len, void *msg)
 #endif
 			__set_bit(EV_SYN, dd->input_dev[i]->evbit);
 			__set_bit(EV_ABS, dd->input_dev[i]->evbit);
-			if (i == (INPUT_DEVICES - 1)) {
+			if (pdata->stylus_support &&
+					(i == (INPUT_DEVICES - 1))) {
 				__set_bit(EV_KEY, dd->input_dev[i]->evbit);
 				__set_bit(BTN_TOOL_RUBBER,
 					  dd->input_dev[i]->keybit);
@@ -1620,7 +1629,8 @@ nl_process_driver_msg(struct dev_data *dd, u16 msg_id, u16 msg_len, void *msg)
 			input_set_abs_params(dd->input_dev[i],
 					     ABS_MT_TRACKING_ID, 0,
 					     MAX_INPUT_EVENTS, 0, 0);
-			if (i == (INPUT_DEVICES - 1))
+			if (pdata->stylus_support &&
+					(i == (INPUT_DEVICES - 1)))
 				input_set_abs_params(dd->input_dev[i],
 						     ABS_MT_TOOL_TYPE, 0,
 						     MT_TOOL_MAX, 0, 0);
