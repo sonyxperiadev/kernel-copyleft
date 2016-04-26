@@ -5,6 +5,11 @@
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "fuse_i.h"
 #include "fuse_shortcircuit.h"
@@ -1277,7 +1282,7 @@ static ssize_t fuse_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	if (err)
 		goto out;
 
-	if (ff && ff->rw_lower_file) {
+	if (ff && ff->rw_lower_file && !pos) {
 		/* Use iocb->ki_pos instead of pos to handle the cases of files
 		 * that are opened with O_APPEND. For example if multiple
 		 * processes open the same file with O_APPEND then the

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/err.h>
@@ -764,6 +769,7 @@ static void log_failure_reason(const struct pil_tz_data *d)
 
 	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
 	pr_err("%s subsystem failure reason: %s.\n", name, reason);
+	update_crash_reason(d->subsys, reason, size);
 
 	smem_reason[0] = '\0';
 	wmb();
@@ -784,6 +790,10 @@ static int subsys_shutdown(const struct subsys_desc *subsys, bool force_stop)
 							subsys->name);
 		gpio_set_value(subsys->force_stop_gpio, 0);
 	}
+
+	if (subsys_get_crash_status(d->subsys) &&
+		subsys_is_ramdump_enabled(d->subsys))
+		d->desc.dump_in_progress = 1;
 
 	pil_shutdown(&d->desc);
 	return 0;
@@ -806,11 +816,16 @@ static int subsys_powerup(const struct subsys_desc *subsys)
 static int subsys_ramdump(int enable, const struct subsys_desc *subsys)
 {
 	struct pil_tz_data *d = subsys_to_data(subsys);
+	int ret = 0;
 
 	if (!enable)
 		return 0;
 
-	return pil_do_ramdump(&d->desc, d->ramdump_dev);
+	ret = pil_do_ramdump(&d->desc, d->ramdump_dev);
+	pil_free_memory(&d->desc);
+	d->desc.dump_in_progress = 0;
+
+	return ret;
 }
 
 static void subsys_free_memory(const struct subsys_desc *subsys)

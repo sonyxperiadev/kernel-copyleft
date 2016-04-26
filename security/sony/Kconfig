@@ -1,0 +1,11 @@
+config SECURITY_SONY_RIC
+	bool "Sony RIC support"
+	depends on SECURITY
+	select SECURITYFS
+	default n
+	help
+	  This selects Sony Runtime Integrity Check security module.
+	  This is to validate mount syscalls on configured disk partitions.
+	  Various partitions and the permissive mount flags can be configured
+	  through device tree.
+	  If you are unsure how to answer this question, answer N.
