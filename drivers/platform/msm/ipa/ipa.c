@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/clk.h>
 #include <linux/compat.h>
@@ -1286,7 +1291,7 @@ static int ipa_q6_clean_q6_tables(void)
 	u32 *entry;
 
 	mem.base = dma_alloc_coherent(ipa_ctx->pdev, 4, &mem.phys_base,
-		GFP_KERNEL);
+		GFP_ATOMIC);
 	if (!mem.base) {
 		IPAERR("failed to alloc DMA buff of size %d\n", mem.size);
 		return -ENOMEM;
@@ -1543,23 +1548,17 @@ int ipa_q6_cleanup(void)
 		BUG();
 	}
 
-	/*
-	 * Q6 relies on the AP to reset all Q6 IPA pipes.
-	 * In case the uC is not loaded, or upon any failure in the pipe reset
-	 * sequence, we have to assert.
-	 */
-	if (!ipa_ctx->uc_ctx.uc_loaded) {
-		IPAERR("uC is not loaded, can't reset Q6 pipes\n");
-		BUG();
+	if (!atomic_read(&ipa_ctx->uc_ctx.uc_loaded)) {
+		IPAERR("uC is not loaded, won't reset Q6 pipes\n");
+	} else {
+		for (client_idx = 0; client_idx < IPA_CLIENT_MAX; client_idx++)
+			if (IPA_CLIENT_IS_Q6_CONS(client_idx) ||
+			    IPA_CLIENT_IS_Q6_PROD(client_idx)) {
+				res = ipa_uc_reset_pipe(client_idx);
+				if (res)
+					BUG();
+			}
 	}
-
-	for (client_idx = 0; client_idx < IPA_CLIENT_MAX; client_idx++)
-		if (IPA_CLIENT_IS_Q6_CONS(client_idx) ||
-		    IPA_CLIENT_IS_Q6_PROD(client_idx)) {
-			res = ipa_uc_reset_pipe(client_idx);
-			if (res)
-				BUG();
-		}
 
 	ipa_ctx->q6_proxy_clk_vote_valid = true;
 	return 0;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/init.h>
@@ -494,7 +499,7 @@ static void voip_process_ul_pkt(uint8_t *voc_pkt,
 		pr_debug("%s: pkt_len =%d, frame.pktlen=%d, timestamp=%d\n",
 			 __func__, pkt_len, buf_node->frame.pktlen, timestamp);
 
-		prtd->pcm_capture_irq_pos += prtd->pcm_capture_count;
+		prtd->pcm_capture_irq_pos += buf_node->frame.pktlen;
 		spin_unlock_irqrestore(&prtd->dsp_ul_lock, dsp_flags);
 		snd_pcm_period_elapsed(prtd->capture_substream);
 	} else {
@@ -656,7 +661,7 @@ static void voip_process_dl_pkt(uint8_t *voc_pkt, void *private_data)
 		pr_debug("%s: frame.pktlen=%d\n", __func__,
 			 buf_node->frame.pktlen);
 
-		prtd->pcm_playback_irq_pos += prtd->pcm_count;
+		prtd->pcm_playback_irq_pos += buf_node->frame.pktlen;
 		spin_unlock_irqrestore(&prtd->dsp_lock, dsp_flags);
 		snd_pcm_period_elapsed(prtd->playback_substream);
 	} else {

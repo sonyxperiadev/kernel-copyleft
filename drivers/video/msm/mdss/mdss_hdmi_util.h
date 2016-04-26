@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __HDMI_UTIL_H__
 #define __HDMI_UTIL_H__
@@ -272,6 +277,9 @@ void hdmi_reset_resv_timing_info(void);
 
 /* todo: Fix this. Right now this is defined in mdss_hdmi_tx.c */
 void *hdmi_get_featuredata_from_sysfs_dev(struct device *device, u32 type);
+
+/* get hdmi panel power is on or not*/
+ssize_t hdmi_tx_is_HDMI_panel_power_on(struct device *device);
 
 /* DDC */
 void hdmi_ddc_config(struct hdmi_tx_ddc_ctrl *);

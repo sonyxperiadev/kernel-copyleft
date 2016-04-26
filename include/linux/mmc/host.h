@@ -7,6 +7,11 @@
  *
  *  Host driver specific definitions.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_HOST_H
 #define LINUX_MMC_HOST_H
 
@@ -331,6 +336,7 @@ struct mmc_host {
 #define MMC_CAP2_HS400		(MMC_CAP2_HS400_1_8V | \
 				 MMC_CAP2_HS400_1_2V)
 #define MMC_CAP2_NONHOTPLUG	(1 << 25)	/*Don't support hotplug*/
+#define MMC_CAP2_AWAKE_SUPP	(1 << 27)	/* use CMD5 awake */
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
 	int			clk_requests;	/* internal reference counter */
@@ -356,6 +362,7 @@ struct mmc_host {
 	spinlock_t		lock;		/* lock for claim and bus ops */
 
 	struct mmc_ios		ios;		/* current io bus settings */
+	struct mmc_ios		cached_ios;
 	u32			ocr;		/* the current OCR setting */
 
 	/* group bitfields together to minimize padding */
@@ -388,7 +395,11 @@ struct mmc_host {
 	unsigned int		bus_resume_flags;
 #define MMC_BUSRESUME_MANUAL_RESUME	(1 << 0)
 #define MMC_BUSRESUME_NEEDS_RESUME	(1 << 1)
+#define MMC_BUSRESUME_IS_RESUMING	(1 << 2)
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	wait_queue_head_t	defer_wq;
+#endif
 	unsigned int		sdio_irqs;
 	struct task_struct	*sdio_irq_thread;
 	bool			sdio_irq_pending;
@@ -460,6 +471,9 @@ struct mmc_host {
 	 */
 	bool			card_clock_off;
 	bool			wakeup_on_idle;
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	bool			rescan_exec_flag;
+#endif
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
@@ -490,6 +504,7 @@ static inline void *mmc_priv(struct mmc_host *host)
 #define mmc_hostname(x)	(dev_name(&(x)->class_dev))
 #define mmc_bus_needs_resume(host) ((host)->bus_resume_flags & MMC_BUSRESUME_NEEDS_RESUME)
 #define mmc_bus_manual_resume(host) ((host)->bus_resume_flags & MMC_BUSRESUME_MANUAL_RESUME)
+#define mmc_bus_is_resuming(host) ((host)->bus_resume_flags & MMC_BUSRESUME_IS_RESUMING)
 
 static inline void mmc_set_bus_resume_policy(struct mmc_host *host, int manual)
 {

@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/sched.h>
 #include <linux/sched/sysctl.h>
@@ -140,6 +145,7 @@ struct task_group {
 #ifdef CONFIG_SCHED_HMP
 	bool upmigrate_discouraged;
 #endif
+	bool sched_boost;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* schedulable entities of this group on each cpu */
@@ -425,6 +431,7 @@ struct rq {
 	 * remote CPUs use both these fields when doing load calculation.
 	 */
 	unsigned int nr_running;
+	unsigned int nr_pinned_tasks;
 	#define CPU_LOAD_IDX_MAX 5
 	unsigned long cpu_load[CPU_LOAD_IDX_MAX];
 	unsigned long last_load_update_tick;
@@ -517,6 +524,7 @@ struct rq {
 	u64 window_start;
 	int prefer_idle;
 	u32 mostly_idle_load;
+	u32 mostly_occupied_load;
 	int mostly_idle_nr_run;
 	int mostly_idle_freq;
 	unsigned long hmp_flags;
@@ -720,7 +728,11 @@ extern void init_new_task_load(struct task_struct *p);
 #define WINDOW_STATS_MAX		1
 #define WINDOW_STATS_MAX_RECENT_AVG	2
 #define WINDOW_STATS_AVG		3
-#define WINDOW_STATS_INVALID_POLICY	4
+#define WINDOW_STATS_MAX_RECENT_WMA	4
+#define WINDOW_STATS_WMA		5
+#define WINDOW_STATS_MAX_RECENT_EWA	6
+#define WINDOW_STATS_EWA		7
+#define WINDOW_STATS_INVALID_POLICY	8
 
 extern struct mutex policy_mutex;
 extern unsigned int sched_ravg_window;
@@ -974,6 +986,12 @@ static inline bool task_notify_on_migrate(struct task_struct *p)
 	return task_group(p)->notify_on_migrate;
 }
 
+static inline bool task_sched_boost(struct task_struct *p)
+{
+	return task_group(p)->sched_boost &&
+		TASK_NICE(p) <= sysctl_sched_upmigrate_min_nice;
+}
+
 /* Change a task's cfs_rq and parent entity if it moves across CPUs/groups */
 static inline void set_task_rq(struct task_struct *p, unsigned int cpu)
 {
@@ -1000,6 +1018,10 @@ static inline struct task_group *task_group(struct task_struct *p)
 	return NULL;
 }
 static inline bool task_notify_on_migrate(struct task_struct *p)
+{
+	return false;
+}
+static inline bool task_sched_boost(struct task_struct *p)
 {
 	return false;
 }

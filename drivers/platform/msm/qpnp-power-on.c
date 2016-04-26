@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -69,12 +74,21 @@
 #define QPNP_PON_PS_HOLD_RST_CTL2(base)		(base + 0x5B)
 #define QPNP_PON_WD_RST_S2_CTL(base)		(base + 0x56)
 #define QPNP_PON_WD_RST_S2_CTL2(base)		(base + 0x57)
+#ifdef CONFIG_PON_SOMC_ORG
+#define QPNP_PON_SW_RESET_S2_CTL(base)		(base + 0x62)
+#define QPNP_PON_SW_RESET_S2_CTL2(base)		(base + 0x63)
+#define QPNP_PON_SW_RESET_GO(base)		(base + 0x64)
+#endif /* CONFIG_PON_SOMC_ORG */
 #define QPNP_PON_S3_SRC(base)			(base + 0x74)
 #define QPNP_PON_S3_DBC_CTL(base)		(base + 0x75)
 #define QPNP_PON_TRIGGER_EN(base)		(base + 0x80)
+#define QPNP_PON_DVDD_RB_SPARE(base)		(base + 0x8D)
 #define QPNP_PON_XVDD_RB_SPARE(base)		(base + 0x8E)
 #define QPNP_PON_SOFT_RB_SPARE(base)		(base + 0x8F)
 #define QPNP_PON_SEC_ACCESS(base)		(base + 0xD0)
+#ifdef CONFIG_PON_SOMC_ORG
+#define QPNP_PON_EN_UVLO(base)			(base + 0xF2)
+#endif /* CONFIG_PON_SOMC_ORG */
 
 #define QPNP_PON_SEC_UNLOCK			0xA5
 
@@ -110,6 +124,17 @@
 #define QPNP_PON_HARD_RESET_MASK		PON_MASK(7, 5)
 
 #define QPNP_PON_UVLO_DLOAD_EN		BIT(7)
+
+#ifdef CONFIG_PON_SOMC_ORG
+#define QPNP_PON_DVDD_SHUTDOWN_SET		0x05
+#define QPNP_PON_SW_RESET_EN_SET		0x80
+#define QPNP_PON_SW_RESET_GO_SET		0xA5
+#define QPNP_PON_DVDD_SHUTDOWN_MASK		0xFF
+#define QPNP_PON_SW_RESET_EN_MASK		0xFF
+#define QPNP_PON_SW_RESET_GO_MASK		0xFF
+#define QPNP_PON_EN_UVLO_VOL_THRESH		0xC0
+#define QPNP_PON_EN_UVLO_MASK			0xFE
+#endif /* CONFIG_PON_SOMC_ORG */
 
 /* Ranges */
 #define QPNP_PON_S1_TIMER_MAX			10256
@@ -409,6 +434,24 @@ static int qpnp_pon_reset_config(struct qpnp_pon *pon,
 	return rc;
 }
 
+static void qpnp_pon_rb_spare_config(struct qpnp_pon *pon,
+		enum pon_power_off_type type)
+{
+	int rc;
+	u16 rb_spare_reg;
+
+	if (type == PON_POWER_OFF_SHUTDOWN) {
+		rb_spare_reg = QPNP_PON_DVDD_RB_SPARE(pon->base);
+		rc = qpnp_pon_masked_write(pon, rb_spare_reg, 0xFF, 0xA5);
+		if (rc)
+			dev_err(&pon->spmi->dev,
+					"Unable to write to addr=%hx, rc(%d)\n",
+					rb_spare_reg, rc);
+	}
+
+	return;
+}
+
 /**
  * qpnp_pon_system_pwr_off - Configure system-reset PMIC for shutdown or reset
  * @type: Determines the type of power off to perform - shutdown, reset, etc
@@ -447,6 +490,7 @@ int qpnp_pon_system_pwr_off(enum pon_power_off_type type)
 		dev_emerg(&pon->spmi->dev,
 				"PMIC@SID%d: configuring PON for reset\n",
 				pon->spmi->sid);
+		qpnp_pon_rb_spare_config(pon, type);
 		rc = qpnp_pon_reset_config(pon, type);
 		if (rc) {
 			dev_err(&pon->spmi->dev, "Error configuring secondary PON rc: %d\n",
@@ -538,6 +582,44 @@ int qpnp_pon_trigger_config(enum pon_trigger_source pon_src, bool enable)
 	return rc;
 }
 EXPORT_SYMBOL(qpnp_pon_trigger_config);
+
+#ifdef CONFIG_PON_SOMC_ORG
+int qpnp_pon_dvdd_shutdown(void)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	int rc;
+
+	if (!pon)
+		return -EPROBE_DEFER;
+
+	rc = qpnp_pon_masked_write(pon, QPNP_PON_SW_RESET_S2_CTL(pon->base),
+					QPNP_PON_DVDD_SHUTDOWN_MASK,
+					QPNP_PON_DVDD_SHUTDOWN_SET);
+	if (rc)
+		dev_err(&pon->spmi->dev,
+			"Unable to write to addr=%x, rc(%d)\n",
+			QPNP_PON_SW_RESET_S2_CTL(pon->base), rc);
+
+	rc = qpnp_pon_masked_write(pon, QPNP_PON_SW_RESET_S2_CTL2(pon->base),
+					QPNP_PON_SW_RESET_EN_MASK,
+					QPNP_PON_SW_RESET_EN_SET);
+	if (rc)
+		dev_err(&pon->spmi->dev,
+			"Unable to write to addr=%x, rc(%d)\n",
+			QPNP_PON_SW_RESET_S2_CTL2(pon->base), rc);
+
+	rc = qpnp_pon_masked_write(pon, QPNP_PON_SW_RESET_GO(pon->base),
+					QPNP_PON_SW_RESET_GO_MASK,
+					QPNP_PON_SW_RESET_GO_SET);
+	if (rc)
+		dev_err(&pon->spmi->dev,
+			"Unable to write to addr=%x, rc(%d)\n",
+			QPNP_PON_SW_RESET_GO(pon->base), rc);
+
+	return rc;
+}
+EXPORT_SYMBOL(qpnp_pon_dvdd_shutdown);
+#endif /* CONFIG_PON_SOMC_ORG */
 
 /*
  * This function stores the PMIC warm reset reason register values. It also
@@ -1465,6 +1547,79 @@ static struct kernel_param_ops dload_on_uvlo_ops = {
 };
 
 module_param_cb(dload_on_uvlo, &dload_on_uvlo_ops, &dload_on_uvlo, 0644);
+
+#ifdef CONFIG_PON_SOMC_ORG
+static int qpnp_pon_debugfs_enable_uvlo_get(char *buf,
+		const struct kernel_param *kp)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	int rc = 0;
+	u8 reg;
+
+	if (!pon)
+		return -ENODEV;
+
+	rc = spmi_ext_register_readl(pon->spmi->ctrl, pon->spmi->sid,
+			QPNP_PON_EN_UVLO(pon->base), &reg, 1);
+	if (rc) {
+		dev_err(&pon->spmi->dev,
+			"Unable to read addr=%x, rc(%d)\n",
+			QPNP_PON_EN_UVLO(pon->base), rc);
+		return rc;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "0x%02x", reg);
+}
+
+static int qpnp_pon_debugfs_enable_uvlo_set(const char *val,
+		const struct kernel_param *kp)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	int rc = 0;
+	u8 reg;
+
+	if (!pon)
+		return -ENODEV;
+
+	rc = spmi_ext_register_readl(pon->spmi->ctrl, pon->spmi->sid,
+			QPNP_PON_EN_UVLO(pon->base), &reg, 1);
+	if (rc) {
+		dev_err(&pon->spmi->dev,
+			"Unable to read addr=%x, rc(%d)\n",
+			QPNP_PON_EN_UVLO(pon->base), rc);
+		return rc;
+	}
+
+	reg &= ~QPNP_PON_EN_UVLO_MASK;
+	reg |= QPNP_PON_EN_UVLO_VOL_THRESH;
+
+	rc = qpnp_pon_masked_write(pon, QPNP_PON_SEC_ACCESS(pon->base),
+				0xFF, QPNP_PON_SEC_UNLOCK);
+	if (rc) {
+		dev_err(&pon->spmi->dev, "Unable to do SEC_ACCESS rc:%d\n",
+			rc);
+		return rc;
+	}
+
+	rc = spmi_ext_register_writel(pon->spmi->ctrl, pon->spmi->sid,
+			QPNP_PON_EN_UVLO(pon->base), &reg, 1);
+	if (rc) {
+		dev_err(&pon->spmi->dev,
+			"Unable to write to addr=%hx, rc(%d)\n",
+				QPNP_PON_EN_UVLO(pon->base), rc);
+		return rc;
+	}
+
+	return 0;
+}
+
+static struct kernel_param_ops enable_uvlo_ops = {
+	.set = qpnp_pon_debugfs_enable_uvlo_set,
+	.get = qpnp_pon_debugfs_enable_uvlo_get,
+};
+
+module_param_cb(enable_uvlo, &enable_uvlo_ops, NULL, 0644);
+#endif /* CONFIG_PON_SOMC_ORG */
 
 #if defined(CONFIG_DEBUG_FS)
 

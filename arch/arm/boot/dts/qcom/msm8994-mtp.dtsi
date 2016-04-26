@@ -9,9 +9,14 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "msm8994-pinctrl.dtsi"
-#include "msm8994-camera-sensor-mtp.dtsi"
+/* #include "msm8994-camera-sensor-mtp.dtsi" */
 
 / {
 	bt_qca6174 {
@@ -346,11 +351,6 @@
 	qcom,mdss-dsi-min-refresh-rate = <30>;
 };
 
-&pmx_hdmi_cec {
-	qcom,num-grp-pins = <1>;
-	qcom,pins = <&gp 31>;
-};
-
 &pmx_hdmi_ddc {
 	qcom,num-grp-pins = <2>;
 	qcom,pins = <&gp 32>, <&gp 33>;
@@ -363,18 +363,11 @@
 
 &mdss_hdmi_tx {
 	pinctrl-names = "hdmi_hpd_active", "hdmi_ddc_active",
-				"hdmi_cec_active", "hdmi_active",
-				"hdmi_sleep";
-	pinctrl-0 = <&mdss_hdmi_hpd_active &mdss_hdmi_ddc_suspend
-						&mdss_hdmi_cec_suspend>;
-	pinctrl-1 = <&mdss_hdmi_hpd_active &mdss_hdmi_ddc_active
-						&mdss_hdmi_cec_suspend>;
-	pinctrl-2 = <&mdss_hdmi_hpd_active &mdss_hdmi_cec_active
-						&mdss_hdmi_ddc_suspend>;
-	pinctrl-3 = <&mdss_hdmi_hpd_active &mdss_hdmi_ddc_active
-						&mdss_hdmi_cec_active>;
-	pinctrl-4 = <&mdss_hdmi_hpd_suspend &mdss_hdmi_ddc_suspend
-						&mdss_hdmi_cec_suspend>;
+				"hdmi_active", "hdmi_sleep";
+	pinctrl-0 = <&mdss_hdmi_hpd_active &mdss_hdmi_ddc_suspend>;
+	pinctrl-1 = <&mdss_hdmi_hpd_active &mdss_hdmi_ddc_active>;
+	pinctrl-2 = <&mdss_hdmi_hpd_active &mdss_hdmi_ddc_active>;
+	pinctrl-3 = <&mdss_hdmi_hpd_suspend &mdss_hdmi_ddc_suspend>;
 };
 
 &soc {
@@ -651,8 +644,13 @@
 		qcom,cdc-vdd-spkdrv-2-voltage = <5000000 5000000>;
 		qcom,cdc-vdd-spkdrv-2-current = <600000>;
 
+		cdc-vdd-anc-hph-supply = <&pm8994_l12>;
+		qcom,cdc-vdd-anc-hph-voltage = <1800000 1800000>;
+		qcom,cdc-vdd-anc-hph-current = <0>; /* No curr load expected */
+
 		qcom,cdc-on-demand-supplies = "cdc-vdd-spkdrv",
-					      "cdc-vdd-spkdrv-2";
+					      "cdc-vdd-spkdrv-2",
+					      "cdc-vdd-anc-hph";
 	};
 };
 
@@ -761,7 +759,6 @@
 
 /{
 	mtp_batterydata: qcom,battery-data {
-		qcom,batt-id-range-pct = <15>;
 		#include "batterydata-itech-3000mah.dtsi"
 	};
 };

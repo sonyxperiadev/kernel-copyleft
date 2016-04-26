@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "MSM-CPP %s:%d " fmt, __func__, __LINE__
 
@@ -164,7 +169,11 @@ static struct msm_bus_scale_pdata msm_cpp_bus_scale_data = {
 	qcmd;			 \
 })
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+#define MSM_CPP_MAX_TIMEOUT_TRIAL 3
+#else
 #define MSM_CPP_MAX_TIMEOUT_TRIAL 0
+#endif
 
 struct msm_cpp_timer_data_t {
 	struct cpp_device *cpp_dev;
@@ -1120,7 +1129,11 @@ static int cpp_init_hardware(struct cpp_device *cpp_dev)
 			__func__, rc);
 		goto req_irq_fail;
 	}
+#if defined(CONFIG_SONY_CAM_V4L2)
+	pr_debug("stream_cnt:%d\n", cpp_dev->stream_cnt);
+#else
 	pr_err("stream_cnt:%d\n", cpp_dev->stream_cnt);
+#endif
 	cpp_dev->stream_cnt = 0;
 	if (cpp_dev->is_firmware_loaded == 1) {
 		disable_irq(cpp_dev->irq->start);

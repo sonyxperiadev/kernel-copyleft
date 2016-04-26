@@ -9,6 +9,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/bitops.h>
 #include <linux/err.h>
@@ -20,6 +25,9 @@
 #include <linux/mmc/mmc.h>
 #include <linux/pm_runtime.h>
 #include <linux/reboot.h>
+#ifdef CONFIG_MMC_FFU
+#include <linux/firmware.h>
+#endif
 
 #include "core.h"
 #include "bus.h"
@@ -586,14 +594,24 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 			card->ext_csd.data_tag_unit_size = 0;
 		}
 
-		card->ext_csd.max_packed_writes =
-			ext_csd[EXT_CSD_MAX_PACKED_WRITES];
+		card->ext_csd.max_packed_writes = 8;
 		card->ext_csd.max_packed_reads =
 			ext_csd[EXT_CSD_MAX_PACKED_READS];
 	} else {
 		card->ext_csd.data_sector_size = 512;
 	}
 
+	/* eMMC v5 or later */
+	if (card->ext_csd.rev >= 7) {
+		memcpy(card->ext_csd.fwrev, &ext_csd[EXT_CSD_FIRMWARE_VERSION],
+		       MMC_FIRMWARE_LEN);
+		card->ext_csd.ffu_capable =
+			(ext_csd[EXT_CSD_SUPPORTED_MODE] & 0x1) &&
+			!(ext_csd[EXT_CSD_FW_CONFIG] & 0x1);
+#ifdef CONFIG_MMC_FFU
+		card->ext_csd.ffu_mode_op = ext_csd[EXT_CSD_FFU_FEATURES];
+#endif
+	}
 out:
 	return err;
 }
@@ -669,7 +687,7 @@ MMC_DEV_ATTR(csd, "%08x%08x%08x%08x\n", card->raw_csd[0], card->raw_csd[1],
 MMC_DEV_ATTR(date, "%02d/%04d\n", card->cid.month, card->cid.year);
 MMC_DEV_ATTR(erase_size, "%u\n", card->erase_size << 9);
 MMC_DEV_ATTR(preferred_erase_size, "%u\n", card->pref_erase << 9);
-MMC_DEV_ATTR(fwrev, "0x%x\n", card->cid.fwrev);
+MMC_DEV_ATTR(ffu_capable, "%d\n", card->ext_csd.ffu_capable);
 MMC_DEV_ATTR(hwrev, "0x%x\n", card->cid.hwrev);
 MMC_DEV_ATTR(manfid, "0x%06x\n", card->cid.manfid);
 MMC_DEV_ATTR(name, "%s\n", card->cid.prod_name);
@@ -682,6 +700,22 @@ MMC_DEV_ATTR(enhanced_area_size, "%u\n", card->ext_csd.enhanced_area_size);
 MMC_DEV_ATTR(raw_rpmb_size_mult, "%#x\n", card->ext_csd.raw_rpmb_size_mult);
 MMC_DEV_ATTR(rel_sectors, "%#x\n", card->ext_csd.rel_sectors);
 
+static ssize_t mmc_fwrev_show(struct device *dev,
+			      struct device_attribute *attr,
+			      char *buf)
+{
+	struct mmc_card *card = mmc_dev_to_card(dev);
+
+	if (card->ext_csd.rev < 7) {
+		return sprintf(buf, "0x%x\n", card->cid.fwrev);
+	} else {
+		return sprintf(buf, "0x%*phN\n", MMC_FIRMWARE_LEN,
+			       card->ext_csd.fwrev);
+	}
+}
+
+static DEVICE_ATTR(fwrev, S_IRUGO, mmc_fwrev_show, NULL);
+
 static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_cid.attr,
 	&dev_attr_csd.attr,
@@ -689,6 +723,7 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_erase_size.attr,
 	&dev_attr_preferred_erase_size.attr,
 	&dev_attr_fwrev.attr,
+	&dev_attr_ffu_capable.attr,
 	&dev_attr_hwrev.attr,
 	&dev_attr_manfid.attr,
 	&dev_attr_name.attr,
@@ -1696,6 +1731,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		}
 	}
 
+	memcpy(&host->cached_ios, &host->ios, sizeof(host->cached_ios));
 	return 0;
 
 free_card:
@@ -1849,28 +1885,53 @@ out:
 	return err;
 }
 
-/*
- * Resume callback from host.
- *
- * This function tries to determine if the same card is still present
- * and, if so, restore all state to it.
- */
-static int mmc_resume(struct mmc_host *host)
+static int mmc_partial_init(struct mmc_host *host)
+{
+	int err = 0;
+	struct mmc_card *card = host->card;
+	u32 tuning_cmd;
+
+	pr_debug("%s: %s: bw: %d timing: %d clock: %d\n", mmc_hostname(host),
+		__func__,  host->cached_ios.bus_width,  host->cached_ios.timing,
+		host->cached_ios.clock);
+
+	mmc_set_bus_width(host, host->cached_ios.bus_width);
+	mmc_set_timing(host, host->cached_ios.timing);
+	mmc_set_clock(host, host->cached_ios.clock);
+
+	if (host->ops->execute_tuning && (mmc_card_hs200(card) ||
+					  mmc_card_hs400(card))) {
+		mmc_host_clk_hold(host);
+
+		if (mmc_card_hs200(card))
+			tuning_cmd = MMC_SEND_TUNING_BLOCK_HS200;
+		else if (mmc_card_hs400(card))
+			tuning_cmd = MMC_SEND_TUNING_BLOCK_HS400;
+
+		err = host->ops->execute_tuning(host,
+				tuning_cmd);
+
+		mmc_host_clk_release(host);
+	}
+	if (err)
+		pr_err("%s: tuning execution failed\n",
+			   mmc_hostname(host));
+	return err;
+}
+
+static int mmc_resume_init_card(struct mmc_host *host)
 {
 	int err;
 	int retries;
 
-	BUG_ON(!host);
-	BUG_ON(!host->card);
-
-	mmc_claim_host(host);
 	retries = 3;
 	while (retries) {
 		err = mmc_init_card(host, host->ocr, host->card);
 
 		if (err) {
-			pr_err("%s: MMC card re-init failed rc = %d (retries = %d)\n",
-			       mmc_hostname(host), err, retries);
+			pr_err(
+			 "%s: MMC card re-init failed rc = %d (retries = %d)\n",
+			 mmc_hostname(host), err, retries);
 			retries--;
 			mmc_power_off(host);
 			usleep_range(5000, 5500);
@@ -1880,6 +1941,47 @@ static int mmc_resume(struct mmc_host *host)
 		}
 		break;
 	}
+	return err;
+}
+
+/*
+ * Resume callback from host.
+ *
+ * This function tries to determine if the same card is still present
+ * and, if so, restore all state to it.
+ */
+static int mmc_resume(struct mmc_host *host)
+{
+	int err;
+
+	BUG_ON(!host);
+	BUG_ON(!host->card);
+
+	mmc_claim_host(host);
+
+	if (host->caps2 & MMC_CAP2_AWAKE_SUPP) {
+		err = mmc_card_awake(host);
+		if (err) {
+			pr_err("%s: %s: failed (%d) awake using CMD5\n",
+			       mmc_hostname(host),  __func__, err);
+
+			err = mmc_resume_init_card(host);
+		} else {
+			err = mmc_partial_init(host);
+			if (!err) {
+				err = mmc_cache_ctrl(host, 1);
+				if (err) {
+					pr_err("%s: %s faild (%d) cache_ctrl\n",
+					    mmc_hostname(host), __func__, err);
+
+					err = mmc_resume_init_card(host);
+				}
+			} else
+				err = mmc_resume_init_card(host);
+		}
+	} else
+		err = mmc_resume_init_card(host);
+
 	mmc_release_host(host);
 
 	/*
@@ -1999,6 +2101,93 @@ static void mmc_attach_bus_ops(struct mmc_host *host)
 	mmc_attach_bus(host, bus_ops);
 }
 
+#ifdef CONFIG_MMC_FFU
+static int mmc_ffu_ops(struct mmc_host *host)
+{
+	static bool ffu_done;
+	int err;
+	char *token;
+	char *catalog;
+	char *cur_pos;
+	const char *catalog_path = "/emmc/catalog.txt";
+	const struct firmware *fw = NULL;
+
+	/* ffu_ops must be handled once */
+	if (ffu_done)
+		return 0;
+	ffu_done = true;
+
+	err = request_firmware(&fw, catalog_path, NULL);
+	if (err) {
+		pr_info("FFU: %s: Firmware catalog was not found %s %d\n",
+			mmc_hostname(host), catalog_path, err);
+		return 0;
+	}
+
+	if (!fw) {
+		pr_info("FFU: %s: Couldn't acquire a handle"
+			"from request_firmware()", mmc_hostname(host));
+		return 0;
+	}
+
+	if (fw->size <= 0) {
+		pr_info("FFU: %s: Firmware catalog size is ZERO\n",
+			mmc_hostname(host));
+		return 0;
+	}
+
+	catalog = kzalloc(fw->size + 1, GFP_KERNEL);
+	if (!catalog) {
+		release_firmware(fw);
+		return 0;
+	}
+	memcpy(catalog, fw->data, fw->size);
+	release_firmware(fw);
+
+	cur_pos = catalog;
+	while ((token = strsep(&cur_pos, "\n")) && *token != '\0') {
+		err = mmc_ffu_invoke(host->card, token);
+		/* Error handling */
+		if (err == -EOPNOTSUPP)
+			break; /* exit from this loop now */
+		else if (err == -EINVAL)
+			continue; /* try next fw */
+		/* else: The case which needs reinitialization of the card */
+
+		mmc_remove_card(host->card);
+		host->card = NULL;
+
+		/* Restart the eMMC */
+		mmc_power_off(host);
+		usleep_range(5000, 5500);
+		mmc_power_up(host);
+		mmc_select_voltage(host, host->ocr);
+
+		if (mmc_init_card(host, host->ocr, NULL)) {
+			/* Reinit error occured */
+			kfree(catalog);
+			return -EINVAL;
+		}
+
+		/* Check err code of mmc_ffu_invoke() */
+		if (err)
+			continue; /* try next fw */
+		/* else: mmc_ffu_invoke() successfully done (err == 0) */
+
+		if (mmc_ffu_check_status(host->card))
+			continue;
+
+		pr_info("FFU: %s: End FFU operation name=%s current=0x%02x\n",
+			mmc_hostname(host), token,
+			host->card->ext_csd.fwrev[0]);
+
+	}
+	kfree(catalog);
+
+	return 0;
+}
+#endif
+
 /*
  * Starting point for MMC card init.
  */
@@ -2058,6 +2247,14 @@ int mmc_attach_mmc(struct mmc_host *host)
 	err = mmc_init_card(host, host->ocr, NULL);
 	if (err)
 		goto err;
+
+#ifdef CONFIG_MMC_FFU
+	if (host->card->ext_csd.ffu_capable) {
+		err = mmc_ffu_ops(host);
+		if (err)
+			goto err;
+	}
+#endif
 
 	mmc_release_host(host);
 	err = mmc_add_card(host->card);
