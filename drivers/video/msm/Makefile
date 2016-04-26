@@ -56,6 +56,7 @@ obj-$(CONFIG_FB_MSM_HDMI_MHL_8334) += mhl-8334.o
 else
 endif
 endif
+obj-$(CONFIG_FB_MSM_LOGO) += logo.o
 
 obj-$(CONFIG_MSM_VIDC_1080P) += vidc/
 obj-$(CONFIG_MSM_VIDC_720P) += vidc/

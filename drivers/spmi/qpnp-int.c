@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
@@ -634,6 +639,8 @@ static int __qpnpint_handle_irq(struct spmi_controller *spmi_ctrl,
 		pr_warn("%d triggered [0x%01x, 0x%02x,0x%01x] %s\n",
 				irq, spec->slave, spec->per, spec->irq, name);
 	} else {
+		pr_warn("%d triggered [0x%01x, 0x%02x,0x%01x]\n",
+				irq, spec->slave, spec->per, spec->irq);
 		generic_handle_irq(irq);
 	}
 

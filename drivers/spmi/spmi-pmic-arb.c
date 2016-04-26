@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "#%d: " fmt, __LINE__
 
@@ -848,7 +853,7 @@ periph_interrupt(struct spmi_pmic_arb_dev *pmic_arb, u8 apid, bool show)
 		mb();
 	}
 
-	dev_dbg(pmic_arb->dev,
+	dev_info(pmic_arb->dev,
 		"interrupt, apid:0x%x, sid:0x%x, pid:0x%x, intr:0x%x\n",
 						apid, sid, pid, status);
 
@@ -884,7 +889,7 @@ __pmic_arb_periph_irq(int irq, void *dev_id, bool show)
 	int last = pmic_arb->max_apid >> 5;
 	int i, j;
 
-	dev_dbg(pmic_arb->dev, "Peripheral interrupt detected\n");
+	dev_info(pmic_arb->dev, "Peripheral interrupt detected\n");
 
 	/* Check the accumulated interrupt status */
 	for (i = first; i <= last; ++i) {

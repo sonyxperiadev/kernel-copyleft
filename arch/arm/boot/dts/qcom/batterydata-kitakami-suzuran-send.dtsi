@@ -1,0 +1,60 @@
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2015 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+qcom,kitakami-suzuran-send {
+	qcom,max-voltage-uv = <4350000>;
+	qcom,v-cutoff-uv = <3400000>;
+	qcom,chg-term-ua = <100000>;
+	qcom,batt-id-kohm = <222>;
+	qcom,battery-type = "1293-8715";
+	qcom,fg-profile-data = [
+		 DE 83 6D 7C
+		 7A 80 0A 76
+		 50 83 04 6C
+		 2F 88 D8 8E
+		 10 82 18 99
+		 06 B7 A4 C2
+		 5C 12 D9 82
+		 6A 78 F5 75
+		 70 70 22 83
+		 17 7A 09 87
+		 80 82 4D 82
+		 03 98 4F B5
+		 E7 C0 7D 15
+		 18 0B F2 59
+		 CE 6E 8B FC
+		 D1 32 B7 44
+		 DE 2B 00 00
+		 49 3D 96 38
+		 7A 44 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 DD 71 BF 70
+		 0E 7C 1A 78
+		 1A 77 84 69
+		 91 74 7D 79
+		 07 77 8C 69
+		 DD 87 12 C0
+		 0C DA 5A C1
+		 4E A0 71 0C
+		 28 00 FF 36
+		 F0 11 30 03
+		 00 00 00 00
+	];
+};

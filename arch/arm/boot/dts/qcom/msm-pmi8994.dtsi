@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 &spmi_bus {
 	#address-cells = <1>;
@@ -196,6 +201,7 @@
 			qcom,parallel-usb-min-current-ma = <1400>;
 			qcom,parallel-usb-9v-min-current-ma = <900>;
 			qcom,parallel-allowed-lowering-ma = <500>;
+			qcom,autoadjust-vfloat;
 
 			qcom,chgr@1000 {
 				reg = <0x1000 0x100>;
@@ -304,6 +310,7 @@
 			qcom,cycle-counter-low-soc = <15>;
 			qcom,cycle-counter-high-soc = <85>;
 			qcom,capacity-learning-on;
+			qcom,fg-cc-cv-threshold-mv = <4340>;
 
 			qcom,fg-soc@4000 {
 				status = "okay";
@@ -433,6 +440,8 @@
 			lab_regulator: qcom,lab@de00 {
 				reg = <0xde00 0x100>;
 				reg-names = "lab";
+				interrupts = <0x3 0xde 0x0>;
+				interrupt-names = "lab_vreg_not_ok_interrupt";
 				regulator-name = "lab_reg";
 
 				regulator-min-microvolt = <4600000>;
@@ -462,6 +471,8 @@
 
 			ibb_regulator: qcom,ibb@dc00 {
 				reg = <0xdc00 0x100>;
+				interrupts = <0x3 0xdc 0x0>;
+				interrupt-names = "ibb_vreg_not_ok_interrupt";
 				reg-names = "ibb_reg";
 				regulator-name = "ibb_reg";
 

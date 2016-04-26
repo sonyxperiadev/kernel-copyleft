@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/slab.h>
 #include <linux/kthread.h>
 #include <linux/kernel.h>
@@ -4924,6 +4929,26 @@ int voc_set_device_mute(uint32_t session_id, uint32_t dir, uint32_t mute,
 	return ret;
 }
 
+int voc_get_tx_device_mute(uint32_t session_id)
+{
+	struct voice_data *v = voice_get_session(session_id);
+	int ret = 0;
+
+	if (v == NULL) {
+		pr_err("%s: invalid session_id 0x%x\n", __func__, session_id);
+
+		return -EINVAL;
+	}
+
+	mutex_lock(&v->lock);
+
+	ret = v->dev_tx.dev_mute;
+
+	mutex_unlock(&v->lock);
+
+	return ret;
+}
+
 int voc_get_rx_device_mute(uint32_t session_id)
 {
 	struct voice_data *v = voice_get_session(session_id);
@@ -5220,11 +5245,11 @@ int voc_standby_voice_call(uint32_t session_id)
 	u16 mvm_handle;
 	int ret = 0;
 
-	pr_debug("%s: voc state=%d", __func__, v->voc_state);
 	if (v == NULL) {
 		pr_err("%s: v is NULL\n", __func__);
 		return -EINVAL;
 	}
+	pr_debug("%s: voc state=%d", __func__, v->voc_state);
 	if (v->voc_state == VOC_RUN) {
 		apr_mvm = common.apr_q6_mvm;
 		if (!apr_mvm) {

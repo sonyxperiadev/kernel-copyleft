@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/jiffies.h>
 #include <linux/sched.h>
@@ -676,15 +681,12 @@ static void handle_event_change(enum command_response cmd, void *data)
 			* try_state and event_notify due to inst->sync_lock.
 			*/
 
-			mutex_lock(&inst->lock);
 			if (inst->state >= MSM_VIDC_STOP ||
 				inst->core->state == VIDC_CORE_INVALID) {
 				dprintk(VIDC_ERR,
 					"Event release buf ref received in invalid state - discard\n");
-				mutex_unlock(&inst->lock);
 				return;
 			}
-			mutex_unlock(&inst->lock);
 
 			/*
 			* Get the buffer_info entry for the
@@ -709,8 +711,6 @@ static void handle_event_change(enum command_response cmd, void *data)
 				"RELEASE REFERENCE EVENT FROM F/W - fd = %d offset = %d\n",
 				ptr[0], ptr[1]);
 
-			mutex_lock(&inst->sync_lock);
-
 			/* Decrement buffer reference count*/
 			mutex_lock(&inst->registeredbufs.lock);
 			list_for_each_entry(temp, &inst->registeredbufs.list,
@@ -720,7 +720,6 @@ static void handle_event_change(enum command_response cmd, void *data)
 					break;
 				}
 			}
-			mutex_unlock(&inst->registeredbufs.lock);
 
 			/*
 			* Release buffer and remove from list
@@ -729,7 +728,7 @@ static void handle_event_change(enum command_response cmd, void *data)
 			if (unmap_and_deregister_buf(inst, binfo))
 				dprintk(VIDC_ERR,
 				"%s: buffer unmap failed\n", __func__);
-			mutex_unlock(&inst->sync_lock);
+			mutex_unlock(&inst->registeredbufs.lock);
 
 			/*send event to client*/
 			v4l2_event_queue_fh(&inst->event_handler, &buf_event);
@@ -1693,8 +1692,6 @@ void handle_cmd_response(enum command_response cmd, void *data)
 		handle_seq_hdr_done(cmd, data);
 		break;
 	case SYS_WATCHDOG_TIMEOUT:
-		handle_sys_error(cmd, data);
-		break;
 	case SYS_ERROR:
 		handle_sys_error(cmd, data);
 		break;
@@ -1900,6 +1897,7 @@ static int msm_comm_session_abort(struct msm_vidc_inst *inst)
 {
 	int rc = 0, abort_completion = 0;
 	struct hfi_device *hdev;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
 
 	if (!inst || !inst->core || !inst->core->device) {
 		dprintk(VIDC_ERR, "%s invalid params\n", __func__);
@@ -1922,6 +1920,10 @@ static int msm_comm_session_abort(struct msm_vidc_inst *inst)
 		dprintk(VIDC_ERR,
 				"%s: Wait interrupted or timed out [%p]: %d\n",
 				__func__, inst, abort_completion);
+		snprintf(crash_reason, sizeof(crash_reason),
+			  "%s: Wait interrupted or timed out [%p]: %d",
+			  __func__, inst, abort_completion);
+		subsystem_crash_reason("venus", crash_reason);
 		rc = -EBUSY;
 	} else {
 		rc = 0;
@@ -2468,9 +2470,11 @@ int msm_comm_suspend(int core_id)
 		return -EINVAL;
 	}
 
+	mutex_lock(&core->lock);
 	rc = call_hfi_op(hdev, suspend, hdev->hfi_device_data);
 	if (rc)
 		dprintk(VIDC_WARN, "Failed to suspend\n");
+	mutex_unlock(&core->lock);
 
 	return rc;
 }
