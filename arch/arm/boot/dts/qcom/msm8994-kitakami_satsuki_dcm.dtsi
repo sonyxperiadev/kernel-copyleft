@@ -1,0 +1,56 @@
+/* arch/arm/boot/dts/qcom/msm8994-kitakami_satsuki_dcm.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2015 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+&soc {
+	isdbt_tuner: ej121 {
+		compatible = "sony,ej121";
+		interrupt-parent = <&pm8994_gpios>;
+		interrupts = <9 0>;
+		gpios = <&pmi8994_gpios 3 0>, /* ANT_POWER */
+			<&pmi8994_gpios 4 0>, /* ANT_SWITCH */
+			<&msm_gpio 102 0>, /* TUNER_POWER */
+			<&msm_gpio 39 0>, /* TUNER_RESET */
+			<&pm8994_gpios 9 0>; /* TUNER_INT */
+	};
+    i2c@f9924000 {
+            felica_ldo@1e {
+                    compatible = "rohm,bd7602";
+                    reg = <0x1e>;
+            };
+            felica@29 {
+                    compatible = "sony,cxd224x";
+                    reg = <0x29>;
+                    interrupt-parent = <&msm_gpio>;
+                    interrupts = <29 0x2002>;
+                    cxd224x,irq_gpio = <&msm_gpio 29 0>;
+                    cxd224x,wake_gpio = <&msm_gpio 30 0>;
+
+                    pinctrl-names = "felica_active","felica_suspend";
+                    pinctrl-0 = <&msm_gpio_29_felica_act>;
+                    pinctrl-1 = <&msm_gpio_29_felica_sus>;
+
+                    clocks = <&clock_rpm clk_bb_clk2_pin>;
+                    clock-names = "felica_clk";
+            };
+    };
+};
+
+&pmi8994_charger {
+	somc,enable-llk-fake-capacity;
+};

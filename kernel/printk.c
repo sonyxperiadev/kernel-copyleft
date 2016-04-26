@@ -15,6 +15,11 @@
  * Rewrote bits to get rid of console_lock
  *	01Mar01 Andrew Morton
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -47,6 +52,10 @@
 #include <linux/utsname.h>
 
 #include <asm/uaccess.h>
+
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/printk.h>
@@ -885,6 +894,24 @@ void log_buf_kexec_setup(void)
 	VMCOREINFO_OFFSET(log, len);
 	VMCOREINFO_OFFSET(log, text_len);
 	VMCOREINFO_OFFSET(log, dict_len);
+}
+#endif
+
+#ifdef CONFIG_RAMDUMP_TAGS
+int log_buf_ramdump_setup(void)
+{
+	int count = 0;
+
+	if (!rdtags_tag_symbol(__log_buf))
+		count++;
+	if (!rdtags_tag_symbol(log_buf_len))
+		count++;
+	if (!rdtags_tag_symbol(log_first_idx))
+		count++;
+	if (!rdtags_tag_symbol(log_next_idx))
+		count++;
+
+	return count;
 }
 #endif
 
