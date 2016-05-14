@@ -2492,6 +2492,13 @@ static int msm8952_asoc_machine_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	ret = core_get_adsp_ver();
+	if (ret < 0) {
+		ret = -EPROBE_DEFER;
+		dev_dbg(&pdev->dev, "%s: Get adsp version failed (%d)\n",
+						__func__, ret);
+		goto err;
+	}
 	ret = snd_soc_register_card(card);
 	if (ret) {
 		if (codec_reg_done)
