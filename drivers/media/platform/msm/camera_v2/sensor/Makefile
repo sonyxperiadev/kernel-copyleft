@@ -12,3 +12,4 @@ obj-$(CONFIG_OV2685) += ov2685.o
 obj-$(CONFIG_OV2685_SCV3B4035) += ov2685_scv3b4035.o
 obj-$(CONFIG_OV5645) += ov7695.o
 obj-$(CONFIG_GC0310) += gc0310.o
+obj-$(CONFIG_SONY_CAM_V4L2) += sony_camera_v4l2.o

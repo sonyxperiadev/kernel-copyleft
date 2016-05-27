@@ -893,6 +893,13 @@ config USB_ANDROID_RNDIS_DWORD_ALIGNED
 	help
 		Provides dword aligned for DMA controller.
 
+config USB_ANDROID_PRODUCTION
+	boolean "Production capable Android gadget"
+	depends on USB_G_ANDROID
+	default n
+	help
+		Provides an Android gadget where iSerialNumber is set to 0.
+
 if TTY
 
 config USB_CDC_COMPOSITE
@@ -1121,5 +1128,11 @@ config RMNET_SDIO_SMD_DATA_CHANNEL
        default "DATA40"
        help
 	  Data SMD channel for transferring network data
+
+config USB_MIRRORLINK
+       boolean "Handle MirrorLink USB command"
+       default n
+       help
+         Enabling this option adds support for MirrorLink USB command.
 
 endif # USB_GADGET

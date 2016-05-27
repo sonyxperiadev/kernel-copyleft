@@ -14,4 +14,9 @@ obj-$(CONFIG_MSM_VIDC_V4L2) := 	msm_v4l2_vidc.o \
 				venus_boot.o \
 				msm_vidc_dcvs.o \
 
+ifneq ($(TARGET_BUILD_VARIANT), user)
+CFLAGS_msm_vidc_common.o := \
+				-DSYSTEM_RESET_WITH_VENUS_CRASH
+endif
+
 obj-$(CONFIG_MSM_VIDC_VMEM) += vmem/

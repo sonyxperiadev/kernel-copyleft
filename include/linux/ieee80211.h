@@ -11,6 +11,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef LINUX_IEEE80211_H
 #define LINUX_IEEE80211_H
@@ -2039,15 +2044,22 @@ enum ieee80211_sa_query_action {
 #define WLAN_CIPHER_SUITE_SMS4		0x00147201
 
 #define WLAN_CIPHER_SUITE_SMS4		0x00147201
+#define WLAN_CIPHER_SUITE_PMK		0x00904C00
 
 /* AKM suite selectors */
 #define WLAN_AKM_SUITE_8021X		0x000FAC01
 #define WLAN_AKM_SUITE_PSK		0x000FAC02
+#define WLAN_AKM_SUITE_FT_8021X		0x000FAC03
+#define WLAN_AKM_SUITE_FT_PSK		0x000FAC04
 #define WLAN_AKM_SUITE_8021X_SHA256	0x000FAC05
 #define WLAN_AKM_SUITE_PSK_SHA256	0x000FAC06
 #define WLAN_AKM_SUITE_TDLS		0x000FAC07
 #define WLAN_AKM_SUITE_SAE		0x000FAC08
 #define WLAN_AKM_SUITE_FT_OVER_SAE	0x000FAC09
+/* WAPI */
+
+#define WLAN_AKM_SUITE_WAPI_PSK         0x000FAC13 // BCM WAPI
+#define WLAN_AKM_SUITE_WAPI_CERT        0x000FAC14 // BCM WAPI
 
 #define WLAN_MAX_KEY_LEN		32
 

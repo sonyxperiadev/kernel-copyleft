@@ -1,0 +1,25 @@
+Fairchild USB Type-C Controller
+
+Required properties:
+- compatible: must be "fusb301"
+- reg: i2c slave address
+- interrupts : the interrupt number
+- interrupt-parent : the phandle for the interrupt controller that
+  services interrupts for this device.
+- fusb301,irq_gpio: the phandle for the gpio that to receive interrupt
+  from controller.
+- fusb301,cbl_det-gpio: the phandle for the gpio that to detect a
+  USB cable.
+
+Example:
+	i2c@7af6000 {
+		fusb301@25 {
+			status = "okay";
+			compatible = "fusb301";
+			reg = <0x25>;
+			interrupt-parent = <&msm_gpio>;
+			interrupts = <107 0x3>, <131 0x2>;
+			fusb301,irq_gpio = <&msm_gpio 131 0x00>;
+			fusb301,cbl_det-gpio = <&msm_gpio 107 0x00>;
+		};
+	};

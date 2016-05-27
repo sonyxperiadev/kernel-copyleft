@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _LINUX_TIME_H
 #define _LINUX_TIME_H
 
@@ -193,6 +198,9 @@ extern int timekeeping_inject_offset(struct timespec *ts);
 extern s32 timekeeping_get_tai_offset(void);
 extern void timekeeping_set_tai_offset(s32 tai_offset);
 extern void timekeeping_clocktai(struct timespec *ts);
+#ifdef CONFIG_RAMDUMP_TAGS
+int timekeeping_ramdump_setup(void);
+#endif
 
 struct tms;
 extern void do_sys_times(struct tms *);

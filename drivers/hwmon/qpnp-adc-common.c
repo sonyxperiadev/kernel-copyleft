@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
@@ -582,6 +587,44 @@ static const struct qpnp_vadc_map_pt adcmap_100k_104ef_104fb[] = {
 	{59,	115},
 	{51,	120},
 	{44,	125}
+};
+
+/* Voltage to temperature */
+static const struct qpnp_vadc_map_pt adcmap_100k_104ef_104fb_decidegc[] = {
+	{1758,	-400},
+	{1742,	-350},
+	{1719,	-300},
+	{1691,	-250},
+	{1654,	-200},
+	{1608,	-150},
+	{1551,	-100},
+	{1483,	-50},
+	{1404,	0},
+	{1315,	50},
+	{1218,	100},
+	{1114,	150},
+	{1007,	200},
+	{900,	250},
+	{795,	300},
+	{696,	350},
+	{605,	400},
+	{522,	450},
+	{448,	500},
+	{383,	550},
+	{327,	600},
+	{278,	650},
+	{237,	700},
+	{202,	750},
+	{172,	800},
+	{146,	850},
+	{125,	900},
+	{107,	950},
+	{92,	1000},
+	{79,	1050},
+	{68,	1100},
+	{59,	1150},
+	{51,	1200},
+	{44,	1250}
 };
 
 /* Voltage to temperature */
@@ -1263,6 +1306,40 @@ int32_t qpnp_adc_scale_therm_pu2(struct qpnp_vadc_chip *chip,
 	return 0;
 }
 EXPORT_SYMBOL(qpnp_adc_scale_therm_pu2);
+
+int32_t qpnp_adc_scale_therm_pu2_decidegc(struct qpnp_vadc_chip *chip,
+		int32_t adc_code,
+		const struct qpnp_adc_properties *adc_properties,
+		const struct qpnp_vadc_chan_properties *chan_properties,
+		struct qpnp_vadc_result *adc_chan_result)
+{
+	int64_t therm_voltage = 0;
+	int32_t rc = -EINVAL;
+
+	if (!chip || !adc_properties || !chan_properties || !adc_chan_result)
+		goto error;
+
+	if (chan_properties->calib_type == CALIB_ABSOLUTE) {
+		therm_voltage = qpnp_adc_scale_absolute_calib(adc_code,
+			adc_properties, chan_properties);
+		if (therm_voltage < 0)
+			goto error;
+
+		do_div(therm_voltage , 1000);
+	} else {
+		therm_voltage = qpnp_adc_scale_ratiometric_calib(adc_code,
+			adc_properties, chan_properties);
+		if (therm_voltage < 0)
+			goto error;
+	}
+
+	rc = qpnp_adc_map_voltage_temp(adcmap_100k_104ef_104fb_decidegc,
+		ARRAY_SIZE(adcmap_100k_104ef_104fb_decidegc),
+		therm_voltage, &adc_chan_result->physical);
+error:
+	return rc;
+}
+EXPORT_SYMBOL(qpnp_adc_scale_therm_pu2_decidegc);
 
 int32_t qpnp_adc_tm_scale_voltage_therm_pu2(struct qpnp_vadc_chip *chip,
 					uint32_t reg, int64_t *result)

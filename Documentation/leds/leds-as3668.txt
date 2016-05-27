@@ -1,0 +1,253 @@
+AS3668 LED Driver documentation
+-------------------------------
+Author: Florian Lobmaier <florian.lobmaier@austriamicrosystems.com>
+Last update: 2012-02-01
+
+This document describes how to use the led driver for AS3668. The AS3668 is
+accessed via i2c. It provides support for 4 current sinks for LEDs and a rich
+set of advanced features like dimming, complex pattern generation and
+audio LEDs.
+
+How do I configure it?
+==========
+
+1. Configure it in config by selecting
+
+CONFIG_NEW_LEDS=y
+CONFIG_LEDS_CLASS=y
+CONFIG_LEDS_AS3668=y
+
+2. Configure the driver according to the schematic  by filling out the
+as3668_platform_data. Additionally it is possible to provide
+meaningful names to different sinks instead of the default names
+("as3668::curr1", ...). To support correct functionality of RGB Led function
+set, the meaningful names have to match "red", "green", and "blue" for the
+RGB Led. Add it to the list of attached devices when
+registering the proper i2c bus.
+
+Where do I find it in rootfs?
+==========
+
+The leds can be found under /sys/class/leds/. Getting to the parent
+device can be done by:
+cd /sys/class/leds/as3668::curr1 (if default names are used) and
+cd ../..
+
+On the beagleboard we end up in
+/sys/devices/platform/i2c_omap.2/i2c-adapter/i2c-2/2-0042
+But this varies on different platforms.
+
+How do I use it?
+==========
+
+When you found the device using above procedure you will see the
+following folder structure:
+
+There are attributes per LED and attributes global to the AS3668 affecting
+potentially all LEDs.
+The different attributes will be discussed in the proper feature subsection.
+These are:
+
+General
+---
+
+All attributes are read- and writeable unless otherwise noted.
+
+* debug: reading it allows to read out all the registers of AS3668. The
+    format is:
+    "<reg_name> <address>: <value_from_shadow> -> <real_read_out_value>"
+    For debugging purposes only it can also be used to write registers on the
+    device by writing strings of the form "0x00=0x0d"
+
+* audio_adc_mode: define audio ADC mode. Range 0-1.
+    0 ... linear ADC
+    1 ... logarithmic ADC
+
+* audio_adc_on: switch on/off audio ADC. Range 0(off)-1(on).
+    Set automatically if audio_src_mask and audio_on attributes are used.
+
+* audio_agc_decay_down_ms: audio AGC decay down time in ms. Range 131-524 ms.
+
+* audio_agc_decay_up_ms: audio AGC decay up time in ms. Range 262-1049 ms.
+
+* audio_agc_up_level_inc: enable/disable increased audio AGC up switching
+    level threshold. Range 0-1.
+    0 ... normal AGC up switching level threshold
+    1 ... AGC up switching threshold increased
+
+* audio_agc_down_level_inc: enable/disable increased audio AGC down switching
+    level threshold. Range 0-1.
+    0 ... normal AGC down switching level threshold
+    1 ... AGC down switching threshold increased
+
+* audio_agc_on: switch on/off audio AGC. Range 0(off)-1(on).
+    Set automatically if audio_src_mask and audio_on attributes are used.
+
+* audio_buffer_on: switch on/off audio input buffer. Range 0(off)-1(on).
+    Set automatically if audio_src_mask and audio_on attributes are used.
+
+* audio_decay_ms: audio decay time in ms. Range 10-80 ms.
+
+* audio_gain_dB: audio gain in dB. Range -6dB - +25dB.
+
+* audio_sync_mode: audio sync mode selection. Range 0-6.
+    0 ... 4 LED bar code
+    1 ... 4 LED bar code with dimming
+    2 ... running LED bar code
+    3 ... running LED bar code with dimming
+    4 ... RGB
+    5 ... RGB with dimming
+    6 ... 4 LED parallel with dimming
+
+* audio_src_mask: set LED mask for audio feature. Range 0x00-0x0F.
+    bit 0 ... curr1
+    bit 1 ... curr2
+    bit 2 ... curr3
+    bit 3 ... curr4
+    Example: enable audio on curr1, curr3 and curr4 - set mask to 0x0d.
+
+* audio_on: enable/disable audio feature with previous set settings.
+    Range 0-1.
+    0 ... switch-off ADC, AGC, Audio Input Buffer and switch-off LEDs
+          selected by audio_src_mask.
+    1 ... set audio_brightness of each LED to current register of
+          LEDs selected by audio_src_mask, set LEDs to On-Mode and
+          select audio enable for LEDs. Enable ADC, AGC and Audio
+          Input Buffer.
+
+* cp_auto_on: enable/disable automatic charge pump mode. Range 0-1.
+    0 ... manual mode
+    1 ... automatic mode
+
+* cp_clock_khz: charge pump clock in kHz. Range 500-1000kHz.
+
+* cp_mode: set charge pump mode. Range 0-1.
+    0 ... 1:1 mode
+    1 ... 1:2 mode
+
+* cp_mode_switching: set automatic or manual charge pump mode. Range 0-1.
+    0 ... automatic mode
+    1 ... manual mode
+
+* cp_on : switch on/off charge pump. Range 0(off)-1(on).
+
+* gpio_input_state: actual gpio input state. Range 0-1 (read-only).
+
+* gpio_output_state: set gpio output state. Range 0-1 (write-only).
+
+* gpio_toggle_enable: enable GPIO toggle feature. Range 0(off)-1(on).
+
+* gpio_toggle_frame_nr: set GPIO toggle frame number. Range 1-4.
+    1 ... 1 frame
+    2 ... 2 frames
+    3 ... 3 frames
+    4 ... 4 frames
+
+* pwm_dim_direction: set pwm dimming direction. Range 0-1.
+    0 ... dimming direction down
+    1 ... dimming direction up
+
+* pwm_dim_shape: set pwm dimming shape. Range 0-1.
+    0 ... logarithmic ramp
+    1 ... linear ramp
+
+* pwm_dim_mask: set LED mask for pwm dimming. Range 0x00-0x0F.
+    bit 0 ... curr1
+    bit 1 ... curr2
+    bit 2 ... curr3
+    bit 3 ... curr4
+    Example: enable dimming on curr1, curr3 and curr4 - set mask to 0x0d.
+
+* pwm_dim_start: start pwm dimming for LEDs selected by pwm_dim_mask.
+    Range 0-1. Write 1 to start dimming, reset to 0 automatically after
+    corresponding dim time defined by pattern_pwm_dim_speed_up/down_ms.
+
+* pattern_pwm_dim_speed_down_ms: set pattern/pwm dim speed down in ms.
+    Range 0-8300 ms.
+
+* pattern_pwm_dim_speed_up_ms: set pattern/pwm dim speed up in ms.
+    Range 0-8300 ms.
+
+* pattern_fade_out: enable/disable pattern fade-out functionality.
+    Range 0-1. Must be set before pattern is started.
+    0 ... stop pattern immediately
+    1 ... stop pattern after current pattern loop is finished
+
+* pattern_multiple_pulse_number: set multiple pulse number for pattern.
+    Range 1-4. Must be set before pattern is started.
+
+* pattern_tp_led_ms: set pattern multiple pulse pause time in ms.
+    Range 0-540 ms. Must be set before pattern is started.
+
+* pattern_time_off_ms: set pattern off time in ms. Range 80-8400 ms.
+
+* pattern_time_on_ms: set pattern on time in ms. Range 40-4200 ms.
+
+* pattern_predef_run_num: run a pre-defined pattern from leds-as3668_pattern.h
+    file. Specify the number of the pre-defined pattern to execute.
+    Range 0-maximum number of predefined patterns or 255.
+
+* pattern_source_mask: set LED mask for pattern. Range 0x00-0x0F.
+    bit 0 ... curr1
+    bit 1 ... curr2
+    bit 2 ... curr3
+    bit 3 ... curr4
+    Example: enable pattern on curr1, curr3 and curr4 - set mask to 0x0d.
+
+* pattern_run: start/stop pattern with previous set settings. Range 0-1.
+    0 ... stop pattern
+    1 ... start pattern
+
+LED
+---
+* brightness: per LED regular led class brightness value. Range is 0-255. The
+    brightness can be limited by filling out the platform data parameter
+    max_current_uA. Note that reducing maximum brightness will also map some
+    values 1..n to actual brightness max_current_uA.
+    Brightness value times 100 equals current in uA.
+
+* pwm_dim_brightness: per LED brightness value used for PWM dimming.
+    Range is 0-255. Brightness value times 100 equals current in uA.
+
+* pattern_brightness: per LED brightness value used for pattern mode.
+    Range is 0-255. Brightness value times 100 equals current in uA.
+
+* trigger: per LED configurable trigger source. Can be used to enable HW
+    or SW timer based blinking of LED.
+
+* delay_off: per LED configurable off time in ms. File occurs when timer
+    trigger source is enabled. Range 80-8400 ms.
+
+* delay_on: per LED configurable on time in ms. File occurs when timer
+    trigger source is enabled. Range 40-4200 ms.
+
+* pattern_frame_delay: per LED configurable frame delay for pattern mode.
+    Range is 0-3.
+    0 ... no delay
+    1 ... 1 frame delay
+    2 ... 2 frames delay
+    3 ... 3 frames delay
+
+* pattern_frame_mask: per LED configurable frame mask for pattern mode.
+    Range is 0-3.
+    0 ... no frame mask
+    1 ... mask 1 frame
+    2 ... mask 2 frames
+    3 ... mask 3 frames
+
+* mode: per LED configurable mode of LED. Range is 0-3.
+    0 ... off mode
+    1 ... on mode
+    2 ... PWM mode
+    3 ... pattern mode
+
+* audio_enable: per LED configurable audio mode enable. Range 0-1.
+
+* audio_brightness: per LED brightness value used for audio mode started with
+    audio_on attribute.
+    Range 0-255. Brightness value times 100 equals current in uA.
+
+* max_brightness: maximum brightness value of each LED defined by
+    max_current_uA parameter in platform data (read-only)
+
+* low_voltage_status: low voltage status of each LED (read-only)
