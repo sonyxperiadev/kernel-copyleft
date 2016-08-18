@@ -63,7 +63,6 @@
 #define MDP_PP_AD_BL_LINEAR_INV	0x1
 
 /* Enables Sonys feature Early Unblank for quick wakeup */
-#define SOMC_FEATURE_EARLY_UNBLANK
 
 #ifdef SOMC_FEATURE_EARLY_UNBLANK
 #include <linux/workqueue.h>
