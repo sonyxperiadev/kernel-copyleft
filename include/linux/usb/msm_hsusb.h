@@ -14,6 +14,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __ASM_ARCH_MSM_HSUSB_H
 #define __ASM_ARCH_MSM_HSUSB_H
@@ -171,6 +176,7 @@ enum usb_chg_type {
 	USB_ACA_DOCK_CHARGER,
 	USB_PROPRIETARY_CHARGER,
 	USB_FLOATED_CHARGER,
+	USB_RETRY_DET_CHARGER,
 };
 
 /**
@@ -230,6 +236,8 @@ enum usb_id_state {
  *              for msm_otg driver.
  * @phy_init_seq: PHY configuration sequence. val, reg pairs
  *              terminated by -1.
+ * @phy_init_seq_host: PHY configuration sequence for host mode. val, reg pairs
+ *              terminated by -1.
  * @vbus_power: VBUS power on/off routine.It should return result
  *		as success(zero value) or failure(non-zero value).
  * @power_budget: VBUS power budget in mA (0 will be treated as 500mA).
@@ -285,9 +293,12 @@ enum usb_id_state {
  * @bool enable_streaming: Indicates whether streaming to be enabled by default.
  * @bool enable_axi_prefetch: Indicates whether AXI Prefetch interface is used
 		for improving data performance.
+ * @usb_switch_sel_gpio: Gpio used for controlling switch that routing D+/D-
+		to the PMIC.
  */
 struct msm_otg_platform_data {
 	int *phy_init_seq;
+	int *phy_init_seq_host;
 	int (*vbus_power)(bool on);
 	unsigned power_budget;
 	enum usb_mode_type mode;
@@ -324,6 +335,7 @@ struct msm_otg_platform_data {
 	bool enable_axi_prefetch;
 	struct clk *system_clk;
 	struct clk *pclk;
+	int usb_switch_sel_gpio;
 };
 
 /* phy related flags */
@@ -446,6 +458,7 @@ struct msm_otg_platform_data {
  * @buf: Dynamic Debug Buffer.
  * @max_nominal_system_clk_rate: max freq at which system clock can run in
 		nominal mode.
+ * @usbin_state: Indicates VBUS line status.
  */
 struct msm_otg {
 	struct usb_phy phy;
@@ -486,6 +499,7 @@ struct msm_otg {
 #define B_BUS_REQ	16
 #define MHL	        17
 #define B_FALSE_SDP	18
+#define A_VBUS_DROP_DET	31
 	unsigned long inputs;
 	struct work_struct sm_work;
 	bool sm_work_pending;
@@ -601,6 +615,11 @@ struct msm_otg {
 	char (buf[DEBUG_MAX_MSG])[DEBUG_MSG_LEN];   /* buffer */
 	u32 max_nominal_system_clk_rate;
 	unsigned int vbus_state;
+	int sub_type;
+	bool usbin_state;
+
+	u32 chg_det_cnt;
+	u32 chg_det_retrying;
 };
 
 struct ci13xxx_platform_data {

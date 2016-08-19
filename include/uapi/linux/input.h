@@ -5,6 +5,11 @@
  * under the terms of the GNU General Public License version 2 as published by
  * the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _UAPI_INPUT_H
 #define _UAPI_INPUT_H
 
@@ -878,11 +883,11 @@ struct input_keymap_entry {
 #define SW_FRONT_PROXIMITY	0x0b  /* set = front proximity sensor active */
 #define SW_ROTATE_LOCK		0x0c  /* set = rotate locked/disabled */
 #define SW_LINEIN_INSERT	0x0d  /* set = inserted */
-#define SW_HPHL_OVERCURRENT	0x0e  /* set = over current on left hph */
-#define SW_HPHR_OVERCURRENT	0x0f  /* set = over current on right hph */
-#define SW_UNSUPPORT_INSERT	0x10  /* set = unsupported device inserted */
-#define SW_MICROPHONE2_INSERT   0x11  /* set = inserted */
 #define SW_MUTE_DEVICE		0x12  /* set = device disabled */
+#define SW_HPHL_OVERCURRENT	0x1c  /* set = over current on left hph */
+#define SW_HPHR_OVERCURRENT	0x1d  /* set = over current on right hph */
+#define SW_UNSUPPORT_INSERT	0x1e  /* set = unsupported device inserted */
+#define SW_MICROPHONE2_INSERT   0x1f  /* set = inserted */
 #define SW_MAX			0x20
 #define SW_CNT			(SW_MAX+1)
 

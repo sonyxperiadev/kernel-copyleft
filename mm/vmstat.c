@@ -8,6 +8,11 @@
  *  Copyright (C) 2006 Silicon Graphics, Inc.,
  *		Christoph Lameter <christoph@lameter.com>
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/err.h>
@@ -712,6 +717,7 @@ const char * const vmstat_text[] = {
 	"nr_active_file",
 	"nr_unevictable",
 	"nr_mlock",
+	"nr_mlock_file",
 	"nr_anon_pages",
 	"nr_mapped",
 	"nr_file_pages",
@@ -780,6 +786,7 @@ const char * const vmstat_text[] = {
 	"allocstall",
 
 	"pgrotated",
+	"alloc_slowpath",
 
 #ifdef CONFIG_NUMA_BALANCING
 	"numa_pte_updates",

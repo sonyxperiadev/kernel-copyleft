@@ -172,9 +172,9 @@ struct ipa_ep_cfg_hdr {
  *	byte alignment). Valid for Output Pipes only (IPA Producer).
  * @hdr_total_len_or_pad_offset: Offset to length field containing either
  *	total length or pad length, per hdr_total_len_or_pad config
- * @hdr_payload_len_inc_padding: 0-IPA_ENDP_INIT_HDR_n’s HDR_OFST_PKT_SIZE does
+ * @hdr_payload_len_inc_padding: 0-IPA_ENDP_INIT_HDR_n?s HDR_OFST_PKT_SIZE does
  *	not includes padding bytes size, payload_len = packet length,
- *	1-IPA_ENDP_INIT_HDR_n’s HDR_OFST_PKT_SIZE includes
+ *	1-IPA_ENDP_INIT_HDR_n?s HDR_OFST_PKT_SIZE includes
  *	padding bytes size, payload_len = packet length + padding
  * @hdr_total_len_or_pad: field is used as PAD length ot as Total length
  *	(header + packet + padding)
@@ -273,7 +273,7 @@ struct ipa_ep_cfg_holb {
 /**
  * struct ipa_ep_cfg_deaggr - deaggregation configuration in IPA end-point
  * @deaggr_hdr_len: Deaggregation Header length in bytes. Valid only for Input
- *	Pipes, which are configured for ’Generic’ deaggregation.
+ *	Pipes, which are configured for ?Generic? deaggregation.
  * @packet_offset_valid: - 0: PACKET_OFFSET is not used, 1: PACKET_OFFSET is
  *	used.
  * @packet_offset_location: Location of packet offset field, which specifies

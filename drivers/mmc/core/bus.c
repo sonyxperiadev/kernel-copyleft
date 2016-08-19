@@ -10,6 +10,11 @@
  *
  *  MMC card bus driver model
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/export.h>
 #include <linux/device.h>
@@ -26,7 +31,11 @@
 #include "bus.h"
 
 #define to_mmc_driver(d)	container_of(d, struct mmc_driver, drv)
+
+/* Default idle timeout for MMC devices: 10 seconds. */
 #define RUNTIME_SUSPEND_DELAY_MS 10000
+/* Default idle timeout for SD cards: 5 minutes. */
+#define RUNTIME_SDCARD_SUSPEND_DELAY_MS 300000
 
 static ssize_t mmc_type_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -398,12 +407,11 @@ int mmc_add_card(struct mmc_card *card)
 			mmc_card_ddr_mode(card) ? "DDR " : "",
 			type);
 	} else {
-		pr_info("%s: new %s%s%s%s%s%s%s card at address %04x\n",
+		pr_info("%s: new %s%s%s%s%s%s card at address %04x\n",
 			mmc_hostname(card->host),
 			mmc_card_uhs(card) ? "ultra high speed " :
 			(mmc_card_highspeed(card) ? "high speed " : ""),
 			(mmc_card_hs400(card) ? "HS400 " : ""),
-			(mmc_card_hs400_strobe(card) ? "enhanced strobe " : ""),
 			(mmc_card_hs200(card) ? "HS200 " : ""),
 			mmc_card_ddr_mode(card) ? "DDR " : "",
 			uhs_bus_speed_mode, type, card->rca);
@@ -443,8 +451,10 @@ int mmc_add_card(struct mmc_card *card)
 		if (ret)
 			pr_err("%s: %s: creating runtime pm sysfs entry: failed: %d\n",
 			       mmc_hostname(card->host), __func__, ret);
-		/* Default timeout is 10 seconds */
-		card->idle_timeout = RUNTIME_SUSPEND_DELAY_MS;
+		if (mmc_card_sd(card))
+			card->idle_timeout = RUNTIME_SDCARD_SUSPEND_DELAY_MS;
+		else
+			card->idle_timeout = RUNTIME_SUSPEND_DELAY_MS;
 	}
 
 	mmc_card_set_present(card);

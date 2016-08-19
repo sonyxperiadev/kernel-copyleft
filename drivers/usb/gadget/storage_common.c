@@ -10,6 +10,11 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2011 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  * This file requires the following identifiers used in USB strings to
@@ -142,6 +147,7 @@ struct fsg_lun {
 	unsigned int	blksize;	/* logical block size of bound block device */
 	unsigned int    max_ratio;
 	struct device	dev;
+	char		*lun_filename;
 #ifdef CONFIG_USB_MSC_PROFILING
 	struct {
 		unsigned long rbytes;
@@ -580,7 +586,6 @@ static void store_cdrom_address(u8 *dest, int msf, u32 addr)
 {
 	if (msf) {
 		/* Convert to Minutes-Seconds-Frames */
-		addr >>= 2;		/* Convert to 2048-byte frames */
 		addr += 2*75;		/* Lead-in occupies 2 seconds */
 		dest[3] = addr % 75;	/* Frames */
 		addr /= 75;
@@ -757,12 +762,26 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	if (count > 0 && buf[0]) {
 		/* fsg_lun_open() will close existing file if any. */
 		rc = fsg_lun_open(curlun, buf);
-		if (rc == 0)
-			curlun->unit_attention_data =
+		if (rc == 0) {
+			kfree(curlun->lun_filename);
+			curlun->lun_filename = kmalloc(count + 1, GFP_KERNEL);
+			if (!curlun->lun_filename) {
+				rc = -ENOMEM;
+				fsg_lun_close(curlun);
+				curlun->unit_attention_data =
+					SS_MEDIUM_NOT_PRESENT;
+			} else {
+				memcpy(curlun->lun_filename, buf, count);
+				curlun->lun_filename[count] = '\0';
+				curlun->unit_attention_data =
 					SS_NOT_READY_TO_READY_TRANSITION;
+			}
+		}
 	} else if (fsg_lun_is_open(curlun)) {
 		fsg_lun_close(curlun);
 		curlun->unit_attention_data = SS_MEDIUM_NOT_PRESENT;
+		kfree(curlun->lun_filename);
+		curlun->lun_filename = NULL;
 	}
 	up_write(filesem);
 	return (rc < 0 ? rc : count);

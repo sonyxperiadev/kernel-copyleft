@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "skeleton64.dtsi"
 #include <dt-bindings/clock/msm-clocks-8976.h>
@@ -2593,7 +2598,7 @@
 		qcom,msm-auxpcm-interface = "primary";
 	};
 
-	dai_sec_auxpcm: qcom,msm-pri-auxpcm {
+	dai_sec_auxpcm: qcom,msm-sec-auxpcm {
 		compatible = "qcom,msm-auxpcm-dev";
 		qcom,msm-cpudai-auxpcm-mode = <0>, <0>;
 		qcom,msm-cpudai-auxpcm-sync = <1>, <1>;

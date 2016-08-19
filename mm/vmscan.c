@@ -10,6 +10,11 @@
  *  Zone aware kswapd started 02/00, Kanoj Sarcar (kanoj@sgi.com).
  *  Multiqueue VM started 5.8.00, Rik van Riel.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/mm.h>
 #include <linux/module.h>
@@ -139,6 +144,10 @@ struct scan_control {
  */
 int vm_swappiness = 60;
 unsigned long vm_total_pages;	/* The total number of pages which the VM controls */
+
+#ifdef CONFIG_SWAP_CONSIDER_CMA_FREE
+int swap_thresh_cma_free_pages = INT_MAX;
+#endif
 
 #ifdef CONFIG_KSWAPD_CPU_AFFINITY_MASK
 char *kswapd_cpu_mask = CONFIG_KSWAPD_CPU_AFFINITY_MASK;
@@ -968,6 +977,26 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		if (PageAnon(page) && !PageSwapCache(page)) {
 			if (!(sc->gfp_mask & __GFP_IO))
 				goto keep_locked;
+
+#ifdef CONFIG_SWAP_CONSIDER_CMA_FREE
+			if (swap_thresh_cma_free_pages != INT_MAX) {
+				struct zone *pzone = zone;
+
+				if (!pzone)
+					pzone = page_zone(page);
+
+				/* Don't swap if NON MOVABLE is required
+				 * and the page is cma.
+				 */
+				if (!(sc->gfp_mask & __GFP_MOVABLE) &&
+				    is_cma_pageblock(page) &&
+				    (zone_page_state(pzone, NR_FREE_CMA_PAGES) >
+				     swap_thresh_cma_free_pages)) {
+					goto activate_locked;
+				}
+			}
+#endif /* CONFIG_SWAP_CONSIDER_CMA_FREE */
+
 			if (!add_to_swap(page, page_list))
 				goto activate_locked;
 			may_enter_fs = 1;

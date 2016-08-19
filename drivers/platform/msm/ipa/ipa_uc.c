@@ -140,7 +140,7 @@ union IpaHwResetPipeCmdData_t {
 /**
  * union IpaHwmonitorHolbCmdData_t - Structure holding the parameters
  * for IPA_CPU_2_HW_CMD_UPDATE_HOLB_MONITORING command.
- * @monitorPipe : Indication whether to monitor the pipe. 0 – Do not Monitor Pipe, 1 – Monitor Pipe
+ * @monitorPipe : Indication whether to monitor the pipe. 0 ? Do not Monitor Pipe, 1 ? Monitor Pipe
  * @pipeNum : Pipe to be monitored/not monitored
  * @reserved_02_03 : Reserved
  *

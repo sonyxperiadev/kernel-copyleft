@@ -244,16 +244,6 @@ config MSM_BUS_SCALING
 		for the active devices needs without keeping the clocks at max
 		frequency when a slower speed is sufficient.
 
-config MSM_BUSPM_DEV
-	tristate "MSM Bus Performance Monitor Kernel Module"
-	depends on MSM_BUS_SCALING
-	default n
-	help
-	  This kernel module is used to mmap() hardware registers for the
-	  performance monitors, counters, etc. The module can also be used to
-	  allocate physical memory which is used by bus performance hardware to
-	  dump performance data
-
 config BUS_TOPOLOGY_ADHOC
 	bool "ad-hoc bus scaling topology"
 	default n
@@ -305,4 +295,9 @@ config SEEMP_CORE
           This option enables Qualcomm Technologies, Inc. Snapdragron Smart Protection to
           detect anomalies in various activities. It records task activities in a log and
           rates the actions according to whether a typical user would use the tools.
+
+config PON_SOMC_ORG
+	bool "SoMC specific power on interface"
+	help
+		This option enables SoMC specific power on interface.
 endmenu

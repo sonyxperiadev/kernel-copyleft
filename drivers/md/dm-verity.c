@@ -13,6 +13,11 @@
  * are on the same disk on different partitions on devices with poor random
  * access behavior.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "dm-bufio.h"
 
@@ -197,6 +202,7 @@ static void verity_hash_at_level(struct dm_verity *v, sector_t block, int level,
 		*offset = idx << (v->hash_dev_block_bits - v->hash_per_block_bits);
 }
 
+#ifndef CONFIG_PANIC_ON_DM_VERITY_ERRORS
 /*
  * Handle verification errors.
  */
@@ -244,6 +250,7 @@ out:
 
 	return 1;
 }
+#endif
 
 /*
  * Verify hash of a metadata block pertaining to the specified data block
@@ -322,6 +329,10 @@ static int verity_verify_level(struct dm_verity_io *io, sector_t block,
 			goto release_ret_r;
 		}
 		if (unlikely(memcmp(result, io_want_digest(v, io), v->digest_size))) {
+#ifdef CONFIG_PANIC_ON_DM_VERITY_ERRORS
+			panic("dm-verity: metadata block %llu is corrupted",
+					(unsigned long long)hash_block);
+#else
 			v->hash_failed = 1;
 
 			if (verity_handle_err(v, DM_VERITY_BLOCK_TYPE_METADATA,
@@ -329,6 +340,7 @@ static int verity_verify_level(struct dm_verity_io *io, sector_t block,
 				r = -EIO;
 				goto release_ret_r;
 			}
+#endif
 		} else
 			aux->hash_verified = 1;
 	}
@@ -445,11 +457,16 @@ test_block_hash:
 			return r;
 		}
 		if (unlikely(memcmp(result, io_want_digest(v, io), v->digest_size))) {
+#ifdef CONFIG_PANIC_ON_DM_VERITY_ERRORS
+			panic("dm-verity: data block %llu is corrupted",
+				(unsigned long long)(io->block + b));
+#else
 			v->hash_failed = 1;
 
 			if (verity_handle_err(v, DM_VERITY_BLOCK_TYPE_DATA,
 					      io->block + b))
 				return -EIO;
+#endif
 		}
 	}
 	BUG_ON(vector != io->io_vec_size);

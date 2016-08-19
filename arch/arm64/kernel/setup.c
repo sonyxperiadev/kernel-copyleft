@@ -3,6 +3,7 @@
  *
  * Copyright (C) 1995-2001 Russell King
  * Copyright (C) 2012 ARM Ltd.
+ * Copyright (C) 2009-2014 Broadcom Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -542,6 +543,14 @@ void arch_setup_pdev_archdata(struct platform_device *pdev)
 int msm8994_req_tlbi_wa = 1;
 #define SOC_MAJOR_REV(val) (((val) & 0xF00) >> 8)
 
+static struct platform_device bcm_ldisc_device = {
+	.name = "bcm_ldisc",
+	.id = -1,
+	.dev = {
+
+	},
+};
+
 static int __init msm8994_check_tlbi_workaround(void)
 {
 	void __iomem *addr;
@@ -558,6 +567,8 @@ static int __init msm8994_check_tlbi_workaround(void)
 		/* If the node does not exist disable the workaround */
 		msm8994_req_tlbi_wa = 0;
 	}
+
+	platform_device_register(&bcm_ldisc_device);
 
 	return 0;
 }

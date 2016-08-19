@@ -10,6 +10,11 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/capability.h>
 #include <linux/module.h>
@@ -25,6 +30,9 @@
 #include <linux/personality.h>
 #include <linux/backing-dev.h>
 #include <net/flow.h>
+#if defined(CONFIG_SECURITY_SONY_RIC) && !defined(CONFIG_DEFAULT_SECURITY_SONY)
+#include "sony/ric.h"
+#endif
 
 #define MAX_LSM_EVM_XATTR	2
 
@@ -279,6 +287,13 @@ int security_sb_statfs(struct dentry *dentry)
 int security_sb_mount(const char *dev_name, struct path *path,
                        const char *type, unsigned long flags, void *data)
 {
+#if defined(CONFIG_SECURITY_SONY_RIC) && !defined(CONFIG_DEFAULT_SECURITY_SONY)
+	int ret;
+
+	ret = sony_ric_mount(dev_name, path, type, flags, data);
+	if (ret)
+		return ret;
+#endif
 	return security_ops->sb_mount(dev_name, path, type, flags, data);
 }
 

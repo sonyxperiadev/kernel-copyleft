@@ -7,6 +7,11 @@
  *  Copyright (c) 2008 Jiri Slaby
  *  Copyright (c) 2006-2008 Jiri Kosina
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  * This program is free software; you can redistribute it and/or modify it
@@ -26,6 +31,7 @@
 #define VAIO_RDESC_CONSTANT     (1 << 0)
 #define SIXAXIS_CONTROLLER_USB  (1 << 1)
 #define SIXAXIS_CONTROLLER_BT   (1 << 2)
+#define DUALSHOCK4_CONTROLLER_USB   (1 << 3)
 
 static const u8 sixaxis_rdesc_fixup[] = {
 	0x95, 0x13, 0x09, 0x01, 0x81, 0x02, 0x95, 0x0C,
@@ -198,6 +204,11 @@ static int sony_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	unsigned long quirks = id->driver_data;
 	struct sony_sc *sc;
 
+	if (quirks & DUALSHOCK4_CONTROLLER_USB) {
+		hid_dbg(hdev, "Ignoring DUALSHOCK4 Controller via USB\n");
+		return 0;
+	}
+
 	sc = kzalloc(sizeof(*sc), GFP_KERNEL);
 	if (sc == NULL) {
 		hid_err(hdev, "can't alloc sony descriptor\n");
@@ -257,6 +268,10 @@ static const struct hid_device_id sony_devices[] = {
 		.driver_data = VAIO_RDESC_CONSTANT },
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_VAIO_VGP_MOUSE),
 		.driver_data = VAIO_RDESC_CONSTANT },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER),
+		.driver_data = DUALSHOCK4_CONTROLLER_USB },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER_2),
+		.driver_data = DUALSHOCK4_CONTROLLER_USB },
 	{ }
 };
 MODULE_DEVICE_TABLE(hid, sony_devices);

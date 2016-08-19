@@ -5,6 +5,11 @@
  *
  * This file is GPLv2 as found in COPYING.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/ieee80211.h>
 #include <linux/nl80211.h>
@@ -1423,14 +1428,14 @@ static int ieee80211_add_station(struct wiphy *wiphy, struct net_device *dev,
 }
 
 static int ieee80211_del_station(struct wiphy *wiphy, struct net_device *dev,
-				 struct station_del_parameters *params)
+				 u8 *mac)
 {
 	struct ieee80211_sub_if_data *sdata;
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	if (params->mac)
-		return sta_info_destroy_addr_bss(sdata, params->mac);
+	if (mac)
+		return sta_info_destroy_addr_bss(sdata, mac);
 
 	sta_info_flush(sdata);
 	return 0;
