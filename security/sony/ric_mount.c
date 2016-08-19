@@ -1,7 +1,7 @@
 /*
  * Sony RIC Mount
  *
- * Copyright (C) 2013 Sony Mobile Communications AB.
+ * Copyright (C) 2015 Sony Mobile Communications Inc.
  *
  * Author: Srinavasa, Nagaraju <srinavasa.x.nagaraju@sonymobile.com>
  *
@@ -22,7 +22,6 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #endif
-#include "../../fs/mount.h"
 #include "ric.h"
 
 struct ric_part_info {
@@ -43,7 +42,7 @@ static int sony_ric_bdev_mount_perm(const char *volname, struct path *path,
 					unsigned long flags)
 {
 	struct ric_part_info *part;
-	int i, match = 0;
+	int i, ret, match = 0;
 	struct path mnt_path;
 
 	pr_debug("RIC: volname: %s\n", volname);
@@ -60,17 +59,27 @@ static int sony_ric_bdev_mount_perm(const char *volname, struct path *path,
 	}
 
 	if (match) {
-		if ((flags & part->mnt_flags) != part->mnt_flags)
+		if ((flags & part->mnt_flags) != part->mnt_flags) {
+			pr_warning("RIC: %s mount denied, mnt_flags:0x%lx\n",
+				    volname, flags);
 			return -EPERM;
+		}
 
-		if (kern_path(part->mnt_path, LOOKUP_FOLLOW, &mnt_path))
-			goto done;
+		ret = kern_path(part->mnt_path, LOOKUP_FOLLOW, &mnt_path);
+		if (ret) {
+			pr_warning("RIC: kern_path() failed for %s ret = %d\n",
+				    part->mnt_path, ret);
+			return ret;
+		}
 
-		if (path->dentry != mnt_path.dentry)
+		if (path->dentry != mnt_path.dentry) {
+			path_put(&mnt_path);
 			return -EPERM;
+		}
+
+		path_put(&mnt_path);
 	}
 
-done:
 	return 0;
 }
 
@@ -105,19 +114,6 @@ done:
 	return ret;
 }
 
-static int sony_ric_cdev_mount(const char *dev_name, struct path *path,
-				struct inode *inode, unsigned long flags)
-{
-	if (inode->i_rdev ==  MKDEV(MISC_MAJOR, FUSE_MINOR)) {
-		unsigned long fuse_flags = MS_NOSUID | MS_NODEV | MS_NOEXEC;
-
-		if ((flags & fuse_flags) != fuse_flags)
-			return -EPERM;
-	}
-
-	return 0;
-}
-
 static int sony_ric_dev_mount(const char *dev_name, struct path *path,
 				unsigned long flags)
 {
@@ -125,26 +121,73 @@ static int sony_ric_dev_mount(const char *dev_name, struct path *path,
 	struct inode *inode;
 	int ret;
 
-	ret = kern_path(dev_name, LOOKUP_FOLLOW, &dev_path);
-	if (ret)
-		return 0;
+	if (!dev_name || kern_path(dev_name, LOOKUP_FOLLOW, &dev_path))
+		return -ENOENT;
 
 	inode = dev_path.dentry->d_inode;
-	if (S_ISBLK(inode->i_mode))
-		ret = sony_ric_bdev_mount(dev_name, path, inode, flags);
-	else if (S_ISCHR(inode->i_mode))
-		ret = sony_ric_cdev_mount(dev_name, path, inode, flags);
+	ret = sony_ric_bdev_mount(dev_name, path, inode, flags);
 
 	path_put(&dev_path);
 	return ret;
 }
 
+static struct ric_part_info *find_matching_bdev_mountpoint(struct path *path)
+{
+	struct ric_part_info *part;
+	struct path mnt_path;
+	int i, ret, match = 0;
+
+	for (i = 0; i < num_partitions; i++) {
+		part = &bdev_info[i];
+		ret = kern_path(part->mnt_path, LOOKUP_FOLLOW, &mnt_path);
+		if (ret)
+			continue;
+
+		if ((path->dentry == mnt_path.dentry) ||
+		     is_subdir(path->dentry, mnt_path.dentry)) {
+			match = 1;
+			path_put(&mnt_path);
+			break;
+		}
+
+		path_put(&mnt_path);
+	}
+
+	if (match)
+		return part;
+
+	return NULL;
+}
+
+static int sony_ric_bind_mount(const char *dev_name, unsigned long flags)
+{
+	struct ric_part_info *part;
+	struct path dev_path;
+
+	if (!dev_name || kern_path(dev_name, LOOKUP_FOLLOW, &dev_path))
+		return -ENOENT;
+
+	part = find_matching_bdev_mountpoint(&dev_path);
+	if (part) {
+		pr_warning("RIC: %s bind mount denied, mnt_flags:0x%lx\n",
+			    part->mnt_path, flags);
+		path_put(&dev_path);
+		return -EPERM;
+	}
+
+	path_put(&dev_path);
+	return 0;
+}
+
 static int sony_ric_root_mount(unsigned long flags)
 {
-	if (!(flags & MS_RDONLY))
+	if (!(flags & MS_RDONLY)) {
+		pr_warning("RIC: rootfs remount denied, mnt_flags:0x%lx\n",
+			    flags);
 		return -EPERM;
-	else
-		return 0;
+	}
+
+	return 0;
 }
 
 static inline int mount_point_is_rootfs(struct path *path)
@@ -161,26 +204,28 @@ static inline int mount_point_is_rootfs(struct path *path)
 
 static int sony_ric_remount(struct path *path, unsigned long flags)
 {
-	struct mount *mnt = real_mount(path->mnt);
-
-	if (mnt->mnt_ns != current->nsproxy->mnt_ns)
-		goto done;
-
-	if (path->dentry != path->mnt->mnt_root)
-		goto done;
+	struct ric_part_info *part;
 
 	if (mount_point_is_rootfs(path))
 		return sony_ric_root_mount(flags);
 
-	if (mnt->mnt_devname)
-		return sony_ric_dev_mount(mnt->mnt_devname, path, flags);
-done:
+	part = find_matching_bdev_mountpoint(path);
+	if (part) {
+		if ((flags & part->mnt_flags) != part->mnt_flags) {
+			pr_warning("RIC: %s remount denied, mnt_flags:0x%lx\n",
+				    part->mnt_path, flags);
+			return -EPERM;
+		}
+	}
+
 	return 0;
 }
 
 int sony_ric_mount(char *dev_name, struct path *path,
 			  char *type, unsigned long flags, void *data)
 {
+	struct file_system_type *fstype = NULL;
+
 	pr_debug("RIC: mount dev_name %s, type %s flags %lu\n",
 			dev_name ? dev_name : "NULL",
 			type ? type : "NULL", flags);
@@ -188,16 +233,35 @@ int sony_ric_mount(char *dev_name, struct path *path,
 	if (!sony_ric_enabled())
 		return 0;
 
-	/* Ignore change type mounts */
-	if (flags & (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE))
-		return 0;
-
 	/* Check for remounts */
 	if (flags & MS_REMOUNT)
 		return sony_ric_remount(path, flags);
 
+	/* Check for bind mounts */
+	if (flags & (MS_BIND | MS_MOVE))
+		return sony_ric_bind_mount(dev_name, flags);
+
+	/* Ignore change type mounts */
+	if (flags & (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE))
+		return 0;
+
+	if (type)
+		fstype = get_fs_type(type);
+
+	if (!fstype) {
+		pr_err("RIC: unknown filesystem\n");
+		return -ENODEV;
+	}
+
 	/* Check for new mounts while ignoring pseudo fs mounts */
-	return sony_ric_dev_mount(dev_name, path, flags);
+	if (fstype->fs_flags & FS_REQUIRES_DEV) {
+		put_filesystem(fstype);
+		return sony_ric_dev_mount(dev_name, path, flags);
+	}
+
+	put_filesystem(fstype);
+
+	return 0;
 }
 EXPORT_SYMBOL(sony_ric_mount);
 
