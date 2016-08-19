@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "bw-hwmon: " fmt
 
@@ -459,7 +464,6 @@ int update_bw_hwmon(struct bw_hwmon *hwmon)
 {
 	struct devfreq *df;
 	struct hwmon_node *node;
-	int ret;
 
 	if (!hwmon)
 		return -EINVAL;
@@ -474,16 +478,7 @@ int update_bw_hwmon(struct bw_hwmon *hwmon)
 		return -EBUSY;
 
 	dev_dbg(df->dev.parent, "Got update request\n");
-	devfreq_monitor_stop(df);
-
-	mutex_lock(&df->lock);
-	ret = update_devfreq(df);
-	if (ret)
-		dev_err(df->dev.parent,
-			"Unable to update freq on request!\n");
-	mutex_unlock(&df->lock);
-
-	devfreq_monitor_start(df);
+	devfreq_monitor_restart(df);
 
 	return 0;
 }

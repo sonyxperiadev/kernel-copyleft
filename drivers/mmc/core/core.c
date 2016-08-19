@@ -10,6 +10,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -40,6 +45,7 @@
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/sd.h>
 #include <linux/mmc/slot-gpio.h>
+#include <linux/mmc/slot-gpio.h>
 
 #include "core.h"
 #include "bus.h"
@@ -58,6 +64,9 @@
  * operations the card has to perform.
  */
 #define MMC_BKOPS_MAX_TIMEOUT	(30 * 1000) /* max time to wait in ms */
+
+/* Flushing a large amount of cached data may take a long time. */
+#define MMC_FLUSH_REQ_TIMEOUT_MS 180000 /* msec */
 
 static struct workqueue_struct *workqueue;
 static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
@@ -944,6 +953,24 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 	struct scatterlist *sg;
 #endif
 
+#ifdef CONFIG_MMC_CMD_DEBUG
+	if (host->card) {
+		struct mmc_cmdq *cq = NULL;
+		cq = &host->card->cmd_stats.cmdq[host->card->
+						cmd_stats.next_idx];
+		cq->opcode = mrq->cmd->opcode;
+		cq->arg = mrq->cmd->arg;
+		cq->flags = mrq->cmd->flags;
+		cq->timestamp = sched_clock();
+		host->card->cmd_stats.next_idx++;
+
+		if (host->card->cmd_stats.next_idx == CMD_QUEUE_SIZE) {
+			host->card->cmd_stats.next_idx = 0;
+			host->card->cmd_stats.wrapped = 1;
+		}
+	}
+#endif
+
 	if (mrq->sbc) {
 		pr_debug("<%s: starting CMD%u arg %08x flags %08x>\n",
 			 mmc_hostname(host), mrq->sbc->opcode,
@@ -1674,6 +1701,7 @@ int mmc_interrupt_hpi(struct mmc_card *card)
 		 */
 		goto out;
 	case R1_STATE_PRG:
+		pr_debug("%s: Sending HPI cmd\n", mmc_hostname(card->host));
 		break;
 	default:
 		/* In all other states, it's illegal to issue HPI */
@@ -2581,7 +2609,10 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
 
 	host->card_clock_off = false;
 	/* Wait for at least 1 ms according to spec */
-	mmc_delay(1);
+	if (host->caps & MMC_CAP_NONREMOVABLE)
+		mmc_delay(1);
+	else
+		mmc_delay(40);
 
 	/*
 	 * Failure to switch is indicated by the card holding
@@ -3636,6 +3667,8 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 		return 0;
 	if (!mmc_attach_sd(host))
 		return 0;
+	else
+		mmc_gpio_tray_close_set_uim2(host, 1);
 	if (!mmc_attach_mmc(host))
 		return 0;
 
@@ -3806,6 +3839,8 @@ void mmc_stop_host(struct mmc_host *host)
 	cancel_delayed_work_sync(&host->detect);
 	mmc_flush_scheduled_work();
 
+	mmc_gpio_set_uim2_en(host, 0);
+
 	/* clear pm flags now and let card drivers set them as needed */
 	host->pm_flags = 0;
 
@@ -3944,6 +3979,59 @@ int mmc_flush_cache(struct mmc_card *card)
 	return err;
 }
 EXPORT_SYMBOL(mmc_flush_cache);
+
+/*
+ * Turn the cache ON/OFF.
+ * Turning the cache OFF shall trigger flushing of the data
+ * to the non-volatile storage.
+ * This function should be called with host claimed
+ */
+int mmc_cache_ctrl(struct mmc_host *host, u8 enable)
+{
+	struct mmc_card *card = host->card;
+	unsigned int timeout;
+	int err = 0, rc;
+
+	BUG_ON(!card);
+	timeout = card->ext_csd.generic_cmd6_time;
+
+	if (mmc_card_is_removable(host) ||
+			(card->quirks & MMC_QUIRK_CACHE_DISABLE))
+		return err;
+
+	if (card && mmc_card_mmc(card) &&
+			(card->ext_csd.cache_size > 0)) {
+		enable = !!enable;
+
+		if (card->ext_csd.cache_ctrl ^ enable) {
+			if (!enable)
+				timeout = MMC_FLUSH_REQ_TIMEOUT_MS;
+
+			err = mmc_switch_ignore_timeout(card,
+					EXT_CSD_CMD_SET_NORMAL,
+					EXT_CSD_CACHE_CTRL, enable, timeout);
+
+			if (err == -ETIMEDOUT && !enable) {
+				pr_err("%s:cache disable operation timeout\n",
+						mmc_hostname(card->host));
+				rc = mmc_interrupt_hpi(card);
+				if (rc)
+					pr_err("%s: mmc_interrupt_hpi() failed (%d)\n",
+							mmc_hostname(host), rc);
+			} else if (err) {
+				pr_err("%s: cache %s error %d\n",
+						mmc_hostname(card->host),
+						enable ? "on" : "off",
+						err);
+			} else {
+				card->ext_csd.cache_ctrl = enable;
+			}
+		}
+	}
+
+	return err;
+}
+EXPORT_SYMBOL(mmc_cache_ctrl);
 
 #ifdef CONFIG_PM
 

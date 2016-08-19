@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/io.h>
 #include "kgsl.h"
@@ -582,6 +587,7 @@ static const struct a5xx_shader_block a5xx_shader_blocks[] = {
 	{A5XX_TP_POWER_RESTORE_RAM,      0x40},
 };
 
+#if 0
 static size_t a5xx_snapshot_shader_memory(struct kgsl_device *device,
 	u8 *buf, size_t remain, void *priv)
 {
@@ -632,7 +638,9 @@ static void a5xx_snapshot_shader(struct kgsl_device *device,
 		}
 	}
 }
+#endif
 
+#if 0
 static int get_hlsq_registers(struct kgsl_device *device,
 		const struct a5xx_hlsq_sp_tp_regs *regs, unsigned int *data)
 {
@@ -685,6 +693,7 @@ static size_t a5xx_snapshot_dump_hlsq_sp_tp_regs(struct kgsl_device *device,
 	/* Return the size of the section */
 	return (count * 8) + sizeof(*header);
 }
+#endif
 
 static size_t a5xx_legacy_snapshot_registers(struct kgsl_device *device,
 		u8 *buf, size_t remain)
@@ -810,9 +819,11 @@ void a5xx_snapshot(struct adreno_device *adreno_dev,
 		a5xx_vbif_snapshot_registers,
 		ARRAY_SIZE(a5xx_vbif_snapshot_registers));
 
+#if 0
 	/* Dump SP TP HLSQ registers */
 	kgsl_snapshot_add_section(device, KGSL_SNAPSHOT_SECTION_REGS, snapshot,
 		a5xx_snapshot_dump_hlsq_sp_tp_regs, NULL);
+#endif
 
 	/* CP_PFP indexed registers */
 	kgsl_snapshot_indexed_registers(device, snapshot,
@@ -870,8 +881,10 @@ void a5xx_snapshot(struct adreno_device *adreno_dev,
 	kgsl_snapshot_add_section(device, KGSL_SNAPSHOT_SECTION_DEBUG,
 		snapshot, a5xx_snapshot_cp_pm4, NULL);
 
+#if 0
 	/* Shader memory */
 	a5xx_snapshot_shader(device, snapshot);
+#endif
 
 	/* Debug bus */
 	a5xx_snapshot_debugbus(device, snapshot);

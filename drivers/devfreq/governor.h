@@ -10,6 +10,11 @@
  *
  * This header is for devfreq governors in drivers/devfreq/
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _GOVERNOR_H
 #define _GOVERNOR_H
@@ -34,6 +39,7 @@ extern void devfreq_monitor_suspend(struct devfreq *devfreq);
 extern void devfreq_monitor_resume(struct devfreq *devfreq);
 extern void devfreq_interval_update(struct devfreq *devfreq,
 					unsigned int *delay);
+extern void devfreq_monitor_restart(struct devfreq *devfreq);
 
 extern int devfreq_add_governor(struct devfreq_governor *governor);
 extern int devfreq_remove_governor(struct devfreq_governor *governor);
