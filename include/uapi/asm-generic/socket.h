@@ -76,4 +76,9 @@
 
 #define SO_SELECT_ERR_QUEUE	45
 
+/* mainline kernel is using up to 53, select a number that is far
+ * above to be on the safe side. We will try to get this number
+ * into mainline but it will take a while. */
+#define SO_SIZEHINT		100
+
 #endif /* __ASM_GENERIC_SOCKET_H */
