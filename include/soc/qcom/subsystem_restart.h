@@ -22,7 +22,7 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 
-#define SUBSYS_CRASH_REASON_LEN 81
+#define SUBSYS_CRASH_REASON_LEN 512
 
 struct subsys_device;
 
