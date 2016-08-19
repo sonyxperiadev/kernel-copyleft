@@ -2187,6 +2187,14 @@ config CRASH_DUMP
 
 	  For more details see Documentation/kdump/kdump.txt
 
+config CRASH_NOTES
+	bool "Support storing crash notes at panic"
+	depends on !KEXEC
+	help
+	  Generate kdump style crash notes at the time of a panic and fill it
+	  with the crashed context to support analysis of the memory dump with
+	  tools like Redhat CRASH.
+
 config AUTO_ZRELADDR
 	bool "Auto calculation of the decompressed kernel image address"
 	depends on !ZBOOT_ROM && !ARCH_U300

@@ -16,6 +16,11 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/bitops.h>
 #include <linux/init.h>
@@ -135,6 +140,16 @@ static int uac_clock_selector_set_val(struct snd_usb_audio *chip, int selector_i
 	return ret;
 }
 
+static bool uac_clock_source_is_valid_quirks(struct snd_usb_audio *chip)
+{
+	/* clock source must be valid for certain devices */
+	switch (chip->usb_id) {
+	case USB_ID(0x054C, 0x0899): /* Sony SRS-X9 */
+		return true;
+	}
+	return false;
+}
+
 static bool uac_clock_source_is_valid(struct snd_usb_audio *chip, int source_id)
 {
 	int err;
@@ -145,6 +160,9 @@ static bool uac_clock_source_is_valid(struct snd_usb_audio *chip, int source_id)
 
 	if (!cs_desc)
 		return 0;
+
+	if (uac_clock_source_is_valid_quirks(chip))
+		return 1;
 
 	/* If a clock source can't tell us whether it's valid, we assume it is */
 	if (!uac2_control_is_readable(cs_desc->bmControls,
@@ -356,7 +374,7 @@ static int set_sample_rate_v2(struct snd_usb_audio *chip, int iface,
 		return clock;
 
 	prev_rate = get_sample_rate_v2(chip, iface, fmt->altsetting, clock);
-	if (prev_rate == rate)
+	if (prev_rate == rate && !uac_clock_source_is_valid_quirks(chip))
 		return 0;
 
 	cs_desc = snd_usb_find_clock_source(chip->ctrl_intf, clock);

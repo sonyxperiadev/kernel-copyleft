@@ -4,4 +4,12 @@ config MSM_CLK_CONTROLLER_V2
 	   Generate clock data structures from definitions found in
 	   device tree.
 
+config MSM_CLK_SDCC2_CLK_SRC_40MHZ
+	bool "SDCC2 clock source 40MHz"
+	depends on MMC_DDR50_MAX_DTR_LMT
+	default n
+	---help---
+	   If you say Y here, support will be add clock source
+	   40MHz for SDCC2.
+
 source "drivers/clk/qcom/mdss/Kconfig"
