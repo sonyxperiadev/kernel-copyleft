@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __ARCH_ARM_MACH_MSM_CLOCK_LOCAL_2_H
 #define __ARCH_ARM_MACH_MSM_CLOCK_LOCAL_2_H
@@ -57,6 +62,8 @@ struct clk_freq_tbl {
  * @current_freq: current RCG frequency
  * @c: generic clock data
  * @non_local_children: set if RCG has at least one branch owned by a diff EE
+ * @non_local_control: set if branch clocks of the RCG can be controlled by an
+ *			entity outside of HLOS.
  * @force_enable_rcgr: set if RCG needs to be force enabled/disabled during
  * power sequence
  * @base: pointer to base address of ioremapped registers.
@@ -71,6 +78,7 @@ struct rcg_clk {
 	struct clk	c;
 
 	bool non_local_children;
+	bool non_local_control;
 	bool force_enable_rcgr;
 	void *const __iomem *base;
 };

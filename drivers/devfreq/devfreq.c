@@ -9,6 +9,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -283,6 +288,34 @@ void devfreq_monitor_stop(struct devfreq *devfreq)
 	cancel_delayed_work_sync(&devfreq->work);
 }
 EXPORT_SYMBOL(devfreq_monitor_stop);
+
+/**
+ * devfreq_monitor_restart() - Restart load monitoring of devfreq instance
+ * @devfreq:	the devfreq instance.
+ *
+ * Helper function for restarting devfreq device load monitoring.
+ * Except during init and when DEVFREQ_GOV_START event is recieved,
+ * this function should be used to restart the devfreq device
+ * load monitoring
+ */
+void devfreq_monitor_restart(struct devfreq *devfreq)
+{
+	int ret;
+
+	devfreq_monitor_stop(devfreq);
+
+	mutex_lock(&devfreq->lock);
+	ret = update_devfreq(devfreq);
+	if (ret)
+		dev_err(devfreq->dev.parent,
+			"Unable to update freq on request!\n");
+
+	if (devfreq->profile->polling_ms)
+		queue_delayed_work(devfreq_wq, &devfreq->work,
+			msecs_to_jiffies(devfreq->profile->polling_ms));
+	mutex_unlock(&devfreq->lock);
+}
+EXPORT_SYMBOL(devfreq_monitor_restart);
 
 /**
  * devfreq_monitor_suspend() - Suspend load monitoring of a devfreq instance

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "MSM-CPP %s:%d " fmt, __func__, __LINE__
 
@@ -109,6 +114,12 @@ static int msm_cpp_send_command_to_hardware(struct cpp_device *cpp_dev,
 
 static  int msm_cpp_update_gdscr_status(struct cpp_device *cpp_dev,
 	bool status);
+#if defined(CONFIG_SONY_CAM_V4L2)
+#define CPP_DBG(fmt, args...)
+#define CPP_LOW(fmt, args...)
+#define ERR_USER_COPY(to)
+#define ERR_COPY_FROM_USER()
+#else
 #if CONFIG_MSM_CPP_DBG
 #define CPP_DBG(fmt, args...) pr_err(fmt, ##args)
 #else
@@ -123,6 +134,7 @@ static  int msm_cpp_update_gdscr_status(struct cpp_device *cpp_dev,
 #define ERR_USER_COPY(to) pr_err("copy %s user\n", \
 			((to) ? "to" : "from"))
 #define ERR_COPY_FROM_USER() ERR_USER_COPY(0)
+#endif
 
 /* CPP bus bandwidth definitions */
 static struct msm_bus_vectors msm_cpp_init_vectors[] = {
@@ -337,7 +349,11 @@ static void cpp_timer_callback(unsigned long data);
 uint8_t induce_error;
 static int msm_cpp_enable_debugfs(struct cpp_device *cpp_dev);
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+static inline void msm_cpp_write(u32 data, void __iomem *cpp_base)
+#else
 static void msm_cpp_write(u32 data, void __iomem *cpp_base)
+#endif
 {
 	msm_camera_io_w((data), cpp_base + MSM_CPP_MICRO_FIFO_RX_DATA);
 }

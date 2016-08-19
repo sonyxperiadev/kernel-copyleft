@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _MSM_H
 #define _MSM_H
@@ -33,7 +38,11 @@
  * backend will operate @ .6fps in certain usecases
  * like Long exposure usecase and isp needs max of 2 frames
  * to stop the hardware which will be around 3 seconds*/
+#if defined(CONFIG_SONY_CAM_V4L2)
+#define MSM_POST_EVT_TIMEOUT 4000
+#else
 #define MSM_POST_EVT_TIMEOUT 6500
+#endif
 #define MSM_POST_EVT_NOTIMEOUT 0xFFFFFFFF
 #define MSM_CAMERA_STREAM_CNT_BITS  32
 
