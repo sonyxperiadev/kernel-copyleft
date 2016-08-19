@@ -87,3 +87,14 @@ obj-$(CONFIG_MSM_SYSTEM_HEALTH_MONITOR) += system_health_monitor.o
 obj-$(CONFIG_MSM_RTB) += msm_rtb-hotplug.o
 obj-$(CONFIG_QCOM_EARLY_RANDOM)	+= early_random.o
 obj-$(CONFIG_MSM_PACMAN)        += msm_pacman.o
+obj-$(CONFIG_RAMDUMP_TAGS) += board-rdtags.o
+obj-$(CONFIG_SONY_SSM) += sony_ssm.o
+CFLAGS_board-rdtags.o  := \
+	-D"INFO_PRODUCT=\"$(if $(TARGET_PRODUCT),$(TARGET_PRODUCT),unknown)\"" \
+	-D"INFO_VARIANT= \
+	\"$(if $(TARGET_BUILD_VARIANT),$(TARGET_BUILD_VARIANT),unknown)\"" \
+	-D"INFO_BUILDID= \
+	\"$(if $(SEMC_SYSTEM_VERSION),$(SEMC_SYSTEM_VERSION),private)\""
+obj-$(CONFIG_ARCH_MSM8994) += board-ramdump.o
+obj-$(CONFIG_AMSS_ERR_LOG) += last_amsslog.o
+obj-$(CONFIG_ARCH_MSM8994) += console_setup.o

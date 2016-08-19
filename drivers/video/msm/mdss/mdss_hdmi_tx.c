@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/bitops.h>
 #include <linux/delay.h>
@@ -2151,8 +2156,9 @@ static void hdmi_tx_core_off(struct hdmi_tx_ctrl *hdmi_ctrl)
 		DEV_ERR("%s: invalid input\n", __func__);
 		return;
 	}
-
+#if 0
 	hdmi_tx_enable_power(hdmi_ctrl, HDMI_TX_CEC_PM, 0);
+#endif
 	hdmi_tx_enable_power(hdmi_ctrl, HDMI_TX_CORE_PM, 0);
 } /* hdmi_tx_core_off */
 
@@ -2171,6 +2177,7 @@ static int hdmi_tx_core_on(struct hdmi_tx_ctrl *hdmi_ctrl)
 			__func__, rc);
 		return rc;
 	}
+#if 0
 	rc = hdmi_tx_enable_power(hdmi_ctrl, HDMI_TX_CEC_PM, 1);
 	if (rc) {
 		DEV_ERR("%s: cec hdmi_msm_enable_power failed rc = %d\n",
@@ -2181,6 +2188,7 @@ static int hdmi_tx_core_on(struct hdmi_tx_ctrl *hdmi_ctrl)
 	return rc;
 disable_core_power:
 	hdmi_tx_enable_power(hdmi_ctrl, HDMI_TX_CORE_PM, 0);
+#endif
 	return rc;
 } /* hdmi_tx_core_on */
 
@@ -3199,6 +3207,19 @@ static int hdmi_tx_set_mhl_hpd(struct platform_device *pdev, uint8_t on)
 
 }
 
+ssize_t hdmi_tx_is_HDMI_panel_power_on(struct device *device)
+{
+	struct hdmi_tx_ctrl *hdmi_ctrl =
+			hdmi_tx_get_drvdata_from_sysfs_dev(device);
+	if (!hdmi_ctrl) {
+		DEV_WARN("%s: invalid hdmi_ctrl\n", __func__);
+		return -EINVAL;
+	}
+
+	return hdmi_ctrl->panel_power_on;
+}
+EXPORT_SYMBOL(hdmi_tx_is_HDMI_panel_power_on);
+
 static irqreturn_t hdmi_tx_isr(int irq, void *data)
 {
 	struct dss_io_data *io = NULL;
@@ -3223,11 +3244,21 @@ static irqreturn_t hdmi_tx_isr(int irq, void *data)
 			(DSS_REG_R(io, HDMI_HPD_INT_STATUS) & BIT(1)) >> 1;
 		spin_unlock_irqrestore(&hdmi_ctrl->hpd_state_lock, flags);
 
-		/*
-		 * Ack the current hpd interrupt and stop listening to
-		 * new hpd interrupt.
-		 */
-		DSS_REG_W(io, HDMI_HPD_INT_CTRL, BIT(0));
+		/* Ack the current hpd */
+		if (hdmi_ctrl->hpd_state) {
+			/*
+			 * Ack the interrupt and enable HPD interrupts
+			 * to make sure to get disconnect interrupt.
+			 */
+			DSS_REG_W(io, HDMI_HPD_INT_CTRL, BIT(0) | BIT(2));
+		} else {
+			/*
+			 * Ack the interrupt and enable HPD interrupts
+			 * to make sure to get connect interrupt.
+			 */
+			DSS_REG_W(io, HDMI_HPD_INT_CTRL,
+				BIT(0) | BIT(2) | BIT(1));
+		}
 
 		/*
 		 * If suspend has already triggered, don't start the hpd work
