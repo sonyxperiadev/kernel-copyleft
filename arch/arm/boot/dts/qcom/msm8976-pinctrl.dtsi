@@ -907,6 +907,30 @@
 			};
 		};
 
+		uicc-active {
+			qcom,pins = <&gp 49>, <&gp 50>;
+			qcom,num-grp-pins = <2>;
+			qcom,pin-func = <1>;
+			label = "uicc-active-pins";
+
+			uicc_active: active {
+				drive-strength = <8>;
+				bias-pull-down;
+			};
+		};
+
+		uicc-sleep {
+			qcom,pins = <&gp 49>, <&gp 50>;
+			qcom,num-grp-pins = <2>;
+			qcom,pin-func = <0>;
+			label = "uicc-sleep-pins";
+
+			uicc_sleep: sleep {
+				drive-strength = <2>;
+				bias-pull-down;
+			};
+		};
+
 		pmx_qdsd_data1 {
 			qcom,pins = <&qdsd 3>;
 			qcom,num-grp-pins = <1>;
