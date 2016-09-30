@@ -90,6 +90,7 @@ struct msm_isp_bufq *msm_isp_get_bufq(
 	uint32_t bufq_index = bufq_handle & 0xFF;
 
 	if ((bufq_handle == 0) ||
+		bufq_index >= BUF_MGR_NUM_BUF_Q ||
 		(bufq_index > buf_mgr->num_buf_q))
 		return NULL;
 
@@ -1427,9 +1428,6 @@ static int msm_isp_buf_mgr_debug(struct msm_isp_buf_mgr *buf_mgr)
 			strlcat(print_buf, temp_buf, print_buf_size);
 			for (j = 0; j < buf_mgr->bufq[i].num_bufs; j++) {
 				bufs = &buf_mgr->bufq[i].bufs[j];
-				if (!bufs) {
-					continue;
-				}
 				for (k = 0; k < bufs->num_planes; k++) {
 					start_addr = bufs->
 							mapped_info[k].paddr;

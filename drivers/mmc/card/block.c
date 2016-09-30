@@ -3289,12 +3289,12 @@ static void mmc_blk_cmdq_err(struct mmc_queue *mq)
 
 reset:
 	mmc_blk_cmdq_reset_all(host, err);
+	if (mrq->cmdq_req->resp_err)
+		mrq->cmdq_req->resp_err = false;
 	mmc_cmdq_halt(host, false);
 	host->err_mrq = NULL;
 	clear_bit(CMDQ_STATE_REQ_TIMED_OUT, &ctx_info->curr_state);
 	WARN_ON(!test_and_clear_bit(CMDQ_STATE_ERR, &ctx_info->curr_state));
-	if (mrq->cmdq_req->resp_err)
-		mrq->cmdq_req->resp_err = false;
 
 	clear_bit(0, &ctx_info->req_starved);
 	blk_run_queue(q);
@@ -3319,7 +3319,7 @@ void mmc_blk_cmdq_complete_rq(struct request *rq)
 	else if (mrq->data && mrq->data->error)
 		err = mrq->data->error;
 
-	if (err || cmdq_req->resp_err) {
+	if (err || cmdq_req->resp_err || work_busy(&mq->cmdq_err_work)) {
 		pr_err("%s: %s: txfr error(%d)/resp_err(%d)\n",
 				mmc_hostname(mrq->host), __func__, err,
 				cmdq_req->resp_err);
@@ -3327,11 +3327,9 @@ void mmc_blk_cmdq_complete_rq(struct request *rq)
 			pr_err("%s: CQ in error state, ending current req: %d\n",
 				__func__, err);
 		} else {
-			cmdq_req->resp_err = true;
 			set_bit(CMDQ_STATE_ERR, &ctx_info->curr_state);
 			BUG_ON(host->err_mrq != NULL);
 			host->err_mrq = mrq;
-			pr_err("%s: request cmdq_err_work\n", __func__);
 			schedule_work(&mq->cmdq_err_work);
 		}
 		goto out;

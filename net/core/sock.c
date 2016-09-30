@@ -1204,6 +1204,23 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 		v.val = sock_flag(sk, SOCK_SELECT_ERR_QUEUE);
 		break;
 
+	case SO_SIZEHINT:
+	{
+		struct sock_sizehint hint;
+
+		if (len > sizeof(hint))
+			len = sizeof(hint);
+
+		hint.order_zero_size = PAGE_SIZE -
+			SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+		hint.cache_size =  KMALLOC_MAX_CACHE_SIZE -
+			SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+
+		if (copy_to_user(optval, &hint, len))
+			return -EFAULT;
+		goto lenout;
+	}
+
 	default:
 		return -ENOPROTOOPT;
 	}

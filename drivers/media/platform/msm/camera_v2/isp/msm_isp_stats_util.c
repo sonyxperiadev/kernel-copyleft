@@ -88,7 +88,7 @@ static int msm_isp_stats_cfg_ping_pong_address(struct vfe_device *vfe_dev,
 					dual_vfe_stream_info->buffer_offset);
 			}
 		}
-	} else if (!vfe_dev->is_split) {
+	} else {
 		vfe_dev->hw_info->vfe_ops.stats_ops.update_ping_pong_addr(
 			vfe_dev->vfe_base, stream_info,
 			pingpong_status, buf->mapped_info[0].paddr +

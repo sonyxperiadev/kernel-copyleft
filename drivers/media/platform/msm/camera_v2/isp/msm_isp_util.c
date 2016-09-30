@@ -994,6 +994,7 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)
 {
 	long rc = 0;
+	long rc2 = 0;
 	struct vfe_device *vfe_dev = v4l2_get_subdevdata(sd);
 
 	if (!vfe_dev || !vfe_dev->vfe_base) {
@@ -1064,7 +1065,9 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 		if (atomic_read(&vfe_dev->error_info.overflow_state)
 			!= HALT_ENFORCED) {
 			rc = msm_isp_stats_reset(vfe_dev);
-			rc |= msm_isp_axi_reset(vfe_dev, arg);
+			rc2 |= msm_isp_axi_reset(vfe_dev, arg);
+			if (!rc && rc2)
+				rc = rc2;
 		} else {
 				pr_err_ratelimited("Halt Enforced");
 		}
@@ -1075,7 +1078,9 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 			!= HALT_ENFORCED) {
 			mutex_lock(&vfe_dev->core_mutex);
 			rc = msm_isp_stats_restart(vfe_dev);
-			rc |= msm_isp_axi_restart(vfe_dev, arg);
+			rc2 |= msm_isp_axi_restart(vfe_dev, arg);
+			if (!rc && rc2)
+				rc = rc2;
 		} else {
 				pr_err_ratelimited("Halt Enforced");
 		}
@@ -1859,8 +1864,6 @@ void msm_isp_update_error_frame_count(struct vfe_device *vfe_dev)
 {
 	struct msm_vfe_error_info *error_info = &vfe_dev->error_info;
 	error_info->info_dump_frame_count++;
-	if (error_info->info_dump_frame_count == 0)
-		error_info->info_dump_frame_count++;
 }
 
 
@@ -1871,6 +1874,7 @@ void msm_isp_process_iommu_page_fault(struct vfe_device *vfe_dev)
 	uint32_t i, vfe_id;
 	struct dual_vfe_resource *dual_vfe_res = NULL;
 
+	memset(&error_event, 0, sizeof(struct msm_isp_event_data));
 	memset(&halt_cmd, 0, sizeof(struct msm_vfe_axi_halt_cmd));
 	halt_cmd.stop_camif = 1;
 	halt_cmd.overflow_detected = 0;
@@ -1967,6 +1971,8 @@ static void msm_isp_process_overflow_irq(
 		struct msm_isp_event_data error_event;
 		struct msm_vfe_axi_halt_cmd halt_cmd;
 
+		memset(&error_event, 0, sizeof(error_event));
+
 		if (vfe_dev->reset_pending == 1) {
 			pr_err("%s:%d failed: overflow %x during reset\n",
 				__func__, __LINE__, overflow_mask);
@@ -2022,8 +2028,7 @@ void msm_isp_reset_burst_count_and_frame_drop(
 		stream_info->stream_type != BURST_STREAM) {
 		return;
 	}
-	if (stream_info->stream_type == BURST_STREAM &&
-		stream_info->num_burst_capture != 0) {
+	if (stream_info->num_burst_capture != 0) {
 		framedrop_period = msm_isp_get_framedrop_period(
 		   stream_info->frame_skip_pattern);
 		stream_info->burst_frame_count =
