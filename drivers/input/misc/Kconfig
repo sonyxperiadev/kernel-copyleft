@@ -481,6 +481,15 @@ config INPUT_GPIO
 	help
 	  Say Y here if you want to support gpio based keys, wheels etc...
 
+config INPUT_BU520X1NVX
+	tristate "BU520X1NVX driver support"
+	default n
+	help
+	  Say Y here
+	  if you want to
+	  support BU520X1NVX
+	  as bipolar detection device.
+
 config INPUT_ISA1200_FF_MEMLESS
 	tristate "ISA1200 haptic ff-memless support"
 	depends on I2C
@@ -862,6 +871,12 @@ config SENSORS_ISL29044A
 	depends on I2C
 	help
 	 This option enables support for the INTERSIL ISL29044A P/L sensor.
+
+config FPC1145_PLATFORM
+	tristate "Platform FPC1145 finger print driver"
+	default n
+	help
+	  Select this module to enable FPC1145 tee finger print driver
 
 endif
 

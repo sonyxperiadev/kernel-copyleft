@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <asm/cacheflush.h>
 #include <linux/slab.h>
 #include <linux/io.h>
@@ -20,6 +25,9 @@
 #include <linux/kmemleak.h>
 #include <soc/qcom/memory_dump.h>
 #include <soc/qcom/scm.h>
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
 
 #define MSM_DUMP_TABLE_VERSION		MSM_DUMP_MAKE_VERSION(2, 0)
 
@@ -110,6 +118,22 @@ int msm_dump_data_register(enum msm_dump_table_ids id,
 	return 0;
 }
 EXPORT_SYMBOL(msm_dump_data_register);
+
+#ifdef CONFIG_RAMDUMP_TAGS
+int dump_table_ramdump_setup(void)
+{
+	char data[32];
+	int count = 0;
+
+	snprintf(data, sizeof(data), "0x%lx",
+			(unsigned long) memdump.table_phys);
+	if (rdtags_add_tag("dump_table_addr", data,
+				strnlen(data, sizeof(data))))
+		count++;
+
+	return count;
+}
+#endif
 
 static int __init init_memory_dump(void)
 {

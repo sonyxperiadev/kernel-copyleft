@@ -290,6 +290,13 @@ Optional Properties:
 					reported by USB driver.
 - qcom,parallel-disable-vbat-threshold-uv	The vbat-threshold (in uV) at which
 					parallel-charging is disabled for DCP.
+- qcom,external-typec		A boolean property to be used when an external
+				USB TypeC module is used with charger.
+- qcom,typec-psy-name		The psy name to use for external typec. If
+				'qcom,external-typec' is present then this is
+				a required property.
+- qcom,otg-pinctrl:		A boolean property to be used when OTG enable
+				control is configured in pin control mode.
 
 Example:
 	qcom,qpnp-smbcharger {

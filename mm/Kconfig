@@ -488,6 +488,16 @@ config MEMORY_HOLE_CARVEOUT
           the memory corresponding to the hole to be removed using memblock-
           remove.
 
+config SWAP_CONSIDER_CMA_FREE
+	bool "swap consider cma free size"
+	depends on CMA
+	help
+	  When swap is enable, CMA page is also swapped out.
+	  But CMA page is not used for movable pages.
+	  So in some cases many CMA page remains free.
+	  This help to avoid this situation
+	  by introducing a threshold allowing CMA page reclaim.
+
 config USE_USER_ACCESSIBLE_TIMERS
 	bool "Enables timers accessible from userspace"
 	depends on MMU

@@ -21,6 +21,11 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/bcd.h>
 #include <linux/module.h>
@@ -2680,6 +2685,7 @@ void usb_remove_hcd(struct usb_hcd *hcd)
 
 	hcd->driver->stop(hcd);
 	hcd->state = HC_STATE_HALT;
+	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 
 	/* In case the HCD restarted the timer, stop it again. */
 	clear_bit(HCD_FLAG_POLL_RH, &hcd->flags);

@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/export.h>
 #include <linux/vmalloc.h>
@@ -676,9 +681,6 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	if (align < ilog2(page_size))
 		kgsl_memdesc_set_align(memdesc, ilog2(page_size));
 
-	if (size > SIZE_MAX)
-		return -EINVAL;
-
 	/*
 	 * There needs to be enough room in the page array to be able to
 	 * service the allocation entirely with PAGE_SIZE sized chunks
@@ -855,7 +857,7 @@ kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
 			    uint64_t size)
 {
 	size = PAGE_ALIGN(size);
-	if (size == 0)
+	if (size == 0 || size > UINT_MAX)
 		return -EINVAL;
 
 	return _kgsl_sharedmem_page_alloc(memdesc, pagetable, size);

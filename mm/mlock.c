@@ -4,6 +4,11 @@
  *  (C) Copyright 1995 Linus Torvalds
  *  (C) Copyright 2002 Christoph Hellwig
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/capability.h>
 #include <linux/mman.h>
@@ -18,6 +23,7 @@
 #include <linux/rmap.h>
 #include <linux/mmzone.h>
 #include <linux/hugetlb.h>
+#include <linux/mm_inline.h>
 
 #include "internal.h"
 
@@ -58,6 +64,9 @@ void clear_page_mlock(struct page *page)
 
 	mod_zone_page_state(page_zone(page), NR_MLOCK,
 			    -hpage_nr_pages(page));
+	if (page_is_file_cache(page))
+		mod_zone_page_state(page_zone(page), NR_MLOCK_FILE,
+			    -hpage_nr_pages(page));
 	count_vm_event(UNEVICTABLE_PGCLEARED);
 	if (!isolate_lru_page(page)) {
 		putback_lru_page(page);
@@ -82,6 +91,9 @@ void mlock_vma_page(struct page *page)
 	if (!TestSetPageMlocked(page)) {
 		mod_zone_page_state(page_zone(page), NR_MLOCK,
 				    hpage_nr_pages(page));
+		if (page_is_file_cache(page))
+			mod_zone_page_state(page_zone(page), NR_MLOCK_FILE,
+					hpage_nr_pages(page));
 		count_vm_event(UNEVICTABLE_PGMLOCKED);
 		if (!isolate_lru_page(page))
 			putback_lru_page(page);
@@ -113,6 +125,8 @@ unsigned int munlock_vma_page(struct page *page)
 	if (TestClearPageMlocked(page)) {
 		unsigned int nr_pages = hpage_nr_pages(page);
 		mod_zone_page_state(page_zone(page), NR_MLOCK, -nr_pages);
+		if (page_is_file_cache(page))
+			mod_zone_page_state(page_zone(page), NR_MLOCK_FILE, -nr_pages);
 		page_mask = nr_pages - 1;
 		if (!isolate_lru_page(page)) {
 			int ret = SWAP_AGAIN;
