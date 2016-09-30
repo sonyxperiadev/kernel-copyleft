@@ -11,7 +11,7 @@
  */
 /*
  * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
  * and licensed under the license of the file.
  */
 
@@ -1187,7 +1187,7 @@ static ssize_t subsys_debugfs_reason_read(struct file *filp, char __user *ubuf,
 		size_t cnt, loff_t *ppos)
 {
 	int r;
-	char buf[81];
+	char buf[SUBSYS_CRASH_REASON_LEN];
 	ssize_t size;
 	struct subsys_device *subsys = filp->private_data;
 
