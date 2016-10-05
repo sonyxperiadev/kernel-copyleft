@@ -195,6 +195,7 @@ static void somc_chg_usbid_stop_polling(struct usb_somc_params *usb_params)
 	if (typecctrl->user_request_polling)
 		return;
 
+	cancel_delayed_work_sync(&typecctrl->stop_polling_delay);
 	queue_delayed_work(typecctrl->polling_wq,
 					&typecctrl->stop_polling_delay, 0);
 }
