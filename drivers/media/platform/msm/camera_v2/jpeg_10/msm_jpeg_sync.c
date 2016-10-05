@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 
 #include <linux/module.h>
@@ -754,7 +759,7 @@ int __msm_jpeg_open(struct msm_jpeg_device *pgmn_dev)
 			__LINE__, rc);
 		goto platform_init_fail;
 	}
-	JPEG_DBG("%s:%d] platform resources - base %p, irq %d\n",
+	JPEG_DBG("%s:%d] platform resources - base %pK, irq %d\n",
 		__func__, __LINE__,
 		pgmn_dev->base, (int)pgmn_dev->jpeg_irq_res->start);
 	msm_jpeg_q_cleanup(&pgmn_dev->evt_q);
@@ -827,7 +832,11 @@ int msm_jpeg_ioctl_hw_cmd(struct msm_jpeg_device *pgmn_dev,
 		__func__, __LINE__, hw_cmd.type, hw_cmd.n, hw_cmd.offset,
 		hw_cmd.mask, hw_cmd.data, (unsigned long) hw_cmd.pdata);
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+	if (is_copy_to_user > 0) {
+#else
 	if (is_copy_to_user >= 0) {
+#endif
 		if (copy_to_user(arg, &hw_cmd, sizeof(hw_cmd))) {
 			JPEG_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
 			return -EFAULT;

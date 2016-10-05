@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,8 +24,9 @@
 #include <linux/tty.h>
 #include <linux/delay.h>
 #include <linux/ipc_logging.h>
-#include <linux/dma-mapping.h>
+#include <linux/errno.h>
 #include <linux/device.h>
+#include <linux/errno.h>
 
 #define MHI_DEV_NODE_NAME_LEN 13
 #define MHI_MAX_NR_OF_CLIENTS 23
@@ -49,10 +50,14 @@ enum UCI_DBG_LEVEL {
 	UCI_DBG_CRITICAL = 0x5,
 	UCI_DBG_reserved = 0x80000000
 };
-
 enum UCI_DBG_LEVEL mhi_uci_msg_lvl = UCI_DBG_CRITICAL;
-enum UCI_DBG_LEVEL mhi_uci_ipc_log_lvl = UCI_DBG_INFO;
-static unsigned int uci_log_override;
+
+#ifdef CONFIG_MSM_MHI_DEBUG
+enum UCI_DBG_LEVEL mhi_uci_ipc_log_lvl = UCI_DBG_VERBOSE;
+#else
+enum UCI_DBG_LEVEL mhi_uci_ipc_log_lvl = UCI_DBG_ERROR;
+#endif
+
 void *mhi_uci_ipc_log;
 
 struct __packed rs232_ctrl_msg {
@@ -115,7 +120,7 @@ struct uci_client {
 	int mhi_status;
 	void *pkt_loc;
 	size_t pkt_size;
-	dma_addr_t *in_buf_list;
+	void **in_buf_list;
 	atomic_t out_pkt_pend_ack;
 	atomic_t mhi_disabled;
 	struct mhi_uci_ctxt_t *uci_ctxt;
@@ -215,15 +220,10 @@ struct mhi_uci_ctxt_t {
 };
 
 #define uci_log(_msg_lvl, _msg, ...) do { \
-	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, _msg);	 \
-	if ((uci_log_override ||				 \
-		    unlikely(descriptor.flags & _DPRINTK_FLAGS_PRINT)) &&\
-		    (_msg_lvl >= mhi_uci_msg_lvl)) {			 \
-		pr_err("[%s] "_msg, __func__, ##__VA_ARGS__);		 \
-	}								 \
-	if ((uci_log_override ||				 \
-		    unlikely(descriptor.flags & _DPRINTK_FLAGS_PRINT)) && \
-		    mhi_uci_ipc_log && (_msg_lvl >= mhi_uci_ipc_log_lvl)) { \
+	if (_msg_lvl >= mhi_uci_msg_lvl) { \
+		pr_err("[%s] "_msg, __func__, ##__VA_ARGS__); \
+	} \
+	if (mhi_uci_ipc_log && (_msg_lvl >= mhi_uci_ipc_log_lvl)) { \
 		ipc_log_string(mhi_uci_ipc_log,                     \
 			"[%s] " _msg, __func__, ##__VA_ARGS__);     \
 	} \
@@ -234,9 +234,6 @@ MODULE_PARM_DESC(mhi_uci_msg_lvl, "uci dbg lvl");
 
 module_param(mhi_uci_ipc_log_lvl, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(mhi_uci_ipc_log_lvl, "ipc dbg lvl");
-
-module_param(uci_log_override , uint, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(uci_log_override, "dbg class");
 
 static ssize_t mhi_uci_client_read(struct file *file, char __user *buf,
 		size_t count, loff_t *offp);
@@ -251,12 +248,11 @@ static long mhi_uci_ctl_ioctl(struct file *file, unsigned int cmd,
 
 static struct mhi_uci_ctxt_t uci_ctxt;
 
-static enum MHI_STATUS mhi_init_inbound(struct uci_client *client_handle,
+static int mhi_init_inbound(struct uci_client *client_handle,
 		enum MHI_CLIENT_CHANNEL chan)
 {
-	enum MHI_STATUS ret_val = MHI_STATUS_SUCCESS;
+	int ret_val = 0;
 	u32 i = 0;
-	dma_addr_t dma_addr = 0;
 	struct chan_attr *chan_attributes =
 		&uci_ctxt.chan_attrib[chan];
 	void *data_loc = NULL;
@@ -264,15 +260,15 @@ static enum MHI_STATUS mhi_init_inbound(struct uci_client *client_handle,
 
 	if (client_handle == NULL) {
 		uci_log(UCI_DBG_ERROR, "Bad Input data, quitting\n");
-		return MHI_STATUS_ERROR;
+		return -EINVAL;
 	}
 	chan_attributes->nr_trbs =
 			mhi_get_free_desc(client_handle->in_handle);
 	client_handle->in_buf_list =
-			kmalloc(sizeof(dma_addr_t) * chan_attributes->nr_trbs,
+			kmalloc(sizeof(void *) * chan_attributes->nr_trbs,
 			GFP_KERNEL);
 	if (!client_handle->in_buf_list)
-		return MHI_STATUS_ERROR;
+		return -ENOMEM;
 
 	uci_log(UCI_DBG_INFO, "Channel %d supports %d desc\n",
 			i, chan_attributes->nr_trbs);
@@ -282,18 +278,10 @@ static enum MHI_STATUS mhi_init_inbound(struct uci_client *client_handle,
 			data_loc, buf_size);
 		if (data_loc == NULL)
 			return -ENOMEM;
-		dma_addr = dma_map_single(NULL, data_loc,
-					buf_size, DMA_FROM_DEVICE);
-		if (dma_mapping_error(NULL, dma_addr)) {
-			uci_log(UCI_DBG_ERROR, "Failed to Map DMA\n");
-			return -ENOMEM;
-		}
-		client_handle->in_buf_list[i] = dma_addr;
+		client_handle->in_buf_list[i] = data_loc;
 		ret_val = mhi_queue_xfer(client_handle->in_handle,
-					  dma_addr, buf_size, MHI_EOT);
-		if (MHI_STATUS_SUCCESS != ret_val) {
-			dma_unmap_single(NULL, dma_addr,
-					 buf_size, DMA_FROM_DEVICE);
+					  data_loc, buf_size, MHI_EOT);
+		if (0 != ret_val) {
 			kfree(data_loc);
 			uci_log(UCI_DBG_ERROR,
 				"Failed insertion for chan %d, ret %d\n",
@@ -314,7 +302,6 @@ static int mhi_uci_send_packet(struct mhi_client_handle **client_handle,
 	int data_left_to_insert = 0;
 	size_t data_to_insert_now = 0;
 	u32 data_inserted_so_far = 0;
-	dma_addr_t dma_addr = 0;
 	int ret_val = 0;
 	enum MHI_FLAGS flags;
 	struct uci_client *uci_handle;
@@ -323,7 +310,7 @@ static int mhi_uci_send_packet(struct mhi_client_handle **client_handle,
 
 	if (client_handle == NULL || buf == NULL ||
 		!size || uci_handle == NULL)
-		return MHI_STATUS_ERROR;
+		return -EINVAL;
 
 	nr_avail_trbs = mhi_get_free_desc(*client_handle);
 
@@ -353,27 +340,19 @@ static int mhi_uci_send_packet(struct mhi_client_handle **client_handle,
 			data_loc = buf;
 		}
 
-		dma_addr = dma_map_single(NULL, data_loc,
-					data_to_insert_now, DMA_TO_DEVICE);
-		if (dma_mapping_error(NULL, dma_addr)) {
-			uci_log(UCI_DBG_ERROR,
-					"Failed to Map DMA 0x%x\n", size);
-			data_inserted_so_far = -ENOMEM;
-			goto error_memcpy;
-		}
-
 		flags = MHI_EOT;
 		if (data_left_to_insert - data_to_insert_now > 0)
 			flags |= MHI_CHAIN | MHI_EOB;
 		uci_log(UCI_DBG_VERBOSE,
-			    "At trb i = %d/%d, chain = %d, eob = %d, addr 0x%lx chan %d\n",
+			    "At trb i = %d/%d, chain = %d, eob = %d, addr 0x%p chan %d\n",
 				i, nr_avail_trbs,
 				flags & MHI_CHAIN,
 				flags & MHI_EOB,
-				(uintptr_t)dma_addr,
+				data_loc,
 				uci_handle->out_chan);
-		ret_val = mhi_queue_xfer(*client_handle, dma_addr,
+		ret_val = mhi_queue_xfer(*client_handle, data_loc,
 					data_to_insert_now, flags);
+
 		if (0 != ret_val) {
 			goto error_queue;
 		} else {
@@ -387,10 +366,6 @@ static int mhi_uci_send_packet(struct mhi_client_handle **client_handle,
 	return data_inserted_so_far;
 
 error_queue:
-	dma_unmap_single(NULL,
-		(dma_addr_t)dma_addr,
-		data_to_insert_now,
-		DMA_TO_DEVICE);
 error_memcpy:
 	kfree(data_loc);
 	return data_inserted_so_far;
@@ -415,7 +390,7 @@ static int mhi_uci_send_status_cmd(struct uci_client *client)
 			"Opening outbound control channel %d\n",
 			uci_ctrl_handle->out_chan);
 		ret_val = mhi_open_channel(uci_ctrl_handle->out_handle);
-		if (MHI_STATUS_SUCCESS != ret_val) {
+		if (0 != ret_val) {
 			uci_log(UCI_DBG_CRITICAL,
 				"Could not open chan %d, for sideband ctrl\n",
 				client->out_chan);
@@ -558,7 +533,7 @@ static unsigned int mhi_uci_client_poll(struct file *file, poll_table *wait)
 
 static int open_client_mhi_channels(struct uci_client *uci_client)
 {
-	enum MHI_STATUS ret_val = MHI_STATUS_SUCCESS;
+	int ret_val = 0;
 	int r = 0;
 	uci_log(UCI_DBG_INFO,
 			"Starting channels %d %d.\n",
@@ -567,8 +542,8 @@ static int open_client_mhi_channels(struct uci_client *uci_client)
 	mutex_lock(&uci_client->out_chan_lock);
 	mutex_lock(&uci_client->in_chan_lock);
 	ret_val = mhi_open_channel(uci_client->out_handle);
-	if (ret_val != MHI_STATUS_SUCCESS) {
-		if (ret_val == MHI_STATUS_DEVICE_NOT_READY)
+	if (ret_val != 0) {
+		if (ret_val == -ENOTCONN)
 			r = -EAGAIN;
 		else
 			r = -EIO;
@@ -577,7 +552,7 @@ static int open_client_mhi_channels(struct uci_client *uci_client)
 	uci_client->out_chan_state = 1;
 
 	ret_val = mhi_open_channel(uci_client->in_handle);
-	if (ret_val != MHI_STATUS_SUCCESS) {
+	if (ret_val != 0) {
 		uci_log(UCI_DBG_ERROR,
 				 "Failed to open chan %d, ret 0x%x\n",
 		   uci_client->out_chan, ret_val);
@@ -589,7 +564,7 @@ static int open_client_mhi_channels(struct uci_client *uci_client)
 	uci_client->in_chan_state = 1;
 
 	ret_val = mhi_init_inbound(uci_client, uci_client->in_chan);
-	if (MHI_STATUS_SUCCESS != ret_val) {
+	if (0 != ret_val) {
 		uci_log(UCI_DBG_ERROR,
 			   "Failed to init inbound 0x%x, ret 0x%x\n",
 			   uci_client->in_chan, ret_val);
@@ -648,17 +623,20 @@ static int mhi_uci_client_release(struct inode *mhi_inode,
 		struct file *file_handle)
 {
 	struct uci_client *uci_handle = file_handle->private_data;
-	struct mhi_uci_ctxt_t *uci_ctxt = uci_handle->uci_ctxt;
+	struct mhi_uci_ctxt_t *uci_ctxt;
 	u32 nr_in_bufs = 0;
 	int in_chan = 0;
 	int i = 0;
 	u32 buf_size = 0;
+
+	if (uci_handle == NULL)
+		return -EINVAL;
+
+	uci_ctxt = uci_handle->uci_ctxt;
 	in_chan = iminor(mhi_inode) + 1;
 	nr_in_bufs = uci_ctxt->chan_attrib[in_chan].nr_trbs;
 	buf_size = uci_ctxt->chan_attrib[in_chan].max_packet_size;
 
-	if (uci_handle == NULL)
-		return -EINVAL;
 	if (atomic_sub_return(1, &uci_handle->ref_count) == 0) {
 		uci_log(UCI_DBG_ERROR,
 				"Last client left, closing channel 0x%x\n",
@@ -676,10 +654,6 @@ static int mhi_uci_client_release(struct inode *mhi_inode,
 		uci_handle->in_chan_state = 0;
 		atomic_set(&uci_handle->out_pkt_pend_ack, 0);
 		for (i = 0; i < nr_in_bufs; ++i) {
-			dma_unmap_single(NULL,
-					uci_handle->in_buf_list[i],
-					buf_size,
-					DMA_FROM_DEVICE);
 			kfree((void *)uci_handle->in_buf_list[i]);
 		}
 		kfree(uci_handle->in_buf_list);
@@ -697,7 +671,6 @@ static ssize_t mhi_uci_client_read(struct file *file, char __user *buf,
 		size_t uspace_buf_size, loff_t *bytes_pending)
 {
 	struct uci_client *uci_handle = NULL;
-	uintptr_t phy_buf = 0;
 	struct mhi_client_handle *client_handle = NULL;
 	int ret_val = 0;
 	size_t buf_size = 0;
@@ -728,19 +701,16 @@ static ssize_t mhi_uci_client_read(struct file *file, char __user *buf,
 				"Failed to poll inbound ret %d avail pkt %d\n",
 				ret_val, atomic_read(&uci_handle->avail_pkts));
 			}
-			phy_buf = result.payload_buf;
-			if (phy_buf != 0)
-				uci_handle->pkt_loc = (void *)phy_buf;
+			if (result.buf_addr)
+				uci_handle->pkt_loc = result.buf_addr;
 			else
 				uci_handle->pkt_loc = 0;
 			uci_handle->pkt_size = result.bytes_xferd;
 			*bytes_pending = uci_handle->pkt_size;
 			uci_log(UCI_DBG_VERBOSE,
-				"Got pkt of size 0x%zx at addr 0x%lx, chan %d\n",
-				uci_handle->pkt_size, (uintptr_t)phy_buf, chan);
-			dma_unmap_single(NULL, (dma_addr_t)phy_buf,
-					 buf_size,
-					 DMA_FROM_DEVICE);
+				"Got pkt size 0x%zx at addr 0x%lx, chan %d\n",
+				uci_handle->pkt_size,
+				(uintptr_t)result.buf_addr, chan);
 		}
 		if ((*bytes_pending == 0 || uci_handle->pkt_loc == 0) &&
 				(atomic_read(&uci_handle->avail_pkts) <= 0)) {
@@ -774,9 +744,9 @@ static ssize_t mhi_uci_client_read(struct file *file, char __user *buf,
 			   uci_handle->pkt_size != 0 &&
 			   uci_handle->pkt_loc != 0) {
 			uci_log(UCI_DBG_VERBOSE,
-			"Got packet: avail pkts %d phy_adr 0x%lx, chan %d\n",
+			"Got packet: avail pkts %d phy_adr 0x%p, chan %d\n",
 					atomic_read(&uci_handle->avail_pkts),
-					phy_buf,
+					result.buf_addr,
 					chan);
 			break;
 			/*
@@ -785,10 +755,10 @@ static ssize_t mhi_uci_client_read(struct file *file, char __user *buf,
 			 */
 		} else {
 			uci_log(UCI_DBG_CRITICAL,
-			"chan %d err: avail pkts %d phy_adr 0x%lx mhi_stat%d\n",
+			"chan %d err: avail pkts %d phy_adr 0x%p mhi_stat%d\n",
 					chan,
 					atomic_read(&uci_handle->avail_pkts),
-					phy_buf,
+					result.buf_addr,
 					uci_handle->mhi_status);
 			return -EIO;
 		}
@@ -830,17 +800,13 @@ static ssize_t mhi_uci_client_read(struct file *file, char __user *buf,
 		uci_log(UCI_DBG_VERBOSE, "Pkt loc %p ,chan %d\n",
 					uci_handle->pkt_loc, chan);
 		memset(uci_handle->pkt_loc, 0, buf_size);
-		phy_buf = dma_map_single(NULL, uci_handle->pkt_loc,
-				buf_size, DMA_FROM_DEVICE);
 		atomic_dec(&uci_handle->avail_pkts);
 		uci_log(UCI_DBG_VERBOSE,
 				"Decremented avail pkts avail 0x%x\n",
 				atomic_read(&uci_handle->avail_pkts));
-
-		ret_val = mhi_queue_xfer(client_handle, phy_buf,
+		ret_val = mhi_queue_xfer(client_handle, uci_handle->pkt_loc,
 					 buf_size, MHI_EOT);
-
-		if (MHI_STATUS_SUCCESS != ret_val) {
+		if (0 != ret_val) {
 			uci_log(UCI_DBG_ERROR,
 					"Failed to recycle element\n");
 			ret_val = -EIO;
@@ -901,7 +867,7 @@ sys_interrupt:
 	return ret_val;
 }
 
-static enum MHI_STATUS uci_init_client_attributes(struct mhi_uci_ctxt_t
+static int uci_init_client_attributes(struct mhi_uci_ctxt_t
 								*uci_ctxt)
 {
 	u32 i = 0;
@@ -925,6 +891,8 @@ static enum MHI_STATUS uci_init_client_attributes(struct mhi_uci_ctxt_t
 		case MHI_CLIENT_IP_CTRL_0_IN:
 		case MHI_CLIENT_IP_CTRL_1_OUT:
 		case MHI_CLIENT_IP_CTRL_1_IN:
+		case MHI_CLIENT_BL_OUT:
+		case MHI_CLIENT_BL_IN:
 		case MHI_CLIENT_DUN_OUT:
 		case MHI_CLIENT_DUN_IN:
 			chan_attrib->uci_ownership = 1;
@@ -942,7 +910,7 @@ static enum MHI_STATUS uci_init_client_attributes(struct mhi_uci_ctxt_t
 		else
 			chan_attrib->dir = MHI_DIR_IN;
 	}
-	return MHI_STATUS_SUCCESS;
+	return 0;
 }
 
 static int process_mhi_disabled_notif_sync(struct uci_client *uci_handle)
@@ -975,11 +943,11 @@ static void process_rs232_state(struct mhi_result *result)
 	struct rs232_ctrl_msg *rs232_pkt;
 	struct uci_client *client;
 	u32 msg_id;
-	enum MHI_STATUS ret_val;
+	int ret_val;
 	u32 chan;
 
 	mutex_lock(&uci_ctxt.ctrl_mutex);
-	if (result->transaction_status != MHI_STATUS_SUCCESS) {
+	if (result->transaction_status != 0) {
 		uci_log(UCI_DBG_ERROR,
 			"Non successful transfer code 0x%x\n",
 			 result->transaction_status);
@@ -987,13 +955,11 @@ static void process_rs232_state(struct mhi_result *result)
 	}
 	if (result->bytes_xferd != sizeof(struct rs232_ctrl_msg)) {
 		uci_log(UCI_DBG_ERROR,
-		"Buffer is of wrong size is: 0x%x: expected 0x%zx\n",
+		"Buffer is of wrong size is: 0x%zx: expected 0x%zx\n",
 		result->bytes_xferd, sizeof(struct rs232_ctrl_msg));
 		goto error_size;
 	}
-	dma_unmap_single(NULL, result->payload_buf,
-			result->bytes_xferd, DMA_FROM_DEVICE);
-	rs232_pkt = (void *)result->payload_buf;
+	rs232_pkt = result->buf_addr;
 	MHI_GET_CTRL_DEST_ID(CTRL_DEST_ID, rs232_pkt, chan);
 	client = &uci_ctxt.client_handles[chan / 2];
 
@@ -1014,14 +980,11 @@ static void process_rs232_state(struct mhi_result *result)
 error_bad_xfer:
 error_size:
 	memset(rs232_pkt, 0, sizeof(struct rs232_ctrl_msg));
-	dma_map_single(NULL, rs232_pkt,
-			sizeof(struct rs232_ctrl_msg),
-			DMA_FROM_DEVICE);
 	ret_val = mhi_queue_xfer(client->in_handle,
-			result->payload_buf,
+			result->buf_addr,
 			result->bytes_xferd,
 			result->flags);
-	if (MHI_STATUS_SUCCESS != ret_val) {
+	if (0 != ret_val) {
 		uci_log(UCI_DBG_ERROR,
 		"Failed to recycle ctrl msg buffer\n");
 	}
@@ -1044,11 +1007,7 @@ static void parse_inbound_ack(struct uci_client *uci_handle,
 static void parse_outbound_ack(struct uci_client *uci_handle,
 			struct mhi_result *result)
 {
-	dma_unmap_single(NULL,
-			result->payload_buf,
-			result->bytes_xferd,
-			DMA_TO_DEVICE);
-	kfree((void *) result->payload_buf);
+	kfree(result->buf_addr);
 	uci_log(UCI_DBG_VERBOSE,
 		"Received ack on chan %d, pending acks: 0x%x\n",
 		uci_handle->out_chan,
@@ -1065,14 +1024,15 @@ static void uci_xfer_cb(struct mhi_cb_info *cb_info)
 	u32 client_index;
 	struct mhi_result *result;
 
-	if (!cb_info)
+	if (!cb_info || !cb_info->result) {
 		uci_log(UCI_DBG_CRITICAL, "Bad CB info from MHI.\n");
-	if (cb_info->result) {
-		chan_nr = (uintptr_t)cb_info->result->user_data;
-		client_index = CHAN_TO_CLIENT(chan_nr);
-		uci_handle =
-			&uci_ctxt.client_handles[client_index];
+		return;
 	}
+
+	chan_nr = (uintptr_t)cb_info->result->user_data;
+	client_index = CHAN_TO_CLIENT(chan_nr);
+	uci_handle = &uci_ctxt.client_handles[client_index];
+
 	switch (cb_info->cb_reason) {
 	case MHI_CB_MHI_ENABLED:
 		atomic_set(&uci_handle->mhi_disabled, 0);
@@ -1107,7 +1067,7 @@ static void uci_xfer_cb(struct mhi_cb_info *cb_info)
 
 static int mhi_register_client(struct uci_client *mhi_client, int index)
 {
-	enum MHI_STATUS ret_val = MHI_STATUS_SUCCESS;
+	int ret_val = 0;
 
 	uci_log(UCI_DBG_INFO, "Setting up workqueues.\n");
 	init_waitqueue_head(&mhi_client->read_wq);
@@ -1126,7 +1086,7 @@ static int mhi_register_client(struct uci_client *mhi_client, int index)
 			0,
 			&uci_ctxt.client_info,
 			(void *)(uintptr_t)(mhi_client->out_chan));
-	if (MHI_STATUS_SUCCESS != ret_val)
+	if (0 != ret_val)
 			uci_log(UCI_DBG_ERROR,
 			"Failed to init outbound chan 0x%x, ret 0x%x\n",
 			mhi_client->out_chan, ret_val);
@@ -1137,7 +1097,7 @@ static int mhi_register_client(struct uci_client *mhi_client, int index)
 			0,
 			&uci_ctxt.client_info,
 			(void *)(uintptr_t)(mhi_client->in_chan));
-	if (MHI_STATUS_SUCCESS != ret_val)
+	if (0 != ret_val)
 		uci_log(UCI_DBG_ERROR,
 			"Failed to init inbound chan 0x%x, ret 0x%x\n",
 			mhi_client->in_chan, ret_val);
@@ -1156,7 +1116,7 @@ static const struct file_operations mhi_uci_client_fops = {
 static int mhi_uci_init(void)
 {
 	u32 i = 0;
-	enum MHI_STATUS ret_val = MHI_STATUS_SUCCESS;
+	int ret_val = 0;
 	struct uci_client *mhi_client = NULL;
 	s32 r = 0;
 	mhi_uci_ipc_log = ipc_log_context_create(MHI_UCI_IPC_LOG_PAGES,
@@ -1172,7 +1132,7 @@ static int mhi_uci_init(void)
 
 	uci_log(UCI_DBG_INFO, "Setting up channel attributes.\n");
 	ret_val = uci_init_client_attributes(&uci_ctxt);
-	if (MHI_STATUS_SUCCESS != ret_val) {
+	if (ret_val) {
 		uci_log(UCI_DBG_ERROR,
 				"Failed to init client attributes\n");
 		return -EIO;

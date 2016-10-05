@@ -732,6 +732,8 @@
 #define TSENS_DEBUG_BUS_ID2_MIN_CYCLE	50
 #define TSENS_DEBUG_BUS_ID2_MAX_CYCLE	51
 #define TSENS_DEBUG_ID_MASK_1_4		0xffffffe1
+#define TSENS_DEBUG_WDOG_MIN		20000000
+#define TSENS_DEBUG_WDOG_MAX		21000000
 
 static uint32_t tsens_sec_to_msec_value = 1000;
 static uint32_t tsens_completion_timeout_hz = HZ/2;
@@ -2183,6 +2185,30 @@ debug_start:
 			usleep_range(TSENS_DEBUG_MIN_CYCLE,
 				TSENS_DEBUG_MAX_CYCLE);
 		}
+		/*
+		 * Sleep for atleast 20 seconds and check if hardware wdog
+		 * resets the system.
+		 */
+		usleep_range(TSENS_DEBUG_WDOG_MIN,
+				TSENS_DEBUG_WDOG_MAX);
+		offset = TSENS_DEBUG_OFFSET_ROW *
+				TSENS_DEBUG_STATUS_REG_START;
+		pr_err("Start of TSENS TM dump %d\n", loop);
+		/* Limited dump of the registers for the temperature */
+		for (i = 0; i < TSENS_DEBUG_LOOP_COUNT; i++) {
+			r1 = readl_relaxed(controller_id_addr + offset);
+			r2 = readl_relaxed(controller_id_addr +
+				(offset + TSENS_DEBUG_OFFSET_WORD1));
+			r3 = readl_relaxed(controller_id_addr +
+				(offset + TSENS_DEBUG_OFFSET_WORD2));
+			r4 = readl_relaxed(controller_id_addr +
+				(offset + TSENS_DEBUG_OFFSET_WORD3));
+
+		pr_err("ctrl:%d:0x%08x 0x%08x 0x%08x 0x%08x 0x%08x\n",
+			cntrl_id, offset, r1, r2, r3, r4);
+			offset += TSENS_DEBUG_OFFSET_ROW;
+		}
+
 		BUG();
 	}
 

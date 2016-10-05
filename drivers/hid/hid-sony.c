@@ -10,6 +10,11 @@
  *  Copyright (c) 2013 Colin Leitner <colin.leitner@gmail.com>
  *  Copyright (c) 2014 Frank Praznik <frank.praznik@gmail.com>
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  * This program is free software; you can redistribute it and/or modify it
@@ -1100,20 +1105,23 @@ static int sony_register_touchpad(struct hid_input *hi, int touch_count,
 	return 0;
 }
 
-static void sony_input_configured(struct hid_device *hdev,
+static int sony_input_configured(struct hid_device *hdev,
 					struct hid_input *hidinput)
 {
 	struct sony_sc *sc = hid_get_drvdata(hdev);
+	int ret = 0;
 
 	/*
 	 * The Dualshock 4 touchpad supports 2 touches and has a
 	 * resolution of 1920x942 (44.86 dots/mm).
 	 */
 	if (sc->quirks & DUALSHOCK4_CONTROLLER) {
-		if (sony_register_touchpad(hidinput, 2, 1920, 942) != 0)
+		ret = sony_register_touchpad(hidinput, 2, 1920, 942);
+		if (ret != 0)
 			hid_err(sc->hdev,
 				"Unable to initialize multi-touch slots\n");
 	}
+	return ret;
 }
 
 /*
@@ -1878,6 +1886,11 @@ static int sony_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	hid_set_drvdata(hdev, sc);
 	sc->hdev = hdev;
 
+	if (sc->quirks & DUALSHOCK4_CONTROLLER_USB) {
+		hid_dbg(hdev, "Ignoring DUALSHOCK4 Controller via USB\n");
+		return 0;
+	}
+
 	ret = hid_parse(hdev);
 	if (ret) {
 		hid_err(hdev, "parse failed\n");
@@ -1994,6 +2007,11 @@ static void sony_remove(struct hid_device *hdev)
 {
 	struct sony_sc *sc = hid_get_drvdata(hdev);
 
+	if (sc->quirks & DUALSHOCK4_CONTROLLER_USB) {
+		hid_dbg(hdev, "Ignoring DUALSHOCK4 Controller via USB\n");
+		return;
+	}
+
 	if (sc->quirks & SONY_LED_SUPPORT)
 		sony_leds_remove(sc);
 
@@ -2039,6 +2057,8 @@ static const struct hid_device_id sony_devices[] = {
 		.driver_data = PS3REMOTE },
 	/* Sony Dualshock 4 controllers for PS4 */
 	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER),
+		.driver_data = DUALSHOCK4_CONTROLLER_USB },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER_2),
 		.driver_data = DUALSHOCK4_CONTROLLER_USB },
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER),
 		.driver_data = DUALSHOCK4_CONTROLLER_BT },

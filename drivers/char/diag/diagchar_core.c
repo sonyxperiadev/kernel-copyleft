@@ -96,7 +96,7 @@ module_param(poolsize_dci, uint, 0);
 #ifdef CONFIG_DIAGFWD_BRIDGE_CODE
 /* Used for reading data from the remote device. */
 static unsigned int itemsize_mdm = DIAG_MDM_BUF_SIZE;
-static unsigned int poolsize_mdm = 9;
+static unsigned int poolsize_mdm = 18;
 module_param(itemsize_mdm, uint, 0);
 module_param(poolsize_mdm, uint, 0);
 
@@ -113,7 +113,7 @@ module_param(itemsize_mdm_dci, uint, 0);
  * Don't expose the itemsize since it is constant.
  */
 static unsigned int itemsize_mdm_usb = sizeof(struct diag_request);
-static unsigned int poolsize_mdm_usb = 9;
+static unsigned int poolsize_mdm_usb = 18;
 module_param(poolsize_mdm_usb, uint, 0);
 
 /*
@@ -1340,6 +1340,7 @@ static int diag_md_session_check(int curr_mode, int req_mode,
 				 uint8_t *change_mode)
 {
 	int err = 0;
+	struct diag_md_session_t *session_info = NULL;
 
 	if (!param || !change_mode)
 		return -EIO;
@@ -1404,8 +1405,10 @@ static int diag_md_session_check(int curr_mode, int req_mode,
 					 "another instance running\n");
 				*change_mode = 0;
 				return -EINVAL;
-			} else
-				return 0;
+			}
+			session_info = diag_md_session_get_pid(current->tgid);
+			diag_md_session_close(session_info);
+			return 0;
 		}
 
 		if (param->mode_param == DIAG_MD_NORMAL) {

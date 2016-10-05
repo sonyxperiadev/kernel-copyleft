@@ -73,6 +73,7 @@ static const char *const mpeg_video_vidc_extradata[] = {
 	"Extradata frame QP",
 	"Extradata frame bits info",
 	"Extradata VQZip SEI",
+	"Extradata output crop",
 };
 static const char *const mpeg_vidc_video_alloc_mode_type[] = {
 	"Buffer Allocation Static",
@@ -272,7 +273,7 @@ static struct msm_vidc_ctrl msm_vdec_ctrls[] = {
 		.name = "Extradata Type",
 		.type = V4L2_CTRL_TYPE_MENU,
 		.minimum = V4L2_MPEG_VIDC_EXTRADATA_NONE,
-		.maximum = V4L2_MPEG_VIDC_EXTRADATA_VQZIP_SEI,
+		.maximum = V4L2_MPEG_VIDC_EXTRADATA_OUTPUT_CROP,
 		.default_value = V4L2_MPEG_VIDC_EXTRADATA_NONE,
 		.menu_skip_mask = ~(
 			(1 << V4L2_MPEG_VIDC_EXTRADATA_NONE) |
@@ -295,7 +296,8 @@ static struct msm_vidc_ctrl msm_vdec_ctrls[] = {
 			(1 << V4L2_MPEG_VIDC_EXTRADATA_STREAM_USERDATA) |
 			(1 << V4L2_MPEG_VIDC_EXTRADATA_FRAME_QP) |
 			(1 << V4L2_MPEG_VIDC_EXTRADATA_FRAME_BITS_INFO) |
-			(1 << V4L2_MPEG_VIDC_EXTRADATA_VQZIP_SEI)
+			(1 << V4L2_MPEG_VIDC_EXTRADATA_VQZIP_SEI) |
+			(1 << V4L2_MPEG_VIDC_EXTRADATA_OUTPUT_CROP)
 			),
 		.qmenu = mpeg_video_vidc_extradata,
 	},
@@ -1472,13 +1474,6 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 			inst->prop.height[CAPTURE_PORT] = f->fmt.pix_mp.height;
 		}
 
-		rc = msm_vidc_check_session_supported(inst);
-		if (rc) {
-			dprintk(VIDC_ERR,
-				"%s: session not supported\n", __func__);
-			goto err_invalid_fmt;
-		}
-
 		fmt = msm_comm_get_pixel_fmt_fourcc(vdec_formats,
 				ARRAY_SIZE(vdec_formats),
 				f->fmt.pix_mp.pixelformat,
@@ -1511,6 +1506,13 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		rc = msm_comm_try_state(inst, MSM_VIDC_OPEN_DONE);
 		if (rc) {
 			dprintk(VIDC_ERR, "Failed to open instance\n");
+			goto err_invalid_fmt;
+		}
+
+		rc = msm_vidc_check_session_supported(inst);
+		if (rc) {
+			dprintk(VIDC_ERR,
+				"%s: session not supported\n", __func__);
 			goto err_invalid_fmt;
 		}
 

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -46,7 +51,7 @@
 
 #define ISPIF_TIMEOUT_SLEEP_US                1000
 #define ISPIF_TIMEOUT_ALL_US               1000000
-#define ISPIF_SOF_DEBUG_COUNT                    0
+#define ISPIF_SOF_DEBUG_COUNT                    5
 
 #undef CDBG
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
@@ -388,11 +393,6 @@ static int msm_ispif_clk_ahb_enable(struct ispif_device *ispif, int enable)
 {
 	int rc = 0;
 
-	if (ispif->csid_version < CSID_VERSION_V30) {
-		/* Older ISPIF versiond don't need ahb clokc */
-		return 0;
-	}
-
 	rc = msm_cam_clk_enable(&ispif->pdev->dev,
 		ispif_ahb_clk_info, ispif->ahb_clk,
 		ispif->num_ahb_clk, enable);
@@ -472,23 +472,23 @@ static void msm_ispif_sel_csid_core(struct ispif_device *ispif,
 	switch (intftype) {
 	case PIX0:
 		data &= ~(BIT(1) | BIT(0));
-		data |= csid;
+		data |= (uint32_t) csid;
 		break;
 	case RDI0:
 		data &= ~(BIT(5) | BIT(4));
-		data |= (csid << 4);
+		data |= ((uint32_t) csid) << 4;
 		break;
 	case PIX1:
 		data &= ~(BIT(9) | BIT(8));
-		data |= (csid << 8);
+		data |= ((uint32_t) csid) << 8;
 		break;
 	case RDI1:
 		data &= ~(BIT(13) | BIT(12));
-		data |= (csid << 12);
+		data |= ((uint32_t) csid) << 12;
 		break;
 	case RDI2:
 		data &= ~(BIT(21) | BIT(20));
-		data |= (csid << 20);
+		data |= ((uint32_t) csid) << 20;
 		break;
 	}
 
@@ -564,9 +564,9 @@ static void msm_ispif_enable_intf_cids(struct ispif_device *ispif,
 
 	data = msm_camera_io_r(ispif->base + intf_addr);
 	if (enable)
-		data |= cid_mask;
+		data |=  (uint32_t) cid_mask;
 	else
-		data &= ~cid_mask;
+		data &= ~((uint32_t) cid_mask);
 	msm_camera_io_w_mb(data, ispif->base + intf_addr);
 }
 
@@ -1297,7 +1297,7 @@ static int msm_ispif_set_vfe_info(struct ispif_device *ispif,
 {
 	if (!vfe_info || (vfe_info->num_vfe == 0) ||
 		(vfe_info->num_vfe > ispif->hw_num_isps)) {
-		pr_err("Invalid VFE info: %p %d\n", vfe_info,
+		pr_err("Invalid VFE info: %pK %d\n", vfe_info,
 			   (vfe_info ? vfe_info->num_vfe : 0));
 		return -EINVAL;
 	}
@@ -1332,7 +1332,7 @@ static int msm_ispif_init(struct ispif_device *ispif,
 
 	if (ispif->csid_version >= CSID_VERSION_V30) {
 		if (!ispif->clk_mux_mem || !ispif->clk_mux_io) {
-			pr_err("%s csi clk mux mem %p io %p\n", __func__,
+			pr_err("%s csi clk mux mem %pK io %pK\n", __func__,
 				ispif->clk_mux_mem, ispif->clk_mux_io);
 			rc = -ENOMEM;
 			return rc;
@@ -1485,9 +1485,20 @@ static long msm_ispif_subdev_ioctl(struct v4l2_subdev *sd,
 {
 	struct ispif_device *ispif =
 		(struct ispif_device *)v4l2_get_subdevdata(sd);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	struct ispif_cfg_data *pcdata = (struct ispif_cfg_data *)arg;
+#endif
 
 	switch (cmd) {
 	case VIDIOC_MSM_ISPIF_CFG:
+#if defined(CONFIG_SONY_CAM_V4L2)
+		if (pcdata->cfg_type == ISPIF_RELEASE) {
+			ispif->ispif_sof_debug = 0;
+			ispif->ispif_rdi0_debug = 0;
+			ispif->ispif_rdi1_debug = 0;
+			ispif->ispif_rdi2_debug = 0;
+		}
+#endif
 		return msm_ispif_cmd(sd, arg);
 	case MSM_SD_NOTIFY_FREEZE: {
 		ispif->ispif_sof_debug = 0;
@@ -1496,20 +1507,10 @@ static long msm_ispif_subdev_ioctl(struct v4l2_subdev *sd,
 		ispif->ispif_rdi2_debug = 0;
 		return 0;
 	}
-	case MSM_SD_SHUTDOWN: {
-		struct ispif_device *ispif =
-			(struct ispif_device *)v4l2_get_subdevdata(sd);
-
-		if (ispif && ispif->base) {
-			while (ispif->open_cnt != 0)
-				ispif_close_node(sd, NULL);
-		} else {
-			pr_debug("%s:SD SHUTDOWN fail, ispif%s %p\n", __func__,
-				ispif ? "_base" : "",
-				ispif ? ispif->base : NULL);
-		}
+	case MSM_SD_UNNOTIFY_FREEZE:
 		return 0;
-	}
+	case MSM_SD_SHUTDOWN:
+		return 0;
 	default:
 		pr_err_ratelimited("%s: invalid cmd 0x%x received\n",
 			__func__, cmd);

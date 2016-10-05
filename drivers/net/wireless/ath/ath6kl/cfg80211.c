@@ -686,20 +686,21 @@ ath6kl_add_bss_if_needed(struct ath6kl_vif *vif,
 {
 	struct ath6kl *ar = vif->ar;
 	struct cfg80211_bss *bss;
-	u16 cap_mask, cap_val;
+	u16 cap_val;
+	enum ieee80211_bss_type bss_type;
 	u8 *ie;
 
 	if (nw_type & ADHOC_NETWORK) {
-		cap_mask = WLAN_CAPABILITY_IBSS;
 		cap_val = WLAN_CAPABILITY_IBSS;
+		bss_type = IEEE80211_BSS_TYPE_IBSS;
 	} else {
-		cap_mask = WLAN_CAPABILITY_ESS;
 		cap_val = WLAN_CAPABILITY_ESS;
+		bss_type = IEEE80211_BSS_TYPE_ESS;
 	}
 
 	bss = cfg80211_get_bss(ar->wiphy, chan, bssid,
 			       vif->ssid, vif->ssid_len,
-			       cap_mask, cap_val);
+			       bss_type, IEEE80211_PRIVACY_ANY);
 	if (bss == NULL) {
 		/*
 		 * Since cfg80211 may not yet know about the BSS,
@@ -888,7 +889,7 @@ void ath6kl_cfg80211_disconnect_event(struct ath6kl_vif *vif, u8 reason,
 					GFP_KERNEL);
 	} else if (vif->sme_state == SME_CONNECTED) {
 		cfg80211_disconnected(vif->ndev, proto_reason,
-				      NULL, 0, GFP_KERNEL);
+				      NULL, 0, false, GFP_KERNEL);
 	}
 
 	vif->sme_state = SME_DISCONNECTED;
@@ -3464,7 +3465,7 @@ void ath6kl_cfg80211_stop(struct ath6kl_vif *vif)
 					GFP_KERNEL);
 		break;
 	case SME_CONNECTED:
-		cfg80211_disconnected(vif->ndev, 0, NULL, 0, GFP_KERNEL);
+		cfg80211_disconnected(vif->ndev, 0, NULL, 0, true, GFP_KERNEL);
 		break;
 	}
 

@@ -3,7 +3,7 @@
  *
  * This code is based on drivers/scsi/ufs/ufshcd.c
  * Copyright (C) 2011-2013 Samsung India Software Operations
- * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  *
  * Authors:
  *	Santosh Yaraganavi <santosh.sy@samsung.com>
@@ -71,6 +71,7 @@ static int ufshcd_tag_req_type(struct request *rq)
 
 static void ufshcd_update_error_stats(struct ufs_hba *hba, int type)
 {
+	ufsdbg_set_err_state(hba);
 	if (type < UFS_ERR_MAX)
 		hba->ufs_stats.err_stats[type]++;
 }
@@ -183,15 +184,9 @@ void ufshcd_update_query_stats(struct ufs_hba *hba,
 #define NOP_OUT_TIMEOUT    30 /* msecs */
 
 /* Query request retries */
-#define QUERY_REQ_RETRIES 10
+#define QUERY_REQ_RETRIES 3
 /* Query request timeout */
-#define QUERY_REQ_TIMEOUT 100 /* msec */
-/*
- * Query request timeout for fDeviceInit flag
- * fDeviceInit query response time for some devices is too large that default
- * QUERY_REQ_TIMEOUT may not be enough for such devices.
- */
-#define QUERY_FDEVICEINIT_REQ_TIMEOUT 600 /* msec */
+#define QUERY_REQ_TIMEOUT 1500 /* 1.5 seconds */
 
 /* Task management command timeout */
 #define TM_CMD_TIMEOUT	100 /* msecs */
@@ -1961,14 +1956,6 @@ int ufshcd_send_command(struct ufs_hba *hba, unsigned int task_tag)
 {
 	int ret = 0;
 
-	ret = ufshcd_vops_crypto_engine_cfg(hba, task_tag);
-	if (ret) {
-		dev_err(hba->dev,
-			"%s: failed to configure crypto engine %d\n",
-			__func__, ret);
-		return ret;
-	}
-
 	hba->lrb[task_tag].issue_time_stamp = ktime_get();
 	hba->lrb[task_tag].complete_time_stamp = ktime_set(0, 0);
 	ufshcd_clk_scaling_start_busy(hba);
@@ -2122,6 +2109,9 @@ ufshcd_wait_for_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 		ret = uic_cmd->argument2 & MASK_UIC_COMMAND_RESULT;
 	else
 		ret = -ETIMEDOUT;
+
+	if (ret)
+		ufsdbg_set_err_state(hba);
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	hba->active_uic_cmd = NULL;
@@ -2634,6 +2624,22 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 		goto out;
 	}
 
+	err = ufshcd_vops_crypto_engine_cfg_start(hba, tag);
+	if (err) {
+		if (err != -EAGAIN)
+			dev_err(hba->dev,
+				"%s: failed to configure crypto engine %d\n",
+				__func__, err);
+
+		scsi_dma_unmap(lrbp->cmd);
+		lrbp->cmd = NULL;
+		clear_bit_unlock(tag, &hba->lrb_in_use);
+		ufshcd_release_all(hba);
+		ufshcd_vops_pm_qos_req_end(hba, cmd->request, true);
+
+		goto out;
+	}
+
 	/* Make sure descriptors are ready before ringing the doorbell */
 	wmb();
 	/* issue command to the controller */
@@ -2647,6 +2653,7 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 		clear_bit_unlock(tag, &hba->lrb_in_use);
 		ufshcd_release_all(hba);
 		ufshcd_vops_pm_qos_req_end(hba, cmd->request, true);
+		ufshcd_vops_crypto_engine_cfg_end(hba, lrbp, cmd->request);
 		dev_err(hba->dev, "%s: failed sending command, %d\n",
 							__func__, err);
 		err = DID_ERROR;
@@ -2785,6 +2792,9 @@ static int ufshcd_wait_for_dev_cmd(struct ufs_hba *hba,
 		 */
 		ufshcd_outstanding_req_clear(hba, lrbp->task_tag);
 	}
+
+	if (err)
+		ufsdbg_set_err_state(hba);
 
 	return err;
 }
@@ -2984,9 +2994,6 @@ int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
 		err = -EINVAL;
 		goto out_unlock;
 	}
-
-	if (idn == QUERY_FLAG_IDN_FDEVICEINIT)
-		timeout = QUERY_FDEVICEINIT_REQ_TIMEOUT;
 
 	err = ufshcd_exec_dev_cmd(hba, DEV_CMD_TYPE_QUERY, timeout);
 
@@ -3821,6 +3828,9 @@ static int ufshcd_uic_pwr_ctrl(struct ufs_hba *hba, struct uic_command *cmd)
 		ret = (status != PWR_OK) ? status : -1;
 	}
 out:
+	if (ret)
+		ufsdbg_set_err_state(hba);
+
 	ufshcd_save_tstamp_of_last_dme_cmd(hba);
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	hba->active_uic_cmd = NULL;
@@ -4441,7 +4451,16 @@ static int ufshcd_link_startup(struct ufs_hba *hba)
 {
 	int ret;
 	int retries = DME_LINKSTARTUP_RETRIES;
+	bool link_startup_again = false;
 
+	/*
+	 * If UFS device isn't active then we will have to issue link startup
+	 * 2 times to make sure the device state move to active.
+	 */
+	if (!ufshcd_is_ufs_dev_active(hba))
+		link_startup_again = true;
+
+link_startup:
 	do {
 		ufshcd_vops_link_startup_notify(hba, PRE_CHANGE);
 
@@ -4469,6 +4488,12 @@ static int ufshcd_link_startup(struct ufs_hba *hba)
 	if (ret)
 		/* failed to get the link up... retire */
 		goto out;
+
+	if (link_startup_again) {
+		link_startup_again = false;
+		retries = DME_LINKSTARTUP_RETRIES;
+		goto link_startup;
+	}
 
 	/* Mark that link is up in PWM-G1, 1-lane, SLOW-AUTO mode */
 	ufshcd_init_pwr_info(hba);
@@ -4901,6 +4926,11 @@ ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 			ocs == OCS_MISMATCH_DATA_BUF_SIZE);
 		ufshcd_print_trs(hba, 1 << lrbp->task_tag, print_prdt);
 	}
+
+	if ((host_byte(result) == DID_ERROR) ||
+	    (host_byte(result) == DID_ABORT))
+		ufsdbg_set_err_state(hba);
+
 	return result;
 }
 
@@ -4955,7 +4985,7 @@ void ufshcd_abort_outstanding_transfer_requests(struct ufs_hba *hba, int result)
 			/* Mark completed command as NULL in LRB */
 			lrbp->cmd = NULL;
 			ufshcd_release_all(hba);
-			if (cmd->request)
+			if (cmd->request) {
 				/*
 				 * As we are accessing the "request" structure,
 				 * this must be called before calling
@@ -4963,6 +4993,9 @@ void ufshcd_abort_outstanding_transfer_requests(struct ufs_hba *hba, int result)
 				 */
 				ufshcd_vops_pm_qos_req_end(hba, cmd->request,
 					true);
+				ufshcd_vops_crypto_engine_cfg_end(hba,
+						lrbp, cmd->request);
+			}
 			/* Do not touch lrbp after scsi done */
 			cmd->scsi_done(cmd);
 		} else if (lrbp->command_type == UTP_CMD_TYPE_DEV_MANAGE) {
@@ -5007,7 +5040,7 @@ static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
 			lrbp->cmd = NULL;
 			__ufshcd_release(hba, false);
 			__ufshcd_hibern8_release(hba, false);
-			if (cmd->request)
+			if (cmd->request) {
 				/*
 				 * As we are accessing the "request" structure,
 				 * this must be called before calling
@@ -5015,6 +5048,10 @@ static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
 				 */
 				ufshcd_vops_pm_qos_req_end(hba, cmd->request,
 					false);
+				ufshcd_vops_crypto_engine_cfg_end(hba,
+					lrbp, cmd->request);
+			}
+
 			/* Do not touch lrbp after scsi done */
 			cmd->scsi_done(cmd);
 		} else if (lrbp->command_type == UTP_CMD_TYPE_DEV_MANAGE) {
@@ -5479,6 +5516,7 @@ static void ufshcd_err_handler(struct work_struct *work)
 
 	hba = container_of(work, struct ufs_hba, eh_work);
 
+	ufsdbg_set_err_state(hba);
 	pm_runtime_get_sync(hba->dev);
 	ufshcd_hold_all(hba);
 
@@ -8620,17 +8658,18 @@ static int ufshcd_devfreq_scale(struct ufs_hba *hba, bool scale_up)
 {
 	int ret = 0;
 
-	ret = ufshcd_clock_scaling_prepare(hba);
-	if (ret)
-		return ret;
-
 	/* let's not get into low power until clock scaling is completed */
 	ufshcd_hold_all(hba);
+
+	ret = ufshcd_clock_scaling_prepare(hba);
+	if (ret)
+		goto out;
+
 	/* scale down the gear before scaling down clocks */
 	if (!scale_up) {
 		ret = ufshcd_scale_gear(hba, false);
 		if (ret)
-			goto out;
+			goto clk_scaling_unprepare;
 	}
 
 	ret = ufshcd_scale_clks(hba, scale_up);
@@ -8642,7 +8681,7 @@ static int ufshcd_devfreq_scale(struct ufs_hba *hba, bool scale_up)
 		ret = ufshcd_scale_gear(hba, true);
 		if (ret) {
 			ufshcd_scale_clks(hba, false);
-			goto out;
+			goto clk_scaling_unprepare;
 		}
 	}
 
@@ -8656,13 +8695,14 @@ static int ufshcd_devfreq_scale(struct ufs_hba *hba, bool scale_up)
 				hba->clk_gating.delay_ms_pwr_save;
 	}
 
-	goto out;
+	goto clk_scaling_unprepare;
 
 scale_up_gear:
 	if (!scale_up)
 		ufshcd_scale_gear(hba, true);
-out:
+clk_scaling_unprepare:
 	ufshcd_clock_scaling_unprepare(hba);
+out:
 	ufshcd_release_all(hba);
 	return ret;
 }
@@ -9111,10 +9151,12 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	pm_runtime_get_sync(dev);
 
 	/*
-	 * The device-initialize-sequence hasn't been invoked yet.
-	 * Set the device to power-off state
+	 * We are assuming that device wasn't put in sleep/power-down
+	 * state exclusively during the boot stage before kernel.
+	 * This assumption helps avoid doing link startup twice during
+	 * ufshcd_probe_hba().
 	 */
-	ufshcd_set_ufs_dev_poweroff(hba);
+	ufshcd_set_ufs_dev_active(hba);
 
 	async_schedule(ufshcd_async_scan, hba);
 

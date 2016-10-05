@@ -548,6 +548,24 @@ static void ssr_work_func(struct work_struct *work)
 }
 
 /**
+ * deferred_close_ack() - Generate a deferred channel close ack
+ * @work:	The channel close ack work to generate.
+ */
+static void deferred_close_ack(struct work_struct *work)
+{
+	struct channel_work *ch_work;
+	struct channel *ch;
+
+	ch_work = container_of(work, struct channel_work, work);
+	ch = ch_work->ch;
+	mutex_lock(&ch->edge->rx_cmd_lock);
+	ch->edge->xprt_if.glink_core_if_ptr->rx_cmd_ch_close_ack(
+				&ch->edge->xprt_if, ch->lcid);
+	mutex_unlock(&ch->edge->rx_cmd_lock);
+	kfree(ch_work);
+}
+
+/**
  * process_tx_done() - process a tx done task
  * @work:	The tx done task to process.
  */
@@ -686,6 +704,7 @@ static void process_reopen_event(struct work_struct *work)
 		mutex_unlock(&einfo->rx_cmd_lock);
 	}
 	if (ch->local_legacy) {
+		ch->local_legacy = false;
 		mutex_lock(&einfo->rx_cmd_lock);
 		einfo->xprt_if.glink_core_if_ptr->rx_cmd_ch_close_ack(
 								&einfo->xprt_if,
@@ -877,6 +896,7 @@ static void smd_data_ch_close(struct channel *ch)
 {
 	struct intent_info *intent;
 	unsigned long flags;
+	struct channel_work *ch_work;
 
 	SMDXPRT_INFO(ch->edge, "%s Closing SMD channel lcid %u\n",
 			__func__, ch->lcid);
@@ -891,15 +911,16 @@ static void smd_data_ch_close(struct channel *ch)
 		smd_close(ch->smd_ch);
 		ch->smd_ch = NULL;
 	} else if (ch->local_legacy) {
-		mutex_lock(&ch->edge->rx_cmd_lock);
-		ch->edge->xprt_if.glink_core_if_ptr->rx_cmd_ch_close_ack(
-							&ch->edge->xprt_if,
-							ch->lcid);
-		mutex_unlock(&ch->edge->rx_cmd_lock);
+		ch_work = kzalloc(sizeof(*ch_work), GFP_KERNEL);
+		ch->local_legacy = false;
+		if (ch_work) {
+			ch_work->ch = ch;
+			INIT_WORK(&ch_work->work, deferred_close_ack);
+			queue_work(ch->wq, &ch_work->work);
+		}
 	}
 	mutex_unlock(&ch->ch_probe_lock);
 
-	ch->local_legacy = false;
 
 	spin_lock_irqsave(&ch->intents_lock, flags);
 	while (!list_empty(&ch->intents)) {
@@ -1754,6 +1775,12 @@ static int tx(struct glink_transport_if *if_ptr, uint32_t lcid,
 		if (!ch->streaming_ch)
 			smd_write_end(ch->smd_ch);
 		tx_done = kmalloc(sizeof(*tx_done), GFP_ATOMIC);
+		if (!tx_done) {
+			SMDXPRT_ERR(einfo, "%s: failed allocation of tx_done\n",
+					__func__);
+			srcu_read_unlock(&einfo->ssr_sync, rcu_id);
+			return -ENOMEM;
+		}
 		tx_done->ch = ch;
 		tx_done->iid = pctx->riid;
 		INIT_WORK(&tx_done->work, process_tx_done);
@@ -1779,8 +1806,14 @@ static int tx_cmd_rx_intent_req(struct glink_transport_if *if_ptr,
 	struct edge_info *einfo;
 	struct channel *ch;
 	unsigned long flags;
+	int rcu_id;
 
 	einfo = container_of(if_ptr, struct edge_info, xprt_if);
+	rcu_id = srcu_read_lock(&einfo->ssr_sync);
+	if (einfo->in_ssr) {
+		srcu_read_unlock(&einfo->ssr_sync, rcu_id);
+		return -EFAULT;
+	}
 	spin_lock_irqsave(&einfo->channels_lock, flags);
 	list_for_each_entry(ch, &einfo->channels, node) {
 		if (lcid == ch->lcid)
@@ -1796,6 +1829,7 @@ static int tx_cmd_rx_intent_req(struct glink_transport_if *if_ptr,
 							ch->rcid,
 							ch->next_intent_id++,
 							size);
+	srcu_read_unlock(&einfo->ssr_sync, rcu_id);
 	return 0;
 }
 

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/clk.h>
@@ -17,7 +22,6 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
-#include <media/msm_isp.h>
 #include "msm_sd.h"
 #include "msm_cci.h"
 #include "msm_cam_cci_hwreg.h"
@@ -31,7 +35,7 @@
 #define CYCLES_PER_MICRO_SEC_DEFAULT 4915
 #define CCI_MAX_DELAY 1000000
 
-#define CCI_TIMEOUT msecs_to_jiffies(100)
+#define CCI_TIMEOUT msecs_to_jiffies(500)
 
 /* TODO move this somewhere else */
 #define MSM_CCI_DRV_NAME "msm_cci"
@@ -448,6 +452,7 @@ static int32_t msm_cci_wait_report_cmd(struct cci_device *cci_dev,
 	return msm_cci_wait(cci_dev, master, queue);
 }
 
+#if !defined(CONFIG_SONY_CAM_V4L2)
 static void msm_cci_process_half_q(struct cci_device *cci_dev,
 	enum cci_i2c_master_t master,
 	enum cci_i2c_queue_t queue)
@@ -460,6 +465,7 @@ static void msm_cci_process_half_q(struct cci_device *cci_dev,
 			CCI_QUEUE_START_ADDR);
 	}
 }
+#endif
 
 static int32_t msm_cci_process_full_q(struct cci_device *cci_dev,
 	enum cci_i2c_master_t master,
@@ -570,7 +576,7 @@ static int32_t msm_cci_data_queue(struct cci_device *cci_dev,
 	uint32_t read_val = 0;
 	uint32_t reg_offset;
 	uint32_t val = 0;
-	uint32_t max_queue_size;
+	uint32_t max_queue_size, queue_size = 0;
 
 	if (i2c_cmd == NULL) {
 		pr_err("%s:%d Failed line\n", __func__,
@@ -618,6 +624,11 @@ static int32_t msm_cci_data_queue(struct cci_device *cci_dev,
 
 	max_queue_size = cci_dev->cci_i2c_queue_info[master][queue].
 			max_queue_size;
+
+	if (c_ctrl->cmd == MSM_CCI_I2C_WRITE_SEQ)
+		queue_size = max_queue_size;
+	else
+		queue_size = max_queue_size/2;
 	reg_addr = i2c_cmd->reg_addr;
 
 	if (sync_en == MSM_SYNC_ENABLE && cci_dev->valid_sync &&
@@ -648,8 +659,8 @@ static int32_t msm_cci_data_queue(struct cci_device *cci_dev,
 			CCI_I2C_M0_Q0_CUR_WORD_CNT_ADDR + reg_offset);
 		CDBG("%s line %d CUR_WORD_CNT_ADDR %d len %d max %d\n",
 			__func__, __LINE__, read_val, len, max_queue_size);
-		/* + 1 - space alocation for Report CMD*/
-		if ((read_val + len + 1) > max_queue_size/2) {
+		/* + 1 - space alocation for Report CMD */
+		if ((read_val + len + 1) > queue_size) {
 			if ((read_val + len + 1) > max_queue_size) {
 				rc = msm_cci_process_full_q(cci_dev,
 					master, queue);
@@ -660,7 +671,9 @@ static int32_t msm_cci_data_queue(struct cci_device *cci_dev,
 				}
 				continue;
 			}
-			msm_cci_process_half_q(cci_dev,	master, queue);
+#if !defined(CONFIG_SONY_CAM_V4L2)
+			msm_cci_process_half_q(cci_dev, master, queue);
+#endif
 		}
 
 		CDBG("%s cmd_size %d addr 0x%x data 0x%x\n", __func__,
@@ -842,13 +855,12 @@ static int32_t msm_cci_i2c_read(struct v4l2_subdev *sd,
 		goto ERROR;
 	}
 
-	if (read_cfg->addr_type == MSM_CAMERA_I2C_BYTE_ADDR)
-		val = CCI_I2C_WRITE_DISABLE_P_CMD | (read_cfg->addr_type << 4) |
-			((read_cfg->addr & 0xFF) << 8);
-	if (read_cfg->addr_type == MSM_CAMERA_I2C_WORD_ADDR)
-		val = CCI_I2C_WRITE_DISABLE_P_CMD | (read_cfg->addr_type << 4) |
-			(((read_cfg->addr & 0xFF00) >> 8) << 8) |
-			((read_cfg->addr & 0xFF) << 16);
+	val = CCI_I2C_WRITE_DISABLE_P_CMD | (read_cfg->addr_type << 4);
+	for (i = 0; i < read_cfg->addr_type; i++) {
+		val |= ((read_cfg->addr >> (i << 3)) & 0xFF)  <<
+		((read_cfg->addr_type - i) << 3);
+	}
+
 	rc = msm_cci_write_i2c_queue(cci_dev, val, master, queue);
 	if (rc < 0) {
 		CDBG("%s failed line %d\n", __func__, __LINE__);
@@ -941,7 +953,7 @@ static int32_t msm_cci_i2c_read_bytes(struct v4l2_subdev *sd,
 	uint16_t read_bytes = 0;
 
 	if (!sd || !c_ctrl) {
-		pr_err("%s:%d sd %p c_ctrl %p\n", __func__,
+		pr_err("%s:%d sd %pK c_ctrl %pK\n", __func__,
 			__LINE__, sd, c_ctrl);
 		return -EINVAL;
 	}
@@ -1234,7 +1246,7 @@ static int32_t msm_cci_i2c_set_sync_prms(struct v4l2_subdev *sd,
 
 	cci_dev = v4l2_get_subdevdata(sd);
 	if (!cci_dev || !c_ctrl) {
-		pr_err("%s:%d failed: invalid params %p %p\n", __func__,
+		pr_err("%s:%d failed: invalid params %pK %pK\n", __func__,
 			__LINE__, cci_dev, c_ctrl);
 		rc = -EINVAL;
 		return rc;
@@ -1256,7 +1268,7 @@ static int32_t msm_cci_init(struct v4l2_subdev *sd,
 
 	cci_dev = v4l2_get_subdevdata(sd);
 	if (!cci_dev || !c_ctrl) {
-		pr_err("%s:%d failed: invalid params %p %p\n", __func__,
+		pr_err("%s:%d failed: invalid params %pK %pK\n", __func__,
 			__LINE__, cci_dev, c_ctrl);
 		rc = -EINVAL;
 		return rc;
@@ -1498,7 +1510,7 @@ static int32_t msm_cci_write(struct v4l2_subdev *sd,
 
 	cci_dev = v4l2_get_subdevdata(sd);
 	if (!cci_dev || !c_ctrl) {
-		pr_err("%s:%d failed: invalid params %p %p\n", __func__,
+		pr_err("%s:%d failed: invalid params %pK %pK\n", __func__,
 			__LINE__, cci_dev, c_ctrl);
 		rc = -EINVAL;
 		return rc;
@@ -1698,6 +1710,8 @@ static long msm_cci_subdev_ioctl(struct v4l2_subdev *sd,
 		break;
 	case MSM_SD_NOTIFY_FREEZE:
 		break;
+	case MSM_SD_UNNOTIFY_FREEZE:
+		break;
 	case MSM_SD_SHUTDOWN: {
 		struct msm_camera_cci_ctrl ctrl_cmd;
 		ctrl_cmd.cmd = MSM_CCI_RELEASE;
@@ -1820,17 +1834,17 @@ static void msm_cci_init_default_clk_params(struct cci_device *cci_dev,
 	uint8_t index)
 {
 	/* default clock params are for 100Khz */
-	cci_dev->cci_clk_params[index].hw_thigh = 78;
-	cci_dev->cci_clk_params[index].hw_tlow = 114;
-	cci_dev->cci_clk_params[index].hw_tsu_sto = 28;
-	cci_dev->cci_clk_params[index].hw_tsu_sta = 28;
-	cci_dev->cci_clk_params[index].hw_thd_dat = 10;
-	cci_dev->cci_clk_params[index].hw_thd_sta = 77;
-	cci_dev->cci_clk_params[index].hw_tbuf = 118;
+	cci_dev->cci_clk_params[index].hw_thigh = 201;
+	cci_dev->cci_clk_params[index].hw_tlow = 174;
+	cci_dev->cci_clk_params[index].hw_tsu_sto = 204;
+	cci_dev->cci_clk_params[index].hw_tsu_sta = 231;
+	cci_dev->cci_clk_params[index].hw_thd_dat = 22;
+	cci_dev->cci_clk_params[index].hw_thd_sta = 162;
+	cci_dev->cci_clk_params[index].hw_tbuf = 227;
 	cci_dev->cci_clk_params[index].hw_scl_stretch_en = 0;
 	cci_dev->cci_clk_params[index].hw_trdhld = 6;
-	cci_dev->cci_clk_params[index].hw_tsp = 1;
-	cci_dev->cci_clk_params[index].cci_clk_src = 19200000;
+	cci_dev->cci_clk_params[index].hw_tsp = 3;
+	cci_dev->cci_clk_params[index].cci_clk_src = 37500000;
 }
 
 static void msm_cci_init_clk_params(struct cci_device *cci_dev)
@@ -2016,7 +2030,7 @@ static int msm_cci_probe(struct platform_device *pdev)
 {
 	struct cci_device *new_cci_dev;
 	int rc = 0, i = 0;
-	CDBG("%s: pdev %p device id = %d\n", __func__, pdev, pdev->id);
+	CDBG("%s: pdev %pK device id = %d\n", __func__, pdev, pdev->id);
 	new_cci_dev = kzalloc(sizeof(struct cci_device), GFP_KERNEL);
 	if (!new_cci_dev) {
 		pr_err("%s: no enough memory\n", __func__);
@@ -2028,7 +2042,7 @@ static int msm_cci_probe(struct platform_device *pdev)
 			ARRAY_SIZE(new_cci_dev->msm_sd.sd.name), "msm_cci");
 	v4l2_set_subdevdata(&new_cci_dev->msm_sd.sd, new_cci_dev);
 	platform_set_drvdata(pdev, &new_cci_dev->msm_sd.sd);
-	CDBG("%s sd %p\n", __func__, &new_cci_dev->msm_sd.sd);
+	CDBG("%s sd %pK\n", __func__, &new_cci_dev->msm_sd.sd);
 	if (pdev->dev.of_node)
 		of_property_read_u32((&pdev->dev)->of_node,
 			"cell-index", &pdev->id);
@@ -2050,15 +2064,15 @@ static int msm_cci_probe(struct platform_device *pdev)
 	}
 	new_cci_dev->irq = platform_get_resource_byname(pdev,
 					IORESOURCE_IRQ, "cci");
-	CDBG("%s line %d cci irq start %d end %d\n", __func__,
-		__LINE__,
-		(int) new_cci_dev->irq->start,
-		(int) new_cci_dev->irq->end);
 	if (!new_cci_dev->irq) {
 		pr_err("%s: no irq resource?\n", __func__);
 		rc = -ENODEV;
 		goto cci_no_resource;
 	}
+	CDBG("%s line %d cci irq start %d end %d\n", __func__,
+		__LINE__,
+		(int) new_cci_dev->irq->start,
+		(int) new_cci_dev->irq->end);
 	new_cci_dev->io = request_mem_region(new_cci_dev->mem->start,
 		resource_size(new_cci_dev->mem), pdev->name);
 	if (!new_cci_dev->io) {
@@ -2116,7 +2130,7 @@ static int msm_cci_probe(struct platform_device *pdev)
 		if (!new_cci_dev->write_wq[i])
 			pr_err("Failed to create write wq\n");
 	}
-	CDBG("%s cci subdev %p\n", __func__, &new_cci_dev->msm_sd.sd);
+	CDBG("%s cci subdev %pK\n", __func__, &new_cci_dev->msm_sd.sd);
 	CDBG("%s line %d\n", __func__, __LINE__);
 	return 0;
 

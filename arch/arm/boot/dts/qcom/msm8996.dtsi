@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include "skeleton64.dtsi"
@@ -40,6 +45,7 @@
 		i2c8 = &i2c_8;
 		i2c12 = &i2c_12;
 		spi0 = &spi_0;
+		spi11 = &spi_11;
 	};
 
 	psci {
@@ -900,6 +906,14 @@
 			&tsif1_sync_active>;		/* dual-tsif-mode2 */
 	};
 
+	wcd_rst_gpio: wcd_gpio_ctrl {
+		compatible = "qcom,wcd-gpio-ctrl";
+		qcom,cdc-rst-n-gpio = <&tlmm 64 0>;
+		pinctrl-names = "aud_active", "aud_sleep";
+		pinctrl-0 = <&cdc_reset_active>;
+		pinctrl-1 = <&cdc_reset_sleep>;
+	};
+
 	slim_msm: slim@91c0000 {
 		cell-index = <1>;
 		compatible = "qcom,slim-ngd";
@@ -925,10 +939,7 @@
 				      17 18 19 20 21 22 23 24 25 26 27 28 29
 				      30>;
 
-			qcom,cdc-reset-gpio = <&tlmm 64 0>;
-			pinctrl-names = "default", "idle";
-			pinctrl-0 = <&cdc_reset_active>;
-			pinctrl-1 = <&cdc_reset_sleep>;
+			qcom,wcd-rst-gpio-node = <&wcd_rst_gpio>;
 
 			clock-names = "wcd_clk", "wcd_native_clk";
 			clocks = <&clock_audio clk_audio_pmi_clk>,
@@ -1903,6 +1914,7 @@
 		clock-names = "core_clk", "iface_clk", "bus_aggr_clk", "utmi_clk",
 				"sleep_clk", "xo", "cfg_ahb_clk";
 
+		qcom,core-clk-rate = <120000000>;
 		dwc3@6a00000 {
 			compatible = "snps,dwc3";
 			reg = <0x06a00000 0xc8d0>;
@@ -2009,6 +2021,7 @@
 		clock-names = "core_clk", "iface_clk", "utmi_clk", "sleep_clk",
 				"xo", "cfg_ahb_clk";
 
+		qcom,core-clk-rate = <60000000>;
 		dwc3@7600000 {
 			compatible = "snps,dwc3";
 			reg = <0x07600000 0xc8d0>;
@@ -2102,7 +2115,7 @@
 
 	ssphy: ssphy@7410000 {
 		compatible = "qcom,usb-ssphy-qmp-v2";
-		reg = <0x7410000 0x45c>,
+		reg = <0x7410000 0x7a8>,
 		      <0x007ab244 0x4>;
 		reg-names = "qmp_phy_base",
 			    "vls_clamp_reg";
@@ -2388,6 +2401,34 @@
 			 <&clock_gcc clk_gcc_blsp1_qup1_spi_apps_clk>;
 	};
 
+	spi_11: spi@75BA000 { /* BLSP2 QUP6 */
+		compatible = "qcom,spi-qup-v2";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg-names = "spi_physical", "spi_bam_physical";
+		reg = <0x075BA000 0x600>,
+		      <0x07584000 0x2b000>;
+		interrupt-names = "spi_irq", "spi_bam_irq";
+		interrupts = <0 106 0>, <0 239 0>;
+		spi-max-frequency = <19200000>;
+
+		qcom,infinite-mode = <0>;
+		qcom,use-bam;
+		qcom,ver-reg-exists;
+		qcom,bam-consumer-pipe-index = <14>;
+		qcom,bam-producer-pipe-index = <15>;
+		qcom,master-id = <86>;
+		qcom,use-pinctrl;
+		pinctrl-names = "spi_default", "spi_sleep";
+		pinctrl-0 = <&spi_11_active>;
+		pinctrl-1 = <&spi_11_sleep>;
+
+		clock-names = "iface_clk", "core_clk";
+
+		clocks = <&clock_gcc clk_gcc_blsp2_ahb_clk>,
+			 <&clock_gcc clk_gcc_blsp2_qup6_spi_apps_clk>;
+	};
+
 	qcom,rmnet-ipa {
 		compatible = "qcom,rmnet-ipa";
 		qcom,rmnet-ipa-ssr;
@@ -2427,10 +2468,10 @@
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps =
 				<55 512 0 0>,
-				<55 512 3936000 393600>;
+				<55 512 393600 393600>;
 		clock-names = "core_clk_src", "core_clk",
 				"iface_clk", "bus_clk";
-		clocks = <&clock_gcc clk_ce1_clk>,
+		clocks = <&clock_gcc clk_qcrypto_ce1_clk>,
 			 <&clock_gcc clk_qcrypto_ce1_clk>,
 			 <&clock_gcc clk_gcc_ce1_ahb_m_clk>,
 			 <&clock_gcc clk_gcc_ce1_axi_m_clk>;
@@ -2457,10 +2498,10 @@
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps =
 				<55 512 0 0>,
-				<55 512 3936000 393600>;
+				<55 512 393600 393600>;
 		clock-names = "core_clk_src", "core_clk",
 				"iface_clk", "bus_clk";
-		clocks = <&clock_gcc clk_ce1_clk>,
+		clocks = <&clock_gcc clk_qcedev_ce1_clk>,
 			 <&clock_gcc clk_qcedev_ce1_clk>,
 			 <&clock_gcc clk_gcc_ce1_ahb_m_clk>,
 			 <&clock_gcc clk_gcc_ce1_axi_m_clk>;
@@ -3174,9 +3215,6 @@
 			qcom,msm-dai-q6-mi2s-dev-id = <2>;
 			qcom,msm-mi2s-rx-lines = <2>;
 			qcom,msm-mi2s-tx-lines = <1>;
-			pinctrl-names = "default", "sleep";
-			pinctrl-0 = <&tert_mi2s_active &tert_mi2s_sd0_active>;
-			pinctrl-1 = <&tert_mi2s_sleep &tert_mi2s_sd0_sleep>;
 		};
 
 		dai_mi2s_quat: qcom,msm-dai-q6-mi2s-quat {

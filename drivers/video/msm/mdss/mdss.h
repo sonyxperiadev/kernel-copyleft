@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef MDSS_H
 #define MDSS_H
@@ -34,6 +39,10 @@
 
 #define MDSS_PINCTRL_STATE_DEFAULT "mdss_default"
 #define MDSS_PINCTRL_STATE_SLEEP  "mdss_sleep"
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+#define MDSS_PINCTRL_STATE_TOUCH_ACTIVE "mdss_touch_active"
+#define MDSS_PINCTRL_STATE_TOUCH_SUSPEND  "mdss_touch_suspend"
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 enum mdss_mdp_clk_type {
 	MDSS_CLK_AHB,
@@ -193,6 +202,7 @@ struct mdss_smmu_client {
 	struct reg_bus_client *reg_bus_clt;
 	bool domain_attached;
 	bool handoff_pending;
+	char __iomem *mmu_base;
 };
 
 struct mdss_data_type;
@@ -293,6 +303,7 @@ struct mdss_data_type {
 
 	u32 mdp_irq_mask;
 	u32 mdp_hist_irq_mask;
+	u32 mdp_intf_irq_mask;
 
 	int suspend_fs_ena;
 	u8 clk_ena;
@@ -459,7 +470,9 @@ extern struct mdss_data_type *mdss_res;
 struct irq_info {
 	u32 irq;
 	u32 irq_mask;
+	u32 irq_wake_mask;
 	u32 irq_ena;
+	u32 irq_wake_ena;
 	u32 irq_buzy;
 };
 
@@ -483,6 +496,8 @@ struct mdss_util_intf {
 	int (*register_irq)(struct mdss_hw *hw);
 	void (*enable_irq)(struct mdss_hw *hw);
 	void (*disable_irq)(struct mdss_hw *hw);
+	void (*enable_wake_irq)(struct mdss_hw *hw);
+	void (*disable_wake_irq)(struct mdss_hw *hw);
 	void (*disable_irq_nosync)(struct mdss_hw *hw);
 	int (*irq_dispatch)(u32 hw_ndx, int irq, void *ptr);
 	int (*get_iommu_domain)(u32 type);

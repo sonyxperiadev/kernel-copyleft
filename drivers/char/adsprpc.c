@@ -1715,12 +1715,12 @@ static int fastrpc_device_release(struct inode *inode, struct file *file)
 
 	if (fl) {
 		cid = fl->cid;
-		fastrpc_file_free(fl);
-		file->private_data = 0;
 		if (fl->sctx) {
 			session = fl->sctx - &me->channel[cid].session[0];
 			fastrpc_session_free(&me->channel[cid], session);
 		}
+		fastrpc_file_free(fl);
+		file->private_data = 0;
 	}
 	return 0;
 }
@@ -2053,7 +2053,13 @@ static int fastrpc_cb_legacy_probe(struct device *dev)
 					first_sess->smmu.mapping));
 	if (err)
 		goto bail;
+	VERIFY(err, (sids_size/sizeof(unsigned int)) <= NUM_SESSIONS);
+	if (err)
+		goto bail;
 	for (i = 0; i < sids_size/sizeof(unsigned int); i++) {
+		VERIFY(err, chan->sesscount < NUM_SESSIONS);
+		if (err)
+			goto bail;
 		sess = &chan->session[chan->sesscount];
 		sess->smmu.cb = sids[i];
 		sess->dev = first_sess->dev;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,8 +18,14 @@
 
 #include "mhi_sys.h"
 
-enum MHI_DEBUG_LEVEL mhi_msg_lvl = MHI_MSG_VERBOSE;
-enum MHI_DEBUG_LEVEL mhi_ipc_log_lvl = MHI_MSG_VERBOSE;
+enum MHI_DEBUG_LEVEL mhi_msg_lvl = MHI_MSG_ERROR;
+
+#ifdef CONFIG_MSM_MHI_DEBUG
+	enum MHI_DEBUG_LEVEL mhi_ipc_log_lvl = MHI_MSG_VERBOSE;
+#else
+	enum MHI_DEBUG_LEVEL mhi_ipc_log_lvl = MHI_MSG_ERROR;
+#endif
+
 unsigned int mhi_log_override;
 
 module_param(mhi_msg_lvl , uint, S_IRUGO | S_IWUSR);
@@ -28,8 +34,16 @@ MODULE_PARM_DESC(mhi_msg_lvl, "dbg lvl");
 module_param(mhi_ipc_log_lvl, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(mhi_ipc_log_lvl, "dbg lvl");
 
-module_param(mhi_log_override , uint, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(mhi_log_override, "dbg class");
+const char * const mhi_states_str[MHI_STATE_LIMIT] = {
+	"RESET",
+	"READY",
+	"M0",
+	"M1",
+	"M2",
+	"M3",
+	"BHI",
+	"SYS_ERR",
+};
 
 static ssize_t mhi_dbgfs_chan_read(struct file *fp, char __user *buf,
 				size_t count, loff_t *offp)
@@ -50,16 +64,16 @@ static ssize_t mhi_dbgfs_chan_read(struct file *fp, char __user *buf,
 	*offp = (u32)(*offp) % MHI_MAX_CHANNELS;
 
 	while (!valid_chan) {
-		client_handle = mhi_dev_ctxt->client_handle_list[*offp];
 		if (*offp == (MHI_MAX_CHANNELS - 1))
 			msleep(1000);
 		if (!VALID_CHAN_NR(*offp) ||
 		    !cc_list[*offp].mhi_trb_ring_base_addr ||
-		    !client_handle) {
+		    !mhi_dev_ctxt->client_handle_list[*offp]) {
 			*offp += 1;
 			*offp = (u32)(*offp) % MHI_MAX_CHANNELS;
 			continue;
 		}
+		client_handle = mhi_dev_ctxt->client_handle_list[*offp];
 		valid_chan = 1;
 	}
 
@@ -222,9 +236,9 @@ static ssize_t mhi_dbgfs_state_read(struct file *fp, char __user *buf,
 	amnt_copied =
 	scnprintf(mhi_dev_ctxt->chan_info,
 			MHI_LOG_SIZE,
-			"%s %u %s %d %s %d %s %d %s %d %s %d %s %d %s %d %s %d %s %d %s %d, %s, %d, %s %d\n",
+			"%s %s %s %d %s %d %s %d %s %d %s %d %s %d %s %d %s %d %s %d %s %d, %s, %d, %s %d\n",
 			"Our State:",
-			mhi_dev_ctxt->mhi_state,
+			TO_MHI_STATE_STR(mhi_dev_ctxt->mhi_state),
 			"M0->M1:",
 			mhi_dev_ctxt->counters.m0_m1,
 			"M0<-M1:",

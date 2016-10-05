@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -585,11 +585,11 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 
 	if (gpudev->preemption_pre_ibsubmit &&
 				adreno_is_preemption_enabled(adreno_dev))
-		total_sizedwords += 20;
+		total_sizedwords += 22;
 
 	if (gpudev->preemption_post_ibsubmit &&
 				adreno_is_preemption_enabled(adreno_dev))
-		total_sizedwords += 13;
+		total_sizedwords += 5;
 
 	/*
 	 * a5xx uses 64 bit memory address. pm4 commands that involve read/write
@@ -765,8 +765,8 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 
 	if (gpudev->preemption_post_ibsubmit &&
 				adreno_is_preemption_enabled(adreno_dev))
-		ringcmds += gpudev->preemption_post_ibsubmit(adreno_dev,
-					rb, ringcmds, &drawctxt->base);
+		ringcmds += gpudev->preemption_post_ibsubmit(adreno_dev, rb,
+					ringcmds, &drawctxt->base);
 
 	/*
 	 * If we have more ringbuffer commands than space reserved
@@ -918,6 +918,7 @@ int adreno_ringbuffer_submitcmd(struct adreno_device *adreno_dev,
 		struct kgsl_cmdbatch *cmdbatch, struct adreno_submit_time *time)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	struct adreno_gpudev *gpudev = ADRENO_GPU_DEVICE(adreno_dev);
 	struct kgsl_memobj_node *ib;
 	unsigned int numibs = 0;
 	unsigned int *link;
@@ -1036,6 +1037,10 @@ int adreno_ringbuffer_submitcmd(struct adreno_device *adreno_dev,
 			dwords += 2;
 	}
 
+	if (gpudev->preemption_yield_enable &&
+				adreno_is_preemption_enabled(adreno_dev))
+		dwords += 8;
+
 	link = kzalloc(sizeof(unsigned int) *  dwords, GFP_KERNEL);
 	if (!link) {
 		ret = -ENOMEM;
@@ -1085,6 +1090,10 @@ int adreno_ringbuffer_submitcmd(struct adreno_device *adreno_dev,
 			use_preamble = false;
 		}
 	}
+
+	if (gpudev->preemption_yield_enable &&
+				adreno_is_preemption_enabled(adreno_dev))
+		cmds += gpudev->preemption_yield_enable(cmds);
 
 	if (cmdbatch_kernel_profiling) {
 		cmds += _get_alwayson_counter(adreno_dev, cmds,
@@ -1144,8 +1153,22 @@ int adreno_ringbuffer_submitcmd(struct adreno_device *adreno_dev,
 
 		/* Put the timevalues in the profiling buffer */
 		if (cmdbatch_user_profiling) {
-			profile_buffer->wall_clock_s = time->utime.tv_sec;
-			profile_buffer->wall_clock_ns = time->utime.tv_nsec;
+			/*
+			* Return kernel clock time to the the client
+			* if requested
+			*/
+			if (cmdbatch->flags & KGSL_CMDBATCH_PROFILING_KTIME) {
+				uint64_t secs = time->ktime;
+
+				profile_buffer->wall_clock_ns =
+					do_div(secs, NSEC_PER_SEC);
+				profile_buffer->wall_clock_s = secs;
+			} else {
+				profile_buffer->wall_clock_s =
+					time->utime.tv_sec;
+				profile_buffer->wall_clock_ns =
+					time->utime.tv_nsec;
+			}
 			profile_buffer->gpu_ticks_queued = time->ticks;
 		}
 	}

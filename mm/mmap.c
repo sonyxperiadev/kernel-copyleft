@@ -47,6 +47,10 @@
 #include <asm/tlb.h>
 #include <asm/mmu_context.h>
 
+#ifdef CONFIG_MSM_APP_SETTINGS
+#include <asm/app_api.h>
+#endif
+
 #include "internal.h"
 
 #ifndef arch_mmap_check
@@ -1262,7 +1266,6 @@ static inline int mlock_future_check(struct mm_struct *mm,
 /*
  * The caller must hold down_write(&current->mm->mmap_sem).
  */
-
 unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 			unsigned long len, unsigned long prot,
 			unsigned long flags, unsigned long pgoff,
@@ -1272,6 +1275,11 @@ unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	vm_flags_t vm_flags;
 
 	*populate = 0;
+
+#ifdef CONFIG_MSM_APP_SETTINGS
+	if (use_app_setting)
+		apply_app_setting_bit(file);
+#endif
 
 	/*
 	 * Does the application expect PROT_READ to imply PROT_EXEC?

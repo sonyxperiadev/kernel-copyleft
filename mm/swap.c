@@ -3,6 +3,11 @@
  *
  *  Copyright (C) 1991, 1992, 1993, 1994  Linus Torvalds
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  * This file contains the default values for the operation of the
@@ -717,6 +722,10 @@ void lru_cache_add_active_or_unevictable(struct page *page,
 		 */
 		__mod_zone_page_state(page_zone(page), NR_MLOCK,
 				    hpage_nr_pages(page));
+		if (page_is_file_cache(page))
+			__mod_zone_page_state(page_zone(page), NR_MLOCK,
+				hpage_nr_pages(page));
+
 		count_vm_event(UNEVICTABLE_PGMLOCKED);
 	}
 	add_page_to_unevictable_list(page);

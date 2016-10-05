@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/kernel.h>
@@ -1414,7 +1419,9 @@ static struct clk_freq_tbl ftbl_sdcc2_apps_clk_src[] = {
 	F(    400000,         cxo_clk_src,   12,    1,     4),
 	F(  20000000, gpll0_out_main,   15,    1,     2),
 	F(  25000000, gpll0_out_main,   12,    1,     2),
+	F(  40000000, gpll0_out_main,  7.5,    1,     2),
 	F(  50000000, gpll0_out_main,   12,    0,     0),
+	F(  80000000, gpll0_out_main,  7.5,    0,     0),
 	F( 100000000, gpll0_out_main,    6,    0,     0),
 	F( 200000000, gpll0_out_main,    3,    0,     0),
 	F_END
@@ -3642,14 +3649,6 @@ static int msm_gcc_8996_probe(struct platform_device *pdev)
 	regval = readl_relaxed(virt_base + GCC_APCS_CLOCK_BRANCH_ENA_VOTE);
 	regval |= BIT(21);
 	writel_relaxed(regval, virt_base + GCC_APCS_CLOCK_BRANCH_ENA_VOTE);
-
-	/*
-	 * Set the HMSS_AHB_CLK_SLEEP_ENA bit to allow the hmss_ahb_clk to be
-	 * turned off by hardware during certain apps low power modes.
-	 */
-	regval = readl_relaxed(virt_base + GCC_APCS_CLOCK_SLEEP_ENA_VOTE);
-	regval |= BIT(21);
-	writel_relaxed(regval, virt_base + GCC_APCS_CLOCK_SLEEP_ENA_VOTE);
 
 	vdd_dig.vdd_uv[1] = RPM_REGULATOR_CORNER_SVS_KRAIT;
 	vdd_dig.regulator[0] = devm_regulator_get(&pdev->dev, "vdd_dig");

@@ -9,9 +9,14 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "msm8996-pinctrl.dtsi"
-#include "msm8996-camera-sensor-mtp.dtsi"
+/* #include "msm8996-camera-sensor-mtp.dtsi" */
 #include "msm8996-wsa881x.dtsi"
 
 / {
@@ -274,6 +279,7 @@
 	};
 };
 
+/*
 &mdss_hdmi_tx {
 	pinctrl-names = "hdmi_hpd_active", "hdmi_ddc_active", "hdmi_cec_active",
 				"hdmi_active", "hdmi_sleep";
@@ -288,7 +294,7 @@
 	pinctrl-4 = <&mdss_hdmi_hpd_suspend &mdss_hdmi_ddc_suspend
 						&mdss_hdmi_cec_suspend>;
 };
-
+*/
 &pmi8994_vadc {
 	chan@0 {
 		label = "usbin";
@@ -398,6 +404,7 @@
 	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
 	qcom,partial-update-enabled;
 	qcom,panel-roi-alignment = <720 128 720 64 720 64>;
+	qcom,panel-allow-phy-poweroff;
 };
 
 &dsi_nt35950_4k_dsc_cmd {
@@ -414,6 +421,16 @@
 	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
 };
 
+&dsi_sharp_4k_dsc_cmd {
+	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+	qcom,mdss-dsi-bl-min-level = <1>;
+	qcom,mdss-dsi-bl-max-level = <4095>;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,partial-update-enabled;
+	/* panel supports slice height of 8/16/32/48/3840 */
+	qcom,panel-roi-alignment = <1080 8 1080 8 1080 8>;
+};
+
 &dsi_nt35597_dsc_video {
 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 	qcom,mdss-dsi-bl-min-level = <1>;
@@ -426,6 +443,7 @@
 	qcom,mdss-dsi-bl-min-level = <1>;
 	qcom,mdss-dsi-bl-max-level = <4095>;
 	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,panel-allow-phy-poweroff;
 };
 
 &dsi_dual_sharp_1080_120hz_cmd {
@@ -530,7 +548,7 @@
 		qcom,vin-sel = <2>;		/* S4 1.8V */
 		qcom,src-sel = <0>;		/* Constant */
 		qcom,master-en = <1>;		/* Enable GPIO */
-		qcom,invert = <0>;
+		qcom,invert = <1>;
 		status = "okay";
 	};
 };
@@ -586,7 +604,7 @@
 
 &pmi8994_pwm_4 {
 	qcom,channel-owner = "lcd_bl";
-	qcom,lpg-dtest-line = <4>;
+	qcom,dtest-line = <4>;
 	qcom,dtest-output = <1>;
 	status = "okay";
 };
@@ -711,9 +729,6 @@
 			"SpkrLeft IN", "SPK1 OUT",
 			"SpkrRight IN", "SPK2 OUT";
 
-		qcom,hdmi-audio-rx;
-		asoc-codec = <&stub_codec>, <&hdmi_audio>;
-		asoc-codec-names = "msm-stub-codec.1", "msm-hdmi-audio-codec-rx";
 		qcom,hph-en1-gpio = <&pmi8994_gpios 10 0>;
 		qcom,hph-en0-gpio = <&pm8994_gpios 13 0>;
 		qcom,us-euro-gpios = <&pm8994_mpps 2 0>;

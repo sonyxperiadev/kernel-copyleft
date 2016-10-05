@@ -552,6 +552,16 @@ config MSM_IPC_ROUTER_GLINK_XPRT
 	  this layer registers a transport with IPC Router and enable
 	  message exchange.
 
+config MSM_IPC_ROUTER_MHI_XPRT
+	depends on MSM_MHI
+	depends on IPC_ROUTER
+	bool "MSM MHI XPRT Layer"
+	help
+	  MHI Transport Layer that enables off-chip communication of
+	  IPC Router. When the MHI endpoint becomes available, this layer
+	  registers the transport with IPC Router and enable message
+	  exchange.
+
 config MSM_SYSTEM_HEALTH_MONITOR
 	bool "System Health Monitor"
 	depends on MSM_QMI_INTERFACE && MSM_SUBSYSTEM_RESTART
@@ -571,6 +581,13 @@ config MSM_GLINK_PKT
 	  clients to communicate over G-Link via deivce nodes.
 	  This enable the usersapce clients to read and write to
 	  some glink packets channel.
+
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on MSM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
 
 config MSM_TZ_SMMU
 	bool "Helper functions for SMMU configuration through TZ"
@@ -738,6 +755,14 @@ config MSM_KERNEL_PROTECT_TEST
           Attempts to write to the kernel text after making the kernel text
           read-only.  This test is FATAL whether it passes or fails!
           Success is signaled by a stage-2 fault.
+
+config SUBSYS_LAST_ERR_LOG
+	bool "support last error log for subsystems"
+	help
+	  When a fatal error is encountered, few subsystems export the
+	  error log into SMEM. This driver supports the mechanism to read
+	  these logs and exports them to user via procfs.
+	  If unsure, say N
 
 source "drivers/soc/qcom/memshare/Kconfig"
 

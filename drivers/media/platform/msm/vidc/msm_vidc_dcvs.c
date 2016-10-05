@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "msm_vidc_common.h"
 #include "vidc_hfi_api.h"
@@ -602,6 +607,11 @@ static bool msm_dcvs_check_supported(struct msm_vidc_inst *inst)
 	if (instance_count == 1 && inst->session_type == MSM_VIDC_DECODER &&
 		!msm_comm_turbo_session(inst)) {
 		num_mbs_per_frame = msm_dcvs_get_mbs_per_frame(inst);
+
+		if (num_mbs_per_frame >= 32400) { /* disable for 4K */
+			return false;
+		}
+
 		instance_load = msm_comm_get_inst_load(inst,
 			LOAD_CALC_NO_QUIRKS);
 		output_buf_req = get_buff_req_buffer(inst,
@@ -617,7 +627,8 @@ static bool msm_dcvs_check_supported(struct msm_vidc_inst *inst)
 		if (!is_codec_supported ||
 			!IS_VALID_DCVS_SESSION(num_mbs_per_frame,
 				res->dcvs_limit[inst->session_type].min_mbpf) ||
-			!IS_VALID_DCVS_SESSION(instance_load, dcvs_limit))
+			!IS_VALID_DCVS_SESSION(instance_load, dcvs_limit) ||
+			inst->seqchanged_count > 1)
 			return false;
 
 		if (!output_buf_req) {

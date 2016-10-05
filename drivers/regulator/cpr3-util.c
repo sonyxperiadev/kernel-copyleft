@@ -18,6 +18,7 @@
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
+#include <linux/cpumask.h>
 #include <linux/device.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
@@ -445,9 +446,9 @@ int cpr3_parse_corner_array_property(struct cpr3_regulator *vreg,
  * and qcom,cpr-corner-fmax-map.
  *
  * It initializes these CPR3 regulator elements: corner, corner_count,
- * fuse_combos_supported, and speed_bins_supported.  It initializes these
- * elements for each corner: ceiling_volt, floor_volt, proc_freq, and
- * cpr_fuse_corner.
+ * fuse_combos_supported, fuse_corner_map, and speed_bins_supported.  It
+ * initializes these elements for each corner: ceiling_volt, floor_volt,
+ * proc_freq, and cpr_fuse_corner.
  *
  * It requires that the following CPR3 regulator elements be initialized before
  * being called: fuse_corner_count, fuse_combo, and speed_bin_fuse.
@@ -605,9 +606,11 @@ int cpr3_parse_common_corner_data(struct cpr3_regulator *vreg)
 			1, temp);
 	if (rc)
 		goto free_temp;
-	for (i = 0; i < vreg->corner_count; i++)
+	for (i = 0; i < vreg->corner_count; i++) {
 		vreg->corner[i].ceiling_volt
 			= CPR3_ROUND(temp[i], ctrl->step_volt);
+		vreg->corner[i].abs_ceiling_volt = vreg->corner[i].ceiling_volt;
+	}
 
 	rc = cpr3_parse_corner_array_property(vreg, "qcom,cpr-voltage-floor",
 			1, temp);
@@ -658,11 +661,19 @@ int cpr3_parse_common_corner_data(struct cpr3_regulator *vreg)
 		}
 	}
 
+	vreg->fuse_corner_map = devm_kcalloc(ctrl->dev, vreg->fuse_corner_count,
+				    sizeof(*vreg->fuse_corner_map), GFP_KERNEL);
+	if (!vreg->fuse_corner_map) {
+		rc = -ENOMEM;
+		goto free_temp;
+	}
+
 	rc = cpr3_parse_array_property(vreg, "qcom,cpr-corner-fmax-map",
 		vreg->fuse_corner_count, temp);
 	if (rc)
 		goto free_temp;
 	for (i = 0; i < vreg->fuse_corner_count; i++) {
+		vreg->fuse_corner_map[i] = temp[i] - CPR3_CORNER_OFFSET;
 		if (temp[i] < CPR3_CORNER_OFFSET
 		    || temp[i] > vreg->corner_count + CPR3_CORNER_OFFSET) {
 			cpr3_err(vreg, "invalid corner value specified in qcom,cpr-corner-fmax-map: %u\n",
@@ -676,19 +687,25 @@ int cpr3_parse_common_corner_data(struct cpr3_regulator *vreg)
 			goto free_temp;
 		}
 	}
-	if (temp[vreg->fuse_corner_count - 1] != vreg->corner_count) {
-		cpr3_err(vreg, "highest Fmax corner %u in qcom,cpr-corner-fmax-map does not match highest supported corner %d\n",
+	if (temp[vreg->fuse_corner_count - 1] != vreg->corner_count)
+		cpr3_debug(vreg, "Note: highest Fmax corner %u in qcom,cpr-corner-fmax-map does not match highest supported corner %d\n",
 			temp[vreg->fuse_corner_count - 1],
 			vreg->corner_count);
-		rc = -EINVAL;
-		goto free_temp;
-	}
+
 	for (i = 0; i < vreg->corner_count; i++) {
 		for (j = 0; j < vreg->fuse_corner_count; j++) {
 			if (i + CPR3_CORNER_OFFSET <= temp[j]) {
 				vreg->corner[i].cpr_fuse_corner = j;
 				break;
 			}
+		}
+		if (j == vreg->fuse_corner_count) {
+			/*
+			 * Handle the case where the highest fuse corner maps
+			 * to a corner below the highest corner.
+			 */
+			vreg->corner[i].cpr_fuse_corner
+				= vreg->fuse_corner_count - 1;
 		}
 	}
 
@@ -701,6 +718,17 @@ int cpr3_parse_common_corner_data(struct cpr3_regulator *vreg)
 			goto free_temp;
 
 		vreg->aging_allowed = aging_allowed;
+	}
+
+	if (of_find_property(vreg->of_node,
+		       "qcom,allow-aging-open-loop-voltage-adjustment", NULL)) {
+		rc = cpr3_parse_array_property(vreg,
+			"qcom,allow-aging-open-loop-voltage-adjustment",
+			1, &aging_allowed);
+		if (rc)
+			goto free_temp;
+
+		vreg->aging_allow_open_loop_adj = aging_allowed;
 	}
 
 	if (vreg->aging_allowed) {
@@ -863,6 +891,46 @@ int cpr3_parse_common_thread_data(struct cpr3_thread *thread)
 }
 
 /**
+ * cpr3_parse_irq_affinity() - parse CPR IRQ affinity information
+ * @ctrl:		Pointer to the CPR3 controller
+ *
+ * Return: 0 on success, errno on failure
+ */
+static int cpr3_parse_irq_affinity(struct cpr3_controller *ctrl)
+{
+	struct device_node *cpu_node;
+	int i, cpu;
+	int len = 0;
+
+	if (!of_find_property(ctrl->dev->of_node, "qcom,cpr-interrupt-affinity",
+				&len)) {
+		/* No IRQ affinity required */
+		return 0;
+	}
+
+	len /= sizeof(u32);
+
+	for (i = 0; i < len; i++) {
+		cpu_node = of_parse_phandle(ctrl->dev->of_node,
+					    "qcom,cpr-interrupt-affinity", i);
+		if (!cpu_node) {
+			cpr3_err(ctrl, "could not find CPU node %d\n", i);
+			return -EINVAL;
+		}
+
+		for_each_possible_cpu(cpu) {
+			if (of_get_cpu_node(cpu, NULL) == cpu_node) {
+				cpumask_set_cpu(cpu, &ctrl->irq_affinity_mask);
+				break;
+			}
+		}
+		of_node_put(cpu_node);
+	}
+
+	return 0;
+}
+
+/**
  * cpr3_parse_common_ctrl_data() - parse common CPR3 controller properties from
  *		device tree
  * @ctrl:		Pointer to the CPR3 controller
@@ -927,6 +995,10 @@ int cpr3_parse_common_ctrl_data(struct cpr3_controller *ctrl)
 
 	ctrl->cpr_allowed_sw = of_property_read_bool(ctrl->dev->of_node,
 			"qcom,cpr-enable");
+
+	rc = cpr3_parse_irq_affinity(ctrl);
+	if (rc)
+		return rc;
 
 	/* Aging reference voltage is optional */
 	ctrl->aging_ref_volt = 0;

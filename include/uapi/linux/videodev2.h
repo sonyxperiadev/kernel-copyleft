@@ -53,6 +53,11 @@
  *              Hans Verkuil <hverkuil@xs4all.nl>
  *		et al.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _UAPI__LINUX_VIDEODEV2_H
 #define _UAPI__LINUX_VIDEODEV2_H
 
@@ -69,7 +74,9 @@
  * Common stuff for both V4L1 and V4L2
  * Moved from videodev.h
  */
-#define VIDEO_MAX_FRAME               32
+/* extension begin */
+#define VIDEO_MAX_FRAME               96
+/* extension end */
 #define VIDEO_MAX_PLANES               8
 
 /*
@@ -1893,12 +1900,19 @@ struct v4l2_streamparm {
 #define V4L2_EVENT_MOTION_DET			6
 #define V4L2_EVENT_PRIVATE_START		0x08000000
 
+#define V4L2_EVENT_BITDEPTH_FLAG	0x1
+#define V4L2_EVENT_PICSTRUCT_FLAG	0x2
+
 #define V4L2_EVENT_MSM_VIDC_START	(V4L2_EVENT_PRIVATE_START + 0x00001000)
 #define V4L2_EVENT_MSM_VIDC_FLUSH_DONE	(V4L2_EVENT_MSM_VIDC_START + 1)
 #define V4L2_EVENT_MSM_VIDC_PORT_SETTINGS_CHANGED_SUFFICIENT	\
 		(V4L2_EVENT_MSM_VIDC_START + 2)
 #define V4L2_EVENT_MSM_VIDC_PORT_SETTINGS_CHANGED_INSUFFICIENT	\
 		(V4L2_EVENT_MSM_VIDC_START + 3)
+/*
+ * Bitdepth changed insufficient is deprecated now, however retaining
+ * to prevent changing the values of the other macros after bitdepth
+ */
 #define V4L2_EVENT_MSM_VIDC_PORT_SETTINGS_BITDEPTH_CHANGED_INSUFFICIENT \
 		(V4L2_EVENT_MSM_VIDC_START + 4)
 #define V4L2_EVENT_MSM_VIDC_SYS_ERROR	(V4L2_EVENT_MSM_VIDC_START + 5)

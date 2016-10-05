@@ -15,6 +15,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -1142,7 +1147,8 @@ static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep, u16 cmd_param,
 	cmd |= DWC3_DEPCMD_PARAM(cmd_param);
 	ret = dwc3_send_gadget_ep_cmd(dwc, dep->number, cmd, &params);
 	if (ret < 0) {
-		dev_dbg(dwc->dev, "failed to send STARTTRANSFER command\n");
+		dev_err(dwc->dev,
+			"failed to send STARTTRANSFER command ret=0x%x\n", ret);
 
 		if ((ret == -EAGAIN) && start_new &&
 				usb_endpoint_xfer_isoc(dep->endpoint.desc)) {
@@ -1172,6 +1178,8 @@ static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep, u16 cmd_param,
 			}
 			return ret;
 		} else {
+			dev_err(dwc->dev,
+				"goes through unexpected FIXME root.\n");
 			/*
 			 * FIXME we need to iterate over the list of requests
 			 * here and stop, unmap, free and del each of the linked
@@ -1416,6 +1424,17 @@ static int dwc3_gadget_ep_queue(struct usb_ep *ep, struct usb_request *request,
 				request, ep->name);
 		spin_unlock_irqrestore(&dwc->lock, flags);
 		return -ESHUTDOWN;
+	}
+
+	/*
+	 * Queuing endless request to USB endpoint through generic ep queue
+	 * API should not be allowed.
+	 */
+	if (dep->endpoint.endless) {
+		dev_dbg(dwc->dev, "trying to queue endless request %p to %s\n",
+				request, ep->name);
+		spin_unlock_irqrestore(&dwc->lock, flags);
+		return -EPERM;
 	}
 
 	if (dwc3_gadget_is_suspended(dwc)) {
@@ -2009,7 +2028,6 @@ void dwc3_gadget_disable_irq(struct dwc3 *dwc)
 	dwc3_writel(dwc->regs, DWC3_DEVTEN, 0x00);
 }
 
-static irqreturn_t dwc3_interrupt(int irq, void *_dwc);
 static irqreturn_t dwc3_thread_interrupt(int irq, void *_dwc);
 static void dwc3_gadget_disconnect_interrupt(struct dwc3 *dwc);
 
@@ -2159,18 +2177,7 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 	struct dwc3		*dwc = gadget_to_dwc(g);
 	unsigned long		flags;
 	int			ret = 0;
-	int			irq;
 
-	irq = platform_get_irq(to_platform_device(dwc->dev), 0);
-	dwc->irq = irq;
-	ret = request_irq(irq, dwc3_interrupt, IRQF_SHARED, "dwc3", dwc);
-	if (ret) {
-		dev_err(dwc->dev, "failed to request irq #%d --> %d\n",
-				irq, ret);
-		goto err0;
-	}
-
-	dwc->irq = irq;
 	g->interrupt_num = dwc->irq;
 	spin_lock_irqsave(&dwc->lock, flags);
 
@@ -2179,7 +2186,7 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 				dwc->gadget.name,
 				dwc->gadget_driver->driver.name);
 		ret = -EBUSY;
-		goto err1;
+		goto err0;
 	}
 
 	dwc->gadget_driver	= driver;
@@ -2193,11 +2200,8 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 	spin_unlock_irqrestore(&dwc->lock, flags);
 	return 0;
 
-err1:
-	spin_unlock_irqrestore(&dwc->lock, flags);
-	free_irq(irq, dwc);
-
 err0:
+	spin_unlock_irqrestore(&dwc->lock, flags);
 	return ret;
 }
 
@@ -3527,7 +3531,7 @@ static irqreturn_t dwc3_check_event_buf(struct dwc3 *dwc, u32 buf)
 	return IRQ_WAKE_THREAD;
 }
 
-static irqreturn_t dwc3_interrupt(int irq, void *_dwc)
+irqreturn_t dwc3_interrupt(int irq, void *_dwc)
 {
 	struct dwc3			*dwc = _dwc;
 	int				i;

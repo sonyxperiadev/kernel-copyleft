@@ -409,7 +409,11 @@ Optional properties:
 					fields in the supply entry, refer to the qcom,ctrl-supply-entries
 					binding above.
 - qcom,config-select:			Optional property to select default configuration.
-
+- qcom,panel-allow-phy-poweroff:	A boolean property indicates that panel allows to turn off the phy power
+					supply during idle screen. A panel should able to handle the dsi lanes
+					in floating state(not LP00 or LP11) to turn on this property. Software
+					turns off PHY pmic power supply, phy ldo and DSI Lane ldo during
+					idle screen (footswitch control off) when this property is enabled.
 [[Optional config sub-nodes]]		These subnodes provide different configurations for a given same panel.
 					Default configuration can be chosen by specifying phandle of the
 					selected subnode in the qcom,config-select.
@@ -430,6 +434,12 @@ Optional properites:
 - qcom,split-mode:			String property indicating which split mode MDP should use. Valid
 					entries are "pingpong-split" and "dualctl-split".
 					This property is mutually exclusive with qcom,lm-split.
+- qcom,mdss-dsc-version:		An 8 bit value indicates the DSC version supported by panel. Bits[0.3]
+					provides information about minor version while Bits[4.7] provides
+					major version information. It supports only DSC rev 1(Major).1(Minor)
+					right now.
+- qcom,mdss-dsc-scr-version:		Each DSC version can have multiple SCR. This 8 bit value indicates
+					current SCR revision information supported by panel.
 - qcom,mdss-dsc-encoders:		An integer value indicating how many DSC encoders should be used
 					to drive data stream to DSI.
 					Default value is 1 and max value is 2.
@@ -585,6 +595,7 @@ Example:
 		qcom,suspend-ulps-enabled;
 		qcom,panel-roi-alignment = <4 4 2 2 20 20>;
 		qcom,esd-check-enabled;
+		qcom,panel-allow-phy-poweroff;
 		qcom,mdss-dsi-panel-status-command = [06 01 00 01 05 00 02 0A 08];
 		qcom,mdss-dsi-panel-status-command-state = "dsi_lp_mode";
 		qcom,mdss-dsi-panel-status-check-mode = "reg_read";
@@ -664,6 +675,8 @@ Example:
 
 		qcom,config-select = <&dsi_sim_vid_config0>;
 		qcom,dba-panel;
+		qcom,mdss-dsc-version = <0x11>;
+		qcom,mdss-dsc-scr-version = <0x1>;
 
 		dsi_sim_vid_config0: config0 {
 			qcom,lm-split = <360 360>;

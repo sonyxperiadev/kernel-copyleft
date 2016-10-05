@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -531,6 +531,7 @@
 #define clk_perfcl_hf_mux 0x9e8bbe59
 #define clk_perfcl_lf_mux 0x2f9c278d
 #define clk_cbf_pll 0xfe2e96a3
+#define clk_cbf_pll_main 0x2b05cf95
 #define clk_cbf_hf_mux 0x71244f73
 #define clk_cbf_clk 0x48e9e16b
 #define clk_xo_ao 0x428c856d
@@ -541,4 +542,5 @@
 #define clk_audio_ap_clk 0x312ac429
 #define clk_audio_pmi_clk 0xb7ba2274
 #define clk_audio_ap_clk2 0xf0fbaf5b
+#define clk_audio_lpass_mclk2 0x0122abee
 #endif

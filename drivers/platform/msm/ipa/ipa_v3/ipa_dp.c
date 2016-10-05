@@ -88,6 +88,11 @@ static void ipa3_wq_write_done_common(struct ipa3_sys_context *sys,
 	struct ipa3_tx_pkt_wrapper *next_pkt;
 	int i, cnt;
 
+	if (unlikely(tx_pkt == NULL)) {
+		IPAERR("tx_pkt is NULL\n");
+		return;
+	}
+
 	cnt = tx_pkt->cnt;
 	IPADBG("cnt: %d\n", cnt);
 	for (i = 0; i < cnt; i++) {
@@ -634,7 +639,7 @@ failure:
 		kmem_cache_free(ipa3_ctx->tx_pkt_wrapper_cache, tx_pkt);
 		tx_pkt = next_pkt;
 	}
-	if (i < num_desc)
+	if (j < num_desc)
 		/* last desc failed */
 		if (fail_dma_wrap)
 			kmem_cache_free(ipa3_ctx->tx_pkt_wrapper_cache, tx_pkt);
@@ -849,12 +854,11 @@ static void ipa3_rx_switch_to_intr_mode(struct ipa3_sys_context *sys)
 {
 	int ret;
 
-	if (!atomic_read(&sys->curr_polling_state)) {
-		IPAERR("already in intr mode\n");
-		goto fail;
-	}
-
 	if (ipa3_ctx->transport_prototype == IPA_TRANSPORT_TYPE_GSI) {
+		if (!atomic_read(&sys->curr_polling_state)) {
+			IPAERR("already in intr mode\n");
+			goto fail;
+		}
 		atomic_set(&sys->curr_polling_state, 0);
 		ipa3_dec_release_wakelock();
 		ret = gsi_config_channel_mode(sys->ep->gsi_chan_hdl,
@@ -867,6 +871,15 @@ static void ipa3_rx_switch_to_intr_mode(struct ipa3_sys_context *sys)
 		ret = sps_get_config(sys->ep->ep_hdl, &sys->ep->connect);
 		if (ret) {
 			IPAERR("sps_get_config() failed %d\n", ret);
+			goto fail;
+		}
+		if (!atomic_read(&sys->curr_polling_state) &&
+			((sys->ep->connect.options & SPS_O_EOT) == SPS_O_EOT)) {
+			IPADBG("already in intr mode\n");
+			return;
+		}
+		if (!atomic_read(&sys->curr_polling_state)) {
+			IPAERR("already in intr mode\n");
 			goto fail;
 		}
 		sys->event.options = SPS_O_EOT;
@@ -1270,6 +1283,14 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
 		}
 	}
 
+	if (IPA_CLIENT_IS_CONS(sys_in->client))
+		ipa3_replenish_rx_cache(ep->sys);
+
+	if (IPA_CLIENT_IS_WLAN_CONS(sys_in->client)) {
+		ipa3_alloc_wlan_rx_common_cache(IPA_WLAN_COMM_RX_POOL_LOW);
+		atomic_inc(&ipa3_ctx->wc_memb.active_clnt_cnt);
+	}
+
 	ipa3_ctx->skip_ep_cfg_shadow[ipa_ep_idx] = ep->skip_ep_cfg;
 	if (!ep->skip_ep_cfg && IPA_CLIENT_IS_PROD(sys_in->client)) {
 		if (ipa3_ctx->modem_cfg_emb_pipe_flt &&
@@ -1345,6 +1366,8 @@ int ipa3_teardown_sys_pipe(u32 clnt_hdl)
 		} while (1);
 	}
 
+	if (IPA_CLIENT_IS_CONS(ep->client))
+		cancel_delayed_work_sync(&ep->sys->replenish_rx_work);
 	flush_workqueue(ep->sys->wq);
 	if (ipa3_ctx->transport_prototype == IPA_TRANSPORT_TYPE_GSI) {
 		result = ipa3_stop_gsi_channel(clnt_hdl);
@@ -2799,6 +2822,7 @@ static int ipa3_assign_policy(struct ipa_sys_connect_params *in,
 			if (sys->rx_pool_sz > IPA_WLAN_RX_POOL_SZ)
 				sys->rx_pool_sz = IPA_WLAN_RX_POOL_SZ;
 			sys->pyld_hdlr = NULL;
+			sys->repl_hdlr = ipa3_replenish_wlan_rx_cache;
 			sys->get_skb = ipa3_get_skb_ipa_rx;
 			sys->free_skb = ipa3_free_skb_rx;
 			in->ipa_ep_cfg.aggr.aggr_en = IPA_BYPASS_AGGR;

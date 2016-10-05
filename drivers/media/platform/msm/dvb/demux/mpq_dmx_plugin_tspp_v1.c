@@ -60,7 +60,7 @@
 
 #define TSPP_BUFFER_SIZE		(500 * 1024) /* 500KB */
 
-#define TSPP_DESCRIPTOR_SIZE	(TSPP_RAW_TTS_SIZE)
+#define TSPP_DESCRIPTOR_SIZE	(TSPP_RAW_TTS_SIZE * 170)
 
 #define TSPP_BUFFER_COUNT(buffer_size)	\
 	((buffer_size) / TSPP_DESCRIPTOR_SIZE)
@@ -83,7 +83,7 @@ enum mem_buffer_allocation_mode {
 };
 
 /* module parameters for load time configuration */
-static int allocation_mode = MPQ_DMX_TSPP_INTERNAL_ALLOC;
+static int allocation_mode = MPQ_DMX_TSPP_CONTIGUOUS_PHYS_ALLOC;
 static int tspp_out_buffer_size = TSPP_BUFFER_SIZE;
 static int tspp_notification_size =
 	TSPP_NOTIFICATION_SIZE(TSPP_DESCRIPTOR_SIZE);

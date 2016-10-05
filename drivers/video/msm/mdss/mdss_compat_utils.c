@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  * Copyright (C) 1994 Martin Schaller
  *
  * 2001 - Documented with DocBook
@@ -299,7 +299,7 @@ static int __compat_atomic_commit(struct fb_info *info, unsigned int cmd,
 	struct mdp_layer_commit  commit;
 	struct mdp_layer_commit32 commit32;
 	u32 layer_count;
-	struct mdp_input_layer *layer_list = NULL, *layer;
+	struct mdp_input_layer *layer_list = NULL;
 	struct mdp_input_layer32 *layer_list32 = NULL;
 	struct mdp_output_layer *output_layer = NULL;
 
@@ -370,8 +370,8 @@ static int __compat_atomic_commit(struct fb_info *info, unsigned int cmd,
 			argp, layer_count);
 
 	for (i = 0; i < layer_count; i++) {
-		kfree(layer[i].scale);
-		mdss_mdp_free_layer_pp_info(&layer[i]);
+		kfree(layer_list[i].scale);
+		mdss_mdp_free_layer_pp_info(&layer_list[i]);
 	}
 	kfree(layer_list);
 layer_list_err:
@@ -445,8 +445,8 @@ static int __compat_async_position_update(struct fb_info *info,
 
 	update_pos.input_layer_cnt = update_pos32.input_layer_cnt;
 	layer_cnt = update_pos32.input_layer_cnt;
-	if (!layer_cnt) {
-		pr_err("no async layer to update\n");
+	if ((!layer_cnt) || (layer_cnt > MAX_LAYER_COUNT)) {
+		pr_err("invalid async layers :%d to update\n", layer_cnt);
 		return -EINVAL;
 	}
 

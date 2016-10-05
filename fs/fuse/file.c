@@ -5,6 +5,11 @@
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "fuse_i.h"
 #include "fuse_shortcircuit.h"
@@ -65,6 +70,9 @@ struct fuse_file *fuse_file_alloc(struct fuse_conn *fc)
 		return NULL;
 
 	ff->rw_lower_file = NULL;
+	ff->shortcircuit_enabled = 0;
+	if (fc->shortcircuit_io)
+		ff->shortcircuit_enabled = 1;
 	ff->fc = fc;
 	ff->reserved_req = fuse_request_alloc(0);
 	if (unlikely(!ff->reserved_req)) {
@@ -1001,7 +1009,7 @@ static ssize_t fuse_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
 			return err;
 	}
 
-	if (ff && ff->rw_lower_file)
+	if (ff && ff->shortcircuit_enabled && ff->rw_lower_file)
 		ret_val = fuse_shortcircuit_read_iter(iocb, to);
 	else
 		ret_val = generic_file_read_iter(iocb, to);
@@ -1278,7 +1286,7 @@ static ssize_t fuse_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	if (err)
 		goto out;
 
-	if (ff && ff->rw_lower_file) {
+	if (ff && ff->shortcircuit_enabled && ff->rw_lower_file) {
 		written = fuse_shortcircuit_write_iter(iocb, from);
 		goto out;
 	}
@@ -2173,6 +2181,9 @@ static const struct vm_operations_struct fuse_file_vm_ops = {
 
 static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
+	struct fuse_file *ff = file->private_data;
+
+	ff->shortcircuit_enabled = 0;
 	if ((vma->vm_flags & VM_SHARED) && (vma->vm_flags & VM_MAYWRITE))
 		fuse_link_write_file(file);
 
@@ -2183,6 +2194,10 @@ static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
 
 static int fuse_direct_mmap(struct file *file, struct vm_area_struct *vma)
 {
+	struct fuse_file *ff = file->private_data;
+
+	ff->shortcircuit_enabled = 0;
+
 	/* Can't provide the coherency needed for MAP_SHARED */
 	if (vma->vm_flags & VM_MAYSHARE)
 		return -ENODEV;

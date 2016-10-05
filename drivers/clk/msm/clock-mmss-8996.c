@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -123,6 +128,7 @@ static struct alpha_pll_masks pll_masks_b = {
 	.alpha_en_mask = BIT(24),
 	.output_mask = 0xf,
 	.post_div_mask = BM(11, 8),
+	.update_mask = BIT(22),
 };
 
 static struct alpha_pll_vco_tbl mmpll_t_vco[] = {
@@ -317,6 +323,7 @@ static struct alpha_pll_clk mmpll9 = {
 	.num_vco = ARRAY_SIZE(mmpll_t_vco),
 	.post_div_config = 0x100,
 	.enable_config = 0x1,
+	.dynamic_update = true,
 	.c = {
 		.parent = &mmsscc_xo.c,
 		.rate = 960000000,
@@ -725,6 +732,9 @@ static struct clk_freq_tbl ftbl_cpp_clk_src[] = {
 	F_MM( 100000000, mmsscc_gpll0_div,    3,    0,     0),
 	F_MM( 200000000,     mmsscc_gpll0,    3,    0,     0),
 	F_MM( 320000000,  mmpll0_out_main,  2.5,    0,     0),
+#if defined(CONFIG_SONY_CAM_V4L2)
+	F_MM( 384000000, mmpll4_out_main, 2.5, 0, 0),
+#endif
 	F_MM( 480000000,  mmpll4_out_main,    2,    0,     0),
 	F_MM( 640000000,  mmpll4_out_main,  1.5,    0,     0),
 	F_END
@@ -1612,6 +1622,7 @@ static struct rcg_clk video_subcore0_clk_src = {
 	.set_rate = set_rate_mnd,
 	.freq_tbl = ftbl_video_subcore0_clk_src,
 	.current_freq = &rcg_dummy_freq,
+	.non_local_control_timeout = 1000,
 	.base = &virt_base,
 	.c = {
 		.dbg_name = "video_subcore0_clk_src",
@@ -1651,6 +1662,7 @@ static struct rcg_clk video_subcore1_clk_src = {
 	.set_rate = set_rate_mnd,
 	.freq_tbl = ftbl_video_subcore1_clk_src,
 	.current_freq = &rcg_dummy_freq,
+	.non_local_control_timeout = 1000,
 	.base = &virt_base,
 	.c = {
 		.dbg_name = "video_subcore1_clk_src",

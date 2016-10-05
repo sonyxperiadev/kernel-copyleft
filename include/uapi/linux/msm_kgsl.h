@@ -81,6 +81,7 @@
 #define KGSL_CMDBATCH_SUBMIT_IB_LIST	KGSL_CONTEXT_SUBMIT_IB_LIST /* 0x004 */
 #define KGSL_CMDBATCH_CTX_SWITCH	KGSL_CONTEXT_CTX_SWITCH     /* 0x008 */
 #define KGSL_CMDBATCH_PROFILING		0x00000010
+#define KGSL_CMDBATCH_PROFILING_KTIME	0x00000020
 #define KGSL_CMDBATCH_END_OF_FRAME	KGSL_CONTEXT_END_OF_FRAME   /* 0x100 */
 #define KGSL_CMDBATCH_SYNC		KGSL_CONTEXT_SYNC           /* 0x400 */
 #define KGSL_CMDBATCH_PWR_CONSTRAINT	KGSL_CONTEXT_PWR_CONSTRAINT /* 0x800 */
@@ -301,6 +302,7 @@ enum kgsl_timestamp_type {
 #define KGSL_PROP_SP_GENERIC_MEM	0x14
 #define KGSL_PROP_UCODE_VERSION		0x15
 #define KGSL_PROP_GPMU_VERSION		0x16
+#define KGSL_PROP_DEVICE_BITNESS	0x18
 
 struct kgsl_shadowprop {
 	unsigned long gpuaddr;
@@ -384,8 +386,12 @@ struct kgsl_ibdesc {
 
 /**
  * struct kgsl_cmdbatch_profiling_buffer
- * @wall_clock_s: Wall clock at ringbuffer submission time (seconds)
- * @wall_clock_ns: Wall clock at ringbuffer submission time (nanoseconds)
+ * @wall_clock_s: Ringbuffer submission time (seconds).
+ *                If KGSL_CMDBATCH_PROFILING_KTIME is set, time is provided
+ *                in kernel clocks, otherwise wall clock time is used.
+ * @wall_clock_ns: Ringbuffer submission time (nanoseconds).
+ *                 If KGSL_CMDBATCH_PROFILING_KTIME is set time is provided
+ *                 in kernel clocks, otherwise wall clock time is used.
  * @gpu_ticks_queued: GPU ticks at ringbuffer submission
  * @gpu_ticks_submitted: GPU ticks when starting cmdbatch execution
  * @gpu_ticks_retired: GPU ticks when finishing cmdbatch execution

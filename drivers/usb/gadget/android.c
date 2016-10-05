@@ -15,6 +15,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2012 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -35,6 +40,10 @@
 #include <linux/qcom/diag_dload.h>
 
 #include "gadget_chips.h"
+
+
+/* Wait time (ms) before sending CONFIGURED uevent */
+#define WAIT_TIME_BEFORE_SENDING_CONFIGURED		(50)
 
 #include "u_fs.h"
 #include "u_ecm.h"
@@ -83,6 +92,9 @@ static const char longname[] = "Gadget Android";
 /* Default vendor and product IDs, overridden by userspace */
 #define VENDOR_ID		0x18D1
 #define PRODUCT_ID		0x0001
+
+/* Wait time (ms) before sending CONFIGURED uevent */
+#define WAIT_TIME_BEFORE_SENDING_CONFIGURED		(50)
 
 #define ANDROID_DEVICE_NODE_NAME_LENGTH 11
 /* f_midi configuration */
@@ -252,6 +264,9 @@ static struct usb_string strings_dev[] = {
 	[STRING_MANUFACTURER_IDX].s = manufacturer_string,
 	[STRING_PRODUCT_IDX].s = product_string,
 	[STRING_SERIAL_IDX].s = serial_string,
+#ifdef CONFIG_USB_ANDROID_PRODUCTION
+	[USB_GADGET_FIRST_AVAIL_IDX].s = "ZLP",
+#endif
 	{  }			/* end of list */
 };
 
@@ -450,7 +465,7 @@ static void android_work(struct work_struct *data)
 		 * a chance to wakeup userspace threads and notify disconnect
 		 */
 		if (uevent_envp == configured)
-			msleep(50);
+			msleep(WAIT_TIME_BEFORE_SENDING_CONFIGURED);
 
 		/* Do not notify on suspend / resume */
 		if (next_state != USB_SUSPENDED && next_state != USB_RESUMED) {
@@ -677,18 +692,17 @@ static int functionfs_ready_callback(struct ffs_data *ffs)
 	struct android_dev *dev = ffs_function.android_dev;
 	struct functionfs_config *config = ffs_function.config;
 
-	if (dev)
-		mutex_lock(&dev->mutex);
+	if (!dev)
+		return -ENODEV;
 
+	mutex_lock(&dev->mutex);
 	config->data = ffs;
 	config->opened = true;
 
 	if (config->enabled && dev)
 		android_enable(dev);
 
-	if (dev)
-		mutex_unlock(&dev->mutex);
-
+	mutex_unlock(&dev->mutex);
 	return 0;
 }
 
@@ -2563,6 +2577,9 @@ static int mass_storage_function_init(struct android_usb_function *f,
 	}
 
 	fsg_mod_data.removable[0] = true;
+	fsg_mod_data.removable_count = 1;
+	fsg_mod_data.cdrom[0] = true;
+	fsg_mod_data.cdrom_count = 1;
 	fsg_config_from_params(&m_config, &fsg_mod_data, fsg_num_buffers);
 	fsg_opts = fsg_opts_from_func_inst(config->f_ms_inst);
 	ret = fsg_common_set_num_buffers(fsg_opts->common, fsg_num_buffers);
@@ -3515,7 +3532,7 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 		if (err < 0) {
 			pr_err("%s: android_enable failed\n", __func__);
 			dev->connected = 0;
-			dev->enabled = false;
+			dev->enabled = true;
 			mutex_unlock(&dev->mutex);
 			return size;
 		}
@@ -3704,6 +3721,64 @@ static struct device_attribute *android_usb_attributes[] = {
 	NULL
 };
 
+#ifdef CONFIG_USB_MIRRORLINK
+static struct miscdevice mirrorlink_device = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "usb_mirrorlink",
+};
+
+struct work_struct _ncm_wq;
+
+/* MirrorLink NCM control request handling */
+static int mirrorlink_ctrlrequest(struct usb_composite_dev *cdev,
+				  const struct usb_ctrlrequest *ctrl)
+{
+	int value = -EOPNOTSUPP;
+	u8 b_requestType = ctrl->bRequestType;
+	u8 b_request = ctrl->bRequest;
+
+	if (b_requestType == (USB_DIR_OUT | USB_TYPE_VENDOR)) {
+		if (b_request == 0xF0) {
+			pr_debug("ml_ctrlrequest: found request\n");
+			schedule_work(&_ncm_wq);
+			value = 0;
+			/* response to USB MirrorLink command */
+			cdev->req->zero = 0;
+			cdev->req->length = value;
+			value = usb_ep_queue(cdev->gadget->ep0,
+					     cdev->req, GFP_ATOMIC);
+			if (value < 0)
+				pr_err("%s setup response queue error\n",
+				       __func__);
+		}
+	}
+	return value;
+}
+
+static void mirrorlink_work(struct work_struct *data)
+{
+	char *envp[2] = { "MIRRORLINK=START", NULL };
+
+	/* Wait for CONFIGURED uevnet send out */
+	msleep(WAIT_TIME_BEFORE_SENDING_CONFIGURED);
+
+	kobject_uevent_env(&mirrorlink_device.this_device->kobj,
+			   KOBJ_CHANGE, envp);
+}
+
+static int mirrorlink_init(void)
+{
+	misc_register(&mirrorlink_device);
+	INIT_WORK(&_ncm_wq, mirrorlink_work);
+	return 0;
+}
+
+static void mirrorlink_cleanup(void)
+{
+	misc_deregister(&mirrorlink_device);
+}
+#endif
+
 /*-------------------------------------------------------------------------*/
 /* Composite driver */
 
@@ -3767,11 +3842,24 @@ static int android_bind(struct usb_composite_dev *cdev)
 	strlcpy(product_string, "Android", sizeof(product_string) - 1);
 	strlcpy(serial_string, "0123456789ABCDEF", sizeof(serial_string) - 1);
 
+#ifdef CONFIG_USB_ANDROID_PRODUCTION
+	/* Set id to 0 to comply with Sony production tools */
+	id = 0;
+#else
 	id = usb_string_id(cdev);
+#endif
 	if (id < 0)
 		return id;
 	strings_dev[STRING_SERIAL_IDX].id = id;
 	device_desc.iSerialNumber = id;
+
+#ifdef CONFIG_USB_ANDROID_PRODUCTION
+	/* Sony production tools need the ZLP string to be placed at idx 3 */
+	id = usb_string_id(cdev);
+	if (id < 0)
+		return id;
+	strings_dev[USB_GADGET_FIRST_AVAIL_IDX].id = id;
+#endif
 
 	dev->cdev = cdev;
 
@@ -3845,6 +3933,13 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	 */
 	if (value < 0)
 		value = acc_ctrlrequest(cdev, c);
+
+#ifdef CONFIG_USB_MIRRORLINK
+	/* Also handle the control request to enable CDC NCM mode
+	 * for MirrorLink. */
+	if (value < 0)
+		value = mirrorlink_ctrlrequest(cdev, c);
+#endif
 
 	if (value < 0)
 		value = composite_setup_func(gadget, c);
@@ -4212,6 +4307,14 @@ static int android_probe(struct platform_device *pdev)
 		goto err_probe;
 	}
 
+#ifdef CONFIG_USB_MIRRORLINK
+	ret = mirrorlink_init();
+	if (ret) {
+		pr_err("%s(): mirrorlink_init failed\n", __func__);
+		goto err_probe;
+	}
+#endif
+
 	/* pm qos request to prevent apps idle power collapse */
 	android_dev->curr_pm_qos_state = NO_USB_VOTE;
 	if (pdata && pdata->pm_qos_latency[0]) {
@@ -4263,6 +4366,10 @@ static int android_remove(struct platform_device *pdev)
 
 	if (pdata)
 		usb_core_id = pdata->usb_core_id;
+
+#ifdef CONFIG_USB_MIRRORLINK
+	mirrorlink_cleanup();
+#endif
 
 	/* Find the android dev from the list */
 	list_for_each_entry(dev, &android_dev_list, list_item) {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,8 +26,17 @@
 #include "kgsl_sharedmem.h"
 #include "kgsl_log.h"
 #include "kgsl.h"
+#include "adreno_a5xx_packets.h"
 
 static int zap_ucode_loaded;
+static int critical_packet_constructed;
+
+static struct kgsl_memdesc crit_pkts;
+static unsigned int crit_pkts_dwords;
+static struct kgsl_memdesc crit_pkts_refbuf0;
+static struct kgsl_memdesc crit_pkts_refbuf1;
+static struct kgsl_memdesc crit_pkts_refbuf2;
+static struct kgsl_memdesc crit_pkts_refbuf3;
 
 void a5xx_snapshot(struct adreno_device *adreno_dev,
 		struct kgsl_snapshot *snapshot);
@@ -265,10 +274,6 @@ static int a5xx_preemption_token(struct adreno_device *adreno_dev,
 {
 	unsigned int *cmds_orig = cmds;
 
-	/* Enable yield in RB only */
-	*cmds++ = cp_type7_packet(CP_YIELD_ENABLE, 1);
-	*cmds++ = 1;
-
 	*cmds++ = cp_type7_packet(CP_CONTEXT_SWITCH_YIELD, 4);
 	cmds += cp_gpuaddr(adreno_dev, cmds, gpuaddr);
 	*cmds++ = 1;
@@ -293,8 +298,19 @@ static int a5xx_preemption_pre_ibsubmit(
 	uint64_t gpuaddr = rb->preemption_desc.gpuaddr;
 	unsigned int preempt_style = 0;
 
-	if (context)
-		preempt_style = ADRENO_PREEMPT_STYLE(context->flags);
+	if (context) {
+		/*
+		 * Preemption from secure to unsecure needs Zap shader to be
+		 * run to clear all secure content. CP does not know during
+		 * preemption if it is switching between secure and unsecure
+		 * contexts so restrict Secure contexts to be preempted at
+		 * ringbuffer level.
+		 */
+		if (context->flags & KGSL_CONTEXT_SECURE)
+			preempt_style = KGSL_CONTEXT_PREEMPT_STYLE_RINGBUFFER;
+		else
+			preempt_style = ADRENO_PREEMPT_STYLE(context->flags);
+	}
 
 	/*
 	 * CP_PREEMPT_ENABLE_GLOBAL(global preemption) can only be set by KMD
@@ -340,22 +356,19 @@ static int a5xx_preemption_pre_ibsubmit(
 		*cmds++ = 0;
 	}
 
+	/* Enable CP_CONTEXT_SWITCH_YIELD packets in the IB2s */
+	*cmds++ = cp_type7_packet(CP_YIELD_ENABLE, 1);
+	*cmds++ = 2;
+
 	return cmds - cmds_orig;
 }
 
 /*
- * a5xx_preemption_post_ibsubmit() - Below PM4 commands are
+ * a5xx_preemption_yield_enable() - Below PM4 commands are
  * added after every cmdbatch submission.
  */
-static int a5xx_preemption_post_ibsubmit(
-			struct adreno_device *adreno_dev,
-			struct adreno_ringbuffer *rb, unsigned int *cmds,
-			struct kgsl_context *context)
+static int a5xx_preemption_yield_enable(unsigned int *cmds)
 {
-	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
-	unsigned int *cmds_orig = cmds;
-	unsigned int ctx_id = context ? context->id : 0;
-
 	/*
 	 * SRM -- set render mode (ex binning, direct render etc)
 	 * SRM is set by UMD usually at start of IB to tell CP the type of
@@ -370,11 +383,27 @@ static int a5xx_preemption_post_ibsubmit(
 	*cmds++ = 0;
 	*cmds++ = 0;
 
-	cmds += a5xx_preemption_token(adreno_dev, rb, cmds,
+	*cmds++ = cp_type7_packet(CP_YIELD_ENABLE, 1);
+	*cmds++ = 1;
+
+	return 8;
+}
+
+/*
+ * a5xx_preemption_post_ibsubmit() - Below PM4 commands are
+ * added after every cmdbatch submission.
+ */
+static int a5xx_preemption_post_ibsubmit(struct adreno_device *adreno_dev,
+			struct adreno_ringbuffer *rb, unsigned int *cmds,
+			struct kgsl_context *context)
+{
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	unsigned int ctx_id = context ? context->id : 0;
+
+	return a5xx_preemption_token(adreno_dev, rb, cmds,
 				device->memstore.gpuaddr +
 				KGSL_MEMSTORE_OFFSET(ctx_id, preempted));
 
-	return cmds - cmds_orig;
 }
 
 static void a5xx_platform_setup(struct adreno_device *adreno_dev)
@@ -413,12 +442,120 @@ static void a5xx_platform_setup(struct adreno_device *adreno_dev)
 	a5xx_check_features(adreno_dev);
 }
 
+static void a5xx_critical_packet_destroy(struct adreno_device *adreno_dev)
+{
+	kgsl_free_global(&adreno_dev->dev, &crit_pkts);
+	kgsl_free_global(&adreno_dev->dev, &crit_pkts_refbuf1);
+	kgsl_free_global(&adreno_dev->dev, &crit_pkts_refbuf2);
+	kgsl_free_global(&adreno_dev->dev, &crit_pkts_refbuf3);
+
+	kgsl_sharedmem_free(&crit_pkts_refbuf0);
+
+}
+
+static void _do_fixup(const struct adreno_critical_fixup *fixups, int count,
+		uint64_t *gpuaddrs, unsigned int *buffer)
+{
+	int i;
+
+	for (i = 0; i < count; i++) {
+		buffer[fixups[i].lo_offset] =
+			lower_32_bits(gpuaddrs[fixups[i].buffer]) |
+			fixups[i].mem_offset;
+
+		buffer[fixups[i].hi_offset] =
+			upper_32_bits(gpuaddrs[fixups[i].buffer]);
+	}
+}
+
+static int a5xx_critical_packet_construct(struct adreno_device *adreno_dev)
+{
+
+	unsigned int *cmds;
+	uint64_t gpuaddrs[CRITICAL_PACKET_MAX];
+	int ret;
+
+	ret = kgsl_allocate_global(&adreno_dev->dev,
+					&crit_pkts, PAGE_SIZE,
+					KGSL_MEMFLAGS_GPUREADONLY, 0);
+	if (ret)
+		return ret;
+
+	ret = kgsl_allocate_user(&adreno_dev->dev, &crit_pkts_refbuf0,
+					NULL, PAGE_SIZE, KGSL_MEMFLAGS_SECURE);
+	if (ret)
+		return ret;
+
+	kgsl_add_global_secure_entry(&adreno_dev->dev,
+					&crit_pkts_refbuf0);
+
+	ret = kgsl_allocate_global(&adreno_dev->dev,
+					&crit_pkts_refbuf1,
+					PAGE_SIZE, 0, 0);
+	if (ret)
+		return ret;
+
+	ret = kgsl_allocate_global(&adreno_dev->dev,
+					&crit_pkts_refbuf2,
+					PAGE_SIZE, 0, 0);
+	if (ret)
+		return ret;
+
+	ret = kgsl_allocate_global(&adreno_dev->dev,
+					&crit_pkts_refbuf3,
+					PAGE_SIZE, 0, 0);
+	if (ret)
+		return ret;
+
+	cmds = crit_pkts.hostptr;
+
+	gpuaddrs[CRITICAL_PACKET0] = crit_pkts_refbuf0.gpuaddr;
+	gpuaddrs[CRITICAL_PACKET1] = crit_pkts_refbuf1.gpuaddr;
+	gpuaddrs[CRITICAL_PACKET2] = crit_pkts_refbuf2.gpuaddr;
+	gpuaddrs[CRITICAL_PACKET3] = crit_pkts_refbuf3.gpuaddr;
+
+	crit_pkts_dwords = ARRAY_SIZE(_a5xx_critical_pkts);
+
+	memcpy(cmds, _a5xx_critical_pkts, crit_pkts_dwords << 2);
+
+	_do_fixup(critical_pkt_fixups, ARRAY_SIZE(critical_pkt_fixups),
+		gpuaddrs, cmds);
+
+	cmds = crit_pkts_refbuf1.hostptr;
+	memcpy(cmds, _a5xx_critical_pkts_mem01,
+			ARRAY_SIZE(_a5xx_critical_pkts_mem01) << 2);
+
+	cmds = crit_pkts_refbuf2.hostptr;
+	memcpy(cmds, _a5xx_critical_pkts_mem02,
+			ARRAY_SIZE(_a5xx_critical_pkts_mem02) << 2);
+
+	cmds = crit_pkts_refbuf3.hostptr;
+	memcpy(cmds, _a5xx_critical_pkts_mem03,
+			ARRAY_SIZE(_a5xx_critical_pkts_mem03) << 2);
+
+	_do_fixup(critical_pkt_mem03_fixups,
+		ARRAY_SIZE(critical_pkt_mem03_fixups), gpuaddrs, cmds);
+
+	critical_packet_constructed = 1;
+
+	return 0;
+}
+
 static void a5xx_init(struct adreno_device *adreno_dev)
 {
 	if (ADRENO_FEATURE(adreno_dev, ADRENO_GPMU))
 		INIT_WORK(&adreno_dev->gpmu_work, a5xx_gpmu_reset);
 
+	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_CRITICAL_PACKETS))
+		a5xx_critical_packet_construct(adreno_dev);
+
 	a5xx_crashdump_init(adreno_dev);
+}
+
+static void a5xx_remove(struct adreno_device *adreno_dev)
+{
+	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_CRITICAL_PACKETS))
+		a5xx_critical_packet_destroy(adreno_dev);
 }
 
 /**
@@ -877,7 +1014,7 @@ static const struct kgsl_hwcg_reg a50x_hwcg_regs[] = {
 	{A5XX_RBBM_CLOCK_CNTL2_RB0, 0x00222222},
 	{A5XX_RBBM_CLOCK_CNTL_CCU0, 0x00022220},
 	{A5XX_RBBM_CLOCK_CNTL_RAC, 0x05522222},
-	{A5XX_RBBM_CLOCK_CNTL2_RAC, 0x00555555},
+	{A5XX_RBBM_CLOCK_CNTL2_RAC, 0x00505555},
 	{A5XX_RBBM_CLOCK_HYST_RB_CCU0, 0x04040404},
 	{A5XX_RBBM_CLOCK_HYST_RAC, 0x07444044},
 	{A5XX_RBBM_CLOCK_DELAY_RB_CCU_L1_0, 0x00000002},
@@ -934,7 +1071,7 @@ static const struct kgsl_hwcg_reg a510_hwcg_regs[] = {
 	{A5XX_RBBM_CLOCK_CNTL_CCU0, 0x00022220},
 	{A5XX_RBBM_CLOCK_CNTL_CCU1, 0x00022220},
 	{A5XX_RBBM_CLOCK_CNTL_RAC, 0x05522222},
-	{A5XX_RBBM_CLOCK_CNTL2_RAC, 0x00555555},
+	{A5XX_RBBM_CLOCK_CNTL2_RAC, 0x00505555},
 	{A5XX_RBBM_CLOCK_HYST_RB_CCU0, 0x04040404},
 	{A5XX_RBBM_CLOCK_HYST_RB_CCU1, 0x04040404},
 	{A5XX_RBBM_CLOCK_HYST_RAC, 0x07444044},
@@ -1025,7 +1162,7 @@ static const struct kgsl_hwcg_reg a530_hwcg_regs[] = {
 	{A5XX_RBBM_CLOCK_CNTL_CCU2, 0x00022220},
 	{A5XX_RBBM_CLOCK_CNTL_CCU3, 0x00022220},
 	{A5XX_RBBM_CLOCK_CNTL_RAC, 0x05522222},
-	{A5XX_RBBM_CLOCK_CNTL2_RAC, 0x00555555},
+	{A5XX_RBBM_CLOCK_CNTL2_RAC, 0x00505555},
 	{A5XX_RBBM_CLOCK_HYST_RB_CCU0, 0x04040404},
 	{A5XX_RBBM_CLOCK_HYST_RB_CCU1, 0x04040404},
 	{A5XX_RBBM_CLOCK_HYST_RB_CCU2, 0x04040404},
@@ -1121,7 +1258,7 @@ static const struct kgsl_hwcg_reg a540_hwcg_regs[] = {
 	{A5XX_RBBM_CLOCK_CNTL_CCU2, 0x00022220},
 	{A5XX_RBBM_CLOCK_CNTL_CCU3, 0x00022220},
 	{A5XX_RBBM_CLOCK_CNTL_RAC, 0x05522222},
-	{A5XX_RBBM_CLOCK_CNTL2_RAC, 0x00555555},
+	{A5XX_RBBM_CLOCK_CNTL2_RAC, 0x00505555},
 	{A5XX_RBBM_CLOCK_HYST_RB_CCU0, 0x04040404},
 	{A5XX_RBBM_CLOCK_HYST_RB_CCU1, 0x04040404},
 	{A5XX_RBBM_CLOCK_HYST_RB_CCU2, 0x04040404},
@@ -1159,7 +1296,7 @@ static const struct {
 	{ adreno_is_a506, a50x_hwcg_regs, ARRAY_SIZE(a50x_hwcg_regs) },
 };
 
-static void a5xx_hwcg_init(struct adreno_device *adreno_dev)
+void a5xx_hwcg_set(struct adreno_device *adreno_dev, bool on)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	const struct kgsl_hwcg_reg *regs;
@@ -1176,11 +1313,11 @@ static void a5xx_hwcg_init(struct adreno_device *adreno_dev)
 	regs = a5xx_hwcg_registers[i].regs;
 
 	for (j = 0; j < a5xx_hwcg_registers[i].count; j++)
-		kgsl_regwrite(device, regs[j].off, regs[j].val);
+		kgsl_regwrite(device, regs[j].off, on ? regs[j].val : 0);
 
 	/* enable top level HWCG */
-	kgsl_regwrite(device, A5XX_RBBM_CLOCK_CNTL, 0xAAA8AA00);
-	kgsl_regwrite(device, A5XX_RBBM_ISDB_CNT, 0x00000182);
+	kgsl_regwrite(device, A5XX_RBBM_CLOCK_CNTL, on ? 0xAAA8AA00 : 0);
+	kgsl_regwrite(device, A5XX_RBBM_ISDB_CNT, on ? 0x00000182 : 0x00000180);
 }
 
 static int _read_fw2_block_header(uint32_t *header, uint32_t id,
@@ -2012,7 +2149,7 @@ static void a5xx_start(struct adreno_device *adreno_dev)
 		/* if not in ISDB mode enable ME/PFP split notification */
 		kgsl_regwrite(device, A5XX_RBBM_AHB_CNTL1, 0xA6FFFFFF);
 		/* enable HWCG */
-		a5xx_hwcg_init(adreno_dev);
+		a5xx_hwcg_set(adreno_dev, true);
 	}
 
 	kgsl_regwrite(device, A5XX_RBBM_AHB_CNTL2, 0x0000003F);
@@ -2236,6 +2373,36 @@ static int a5xx_switch_to_unsecure_mode(struct adreno_device *adreno_dev,
 	return ret;
 }
 
+static int a5xx_critical_packet_submit(struct adreno_device *adreno_dev,
+					struct adreno_ringbuffer *rb)
+{
+	unsigned int *cmds;
+	int ret;
+
+	if (!critical_packet_constructed)
+		return 0;
+
+	cmds = adreno_ringbuffer_allocspace(rb, 4);
+	if (IS_ERR(cmds))
+		return PTR_ERR(cmds);
+
+	*cmds++ = cp_mem_packet(adreno_dev, CP_INDIRECT_BUFFER_PFE, 2, 1);
+	cmds += cp_gpuaddr(adreno_dev, cmds, crit_pkts.gpuaddr);
+	*cmds++ = crit_pkts_dwords;
+
+	ret = adreno_ringbuffer_submit_spin(rb, NULL, 20);
+	if (ret != 0) {
+		struct kgsl_device *device = &adreno_dev->dev;
+
+		dev_err(device->dev,
+			"Critical packet submission failed to idle\n");
+		spin_idle_debug(device);
+		kgsl_device_snapshot(device, NULL);
+	}
+
+	return ret;
+}
+
 /*
  * a5xx_rb_init() - Initialize ringbuffer
  * @adreno_dev: Pointer to adreno device
@@ -2284,6 +2451,12 @@ static int a5xx_rb_init(struct adreno_device *adreno_dev,
 		dev_err(device->dev, "CP initialization failed to idle\n");
 		spin_idle_debug(device);
 		kgsl_device_snapshot(device, NULL);
+	}
+
+	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_CRITICAL_PACKETS)) {
+		ret = a5xx_critical_packet_submit(adreno_dev, rb);
+		if (ret)
+			return ret;
 	}
 
 	/* GPU comes up in secured mode, make it unsecured by default */
@@ -3725,6 +3898,7 @@ struct adreno_gpudev adreno_a5xx_gpudev = {
 	.num_prio_levels = ADRENO_PRIORITY_MAX_RB_LEVELS,
 	.platform_setup = a5xx_platform_setup,
 	.init = a5xx_init,
+	.remove = a5xx_remove,
 	.rb_init = a5xx_rb_init,
 	.hw_init = a5xx_hw_init,
 	.microcode_read = a5xx_microcode_read,
@@ -3736,8 +3910,10 @@ struct adreno_gpudev adreno_a5xx_gpudev = {
 	.regulator_disable = a5xx_regulator_disable,
 	.pwrlevel_change_settings = a5xx_pwrlevel_change_settings,
 	.preemption_pre_ibsubmit = a5xx_preemption_pre_ibsubmit,
+	.preemption_yield_enable =
+				a5xx_preemption_yield_enable,
 	.preemption_post_ibsubmit =
-				a5xx_preemption_post_ibsubmit,
+			a5xx_preemption_post_ibsubmit,
 	.preemption_token = a5xx_preemption_token,
 	.preemption_init = a5xx_preemption_init,
 	.preemption_schedule = a5xx_preemption_schedule,

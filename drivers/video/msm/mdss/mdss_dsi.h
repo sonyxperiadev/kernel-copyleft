@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef MDSS_DSI_H
 #define MDSS_DSI_H
@@ -349,6 +354,10 @@ struct dsi_pinctrl_res {
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *gpio_state_active;
 	struct pinctrl_state *gpio_state_suspend;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct pinctrl_state *touch_state_active;
+	struct pinctrl_state *touch_state_suspend;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 };
 
 struct panel_horizontal_idle {
@@ -509,6 +518,7 @@ struct mdss_dsi_ctrl_pdata {
 	bool cmd_cfg_restore;
 	bool do_unicast;
 
+	bool idle_enabled;
 	int horizontal_idle_cnt;
 	struct panel_horizontal_idle *line_idle;
 	struct mdss_util_intf *mdss_util;
@@ -517,7 +527,8 @@ struct mdss_dsi_ctrl_pdata {
 	void *clk_mngr;
 	void *dsi_clk_handle;
 	void *mdp_clk_handle;
-	int m_vote_cnt;
+	int m_dsi_vote_cnt;
+	int m_mdp_vote_cnt;
 	/* debugfs structure */
 	struct mdss_dsi_debugfs_info *debugfs_info;
 
@@ -533,6 +544,11 @@ struct mdss_dsi_ctrl_pdata {
 	struct delayed_work dba_work;
 	bool timing_db_mode;
 	bool update_phy_timing; /* flag to recalculate PHY timings */
+
+	bool phy_power_off;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct mdss_panel_specific_pdata *spec_pdata;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 };
 
 struct dsi_status_data {
@@ -559,7 +575,7 @@ void mdss_dsi_cmd_mode_ctrl(int enable);
 void mdp4_dsi_cmd_trigger(void);
 void mdss_dsi_cmd_mdp_start(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_cmd_bta_sw_trigger(struct mdss_panel_data *pdata);
-void mdss_dsi_ack_err_status(struct mdss_dsi_ctrl_pdata *ctrl);
+bool mdss_dsi_ack_err_status(struct mdss_dsi_ctrl_pdata *ctrl);
 int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, void *clk_handle,
 	enum mdss_dsi_clk_type clk_type, enum mdss_dsi_clk_state clk_state);
 void mdss_dsi_clk_req(struct mdss_dsi_ctrl_pdata *ctrl,
@@ -621,9 +637,8 @@ int mdss_dsi_bta_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
 int mdss_dsi_reg_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
 bool __mdss_dsi_clk_enabled(struct mdss_dsi_ctrl_pdata *ctrl, u8 clk_type);
 void mdss_dsi_ctrl_setup(struct mdss_dsi_ctrl_pdata *ctrl);
-void mdss_dsi_dln0_phy_err(struct mdss_dsi_ctrl_pdata *ctrl, bool print_en);
+bool mdss_dsi_dln0_phy_err(struct mdss_dsi_ctrl_pdata *ctrl, bool print_en);
 void mdss_dsi_lp_cd_rx(struct mdss_dsi_ctrl_pdata *ctrl);
-void mdss_dsi_get_hw_revision(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_read_phy_revision(struct mdss_dsi_ctrl_pdata *ctrl);
 int mdss_dsi_panel_cmd_read(struct mdss_dsi_ctrl_pdata *ctrl, char cmd0,
 		char cmd1, void (*fxn)(int), char *rbuf, int len);
@@ -646,6 +661,7 @@ void mdss_dsi_panel_dsc_pps_send(struct mdss_dsi_ctrl_pdata *ctrl,
 void mdss_dsi_dsc_config(struct mdss_dsi_ctrl_pdata *ctrl,
 	struct dsc_desc *dsc);
 void mdss_dsi_dfps_config_8996(struct mdss_dsi_ctrl_pdata *ctrl);
+void mdss_dsi_set_burst_mode(struct mdss_dsi_ctrl_pdata *ctrl);
 
 static inline const char *__mdss_dsi_pm_name(enum dsi_pm_type module)
 {

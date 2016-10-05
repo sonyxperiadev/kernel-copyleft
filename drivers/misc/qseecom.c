@@ -11,6 +11,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "QSEECOM: %s: " fmt, __func__
 
@@ -46,6 +51,7 @@
 #include "qseecom_legacy.h"
 #include "qseecom_kernel.h"
 #include <crypto/ice.h>
+#include <linux/delay.h>
 
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
@@ -426,7 +432,6 @@ static int qseecom_scm_call2(uint32_t svc_id, uint32_t tz_cmd_id,
 			smc_id = TZ_OS_APP_SHUTDOWN_ID;
 			desc.arginfo = TZ_OS_APP_SHUTDOWN_ID_PARAM_ID;
 			desc.args[0] = req->app_id;
-			__qseecom_reentrancy_check_if_no_app_blocked(smc_id);
 			ret = scm_call2(smc_id, &desc);
 			break;
 		}
@@ -1579,6 +1584,100 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 	return ret;
 }
 
+int __qseecom_process_reentrancy_blocked_on_listener(
+				struct qseecom_command_scm_resp *resp,
+				struct qseecom_registered_app_list *ptr_app,
+				struct qseecom_dev_handle *data)
+{
+	struct qseecom_registered_listener_list *list_ptr;
+	int ret = 0;
+	struct qseecom_continue_blocked_request_ireq ireq;
+	struct qseecom_command_scm_resp continue_resp;
+	sigset_t new_sigset, old_sigset;
+	unsigned long flags;
+	bool found_app = false;
+
+	if (!resp || !data) {
+		pr_err("invalid resp or data pointer\n");
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	/* find app_id & img_name from list */
+	if (!ptr_app) {
+		spin_lock_irqsave(&qseecom.registered_app_list_lock, flags);
+		list_for_each_entry(ptr_app, &qseecom.registered_app_list_head,
+							list) {
+			if ((ptr_app->app_id == data->client.app_id) &&
+				(!strcmp(ptr_app->app_name,
+						data->client.app_name))) {
+				found_app = true;
+				break;
+			}
+		}
+		spin_unlock_irqrestore(&qseecom.registered_app_list_lock,
+					flags);
+		if (!found_app) {
+			pr_err("app_id %d (%s) is not found\n",
+				data->client.app_id,
+				(char *)data->client.app_name);
+			ret = -ENOENT;
+			goto exit;
+		}
+	}
+
+	list_ptr = __qseecom_find_svc(resp->data);
+	if (!list_ptr) {
+		pr_err("Invalid listener ID\n");
+		ret = -ENODATA;
+		goto exit;
+	}
+	ptr_app->blocked_on_listener_id = resp->data;
+	list_ptr->listener_in_use = true;
+	/* sleep until listener is available */
+	while (list_ptr->listener_in_use == true) {
+		qseecom.app_block_ref_cnt++;
+		ptr_app->app_blocked = true;
+		sigfillset(&new_sigset);
+		sigprocmask(SIG_SETMASK, &new_sigset, &old_sigset);
+		mutex_unlock(&app_access_lock);
+		do {
+			if (!wait_event_freezable(
+				list_ptr->listener_block_app_wq,
+				!list_ptr->listener_in_use)) {
+				break;
+			}
+		} while (1);
+		mutex_lock(&app_access_lock);
+		sigprocmask(SIG_SETMASK, &old_sigset, NULL);
+		ptr_app->app_blocked = false;
+		qseecom.app_block_ref_cnt--;
+	}
+	ptr_app->blocked_on_listener_id = 0;
+	/* notify the blocked app that listener is available */
+	pr_warn("Lsntr %d is available, unblock app(%d) %s in TZ\n",
+		resp->data, data->client.app_id,
+		data->client.app_name);
+	ireq.qsee_cmd_id = QSEOS_CONTINUE_BLOCKED_REQ_COMMAND;
+	ireq.app_id = data->client.app_id;
+	ret = qseecom_scm_call(SCM_SVC_TZSCHEDULER, 1,
+			&ireq, sizeof(ireq),
+			&continue_resp, sizeof(continue_resp));
+	if (ret) {
+		pr_err("scm_call for continue blocked req for app(%d) %s failed, ret %d\n",
+			data->client.app_id,
+			data->client.app_name, ret);
+		goto exit;
+	}
+	/*
+	 * After TZ app is unblocked, then continue to next case
+	 * for incomplete request processing
+	 */
+	resp->result = QSEOS_RESULT_INCOMPLETE;
+exit:
+	return ret;
+}
+
 static int __qseecom_reentrancy_process_incomplete_cmd(
 					struct qseecom_dev_handle *data,
 					struct qseecom_command_scm_resp *resp)
@@ -1679,20 +1778,41 @@ static int __qseecom_reentrancy_process_incomplete_cmd(
 		if (ret) {
 			pr_err("scm_call() failed with err: %d (app_id = %d)\n",
 				ret, data->client.app_id);
-			if (lstnr == RPMB_SERVICE)
-				__qseecom_disable_clk(CLK_QSEE);
-			return ret;
+			goto exit;
 		}
-		if ((resp->result != QSEOS_RESULT_SUCCESS) &&
-			(resp->result != QSEOS_RESULT_INCOMPLETE)) {
+
+		switch (resp->result) {
+		case QSEOS_RESULT_BLOCKED_ON_LISTENER:
+			pr_warn("send lsr %d rsp, but app %d block on lsr %d\n",
+					lstnr, data->client.app_id, resp->data);
+			if (lstnr == resp->data) {
+				pr_err("lstnr %d should not be blocked!\n",
+					lstnr);
+				ret = -EINVAL;
+				goto exit;
+			}
+			ret = __qseecom_process_reentrancy_blocked_on_listener(
+					resp, NULL, data);
+			if (ret) {
+				pr_err("failed to process App(%d) %s blocked on listener %d\n",
+					data->client.app_id,
+					data->client.app_name, resp->data);
+				goto exit;
+			}
+		case QSEOS_RESULT_SUCCESS:
+		case QSEOS_RESULT_INCOMPLETE:
+			break;
+		default:
 			pr_err("fail:resp res= %d,app_id = %d,lstr = %d\n",
 				resp->result, data->client.app_id, lstnr);
 			ret = -EINVAL;
+			goto exit;
 		}
-		if (lstnr == RPMB_SERVICE)
-			__qseecom_disable_clk(CLK_QSEE);
 
 	}
+exit:
+	if (lstnr == RPMB_SERVICE)
+		__qseecom_disable_clk(CLK_QSEE);
 	if (rc)
 		return rc;
 
@@ -2084,6 +2204,14 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 		goto unload_exit;
 	}
 
+	if (!memcmp(data->client.app_name, "tzs1attest", strlen("tzs1attest"))) {
+		pr_debug("Do not unload tzs1attest app from tz\n");
+		goto unload_exit;
+	}
+
+	__qseecom_cleanup_app(data);
+	__qseecom_reentrancy_check_if_no_app_blocked(TZ_OS_APP_SHUTDOWN_ID);
+
 	if (data->client.app_id > 0) {
 		spin_lock_irqsave(&qseecom.registered_app_list_lock, flags);
 		list_for_each_entry(ptr_app, &qseecom.registered_app_list_head,
@@ -2111,11 +2239,9 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 		}
 	}
 
-	if (found_dead_app) {
+	if (found_dead_app)
 		pr_warn("cleanup app_id %d(%s)\n", data->client.app_id,
 			(char *)data->client.app_name);
-		__qseecom_cleanup_app(data);
-	}
 
 	if (unload) {
 		struct qseecom_unload_app_ireq req;
@@ -2142,7 +2268,6 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 		if (resp.result == QSEOS_RESULT_SUCCESS)
 			pr_debug("App (%d) is unloaded!!\n",
 					data->client.app_id);
-		__qseecom_cleanup_app(data);
 		if (resp.result == QSEOS_RESULT_INCOMPLETE) {
 			ret = __qseecom_process_incomplete_cmd(data, &resp);
 			if (ret) {
@@ -2528,63 +2653,21 @@ int __qseecom_process_reentrancy(struct qseecom_command_scm_resp *resp,
 				struct qseecom_registered_app_list *ptr_app,
 				struct qseecom_dev_handle *data)
 {
-	struct qseecom_registered_listener_list *list_ptr;
 	int ret = 0;
-	struct qseecom_continue_blocked_request_ireq ireq;
-	struct qseecom_command_scm_resp continue_resp;
-	sigset_t new_sigset, old_sigset;
 
 	switch (resp->result) {
 	case QSEOS_RESULT_BLOCKED_ON_LISTENER:
-		pr_debug("App(%d) %s is blocked on listener %d\n",
+		pr_warn("App(%d) %s is blocked on listener %d\n",
 			data->client.app_id, data->client.app_name,
 			resp->data);
-		list_ptr = __qseecom_find_svc(resp->data);
-		if (!list_ptr) {
-			pr_err("Invalid listener ID\n");
-			return -ENODATA;
-		}
-		ptr_app->blocked_on_listener_id = resp->data;
-		list_ptr->listener_in_use = true;
-		/* sleep until listener is available */
-		while (list_ptr->listener_in_use == true) {
-			qseecom.app_block_ref_cnt++;
-			ptr_app->app_blocked = true;
-			sigfillset(&new_sigset);
-			sigprocmask(SIG_SETMASK, &new_sigset, &old_sigset);
-			mutex_unlock(&app_access_lock);
-			do {
-				if (!wait_event_freezable(
-					list_ptr->listener_block_app_wq,
-					!list_ptr->listener_in_use)) {
-					break;
-				}
-			} while (1);
-			mutex_lock(&app_access_lock);
-			sigprocmask(SIG_SETMASK, &old_sigset, NULL);
-			ptr_app->app_blocked = false;
-			qseecom.app_block_ref_cnt--;
-		}
-		/* notify the blocked app that listener is available */
-		pr_debug("Lsntr %d is available, unblock app(%d) %s in TZ\n",
-			resp->data, data->client.app_id,
-			data->client.app_name);
-		ireq.qsee_cmd_id = QSEOS_CONTINUE_BLOCKED_REQ_COMMAND;
-		ireq.app_id = data->client.app_id;
-		ret = qseecom_scm_call(SCM_SVC_TZSCHEDULER, 1,
-				&ireq, sizeof(ireq),
-				&continue_resp, sizeof(continue_resp));
+		ret = __qseecom_process_reentrancy_blocked_on_listener(
+					resp, ptr_app, data);
 		if (ret) {
-			pr_err("scm_call for continue blocked req for app(%d) %s failed, ret %d\n",
-				data->client.app_id,
-				data->client.app_name, ret);
+			pr_err("failed to process App(%d) %s is blocked on listener %d\n",
+			data->client.app_id, data->client.app_name, resp->data);
 			return ret;
 		}
-		/*
-		 * After TZ app is unblocked, then continue to next case
-		 * for incomplete request processing
-		 */
-		resp->result = QSEOS_RESULT_INCOMPLETE;
+
 	case QSEOS_RESULT_INCOMPLETE:
 		qseecom.app_block_ref_cnt++;
 		ptr_app->app_blocked = true;
@@ -5226,6 +5309,11 @@ static int qseecom_create_key(struct qseecom_dev_handle *data,
 			ret = __qseecom_set_clear_ce_key(data,
 					create_key_req.usage,
 					&set_key_ireq);
+			/* wait a little before calling scm again to let other
+			   processes run */
+			if (ret == QSEOS_RESULT_FAIL_PENDING_OPERATION)
+				msleep(50);
+
 		} while (ret == QSEOS_RESULT_FAIL_PENDING_OPERATION);
 
 		qseecom_disable_ice_setup(create_key_req.usage);
@@ -5397,6 +5485,11 @@ static int qseecom_update_key_user_info(struct qseecom_dev_handle *data,
 		ret = __qseecom_update_current_key_user_info(data,
 						update_key_req.usage,
 						&ireq);
+		/* wait a little before calling scm again to let other
+		   processes run */
+		if (ret == QSEOS_RESULT_FAIL_PENDING_OPERATION)
+			msleep(50);
+
 	} while (ret == QSEOS_RESULT_FAIL_PENDING_OPERATION);
 	if (ret) {
 		pr_err("Failed to update key info: %d\n", ret);

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 &soc {
 	tlmm: pinctrl@01010000 {
@@ -1049,8 +1054,8 @@
 			};
 		};
 
-		spi_12 {
-			spi_12_active: spi_12_active {
+		spi_11 {
+			spi_11_active: spi_11_active {
 				mux {
 					pins = "gpio85", "gpio86", "gpio87",
 								"gpio88";
@@ -1065,7 +1070,7 @@
 				};
 			};
 
-			spi_12_sleep: spi_12_sleep {
+			spi_11_sleep: spi_11_sleep {
 				mux {
 					pins = "gpio85", "gpio86", "gpio87",
 								"gpio88";
@@ -1130,7 +1135,8 @@
 				config {
 					pins = "gpio36";
 					drive-strength = <2>;
-					bias-disable;
+					/*bias-disable;*/
+					bias-pull-up;
 				};
 			};
 
@@ -1143,7 +1149,8 @@
 				config {
 					pins = "gpio37";
 					drive-strength = <2>;
-					bias-disable;
+					/*bias-disable;*/
+					bias-pull-up;
 				};
 			};
 		};
@@ -1319,7 +1326,7 @@
 				config {
 					pins = "gpio64";
 					drive-strength = <16>;
-					bias-pull-down;
+					bias-disable;
 					output-high;
 				};
 			};

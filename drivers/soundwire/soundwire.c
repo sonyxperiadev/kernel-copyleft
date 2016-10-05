@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -238,6 +238,75 @@ void swr_port_response(struct swr_master *mstr, u8 tid)
 	kfree(txn);
 }
 EXPORT_SYMBOL(swr_port_response);
+
+/**
+ * swr_remove_from_group - remove soundwire slave devices from group
+ * @dev: pointer to the soundwire slave device
+ * dev_num: device number of the soundwire slave device
+ *
+ * Returns error code for failure and 0 for success
+ */
+int swr_remove_from_group(struct swr_device *dev, u8 dev_num)
+{
+	struct swr_master *master;
+
+	if (!dev)
+		return -ENODEV;
+
+	master = dev->master;
+	if (!master)
+		return -EINVAL;
+
+	if (!dev->group_id)
+		return 0;
+
+	if (master->gr_sid == dev_num)
+		return 0;
+
+	if (master->remove_from_group && master->remove_from_group(master))
+		dev_dbg(&master->dev, "%s: falling back to GROUP_NONE\n",
+			__func__);
+
+	return 0;
+}
+EXPORT_SYMBOL(swr_remove_from_group);
+
+/**
+ * swr_slvdev_datapath_control - Enables/Disables soundwire slave device
+ *                               data path
+ * @dev: pointer to soundwire slave device
+ * @dev_num: device number of the soundwire slave device
+ *
+ * Returns error code for failure and 0 for success
+ */
+int swr_slvdev_datapath_control(struct swr_device *dev, u8 dev_num,
+				bool enable)
+{
+	struct swr_master *master;
+
+	if (!dev)
+		return -ENODEV;
+
+	master = dev->master;
+	if (!master)
+		return -EINVAL;
+
+	if (dev->group_id) {
+		/* Broadcast */
+		if (master->gr_sid != dev_num) {
+			if (!master->gr_sid)
+				master->gr_sid = dev_num;
+			else
+				return 0;
+		}
+	}
+
+	if (master->slvdev_datapath_control)
+		master->slvdev_datapath_control(master, enable);
+
+	return 0;
+}
+EXPORT_SYMBOL(swr_slvdev_datapath_control);
 
 /**
  * swr_connect_port - enable soundwire slave port(s)
@@ -618,11 +687,13 @@ EXPORT_SYMBOL(swr_reset_device);
  */
 int swr_set_device_group(struct swr_device *swr_dev, u8 id)
 {
-	struct swr_master *master = swr_dev->master;
+	struct swr_master *master;
 
 	if (!swr_dev)
 		return -EINVAL;
+
 	swr_dev->group_id = id;
+	master = swr_dev->master;
 	if (!id && master)
 		master->gr_sid = 0;
 

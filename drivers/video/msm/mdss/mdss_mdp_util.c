@@ -49,6 +49,10 @@ enum {
 	MDP_INTR_PING_PONG_1_RD_PTR,
 	MDP_INTR_PING_PONG_2_RD_PTR,
 	MDP_INTR_PING_PONG_3_RD_PTR,
+	MDP_INTR_PING_PONG_0_WR_PTR,
+	MDP_INTR_PING_PONG_1_WR_PTR,
+	MDP_INTR_PING_PONG_2_WR_PTR,
+	MDP_INTR_PING_PONG_3_WR_PTR,
 	MDP_INTR_WB_0,
 	MDP_INTR_WB_1,
 	MDP_INTR_WB_2,
@@ -82,6 +86,9 @@ static int mdss_mdp_intr2index(u32 intr_type, u32 intf_num)
 		break;
 	case MDSS_MDP_IRQ_PING_PONG_RD_PTR:
 		index = MDP_INTR_PING_PONG_0_RD_PTR + intf_num;
+		break;
+	case MDSS_MDP_IRQ_PING_PONG_WR_PTR:
+		index = MDP_INTR_PING_PONG_0_WR_PTR + intf_num;
 		break;
 	case MDSS_MDP_IRQ_WB_ROT_COMP:
 		index = MDP_INTR_WB_0 + intf_num;
@@ -212,6 +219,18 @@ irqreturn_t mdss_mdp_isr(int irq, void *ptr)
 	if (isr & MDSS_MDP_INTR_PING_PONG_3_RD_PTR)
 		mdss_mdp_intr_done(MDP_INTR_PING_PONG_3_RD_PTR);
 
+	if (isr & MDSS_MDP_INTR_PING_PONG_0_WR_PTR)
+		mdss_mdp_intr_done(MDP_INTR_PING_PONG_0_WR_PTR);
+
+	if (isr & MDSS_MDP_INTR_PING_PONG_1_WR_PTR)
+		mdss_mdp_intr_done(MDP_INTR_PING_PONG_1_WR_PTR);
+
+	if (isr & MDSS_MDP_INTR_PING_PONG_2_WR_PTR)
+		mdss_mdp_intr_done(MDP_INTR_PING_PONG_2_WR_PTR);
+
+	if (isr & MDSS_MDP_INTR_PING_PONG_3_WR_PTR)
+		mdss_mdp_intr_done(MDP_INTR_PING_PONG_3_WR_PTR);
+
 	if (isr & MDSS_MDP_INTR_INTF_0_VSYNC) {
 		mdss_mdp_intr_done(MDP_INTR_VSYNC_INTF_0);
 		mdss_misr_crc_collect(mdata, DISPLAY_MISR_EDP);
@@ -273,7 +292,10 @@ mdp_isr_done:
 	if (hist_isr == 0)
 		goto hist_isr_done;
 	mdss_mdp_hist_intr_done(hist_isr);
+
 hist_isr_done:
+	mdss_mdp_video_isr(mdata->video_intf, mdata->nintf);
+
 	return IRQ_HANDLED;
 }
 
@@ -682,13 +704,6 @@ int mdss_mdp_get_plane_sizes(struct mdss_mdp_format_params *fmt, u32 w, u32 h,
 			u32 chroma_samp;
 
 			chroma_samp = fmt->chroma_sample;
-
-			if (rotation) {
-				if (chroma_samp == MDSS_MDP_CHROMA_H2V1)
-					chroma_samp = MDSS_MDP_CHROMA_H1V2;
-				else if (chroma_samp == MDSS_MDP_CHROMA_H1V2)
-					chroma_samp = MDSS_MDP_CHROMA_H2V1;
-			}
 
 			mdss_mdp_get_v_h_subsample_rate(chroma_samp,
 				&v_subsample, &h_subsample);

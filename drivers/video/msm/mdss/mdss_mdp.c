@@ -493,6 +493,19 @@ static inline u32 mdss_mdp_irq_mask(u32 intr_type, u32 intf_num)
 	return 1 << (intr_type + intf_num);
 }
 
+void mdss_mdp_enable_hw_irq(struct mdss_data_type *mdata)
+{
+	mdata->mdss_util->enable_irq(&mdss_mdp_hw);
+}
+
+void mdss_mdp_disable_hw_irq(struct mdss_data_type *mdata)
+{
+	if ((mdata->mdp_irq_mask == 0) &&
+		(mdata->mdp_intf_irq_mask == 0) &&
+		(mdata->mdp_hist_irq_mask == 0))
+		mdata->mdss_util->disable_irq(&mdss_mdp_hw);
+}
+
 /* function assumes that mdp is clocked to access hw registers */
 void mdss_mdp_irq_clear(struct mdss_data_type *mdata,
 		u32 intr_type, u32 intf_num)
@@ -577,7 +590,8 @@ void mdss_mdp_irq_disable(u32 intr_type, u32 intf_num)
 		writel_relaxed(mdata->mdp_irq_mask, mdata->mdp_base +
 			MDSS_MDP_REG_INTR_EN);
 		if ((mdata->mdp_irq_mask == 0) &&
-			(mdata->mdp_hist_irq_mask == 0))
+			(mdata->mdp_hist_irq_mask == 0) &&
+			(mdata->mdp_intf_irq_mask == 0))
 			mdata->mdss_util->disable_irq(&mdss_mdp_hw);
 	}
 	spin_unlock_irqrestore(&mdp_lock, irq_flags);
@@ -618,7 +632,8 @@ void mdss_mdp_hist_irq_disable(u32 irq)
 		writel_relaxed(mdata->mdp_hist_irq_mask, mdata->mdp_base +
 			MDSS_MDP_REG_HIST_INTR_EN);
 		if ((mdata->mdp_irq_mask == 0) &&
-			(mdata->mdp_hist_irq_mask == 0))
+			(mdata->mdp_hist_irq_mask == 0) &&
+			(mdata->mdp_intf_irq_mask == 0))
 			mdata->mdss_util->disable_irq(&mdss_mdp_hw);
 	}
 }
@@ -648,7 +663,8 @@ void mdss_mdp_irq_disable_nosync(u32 intr_type, u32 intf_num)
 		writel_relaxed(mdata->mdp_irq_mask, mdata->mdp_base +
 			MDSS_MDP_REG_INTR_EN);
 		if ((mdata->mdp_irq_mask == 0) &&
-			(mdata->mdp_hist_irq_mask == 0))
+			(mdata->mdp_hist_irq_mask == 0) &&
+			(mdata->mdp_intf_irq_mask == 0))
 			mdata->mdss_util->disable_irq_nosync(&mdss_mdp_hw);
 	}
 }
@@ -1237,7 +1253,7 @@ static int mdss_mdp_debug_init(struct platform_device *pdev,
 
 	mdss_debug_register_io("mdp", &mdata->mdss_io, &dbg_blk);
 	mdss_debug_register_dump_range(pdev, dbg_blk, "qcom,regs-dump-mdp",
-		"qcom,regs-dump-names-mdp");
+		"qcom,regs-dump-names-mdp", "qcom,regs-dump-xin-id-mdp");
 
 	mdss_debug_register_io("vbif", &mdata->vbif_io, NULL);
 	mdss_debug_register_io("vbif_nrt", &mdata->vbif_nrt_io, NULL);
@@ -1426,10 +1442,6 @@ void mdss_hw_init(struct mdss_data_type *mdata)
 		writel_relaxed(1, offset + 16);
 	}
 
-	/* initialize csc matrix default value */
-	for (i = 0; i < mdata->nvig_pipes; i++)
-		vig[i].csc_coeff_set = MDSS_MDP_CSC_YUV2RGB_709L;
-
 	mdata->nmax_concurrent_ad_hw =
 		(mdata->mdp_rev < MDSS_MDP_HW_REV_103) ? 1 : 2;
 
@@ -1531,13 +1543,16 @@ static int mdss_mdp_get_pan_cfg(struct mdss_panel_cfg *pan_cfg)
 	char *t = NULL;
 	char pan_intf_str[MDSS_MAX_PANEL_LEN];
 	int rc, i, panel_len;
-	char pan_name[MDSS_MAX_PANEL_LEN];
+	char pan_name[MDSS_MAX_PANEL_LEN] = {'\0'};
 
 	if (!pan_cfg)
 		return -EINVAL;
 
 	if (mdss_mdp_panel[0] == '0') {
+		pr_debug("panel name is not set\n");
 		pan_cfg->lk_cfg = false;
+		pan_cfg->pan_intf = MDSS_PANEL_INTF_INVALID;
+		return -EINVAL;
 	} else if (mdss_mdp_panel[0] == '1') {
 		pan_cfg->lk_cfg = true;
 	} else {
@@ -1547,7 +1562,7 @@ static int mdss_mdp_get_pan_cfg(struct mdss_panel_cfg *pan_cfg)
 		return -EINVAL;
 	}
 
-	/* skip lk cfg and delimiter; ex: "0:" */
+	/* skip lk cfg and delimiter; ex: "1:" */
 	strlcpy(pan_name, &mdss_mdp_panel[2], MDSS_MAX_PANEL_LEN);
 	t = strnstr(pan_name, ":", MDSS_MAX_PANEL_LEN);
 	if (!t) {

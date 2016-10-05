@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #ifndef __MSM_VFE_H__
@@ -68,6 +73,16 @@ struct msm_vfe_axi_stream;
 struct msm_vfe_stats_stream;
 
 #define VFE_SD_HW_MAX VFE_SD_COMMON
+
+/* Irq operations to perform on the irq mask register */
+enum msm_isp_irq_operation {
+	/* enable the irq bits in given parameters */
+	MSM_ISP_IRQ_ENABLE = 1,
+	/* disable the irq bits in the given parameters */
+	MSM_ISP_IRQ_DISABLE = 2,
+	/* set the irq bits to the given parameters */
+	MSM_ISP_IRQ_SET = 3,
+};
 
 /* This struct is used to save/track SOF info for some INTF.
  * e.g. used in Master-Slave mode */
@@ -142,7 +157,6 @@ struct msm_vfe_irq_ops {
 	void (*process_stats_irq)(struct vfe_device *vfe_dev,
 		uint32_t irq_status0, uint32_t irq_status1,
 		struct msm_isp_timestamp *ts);
-	void (*enable_camif_err)(struct vfe_device *vfe_dev, int enable);
 };
 
 struct msm_vfe_axi_ops {
@@ -221,7 +235,6 @@ struct msm_vfe_core_ops {
 	void (*get_overflow_mask)(uint32_t *overflow_mask);
 	void (*get_irq_mask)(struct vfe_device *vfe_dev,
 		uint32_t *irq0_mask, uint32_t *irq1_mask);
-	void (*restore_irq_mask)(struct vfe_device *vfe_dev);
 	void (*get_halt_restart_mask)(uint32_t *irq0_mask,
 		uint32_t *irq1_mask);
 	void (*get_rdi_wm_mask)(struct vfe_device *vfe_dev,
@@ -362,8 +375,9 @@ struct msm_vfe_axi_stream {
 	enum msm_vfe_axi_stream_type stream_type;
 	uint32_t frame_based;
 	enum msm_vfe_frame_skip_pattern frame_skip_pattern;
-	uint32_t current_framedrop_period;
-	uint32_t prev_framedrop_period;
+	uint32_t current_framedrop_period; /* user requested period*/
+	uint32_t requested_framedrop_period; /* requested period*/
+	uint32_t activated_framedrop_period; /* active hw period */
 	uint32_t num_burst_capture;/*number of frame to capture*/
 	uint32_t init_frame_drop;
 	spinlock_t lock;
@@ -511,8 +525,6 @@ enum msm_vfe_overflow_state {
 
 struct msm_vfe_error_info {
 	atomic_t overflow_state;
-	uint32_t overflow_recover_irq_mask0;
-	uint32_t overflow_recover_irq_mask1;
 	uint32_t error_mask0;
 	uint32_t error_mask1;
 	uint32_t violation_status;
@@ -604,6 +616,7 @@ struct dual_vfe_resource {
 	struct msm_vfe_stats_shared_data *stats_data[MAX_VFE];
 	struct msm_vfe_axi_shared_data *axi_data[MAX_VFE];
 	uint32_t wm_reload_mask[MAX_VFE];
+	uint32_t epoch_sync_mask;
 };
 
 struct master_slave_resource_info {
@@ -691,7 +704,6 @@ struct vfe_device {
 	int vfe_clk_idx;
 	uint32_t vfe_open_cnt;
 	uint8_t vt_enable;
-	uint8_t ignore_error;
 	uint32_t vfe_ub_policy;
 	uint8_t reset_pending;
 	uint8_t reg_update_requested;
@@ -712,6 +724,13 @@ struct vfe_device {
 	uint32_t isp_raw1_debug;
 	uint32_t isp_raw2_debug;
 	uint8_t is_camif_raw_crop_supported;
+
+	/* irq info */
+	uint32_t irq0_mask;
+	uint32_t irq1_mask;
+#if defined(CONFIG_SONY_CAM_V4L2)
+	int timeout;
+#endif
 };
 
 struct vfe_parent_device {
