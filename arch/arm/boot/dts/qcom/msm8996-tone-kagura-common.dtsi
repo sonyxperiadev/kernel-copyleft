@@ -58,6 +58,8 @@
 	qcom,fg-chg-iterm-ma = <150>;
 	qcom,cold-hot-jeita-hysteresis = <20 20>;
 	somc,cool-warm-jeita-hysteresis = <20 20>;
+	somc,rated-capacity-enable;
+	somc,rated-capacity-uah = <2900000>;
 };
 
 &pmi8994_charger {

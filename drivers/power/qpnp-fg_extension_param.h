@@ -59,6 +59,8 @@ struct somc_aging_care_data {
 	u8			resume_soc_raw_not_full_normal;
 	u8			resume_soc_raw_not_full_aging;
 	bool			batt_aging;
+	bool			rated_capacity_enable;
+	int			rated_capacity_uah;
 };
 
 struct fg_somc_params {

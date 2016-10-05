@@ -140,12 +140,31 @@ static int somc_fg_aging_setting(struct fg_chip *chip, bool mode)
 	return rc;
 }
 
+#define INITIAL_SOH 100
 static bool somc_fg_aging_mode_check(struct fg_somc_params *params,
 				int64_t learned_cc_uah, int nom_cap_uah)
 {
-	int learned_soh = learned_cc_uah * EQUAL_MAGNIFICATION / nom_cap_uah;
+	int learned_soh;
 
-	if (learned_soh <= params->aging_data.vfloat_arrangement_threshold &&
+	if (params->aging_data.rated_capacity_enable &&
+		params->aging_data.rated_capacity_uah) {
+		learned_soh = learned_cc_uah * EQUAL_MAGNIFICATION /
+				params->aging_data.rated_capacity_uah;
+		pr_fg_ext(PR_INFO, "soh=%d (learned:%d rated_capacity:%d)\n",
+				learned_soh, (int)learned_cc_uah,
+				params->aging_data.rated_capacity_uah);
+	} else if (nom_cap_uah) {
+		learned_soh = learned_cc_uah * EQUAL_MAGNIFICATION /
+				nom_cap_uah;
+		pr_fg_ext(PR_INFO, "soh=%d (learned:%d nom_cap:%d)\n",
+				learned_soh, (int)learned_cc_uah, nom_cap_uah);
+	} else {
+		learned_soh = INITIAL_SOH;
+	}
+	if (learned_soh > INITIAL_SOH)
+		learned_soh = INITIAL_SOH;
+
+	if (learned_soh < params->aging_data.vfloat_arrangement_threshold &&
 	    params->aging_data.vfloat_arrangement)
 		return true;
 
@@ -611,6 +630,12 @@ static int somc_chg_fg_of_init(struct fg_chip *chip,
 						SOMC_RESUME_SOC_RAW_DEFAULT;
 	else
 		params->aging_data.resume_soc_raw_not_full_aging = (u8)data;
+
+	params->aging_data.rated_capacity_enable = of_property_read_bool(node,
+				"somc,rated-capacity-enable");
+	SOMC_OF_PROP_READ(chip->dev, node,
+		params->aging_data.rated_capacity_uah,
+		"rated-capacity-uah", rc, 1);
 
 	return 0;
 }
