@@ -1,6 +1,6 @@
 /* ehci-msm-uicc.c - UICC (Full-Speed) Host Controller Driver Implementation
  *
- * Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2008-2014, 2016, The Linux Foundation. All rights reserved.
  *
  * Partly derived from ehci-fsl.c and ehci-hcd.c
  * Copyright (c) 2000-2004 by David Brownell
@@ -248,7 +248,7 @@ out:
 
 static const struct ehci_driver_overrides ehci_msm_uicc_overrides = {
 	.extra_priv_size = sizeof(struct uicc_hcd),
-	.flags = HCD_MEMORY | HCD_USB11,
+	.flags = HCD_MEMORY | HCD_USB2,
 	.reset = ehci_msm_uicc_reset,
 	.bus_suspend = ehci_msm_uicc_bus_suspend,
 	.bus_resume = ehci_msm_uicc_bus_resume,
