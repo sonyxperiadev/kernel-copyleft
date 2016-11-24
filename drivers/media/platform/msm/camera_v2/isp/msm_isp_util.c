@@ -1302,6 +1302,9 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 		uint32_t temp;
 		bool grab_lock;
 		unsigned long flags;
+		if (resource_size(vfe_dev->vfe_mem) <
+			reg_cfg_cmd->u.mask_info.reg_offset)
+			return -EINVAL;
 		if ((UINT_MAX - sizeof(temp) <
 			reg_cfg_cmd->u.mask_info.reg_offset) ||
 			(resource_size(vfe_dev->vfe_mem) <

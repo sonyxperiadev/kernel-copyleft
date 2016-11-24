@@ -704,7 +704,7 @@ static int32_t msm_csid_cmd(struct csid_device *csid_dev, void __user *arg)
 	case CSID_CFG: {
 		struct msm_camera_csid_params csid_params;
 		struct msm_camera_csid_vc_cfg *vc_cfg = NULL;
-		int i = 0;
+		int8_t  i = 0;
 		if (copy_from_user(&csid_params,
 			(void *)cdata->cfg.csid_params,
 			sizeof(struct msm_camera_csid_params))) {
@@ -838,7 +838,7 @@ static int32_t msm_csid_cmd32(struct csid_device *csid_dev, void __user *arg)
 
 		struct msm_camera_csid_params csid_params;
 		struct msm_camera_csid_vc_cfg *vc_cfg = NULL;
-		int i = 0;
+		int8_t i = 0;
 		struct msm_camera_csid_lut_params32 lut_par32;
 		struct msm_camera_csid_params32 csid_params32;
 		struct msm_camera_csid_vc_cfg vc_cfg32;

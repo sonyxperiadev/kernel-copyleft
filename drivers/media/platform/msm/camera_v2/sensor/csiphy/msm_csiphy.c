@@ -985,7 +985,7 @@ static int msm_csiphy_release(struct csiphy_device *csiphy_dev, void *arg)
 		csiphy_dev->lane_mask[csiphy_dev->pdev->id] &=
 			~(csi_lane_mask);
 		i = 0;
-		while (csi_lane_mask) {
+		while (csi_lane_mask & 0x1F) {
 			if (csi_lane_mask & 0x1) {
 				msm_camera_io_w(0x0, csiphy_dev->base +
 					csiphy_dev->ctrl_reg->csiphy_reg.
@@ -1096,7 +1096,7 @@ static int msm_csiphy_release(struct csiphy_device *csiphy_dev, void *arg)
 		csiphy_dev->lane_mask[csiphy_dev->pdev->id] &=
 			~(csi_lane_mask);
 		i = 0;
-		while (csi_lane_mask) {
+		while (csi_lane_mask & 0x1F) {
 			if (csi_lane_mask & 0x1) {
 				msm_camera_io_w(0x0, csiphy_dev->base +
 					csiphy_dev->ctrl_reg->csiphy_reg.
