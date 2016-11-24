@@ -2,6 +2,11 @@
  * (C) 1997 Linus Torvalds
  * (C) 1999 Andrea Arcangeli <andrea@suse.de> (dynamic inode allocation)
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/export.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
@@ -57,6 +62,7 @@ static struct hlist_head *inode_hashtable __read_mostly;
 static __cacheline_aligned_in_smp DEFINE_SPINLOCK(inode_hash_lock);
 
 __cacheline_aligned_in_smp DEFINE_SPINLOCK(inode_sb_list_lock);
+EXPORT_SYMBOL(inode_sb_list_lock);
 
 /*
  * Empty aops. Can be used for the cases where the user does not
@@ -391,6 +397,7 @@ void __iget(struct inode *inode)
 {
 	atomic_inc(&inode->i_count);
 }
+EXPORT_SYMBOL(__iget);
 
 /*
  * get additional reference to inode; caller must already hold one.

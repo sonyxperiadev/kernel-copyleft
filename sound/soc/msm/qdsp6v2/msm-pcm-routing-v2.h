@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _MSM_PCM_ROUTING_H
 #define _MSM_PCM_ROUTING_H
 #include <sound/apr_audio-v2.h>
@@ -301,6 +306,13 @@ enum msm_pcm_routing_event {
 	MSM_PCM_RT_EVT_BUF_RECFG,
 	MSM_PCM_RT_EVT_DEVSWITCH,
 	MSM_PCM_RT_EVT_MAX,
+};
+
+enum {
+	SONY_CUSTOM_STEREO_NORMAL = 0,
+	SONY_CUSTOM_STEREO_MIX,
+	SONY_CUSTOM_STEREO_SWAP,
+	SONY_CUSTOM_STEREO_MAX,
 };
 
 #define INVALID_SESSION -1

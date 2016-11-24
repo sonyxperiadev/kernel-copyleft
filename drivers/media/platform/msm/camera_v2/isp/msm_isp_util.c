@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/mutex.h>
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
@@ -1234,7 +1239,8 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 	case VFE_READ_DMI_16BIT:
 	case VFE_READ_DMI_32BIT:
 	case VFE_READ_DMI_64BIT: {
-		if (reg_cfg_cmd->cmd_type == VFE_WRITE_DMI_64BIT) {
+		if (reg_cfg_cmd->cmd_type == VFE_WRITE_DMI_64BIT ||
+			reg_cfg_cmd->cmd_type == VFE_READ_DMI_64BIT) {
 			if ((reg_cfg_cmd->u.dmi_info.hi_tbl_offset <=
 				reg_cfg_cmd->u.dmi_info.lo_tbl_offset) ||
 				(reg_cfg_cmd->u.dmi_info.hi_tbl_offset -
@@ -1302,6 +1308,9 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 		uint32_t temp;
 		bool grab_lock;
 		unsigned long flags;
+		if (resource_size(vfe_dev->vfe_mem) <
+			reg_cfg_cmd->u.mask_info.reg_offset)
+			return -EINVAL;
 		if ((UINT_MAX - sizeof(temp) <
 			reg_cfg_cmd->u.mask_info.reg_offset) ||
 			(resource_size(vfe_dev->vfe_mem) <
@@ -2201,6 +2210,10 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	cam_smmu_reg_client_page_fault_handler(
 			vfe_dev->buf_mgr->iommu_hdl,
 			msm_vfe_iommu_fault_handler, vfe_dev);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	vfe_dev->timeout = VFE_MAX_CFG_TIMEOUT;
+#endif
+
 	mutex_unlock(&vfe_dev->core_mutex);
 	mutex_unlock(&vfe_dev->realtime_mutex);
 	return 0;

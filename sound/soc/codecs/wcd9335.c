@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/firmware.h>
@@ -184,7 +189,7 @@ module_param(sido_buck_svs_voltage, int,
 MODULE_PARM_DESC(sido_buck_svs_voltage,
 			"setting for SVS voltage for SIDO BUCK");
 
-#define TASHA_TX_UNMUTE_DELAY_MS	25
+#define TASHA_TX_UNMUTE_DELAY_MS	50
 
 static int tx_unmute_delay = TASHA_TX_UNMUTE_DELAY_MS;
 module_param(tx_unmute_delay, int,
@@ -1621,7 +1626,7 @@ static inline void tasha_mbhc_get_result_params(struct wcd9xxx *wcd9xxx,
 	if ((c1 < 2) && x1)
 		usleep_range(5000, 5050);
 
-	if (!c1 || !x1) {
+	if (!c1) {
 		dev_dbg(wcd9xxx->dev,
 			"%s: Impedance detect ramp error, c1=%d, x1=0x%x\n",
 			__func__, c1, x1);

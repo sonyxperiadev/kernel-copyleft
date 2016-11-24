@@ -435,6 +435,7 @@ void oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
 	struct task_struct *child;
 	struct task_struct *t;
 	struct mm_struct *mm;
+	unsigned long victim_rss;
 	unsigned int victim_points = 0;
 	static DEFINE_RATELIMIT_STATE(oom_rs, DEFAULT_RATELIMIT_INTERVAL,
 					      DEFAULT_RATELIMIT_BURST);
@@ -497,6 +498,7 @@ void oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
 
 	/* mm cannot safely be dereferenced after task_unlock(victim) */
 	mm = victim->mm;
+	victim_rss = get_mm_rss(victim->mm);
 	pr_err("Killed process %d (%s) total-vm:%lukB, anon-rss:%lukB, file-rss:%lukB\n",
 		task_pid_nr(victim), victim->comm, K(victim->mm->total_vm),
 		K(get_mm_counter(victim->mm, MM_ANONPAGES)),
@@ -529,6 +531,11 @@ void oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
 
 	set_tsk_thread_flag(victim, TIF_MEMDIE);
 	do_send_sig_info(SIGKILL, SEND_SIG_FORCED, victim, true);
+	trace_oom_sigkill(victim->pid,  victim->comm,
+			  victim_points,
+			  victim_rss,
+			  gfp_mask);
+
 	put_task_struct(victim);
 }
 #undef K

@@ -13,6 +13,11 @@
  *	it under the terms of the GNU General Public License as published by
  *	the Free Software Foundation, version 2.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/pagemap.h>
@@ -40,6 +45,9 @@
 #include "security.h"
 #include "objsec.h"
 #include "conditional.h"
+#ifdef CONFIG_SECURITY_SELINUX_TRAP
+#include "trap.h"
+#endif
 
 /* Policy capability filenames */
 static char *policycap_names[] = {
@@ -1459,6 +1467,476 @@ static const struct file_operations sel_avc_cache_stats_ops = {
 };
 #endif
 
+#ifdef CONFIG_SECURITY_SELINUX_TRAP
+static void sel_trap_clear_list_entry(struct selinux_trap_list *entry)
+{
+	enum trap_mask_type type;
+	for (type = TRAP_MASK_TYPE_BEGIN; type != TRAP_MASK_TYPE_MAX; type++)
+		kfree(entry->item_array[type]);
+	kfree(entry);
+}
+
+static void sel_trap_clear_list_entry_rcu(struct rcu_head *rcu)
+{
+	struct selinux_trap_list *entry =
+		container_of(rcu, struct selinux_trap_list, rcu);
+	sel_trap_clear_list_entry(entry);
+}
+
+static struct selinux_trap_list *sel_trap_init_list_entry(char *buf)
+{
+	struct selinux_trap_list *entry;
+	enum trap_mask_type type = TRAP_MASK_TYPE_BEGIN;
+	char *token;
+	int buflen = strlen(buf);
+	int valid_count = 0;
+
+	if (buflen <= 0)
+		return NULL;
+
+	if (buf[buflen-1] == '\n')
+		buf[buflen-1] = '\0';
+
+	entry = kzalloc(sizeof(struct selinux_trap_list), GFP_KERNEL);
+	if (!entry) {
+		printk(KERN_ERR "SELinux: trap: kmalloc() failed\n");
+		return NULL;
+	}
+
+	while ((token = strsep(&buf, ",")) != NULL) {
+		if (type == TRAP_MASK_TYPE_MAX) {
+			sel_trap_clear_list_entry(entry);
+			return NULL;
+		}
+		if (strlen(token) > 0) {
+			entry->item_array[type] =
+				kzalloc(strlen(token)+1, GFP_KERNEL);
+			if (!entry->item_array[type]) {
+				sel_trap_clear_list_entry(entry);
+				return NULL;
+			}
+			strlcpy(entry->item_array[type],
+				token, strlen(token)+1);
+			valid_count++;
+		}
+		type++;
+	}
+	if (valid_count == 0 || type != TRAP_MASK_TYPE_MAX) {
+		sel_trap_clear_list_entry(entry);
+		return NULL;
+	}
+	return entry;
+}
+
+static ssize_t sel_read_trap_enable(struct file *filp, char __user *buf,
+				size_t count, loff_t *ppos)
+{
+	char tmpbuf[2];
+	ssize_t length;
+
+	length = scnprintf(tmpbuf, sizeof(tmpbuf), "%d", selinux_trap_enable);
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
+}
+
+static ssize_t sel_write_trap_enable(struct file *file, const char __user *buf,
+				 size_t count, loff_t *ppos)
+
+{
+	char *page = NULL;
+	ssize_t length;
+	int new_value;
+
+	length = -ENOMEM;
+	if (count >= PAGE_SIZE)
+		goto out;
+
+	/* No partial writes. */
+	length = EINVAL;
+	if (*ppos != 0)
+		goto out;
+
+	length = -ENOMEM;
+	page = (char *)get_zeroed_page(GFP_KERNEL);
+	if (!page)
+		goto out;
+
+	length = -EFAULT;
+	if (copy_from_user(page, buf, count))
+		goto out;
+
+	length = -EINVAL;
+	if (sscanf(page, "%d", &new_value) != 1)
+		goto out;
+
+	if (new_value == 0 || new_value == 1)
+		selinux_trap_enable = new_value;
+
+	length = count;
+out:
+	free_page((unsigned long) page);
+	return length;
+}
+
+static const struct file_operations sel_trap_enable_ops = {
+	.read		= sel_read_trap_enable,
+	.write		= sel_write_trap_enable,
+	.llseek		= generic_file_llseek,
+};
+
+static int show_trap_exceptions(struct seq_file *m, void *v)
+{
+	struct selinux_trap_list *entry;
+	enum trap_mask_type type;
+
+	seq_printf(m,
+		"{-|+},scontext,tcontext,tclass,"
+		"pname,pname_parent,pname_pgl,"
+		"path,name,types\n");
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(entry, &selinux_trap_list_head.list, list) {
+		for (type = TRAP_MASK_TYPE_BEGIN;
+				type < TRAP_MASK_TYPE_MAX; type++) {
+			if (entry->item_array[type])
+				seq_printf(m, "%s", entry->item_array[type]);
+			if (type != TRAP_MASK_TYPE_MAX-1)
+				seq_printf(m, ",");
+		}
+		seq_printf(m, "\n");
+	}
+	rcu_read_unlock();
+	return 0;
+}
+
+static int sel_open_trap_exceptions(struct inode *inode, struct file *file)
+{
+	return single_open(file, show_trap_exceptions, NULL);
+}
+
+static const struct file_operations sel_trap_exceptions_ops = {
+	.open		= sel_open_trap_exceptions,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static ssize_t sel_write_trap_add_exception(struct file *file,
+	const char __user *buf, size_t count, loff_t *ppos)
+{
+	char *page = NULL;
+	ssize_t length;
+	struct selinux_trap_list *new_entry;
+
+	length = -ENOMEM;
+	if (count >= PAGE_SIZE)
+		goto out;
+
+	/* No partial writes. */
+	length = EINVAL;
+	if (*ppos != 0)
+		goto out;
+
+	/* string size error */
+	length = EINVAL ;
+	if (count < 2)
+		goto out ;
+
+	length = -ENOMEM;
+	page = (char *)get_zeroed_page(GFP_KERNEL);
+	if (!page)
+		goto out;
+
+	length = -EFAULT;
+	if (copy_from_user(page, buf, count))
+		goto out;
+
+	new_entry = sel_trap_init_list_entry(page);
+	if (!new_entry) {
+		printk(KERN_ERR "SELinux: trap: sel_trap_init_list_entry failed\n");
+		goto out;
+	}
+	down(&selinux_trap_list_sem);
+	list_add_rcu(&new_entry->list, &selinux_trap_list_head.list);
+	up(&selinux_trap_list_sem);
+
+	length = count;
+out:
+	free_page((unsigned long) page);
+	return length;
+}
+
+static const struct file_operations sel_trap_add_exception_ops = {
+	.write		= sel_write_trap_add_exception,
+	.llseek		= generic_file_llseek,
+};
+
+static ssize_t sel_write_trap_clear_exceptions(
+	struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+
+{
+	char *page = NULL;
+	ssize_t length;
+	int value;
+
+	length = -ENOMEM;
+	if (count >= PAGE_SIZE)
+		goto out;
+
+	/* No partial writes. */
+	length = EINVAL;
+	if (*ppos != 0)
+		goto out;
+
+	length = -ENOMEM;
+	page = (char *)get_zeroed_page(GFP_KERNEL);
+	if (!page)
+		goto out;
+
+	length = -EFAULT;
+	if (copy_from_user(page, buf, count))
+		goto out;
+
+	length = -EINVAL;
+	if (sscanf(page, "%d", &value) != 1)
+		goto out;
+
+	if (value == 1) {
+		struct selinux_trap_list *entry, *n;
+		down(&selinux_trap_list_sem);
+		list_for_each_entry_safe(entry,
+				n, &selinux_trap_list_head.list, list) {
+			list_del_rcu(&entry->list);
+			call_rcu(&entry->rcu, sel_trap_clear_list_entry_rcu);
+		}
+		up(&selinux_trap_list_sem);
+	}
+	length = count;
+out:
+	free_page((unsigned long) page);
+	return length;
+}
+
+static const struct file_operations sel_trap_clear_exceptions_ops = {
+	.write		= sel_write_trap_clear_exceptions,
+	.llseek		= generic_file_llseek,
+};
+
+static ssize_t sel_read_trap_debug(struct file *filp, char __user *buf,
+				size_t count, loff_t *ppos)
+{
+	char tmpbuf[2];
+	ssize_t length;
+
+	length = scnprintf(tmpbuf, sizeof(tmpbuf), "%d", selinux_trap_debug);
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
+}
+
+static ssize_t sel_write_trap_debug(struct file *file, const char __user *buf,
+				 size_t count, loff_t *ppos)
+
+{
+	char *page = NULL;
+	ssize_t length;
+	int new_value;
+
+	length = -ENOMEM;
+	if (count >= PAGE_SIZE)
+		goto out;
+
+	/* No partial writes. */
+	length = EINVAL;
+	if (*ppos != 0)
+		goto out;
+
+	length = -ENOMEM;
+	page = (char *)get_zeroed_page(GFP_KERNEL);
+	if (!page)
+		goto out;
+
+	length = -EFAULT;
+	if (copy_from_user(page, buf, count))
+		goto out;
+
+	length = -EINVAL;
+	if (sscanf(page, "%d", &new_value) != 1)
+		goto out;
+
+	if (new_value >= TRAP_LOGLEVEL_MINIMUM && new_value < TRAP_LOGLEVEL_MAX)
+		selinux_trap_debug = new_value;
+
+	length = count;
+out:
+	free_page((unsigned long) page);
+	return length;
+}
+
+static const struct file_operations sel_trap_debug_ops = {
+	.read		= sel_read_trap_debug,
+	.write		= sel_write_trap_debug,
+	.llseek		= generic_file_llseek,
+};
+
+static struct dentry *trapped_dentry;
+
+static int sel_make_trap_files(struct dentry *dir)
+{
+	int i;
+	static struct tree_descr files[] = {
+		{ "enable",
+		  &sel_trap_enable_ops, S_IRUGO|S_IWUSR },
+		{ "exceptions",
+		  &sel_trap_exceptions_ops, S_IRUGO },
+		{ "add_exception",
+		  &sel_trap_add_exception_ops, S_IWUSR },
+		{ "clear_exceptions",
+		  &sel_trap_clear_exceptions_ops, S_IWUSR },
+		{ "debug",
+		  &sel_trap_debug_ops, S_IRUGO|S_IWUSR },
+	};
+
+	for (i = 0; i < ARRAY_SIZE(files); i++) {
+		struct inode *inode;
+		struct dentry *dentry;
+
+		dentry = d_alloc_name(dir, files[i].name);
+		if (!dentry)
+			return -ENOMEM;
+
+		inode = sel_make_inode(dir->d_sb, S_IFREG|files[i].mode);
+		if (!inode)
+			return -ENOMEM;
+
+		inode->i_fop = files[i].ops;
+		inode->i_ino = ++sel_last_ino;
+		d_add(dentry, inode);
+	}
+
+	/* Create a new node named 'trapped' */
+	trapped_dentry = sel_make_dir(dir, "trapped", &sel_last_ino);
+	if (IS_ERR(trapped_dentry)) {
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static struct selinux_trap_process_list *sel_trap_process_list_entry(pid_t pid, char *msg, struct inode *inode, struct dentry *ldentry)
+{
+	struct selinux_trap_process_list *entry;
+
+	entry = kmalloc(sizeof(struct selinux_trap_process_list), GFP_KERNEL);
+	if (!entry) {
+		printk(KERN_ERR "SELinux: trap: node list kmalloc() failed\n");
+		kfree(msg);
+		return NULL;
+	}
+
+	entry->pid = pid;
+	entry->msg = msg;
+	entry->inode = inode;
+	entry->ldentry = ldentry;
+
+	down(&selinux_trap_list_sem);
+	list_add_tail(&entry->list, &selinux_trap_process_list_head.list);
+	up(&selinux_trap_list_sem);
+
+	return entry;
+}
+
+static int sel_trap_process_list_entry_clear(struct selinux_trap_process_list *entry)
+{
+	if (entry->msg)
+		kfree(entry->msg);
+	list_del(&entry->list);
+	kfree(entry);
+	return 0;
+}
+
+static int show_trap_trapped(struct seq_file *m, void *v)
+{
+	struct inode *inode = (struct inode *)m->private;
+	pid_t pid = inode->i_ino;
+
+	rcu_read_lock();
+	if (!list_empty(&selinux_trap_process_list_head.list)) {
+		struct selinux_trap_process_list *entry, *n;
+		down(&selinux_trap_list_sem);
+		list_for_each_entry_safe(entry, n, &selinux_trap_process_list_head.list, list) {
+			if (entry->pid == pid) {
+				seq_printf(m, "%s\n", entry->msg);
+				break;
+			}
+		}
+		up(&selinux_trap_list_sem);
+	}
+	rcu_read_unlock();
+	return 0;
+}
+
+static int sel_open_trap_trapped(struct inode *inode, struct file *file)
+{
+	return single_open(file, show_trap_trapped, inode);
+}
+
+static const struct file_operations sel_trap_trapped_ops = {
+	.open           = sel_open_trap_trapped,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static void trapped_process_list_refresh(pid_t pid_num)
+{
+	if (!list_empty(&selinux_trap_process_list_head.list)) {
+		struct selinux_trap_process_list *entry, *n;
+		down(&selinux_trap_list_sem);
+		list_for_each_entry_safe(entry, n, &selinux_trap_process_list_head.list, list) {
+			if (!find_task_by_vpid(entry->pid) || entry->pid == pid_num) {
+				/* process not exist or process id hit */
+				dget_dlock(entry->ldentry);
+				d_delete(entry->ldentry);
+				simple_unlink(entry->inode, entry->ldentry);
+				dput(entry->ldentry);
+				sel_trap_process_list_entry_clear(entry);
+			}
+		}
+		up(&selinux_trap_list_sem);
+	}
+}
+
+static int trapped_pid_entry(pid_t pid_num, char *msg)
+{
+	struct inode *inode;
+	struct dentry *ldentry;
+	char pid_name_buf[10]; /* PID name */
+
+	snprintf(pid_name_buf, sizeof(pid_name_buf), "%d", pid_num);
+
+	ldentry = d_alloc_name(trapped_dentry, pid_name_buf);
+	if (!ldentry)
+		return -ENOMEM;
+
+	inode = sel_make_inode(trapped_dentry->d_sb, S_IFREG|S_IRUGO);
+	if (!inode)
+		return -ENOMEM;
+
+	inode->i_fop = &sel_trap_trapped_ops;
+	inode->i_ino = pid_num;
+	d_add(ldentry, inode);
+
+	sel_trap_process_list_entry(pid_num, msg, inode, ldentry);
+
+	return 0 ;
+}
+
+void trapped_node_entry(pid_t pid_num, char *msg)
+{
+	trapped_process_list_refresh(pid_num);
+	trapped_pid_entry(pid_num, msg);
+}
+
+#endif /* CONFIG_SECURITY_SELINUX_TRAP */
+
 static int sel_make_avc_files(struct dentry *dir)
 {
 	int i;
@@ -1855,6 +2333,18 @@ static int sel_fill_super(struct super_block *sb, void *data, int silent)
 	ret = sel_make_avc_files(dentry);
 	if (ret)
 		goto err;
+
+#ifdef CONFIG_SECURITY_SELINUX_TRAP
+	dentry = sel_make_dir(sb->s_root, "trap", &sel_last_ino);
+	if (IS_ERR(dentry)) {
+		ret = PTR_ERR(dentry);
+		goto err;
+	}
+
+	ret = sel_make_trap_files(dentry);
+	if (ret)
+		goto err;
+#endif
 
 	dentry = sel_make_dir(sb->s_root, "initial_contexts", &sel_last_ino);
 	if (IS_ERR(dentry)) {

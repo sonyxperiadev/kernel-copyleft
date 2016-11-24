@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -3948,8 +3953,14 @@ static int mdss_mdp_pp_ioctl(struct msm_fb_data_type *mfd,
 		break;
 
 	case mdp_op_pcc_cfg:
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		ret = mdss_mdp_pcc_config(mfd, &mdp_pp.data.pcc_cfg_data,
+					&copyback, copy_from_kernel);
+#else
 		ret = mdss_mdp_pcc_config(mfd, &mdp_pp.data.pcc_cfg_data,
 					&copyback);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 		break;
 
 	case mdp_op_lut_cfg:
@@ -4290,16 +4301,20 @@ static int __mdss_overlay_src_split_sort(struct msm_fb_data_type *mfd,
 		__overlay_swap_func);
 
 	for (i = 0; i < num_ovs; i++) {
+		if (ovs[i].z_order >= MDSS_MDP_MAX_STAGE) {
+			pr_err("invalid stage:%u\n", ovs[i].z_order);
+			return -EINVAL;
+		}
 		if (ovs[i].dst_rect.x < left_lm_w) {
 			if (left_lm_zo_cnt[ovs[i].z_order] == 2) {
-				pr_err("more than 2 ov @ stage%d on left lm\n",
+				pr_err("more than 2 ov @ stage%u on left lm\n",
 					ovs[i].z_order);
 				return -EINVAL;
 			}
 			left_lm_zo_cnt[ovs[i].z_order]++;
 		} else {
 			if (right_lm_zo_cnt[ovs[i].z_order] == 2) {
-				pr_err("more than 2 ov @ stage%d on right lm\n",
+				pr_err("more than 2 ov @ stage%u on right lm\n",
 					ovs[i].z_order);
 				return -EINVAL;
 			}
@@ -4524,6 +4539,10 @@ static int mdss_mdp_overlay_ioctl_handler(struct msm_fb_data_type *mfd,
 	struct mdp_pp_feature_version pp_feature_version;
 	struct msmfb_overlay_data data;
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	if (mfd->spec_mfd.off_sts)
+		return 0;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	switch (cmd) {
 	case MSMFB_MDP_PP:
 		ret = mdss_mdp_pp_ioctl(mfd, argp);
