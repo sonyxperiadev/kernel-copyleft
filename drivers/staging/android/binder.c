@@ -14,6 +14,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -1927,8 +1932,10 @@ static int binder_thread_write(struct binder_proc *proc,
 				BUG_ON(!buffer->target_node->has_async_transaction);
 				if (list_empty(&buffer->target_node->async_todo))
 					buffer->target_node->has_async_transaction = 0;
-				else
-					list_move_tail(buffer->target_node->async_todo.next, &thread->todo);
+				else {
+					list_move_tail(buffer->target_node->async_todo.next, &proc->todo);
+					wake_up_interruptible(&proc->wait);
+				}
 			}
 			trace_binder_transaction_buffer_release(buffer);
 			binder_transaction_buffer_release(proc, buffer, NULL);

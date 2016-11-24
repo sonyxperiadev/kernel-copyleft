@@ -8,6 +8,11 @@
  * (C) 2007 SGI, Christoph Lameter
  * (C) 2011 Linux Foundation, Christoph Lameter
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/mm.h>
 #include <linux/swap.h> /* struct reclaim_state */

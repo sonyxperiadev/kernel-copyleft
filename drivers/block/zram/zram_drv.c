@@ -52,15 +52,14 @@ static const char *default_compressor = "lzo";
 static unsigned int num_devices = 1;
 
 #define ZRAM_ATTR_RO(name)						\
-static ssize_t zram_attr_##name##_show(struct device *d,		\
+static ssize_t name##_show(struct device *d,		\
 				struct device_attribute *attr, char *b)	\
 {									\
 	struct zram *zram = dev_to_zram(d);				\
 	return scnprintf(b, PAGE_SIZE, "%llu\n",			\
 		(u64)atomic64_read(&zram->stats.name));			\
 }									\
-static struct device_attribute dev_attr_##name =			\
-	__ATTR(name, S_IRUGO, zram_attr_##name##_show, NULL);
+static DEVICE_ATTR_RO(name);
 
 static inline int init_done(struct zram *zram)
 {
@@ -338,19 +337,18 @@ static inline int is_partial_io(struct bio_vec *bvec)
 /*
  * Check if request is within bounds and aligned on zram logical blocks.
  */
-static inline int valid_io_request(struct zram *zram, struct bio *bio)
+static inline int valid_io_request(struct zram *zram,
+		sector_t start, unsigned int size)
 {
-	u64 start, end, bound;
+	u64 end, bound;
 
 	/* unaligned request */
-	if (unlikely(bio->bi_iter.bi_sector &
-		     (ZRAM_SECTOR_PER_LOGICAL_BLOCK - 1)))
+	if (unlikely(start & (ZRAM_SECTOR_PER_LOGICAL_BLOCK - 1)))
 		return 0;
-	if (unlikely(bio->bi_iter.bi_size & (ZRAM_LOGICAL_BLOCK_SIZE - 1)))
+	if (unlikely(size & (ZRAM_LOGICAL_BLOCK_SIZE - 1)))
 		return 0;
 
-	start = bio->bi_iter.bi_sector;
-	end = start + (bio->bi_iter.bi_size >> SECTOR_SHIFT);
+	end = start + (size >> SECTOR_SHIFT);
 	bound = zram->disksize >> SECTOR_SHIFT;
 	/* out of range range */
 	if (unlikely(start >= bound || end > bound || start > end))
@@ -504,7 +502,7 @@ static int zram_decompress_page(struct zram *zram, char *mem, u32 index)
 }
 
 static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
-			  u32 index, int offset, struct bio *bio)
+			  u32 index, int offset)
 {
 	int ret;
 	struct page *page;
@@ -700,14 +698,13 @@ out:
 }
 
 static int zram_bvec_rw(struct zram *zram, struct bio_vec *bvec, u32 index,
-			int offset, struct bio *bio)
+			int offset, int rw)
 {
 	int ret;
-	int rw = bio_data_dir(bio);
 
 	if (rw == READ) {
 		atomic64_inc(&zram->stats.num_reads);
-		ret = zram_bvec_read(zram, bvec, index, offset, bio);
+		ret = zram_bvec_read(zram, bvec, index, offset);
 	} else {
 		atomic64_inc(&zram->stats.num_writes);
 		ret = zram_bvec_write(zram, bvec, index, offset);
@@ -908,7 +905,7 @@ out:
 
 static void __zram_make_request(struct zram *zram, struct bio *bio)
 {
-	int offset;
+	int offset, rw;
 	u32 index;
 	struct bio_vec bvec;
 	struct bvec_iter iter;
@@ -923,6 +920,7 @@ static void __zram_make_request(struct zram *zram, struct bio *bio)
 		return;
 	}
 
+	rw = bio_data_dir(bio);
 	bio_for_each_segment(bvec, bio, iter) {
 		int max_transfer_size = PAGE_SIZE - offset;
 
@@ -937,15 +935,15 @@ static void __zram_make_request(struct zram *zram, struct bio *bio)
 			bv.bv_len = max_transfer_size;
 			bv.bv_offset = bvec.bv_offset;
 
-			if (zram_bvec_rw(zram, &bv, index, offset, bio) < 0)
+			if (zram_bvec_rw(zram, &bv, index, offset, rw) < 0)
 				goto out;
 
 			bv.bv_len = bvec.bv_len - max_transfer_size;
 			bv.bv_offset += max_transfer_size;
-			if (zram_bvec_rw(zram, &bv, index + 1, 0, bio) < 0)
+			if (zram_bvec_rw(zram, &bv, index + 1, 0, rw) < 0)
 				goto out;
 		} else
-			if (zram_bvec_rw(zram, &bvec, index, offset, bio) < 0)
+			if (zram_bvec_rw(zram, &bvec, index, offset, rw) < 0)
 				goto out;
 
 		update_position(&index, &offset, &bvec);
@@ -970,7 +968,8 @@ static void zram_make_request(struct request_queue *queue, struct bio *bio)
 	if (unlikely(!init_done(zram)))
 		goto error;
 
-	if (!valid_io_request(zram, bio)) {
+	if (!valid_io_request(zram, bio->bi_iter.bi_sector,
+					bio->bi_iter.bi_size)) {
 		atomic64_inc(&zram->stats.invalid_io);
 		goto error;
 	}
@@ -1005,20 +1004,15 @@ static const struct block_device_operations zram_devops = {
 	.owner = THIS_MODULE
 };
 
-static DEVICE_ATTR(disksize, S_IRUGO | S_IWUSR,
-		disksize_show, disksize_store);
-static DEVICE_ATTR(initstate, S_IRUGO, initstate_show, NULL);
-static DEVICE_ATTR(reset, S_IWUSR, NULL, reset_store);
-static DEVICE_ATTR(orig_data_size, S_IRUGO, orig_data_size_show, NULL);
-static DEVICE_ATTR(mem_used_total, S_IRUGO, mem_used_total_show, NULL);
-static DEVICE_ATTR(mem_limit, S_IRUGO | S_IWUSR, mem_limit_show,
-		mem_limit_store);
-static DEVICE_ATTR(mem_used_max, S_IRUGO | S_IWUSR, mem_used_max_show,
-		mem_used_max_store);
-static DEVICE_ATTR(max_comp_streams, S_IRUGO | S_IWUSR,
-		max_comp_streams_show, max_comp_streams_store);
-static DEVICE_ATTR(comp_algorithm, S_IRUGO | S_IWUSR,
-		comp_algorithm_show, comp_algorithm_store);
+static DEVICE_ATTR_RW(disksize);
+static DEVICE_ATTR_RO(initstate);
+static DEVICE_ATTR_WO(reset);
+static DEVICE_ATTR_RO(orig_data_size);
+static DEVICE_ATTR_RO(mem_used_total);
+static DEVICE_ATTR_RW(mem_limit);
+static DEVICE_ATTR_RW(mem_used_max);
+static DEVICE_ATTR_RW(max_comp_streams);
+static DEVICE_ATTR_RW(comp_algorithm);
 
 ZRAM_ATTR_RO(num_reads);
 ZRAM_ATTR_RO(num_writes);
