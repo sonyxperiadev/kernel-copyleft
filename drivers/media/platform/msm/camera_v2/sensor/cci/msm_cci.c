@@ -900,7 +900,7 @@ static int32_t msm_cci_i2c_read(struct v4l2_subdev *sd,
 		msm_cci_flush_queue(cci_dev, master);
 		goto ERROR;
 	} else {
-		rc = 0;
+		rc = cci_dev->cci_master_info[master].status;
 	}
 
 	read_words = msm_camera_io_r_mb(cci_dev->base +
