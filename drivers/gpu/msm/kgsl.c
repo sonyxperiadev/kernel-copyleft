@@ -388,6 +388,17 @@ kgsl_mem_entry_untrack_gpuaddr(struct kgsl_process_private *process,
 		kgsl_mmu_put_gpuaddr(pagetable, &entry->memdesc);
 }
 
+/* Commit the entry to the process so it can be accessed by other operations */
+static void kgsl_mem_entry_commit_process(struct kgsl_mem_entry *entry)
+{
+	if (!entry)
+		return;
+
+	spin_lock(&entry->priv->mem_lock);
+	idr_replace(&entry->priv->mem_idr, entry, entry->id);
+	spin_unlock(&entry->priv->mem_lock);
+}
+
 /**
  * kgsl_mem_entry_attach_process - Attach a mem_entry to its owner process
  * @entry: the memory entry
@@ -413,7 +424,8 @@ kgsl_mem_entry_attach_process(struct kgsl_mem_entry *entry,
 		return -EBADF;
 	idr_preload(GFP_KERNEL);
 	spin_lock(&process->mem_lock);
-	id = idr_alloc(&process->mem_idr, entry, 1, 0, GFP_NOWAIT);
+	/* Allocate the ID but don't attach the pointer just yet */
+	id = idr_alloc(&process->mem_idr, NULL, 1, 0, GFP_NOWAIT);
 	spin_unlock(&process->mem_lock);
 	idr_preload_end();
 
@@ -1962,6 +1974,20 @@ static inline int _check_region(unsigned long start, unsigned long size,
 	return (end > len);
 }
 
+static int check_vma_flags(struct vm_area_struct *vma,
+		unsigned int flags)
+{
+	unsigned long flags_requested = (VM_READ | VM_WRITE);
+
+	if (flags & KGSL_MEMFLAGS_GPUREADONLY)
+		flags_requested &= ~VM_WRITE;
+
+	if ((vma->vm_flags & flags_requested) == flags_requested)
+		return 0;
+
+	return -EFAULT;
+}
+
 static int check_vma(struct vm_area_struct *vma, struct file *vmfile,
 		struct kgsl_memdesc *memdesc)
 {
@@ -1975,7 +2001,7 @@ static int check_vma(struct vm_area_struct *vma, struct file *vmfile,
 	if (vma->vm_start != memdesc->useraddr ||
 		(memdesc->useraddr + memdesc->size) != vma->vm_end)
 		return -EINVAL;
-	return 0;
+	return check_vma_flags(vma, memdesc->flags);
 }
 
 static int memdesc_sg_virt(struct kgsl_memdesc *memdesc, struct file *vmfile)
@@ -1984,7 +2010,7 @@ static int memdesc_sg_virt(struct kgsl_memdesc *memdesc, struct file *vmfile)
 	long npages = 0, i;
 	size_t sglen = (size_t) (memdesc->size / PAGE_SIZE);
 	struct page **pages = NULL;
-	int write = (memdesc->flags & KGSL_MEMFLAGS_GPUREADONLY) != 0;
+	int write = ((memdesc->flags & KGSL_MEMFLAGS_GPUREADONLY) ? 0 : 1);
 
 	if (sglen == 0 || sglen >= LONG_MAX)
 		return -EINVAL;
@@ -2102,6 +2128,12 @@ static int kgsl_setup_dmabuf_useraddr(struct kgsl_device *device,
 
 	if (vma && vma->vm_file) {
 		int fd;
+
+		ret = check_vma_flags(vma, entry->memdesc.flags);
+		if (ret) {
+			up_read(&current->mm->mmap_sem);
+			return ret;
+		}
 
 		/*
 		 * Check to see that this isn't our own memory that we have
@@ -2305,6 +2337,7 @@ long kgsl_ioctl_gpuobj_import(struct kgsl_device_private *dev_priv,
 
 	trace_kgsl_mem_map(entry, fd);
 
+	kgsl_mem_entry_commit_process(entry);
 	return 0;
 
 unmap:
@@ -2576,6 +2609,7 @@ long kgsl_ioctl_map_user_mem(struct kgsl_device_private *dev_priv,
 
 	trace_kgsl_mem_map(entry, param->fd);
 
+	kgsl_mem_entry_commit_process(entry);
 	return result;
 
 error_attach:
@@ -2982,6 +3016,7 @@ static struct kgsl_mem_entry *gpumem_alloc_entry(
 			entry->memdesc.size);
 	trace_kgsl_mem_alloc(entry);
 
+	kgsl_mem_entry_commit_process(entry);
 	return entry;
 err:
 	kfree(entry);
