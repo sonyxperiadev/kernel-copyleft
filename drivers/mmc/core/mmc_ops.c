@@ -8,6 +8,11 @@
  * the Free Software Foundation; either version 2 of the License, or (at
  * your option) any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/export.h>
@@ -586,6 +591,14 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 				false);
 }
 EXPORT_SYMBOL_GPL(mmc_switch);
+
+int mmc_switch_ignore_timeout(struct mmc_card *card, u8 set, u8 index, u8 value,
+		unsigned int timeout_ms)
+{
+	return __mmc_switch(card, set, index, value, timeout_ms, true, true,
+				true);
+}
+EXPORT_SYMBOL(mmc_switch_ignore_timeout);
 
 static int
 mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
