@@ -1,0 +1,23 @@
+RAM Oops/Panic logger
+
+Ramoops is an oops/panic logger that writes its logs to RAM before the system
+crashes. It works by logging oopses and panics in a circular buffer.
+Ramoops uses a reserved memory area to store the dump. The start and size
+of the memory area are set using two variables:
+
+"mem_address" for the start.
+"mem_size" for the size.
+
+Ramoops must reserve memory using the msm specific memory reservation
+bindings (see Documentation/devicetree/bindings/arm/msm/memory-reserve.txt).
+
+Required properties
+
+-compatible: "pstore-ramoops"
+-linux,contiguous-region: phandle reference to a pstore reserve memory
+
+Example:
+	ramoops {
+		compatible = "pstore-ramoops";
+		linux,contiguous-region = <&pstore_reserve_mem>
+	};

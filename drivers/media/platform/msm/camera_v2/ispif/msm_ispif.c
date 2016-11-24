@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -1480,9 +1485,20 @@ static long msm_ispif_subdev_ioctl(struct v4l2_subdev *sd,
 {
 	struct ispif_device *ispif =
 		(struct ispif_device *)v4l2_get_subdevdata(sd);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	struct ispif_cfg_data *pcdata = (struct ispif_cfg_data *)arg;
+#endif
 
 	switch (cmd) {
 	case VIDIOC_MSM_ISPIF_CFG:
+#if defined(CONFIG_SONY_CAM_V4L2)
+		if (pcdata->cfg_type == ISPIF_RELEASE) {
+			ispif->ispif_sof_debug = 0;
+			ispif->ispif_rdi0_debug = 0;
+			ispif->ispif_rdi1_debug = 0;
+			ispif->ispif_rdi2_debug = 0;
+		}
+#endif
 		return msm_ispif_cmd(sd, arg);
 	case MSM_SD_NOTIFY_FREEZE: {
 		ispif->ispif_sof_debug = 0;

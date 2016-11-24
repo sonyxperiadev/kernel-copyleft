@@ -59,6 +59,14 @@ config MMC_BLOCK_DEFERRED_RESUME
 	  is requested. This will reduce overall resume latency and
 	  save power when theres an SD card inserted but not being used.
 
+config MMC_SD_DEFERRED_RESUME
+	bool "Deferr MMC SD resume until runtime resume is requested"
+	default n
+	help
+	  Say Y here to enable deferred MMC SD resume until runtime resume
+	  requested. This will reduce overall resume latency and
+	  save power when theres an SD card inserted but not being used.
+
 config SDIO_UART
 	tristate "SDIO UART/GPS class support"
 	depends on TTY
@@ -88,3 +96,10 @@ config MMC_BLOCK_TEST
 	  Currently used to test eMMC 4.5 features (packed commands, sanitize,
 	  BKOPs).
 
+config MMC_FFU
+	bool "FFU SUPPORT"
+	depends on MMC != n
+	help
+		This is an option to run firmware update on eMMC 5.0.
+		Field firmware updates (FFU) enables features enhancment
+		in the field.
