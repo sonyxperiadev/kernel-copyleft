@@ -1205,10 +1205,6 @@ EXPORT_SYMBOL(mmc_start_req);
  */
 void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 {
-#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
-	if (mmc_bus_needs_resume(host))
-		mmc_resume_bus(host);
-#endif
 	__mmc_start_req(host, mrq);
 	mmc_wait_for_req_done(host, mrq);
 }
@@ -2369,8 +2365,12 @@ int mmc_resume_bus(struct mmc_host *host)
 	unsigned long flags;
 	int err = 0;
 
-	if (!mmc_bus_needs_resume(host))
+	mmc_claim_host(host);
+
+	if (!mmc_bus_needs_resume(host)) {
+		mmc_release_host(host);
 		return -EINVAL;
+	}
 
 	spin_lock_irqsave(&host->lock, flags);
 	host->bus_resume_flags &= ~MMC_BUSRESUME_NEEDS_RESUME;
@@ -2394,6 +2394,8 @@ int mmc_resume_bus(struct mmc_host *host)
 	}
 
 	mmc_bus_put(host);
+	mmc_release_host(host);
+
 	return 0;
 }
 
@@ -4346,6 +4348,11 @@ void mmc_rpm_hold(struct mmc_host *host, struct device *dev)
 		if (pm_runtime_suspended(dev))
 			BUG_ON(1);
 	}
+
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	if (mmc_bus_needs_resume(host))
+		mmc_resume_bus(host);
+#endif
 }
 
 EXPORT_SYMBOL(mmc_rpm_hold);
