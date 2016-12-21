@@ -884,9 +884,31 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 		gconf->gpio_num_info->valid[SENSOR_GPIO_RESET] = 1;
 		CDBG("%s qcom,gpio-reset %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_RESET]);
-	} else {
+	} else
 		rc = 0;
-	}
+    
+    /* MM-MC-BringUpImx214CameraSensor-00+{ */
+    rc = of_property_read_u32(of_node, "qcom,gpio-f-reset", &val);
+    if (rc != -EINVAL) {
+        if (rc < 0) {
+            pr_err("%s:%d read qcom,gpio-f-reset failed rc %d\n",
+                __func__, __LINE__, rc);
+            goto ERROR;
+        } else if (val >= gpio_array_size) {
+            pr_err("%s:%d qcom,gpio-f-reset invalid %d\n",
+                __func__, __LINE__, val);
+            rc = -EINVAL;
+            goto ERROR;
+        }
+        gconf->gpio_num_info->gpio_num[SENSOR_GPIO_F_RESET] =
+            gpio_array[val];
+        gconf->gpio_num_info->valid[SENSOR_GPIO_F_RESET] = 1;
+        CDBG("%s qcom,gpio-f-reset %d\n", __func__,
+            gconf->gpio_num_info->gpio_num[SENSOR_GPIO_F_RESET]);
+    } else {
+        rc = 0;
+    }
+    /* MM-MC-BringUpImx214CameraSensor-00+} */
 
 	rc = of_property_read_u32(of_node, "qcom,gpio-standby", &val);
 	if (rc != -EINVAL) {
@@ -905,9 +927,31 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 		gconf->gpio_num_info->valid[SENSOR_GPIO_STANDBY] = 1;
 		CDBG("%s qcom,gpio-standby %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY]);
-	} else {
+	} else
 		rc = 0;
-	}
+
+    /* MM-MC-BringUpImx214CameraSensor-00+{ */
+    rc = of_property_read_u32(of_node, "qcom,gpio-f-standby", &val);
+    if (rc != -EINVAL) {
+        if (rc < 0) {
+            pr_err("%s:%d read qcom,gpio-f-standby failed rc %d\n",
+                __func__, __LINE__, rc);
+            goto ERROR;
+        } else if (val >= gpio_array_size) {
+            pr_err("%s:%d qcom,gpio-f-standby invalid %d\n",
+                __func__, __LINE__, val);
+            rc = -EINVAL;
+            goto ERROR;
+        }
+        gconf->gpio_num_info->gpio_num[SENSOR_GPIO_F_PWDN] =
+            gpio_array[val];
+        gconf->gpio_num_info->valid[SENSOR_GPIO_F_PWDN] = 1;
+        CDBG("%s qcom,gpio-f-standby %d\n", __func__,
+            gconf->gpio_num_info->gpio_num[SENSOR_GPIO_F_PWDN]);
+    } else {
+        rc = 0;
+    }
+    /* MM-MC-BringUpImx214CameraSensor-00+} */
 
 	rc = of_property_read_u32(of_node, "qcom,gpio-af-pwdm", &val);
 	if (rc != -EINVAL) {

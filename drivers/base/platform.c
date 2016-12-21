@@ -26,6 +26,12 @@
 #include "base.h"
 #include "power/power.h"
 
+//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00+[
+#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+#include <linux/kallsyms.h>
+#endif
+//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00+]
+
 /* For automatically allocated device IDs */
 static DEFINE_IDA(platform_devid_ida);
 
@@ -749,8 +755,14 @@ static int platform_legacy_suspend(struct device *dev, pm_message_t mesg)
 	struct platform_device *pdev = to_platform_device(dev);
 	int ret = 0;
 
-	if (dev->driver && pdrv->suspend)
+	if (dev->driver && pdrv->suspend) {
 		ret = pdrv->suspend(pdev, mesg);
+//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00*[
+        #ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+		print_symbol("[PM]platform_legacy_suspend: %s\n", (unsigned long)pdrv->suspend);
+        #endif
+//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00*]
+	}
 
 	return ret;
 }
@@ -761,9 +773,14 @@ static int platform_legacy_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	int ret = 0;
 
-	if (dev->driver && pdrv->resume)
+	if (dev->driver && pdrv->resume) {
 		ret = pdrv->resume(pdev);
-
+//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00*[
+        #ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+		print_symbol("[PM]platform_legacy_resume: %s\n", (unsigned long)pdrv->resume);
+        #endif
+//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00*]
+	}
 	return ret;
 }
 

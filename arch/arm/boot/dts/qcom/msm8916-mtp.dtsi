@@ -12,7 +12,8 @@
 
 #include "msm8916.dtsi"
 #include "msm8916-pinctrl.dtsi"
-#include "msm8916-camera-sensor-mtp.dtsi"
+/* #include "msm8916-camera-sensor-mtp.dtsi" *//* MM-MC-BringUpImx214CameraSensor-00- */
+#include "msm8916-camera-sensor-mtp-fih.dtsi"/* MM-MC-BringUpImx214CameraSensor-00+ */
 
 / {
 	aliases {
@@ -22,30 +23,212 @@
 
 &soc {
 	i2c@78b9000 { /* BLSP1 QUP5 */
-		synaptics@20 {
-			compatible = "synaptics,rmi4";
-			reg = <0x20>;
-			interrupt-parent = <&msm_gpio>;
-			interrupts = <13 0x2008>;
-			vdd-supply = <&pm8916_l17>;
-			vcc_i2c-supply = <&pm8916_l6>;
-			/* pins used by touchscreen */
-			pinctrl-names = "pmx_ts_active","pmx_ts_suspend","pmx_ts_suspend";
-			pinctrl-0 = <&ts_int_active &ts_reset_active>;
-			pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
-			pinctrl-2 = <&ts_release>;
-			synaptics,display-coords = <0 0 1079 1919>;
-			synaptics,panel-coords = <0 0 1079 2084>;
-			synaptics,irq-gpio = <&msm_gpio 13 0x2008>;
-			synaptics,reset-gpio = <&msm_gpio 12 0x0>;
-			synaptics,i2c-pull-up;
-			synaptics,power-down;
-			synaptics,disable-gpios;
-			/* Underlying clocks used by secure touch */
-			clocks = <&clock_gcc clk_gcc_blsp1_ahb_clk>,
-			 <&clock_gcc clk_gcc_blsp1_qup5_i2c_apps_clk>;
-			clock-names = "iface_clk", "core_clk";
-		};
+//		synaptics@20 {
+//			compatible = "synaptics,rmi4";
+//			reg = <0x20>;
+//			interrupt-parent = <&msm_gpio>;
+//			interrupts = <13 0x2008>;
+//			vdd-supply = <&pm8916_l17>;
+//			vcc_i2c-supply = <&pm8916_l6>;
+//			/* pins used by touchscreen */
+//			pinctrl-names = "pmx_ts_active","pmx_ts_suspend","pmx_ts_suspend";
+//			pinctrl-0 = <&ts_int_active &ts_reset_active>;
+//			pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
+//			pinctrl-2 = <&ts_release>;
+//			synaptics,display-coords = <0 0 1079 1919>;
+//			synaptics,panel-coords = <0 0 1079 2084>;
+//			synaptics,irq-gpio = <&msm_gpio 13 0x2008>;
+//			synaptics,reset-gpio = <&msm_gpio 12 0x0>;
+//			synaptics,i2c-pull-up;
+//			synaptics,power-down;
+//			synaptics,disable-gpios;
+//			/* Underlying clocks used by secure touch */
+//			clocks = <&clock_gcc clk_gcc_blsp1_ahb_clk>,
+//			 <&clock_gcc clk_gcc_blsp1_qup5_i2c_apps_clk>;
+//			clock-names = "iface_clk", "core_clk";
+//		};
+		/*PROD-DH-Touch-BringUp*/
+		tsc@24 {
+                        compatible = "cy,cyttsp4_i2c_adapter";
+                        reg = <0x24>;
+                        /* GPIO 38, high-to-low edge triggered */
+                        interrupts = <13 0x2008>;
+                        interrupt-parent = <&msm_gpio>;
+                        cy,adapter_id = "cyttsp4_i2c_adapter";
+                        pinctrl-names = "pmx_ts_active","pmx_ts_suspend";
+                        pinctrl-0 = <&ts_int_active &ts_reset_active>;
+                        pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
+                        vdda-supply = <&pm8916_l17>;
+                        vddio_EVM-supply = <&pm8916_l6>;
+                        vddio_PD1-supply = <&pm8916_l16>;
+                        vddio_DEFAULT-supply = <&pm8916_l6>;
+                        qcom,module_adc-vadc = <&pm8916_vadc>;
+
+
+                        cy,core {
+                                cy,name = "cyttsp4_core";
+                                cy,id = "main_ttsp_core";
+
+                                gpios = <&msm_gpio 12 0>, <&msm_gpio 13 0>, <&msm_gpio 52 0>, <&msm_gpio 60 0>;
+
+                                cy,irq_gpio = <13>;
+                                cy,rst_gpio = <12>;
+
+                                /* Enable cy,max_xfer_len to limit max I2C/SPI transfer length */
+                                /* cy,max_xfer_len = <0x100>; */
+
+                                /* CY_CORE_FLAG_WAKE_ON_GESTURE */
+                                cy,flags = <1>;
+                                /* CY_CORE_EWG_TAP_TAP | CY_CORE_EWG_TWO_FINGER_SLIDE */
+                                cy,easy_wakeup_gesture = <3>;
+                                cy,btn_keys = <102 /* KEY_HOME */
+                                               139 /* KEY_MENU */
+                                               158 /* KEY_BACK */
+                                               217 /* KEY_SEARCH */
+                                               114 /* KEY_VOLUMEDOWN */
+                                               115 /* KEY_VOLUMEUP */
+                                               212 /* KEY_CAMERA */
+                                               116>; /* KEY_POWER */
+                                cy,btn_keys-tag = <0>;
+
+                                cy,mt {
+                                        cy,name = "cyttsp4_mt";
+
+                                        cy,inp_dev_name = "cyttsp4_mt";
+                                        /* CY_MT_FLAG_FLIP | CY_MT_FLAG_INV_X | CY_MT_FLAG_INV_Y */
+                                        cy,flags = <0x8>;
+                                        cy,abs =
+                                                /* ABS_MT_POSITION_X, CY_ABS_MIN_X, CY_ABS_MAX_X, 0, 0 */
+                                                <0x35 0 1080 0 0
+                                                /* ABS_MT_POSITION_Y, CY_ABS_MIN_Y, CY_ABS_MAX_Y, 0, 0 */
+                                                0x36 0 1920 0 0
+                                                /* ABS_MT_PRESSURE, CY_ABS_MIN_P, CY_ABS_MAX_P, 0, 0 */
+                                                0x3a 0 255 0 0
+                                                /* CY_IGNORE_VALUE, CY_ABS_MIN_W, CY_ABS_MAX_W, 0, 0 */
+                                                0xffff 0 255 0 0
+                                                /* ABS_MT_TRACKING_ID, CY_ABS_MIN_T, CY_ABS_MAX_T, 0, 0 */
+                                                0x39 0 15 0 0
+                                                /* ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0 */
+                                                0x30 0 255 0 0
+                                                /* ABS_MT_TOUCH_MINOR, 0, 255, 0, 0 */
+                                                0x31 0 255 0 0
+                                                /* ABS_MT_ORIENTATION, -128, 127, 0, 0 */
+                                                0x34 0xfffffed7 127 0 0>;
+
+                                        cy,vkeys_x = <720>;
+                                        cy,vkeys_y = <1280>;
+
+                                        //cy,virtual_keys = /* KeyCode CenterX CenterY Width Height */
+                                        //        /* KEY_BACK */
+                                        //        <158 1360 90 160 180
+                                        //        /* KEY_MENU */
+                                        //        139 1360 270 160 180
+                                        //        /* KEY_HOME */
+                                        //        102 1360 450 160 180
+                                        //        /* KEY SEARCH */
+                                        //       217 1360 630 160 180>;
+                                };
+                        };
+                };
+        tsc@34 {
+		        	compatible = "cy,cyttsp5_i2c_adapter";
+			        reg = <0x34>;
+
+			        /* GPIO 38, high-to-low edge triggered */
+			        interrupts = <13 0x2008>;
+			        interrupt-parent = <&msm_gpio>;
+			        cy,adapter_id = "cyttsp5_i2c_adapter";
+			        pinctrl-names = "pmx_ts_active","pmx_ts_suspend";
+			        pinctrl-0 = <&ts_int_active &ts_reset_active>;
+			        pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
+			        vdda-supply = <&pm8916_l17>;
+			        vddio_EVM-supply = <&pm8916_l6>;
+			        vddio_PD1-supply = <&pm8916_l16>;
+			        vddio_DEFAULT-supply = <&pm8916_l6>;
+			        qcom,module_adc-vadc = <&pm8916_vadc>;
+
+			        cy,core {
+				        cy,name = "cyttsp5_core";
+
+				        gpios = <&msm_gpio 12 0>, <&msm_gpio 13 0>, <&msm_gpio 52 0>, <&msm_gpio 60 0>;
+
+				        cy,irq_gpio = <13>;
+				        cy,rst_gpio = <12>;
+				        cy,hid_desc_register = <1>;
+				        /* CY_CORE_FLAG_WAKE_ON_GESTURE | CY_CORE_FLAG_RESTORE_PARAMETERS */
+				        cy,flags = <5>;
+				        /* CY_CORE_EWG_NONE */
+				        cy,easy_wakeup_gesture = <0>;
+				        cy,btn_keys = <172 /* KEY_HOMEPAGE */
+						       /* previously was KEY_HOME, new Android versions use KEY_HOMEPAGE */
+					           139 /* KEY_MENU */
+					           158 /* KEY_BACK */
+					           217 /* KEY_SEARCH */
+					           114 /* KEY_VOLUMEDOWN */
+					           115 /* KEY_VOLUMEUP */
+					           212 /* KEY_CAMERA */
+					           116>; /* KEY_POWER */
+				        cy,btn_keys-tag = <0>;
+
+				        cy,mt {
+					        cy,name = "cyttsp5_mt";
+
+					        cy,inp_dev_name = "cyttsp5_mt";
+					            /* CY_MT_FLAG_FLIP | CY_MT_FLAG_INV_X | CY_MT_FLAG_INV_Y */
+					        cy,flags = <0x8>;
+					        cy,abs =
+						        /* ABS_MT_POSITION_X, CY_ABS_MIN_X, CY_ABS_MAX_X, 0, 0 */
+						        <0x35 0 1080 0 0
+						        /* ABS_MT_POSITION_Y, CY_ABS_MIN_Y, CY_ABS_MAX_Y, 0, 0 */
+						        0x36 0 1920 0 0
+						        /* ABS_MT_PRESSURE, CY_ABS_MIN_P, CY_ABS_MAX_P, 0, 0 */
+						        0x3a 0 255 0 0
+						        /* CY_IGNORE_VALUE, CY_ABS_MIN_W, CY_ABS_MAX_W, 0, 0 */
+						        0xffff 0 255 0 0
+						        /* ABS_MT_TRACKING_ID, CY_ABS_MIN_T, CY_ABS_MAX_T, 0, 0 */
+						        0x39 0 15 0 0
+						        /* ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0 */
+						        0x30 0 255 0 0
+						        /* ABS_MT_TOUCH_MINOR, 0, 255, 0, 0 */
+						        0x31 0 255 0 0
+						        /* ABS_MT_ORIENTATION, -127, 127, 0, 0 */
+						        0x34 0xffffff81 127 0 0
+						        /* ABS_MT_TOOL_TYPE, 0, MT_TOOL_MAX, 0, 0 */
+						        0x37 0 1 0 0
+						        /* ABS_DISTANCE, 0, 255, 0, 0 */
+						        0x19 0 255 0 0>;
+
+        					cy,vkeys_x = <720>;
+		        			cy,vkeys_y = <1280>;
+
+				        	//cy,virtual_keys = /* KeyCode CenterX CenterY Width Height */
+						//        /* KEY_BACK */
+						//        <158 1360 90 160 180
+						//        /* KEY_MENU */
+						//        139 1360 270 160 180
+						//        /* KEY_HOMEPAGE */
+						//        172 1360 450 160 180
+						//        /* KEY SEARCH */
+						//        217 1360 630 160 180>;
+				        };
+
+        				//cy,btn {
+		        		//	cy,name = "cyttsp5_btn";
+
+				        //	cy,inp_dev_name = "cyttsp5_btn";
+				        //};
+
+				        //cy,proximity {
+					//        cy,name = "cyttsp5_proximity";
+
+					//        cy,inp_dev_name = "cyttsp5_proximity";
+					//        cy,abs =
+					//	        /* ABS_DISTANCE, CY_PROXIMITY_MIN_VAL, CY_PROXIMITY_MAX_VAL, 0, 0 */
+					//	        <0x19 0 1 0 0>;
+				        };
+			        };
+		        };
+		/*PROD-DH-Touch-BringUp*/
 	};
 
 	gen-vkeys {
@@ -78,58 +261,58 @@
 		};
 	};
 
-	i2c@78b6000 { /* BLSP1 QUP2 */
-		mpu6050@68 { /* Gyroscope and accelerometer sensor combo */
-			compatible = "invn,mpu6050";
-			reg = <0x68>;
-			pinctrl-names = "mpu_default","mpu_sleep";
-			pinctrl-0 = <&mpu6050_default>;
-			pinctrl-1 = <&mpu6050_sleep>;
-			interrupt-parent = <&msm_gpio>;
-			interrupts = <115 0x2>;
-			vdd-supply = <&pm8916_l17>;
-			vlogic-supply = <&pm8916_l16>;
-			vi2c-supply = <&pm8916_l6>;
-			invn,gpio-int = <&msm_gpio 115 0x2>;
-			invn,place = "Portrait Down Back Side";
-		};
+//	i2c@78b6000 { /* BLSP1 QUP2 */
+//		mpu6050@68 { /* Gyroscope and accelerometer sensor combo */
+//			compatible = "invn,mpu6050";
+//			reg = <0x68>;
+//			pinctrl-names = "mpu_default","mpu_sleep";
+//			pinctrl-0 = <&mpu6050_default>;
+//			pinctrl-1 = <&mpu6050_sleep>;
+//			interrupt-parent = <&msm_gpio>;
+//			interrupts = <115 0x2>;
+//			vdd-supply = <&pm8916_l17>;
+//			vlogic-supply = <&pm8916_l16>;
+//			vi2c-supply = <&pm8916_l6>;
+//			invn,gpio-int = <&msm_gpio 115 0x2>;
+//			invn,place = "Portrait Down Back Side";
+//		};
+//
+//		avago@39 { /* Ambient light and proximity sensor */
+//			compatible = "avago,apds9900";
+//			reg = <0x39>;
+//			pinctrl-names = "default","sleep";
+//			pinctrl-0 = <&apds99xx_default>;
+//			pinctrl-1 = <&apds99xx_sleep>;
+//			interrupt-parent = <&msm_gpio>;
+//			interrupts = <113 0x2002>;
+//			vdd-supply = <&pm8916_l17>;
+//			vio-supply = <&pm8916_l6>;
+//			avago,irq-gpio = <&msm_gpio 113 0x2002>;
+//			avago,ps-threshold = <600>;
+//			avago,ps-hysteresis-threshold = <500>;
+//			avago,ps-pulse = <8>;
+//			avago,ps-pgain = <0>;
+//			avago,als-B = <223>;
+//			avago,als-C = <70>;
+//			avago,als-D = <142>;
+//			avago,ga-value = <48>;
+//		};
+//
+//		akm@c {
+//			compatible = "ak,ak8963";
+//			reg = <0x0c>;
+//			pinctrl-names = "ak8963_default", "ak8963_sleep";
+//			pinctrl-0 = <&ak8963_default>;
+//			pinctrl-1 = <&ak8963_sleep>;
+//			interrupt-parent = <&msm_gpio>;
+//			interrupts = <69 0x2>;
+//			vdd-supply = <&pm8916_l17>;
+//			vio-supply = <&pm8916_l6>;
+//			ak,layout = <0x6>;
+//			ak,auto-report;
+//		};
 
-		avago@39 { /* Ambient light and proximity sensor */
-			compatible = "avago,apds9900";
-			reg = <0x39>;
-			pinctrl-names = "default","sleep";
-			pinctrl-0 = <&apds99xx_default>;
-			pinctrl-1 = <&apds99xx_sleep>;
-			interrupt-parent = <&msm_gpio>;
-			interrupts = <113 0x2002>;
-			vdd-supply = <&pm8916_l17>;
-			vio-supply = <&pm8916_l6>;
-			avago,irq-gpio = <&msm_gpio 113 0x2002>;
-			avago,ps-threshold = <600>;
-			avago,ps-hysteresis-threshold = <500>;
-			avago,ps-pulse = <8>;
-			avago,ps-pgain = <0>;
-			avago,als-B = <223>;
-			avago,als-C = <70>;
-			avago,als-D = <142>;
-			avago,ga-value = <48>;
-		};
-
-		akm@c {
-			compatible = "ak,ak8963";
-			reg = <0x0c>;
-			pinctrl-names = "ak8963_default", "ak8963_sleep";
-			pinctrl-0 = <&ak8963_default>;
-			pinctrl-1 = <&ak8963_sleep>;
-			interrupt-parent = <&msm_gpio>;
-			interrupts = <69 0x2>;
-			vdd-supply = <&pm8916_l17>;
-			vio-supply = <&pm8916_l6>;
-			ak,layout = <0x6>;
-			ak,auto-report;
-		};
-
-	};
+//	};
 
 	sound {
 		compatible = "qcom,msm8x16-audio-codec";
@@ -138,7 +321,7 @@
 		qcom,msm-codec-type = "internal";
 		qcom,msm-ext-pa = "primary";
 		qcom,msm-mclk-freq = <9600000>;
-		qcom,msm-mbhc-hphl-swh = <0>;
+		qcom,msm-mbhc-hphl-swh = <1>;
 		qcom,msm-mbhc-gnd-swh = <0>;
 		qcom,msm-micbias1-ext-cap;
 		qcom,msm-hs-micbias-type = "internal";
@@ -170,7 +353,11 @@
 						&cdc_ext_pa_ws_sus>;
 		pinctrl-4 = <&cross_conn_det_act>;
 		pinctrl-5 = <&cross_conn_det_sus>;
-		qcom,cdc-us-euro-gpios = <&msm_gpio 120 0>;
+              //qcom,cdc-us-euro-gpios = <&msm_gpio 120 0>;
+              qcom,cdc-vdd-spkr-pd-gpios = <&msm_gpio 116 0>;
+              qcom,cdc-vdd-rcv-pd-gpios = <&msm_gpio 49 0>;
+              qcom,cdc-vdd-spkr-gpios = <&msm_gpio 49 0>;
+              qcom,cdc-vdd-hac-gpios = <&msm_gpio 116 0>;
 		asoc-platform = <&pcm0>, <&pcm1>, <&voip>, <&voice>,
 				<&loopback>, <&compress>, <&hostless>,
 				<&afe>, <&lsm>, <&routing>, <&lpa>;
@@ -182,7 +369,8 @@
 				<&dai_mi2s0>, <&dai_mi2s1>, <&dai_mi2s2>, <&dai_mi2s3>,
 				<&sb_0_rx>, <&sb_0_tx>, <&sb_1_rx>, <&sb_1_tx>,
 				<&sb_3_rx>, <&sb_3_tx>, <&sb_4_rx>, <&sb_4_tx>,
-				<&bt_sco_rx>, <&bt_sco_tx>, <&int_fm_rx>, <&int_fm_tx>,
+				<&bt_sco_rx>, <&bt_sco_tx>, <&bt_a2dp_rx>,
+				<&int_fm_rx>, <&int_fm_tx>,
 				<&afe_pcm_rx>, <&afe_pcm_tx>, <&afe_proxy_rx>, <&afe_proxy_tx>,
 				<&incall_record_rx>, <&incall_record_tx>, <&incall_music_rx>,
 				<&incall_music_2_rx>;
@@ -194,11 +382,12 @@
 				"msm-dai-q6-dev.16390", "msm-dai-q6-dev.16391",
 				"msm-dai-q6-dev.16392", "msm-dai-q6-dev.16393",
 				"msm-dai-q6-dev.12288", "msm-dai-q6-dev.12289",
-				"msm-dai-q6-dev.12292", "msm-dai-q6-dev.12293",
-				"msm-dai-q6-dev.224", "msm-dai-q6-dev.225",
-				"msm-dai-q6-dev.241", "msm-dai-q6-dev.240",
-				"msm-dai-q6-dev.32771", "msm-dai-q6-dev.32772",
-				"msm-dai-q6-dev.32773", "msm-dai-q6-dev.32770";
+				"msm-dai-q6-dev.12290", "msm-dai-q6-dev.12292",
+				"msm-dai-q6-dev.12293",	"msm-dai-q6-dev.224",
+				"msm-dai-q6-dev.225", "msm-dai-q6-dev.241",
+				"msm-dai-q6-dev.240", "msm-dai-q6-dev.32771",
+				"msm-dai-q6-dev.32772", "msm-dai-q6-dev.32773",
+				"msm-dai-q6-dev.32770";
 		asoc-codec = <&stub_codec>, <&pm8916_tombak_dig>;
 		asoc-codec-names = "msm-stub-codec.1", "tombak_codec";
 	};
@@ -366,8 +555,9 @@
 };
 
 &pmx_mdss {
-	qcom,num-grp-pins = <3>;
-	qcom,pins = <&gp 97>, <&gp 25>, <&gp 98>;
+	qcom,num-grp-pins = <4>;
+	qcom,pins = <&gp 114>, <&gp 17>, <&gp 25>, <&gp 10>;
+
 };
 
 &pmx_mdss_te {
@@ -376,19 +566,29 @@
 };
 
 &mdss_dsi0 {
-	qcom,dsi-pref-prim-pan = <&dsi_jdi_1080_vid>;
+	qcom,dsi-pref-prim-pan = <&dsi_nt35521_720_vid_truly>;
 	pinctrl-names = "mdss_default", "mdss_sleep";
 	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
 	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+	
+	qcom,platform-regulator-settings = [04 09 03 00 20 00 01];
 
-	qcom,platform-enable-gpio = <&msm_gpio 97 0>;
 	qcom,platform-reset-gpio = <&msm_gpio 25 0>;
-	qcom,platform-bklight-en-gpio = <&msm_gpio 98 0>;
+
+	/* MM-GL-DISPLAY-panel-00+[ */
+	qcom,platform-p5-gpio = <&msm_gpio 114 0>;
+	qcom,platform-n5-1-gpio = <&msm_gpio 17 0>;
+	qcom,platform-te-gpio = <&msm_gpio 24 0>;
+	qcom,platform-bklight-en-gpio = <&msm_gpio 10 0>;
+
 };
 
-&dsi_jdi_1080_vid {
+&dsi_nt35521_720_vid_truly {
        qcom,cont-splash-enabled;
+	qcom,mdss-fb-splash-logo-enabled;
+
 };
+
 
 &pm8916_chg {
 	status = "ok";

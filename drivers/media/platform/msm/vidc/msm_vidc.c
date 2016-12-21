@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,6 +23,15 @@
 #include "vidc_hfi_api.h"
 
 #define MAX_EVENTS 30
+
+
+//[somc]add method to trigger venus crash
+static struct msm_vidc_core *local_core = NULL;
+void dbgcontrol_assert_venus(void)
+{
+ if(local_core)
+  msm_vidc_trigger_ssr(local_core, 1);
+}
 
 static int get_poll_flags(void *instance)
 {
@@ -726,20 +735,26 @@ int output_buffer_cache_invalidate(struct msm_vidc_inst *inst,
 	}
 	return 0;
 }
+static bool valid_v4l2_buffer(struct v4l2_buffer *b,
+               struct msm_vidc_inst *inst) {
+       enum vidc_ports port =
+               !V4L2_TYPE_IS_MULTIPLANAR(b->type) ? MAX_PORT_NUM :
+               b->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE ? CAPTURE_PORT :
+               b->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE ? OUTPUT_PORT :
+                                                               MAX_PORT_NUM;
+
+       return port != MAX_PORT_NUM &&
+               inst->fmts[port]->num_planes == b->length;
+}
+
 
 int msm_vidc_prepare_buf(void *instance, struct v4l2_buffer *b)
 {
 	struct msm_vidc_inst *inst = instance;
 
-	if (!inst || !b)
-		return -EINVAL;
+       if (!inst || !b || !valid_v4l2_buffer(b, inst))
+                return -EINVAL;
 
-	if (!V4L2_TYPE_IS_MULTIPLANAR(b->type) || !b->length ||
-		(b->length > VIDEO_MAX_PLANES)) {
-		dprintk(VIDC_ERR, "%s: wrong input params\n",
-				__func__);
-		return -EINVAL;
-	}
 
 	if (is_dynamic_output_buffer_mode(b, inst))
 		return 0;
@@ -887,15 +902,9 @@ int msm_vidc_qbuf(void *instance, struct v4l2_buffer *b)
 	int rc = 0;
 	int i;
 
-	if (!inst || !b)
-		return -EINVAL;
+	if (!inst || !b || !valid_v4l2_buffer(b, inst))
+                return -EINVAL;
 
-	if (!V4L2_TYPE_IS_MULTIPLANAR(b->type) || !b->length ||
-		(b->length > VIDEO_MAX_PLANES)) {
-		dprintk(VIDC_ERR, "%s: wrong input params\n",
-				__func__);
-		return -EINVAL;
-	}
 
 	if (is_dynamic_output_buffer_mode(b, inst)) {
 		if (b->m.planes[0].reserved[0])
@@ -972,15 +981,8 @@ int msm_vidc_dqbuf(void *instance, struct v4l2_buffer *b)
 	struct buffer_info *buffer_info = NULL;
 	int i = 0, rc = 0;
 
-	if (!inst || !b)
+        if (!inst || !b || !valid_v4l2_buffer(b, inst))
 		return -EINVAL;
-
-	if (!V4L2_TYPE_IS_MULTIPLANAR(b->type) || !b->length ||
-		(b->length > VIDEO_MAX_PLANES)) {
-		dprintk(VIDC_ERR, "%s: wrong input params\n",
-				__func__);
-		return -EINVAL;
-	}
 
 	if (inst->session_type == MSM_VIDC_DECODER)
 		rc = msm_vdec_dqbuf(instance, b);
@@ -1202,6 +1204,12 @@ static int setup_event_queue(void *inst,
 	int rc = 0;
 	struct msm_vidc_inst *vidc_inst = (struct msm_vidc_inst *)inst;
 
+	if (!inst || !pvdev) {
+		dprintk(VIDC_ERR, "%s Invalid params inst %p pvdev %p\n",
+					__func__, inst, pvdev);
+		return -EINVAL;
+	}
+
 	v4l2_fh_init(&vidc_inst->event_handler, pvdev);
 	v4l2_fh_add(&vidc_inst->event_handler);
 
@@ -1291,6 +1299,7 @@ void *msm_vidc_open(int core_id, int session_type)
 	init_waitqueue_head(&inst->kernel_event_queue);
 	inst->state = MSM_VIDC_CORE_UNINIT_DONE;
 	inst->core = core;
+        local_core = core;
 	inst->map_output_buffer = false;
 
 	for (i = SESSION_MSG_INDEX(SESSION_MSG_START);
@@ -1339,9 +1348,18 @@ void *msm_vidc_open(int core_id, int session_type)
 	inst->debugfs_root =
 		msm_vidc_debugfs_init_inst(inst, core->debugfs_root);
 
-	setup_event_queue(inst, &core->vdev[session_type].vdev);
+	rc = setup_event_queue(inst, &core->vdev[session_type].vdev);
+	if (rc) {
+		dprintk(VIDC_ERR,
+			"%s Failed to set up event queue\n", __func__);
+		goto fail_setup;
+	}
 
 	return inst;
+
+fail_setup:
+	debugfs_remove_recursive(inst->debugfs_root);
+
 fail_init:
 	vb2_queue_release(&inst->bufq[OUTPUT_PORT].vb2_bufq);
 

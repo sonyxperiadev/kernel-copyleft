@@ -1,6 +1,7 @@
 /*
  *  linux/kernel/panic.c
  *
+ *  Copyright(C) 2011-2014 Foxconn International Holdings, Ltd. All rights reserved.
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
@@ -25,10 +26,16 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/exception.h>
+#include <linux/fih_sw_info.h> /* MTD-CORE-EL-power_on_cause-00+ */
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
+/*FIH-CORE-TH-DebugToolPorting-01+[*/
+#include <linux/rtc.h>
+#include <linux/ktime.h>
 
+void * get_timestamp_buffer_virt_addr(void);
+/*FIH-CORE-TH-DebugToolPorting-01+]*/
 /* Machine specific panic information string */
 char *mach_panic_string;
 
@@ -66,6 +73,8 @@ void __weak panic_smp_self_stop(void)
 		cpu_relax();
 }
 
+extern void write_pwron_cause (int pwron_cause); /* MTD-CORE-EL-power_on_cause-00+ */
+
 /**
  *	panic - halt the system
  *	@fmt: The text string to print
@@ -82,6 +91,13 @@ void panic(const char *fmt, ...)
 	long i, i_next = 0;
 	int state = 0;
 
+	/*FIH-CORE-TH-DebugToolPorting-01+[*/
+	struct timespec tmp_time;
+	struct rtc_time rtc_new_rtc_time;
+	char Timebuf[15];
+	void *crash_timestamp_buffer_virt_addr = 0;
+	/*FIH-CORE-TH-DebugToolPorting-01+]*/
+	
 	trace_kernel_panic(0);
 	/*
 	 * Disable local interrupts. This will prevent panic_smp_self_stop
@@ -156,6 +172,23 @@ void panic(const char *fmt, ...)
 			}
 			mdelay(PANIC_TIMER_STEP);
 		}
+
+		/*FIH-CORE-TH-DebugToolPorting-01+[*/
+		getnstimeofday(&tmp_time);
+		rtc_time_to_tm(tmp_time.tv_sec, &rtc_new_rtc_time);
+		snprintf(Timebuf, sizeof(Timebuf), "%04d%02d%02d%02d%02d%02d",
+						rtc_new_rtc_time.tm_year + 1900,
+						rtc_new_rtc_time.tm_mon + 1,
+						rtc_new_rtc_time.tm_mday,				
+						rtc_new_rtc_time.tm_hour, 
+						rtc_new_rtc_time.tm_min,
+						rtc_new_rtc_time.tm_sec);
+		crash_timestamp_buffer_virt_addr = get_timestamp_buffer_virt_addr();
+		if (crash_timestamp_buffer_virt_addr != NULL){
+			memcpy(crash_timestamp_buffer_virt_addr, Timebuf, sizeof(Timebuf));
+			printk(KERN_EMERG "Crash time on panic(mon/day/year hour:min:sec): %s\n", Timebuf);
+		}
+		/*FIH-CORE-TH-DebugToolPorting-01+[*/
 	}
 
 	trace_kernel_panic_late(0);
@@ -166,7 +199,15 @@ void panic(const char *fmt, ...)
 		 * shutting down.  But if there is a chance of
 		 * rebooting the system it will be rebooted.
 		 */
-		emergency_restart();
+		/* MTD-CORE-EL-power_on_cause-00+[ */
+		printk(KERN_EMERG "Kernel panic. Let's note!\n");
+		write_pwron_cause(HOST_KERNEL_PANIC); 
+		/* MTD-CORE-EL-power_on_cause-00+] */
+		 
+		/* FIH-CORE-TH-DebugToolPorting-01*[ */
+		//emergency_restart();
+		machine_restart("panic");
+		/* FIH-CORE-TH-DebugToolPorting-01*] */
 	}
 #ifdef __sparc__
 	{

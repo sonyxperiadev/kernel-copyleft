@@ -306,8 +306,8 @@ static int kgsl_iommu_fault_handler(struct iommu_domain *domain,
 	struct kgsl_iommu *iommu;
 	struct kgsl_iommu_unit *iommu_unit;
 	struct kgsl_iommu_device *iommu_dev;
-	unsigned int ptbase, fsr;
-	unsigned int pid;
+	phys_addr_t ptbase;
+	unsigned int pid, fsr;
 	struct _mem_entry prev, next;
 	unsigned int fsynr0, fsynr1;
 	int write;
@@ -374,12 +374,12 @@ static int kgsl_iommu_fault_handler(struct iommu_domain *domain,
 	if (adreno_dev->ft_pf_policy & KGSL_FT_PAGEFAULT_GPUHALT_ENABLE) {
 		adreno_set_gpu_fault(adreno_dev, ADRENO_IOMMU_PAGE_FAULT);
 		/* turn off GPU IRQ so we don't get faults from it too */
-		kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_OFF);
+		kgsl_pwrctrl_change_state(device, KGSL_STATE_AWARE);
 		adreno_dispatcher_schedule(device);
 	}
 
 	ptbase = KGSL_IOMMU_GET_CTX_REG_Q(iommu, iommu_unit,
-				iommu_dev->ctx_id, TTBR0);
+		iommu_dev->ctx_id, TTBR0) & KGSL_IOMMU_CTX_TTBR0_ADDR_MASK;
 
 	fsynr0 = KGSL_IOMMU_GET_CTX_REG(iommu, iommu_unit,
 		iommu_dev->ctx_id, FSYNR0);
@@ -402,8 +402,8 @@ static int kgsl_iommu_fault_handler(struct iommu_domain *domain,
 		KGSL_MEM_CRIT(iommu_dev->kgsldev,
 			"GPU PAGE FAULT: addr = %lX pid = %d\n", addr, pid);
 		KGSL_MEM_CRIT(iommu_dev->kgsldev,
-		 "context = %d TTBR0 = %X FSR = %X FSYNR0 = %X FSYNR1 = %X(%s fault)\n",
-			iommu_dev->ctx_id, ptbase, fsr, fsynr0, fsynr1,
+		 "context = %d TTBR0 = %pa FSR = %X FSYNR0 = %X FSYNR1 = %X(%s fault)\n",
+			iommu_dev->ctx_id, &ptbase, fsr, fsynr0, fsynr1,
 			write ? "write" : "read");
 
 		_check_if_freed(iommu_dev, addr, pid);

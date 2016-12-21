@@ -50,6 +50,15 @@
 #define MDP_PP_AD_BL_LINEAR	0x0
 #define MDP_PP_AD_BL_LINEAR_INV	0x1
 
+/* MM-GL-DISPLAY-panel-00+[ */
+#define INIT_IMAGE_FILE "/logo.rle"
+#define SPLASH_RLE_TO_RGBA_IMAGE_HEIGHT 1280
+#define SPLASH_RLE_TO_RGBA_IMAGE_WIDTH	720
+#define SPLASH_RLE_TO_RGBA_IMAGE_BPP 4
+int fih_load_rle_image(const char *filename);
+int fih_dump_framebuffer(char *filename);
+int mdss_load_rle565_image(const char *filename,int clean,struct msm_fb_splash_info *sinfo);
+/* MM-GL-DISPLAY-panel-00+] */
 /**
  * enum mdp_notify_event - Different frame events to indicate frame update state
  *
@@ -168,6 +177,7 @@ struct msm_mdp_interface {
 				struct mdp_histogram *hist);
 	int (*ad_calc_bl)(struct msm_fb_data_type *mfd, int bl_in,
 		int *bl_out, bool *bl_out_notify);
+	int (*ad_shutdown_cleanup)(struct msm_fb_data_type *mfd);
 	int (*panel_register_done)(struct mdss_panel_data *pdata);
 	u32 (*fb_stride)(u32 fb_index, u32 xres, int bpp);
 	int (*splash_init_fnc)(struct msm_fb_data_type *mfd);
@@ -209,6 +219,7 @@ struct msm_fb_data_type {
 
 	struct panel_id panel;
 	struct mdss_panel_info *panel_info;
+	struct mdss_panel_info reconfig_panel_info;
 	int split_mode;
 	int split_fb_left;
 	int split_fb_right;

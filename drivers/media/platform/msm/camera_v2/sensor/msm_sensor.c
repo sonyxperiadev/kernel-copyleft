@@ -21,7 +21,95 @@
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
+/* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+{ */
+extern uint8_t g_main_cam_sensor_source;
+extern uint8_t g_front_cam_sensor_source;
+/* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+} */
+
 static struct v4l2_file_operations msm_sensor_v4l2_subdev_fops;
+
+/* MM-MC-BringUpSensorOv5648_2nd-01+{ */
+struct otp_struct {
+int module_integrator_id;
+int lens_id;
+int rg_ratio;
+int bg_ratio;
+int user_data[2];
+int light_rg;
+int light_bg;
+};
+struct otp_struct g_ov5648_otp_data;
+bool g_bReadOtpDone = false;
+
+int OV5648_read_i2c(uint16_t reg_addr, struct msm_sensor_ctrl_t *s_ctrl)
+{
+    uint16_t read_val = 0;
+    int rc = 0;
+    rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_read(
+            s_ctrl->sensor_i2c_client,
+            reg_addr,
+            &read_val, MSM_CAMERA_I2C_BYTE_DATA);
+	if (rc < 0) {
+		pr_err("%s: Read reg_addr(0x%x) failed !\n", __func__, reg_addr);
+	}
+    CDBG("%s %d Read reg_addr(0x%x) = 0x%x !\n", __func__, __LINE__, reg_addr, read_val);
+    return (int)read_val;
+}
+
+void OV5648_write_i2c(uint16_t reg_addr, uint16_t reg_val, struct msm_sensor_ctrl_t *s_ctrl)
+{
+    int rc = 0;
+    rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
+    				s_ctrl->sensor_i2c_client, 
+    				reg_addr,
+    				reg_val,
+    				MSM_CAMERA_I2C_BYTE_DATA);
+	if (rc < 0) {
+		pr_err("%s: Write reg_addr(0x%x) failed !\n", __func__, reg_addr);
+	}
+    CDBG("%s %d write reg_addr(0x%x) = 0x%x !\n", __func__, __LINE__, reg_addr, reg_val);
+}
+
+/*
+* index: index of otp group. (1, 2, 3)
+* return:0
+*/
+int read_otp(struct otp_struct *otp_ptr, struct msm_sensor_ctrl_t *s_ctrl)
+{
+    OV5648_write_i2c(0x0100, 0x01, s_ctrl);/* Streaming on */
+    msleep(50);
+
+    /* Read otp into buffer */
+    /* Read otp --Bank 0 */
+    OV5648_write_i2c(0x3d84, 0xc0, s_ctrl);
+    OV5648_write_i2c(0x3d85, 0x00, s_ctrl);
+    OV5648_write_i2c(0x3d86, 0x0f, s_ctrl);
+    OV5648_write_i2c(0x3d81, 0x01, s_ctrl);
+    msleep(10);
+    OV5648_write_i2c(0x3d81, 0x00, s_ctrl);
+
+    otp_ptr->module_integrator_id = OV5648_read_i2c(0x3d05, s_ctrl);
+    otp_ptr->light_rg = ((OV5648_read_i2c(0x3d07, s_ctrl) << 8) | OV5648_read_i2c(0x3d08, s_ctrl));
+    otp_ptr->light_bg = ((OV5648_read_i2c(0x3d09, s_ctrl) << 8) | OV5648_read_i2c(0x3d0A, s_ctrl));
+    
+    printk("%s %d OV5648 module_integrator_id = 0x%x. \n", __func__, __LINE__, otp_ptr->module_integrator_id);
+    printk("%s %d OV5648 light_rg = 0x%x. \n", __func__, __LINE__, otp_ptr->light_rg);
+    printk("%s %d OV5648 light_bg = 0x%x. \n", __func__, __LINE__, otp_ptr->light_bg);
+
+    OV5648_write_i2c(0x0100, 0x00, s_ctrl);/* Streaming off */
+
+    /* Lite-on module ID 0x15, OMP module ID 0x11 */
+    if ((otp_ptr->module_integrator_id != 0x11) && (otp_ptr->module_integrator_id != 0x15))
+    {
+        /* Use OMP setting if read OTP fail */
+        otp_ptr->module_integrator_id = 0x11;
+        printk("%s %d OV5648 read OTP module ID fail or invalid !\n", __func__, __LINE__);
+    }
+    g_bReadOtpDone = true;
+    return 0;
+}
+/* MM-MC-BringUpSensorOv5648_2nd-01+} */
+
 static void msm_sensor_adjust_mclk(struct msm_camera_power_ctrl_t *ctrl)
 {
 	int idx;
@@ -523,6 +611,53 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("msm_sensor_match_id chip id doesnot match\n");
 		return -ENODEV;
 	}
+
+    /* MM-MC-BringUpSensorOv5648_2nd-01+{ */
+    /* Here to check OTP module ID for OV5648 */
+    if (0x5648 == chipid)
+    {
+        /* The sensor has to streaming on and then read OTP */
+        if (g_bReadOtpDone == false)
+        {
+            memset(&g_ov5648_otp_data, 0, sizeof(g_ov5648_otp_data));
+            read_otp(&g_ov5648_otp_data, s_ctrl);
+        }
+        
+        /* Lite-on module ID 0x15, OMP module ID 0x11 */
+        if ((strcmp("ov5648_f", sensor_name) == 0)&&(g_ov5648_otp_data.module_integrator_id == 0x11))
+        {
+            g_front_cam_sensor_source = 0;
+            printk("%s: OMP OV5648 module, g_front_cam_sensor_source = %d \n", __func__, g_front_cam_sensor_source);
+        }
+        else if ((strcmp("ov5648_f_2nd", sensor_name) == 0)&&(g_ov5648_otp_data.module_integrator_id == 0x15))
+        {
+            g_front_cam_sensor_source = 1;
+            printk("%s: Lite-on OV5648 module, g_front_cam_sensor_source = %d \n", __func__, g_front_cam_sensor_source);
+        }
+        else
+        {
+            pr_err("msm_sensor_match_id module ID doesnot match\n");
+            return -ENODEV;
+        }
+    }
+    /* MM-MC-BringUpSensorOv5648_2nd-01+} */
+    /* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+{ */
+    else if (0x0214 == chipid)
+    {
+        if (strcmp("imx214", sensor_name) == 0)
+        {
+            printk("%s: LG IMX214 module \n", __func__);
+            g_main_cam_sensor_source = 0;
+        }
+        else
+        {
+            printk("%s: OMP IMX214 module \n", __func__);
+            g_main_cam_sensor_source = 1;
+        }
+        printk("%s: g_main_cam_sensor_source = %d \n", __func__, g_main_cam_sensor_source);
+    }
+    /* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+} */
+    
 	return rc;
 }
 
@@ -691,8 +826,7 @@ static int msm_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl,
 		conf_array.reg_setting = compat_ptr(conf_array32.reg_setting);
 		conf_array.qup_i2c_batch = conf_array32.qup_i2c_batch;
 
-		if (!conf_array.size ||
-			conf_array.size > I2C_REG_DATA_MAX) {
+		if (!conf_array.size) {
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;
@@ -798,13 +932,11 @@ static int msm_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl,
 		conf_array.size = conf_array32.size;
 		conf_array.reg_setting = compat_ptr(conf_array32.reg_setting);
 
-		if (!conf_array.size ||
-			conf_array.size > I2C_SEQ_REG_DATA_MAX) {
+		if (!conf_array.size) {
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;
 		}
-
 		reg_setting = kzalloc(conf_array.size *
 			(sizeof(struct msm_camera_i2c_seq_reg_array)),
 			GFP_KERNEL);
@@ -1014,8 +1146,7 @@ int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			break;
 		}
 
-		if (!conf_array.size ||
-			conf_array.size > I2C_REG_DATA_MAX) {
+		if (!conf_array.size) {
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;
@@ -1111,13 +1242,11 @@ int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			write_config.slave_addr,
 			write_config.conf_array.size);
 
-		if (!write_config.conf_array.size ||
-			write_config.conf_array.size > I2C_SEQ_REG_DATA_MAX) {
+		if (!write_config.conf_array.size) {
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;
 		}
-
 		reg_setting = kzalloc(write_config.conf_array.size *
 			(sizeof(struct msm_camera_i2c_reg_array)), GFP_KERNEL);
 		if (!reg_setting) {
@@ -1191,13 +1320,11 @@ int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			break;
 		}
 
-		if (!conf_array.size ||
-			conf_array.size > I2C_SEQ_REG_DATA_MAX) {
+		if (!conf_array.size) {
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;
 		}
-
 		reg_setting = kzalloc(conf_array.size *
 			(sizeof(struct msm_camera_i2c_seq_reg_array)),
 			GFP_KERNEL);

@@ -80,10 +80,10 @@ static int32_t msm_camera_qup_i2c_txdata_batch(
 	int32_t rc = 0;
 	uint16_t saddr = dev_client->client->addr >> 1;
 	struct i2c_msg msg[dev_client->batch_size];
-	int i=0;
+	int i = 0;
 	int batch_size = dev_client->batch_size;
 
-	for (i=0; i < batch_size; i++) {
+	for (i = 0; i < batch_size; i++) {
 		msg[i].addr = saddr;
 		msg[i].flags = 0;
 		msg[i].len = length;
@@ -182,7 +182,7 @@ int32_t msm_camera_qup_i2c_write(struct msm_camera_i2c_client *client,
 			  __func__, addr, client->addr_type, data_type);
 	if (client->addr_type == MSM_CAMERA_I2C_BYTE_ADDR) {
 		buf[0] = addr;
-		S_I2C_DBG("%s:%d byte %d: 0x%x\n", __func__,__LINE__,
+		S_I2C_DBG("%s:%d byte %d: 0x%x\n", __func__, __LINE__,
 			len, buf[len]);
 		len = 1;
 	} else if (client->addr_type == MSM_CAMERA_I2C_WORD_ADDR) {
@@ -222,7 +222,7 @@ int32_t msm_camera_qup_i2c_write_word_addr_byte_data_batch(
 	int i = 0;
 	int batch_size = client->batch_size;
 
-	for (i=0; i < batch_size; i++) {
+	for (i = 0; i < batch_size; i++) {
 		S_I2C_DBG("%s reg addr = 0x%x data type: %d\n",
 			__func__, reg_setting->addr,
 			MSM_CAMERA_I2C_BYTE_DATA);
@@ -238,7 +238,7 @@ int32_t msm_camera_qup_i2c_write_word_addr_byte_data_batch(
 		S_I2C_DBG("Data: 0x%x\n", reg_setting->reg_data);
 		buf[i][2] = reg_setting->reg_data;
 
-		S_I2C_DBG("Byte %d: 0x%x\n", len +2, buf[i][len+2]);
+		S_I2C_DBG("Byte %d: 0x%x\n", len + 2, buf[i][len+2]);
 		len = 3;
 		reg_setting++;
 	}
@@ -258,7 +258,7 @@ int32_t msm_camera_qup_i2c_write_word_addr_word_data_batch(
 	int i = 0;
 	int batch_size = client->batch_size;
 
-	for (i=0; i < batch_size; i++) {
+	for (i = 0; i < batch_size; i++) {
 		S_I2C_DBG("%s reg addr = 0x%x data type: %d\n",
 			__func__, reg_setting->addr,
 			MSM_CAMERA_I2C_BYTE_DATA);
@@ -297,7 +297,7 @@ int32_t msm_camera_qup_i2c_write_byte_addr_word_data_batch(
 	int i = 0;
 	int batch_size = client->batch_size;
 
-	for (i=0; i < batch_size; i++) {
+	for (i = 0; i < batch_size; i++) {
 		S_I2C_DBG("%s reg addr = 0x%x data type: %d\n",
 			__func__, reg_setting->addr,
 			MSM_CAMERA_I2C_BYTE_DATA);
@@ -332,7 +332,7 @@ int32_t msm_camera_qup_i2c_write_byte_addr_byte_data_batch(
 	int i = 0;
 	int batch_size = client->batch_size;
 
-	for (i=0; i < batch_size; i++) {
+	for (i = 0; i < batch_size; i++) {
 		S_I2C_DBG("%s reg addr = 0x%x data type: %d\n",
 			__func__, reg_setting->addr,
 			MSM_CAMERA_I2C_BYTE_DATA);
@@ -345,7 +345,7 @@ int32_t msm_camera_qup_i2c_write_byte_addr_byte_data_batch(
 		S_I2C_DBG("Data: 0x%x\n", reg_setting->reg_data);
 		buf[i][1] = reg_setting->reg_data;
 
-		S_I2C_DBG("Byte %d: 0x%x\n", len +2, buf[i][len+1]);
+		S_I2C_DBG("Byte %d: 0x%x\n", len + 2, buf[i][len+1]);
 		len = 2;
 		reg_setting++;
 	}
@@ -409,6 +409,9 @@ int32_t msm_camera_qup_i2c_write_table(struct msm_camera_i2c_client *client,
 	int num_batch = 0;
 	int excess = 0;
 	int batch_size = 1;
+	int32_t (*qup_i2c_write_batch_fp)(
+		struct msm_camera_i2c_client*,
+		struct msm_camera_i2c_reg_array*) = NULL;
 
 	if (!client || !write_setting)
 		return rc;
@@ -434,44 +437,30 @@ int32_t msm_camera_qup_i2c_write_table(struct msm_camera_i2c_client *client,
 
 	if (write_setting->addr_type == MSM_CAMERA_I2C_WORD_ADDR &&
 		write_setting->data_type == MSM_CAMERA_I2C_BYTE_DATA) {
-		for (i = 0; i < num_batch; i++) {
-			rc = msm_camera_qup_i2c_write_word_addr_byte_data_batch(client,
-				reg_setting);
-			if (rc < 0)
-				break;
-			reg_setting += batch_size;
-		}
-
+		qup_i2c_write_batch_fp =
+			msm_camera_qup_i2c_write_word_addr_byte_data_batch;
 	} else if (write_setting->addr_type == MSM_CAMERA_I2C_WORD_ADDR &&
 		write_setting->data_type == MSM_CAMERA_I2C_WORD_DATA) {
-		for (i = 0; i < num_batch; i++) {
-			rc = msm_camera_qup_i2c_write_word_addr_word_data_batch(client,
-				reg_setting);
-			if (rc < 0)
-				break;
-			reg_setting += batch_size;
-		}
-
+		qup_i2c_write_batch_fp =
+			msm_camera_qup_i2c_write_word_addr_word_data_batch;
 	} else if (write_setting->addr_type == MSM_CAMERA_I2C_BYTE_ADDR &&
 		write_setting->data_type == MSM_CAMERA_I2C_BYTE_DATA) {
-		for (i = 0; i < num_batch; i++) {
-			rc = msm_camera_qup_i2c_write_byte_addr_byte_data_batch(client,
-				reg_setting);
-			if (rc < 0)
-				break;
-			reg_setting += batch_size;
-		}
-
+		qup_i2c_write_batch_fp =
+			msm_camera_qup_i2c_write_byte_addr_byte_data_batch;
 	} else if (write_setting->addr_type == MSM_CAMERA_I2C_BYTE_ADDR &&
 		write_setting->data_type == MSM_CAMERA_I2C_WORD_DATA) {
-		for (i = 0; i < num_batch; i++) {
-			rc = msm_camera_qup_i2c_write_byte_addr_word_data_batch(client,
-				reg_setting);
-			if (rc < 0)
-				break;
-			reg_setting += batch_size;
-		}
+		qup_i2c_write_batch_fp =
+			msm_camera_qup_i2c_write_byte_addr_word_data_batch;
+	}
 
+	if (qup_i2c_write_batch_fp == NULL)
+		return rc;
+
+	for (i = 0; i < num_batch; i++) {
+		rc = qup_i2c_write_batch_fp(client, reg_setting);
+		if (rc < 0)
+			break;
+		reg_setting += batch_size;
 	}
 
 	for (i = 0; i < excess; i++) {

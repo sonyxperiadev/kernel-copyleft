@@ -134,7 +134,7 @@ int msmbus_coresight_init_adhoc(struct platform_device *pdev,
 	if (IS_ERR(pdata))
 		return PTR_ERR(pdata);
 
-	drvdata = platform_get_drvdata(pdev);
+        dev_info(dev, "info: removed buspm module from kernel space\n");
 	if (IS_ERR_OR_NULL(drvdata)) {
 		drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
 		if (!drvdata) {

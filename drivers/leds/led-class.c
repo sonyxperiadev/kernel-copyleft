@@ -180,6 +180,11 @@ static int led_suspend(struct device *dev, pm_message_t state)
 {
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
 
+//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00+[
+#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+	printk(KERN_INFO "[PM]led suspend(): %s\n", led_cdev->name);
+#endif
+//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00+]
 	if (led_cdev->flags & LED_CORE_SUSPENDRESUME)
 		led_classdev_suspend(led_cdev);
 
@@ -190,6 +195,11 @@ static int led_resume(struct device *dev)
 {
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
 
+//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00+[
+#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+	printk(KERN_INFO "[PM]led resume(): %s\n", led_cdev->name);
+#endif
+//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00+]
 	if (led_cdev->flags & LED_CORE_SUSPENDRESUME)
 		led_classdev_resume(led_cdev);
 

@@ -403,6 +403,11 @@ static void input_handle_event(struct input_dev *dev,
 
 }
 
+/* PERI-FG-TOUCH_CHECK_HW-01+[ */
+bool cyttsp_i2c_driver = false;
+EXPORT_SYMBOL(cyttsp_i2c_driver);
+/* PERI-FG-TOUCH_CHECK_HW-01+] */
+
 /**
  * input_event() - report new input event
  * @dev: device that generated the event

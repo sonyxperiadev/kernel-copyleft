@@ -15,8 +15,22 @@
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#ifdef CONFIG_PM_WAKEUP_TIMES
+#include <linux/poll.h>
+#endif
 
 #include "power.h"
+
+#include <linux/random.h>
+/*
++ * suspend back-off default values
++ */
+#define SBO_SLEEP_MSEC 1100
+#define SBO_TIME 10
+#define SBO_CNT 10
+
+static unsigned suspend_short_count;
+static struct wakeup_source *ws;
 
 DEFINE_MUTEX(pm_mutex);
 
@@ -25,6 +39,29 @@ DEFINE_MUTEX(pm_mutex);
 /* Routines for PM-transition notifications */
 
 static BLOCKING_NOTIFIER_HEAD(pm_chain_head);
+//CORE-KC-PMSWakelockInfo-00+[
+#ifdef CONFIG_FIH_DUMP_WAKELOCK
+static void getPMSWakeLockInfo(char* name, char **pid, char **tag)
+{
+	// parse wakelock name field
+	while (*name && *name!='^')
+		name++;
+	if (*name) *name++='\0';
+	
+	// parse pid field
+	*pid=name;
+	while (*name && *name!='^')
+		name++;
+	if (*name) *name++='\0';
+
+	// parse tag field
+	*tag=name;
+	while (*name && *name!='^')
+		name++;
+	if (*name) *name++='\0';
+}
+#endif
+//CORE-KC-PMSWakelockInfo-00+]
 
 int register_pm_notifier(struct notifier_block *nb)
 {
@@ -208,6 +245,51 @@ static int suspend_stats_show(struct seq_file *s, void *unused)
 				suspend_stats.failed_steps[index]));
 	}
 
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	seq_printf(s,	"%s\n%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms\n",
+		"suspend time:",
+		"  min:", ktime_to_ms(ktime_sub(
+			suspend_stats.suspend_min_time.end,
+			suspend_stats.suspend_min_time.start)),
+		"start:", ktime_to_ms(suspend_stats.suspend_min_time.start),
+		"end:", ktime_to_ms(suspend_stats.suspend_min_time.end),
+		"  max:", ktime_to_ms(ktime_sub(
+			suspend_stats.suspend_max_time.end,
+			suspend_stats.suspend_max_time.start)),
+		"start:", ktime_to_ms(suspend_stats.suspend_max_time.start),
+		"end:", ktime_to_ms(suspend_stats.suspend_max_time.end),
+		"  last:", ktime_to_ms(ktime_sub(
+			suspend_stats.suspend_last_time.end,
+			suspend_stats.suspend_last_time.start)),
+		"start:", ktime_to_ms(suspend_stats.suspend_last_time.start),
+		"end:", ktime_to_ms(suspend_stats.suspend_last_time.end),
+		"  avg:", ktime_to_ms(suspend_stats.suspend_avg_time));
+
+	seq_printf(s,	"%s\n%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms (%s %lldms %s %lldms)\n" \
+			"%s  %lldms\n",
+		"resume time:",
+		"  min:", ktime_to_ms(ktime_sub(
+			suspend_stats.resume_min_time.end,
+			suspend_stats.resume_min_time.start)),
+		"start:", ktime_to_ms(suspend_stats.resume_min_time.start),
+		"end:", ktime_to_ms(suspend_stats.resume_min_time.end),
+		"  max:", ktime_to_ms(ktime_sub(
+			suspend_stats.resume_max_time.end,
+			suspend_stats.resume_max_time.start)),
+		"start:", ktime_to_ms(suspend_stats.resume_max_time.start),
+		"end:", ktime_to_ms(suspend_stats.resume_max_time.end),
+		"  last:", ktime_to_ms(ktime_sub(
+			suspend_stats.resume_last_time.end,
+			suspend_stats.resume_last_time.start)),
+		"start:", ktime_to_ms(suspend_stats.resume_last_time.start),
+		"end:", ktime_to_ms(suspend_stats.resume_last_time.end),
+		"  avg:", ktime_to_ms(suspend_stats.resume_avg_time));
+#endif
 	return 0;
 }
 
@@ -216,10 +298,29 @@ static int suspend_stats_open(struct inode *inode, struct file *file)
 	return single_open(file, suspend_stats_show, NULL);
 }
 
+#ifdef CONFIG_PM_WAKEUP_TIMES
+static unsigned int suspend_stats_poll(struct file *filp,
+			struct poll_table_struct *wait)
+{
+	unsigned int mask = 0;
+
+	poll_wait(filp, &suspend_stats_queue.wait_queue, wait);
+	if (suspend_stats_queue.resume_done) {
+		mask |= (POLLIN | POLLRDNORM);
+		suspend_stats_queue.resume_done = 0;
+	}
+
+	return mask;
+}
+#endif
+
 static const struct file_operations suspend_stats_operations = {
 	.open           = suspend_stats_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	.poll           = suspend_stats_poll,
+#endif
 	.release        = single_release,
 };
 
@@ -227,6 +328,9 @@ static int __init pm_debugfs_init(void)
 {
 	debugfs_create_file("suspend_stats", S_IFREG | S_IRUGO,
 			NULL, NULL, &suspend_stats_operations);
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	init_waitqueue_head(&suspend_stats_queue.wait_queue);
+#endif
 	return 0;
 }
 
@@ -335,10 +439,28 @@ static suspend_state_t decode_state(const char *buf, size_t n)
 	return PM_SUSPEND_ON;
 }
 
+static void
+suspend_backoff_range(u32 start, u32 end)
+{
+	u32 range, timeout;
+
+	if (end <= start)
+		return;
+
+	range = end - start;
+	timeout = get_random_int() % range + start;
+
+	pr_info("suspend: too many immediate wakeups, back off (%u msec)\n", timeout);
+	__pm_wakeup_event(ws, timeout);
+}
+
 static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 			   const char *buf, size_t n)
 {
 	suspend_state_t state;
+	struct timespec ts_entry, ts_exit;
+	u64 elapsed_msecs64;
+	u32 elapsed_msecs32;
 	int error;
 
 	error = pm_autosleep_lock();
@@ -351,9 +473,32 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 	}
 
 	state = decode_state(buf, n);
-	if (state < PM_SUSPEND_MAX)
+	if (state < PM_SUSPEND_MAX) {
+		/*
+		 * We want to prevent system from frequent periodic wake-ups
+		 * when sleeping time is less or equal certain interval.
+		 * It's done in order to save power in certain cases, one of
+		 * the examples is GPS tracking, but not only.
+		 */
+		getnstimeofday(&ts_entry);
 		error = pm_suspend(state);
-	else if (state == PM_SUSPEND_MAX)
+		getnstimeofday(&ts_exit);
+
+		elapsed_msecs64 = timespec_to_ns(&ts_exit) -
+			timespec_to_ns(&ts_entry);
+		do_div(elapsed_msecs64, NSEC_PER_MSEC);
+		elapsed_msecs32 = elapsed_msecs64;
+
+		if (elapsed_msecs32 <= SBO_SLEEP_MSEC) {
+			if (suspend_short_count == SBO_CNT)
+				suspend_backoff_range((SBO_TIME * MSEC_PER_SEC) / 2,
+					SBO_TIME * MSEC_PER_SEC);
+			else
+				suspend_short_count++;
+		} else {
+			suspend_short_count = 0;
+		}
+	} else if (state == PM_SUSPEND_MAX)
 		error = hibernate();
 	else
 		error = -EINVAL;
@@ -480,12 +625,34 @@ static ssize_t wake_lock_show(struct kobject *kobj,
 {
 	return pm_show_wakelocks(buf, true);
 }
+//CORE-KC-PMSWakelockInfo-00+[
+#ifdef CONFIG_FIH_DUMP_WAKELOCK
+extern void pms_add_wakelock_info(char *pid, char *tag);
+extern void pms_remove_wakelock_info(char *pid, char *tag);
+#endif
+//CORE-KC-PMSWakelockInfo-00+]
 
 static ssize_t wake_lock_store(struct kobject *kobj,
 			       struct kobj_attribute *attr,
 			       const char *buf, size_t n)
 {
-	int error = pm_wake_lock(buf);
+	int error = 0;
+
+//CORE-KC-PMSWakelockInfo-00+[
+	#ifdef CONFIG_FIH_DUMP_WAKELOCK
+	char *pid = NULL;
+	char *tag = NULL;
+
+	if (!strncmp(buf,"PMS^",4)) {
+		getPMSWakeLockInfo((char *)buf, &pid, &tag);
+		pms_add_wakelock_info(pid, tag);
+		return n;
+	}
+	#endif
+//CORE-KC-PMSWakelockInfo-00+]
+
+	error = pm_wake_lock(buf);
+
 	return error ? error : n;
 }
 
@@ -502,7 +669,22 @@ static ssize_t wake_unlock_store(struct kobject *kobj,
 				 struct kobj_attribute *attr,
 				 const char *buf, size_t n)
 {
-	int error = pm_wake_unlock(buf);
+	int error = 0;
+
+//CORE-KC-PMSWakelockInfo-00+[
+	#ifdef CONFIG_FIH_DUMP_WAKELOCK
+	char *pid = NULL;
+	char *tag = NULL;
+	
+	if (!strncmp(buf,"PMS^",4)) {
+		getPMSWakeLockInfo((char *)buf, &pid, &tag);
+		pms_remove_wakelock_info(pid, tag);
+		return n;
+	}
+	#endif
+//CORE-KC-PMSWakelockInfo-00+]
+	error = pm_wake_unlock(buf);
+
 	return error ? error : n;
 }
 
@@ -638,6 +820,8 @@ static int __init pm_init(void)
 	if (error)
 		return error;
 	pm_print_times_init();
+
+	ws = wakeup_source_register("suspend_backoff");
 	return pm_autosleep_init();
 }
 

@@ -2581,6 +2581,7 @@ static irqreturn_t usbin_uv_handler(int irq, void *_chip)
 {
 	struct smbchg_chip *chip = _chip;
 	bool usb_present = is_usb_present(chip);
+	bool usb_changed = (chip->usb_present != usb_present);
 
 	pr_smb(PR_STATUS, "chip->usb_present = %d usb_present = %d\n",
 			chip->usb_present, usb_present);
@@ -2588,6 +2589,11 @@ static irqreturn_t usbin_uv_handler(int irq, void *_chip)
 		/* USB removed */
 		chip->usb_present = usb_present;
 		handle_usb_removal(chip);
+	}
+	if (usb_changed) {
+		const union power_supply_propval ret = {usb_present,};
+		chip->usb_psy->set_property(chip->usb_psy,
+					POWER_SUPPLY_PROP_USBIN_DET, &ret);
 	}
 	return IRQ_HANDLED;
 }
@@ -2722,10 +2728,24 @@ static int determine_initial_status(struct smbchg_chip *chip)
 	chip->usb_present = is_usb_present(chip);
 	chip->dc_present = is_dc_present(chip);
 
+#ifndef CONFIG_QPNP_SMBCHARGER_EXTENSION
 	if (chip->usb_present)
 		handle_usb_insertion(chip);
 	else
 		handle_usb_removal(chip);
+#else
+	if (chip->usb_present) {
+		const union power_supply_propval ret = {chip->usb_present,};
+		chip->usb_psy->set_property(chip->usb_psy,
+					POWER_SUPPLY_PROP_USBIN_DET, &ret);
+		handle_usb_insertion(chip);
+	} else {
+		const union power_supply_propval ret = {chip->usb_present,};
+		handle_usb_removal(chip);
+		chip->usb_psy->set_property(chip->usb_psy,
+					POWER_SUPPLY_PROP_USBIN_DET, &ret);
+	}
+#endif
 
 	return 0;
 }

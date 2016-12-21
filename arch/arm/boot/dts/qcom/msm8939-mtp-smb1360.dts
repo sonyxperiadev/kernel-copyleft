@@ -30,15 +30,27 @@
 		interrupts = <62 8>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&smb_int_default>;
-		qcom,charging-disabled;
+		//qcom,charging-disabled; //CORE-DL-ImplementChgAlg-00
 		qcom,empty-soc-disabled;
 		qcom,chg-inhibit-disabled;
-		qcom,float-voltage-mv = <4200>;
-		qcom,iterm-ma = <200>;
-		qcom,recharge-thresh-mv = <100>;
+		qcom,float-voltage-mv = <4350>; //4200
+		qcom,iterm-ma = <100>; //200
+		qcom,recharge-thresh-mv = <200>; //100
 		qcom,fg-auto-recharge-soc = <99>;
 		qcom,thermal-mitigation = <1500 700 600 0>;
 		regulator-name = "smb1360_otg_vreg";
+		//CORE-DL-ImplementChgAlg-00 +[
+		qcom,batt-profile-select;
+		qcom,smb1360-vadc = <&pm8916_vadc>;
+		qcom,batt-id-vref-uv = <1800000>;
+		qcom,batt-id-rpullup-kohm = <100>;
+		qcom,profile-a-rid-kohm = <324>;
+		qcom,profile-b-rid-kohm = <181>;
+		qcom,shdn-after-pwroff;
+		qcom,charging-timeout = <192>; //CORE-DL-UseHwSafetyTimer-00
+		//qcom,fg-reset-at-pon;
+		//qcom,fg-reset-thresold-mv = <25>;
+		//CORE-DL-ImplementChgAlg-00 +]
 	};
 };
 
@@ -53,7 +65,7 @@
 };
 
 &usb_otg {
-	qcom,hsusb-otg-mode = <3>;
+	qcom,hsusb-otg-mode = <1>;
 	qcom,usbid-gpio = <&msm_gpio 110 0>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&usbid_default>;
@@ -61,32 +73,6 @@
 };
 
 &cci {
-	led_flash0: qcom,led-flash@66 {
-		cell-index = <0>;
-		reg = <0x66>;
-		qcom,slave-id = <0x66 0x00 0x0011>;
-		compatible = "qcom,led-flash1";
-		label = "bd7710";
-		qcom,flash-type = <1>;
-		qcom,gpio-no-mux = <0>;
-		qcom,enable_pinctrl;
-		pinctrl-names = "cam_flash_default", "cam_flash_suspend";
-		pinctrl-0 = <&cam_sensor_flash_default>;
-		pinctrl-1 = <&cam_sensor_flash_sleep>;
-		gpios = <&msm_gpio 36 0>,
-			<&msm_gpio 32 0>,
-			<&msm_gpio 31 0>;
-		qcom,gpio-flash-reset = <0>;
-		qcom,gpio-flash-en = <1>;
-		qcom,gpio-flash-now = <2>;
-		qcom,gpio-req-tbl-num = <0 1 2>;
-		qcom,gpio-req-tbl-flags = <0 0 0>;
-		qcom,gpio-req-tbl-label = "FLASH_RST",
-			"FLASH_EN",
-			"FLASH_NOW";
-		qcom,cci-master = <0>;
-	};
-
 	qcom,camera@0 {
 		qcom,led-flash-src = <&led_flash0>;
 	};

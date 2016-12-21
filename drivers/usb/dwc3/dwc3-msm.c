@@ -2213,6 +2213,9 @@ static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = get_prop_usbin_voltage_now(mdwc);
 		break;
+	case POWER_SUPPLY_PROP_CHARGER_TYPE:
+		val->strval = chg_to_string(mdwc->charger.chg_type);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2368,6 +2371,7 @@ static enum power_supply_property dwc3_msm_pm_power_props_usb[] = {
 	POWER_SUPPLY_PROP_TYPE,
 	POWER_SUPPLY_PROP_SCOPE,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_CHARGER_TYPE,
 };
 
 static void dwc3_init_adc_work(struct work_struct *w);

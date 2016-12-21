@@ -7,4 +7,5 @@ obj-$(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST)	+= tick-broadcast.o tick-broadcast-h
 obj-$(CONFIG_GENERIC_SCHED_CLOCK)		+= sched_clock.o
 obj-$(CONFIG_TICK_ONESHOT)			+= tick-oneshot.o
 obj-$(CONFIG_TICK_ONESHOT)			+= tick-sched.o
+obj-$(CONFIG_TICK_ONESHOT)			+= tick-sched_external.o
 obj-$(CONFIG_TIMER_STATS)			+= timer_stats.o

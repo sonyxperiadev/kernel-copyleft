@@ -197,7 +197,8 @@ enum dsi_pm_type {
 #define DSI_DYNAMIC_REFRESH_PIPE_DELAY		0x204
 #define DSI_DYNAMIC_REFRESH_PIPE_DELAY2		0x208
 #define DSI_DYNAMIC_REFRESH_PLL_DELAY		0x20C
-
+extern int is_reset_done;/*MM-GL-DISPLAY-panel-00+*/
+extern bool display_on_in_boot;/* MM-GL-DISPLAY-panel-00+ */
 extern struct device dsi_dev;
 extern u32 dsi_irq;
 extern struct mdss_dsi_ctrl_pdata *ctrl_list[];
@@ -302,6 +303,7 @@ enum {
 struct mdss_dsi_ctrl_pdata {
 	int ndx;	/* panel_num */
 	int (*on) (struct mdss_panel_data *pdata);
+	int (*post_panel_on)(struct mdss_panel_data *pdata);
 	int (*off) (struct mdss_panel_data *pdata);
 	int (*low_power_config) (struct mdss_panel_data *pdata, int enable);
 	int (*set_col_page_addr) (struct mdss_panel_data *pdata);
@@ -338,6 +340,10 @@ struct mdss_dsi_ctrl_pdata {
 	int irq_cnt;
 	int disp_te_gpio;
 	int rst_gpio;
+/* MM-GL-DISPLAY-panel-00+[ */
+	int disp_p5_gpio;
+	int disp_n5_gpio;
+/* MM-GL-DISPLAY-panel-00+] */
 	int disp_en_gpio;
 	int bklt_en_gpio;
 	int mode_gpio;
@@ -370,6 +376,8 @@ struct mdss_dsi_ctrl_pdata {
 	struct mdss_intf_recovery *recovery;
 
 	struct dsi_panel_cmds on_cmds;
+	struct dsi_panel_cmds post_dms_on_cmds;
+	struct dsi_panel_cmds post_panel_on_cmds;
 	struct dsi_panel_cmds off_cmds;
 	struct dsi_panel_cmds status_cmds;
 	u32 status_cmds_rlen;
@@ -493,11 +501,13 @@ void mdss_dsi_get_hw_revision(struct mdss_dsi_ctrl_pdata *ctrl);
 int mdss_dsi_panel_init(struct device_node *node,
 		struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		bool cmd_cfg_cont_splash);
+unsigned char mdss_manufacture_id_read(void);/* MM-GL-DISPLAY-panel-00+ */
 int mdss_panel_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
 				char *dst_format);
 
 int mdss_dsi_register_recovery_handler(struct mdss_dsi_ctrl_pdata *ctrl,
 		struct mdss_intf_recovery *recovery);
+void mdss_dsi_unregister_bl_settings(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 
 static inline const char *__mdss_dsi_pm_name(enum dsi_pm_type module)
 {
@@ -619,4 +629,5 @@ static inline bool mdss_dsi_ulps_feature_enabled(
 	return pdata->panel_info.ulps_feature_enabled;
 }
 
+bool mdss_display_splash_LK(void);/* MM-GL-DISPLAY-panel-06+ */
 #endif /* MDSS_DSI_H */

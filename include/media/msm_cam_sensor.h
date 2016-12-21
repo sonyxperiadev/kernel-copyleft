@@ -278,6 +278,8 @@ struct msm_eeprom_cfg_data {
 		struct eeprom_write_t write_data;
 		struct eeprom_get_cmm_t get_cmm_data;
 	} cfg;
+    uint8_t main_cam_sensor_source;/* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+ */
+    uint8_t front_cam_sensor_source;/* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+ */
 };
 
 #ifdef CONFIG_COMPAT
@@ -364,6 +366,8 @@ struct msm_eeprom_cfg_data32 {
 		struct eeprom_read_t32 read_data;
 		struct eeprom_write_t32 write_data;
 	} cfg;
+    uint8_t main_cam_sensor_source;/* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+ */
+    uint8_t front_cam_sensor_source;/* MM-MC-AddCameraSwitchMechanismForImx214Eeprom+ */
 };
 
 struct msm_camera_i2c_seq_reg_setting32 {

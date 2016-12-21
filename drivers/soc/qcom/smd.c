@@ -143,7 +143,7 @@ struct interrupt_stat interrupt_stats[NUM_SMD_SUBSYSTEMS];
 int msm_smd_debug_mask = MSM_SMD_POWER_INFO | MSM_SMD_INFO |
 							MSM_SMSM_POWER_INFO;
 module_param_named(debug_mask, msm_smd_debug_mask,
-		   int, S_IRUGO | S_IWUSR | S_IWGRP);
+		   int, S_IRUGO | S_IWUSR );
 void *smd_log_ctx;
 void *smsm_log_ctx;
 #define NUM_LOG_PAGES 4

@@ -338,21 +338,28 @@ static int enter_state(suspend_state_t state)
 	sys_sync();
 	printk("done.\n");
 
-	pr_debug("PM: Preparing system for %s sleep\n", pm_states[state]);
+//CORE-KC-DBG_SUSPEND_RESUME-00-	pr_debug("PM: Preparing system for %s sleep\n", pm_states[state]);
+	pr_info("PM: Preparing system for %s sleep\n", pm_states[state]);	//CORE-KC-DBG_SUSPEND_RESUME-00+
 	error = suspend_prepare(state);
-	if (error)
+	if (error) {
+		pr_info("PM: suspend_prepare error = %d for %s sleep\n", error, pm_states[state]);	//CORE-KC-DBG_SUSPEND_RESUME-00+
 		goto Unlock;
+	}
 
-	if (suspend_test(TEST_FREEZER))
+	if (suspend_test(TEST_FREEZER)) {
+		pr_info("PM: suspend_test for %s sleep\n", pm_states[state]);	//CORE-KC-DBG_SUSPEND_RESUME-00+	
 		goto Finish;
+	}
 
-	pr_debug("PM: Entering %s sleep\n", pm_states[state]);
+//CORE-KC-DBG_SUSPEND_RESUME-00-	pr_debug("PM: Entering %s sleep\n", pm_states[state]);
+	pr_info("PM: Entering %s sleep\n", pm_states[state]);	//CORE-KC-DBG_SUSPEND_RESUME-00+	
 	pm_restrict_gfp_mask();
 	error = suspend_devices_and_enter(state);
 	pm_restore_gfp_mask();
 
  Finish:
-	pr_debug("PM: Finishing wakeup.\n");
+//CORE-KC-DBG_SUSPEND_RESUME-00-	pr_debug("PM: Finishing wakeup.\n");
+	pr_info("PM: Finishing wakeup.\n");	//CORE-KC-DBG_SUSPEND_RESUME-00+
 	suspend_finish();
  Unlock:
 	mutex_unlock(&pm_mutex);

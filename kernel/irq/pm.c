@@ -104,6 +104,14 @@ int check_wakeup_irqs(void)
 
 	for_each_irq_desc(irq, desc) {
 		if (irqd_is_wakeup_set(&desc->irq_data)) {
+			//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00+[
+			#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+			pr_info("IRQ %d %s set wake, status(%x)\n",
+				irq,
+				(desc->action && desc->action->name ? desc->action->name : ""),
+				desc->status_use_accessors);
+			#endif
+			//CORE-KC-SUSPEND_RESUME_WAKELOCK_LOG-00+]
 			if (desc->istate & IRQS_PENDING) {
 				pr_info("Wakeup IRQ %d %s pending, suspend aborted\n",
 					irq,

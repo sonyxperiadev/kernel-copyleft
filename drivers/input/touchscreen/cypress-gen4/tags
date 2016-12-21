@@ -1,0 +1,1390 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+BTN_NUM	cyttsp4_device_access.c	60;"	d	file:
+BUFFER_SIZE	cyttsp4_test_device_access_api.c	35;"	d	file:
+COMMAND_INFORMATION	file_node_control/file_node_function.h	558;"	d
+CONFIG_VER_OFFSET	cyttsp4_test_device_access_api.c	32;"	d	file:
+CONFIG_VER_SIZE	cyttsp4_test_device_access_api.c	33;"	d	file:
+CONVERT_TO_INFORMATION_BUFFER	file_node_control/file_node_function.h	/^	CONVERT_TO_INFORMATION_BUFFER	= 60,$/;"	e	enum:touch_command_id
+CYTTSP4_AUTO_LOAD_FOR_CORRUPTED_FW	cyttsp4_loader.c	45;"	d	file:
+CYTTSP4_DEBUG_NAME	cyttsp4_debug.c	50;"	d	file:
+CYTTSP4_DEVICE_ACCESS_NAME	cyttsp4_device_access.h	34;"	d
+CYTTSP4_FW_UPGRADE	cyttsp4_loader.c	47;"	d	file:
+CYTTSP4_I2C_NAME	cyttsp4_i2c.c	/^MODULE_ALIAS(CYTTSP4_I2C_NAME);$/;"	v
+CYTTSP4_I2C_NAME	cyttsp4_i2c.h	33;"	d
+CYTTSP4_INPUT_ELEM_SZ	cyttsp4_device_access.h	36;"	d
+CYTTSP4_LOADER_NAME	cyttsp4_loader.c	42;"	d	file:
+CYTTSP4_SPI_NAME	cyttsp4_spi.h	35;"	d
+CYTTSP4_TCH_PARAM_SIZE_BLK_SZ	cyttsp4_device_access.h	37;"	d
+CYTTSP4_TTCONFIG_CHECK	cyttsp4_loader.c	56;"	d	file:
+CYTTSP4_TTCONFIG_UPGRADE	cyttsp4_loader.c	51;"	d	file:
+CY_ADAP_MIN_XFER	cyttsp4_regs.h	41;"	d
+CY_ARRAY_ID_OFFSET	cyttsp4_loader.c	82;"	d	file:
+CY_BAL_BASE	cyttsp4_device_access.h	/^	CY_BAL_BASE,$/;"	e	enum:cyttsp4_scan_data_type
+CY_BAL_DIFF	cyttsp4_device_access.h	/^	CY_BAL_DIFF,$/;"	e	enum:cyttsp4_scan_data_type
+CY_BAL_RAW	cyttsp4_device_access.h	/^	CY_BAL_RAW,$/;"	e	enum:cyttsp4_scan_data_type
+CY_BITS_PER_BTN	cyttsp4_regs.h	547;"	d
+CY_BOFS_MASK	cyttsp4_regs.h	95;"	d
+CY_BOFS_SHIFT	cyttsp4_regs.h	96;"	d
+CY_BTN_NUM_STATE	cyttsp4_regs.h	/^	CY_BTN_NUM_STATE$/;"	e	enum:cyttsp4_btn_state
+CY_BTN_PRESSED	cyttsp4_regs.h	/^	CY_BTN_PRESSED = 1,$/;"	e	enum:cyttsp4_btn_state
+CY_BTN_RELEASED	cyttsp4_regs.h	/^	CY_BTN_RELEASED = 0,$/;"	e	enum:cyttsp4_btn_state
+CY_BTN_SCAN	cyttsp4_device_access.h	/^	CY_BTN_SCAN,$/;"	e	enum:cyttsp4_idac_type
+CY_BUT_RAW	cyttsp4_device_access.h	/^	CY_BUT_RAW,$/;"	e	enum:cyttsp4_scan_data_type
+CY_BYTE_OFS_MASK	cyttsp4_regs.h	94;"	d
+CY_CALIBRATE_COMPLETE_TIMEOUT	cyttsp4_regs.h	113;"	d
+CY_CMD_BUSY	cyttsp4_loader.c	81;"	d	file:
+CY_CMD_BYTE	cyttsp4_loader.c	71;"	d	file:
+CY_CMD_CAT_CALIBRATE_IDACS	cyttsp4_regs.h	/^	CY_CMD_CAT_CALIBRATE_IDACS,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_CALIBRATE_IDAC_CMD_SZ	cyttsp4_regs.h	219;"	d
+CY_CMD_CAT_CALIBRATE_IDAC_RET_SZ	cyttsp4_regs.h	220;"	d
+CY_CMD_CAT_EXECUTE_PANEL_SCAN_CMD_SZ	cyttsp4_regs.h	228;"	d
+CY_CMD_CAT_EXECUTE_PANEL_SCAN_RET_SZ	cyttsp4_regs.h	229;"	d
+CY_CMD_CAT_EXEC_PANEL_SCAN	cyttsp4_regs.h	/^	CY_CMD_CAT_EXEC_PANEL_SCAN,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_GET_CFG_ROW_SIZE_CMD_SZ	cyttsp4_regs.h	202;"	d
+CY_CMD_CAT_GET_CFG_ROW_SIZE_RET_SZ	cyttsp4_regs.h	203;"	d
+CY_CMD_CAT_GET_CFG_ROW_SZ	cyttsp4_regs.h	/^	CY_CMD_CAT_GET_CFG_ROW_SZ,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_GET_SELFTEST_RES_CMD_SZ	cyttsp4_regs.h	222;"	d
+CY_CMD_CAT_GET_SELFTEST_RES_RET_SZ	cyttsp4_regs.h	223;"	d
+CY_CMD_CAT_GET_SELF_TEST_RESULT	cyttsp4_regs.h	/^	CY_CMD_CAT_GET_SELF_TEST_RESULT,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_INIT_BASELINES	cyttsp4_regs.h	/^	CY_CMD_CAT_INIT_BASELINES,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_INIT_BASELINE_CMD_SZ	cyttsp4_regs.h	225;"	d
+CY_CMD_CAT_INIT_BASELINE_RET_SZ	cyttsp4_regs.h	226;"	d
+CY_CMD_CAT_INT_PIN_MODE	cyttsp4_regs.h	/^	CY_CMD_CAT_INT_PIN_MODE,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_INT_PIN_OVERRIDE_CMD_SZ	cyttsp4_regs.h	240;"	d
+CY_CMD_CAT_INT_PIN_OVERRIDE_RET_SZ	cyttsp4_regs.h	241;"	d
+CY_CMD_CAT_LOAD_SELFTEST_DATA_CMD_SZ	cyttsp4_regs.h	213;"	d
+CY_CMD_CAT_LOAD_SELFTEST_DATA_RET_SZ	cyttsp4_regs.h	214;"	d
+CY_CMD_CAT_LOAD_SELF_TEST_DATA	cyttsp4_regs.h	/^	CY_CMD_CAT_LOAD_SELF_TEST_DATA,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_NULL	cyttsp4_regs.h	/^	CY_CMD_CAT_NULL,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_NULL_CMD_SZ	cyttsp4_regs.h	199;"	d
+CY_CMD_CAT_NULL_RET_SZ	cyttsp4_regs.h	200;"	d
+CY_CMD_CAT_READ_CFG_BLK	cyttsp4_regs.h	/^	CY_CMD_CAT_READ_CFG_BLK,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_READ_CFG_BLK_CMD_SZ	cyttsp4_regs.h	205;"	d
+CY_CMD_CAT_READ_CFG_BLK_RET_HDR_SZ	cyttsp4_regs.h	207;"	d
+CY_CMD_CAT_READ_CFG_BLK_RET_SZ	cyttsp4_regs.h	206;"	d
+CY_CMD_CAT_RESERVED_1	cyttsp4_regs.h	/^	CY_CMD_CAT_RESERVED_1,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_RESERVED_2	cyttsp4_regs.h	/^	CY_CMD_CAT_RESERVED_2,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_RESERVED_N	cyttsp4_regs.h	/^	CY_CMD_CAT_RESERVED_N,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_RETRIEVE_DATA_STRUCTURE	cyttsp4_regs.h	/^	CY_CMD_CAT_RETRIEVE_DATA_STRUCTURE,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_RETRIEVE_DATA_STRUCT_CMD_SZ	cyttsp4_regs.h	243;"	d
+CY_CMD_CAT_RETRIEVE_DATA_STRUCT_RET_SZ	cyttsp4_regs.h	244;"	d
+CY_CMD_CAT_RETRIEVE_PANEL_SCAN	cyttsp4_regs.h	/^	CY_CMD_CAT_RETRIEVE_PANEL_SCAN,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_RETRIEVE_PANEL_SCAN_CMD_SZ	cyttsp4_regs.h	231;"	d
+CY_CMD_CAT_RETRIEVE_PANEL_SCAN_RET_SZ	cyttsp4_regs.h	232;"	d
+CY_CMD_CAT_RUN_SELFTEST_CMD_SZ	cyttsp4_regs.h	216;"	d
+CY_CMD_CAT_RUN_SELFTEST_RET_SZ	cyttsp4_regs.h	217;"	d
+CY_CMD_CAT_RUN_SELF_TEST	cyttsp4_regs.h	/^	CY_CMD_CAT_RUN_SELF_TEST,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_START_SENSOR_DATA_MODE	cyttsp4_regs.h	/^	CY_CMD_CAT_START_SENSOR_DATA_MODE,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_START_SENSOR_MODE_CMD_SZ	cyttsp4_regs.h	234;"	d
+CY_CMD_CAT_START_SENSOR_MODE_RET_SZ	cyttsp4_regs.h	235;"	d
+CY_CMD_CAT_STOP_SENSOR_DATA_MODE	cyttsp4_regs.h	/^	CY_CMD_CAT_STOP_SENSOR_DATA_MODE,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_STOP_SENSOR_MODE_CMD_SZ	cyttsp4_regs.h	237;"	d
+CY_CMD_CAT_STOP_SENSOR_MODE_RET_SZ	cyttsp4_regs.h	238;"	d
+CY_CMD_CAT_VERIFY_CFG_BLK_CRC	cyttsp4_regs.h	/^	CY_CMD_CAT_VERIFY_CFG_BLK_CRC,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_VERIFY_CFG_BLK_CRC_CMD_SZ	cyttsp4_regs.h	246;"	d
+CY_CMD_CAT_VERIFY_CFG_BLK_CRC_RET_SZ	cyttsp4_regs.h	247;"	d
+CY_CMD_CAT_WRITE_CFG_BLK	cyttsp4_regs.h	/^	CY_CMD_CAT_WRITE_CFG_BLK,$/;"	e	enum:cyttsp4_cmd_cat
+CY_CMD_CAT_WRITE_CFG_BLK_CMD_HDR_SZ	cyttsp4_regs.h	211;"	d
+CY_CMD_CAT_WRITE_CFG_BLK_CMD_SZ	cyttsp4_regs.h	209;"	d
+CY_CMD_CAT_WRITE_CFG_BLK_RET_SZ	cyttsp4_regs.h	210;"	d
+CY_CMD_COMPLETE	cyttsp4_regs.h	/^	CY_CMD_COMPLETE    = (1 << 6),$/;"	e	enum:cyttsp_cmd_bits
+CY_CMD_COMPLETE_MASK	cyttsp4_regs.h	72;"	d
+CY_CMD_INDEX	cyttsp4_device_access.c	51;"	d	file:
+CY_CMD_IN_DATA_OFFSET_VALUE	cyttsp4_device_access.h	46;"	d
+CY_CMD_LDR_ENTER	cyttsp4_loader.c	90;"	d	file:
+CY_CMD_LDR_ENTER_CMD_SIZE	cyttsp4_loader.c	91;"	d	file:
+CY_CMD_LDR_ENTER_STAT_SIZE	cyttsp4_loader.c	92;"	d	file:
+CY_CMD_LDR_ERASE_ROW	cyttsp4_loader.c	96;"	d	file:
+CY_CMD_LDR_ERASE_ROW_CMD_SIZE	cyttsp4_loader.c	97;"	d	file:
+CY_CMD_LDR_ERASE_ROW_STAT_SIZE	cyttsp4_loader.c	98;"	d	file:
+CY_CMD_LDR_EXIT	cyttsp4_loader.c	87;"	d	file:
+CY_CMD_LDR_EXIT_CMD_SIZE	cyttsp4_loader.c	88;"	d	file:
+CY_CMD_LDR_EXIT_STAT_SIZE	cyttsp4_loader.c	89;"	d	file:
+CY_CMD_LDR_HOST_SYNC	cyttsp4_loader.c	86;"	d	file:
+CY_CMD_LDR_INIT	cyttsp4_loader.c	93;"	d	file:
+CY_CMD_LDR_INIT_CMD_SIZE	cyttsp4_loader.c	94;"	d	file:
+CY_CMD_LDR_INIT_STAT_SIZE	cyttsp4_loader.c	95;"	d	file:
+CY_CMD_LDR_INIT_TIMEOUT	cyttsp4_loader.c	68;"	d	file:
+CY_CMD_LDR_PROG_ROW	cyttsp4_loader.c	102;"	d	file:
+CY_CMD_LDR_PROG_ROW_CMD_SIZE	cyttsp4_loader.c	103;"	d	file:
+CY_CMD_LDR_PROG_ROW_STAT_SIZE	cyttsp4_loader.c	104;"	d	file:
+CY_CMD_LDR_SEND_DATA	cyttsp4_loader.c	99;"	d	file:
+CY_CMD_LDR_SEND_DATA_CMD_SIZE	cyttsp4_loader.c	100;"	d	file:
+CY_CMD_LDR_SEND_DATA_STAT_SIZE	cyttsp4_loader.c	101;"	d	file:
+CY_CMD_LDR_VERIFY_CHKSUM	cyttsp4_loader.c	108;"	d	file:
+CY_CMD_LDR_VERIFY_CHKSUM_CMD_SIZE	cyttsp4_loader.c	109;"	d	file:
+CY_CMD_LDR_VERIFY_CHKSUM_STAT_SIZE	cyttsp4_loader.c	110;"	d	file:
+CY_CMD_LDR_VERIFY_ROW	cyttsp4_loader.c	105;"	d	file:
+CY_CMD_LDR_VERIFY_ROW_CMD_SIZE	cyttsp4_loader.c	107;"	d	file:
+CY_CMD_LDR_VERIFY_ROW_STAT_SIZE	cyttsp4_loader.c	106;"	d	file:
+CY_CMD_MASK	cyttsp4_regs.h	73;"	d
+CY_CMD_OP_GET_CFG_BLK_CRC_CMD_SZ	cyttsp4_regs.h	192;"	d
+CY_CMD_OP_GET_CFG_BLK_CRC_RET_SZ	cyttsp4_regs.h	193;"	d
+CY_CMD_OP_GET_CRC	cyttsp4_regs.h	/^	CY_CMD_OP_GET_CRC,$/;"	e	enum:cyttsp4_cmd_op
+CY_CMD_OP_GET_CRC_CMD_SZ	cyttsp4_core.c	61;"	d	file:
+CY_CMD_OP_GET_CRC_RET_SZ	cyttsp4_core.c	62;"	d	file:
+CY_CMD_OP_GET_PARAM	cyttsp4_regs.h	/^	CY_CMD_OP_GET_PARAM,$/;"	e	enum:cyttsp4_cmd_op
+CY_CMD_OP_GET_PARAM_CMD_SZ	cyttsp4_regs.h	186;"	d
+CY_CMD_OP_GET_PARAM_RET_SZ	cyttsp4_regs.h	187;"	d
+CY_CMD_OP_GET_PARA_CMD_SZ	cyttsp4_core.c	66;"	d	file:
+CY_CMD_OP_GET_PARA_RET_SZ	cyttsp4_core.c	68;"	d	file:
+CY_CMD_OP_NULL	cyttsp4_regs.h	/^	CY_CMD_OP_NULL,$/;"	e	enum:cyttsp4_cmd_op
+CY_CMD_OP_NULL_CMD_SZ	cyttsp4_regs.h	183;"	d
+CY_CMD_OP_NULL_RET_SZ	cyttsp4_regs.h	184;"	d
+CY_CMD_OP_RESERVED_1	cyttsp4_regs.h	/^	CY_CMD_OP_RESERVED_1,$/;"	e	enum:cyttsp4_cmd_op
+CY_CMD_OP_RESERVED_2	cyttsp4_regs.h	/^	CY_CMD_OP_RESERVED_2,$/;"	e	enum:cyttsp4_cmd_op
+CY_CMD_OP_SET_PARAM	cyttsp4_regs.h	/^	CY_CMD_OP_SET_PARAM,$/;"	e	enum:cyttsp4_cmd_op
+CY_CMD_OP_SET_PARAM_CMD_SZ	cyttsp4_regs.h	189;"	d
+CY_CMD_OP_SET_PARAM_RET_SZ	cyttsp4_regs.h	190;"	d
+CY_CMD_OP_SET_PARA_CMD_SZ	cyttsp4_core.c	70;"	d	file:
+CY_CMD_OP_SET_PARA_RET_SZ	cyttsp4_core.c	72;"	d	file:
+CY_CMD_OP_WAIT_FOR_EVENT	cyttsp4_regs.h	/^	CY_CMD_OP_WAIT_FOR_EVENT,$/;"	e	enum:cyttsp4_cmd_op
+CY_CMD_OP_WAIT_FOR_EVENT_CMD_SZ	cyttsp4_regs.h	195;"	d
+CY_CMD_OUT_STATUS_OFFSET	cyttsp4_device_access.h	48;"	d
+CY_CMD_RET_PANEL_ELMNT_SZ_MASK	cyttsp4_device_access.h	53;"	d
+CY_CMD_RET_PNL_OUT_DATA_FORMAT_OFFS	cyttsp4_device_access.h	51;"	d
+CY_CMD_RET_PNL_OUT_ELMNT_SZ_OFFS_H	cyttsp4_device_access.h	49;"	d
+CY_CMD_RET_PNL_OUT_ELMNT_SZ_OFFS_L	cyttsp4_device_access.h	50;"	d
+CY_CMD_STATUS_FAILURE	cyttsp4_regs.h	/^	CY_CMD_STATUS_FAILURE,$/;"	e	enum:cyttsp4_cmd_status
+CY_CMD_STATUS_SUCCESS	cyttsp4_regs.h	/^	CY_CMD_STATUS_SUCCESS,$/;"	e	enum:cyttsp4_cmd_status
+CY_CMD_TIMEOUT	cyttsp4_loader.c	67;"	d	file:
+CY_COMMAND_COMPLETE_TIMEOUT	cyttsp4_regs.h	112;"	d
+CY_COMM_BUSY	cyttsp4_loader.c	80;"	d	file:
+CY_CONFIG_LENGTH_INFO_OFFSET	cyttsp4_regs.h	79;"	d
+CY_CONFIG_LENGTH_INFO_SIZE	cyttsp4_regs.h	80;"	d
+CY_CONFIG_LENGTH_OFFSET	cyttsp4_regs.h	81;"	d
+CY_CONFIG_LENGTH_SIZE	cyttsp4_regs.h	82;"	d
+CY_CONFIG_MAXLENGTH_OFFSET	cyttsp4_regs.h	83;"	d
+CY_CONFIG_MAXLENGTH_SIZE	cyttsp4_regs.h	84;"	d
+CY_CORE_BL_HOST_SYNC_BYTE	cyttsp4_core.c	112;"	d	file:
+CY_CORE_MODE_CHANGE_TIMEOUT	cyttsp4_core.c	55;"	d	file:
+CY_CORE_REQUEST_EXCLUSIVE_TIMEOUT	cyttsp4_core.c	52;"	d	file:
+CY_CORE_RESET_AND_WAIT_TIMEOUT	cyttsp4_core.c	56;"	d	file:
+CY_CORE_SLEEP_REQUEST_EXCLUSIVE_TIMEOUT	cyttsp4_core.c	53;"	d	file:
+CY_CORE_STARTUP_RETRY_COUNT	cyttsp4_core.c	59;"	d	file:
+CY_CORE_WAIT_SYSINFO_MODE_TIMEOUT	cyttsp4_core.c	54;"	d	file:
+CY_CORE_WAKEUP_TIMEOUT	cyttsp4_core.c	57;"	d	file:
+CY_DATA_ROW_SIZE	cyttsp4_loader.c	76;"	d	file:
+CY_DATA_ROW_SIZE_TMA400	cyttsp4_loader.c	77;"	d	file:
+CY_DA_REQUEST_EXCLUSIVE_TIMEOUT	cyttsp4_device_access.h	40;"	d
+CY_DBG_RESET	cyttsp4_regs.h	120;"	d
+CY_DBG_RESUME	cyttsp4_regs.h	118;"	d
+CY_DBG_SOFT_RESET	cyttsp4_regs.h	119;"	d
+CY_DBG_SUSPEND	cyttsp4_regs.h	117;"	d
+CY_DDATA_EBID	cyttsp4_regs.h	/^	CY_DDATA_EBID,$/;"	e	enum:cyttsp4_ic_ebid
+CY_DEFAULT_ADAP_MAX_XFER	cyttsp4_regs.h	40;"	d
+CY_DEFAULT_CORE_ID	cyttsp4_regs.h	46;"	d
+CY_EBID_NUM	cyttsp4_regs.h	/^	CY_EBID_NUM,$/;"	e	enum:cyttsp4_ic_ebid
+CY_END_OF_PACKET	cyttsp4_loader.c	75;"	d	file:
+CY_EV_LIFTOFF	cyttsp4_regs.h	/^	CY_EV_LIFTOFF,		\/* record reports last position *\/$/;"	e	enum:cyttsp4_event_id
+CY_EV_MOVE	cyttsp4_regs.h	/^	CY_EV_MOVE,		\/* significant displacement (> act dist) *\/$/;"	e	enum:cyttsp4_event_id
+CY_EV_NO_EVENT	cyttsp4_regs.h	/^	CY_EV_NO_EVENT,$/;"	e	enum:cyttsp4_event_id
+CY_EV_TOUCHDOWN	cyttsp4_regs.h	/^	CY_EV_TOUCHDOWN,$/;"	e	enum:cyttsp4_event_id
+CY_FW_FILE_NAME	cyttsp4_core.c	/^MODULE_FIRMWARE(CY_FW_FILE_NAME);$/;"	v
+CY_FW_FILE_NAME	cyttsp4_regs.h	38;"	d
+CY_FW_MANUAL_UPGRADE_FILE_NAME	cyttsp4_loader.c	43;"	d	file:
+CY_HST_CAT	cyttsp4_regs.h	/^	CY_HST_CAT         = (2 << 4),$/;"	e	enum:cyttsp4_hst_mode_bits
+CY_HST_DEVICE_MODE	cyttsp4_regs.h	/^	CY_HST_DEVICE_MODE = (7 << 4),$/;"	e	enum:cyttsp4_hst_mode_bits
+CY_HST_LOWPOW	cyttsp4_regs.h	/^	CY_HST_LOWPOW      = (1 << 2),$/;"	e	enum:cyttsp4_hst_mode_bits
+CY_HST_MODE_CHANGE	cyttsp4_regs.h	/^	CY_HST_MODE_CHANGE = (1 << 3),$/;"	e	enum:cyttsp4_hst_mode_bits
+CY_HST_OPERATE	cyttsp4_regs.h	/^	CY_HST_OPERATE     = (0 << 4),$/;"	e	enum:cyttsp4_hst_mode_bits
+CY_HST_RESET	cyttsp4_regs.h	/^	CY_HST_RESET       = (1 << 0),$/;"	e	enum:cyttsp4_hst_mode_bits
+CY_HST_SLEEP	cyttsp4_regs.h	/^	CY_HST_SLEEP       = (1 << 1),$/;"	e	enum:cyttsp4_hst_mode_bits
+CY_HST_SYSINFO	cyttsp4_regs.h	/^	CY_HST_SYSINFO     = (1 << 4),$/;"	e	enum:cyttsp4_hst_mode_bits
+CY_HST_TOGGLE	cyttsp4_regs.h	/^	CY_HST_TOGGLE      = (1 << 7),$/;"	e	enum:cyttsp4_hst_mode_bits
+CY_I2C_DATA_SIZE	cyttsp4_i2c.c	57;"	d	file:
+CY_I2C_DATA_SIZE	file_node_control/file_node_function.h	26;"	d
+CY_IC_GRPNUM_BTN_KEYS	cyttsp4_regs.h	/^	CY_IC_GRPNUM_BTN_KEYS,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_CMD_REGS	cyttsp4_regs.h	/^	CY_IC_GRPNUM_CMD_REGS,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_DATA_REC	cyttsp4_regs.h	/^	CY_IC_GRPNUM_DATA_REC,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_DDATA_REC	cyttsp4_regs.h	/^	CY_IC_GRPNUM_DDATA_REC,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_MDATA_REC	cyttsp4_regs.h	/^	CY_IC_GRPNUM_MDATA_REC,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_NUM	cyttsp4_regs.h	/^	CY_IC_GRPNUM_NUM$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_OPCFG_REC	cyttsp4_regs.h	/^	CY_IC_GRPNUM_OPCFG_REC,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_PCFG_REC	cyttsp4_regs.h	/^	CY_IC_GRPNUM_PCFG_REC,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_RESERVED	cyttsp4_regs.h	/^	CY_IC_GRPNUM_RESERVED,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_RESERVED1	cyttsp4_regs.h	/^	CY_IC_GRPNUM_RESERVED1,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_RESERVED2	cyttsp4_regs.h	/^	CY_IC_GRPNUM_RESERVED2,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_TCH_PARM_SIZE	cyttsp4_regs.h	/^	CY_IC_GRPNUM_TCH_PARM_SIZE,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_TCH_PARM_VAL	cyttsp4_regs.h	/^	CY_IC_GRPNUM_TCH_PARM_VAL,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_TCH_REP	cyttsp4_regs.h	/^	CY_IC_GRPNUM_TCH_REP,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_TEST_REC	cyttsp4_regs.h	/^	CY_IC_GRPNUM_TEST_REC,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_TEST_REGS	cyttsp4_regs.h	/^	CY_IC_GRPNUM_TEST_REGS,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_IC_GRPNUM_TTHE_REGS	cyttsp4_regs.h	/^	CY_IC_GRPNUM_TTHE_REGS,$/;"	e	enum:cyttsp4_ic_grpnum
+CY_INT_AWAKE	cyttsp4_regs.h	/^	CY_INT_AWAKE       = (1 << 3),$/;"	e	enum:cyttsp4_int_state
+CY_INT_EXEC_CMD	cyttsp4_regs.h	/^	CY_INT_EXEC_CMD    = (1 << 2),$/;"	e	enum:cyttsp4_int_state
+CY_INT_IGNORE	cyttsp4_regs.h	/^	CY_INT_IGNORE      = (1 << 0),$/;"	e	enum:cyttsp4_int_state
+CY_INT_MODE_CHANGE	cyttsp4_regs.h	/^	CY_INT_MODE_CHANGE = (1 << 1),$/;"	e	enum:cyttsp4_int_state
+CY_INT_NONE	cyttsp4_regs.h	/^	CY_INT_NONE,$/;"	e	enum:cyttsp4_int_state
+CY_INVERT_ORIGIN	cyttsp4_regs.h	502;"	d
+CY_LDR_REQUEST_EXCLUSIVE_TIMEOUT	cyttsp4_loader.c	69;"	d	file:
+CY_MAX_CONFIG_BYTES	cyttsp4_device_access.c	50;"	d	file:
+CY_MAX_NUM_CORE_DEVS	cyttsp4_regs.h	47;"	d
+CY_MAX_PACKET_LEN	cyttsp4_loader.c	79;"	d	file:
+CY_MAX_PRBUF_SIZE	cyttsp4_regs.h	43;"	d
+CY_MAX_STATUS_SIZE	cyttsp4_loader.c	73;"	d	file:
+CY_MDATA_EBID	cyttsp4_regs.h	/^	CY_MDATA_EBID,$/;"	e	enum:cyttsp4_ic_ebid
+CY_MNTR_DISABLED	cyttsp4_debug.c	/^	CY_MNTR_DISABLED,$/;"	e	enum:cyttsp4_monitor_status	file:
+CY_MNTR_ENABLED	cyttsp4_debug.c	/^	CY_MNTR_ENABLED,$/;"	e	enum:cyttsp4_monitor_status	file:
+CY_MODE_BOOTLOADER	cyttsp4_regs.h	/^	CY_MODE_BOOTLOADER   = (1 << 1),$/;"	e	enum:cyttsp4_mode
+CY_MODE_CAT	cyttsp4_regs.h	/^	CY_MODE_CAT          = (1 << 4),$/;"	e	enum:cyttsp4_mode
+CY_MODE_CHANGED	cyttsp4_regs.h	/^	CY_MODE_CHANGED      = (1 << 8),$/;"	e	enum:cyttsp4_mode
+CY_MODE_CHANGE_MODE	cyttsp4_regs.h	/^	CY_MODE_CHANGE_MODE  = (1 << 7),$/;"	e	enum:cyttsp4_mode
+CY_MODE_CMD_COMPLETE	cyttsp4_regs.h	/^	CY_MODE_CMD_COMPLETE = (1 << 9),$/;"	e	enum:cyttsp4_mode
+CY_MODE_LOADER	cyttsp4_regs.h	/^	CY_MODE_LOADER       = (1 << 6),$/;"	e	enum:cyttsp4_mode
+CY_MODE_OPERATIONAL	cyttsp4_regs.h	/^	CY_MODE_OPERATIONAL  = (1 << 2),$/;"	e	enum:cyttsp4_mode
+CY_MODE_STARTUP	cyttsp4_regs.h	/^	CY_MODE_STARTUP      = (1 << 5),$/;"	e	enum:cyttsp4_mode
+CY_MODE_SYSINFO	cyttsp4_regs.h	/^	CY_MODE_SYSINFO      = (1 << 3),$/;"	e	enum:cyttsp4_mode
+CY_MODE_UNKNOWN	cyttsp4_regs.h	/^	CY_MODE_UNKNOWN      = 0,$/;"	e	enum:cyttsp4_mode
+CY_MUT_BASE	cyttsp4_device_access.h	/^	CY_MUT_BASE,$/;"	e	enum:cyttsp4_scan_data_type
+CY_MUT_DIFF	cyttsp4_device_access.h	/^	CY_MUT_DIFF,$/;"	e	enum:cyttsp4_scan_data_type
+CY_MUT_RAW	cyttsp4_device_access.h	/^	CY_MUT_RAW,$/;"	e	enum:cyttsp4_scan_data_type
+CY_MUT_SCAN	cyttsp4_device_access.h	/^	CY_MUT_SCAN,$/;"	e	enum:cyttsp4_idac_type
+CY_NORMAL_ORIGIN	cyttsp4_regs.h	501;"	d
+CY_NULL_CMD_HANDSHAKE	cyttsp4_regs.h	/^	CY_NULL_CMD_HANDSHAKE,$/;"	e	enum:cyttsp4_null_test_cmd_code
+CY_NULL_CMD_INDEX	cyttsp4_device_access.c	52;"	d	file:
+CY_NULL_CMD_LOW_POWER	cyttsp4_regs.h	/^	CY_NULL_CMD_LOW_POWER,$/;"	e	enum:cyttsp4_null_test_cmd_code
+CY_NULL_CMD_MODE	cyttsp4_regs.h	/^	CY_NULL_CMD_MODE,$/;"	e	enum:cyttsp4_null_test_cmd_code
+CY_NULL_CMD_MODE_INDEX	cyttsp4_device_access.c	53;"	d	file:
+CY_NULL_CMD_NULL	cyttsp4_regs.h	/^	CY_NULL_CMD_NULL,$/;"	e	enum:cyttsp4_null_test_cmd_code
+CY_NULL_CMD_SIZEH_INDEX	cyttsp4_device_access.c	56;"	d	file:
+CY_NULL_CMD_SIZEL_INDEX	cyttsp4_device_access.c	55;"	d	file:
+CY_NULL_CMD_SIZE_INDEX	cyttsp4_device_access.c	54;"	d	file:
+CY_NULL_CMD_STATUS_SIZE	cyttsp4_regs.h	/^	CY_NULL_CMD_STATUS_SIZE,$/;"	e	enum:cyttsp4_null_test_cmd_code
+CY_NUM_BTN_PER_REG	cyttsp4_regs.h	546;"	d
+CY_NUM_DDATA	cyttsp4_regs.h	68;"	d
+CY_NUM_EXT_TCH_FIELDS	cyttsp4_regs.h	436;"	d
+CY_NUM_MDATA	cyttsp4_regs.h	69;"	d
+CY_NUM_REVCTRL	cyttsp4_regs.h	67;"	d
+CY_NUM_TCH_FIELDS	cyttsp4_regs.h	435;"	d
+CY_OBJ_GLOVE	cyttsp4_regs.h	/^	CY_OBJ_GLOVE           = 4,$/;"	e	enum:cyttsp4_object_id
+CY_OBJ_PROXIMITY	cyttsp4_regs.h	/^	CY_OBJ_PROXIMITY       = 1,$/;"	e	enum:cyttsp4_object_id
+CY_OBJ_STANDARD_FINGER	cyttsp4_regs.h	/^	CY_OBJ_STANDARD_FINGER = 0,$/;"	e	enum:cyttsp4_object_id
+CY_OBJ_STYLUS	cyttsp4_regs.h	/^	CY_OBJ_STYLUS          = 2,$/;"	e	enum:cyttsp4_object_id
+CY_OP_PARA_SCAN_TYPE	cyttsp4_core.c	64;"	d	file:
+CY_OP_PARA_SCAN_TYPE_APAMC_MASK	cyttsp4_core.c	78;"	d	file:
+CY_OP_PARA_SCAN_TYPE_GLOVE_MASK	cyttsp4_core.c	80;"	d	file:
+CY_OP_PARA_SCAN_TYPE_NORMAL	cyttsp4_core.c	74;"	d	file:
+CY_OP_PARA_SCAN_TYPE_SZ	cyttsp4_core.c	76;"	d	file:
+CY_PACKET_DATA_LEN	cyttsp4_loader.c	78;"	d	file:
+CY_POST_CODEL_CFG_DATA_CRC_FAIL	cyttsp4_regs.h	336;"	d
+CY_POST_CODEL_PANEL_TEST_FAIL	cyttsp4_regs.h	337;"	d
+CY_POST_CODEL_WDG_RST	cyttsp4_regs.h	335;"	d
+CY_PROXIMITY_OFF	cyttsp4_proximity.c	51;"	d	file:
+CY_PROXIMITY_ON	cyttsp4_proximity.c	50;"	d	file:
+CY_PROXIMITY_REQUEST_EXCLUSIVE_TIMEOUT	cyttsp4_proximity.c	48;"	d	file:
+CY_PR_TRUNCATED	cyttsp4_regs.h	44;"	d
+CY_RAM_ID_ACTIVE_DISTANCE	cyttsp4_regs.h	249;"	d
+CY_RAM_ID_ACTIVE_DISTANCE2	cyttsp4_regs.h	255;"	d
+CY_RAM_ID_ACTIVE_LFT_INTERVAL	cyttsp4_regs.h	254;"	d
+CY_RAM_ID_ACTIVE_MODE_TIMEOUT	cyttsp4_regs.h	253;"	d
+CY_RAM_ID_CHARGER_STATUS	cyttsp4_regs.h	256;"	d
+CY_RAM_ID_DETECT_AREA_MARGIN_X	cyttsp4_regs.h	259;"	d
+CY_RAM_ID_DETECT_AREA_MARGIN_Y	cyttsp4_regs.h	260;"	d
+CY_RAM_ID_FINGER_THRESHOLH	cyttsp4_regs.h	258;"	d
+CY_RAM_ID_GRIP_EXC_EDGE_ORIGIN	cyttsp4_regs.h	270;"	d
+CY_RAM_ID_GRIP_FIRST_EXC	cyttsp4_regs.h	269;"	d
+CY_RAM_ID_GRIP_XEDGE_A	cyttsp4_regs.h	261;"	d
+CY_RAM_ID_GRIP_XEDGE_B	cyttsp4_regs.h	262;"	d
+CY_RAM_ID_GRIP_XEXC_A	cyttsp4_regs.h	263;"	d
+CY_RAM_ID_GRIP_XEXC_B	cyttsp4_regs.h	264;"	d
+CY_RAM_ID_GRIP_YEDGE_A	cyttsp4_regs.h	265;"	d
+CY_RAM_ID_GRIP_YEDGE_B	cyttsp4_regs.h	266;"	d
+CY_RAM_ID_GRIP_YEXC_A	cyttsp4_regs.h	267;"	d
+CY_RAM_ID_GRIP_YEXC_B	cyttsp4_regs.h	268;"	d
+CY_RAM_ID_IMO_TRIM_VALUE	cyttsp4_regs.h	257;"	d
+CY_RAM_ID_LOW_POWER_INTERVAL	cyttsp4_regs.h	251;"	d
+CY_RAM_ID_PROX_ACTIVE_DIST_Z_VALUE	cyttsp4_regs.h	271;"	d
+CY_RAM_ID_REFRESH_INTERVAL	cyttsp4_regs.h	252;"	d
+CY_RAM_ID_SCAN_TYPE	cyttsp4_regs.h	250;"	d
+CY_REG_BASE	cyttsp4_regs.h	66;"	d
+CY_REG_CAT_CMD	cyttsp4_regs.h	71;"	d
+CY_ROW_DATA_OFFSET	cyttsp4_loader.c	85;"	d	file:
+CY_ROW_NUM_OFFSET	cyttsp4_loader.c	83;"	d	file:
+CY_ROW_SIZE_OFFSET	cyttsp4_loader.c	84;"	d	file:
+CY_SCAN_TYPE_APA_MC	cyttsp4_regs.h	126;"	d
+CY_SCAN_TYPE_GLOVE	cyttsp4_regs.h	123;"	d
+CY_SCAN_TYPE_PROXIMITY	cyttsp4_regs.h	125;"	d
+CY_SCAN_TYPE_STYLUS	cyttsp4_regs.h	124;"	d
+CY_SELF_BASE	cyttsp4_device_access.h	/^	CY_SELF_BASE,$/;"	e	enum:cyttsp4_scan_data_type
+CY_SELF_DIFF	cyttsp4_device_access.h	/^	CY_SELF_DIFF,$/;"	e	enum:cyttsp4_scan_data_type
+CY_SELF_RAW	cyttsp4_device_access.h	/^	CY_SELF_RAW,$/;"	e	enum:cyttsp4_scan_data_type
+CY_SELF_SCAN	cyttsp4_device_access.h	/^	CY_SELF_SCAN,$/;"	e	enum:cyttsp4_idac_type
+CY_SIGNAL_DISPARITY_MAX	cyttsp4_core.c	/^	CY_SIGNAL_DISPARITY_MAX,$/;"	e	enum:cyttsp4_signal_disparity	file:
+CY_SIGNAL_DISPARITY_NONE	cyttsp4_core.c	/^	CY_SIGNAL_DISPARITY_NONE,$/;"	e	enum:cyttsp4_signal_disparity	file:
+CY_SIGNAL_DISPARITY_PROXIMITY	cyttsp4_core.c	/^	CY_SIGNAL_DISPARITY_PROXIMITY,$/;"	e	enum:cyttsp4_signal_disparity	file:
+CY_SIGNAL_DISPARITY_SENSITIVITY	cyttsp4_core.c	/^	CY_SIGNAL_DISPARITY_SENSITIVITY,$/;"	e	enum:cyttsp4_signal_disparity	file:
+CY_SPI_A8_BIT	cyttsp4_spi.c	49;"	d	file:
+CY_SPI_BITS_PER_WORD	cyttsp4_spi.c	55;"	d	file:
+CY_SPI_DATA_SIZE	cyttsp4_spi.c	54;"	d	file:
+CY_SPI_MAX_HEADER_BYTES	cyttsp4_spi.c	58;"	d	file:
+CY_SPI_NUM_RETRY	cyttsp4_spi.c	56;"	d	file:
+CY_SPI_RD_HEADER_BYTES	cyttsp4_spi.c	51;"	d	file:
+CY_SPI_RD_OP	cyttsp4_spi.c	48;"	d	file:
+CY_SPI_SYNC_ACK	cyttsp4_spi.c	53;"	d	file:
+CY_SPI_SYNC_BYTE	cyttsp4_spi.c	52;"	d	file:
+CY_SPI_WR_HEADER_BYTES	cyttsp4_spi.c	50;"	d	file:
+CY_SPI_WR_OP	cyttsp4_spi.c	47;"	d	file:
+CY_START_OF_PACKET	cyttsp4_loader.c	74;"	d	file:
+CY_STATUS_BYTE	cyttsp4_loader.c	72;"	d	file:
+CY_ST_APA_MC	cyttsp4_regs.h	/^	CY_ST_APA_MC,$/;"	e	enum:cyttsp4_scan_type
+CY_ST_GLOVE	cyttsp4_regs.h	/^	CY_ST_GLOVE,$/;"	e	enum:cyttsp4_scan_type
+CY_ST_PROXIMITY	cyttsp4_regs.h	/^	CY_ST_PROXIMITY,$/;"	e	enum:cyttsp4_scan_type
+CY_ST_STYLUS	cyttsp4_regs.h	/^	CY_ST_STYLUS,$/;"	e	enum:cyttsp4_scan_type
+CY_TCH_E	cyttsp4_regs.h	/^	CY_TCH_E,	\/* EVENT ID *\/$/;"	e	enum:cyttsp4_tch_abs
+CY_TCH_MAJ	cyttsp4_regs.h	/^	CY_TCH_MAJ,	\/* TOUCH_MAJOR *\/$/;"	e	enum:cyttsp4_tch_abs
+CY_TCH_MIN	cyttsp4_regs.h	/^	CY_TCH_MIN,	\/* TOUCH_MINOR *\/$/;"	e	enum:cyttsp4_tch_abs
+CY_TCH_NUM_ABS	cyttsp4_regs.h	/^	CY_TCH_NUM_ABS$/;"	e	enum:cyttsp4_tch_abs
+CY_TCH_O	cyttsp4_regs.h	/^	CY_TCH_O,	\/* OBJECT ID *\/$/;"	e	enum:cyttsp4_tch_abs
+CY_TCH_OR	cyttsp4_regs.h	/^	CY_TCH_OR,	\/* ORIENTATION *\/$/;"	e	enum:cyttsp4_tch_abs
+CY_TCH_P	cyttsp4_regs.h	/^	CY_TCH_P,	\/* P (Z) *\/$/;"	e	enum:cyttsp4_tch_abs
+CY_TCH_PARM_EBID	cyttsp4_regs.h	/^	CY_TCH_PARM_EBID,$/;"	e	enum:cyttsp4_ic_ebid
+CY_TCH_T	cyttsp4_regs.h	/^	CY_TCH_T,	\/* TOUCH ID *\/$/;"	e	enum:cyttsp4_tch_abs
+CY_TCH_W	cyttsp4_regs.h	/^	CY_TCH_W,	\/* SIZE *\/$/;"	e	enum:cyttsp4_tch_abs
+CY_TCH_X	cyttsp4_regs.h	/^	CY_TCH_X,	\/* X *\/$/;"	e	enum:cyttsp4_tch_abs
+CY_TCH_Y	cyttsp4_regs.h	/^	CY_TCH_Y,	\/* Y *\/$/;"	e	enum:cyttsp4_tch_abs
+CY_TEST_MODE_CAT	cyttsp4_regs.h	/^	CY_TEST_MODE_CAT,		\/* Configuration and Test *\/$/;"	e	enum:cyttsp4_test_mode
+CY_TEST_MODE_CLOSED_UNIT	cyttsp4_regs.h	/^	CY_TEST_MODE_CLOSED_UNIT,	\/* Send scan data to sysfs *\/$/;"	e	enum:cyttsp4_test_mode
+CY_TEST_MODE_NORMAL_OP	cyttsp4_regs.h	/^	CY_TEST_MODE_NORMAL_OP,		\/* Send touch data to OS; normal op *\/$/;"	e	enum:cyttsp4_test_mode
+CY_TEST_MODE_SYSINFO	cyttsp4_regs.h	/^	CY_TEST_MODE_SYSINFO,		\/* System information mode *\/$/;"	e	enum:cyttsp4_test_mode
+CY_TMA1036_MAX_TCH	cyttsp4_regs.h	49;"	d
+CY_TMA4XX_MAX_TCH	cyttsp4_regs.h	50;"	d
+CY_TTCONFIG_VERSION_OFFSET	cyttsp4_regs.h	75;"	d
+CY_TTCONFIG_VERSION_ROW	cyttsp4_regs.h	77;"	d
+CY_TTCONFIG_VERSION_SIZE	cyttsp4_regs.h	76;"	d
+CY_WATCHDOG_TIMEOUT	cyttsp4_regs.h	114;"	d
+DEVICE_BTN	cyttsp4_devtree.c	/^	DEVICE_BTN,$/;"	e	enum:cyttsp4_device_type	file:
+DEVICE_MT	cyttsp4_devtree.c	/^	DEVICE_MT,$/;"	e	enum:cyttsp4_device_type	file:
+DEVICE_PROXIMITY	cyttsp4_devtree.c	/^	DEVICE_PROXIMITY,$/;"	e	enum:cyttsp4_device_type	file:
+DEVICE_TYPE_MAX	cyttsp4_devtree.c	/^	DEVICE_TYPE_MAX,$/;"	e	enum:cyttsp4_device_type	file:
+ENABLE_VIRTUAL_KEYS	cyttsp4_devtree.c	48;"	d	file:
+ERROR_COMMAND	cyttsp4_loader.c	/^	ERROR_COMMAND = 1,$/;"	e	enum:ldr_status	file:
+ERROR_FLASH_ARRAY	cyttsp4_loader.c	/^	ERROR_FLASH_ARRAY = 2,$/;"	e	enum:ldr_status	file:
+ERROR_FLASH_CHECKSUM	cyttsp4_loader.c	/^	ERROR_FLASH_CHECKSUM = 7,$/;"	e	enum:ldr_status	file:
+ERROR_FLASH_PROTECTION	cyttsp4_loader.c	/^	ERROR_FLASH_PROTECTION = 6,$/;"	e	enum:ldr_status	file:
+ERROR_INVALID	cyttsp4_loader.c	/^	ERROR_INVALID$/;"	e	enum:ldr_status	file:
+ERROR_INVALID_COMMAND	cyttsp4_loader.c	/^	ERROR_INVALID_COMMAND = 15,$/;"	e	enum:ldr_status	file:
+ERROR_PACKET_CHECKSUM	cyttsp4_loader.c	/^	ERROR_PACKET_CHECKSUM = 5,$/;"	e	enum:ldr_status	file:
+ERROR_PACKET_DATA	cyttsp4_loader.c	/^	ERROR_PACKET_DATA = 3,$/;"	e	enum:ldr_status	file:
+ERROR_PACKET_LEN	cyttsp4_loader.c	/^	ERROR_PACKET_LEN = 4,$/;"	e	enum:ldr_status	file:
+ERROR_SUCCESS	cyttsp4_loader.c	/^	ERROR_SUCCESS = 0,$/;"	e	enum:ldr_status	file:
+ERROR_UKNOWN1	cyttsp4_loader.c	/^	ERROR_UKNOWN1 = 9,$/;"	e	enum:ldr_status	file:
+ERROR_UKNOWN2	cyttsp4_loader.c	/^	ERROR_UKNOWN2 = 10,$/;"	e	enum:ldr_status	file:
+ERROR_UKNOWN3	cyttsp4_loader.c	/^	ERROR_UKNOWN3 = 11,$/;"	e	enum:ldr_status	file:
+ERROR_UKNOWN4	cyttsp4_loader.c	/^	ERROR_UKNOWN4 = 12,$/;"	e	enum:ldr_status	file:
+ERROR_UKNOWN5	cyttsp4_loader.c	/^	ERROR_UKNOWN5 = 13,$/;"	e	enum:ldr_status	file:
+ERROR_UKNOWN6	cyttsp4_loader.c	/^	ERROR_UKNOWN6 = 14,$/;"	e	enum:ldr_status	file:
+ERROR_VERIFY_IMAGE	cyttsp4_loader.c	/^	ERROR_VERIFY_IMAGE = 8,$/;"	e	enum:ldr_status	file:
+GET_BOOTLOADER_MODE_STATE	file_node_control/file_node_function.h	/^	GET_BOOTLOADER_MODE_STATE	= 83,$/;"	e	enum:touch_command_id
+GET_FIELD16	cyttsp4_core.c	95;"	d	file:
+GET_FIRMWARE_VERSION	file_node_control/file_node_function.h	/^	GET_FIRMWARE_VERSION		= 80,$/;"	e	enum:touch_command_id
+GET_HSTMODE	cyttsp4_regs.h	57;"	d
+GET_MODE	file_node_control/file_node_function.h	/^	GET_MODE			= 82,$/;"	e	enum:touch_command_id
+GET_NUM_TOUCH_RECORDS	cyttsp4_regs.h	99;"	d
+GET_PANELID	cyttsp4_regs.h	61;"	d
+GET_SENSOR_ID	file_node_control/file_node_function.h	/^	GET_SENSOR_ID			= 81,$/;"	e	enum:touch_command_id
+GET_TOGGLE	cyttsp4_regs.h	58;"	d
+GROUP	file_node_control/file_node_function.h	339;"	d
+GROUP	file_node_control/file_node_function.h	380;"	d
+HI_BYTE	cyttsp4_regs.h	63;"	d
+I2C_BUF_MAX_SIZE	cyttsp4_device_access.c	61;"	d	file:
+INFORMATION_OFFSET	file_node_control/file_node_function.h	343;"	d
+INFORMATION_STRING_LENGTH	file_node_control/file_node_function.h	341;"	d
+INFORMATION_STRING_LENGTH	file_node_control/file_node_function.h	382;"	d
+INFORMATION_VALUE_LENGTH	file_node_control/file_node_function.h	342;"	d
+INFORMATION_VALUE_LENGTH	file_node_control/file_node_function.h	383;"	d
+IS_BAD_PKT	cyttsp4_regs.h	101;"	d
+IS_BOOTLOADER	cyttsp4_regs.h	52;"	d
+IS_BOOTLOADER_IDLE	cyttsp4_regs.h	54;"	d
+IS_DEEP_SLEEP_CONFIGURED	cyttsp4_core.c	82;"	d	file:
+IS_LARGE_AREA	cyttsp4_regs.h	100;"	d
+IS_LITTLEENDIAN	cyttsp4_regs.h	60;"	d
+IS_TMO	cyttsp4_core.c	85;"	d	file:
+IS_TTSP_VER_GE	cyttsp4_regs.h	102;"	d
+LOAD_COMMAND_DATA	file_node_control/file_node_function.h	538;"	d
+LO_BYTE	cyttsp4_regs.h	64;"	d
+MAX_NAME_LENGTH	cyttsp4_devtree.c	50;"	d	file:
+NEXT_VALUE	file_node_control/file_node_function.h	344;"	d
+OFFSET	file_node_control/file_node_function.h	340;"	d
+OFFSET	file_node_control/file_node_function.h	381;"	d
+OPMODE_FINGER	cyttsp4_core.c	/^         OPMODE_FINGER,$/;"	e	enum:cyttsp4_opmode	file:
+OPMODE_GLOVE	cyttsp4_core.c	/^         OPMODE_GLOVE,$/;"	e	enum:cyttsp4_opmode	file:
+OPMODE_NONE	cyttsp4_core.c	/^         OPMODE_NONE,$/;"	e	enum:cyttsp4_opmode	file:
+PARAMETER_STRING	file_node_control/file_node_function.h	551;"	d
+PUT_FIELD16	cyttsp4_core.c	87;"	d	file:
+READ_FROM_I2C	file_node_control/file_node_function.h	/^	READ_FROM_I2C			= 20,$/;"	e	enum:touch_command_id
+REGISTER_FILE_NODE_CONTROL_DRIVER	file_node_control/file_node_control.h	18;"	d
+REGISTER_FILE_NODE_CONTROL_DRIVER	file_node_control/file_node_control.h	9;"	d
+RETRY_OR_EXIT	cyttsp4_core.c	105;"	d	file:
+RX_NUM	cyttsp4_device_access.c	59;"	d	file:
+RestoreGloveState	cyttsp4_core.c	/^EXPORT_SYMBOL( RestoreGloveState );$/;"	v
+RestoreGloveState	cyttsp4_core.c	/^void	RestoreGloveState( void )$/;"	f
+SEAGULL_TTCONFIG_VERSION	cyttsp4_loader.c	59;"	d	file:
+SET_MODE	file_node_control/file_node_function.h	/^	SET_MODE			= 40,$/;"	e	enum:touch_command_id
+SHOW_INFORMATION	file_node_control/file_node_function.h	/^	SHOW_INFORMATION		= 0,$/;"	e	enum:touch_command_id
+SS_SLEEPING	cyttsp4_core.c	/^	SS_SLEEPING,$/;"	e	enum:cyttsp4_sleep_state	file:
+SS_SLEEP_OFF	cyttsp4_core.c	/^	SS_SLEEP_OFF,$/;"	e	enum:cyttsp4_sleep_state	file:
+SS_SLEEP_ON	cyttsp4_core.c	/^	SS_SLEEP_ON,$/;"	e	enum:cyttsp4_sleep_state	file:
+SS_WAKING	cyttsp4_core.c	/^	SS_WAKING,$/;"	e	enum:cyttsp4_sleep_state	file:
+STARTUP_NONE	cyttsp4_core.c	/^	STARTUP_NONE,$/;"	e	enum:cyttsp4_startup_state	file:
+STARTUP_QUEUED	cyttsp4_core.c	/^	STARTUP_QUEUED,$/;"	e	enum:cyttsp4_startup_state	file:
+STARTUP_RUNNING	cyttsp4_core.c	/^	STARTUP_RUNNING,$/;"	e	enum:cyttsp4_startup_state	file:
+TULIP_TTCONFIG_VERSION_1	cyttsp4_loader.c	60;"	d	file:
+TULIP_TTCONFIG_VERSION_2	cyttsp4_loader.c	61;"	d	file:
+TULIP_TTCONFIG_VERSION_DP	cyttsp4_loader.c	62;"	d	file:
+TX_NUM	cyttsp4_device_access.c	58;"	d	file:
+VIRTUAL_KEY_ELEMENT_SIZE	cyttsp4_devtree.c	164;"	d	file:
+WRITE_TO_I2C	file_node_control/file_node_function.h	/^	WRITE_TO_I2C			= 21,$/;"	e	enum:touch_command_id
+_CYTTSP4_REGS_H	cyttsp4_regs.h	34;"	d
+_LINUX_CYTTSP4_DEVICE_ACCESS_H	cyttsp4_device_access.h	32;"	d
+_LINUX_CYTTSP4_I2C_H	cyttsp4_i2c.h	31;"	d
+_LINUX_CYTTSP4_SPI_H	cyttsp4_spi.h	33;"	d
+__packed	cyttsp4_loader.c	/^} __packed;$/;"	v	typeref:struct:cyttsp4_hex_image
+__packed	cyttsp4_regs.h	/^} __packed;$/;"	v	typeref:struct:cyttsp4_cydata
+__packed	cyttsp4_regs.h	/^} __packed;$/;"	v	typeref:struct:cyttsp4_opcfg
+__packed	cyttsp4_regs.h	/^} __packed;$/;"	v	typeref:struct:cyttsp4_pcfg
+__packed	cyttsp4_regs.h	/^} __packed;$/;"	v	typeref:struct:cyttsp4_sysinfo_data
+__packed	cyttsp4_regs.h	/^} __packed;$/;"	v	typeref:struct:cyttsp4_sysinfo_ptr
+__packed	cyttsp4_regs.h	/^} __packed;$/;"	v	typeref:struct:cyttsp4_tch_rec_params
+__packed	cyttsp4_regs.h	/^} __packed;$/;"	v	typeref:struct:cyttsp4_test
+_cyttsp4_awake_device	cyttsp4_core.c	/^static int _cyttsp4_awake_device(struct cyttsp4_core_data *cd)$/;"	f	file:
+_cyttsp4_awake_device_from_deep_sleep	cyttsp4_core.c	/^static int _cyttsp4_awake_device_from_deep_sleep(struct cyttsp4_core_data *cd,$/;"	f	file:
+_cyttsp4_cmd_handshake	cyttsp4_device_access.c	/^static int _cyttsp4_cmd_handshake(struct cyttsp4_device_access_data *dad)$/;"	f	file:
+_cyttsp4_cmd_toggle_lowpower	cyttsp4_device_access.c	/^static int _cyttsp4_cmd_toggle_lowpower(struct cyttsp4_device_access_data *dad)$/;"	f	file:
+_cyttsp4_compute_crc	cyttsp4_loader.c	/^static u16 _cyttsp4_compute_crc(struct cyttsp4_device *ttsp, u8 *buf, int size)$/;"	f	file:
+_cyttsp4_debug_platform_data	cyttsp4_debug.c	/^	_cyttsp4_debug_platform_data = {$/;"	v	typeref:struct:cyttsp4_debug_platform_data	file:
+_cyttsp4_device_access_platform_data	cyttsp4_device_access.c	/^	_cyttsp4_device_access_platform_data = {$/;"	v	typeref:struct:cyttsp4_device_access_platform_data	file:
+_cyttsp4_exec_cmd	cyttsp4_core.c	/^static int _cyttsp4_exec_cmd(struct cyttsp4_core_data *cd, u8 mode,$/;"	f	file:
+_cyttsp4_exec_scan_cmd	cyttsp4_device_access.c	/^static int _cyttsp4_exec_scan_cmd(struct device *dev)$/;"	f	file:
+_cyttsp4_firmware_cont	cyttsp4_loader.c	/^static void _cyttsp4_firmware_cont(const struct firmware *fw, void *context)$/;"	f	file:
+_cyttsp4_firmware_cont_builtin	cyttsp4_loader.c	/^static void _cyttsp4_firmware_cont_builtin(const struct firmware *fw,$/;"	f	file:
+_cyttsp4_generate_new_scantype	cyttsp4_core.c	/^static u8 _cyttsp4_generate_new_scantype(struct cyttsp4_core_data *cd)$/;"	f	file:
+_cyttsp4_get_row	cyttsp4_loader.c	/^static u8 *_cyttsp4_get_row(struct cyttsp4_device *ttsp,$/;"	f	file:
+_cyttsp4_get_short	cyttsp4_loader.c	/^static u16 _cyttsp4_get_short(u8 *buf)$/;"	f	file:
+_cyttsp4_get_status	cyttsp4_loader.c	/^static int _cyttsp4_get_status(struct cyttsp4_device *ttsp,$/;"	f	file:
+_cyttsp4_ldr_enter	cyttsp4_loader.c	/^static int _cyttsp4_ldr_enter(struct cyttsp4_device *ttsp,$/;"	f	file:
+_cyttsp4_ldr_exit	cyttsp4_loader.c	/^static int _cyttsp4_ldr_exit(struct cyttsp4_device *ttsp)$/;"	f	file:
+_cyttsp4_ldr_init	cyttsp4_loader.c	/^static int _cyttsp4_ldr_init(struct cyttsp4_device *ttsp)$/;"	f	file:
+_cyttsp4_ldr_parse_row	cyttsp4_loader.c	/^static int _cyttsp4_ldr_parse_row(struct cyttsp4_device *ttsp, u8 *row_buf,$/;"	f	file:
+_cyttsp4_ldr_prog_row	cyttsp4_loader.c	/^static int _cyttsp4_ldr_prog_row(struct cyttsp4_device *ttsp,$/;"	f	file:
+_cyttsp4_ldr_verify_chksum	cyttsp4_loader.c	/^static int _cyttsp4_ldr_verify_chksum(struct cyttsp4_device *ttsp,$/;"	f	file:
+_cyttsp4_ldr_verify_row	cyttsp4_loader.c	/^static int _cyttsp4_ldr_verify_row(struct cyttsp4_device *ttsp,$/;"	f	file:
+_cyttsp4_load_app	cyttsp4_loader.c	/^static int _cyttsp4_load_app(struct cyttsp4_device *ttsp, const u8 *fw,$/;"	f	file:
+_cyttsp4_loader_platform_data	cyttsp4_platform.c	/^struct cyttsp4_loader_platform_data _cyttsp4_loader_platform_data = {$/;"	v	typeref:struct:cyttsp4_loader_platform_data
+_cyttsp4_proximity_disable	cyttsp4_proximity.c	/^static int _cyttsp4_proximity_disable(struct cyttsp4_proximity_data *pd,$/;"	f	file:
+_cyttsp4_proximity_enable	cyttsp4_proximity.c	/^static int _cyttsp4_proximity_enable(struct cyttsp4_proximity_data *pd)$/;"	f	file:
+_cyttsp4_put_device_into_deep_sleep	cyttsp4_core.c	/^static int _cyttsp4_put_device_into_deep_sleep(struct cyttsp4_core_data *cd,$/;"	f	file:
+_cyttsp4_put_device_into_easy_wakeup	cyttsp4_core.c	/^static int _cyttsp4_put_device_into_easy_wakeup(struct cyttsp4_core_data *cd)$/;"	f	file:
+_cyttsp4_put_device_into_sleep	cyttsp4_core.c	/^static int _cyttsp4_put_device_into_sleep(struct cyttsp4_core_data *cd,$/;"	f	file:
+_cyttsp4_register_core	cyttsp4_bus.c	/^static int _cyttsp4_register_core(struct cyttsp4_core *pdev,$/;"	f	file:
+_cyttsp4_register_dev	cyttsp4_bus.c	/^static int _cyttsp4_register_dev(struct cyttsp4_device *pdev,$/;"	f	file:
+_cyttsp4_reinitialize_core	cyttsp4_bus.c	/^static void _cyttsp4_reinitialize_core(struct cyttsp4_core *core)$/;"	f	file:
+_cyttsp4_reinitialize_device	cyttsp4_bus.c	/^static void _cyttsp4_reinitialize_device(struct cyttsp4_device *dev)$/;"	f	file:
+_cyttsp4_ret_scan_data_cmd	cyttsp4_device_access.c	/^static int _cyttsp4_ret_scan_data_cmd(struct device *dev, int read_offset,$/;"	f	file:
+_cyttsp4_send_cmd	cyttsp4_loader.c	/^static int _cyttsp4_send_cmd(struct cyttsp4_device *ttsp, const u8 *cmd_buf,$/;"	f	file:
+_cyttsp4_spi_pr_buf	cyttsp4_spi.c	/^static void _cyttsp4_spi_pr_buf(struct cyttsp4_spi *ts_spi, u8 *buf,$/;"	f	file:
+_cyttsp4_unregister_and_reinitialize_devices	cyttsp4_bus.c	/^static void _cyttsp4_unregister_and_reinitialize_devices($/;"	f	file:
+_cyttsp4_unregister_core	cyttsp4_bus.c	/^static void _cyttsp4_unregister_core(struct cyttsp4_core *pdev)$/;"	f	file:
+_cyttsp4_unregister_dev	cyttsp4_bus.c	/^static void _cyttsp4_unregister_dev(struct cyttsp4_device *pdev)$/;"	f	file:
+_cyttsp4_wait_cmd_exec	cyttsp4_core.c	/^static int _cyttsp4_wait_cmd_exec(struct cyttsp4_core_data *cd, int timeout_ms)$/;"	f	file:
+_cyttsp4_wait_for_refresh_cycle	cyttsp4_core.c	/^static int _cyttsp4_wait_for_refresh_cycle(struct cyttsp4_core_data *cd,$/;"	f	file:
+_find_da_device	cyttsp4_device_access.c	/^static struct cyttsp4_device *_find_da_device(const char *core_name)$/;"	f	file:
+_get_cmd_offs	cyttsp4_core.c	/^static int _get_cmd_offs(struct cyttsp4_core_data *cd, u8 mode)$/;"	f	file:
+abs	cyttsp4_regs.h	/^	int abs[CY_TCH_NUM_ABS];$/;"	m	struct:cyttsp4_touch
+active_refresh_cycle_ms	cyttsp4_core.c	/^	unsigned int active_refresh_cycle_ms;$/;"	m	struct:cyttsp4_core_data	file:
+active_refresh_interval	cyttsp4_test_device_access_api.c	/^static int active_refresh_interval;$/;"	v	file:
+adap_lock	cyttsp4_core.c	/^	struct mutex adap_lock;$/;"	m	struct:cyttsp4_core_data	typeref:struct:cyttsp4_core_data::mutex	file:
+add_sysfs_interfaces	cyttsp4_core.c	/^static int add_sysfs_interfaces(struct cyttsp4_core_data *cd,$/;"	f	file:
+apa_mc_en	cyttsp4_core.c	/^	int apa_mc_en;$/;"	m	struct:cyttsp4_core_data	file:
+array_id	cyttsp4_loader.c	/^	u8 array_id;$/;"	m	struct:cyttsp4_hex_image	file:
+atten_list	cyttsp4_core.c	/^	struct list_head atten_list[CY_ATTEN_NUM_ATTEN];$/;"	m	struct:cyttsp4_core_data	typeref:struct:cyttsp4_core_data::list_head	file:
+atten_node	cyttsp4_core.c	/^struct atten_node {$/;"	s	file:
+attributes	cyttsp4_core.c	/^static struct device_attribute attributes[] = {$/;"	v	typeref:struct:device_attribute	file:
+bin_attr_config_data	cyttsp4_loader.c	/^static struct bin_attribute bin_attr_config_data = {$/;"	v	typeref:struct:bin_attribute	file:
+bist_buf	cyttsp4_device_access.c	/^	int bist_buf[2];$/;"	m	struct:cyttsp4_device_access_data	file:
+bl_ver	cyttsp4_loader.c	/^	u32 bl_ver;$/;"	m	struct:cyttsp4_dev_id	file:
+blver_major	cyttsp4_regs.h	/^	u8 blver_major;$/;"	m	struct:cyttsp4_cydata
+blver_minor	cyttsp4_regs.h	/^	u8 blver_minor;$/;"	m	struct:cyttsp4_cydata
+board_properties_kobj	cyttsp4_devtree.c	/^static struct kobject *board_properties_kobj;$/;"	v	typeref:struct:kobject	file:
+bofs	cyttsp4_regs.h	/^	size_t bofs;	\/* bit offset *\/$/;"	m	struct:cyttsp4_tch_abs_params
+btn	cyttsp4_regs.h	/^	struct cyttsp4_btn *btn;	\/* button states *\/$/;"	m	struct:cyttsp4_sysinfo	typeref:struct:cyttsp4_sysinfo::cyttsp4_btn
+btn_diff_ofs	cyttsp4_regs.h	/^	size_t btn_diff_ofs;\/* btn data loc ,diff counts, (Op-Mode byte ofs) *\/$/;"	m	struct:cyttsp4_sysinfo_ofs
+btn_diff_ofs	cyttsp4_regs.h	/^	u8 btn_diff_ofs;\/* btn data loc ,diff counts, (Op-Mode byte ofs) *\/$/;"	m	struct:cyttsp4_opcfg
+btn_diff_size	cyttsp4_regs.h	/^	size_t btn_diff_size;\/* btn size of diff counts (in bits) *\/$/;"	m	struct:cyttsp4_sysinfo_ofs
+btn_diff_size	cyttsp4_regs.h	/^	u8 btn_diff_size;\/* btn size of diff counts (in bits) *\/$/;"	m	struct:cyttsp4_opcfg
+btn_keys_size	cyttsp4_regs.h	/^	size_t btn_keys_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+btn_rec_data	cyttsp4_regs.h	/^	u8 *btn_rec_data;		\/* button diff count data *\/$/;"	m	struct:cyttsp4_sysinfo
+btn_rec_size	cyttsp4_regs.h	/^	size_t btn_rec_size; \/* btn record size (in bytes) *\/$/;"	m	struct:cyttsp4_sysinfo_ofs
+btn_rec_size	cyttsp4_regs.h	/^	u8 btn_rec_size;\/* btn record size (in bytes) *\/$/;"	m	struct:cyttsp4_opcfg
+buffer	cyttsp4_test_device_access_api.c	/^static u8 buffer[BUFFER_SIZE];$/;"	v	file:
+builtin_bin_fw_complete	cyttsp4_loader.c	/^	struct completion builtin_bin_fw_complete;$/;"	m	struct:cyttsp4_loader_data	typeref:struct:cyttsp4_loader_data::completion	file:
+builtin_bin_fw_status	cyttsp4_loader.c	/^	int builtin_bin_fw_status;$/;"	m	struct:cyttsp4_loader_data	file:
+calibration_work	cyttsp4_loader.c	/^	struct work_struct calibration_work;$/;"	m	struct:cyttsp4_loader_data	typeref:struct:cyttsp4_loader_data::work_struct	file:
+call_atten_cb	cyttsp4_core.c	/^static void call_atten_cb(struct cyttsp4_core_data *cd,$/;"	f	file:
+chip_type	cyttsp4_regs.h	/^	size_t chip_type;$/;"	m	struct:cyttsp4_sysinfo_ofs
+client	cyttsp4_i2c.c	/^	struct i2c_client *client;$/;"	m	struct:cyttsp4_i2c	typeref:struct:cyttsp4_i2c::i2c_client	file:
+client	cyttsp4_spi.c	/^	struct spi_device *client;$/;"	m	struct:cyttsp4_spi	typeref:struct:cyttsp4_spi::spi_device	file:
+client	file_node_control/file_node_function.h	/^	struct i2c_client *client;$/;"	m	struct:cyttsp4_i2c	typeref:struct:cyttsp4_i2c::i2c_client
+cmd_ofs	cyttsp4_regs.h	/^	size_t cmd_ofs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+cmd_ofs	cyttsp4_regs.h	/^	u8 cmd_ofs;$/;"	m	struct:cyttsp4_opcfg
+cmd_toggle	cyttsp4_core.c	/^	int cmd_toggle;$/;"	m	struct:cyttsp4_core_data	file:
+config_data	cyttsp4_loader.c	/^	u8 *config_data;$/;"	m	struct:cyttsp4_loader_data	file:
+config_loading	cyttsp4_loader.c	/^	bool config_loading;$/;"	m	struct:cyttsp4_loader_data	file:
+config_lock	cyttsp4_loader.c	/^	struct mutex config_lock;$/;"	m	struct:cyttsp4_loader_data	typeref:struct:cyttsp4_loader_data::mutex	file:
+config_size	cyttsp4_loader.c	/^	int config_size;$/;"	m	struct:cyttsp4_loader_data	file:
+convert_to_information_buffer	file_node_control/file_node_function.h	/^static void	convert_to_information_buffer( void *file_node_data, struct command_parameter *parameter_data )$/;"	f
+core	cyttsp4_core.c	/^	struct cyttsp4_core *core;$/;"	m	struct:cyttsp4_core_data	typeref:struct:cyttsp4_core_data::cyttsp4_core	file:
+core_ids	cyttsp4_debug.c	/^static char *core_ids[CY_MAX_NUM_CORE_DEVS] = {$/;"	v	file:
+core_ids	cyttsp4_device_access.c	/^static char *core_ids[CY_MAX_NUM_CORE_DEVS] = {$/;"	v	file:
+core_ids	cyttsp4_loader.c	/^static char *core_ids[CY_MAX_NUM_CORE_DEVS] = {$/;"	v	file:
+crc	cyttsp4_regs.h	/^	u16 crc;$/;"	m	struct:cyttsp4_ttconfig
+create_and_get_btn_pdata	cyttsp4_devtree.c	/^static void *create_and_get_btn_pdata(struct device_node *dev_node)$/;"	f	file:
+create_and_get_core_pdata	cyttsp4_devtree.c	/^static struct cyttsp4_core_platform_data *create_and_get_core_pdata($/;"	f	file:
+create_and_get_device_pdata	cyttsp4_devtree.c	/^static inline void *create_and_get_device_pdata(struct device_node *dev_node,$/;"	f	file:
+create_and_get_mt_pdata	cyttsp4_devtree.c	/^static void *create_and_get_mt_pdata(struct device_node *dev_node)$/;"	f	file:
+create_and_get_pdata	cyttsp4_devtree.c	/^	void *(*create_and_get_pdata)(struct device_node *);$/;"	m	struct:cyttsp4_device_pdata_func	file:
+create_and_get_proximity_pdata	cyttsp4_devtree.c	/^static void *create_and_get_proximity_pdata(struct device_node *dev_node)$/;"	f	file:
+create_and_get_touch_framework	cyttsp4_devtree.c	/^static struct touch_framework *create_and_get_touch_framework($/;"	f	file:
+create_and_get_touch_setting	cyttsp4_devtree.c	/^static struct touch_settings *create_and_get_touch_setting($/;"	f	file:
+create_and_get_u16_array	cyttsp4_devtree.c	/^static u16 *create_and_get_u16_array(struct device_node *dev_node,$/;"	f	file:
+cur_cmd	cyttsp4_regs.h	/^	int cur_cmd;$/;"	m	struct:cyttsp4_test_mode_params
+cur_mode	cyttsp4_regs.h	/^	int cur_mode;$/;"	m	struct:cyttsp4_test_mode_params
+cur_status_size	cyttsp4_regs.h	/^	size_t cur_status_size;$/;"	m	struct:cyttsp4_test_mode_params
+cy_driver_core_date	cyttsp4_core.c	/^const char *cy_driver_core_date = CY_DRIVER_DATE;$/;"	v
+cy_driver_core_name	cyttsp4_core.c	/^const char *cy_driver_core_name = CYTTSP4_CORE_NAME;$/;"	v
+cy_driver_core_version	cyttsp4_core.c	/^const char *cy_driver_core_version = CY_DRIVER_VERSION;$/;"	v
+cydata	cyttsp4_regs.h	/^	struct cyttsp4_cydata *cydata;$/;"	m	struct:cyttsp4_sysinfo_ptr	typeref:struct:cyttsp4_sysinfo_ptr::cyttsp4_cydata
+cydata_ofs	cyttsp4_regs.h	/^	size_t cydata_ofs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+cydata_ofsh	cyttsp4_regs.h	/^	u8 cydata_ofsh;$/;"	m	struct:cyttsp4_sysinfo_data
+cydata_ofsl	cyttsp4_regs.h	/^	u8 cydata_ofsl;$/;"	m	struct:cyttsp4_sysinfo_data
+cydata_size	cyttsp4_regs.h	/^	size_t cydata_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+cyito_idh	cyttsp4_regs.h	/^	u8 cyito_idh;$/;"	m	struct:cyttsp4_cydata
+cyito_idl	cyttsp4_regs.h	/^	u8 cyito_idl;$/;"	m	struct:cyttsp4_cydata
+cyito_verh	cyttsp4_regs.h	/^	u8 cyito_verh;$/;"	m	struct:cyttsp4_cydata
+cyito_verl	cyttsp4_regs.h	/^	u8 cyito_verl;$/;"	m	struct:cyttsp4_cydata
+cyttsp4_adap_read	cyttsp4_core.c	/^static inline int cyttsp4_adap_read(struct cyttsp4_core_data *cd, u16 addr,$/;"	f	file:
+cyttsp4_adap_write	cyttsp4_core.c	/^static inline int cyttsp4_adap_write(struct cyttsp4_core_data *cd, u16 addr,$/;"	f	file:
+cyttsp4_add_adapter	cyttsp4_bus.c	/^EXPORT_SYMBOL_GPL(cyttsp4_add_adapter);$/;"	v
+cyttsp4_add_adapter	cyttsp4_bus.c	/^int cyttsp4_add_adapter(char const *id, struct cyttsp4_ops const *ops,$/;"	f
+cyttsp4_auto_short_check	cyttsp4_device_access.c	/^static ssize_t cyttsp4_auto_short_check(struct device *dev,$/;"	f	file:
+cyttsp4_bist_auto_short_show	cyttsp4_device_access.c	/^static ssize_t cyttsp4_bist_auto_short_show(struct device *dev, struct device_attribute *attr, char *buf)$/;"	f	file:
+cyttsp4_bist_idac_check	cyttsp4_device_access.c	/^static ssize_t cyttsp4_bist_idac_check(struct device *dev, char *buf, int print_idx, enum cyttsp4_idac_type type)$/;"	f	file:
+cyttsp4_bist_idac_show	cyttsp4_device_access.c	/^static ssize_t cyttsp4_bist_idac_show(struct device *dev,$/;"	f	file:
+cyttsp4_bist_open_show	cyttsp4_device_access.c	/^static ssize_t cyttsp4_bist_open_show(struct device *dev, struct device_attribute *attr, char *buf)$/;"	f	file:
+cyttsp4_bist_raw_data_show	cyttsp4_device_access.c	/^static ssize_t cyttsp4_bist_raw_data_show(struct device *dev, struct device_attribute *attr, char *buf)$/;"	f	file:
+cyttsp4_bist_rawdata_check	cyttsp4_device_access.c	/^static int cyttsp4_bist_rawdata_check(struct device *dev, char *buf)$/;"	f	file:
+cyttsp4_bits_2_bytes	cyttsp4_core.c	/^static inline int cyttsp4_bits_2_bytes(int nbits, size_t *max)$/;"	f	file:
+cyttsp4_bootloader_mode_show	cyttsp4_core.c	/^static ssize_t	cyttsp4_bootloader_mode_show( struct device *dev, struct device_attribute *attr, char *buf )$/;"	f	file:
+cyttsp4_btn	cyttsp4_regs.h	/^struct cyttsp4_btn {$/;"	s
+cyttsp4_btn_attention	cyttsp4_btn.c	/^static int cyttsp4_btn_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_btn_close	cyttsp4_btn.c	/^static void cyttsp4_btn_close(struct input_dev *input)$/;"	f	file:
+cyttsp4_btn_data	cyttsp4_btn.c	/^struct cyttsp4_btn_data {$/;"	s	file:
+cyttsp4_btn_driver	cyttsp4_btn.c	/^static struct cyttsp4_driver cyttsp4_btn_driver = {$/;"	v	typeref:struct:cyttsp4_driver	file:
+cyttsp4_btn_early_suspend	cyttsp4_btn.c	/^static void cyttsp4_btn_early_suspend(struct early_suspend *h)$/;"	f	file:
+cyttsp4_btn_exit	cyttsp4_btn.c	/^module_exit(cyttsp4_btn_exit);$/;"	v
+cyttsp4_btn_exit	cyttsp4_btn.c	/^static void __exit cyttsp4_btn_exit(void)$/;"	f	file:
+cyttsp4_btn_init	cyttsp4_btn.c	/^module_init(cyttsp4_btn_init);$/;"	v
+cyttsp4_btn_init	cyttsp4_btn.c	/^static int __init cyttsp4_btn_init(void)$/;"	f	file:
+cyttsp4_btn_key_action	cyttsp4_btn.c	/^static inline void cyttsp4_btn_key_action(struct cyttsp4_btn_data *bd,$/;"	f	file:
+cyttsp4_btn_late_resume	cyttsp4_btn.c	/^static void cyttsp4_btn_late_resume(struct early_suspend *h)$/;"	f	file:
+cyttsp4_btn_lift_all	cyttsp4_btn.c	/^static void cyttsp4_btn_lift_all(struct cyttsp4_btn_data *bd)$/;"	f	file:
+cyttsp4_btn_open	cyttsp4_btn.c	/^static int cyttsp4_btn_open(struct input_dev *input)$/;"	f	file:
+cyttsp4_btn_pm_ops	cyttsp4_btn.c	/^static const struct dev_pm_ops cyttsp4_btn_pm_ops = {$/;"	v	typeref:struct:dev_pm_ops	file:
+cyttsp4_btn_probe	cyttsp4_btn.c	/^static int cyttsp4_btn_probe(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_btn_release	cyttsp4_btn.c	/^static int cyttsp4_btn_release(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_btn_resume	cyttsp4_btn.c	/^static int cyttsp4_btn_resume(struct device *dev)$/;"	f	file:
+cyttsp4_btn_state	cyttsp4_regs.h	/^enum cyttsp4_btn_state {$/;"	g
+cyttsp4_btn_suspend	cyttsp4_btn.c	/^static int cyttsp4_btn_suspend(struct device *dev)$/;"	f	file:
+cyttsp4_bus_exit	cyttsp4_bus.c	/^module_exit(cyttsp4_bus_exit);$/;"	v
+cyttsp4_bus_exit	cyttsp4_bus.c	/^static void __exit cyttsp4_bus_exit(void)$/;"	f	file:
+cyttsp4_bus_init	cyttsp4_bus.c	/^static int __init cyttsp4_bus_init(void)$/;"	f	file:
+cyttsp4_bus_init	cyttsp4_bus.c	/^subsys_initcall(cyttsp4_bus_init);$/;"	v
+cyttsp4_bus_type	cyttsp4_bus.c	/^EXPORT_SYMBOL_GPL(cyttsp4_bus_type);$/;"	v
+cyttsp4_bus_type	cyttsp4_bus.c	/^struct bus_type cyttsp4_bus_type = {$/;"	v	typeref:struct:bus_type
+cyttsp4_bus_type	cyttsp4_bus.c	/^struct bus_type cyttsp4_bus_type;$/;"	v	typeref:struct:bus_type
+cyttsp4_calc_app_crc	cyttsp4_core.c	/^static inline u16 cyttsp4_calc_app_crc(const u8 *data, int size)$/;"	f	file:
+cyttsp4_calc_partial_app_crc	cyttsp4_core.c	/^static u16 cyttsp4_calc_partial_app_crc(const u8 *data, int size, u16 crc)$/;"	f	file:
+cyttsp4_check_core_info	cyttsp4_bus.c	/^static int cyttsp4_check_core_info($/;"	f	file:
+cyttsp4_check_device_info	cyttsp4_bus.c	/^static int cyttsp4_check_device_info($/;"	f	file:
+cyttsp4_check_firmware_version	cyttsp4_loader.c	/^static int cyttsp4_check_firmware_version(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_check_firmware_version_builtin	cyttsp4_loader.c	/^static int cyttsp4_check_firmware_version_builtin(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_check_firmware_version_platform	cyttsp4_loader.c	/^static int cyttsp4_check_firmware_version_platform(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_check_range	cyttsp4_device_access.c	/^static int cyttsp4_check_range(enum cyttsp4_scan_data_type type, int endian, int datasize, struct cyttsp4_device_access_data* dad, int size)$/;"	f	file:
+cyttsp4_check_ttconfig_version	cyttsp4_loader.c	/^static int cyttsp4_check_ttconfig_version(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_check_ttconfig_version_platform	cyttsp4_loader.c	/^static int cyttsp4_check_ttconfig_version_platform(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_cmd_cat	cyttsp4_regs.h	/^enum cyttsp4_cmd_cat {$/;"	g
+cyttsp4_cmd_op	cyttsp4_regs.h	/^enum cyttsp4_cmd_op {$/;"	g
+cyttsp4_cmd_status	cyttsp4_regs.h	/^enum cyttsp4_cmd_status {$/;"	g
+cyttsp4_config_data_write	cyttsp4_loader.c	/^static ssize_t cyttsp4_config_data_write(struct file *filp,$/;"	f	file:
+cyttsp4_config_loading_show	cyttsp4_loader.c	/^static ssize_t cyttsp4_config_loading_show(struct device *dev,$/;"	f	file:
+cyttsp4_config_loading_store	cyttsp4_loader.c	/^static ssize_t cyttsp4_config_loading_store(struct device *dev,$/;"	f	file:
+cyttsp4_core_data	cyttsp4_core.c	/^struct cyttsp4_core_data {$/;"	s	file:
+cyttsp4_core_driver	cyttsp4_core.c	/^static struct cyttsp4_core_driver cyttsp4_core_driver = {$/;"	v	typeref:struct:cyttsp4_core_driver	file:
+cyttsp4_core_drv_probe	cyttsp4_bus.c	/^static int cyttsp4_core_drv_probe(struct device *_dev)$/;"	f	file:
+cyttsp4_core_drv_remove	cyttsp4_bus.c	/^static int cyttsp4_core_drv_remove(struct device *_dev)$/;"	f	file:
+cyttsp4_core_exit	cyttsp4_core.c	/^module_exit(cyttsp4_core_exit);$/;"	v
+cyttsp4_core_exit	cyttsp4_core.c	/^static void __exit cyttsp4_core_exit(void)$/;"	f	file:
+cyttsp4_core_init	cyttsp4_core.c	/^module_init(cyttsp4_core_init);$/;"	v
+cyttsp4_core_init	cyttsp4_core.c	/^static int __init cyttsp4_core_init(void)$/;"	f	file:
+cyttsp4_core_pm_ops	cyttsp4_core.c	/^static const struct dev_pm_ops cyttsp4_core_pm_ops = {$/;"	v	typeref:struct:dev_pm_ops	file:
+cyttsp4_core_probe	cyttsp4_core.c	/^static int cyttsp4_core_probe(struct cyttsp4_core *core)$/;"	f	file:
+cyttsp4_core_release	cyttsp4_core.c	/^static int cyttsp4_core_release(struct cyttsp4_core *core)$/;"	f	file:
+cyttsp4_core_resume	cyttsp4_core.c	/^static int cyttsp4_core_resume(struct device *dev)$/;"	f	file:
+cyttsp4_core_rt_resume	cyttsp4_core.c	/^static int cyttsp4_core_rt_resume(struct device *dev)$/;"	f	file:
+cyttsp4_core_rt_suspend	cyttsp4_core.c	/^static int cyttsp4_core_rt_suspend(struct device *dev)$/;"	f	file:
+cyttsp4_core_sleep	cyttsp4_core.c	/^static int cyttsp4_core_sleep(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_core_sleep_	cyttsp4_core.c	/^static int cyttsp4_core_sleep_(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_core_suspend	cyttsp4_core.c	/^static int cyttsp4_core_suspend(struct device *dev)$/;"	f	file:
+cyttsp4_core_type	cyttsp4_bus.c	/^static struct device_type cyttsp4_core_type = {$/;"	v	typeref:struct:device_type	file:
+cyttsp4_core_wake	cyttsp4_core.c	/^static int cyttsp4_core_wake(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_core_wake_	cyttsp4_core.c	/^static int cyttsp4_core_wake_(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_cydata	cyttsp4_regs.h	/^struct cyttsp4_cydata {$/;"	s
+cyttsp4_debug_cat_attention	cyttsp4_debug.c	/^static int cyttsp4_debug_cat_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_debug_data	cyttsp4_debug.c	/^struct cyttsp4_debug_data {$/;"	s	file:
+cyttsp4_debug_driver	cyttsp4_debug.c	/^static struct cyttsp4_driver cyttsp4_debug_driver = {$/;"	v	typeref:struct:cyttsp4_driver	file:
+cyttsp4_debug_exit	cyttsp4_debug.c	/^module_exit(cyttsp4_debug_exit);$/;"	v
+cyttsp4_debug_exit	cyttsp4_debug.c	/^static void __exit cyttsp4_debug_exit(void)$/;"	f	file:
+cyttsp4_debug_formated	cyttsp4_debug.c	/^static void cyttsp4_debug_formated(struct device *dev, u8 *pr_buf,$/;"	f	file:
+cyttsp4_debug_infos	cyttsp4_debug.c	/^	cyttsp4_debug_infos[CY_MAX_NUM_CORE_DEVS];$/;"	v	typeref:struct:cyttsp4_device_info	file:
+cyttsp4_debug_init	cyttsp4_debug.c	/^module_init(cyttsp4_debug_init);$/;"	v
+cyttsp4_debug_init	cyttsp4_debug.c	/^static int __init cyttsp4_debug_init(void)$/;"	f	file:
+cyttsp4_debug_name	cyttsp4_debug.c	/^static const char cyttsp4_debug_name[] = CYTTSP4_DEBUG_NAME;$/;"	v	file:
+cyttsp4_debug_op_attention	cyttsp4_debug.c	/^static int cyttsp4_debug_op_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_debug_platform_data	cyttsp4_debug.c	/^struct cyttsp4_debug_platform_data {$/;"	s	file:
+cyttsp4_debug_print	cyttsp4_debug.c	/^static void cyttsp4_debug_print(struct device *dev, u8 *pr_buf, u8 *sptr,$/;"	f	file:
+cyttsp4_debug_probe	cyttsp4_debug.c	/^static int cyttsp4_debug_probe(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_debug_release	cyttsp4_debug.c	/^static int cyttsp4_debug_release(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_debug_startup_attention	cyttsp4_debug.c	/^static int cyttsp4_debug_startup_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_del_adapter	cyttsp4_bus.c	/^EXPORT_SYMBOL_GPL(cyttsp4_del_adapter);$/;"	v
+cyttsp4_del_adapter	cyttsp4_bus.c	/^int cyttsp4_del_adapter(char const *id)$/;"	f
+cyttsp4_detect	cyttsp4_platform.c	/^int cyttsp4_detect(struct cyttsp4_core_platform_data *pdata,$/;"	f
+cyttsp4_dev_attrs	cyttsp4_bus.c	/^static struct device_attribute cyttsp4_dev_attrs[] = {$/;"	v	typeref:struct:device_attribute	file:
+cyttsp4_dev_id	cyttsp4_loader.c	/^struct cyttsp4_dev_id {$/;"	s	file:
+cyttsp4_dev_pm_ops	cyttsp4_bus.c	/^static const struct dev_pm_ops cyttsp4_dev_pm_ops = {$/;"	v	typeref:struct:dev_pm_ops	file:
+cyttsp4_dev_release	cyttsp4_bus.c	/^static void cyttsp4_dev_release(struct device *dev)$/;"	f	file:
+cyttsp4_dev_type	cyttsp4_bus.c	/^static struct device_type cyttsp4_dev_type = {$/;"	v	typeref:struct:device_type	file:
+cyttsp4_device_access_data	cyttsp4_device_access.c	/^struct cyttsp4_device_access_data {$/;"	s	file:
+cyttsp4_device_access_driver	cyttsp4_device_access.c	/^static struct cyttsp4_driver cyttsp4_device_access_driver = {$/;"	v	typeref:struct:cyttsp4_driver	file:
+cyttsp4_device_access_exit	cyttsp4_device_access.c	/^module_exit(cyttsp4_device_access_exit);$/;"	v
+cyttsp4_device_access_exit	cyttsp4_device_access.c	/^static void __exit cyttsp4_device_access_exit(void)$/;"	f	file:
+cyttsp4_device_access_infos	cyttsp4_device_access.c	/^	cyttsp4_device_access_infos[CY_MAX_NUM_CORE_DEVS];$/;"	v	typeref:struct:cyttsp4_device_info	file:
+cyttsp4_device_access_init	cyttsp4_device_access.c	/^module_init(cyttsp4_device_access_init);$/;"	v
+cyttsp4_device_access_init	cyttsp4_device_access.c	/^static int __init cyttsp4_device_access_init(void)$/;"	f	file:
+cyttsp4_device_access_name	cyttsp4_device_access.c	/^static const char cyttsp4_device_access_name[] = CYTTSP4_DEVICE_ACCESS_NAME;$/;"	v	file:
+cyttsp4_device_access_platform_data	cyttsp4_device_access.h	/^struct cyttsp4_device_access_platform_data {$/;"	s
+cyttsp4_device_access_pm_ops	cyttsp4_device_access.c	/^static const struct dev_pm_ops cyttsp4_device_access_pm_ops = {$/;"	v	typeref:struct:dev_pm_ops	file:
+cyttsp4_device_access_probe	cyttsp4_device_access.c	/^static int cyttsp4_device_access_probe(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_device_access_read_command	cyttsp4_device_access.c	/^EXPORT_SYMBOL_GPL(cyttsp4_device_access_read_command);$/;"	v
+cyttsp4_device_access_read_command	cyttsp4_device_access.c	/^int cyttsp4_device_access_read_command(const char *core_name, int ic_grpnum,$/;"	f
+cyttsp4_device_access_release	cyttsp4_device_access.c	/^static int cyttsp4_device_access_release(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_device_access_resume	cyttsp4_device_access.c	/^static int cyttsp4_device_access_resume(struct device *dev)$/;"	f	file:
+cyttsp4_device_access_suspend	cyttsp4_device_access.c	/^static int cyttsp4_device_access_suspend(struct device *dev)$/;"	f	file:
+cyttsp4_device_access_write_command	cyttsp4_device_access.c	/^EXPORT_SYMBOL_GPL(cyttsp4_device_access_write_command);$/;"	v
+cyttsp4_device_access_write_command	cyttsp4_device_access.c	/^int cyttsp4_device_access_write_command(const char *core_name, int ic_grpnum,$/;"	f
+cyttsp4_device_match	cyttsp4_bus.c	/^static int cyttsp4_device_match(struct device *dev, struct device_driver *drv)$/;"	f	file:
+cyttsp4_device_pdata_func	cyttsp4_devtree.c	/^struct cyttsp4_device_pdata_func {$/;"	s	file:
+cyttsp4_device_type	cyttsp4_devtree.c	/^enum cyttsp4_device_type {$/;"	g	file:
+cyttsp4_devtree_exit	cyttsp4_devtree.c	/^module_exit(cyttsp4_devtree_exit);$/;"	v
+cyttsp4_devtree_exit	cyttsp4_devtree.c	/^static void __exit cyttsp4_devtree_exit(void)$/;"	f	file:
+cyttsp4_devtree_init	cyttsp4_devtree.c	/^module_init(cyttsp4_devtree_init);$/;"	v
+cyttsp4_devtree_init	cyttsp4_devtree.c	/^static int __init cyttsp4_devtree_init(void)$/;"	f	file:
+cyttsp4_devtree_register_devices	cyttsp4_devtree.c	/^EXPORT_SYMBOL_GPL(cyttsp4_devtree_register_devices);$/;"	v
+cyttsp4_devtree_register_devices	cyttsp4_devtree.c	/^int cyttsp4_devtree_register_devices(struct device *adap_dev)$/;"	f
+cyttsp4_devtree_register_devices	cyttsp4_devtree.h	/^static inline int cyttsp4_devtree_register_devices(struct device *adap_dev)$/;"	f
+cyttsp4_drv_debug_store	cyttsp4_core.c	/^static ssize_t cyttsp4_drv_debug_store(struct device *dev,$/;"	f	file:
+cyttsp4_drv_irq_show	cyttsp4_core.c	/^static ssize_t cyttsp4_drv_irq_show(struct device *dev,$/;"	f	file:
+cyttsp4_drv_irq_store	cyttsp4_core.c	/^static ssize_t cyttsp4_drv_irq_store(struct device *dev,$/;"	f	file:
+cyttsp4_drv_probe	cyttsp4_bus.c	/^static int cyttsp4_drv_probe(struct device *_dev)$/;"	f	file:
+cyttsp4_drv_remove	cyttsp4_bus.c	/^static int cyttsp4_drv_remove(struct device *_dev)$/;"	f	file:
+cyttsp4_drv_ver_show	cyttsp4_core.c	/^static ssize_t cyttsp4_drv_ver_show(struct device *dev,$/;"	f	file:
+cyttsp4_easy_wakeup_gesture_show	cyttsp4_core.c	/^static ssize_t cyttsp4_easy_wakeup_gesture_show(struct device *dev,$/;"	f	file:
+cyttsp4_easy_wakeup_gesture_store	cyttsp4_core.c	/^static ssize_t cyttsp4_easy_wakeup_gesture_store(struct device *dev,$/;"	f	file:
+cyttsp4_event_id	cyttsp4_regs.h	/^enum cyttsp4_event_id {$/;"	g
+cyttsp4_exec_cmd	cyttsp4_core.c	/^static int cyttsp4_exec_cmd(struct cyttsp4_core_data *cd, u8 mode,$/;"	f	file:
+cyttsp4_extended_mt_platform_data	cyttsp4_devtree.c	/^struct cyttsp4_extended_mt_platform_data {$/;"	s	file:
+cyttsp4_final_sync	cyttsp4_mta.c	/^static void cyttsp4_final_sync(struct input_dev *input, int max_slots,$/;"	f	file:
+cyttsp4_final_sync	cyttsp4_mtb.c	/^static void cyttsp4_final_sync(struct input_dev *input, int max_slots,$/;"	f	file:
+cyttsp4_firmware	cyttsp4_platform.c	/^static struct cyttsp4_touch_firmware cyttsp4_firmware = {$/;"	v	typeref:struct:cyttsp4_touch_firmware	file:
+cyttsp4_forced_upgrade_store	cyttsp4_loader.c	/^static ssize_t cyttsp4_forced_upgrade_store(struct device *dev,$/;"	f	file:
+cyttsp4_formated_output_show	cyttsp4_debug.c	/^static ssize_t cyttsp4_formated_output_show(struct device *dev,$/;"	f	file:
+cyttsp4_formated_output_store	cyttsp4_debug.c	/^static ssize_t cyttsp4_formated_output_store(struct device *dev,$/;"	f	file:
+cyttsp4_free_si_ptrs	cyttsp4_core.c	/^static void cyttsp4_free_si_ptrs(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_fw_and_config_upgrade	cyttsp4_loader.c	/^static void cyttsp4_fw_and_config_upgrade($/;"	f	file:
+cyttsp4_fw_calibrate	cyttsp4_loader.c	/^static void cyttsp4_fw_calibrate(struct work_struct *calibration_work)$/;"	f	file:
+cyttsp4_fw_calibration_attention	cyttsp4_loader.c	/^static int cyttsp4_fw_calibration_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_get_active_refresh_cycle	cyttsp4_core.c	/^static int cyttsp4_get_active_refresh_cycle(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_get_bist_result_	cyttsp4_device_access.c	/^static ssize_t cyttsp4_get_bist_result_(struct device *dev, char *buf, int print_idx)$/;"	f	file:
+cyttsp4_get_btn_touches	cyttsp4_btn.c	/^static void cyttsp4_get_btn_touches(struct cyttsp4_btn_data *bd)$/;"	f	file:
+cyttsp4_get_config_block_crc	cyttsp4_core.c	/^static int cyttsp4_get_config_block_crc(struct cyttsp4_core_data *cd,$/;"	f	file:
+cyttsp4_get_config_length	cyttsp4_core.c	/^static int cyttsp4_get_config_length(struct cyttsp4_core_data *cd, u8 ebid,$/;"	f	file:
+cyttsp4_get_config_row_size	cyttsp4_core.c	/^static int cyttsp4_get_config_row_size(struct cyttsp4_core_data *cd,$/;"	f	file:
+cyttsp4_get_data_and_check	cyttsp4_device_access.c	/^static int cyttsp4_get_data_and_check(struct device* dev, char *buf, int print_idx)$/;"	f	file:
+cyttsp4_get_idac	cyttsp4_device_access.c	/^static int cyttsp4_get_idac(struct device *dev, struct device_attribute *attr, char *buf, int print_index)$/;"	f	file:
+cyttsp4_get_mt_touches	cyttsp4_mt_common.c	/^static void cyttsp4_get_mt_touches(struct cyttsp4_mt_data *md, int num_cur_rec)$/;"	f	file:
+cyttsp4_get_panel_data_show	cyttsp4_device_access.c	/^static ssize_t cyttsp4_get_panel_data_show(struct device *dev,$/;"	f	file:
+cyttsp4_get_panel_data_store	cyttsp4_device_access.c	/^static ssize_t cyttsp4_get_panel_data_store(struct device *dev,$/;"	f	file:
+cyttsp4_get_parameter	cyttsp4_core.c	/^static int cyttsp4_get_parameter(struct cyttsp4_core_data *cd, u8 param_id,$/;"	f	file:
+cyttsp4_get_proximity_touch	cyttsp4_proximity.c	/^static void cyttsp4_get_proximity_touch(struct cyttsp4_proximity_data *pd,$/;"	f	file:
+cyttsp4_get_rawdata	cyttsp4_device_access.c	/^static int cyttsp4_get_rawdata(struct device *dev, char *buf)$/;"	f	file:
+cyttsp4_get_rawdata_	cyttsp4_device_access.c	/^static int cyttsp4_get_rawdata_(struct device* dev, char *buf, int print_idx)$/;"	f	file:
+cyttsp4_get_scantype	cyttsp4_core.c	/^static int cyttsp4_get_scantype(struct cyttsp4_core_data *cd, u8 *scantype)$/;"	f	file:
+cyttsp4_get_security_key_	cyttsp4_core.c	/^static const u8 *cyttsp4_get_security_key_(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_get_sysinfo_regs	cyttsp4_core.c	/^static int cyttsp4_get_sysinfo_regs(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_get_touch_axis	cyttsp4_core.c	/^static inline void cyttsp4_get_touch_axis(struct cyttsp4_core_data *cd,$/;"	f	file:
+cyttsp4_get_touch_record_	cyttsp4_core.c	/^static void cyttsp4_get_touch_record_(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_get_ttconfig_crc	cyttsp4_loader.c	/^static int cyttsp4_get_ttconfig_crc(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_get_ttconfig_info	cyttsp4_core.c	/^static int cyttsp4_get_ttconfig_info(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_get_ttconfig_version	cyttsp4_core.c	/^static int cyttsp4_get_ttconfig_version(struct cyttsp4_core_data *cd,$/;"	f	file:
+cyttsp4_get_ttconfig_version	cyttsp4_loader.c	/^static int cyttsp4_get_ttconfig_version(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_grpdata_show_btn_keycodes	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_btn_keycodes(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_functions	cyttsp4_device_access.c	/^		cyttsp4_grpdata_show_functions[CY_IC_GRPNUM_NUM] = {$/;"	v	file:
+cyttsp4_grpdata_show_operational_regs	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_operational_regs(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_registers	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_registers(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_sysinfo	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_sysinfo(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_sysinfo_data_rec	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_sysinfo_data_rec(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_sysinfo_design	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_sysinfo_design(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_sysinfo_manufacturing	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_sysinfo_manufacturing(struct device *dev,$/;"	f	file:
+cyttsp4_grpdata_show_sysinfo_opcfg	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_sysinfo_opcfg(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_sysinfo_panel	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_sysinfo_panel(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_sysinfo_test_rec	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_sysinfo_test_rec(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_test_regs	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_test_regs(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_touch_params	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_touch_params(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_touch_params_sizes	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_touch_params_sizes(struct device *dev,$/;"	f	file:
+cyttsp4_grpdata_show_touch_regs	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_touch_regs(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_tthe_test_regs	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_tthe_test_regs(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_show_void	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_show_void (struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_store_functions	cyttsp4_device_access.c	/^		cyttsp4_grpdata_store_functions[CY_IC_GRPNUM_NUM] = {$/;"	v	file:
+cyttsp4_grpdata_store_operational_regs	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_store_operational_regs(struct device *dev,$/;"	f	file:
+cyttsp4_grpdata_store_test_regs	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_store_test_regs(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_store_touch_params	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_store_touch_params(struct device *dev,$/;"	f	file:
+cyttsp4_grpdata_store_tthe_test_regs	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_store_tthe_test_regs(struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_grpdata_store_void	cyttsp4_device_access.c	/^static int cyttsp4_grpdata_store_void (struct device *dev, u8 *ic_buf,$/;"	f	file:
+cyttsp4_handshake	cyttsp4_core.c	/^static int cyttsp4_handshake(struct cyttsp4_core_data *cd, u8 mode)$/;"	f	file:
+cyttsp4_hard_irq	cyttsp4_core.c	/^static irqreturn_t cyttsp4_hard_irq(int irq, void *handle)$/;"	f	file:
+cyttsp4_hex_image	cyttsp4_loader.c	/^struct cyttsp4_hex_image {$/;"	s	file:
+cyttsp4_hst_mode_bits	cyttsp4_regs.h	/^enum cyttsp4_hst_mode_bits {$/;"	g
+cyttsp4_hw_hard_reset	cyttsp4_core.c	/^static int cyttsp4_hw_hard_reset(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_hw_hard_reset_	cyttsp4_core.c	/^static int cyttsp4_hw_hard_reset_(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_hw_irq_stat_show	cyttsp4_core.c	/^static ssize_t cyttsp4_hw_irq_stat_show(struct device *dev,$/;"	f	file:
+cyttsp4_hw_reset_	cyttsp4_core.c	/^static int cyttsp4_hw_reset_(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_hw_reset_store	cyttsp4_core.c	/^static ssize_t cyttsp4_hw_reset_store(struct device *dev,$/;"	f	file:
+cyttsp4_hw_soft_reset	cyttsp4_core.c	/^static int cyttsp4_hw_soft_reset(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_hw_soft_reset_	cyttsp4_core.c	/^static int cyttsp4_hw_soft_reset_(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_i2c	cyttsp4_i2c.c	/^struct cyttsp4_i2c {$/;"	s	file:
+cyttsp4_i2c	file_node_control/file_node_function.h	/^struct cyttsp4_i2c {$/;"	s
+cyttsp4_i2c_driver	cyttsp4_i2c.c	/^static struct i2c_driver cyttsp4_i2c_driver = {$/;"	v	typeref:struct:i2c_driver	file:
+cyttsp4_i2c_exit	cyttsp4_i2c.c	/^module_exit(cyttsp4_i2c_exit);$/;"	v
+cyttsp4_i2c_exit	cyttsp4_i2c.c	/^static void __exit cyttsp4_i2c_exit(void)$/;"	f	file:
+cyttsp4_i2c_id	cyttsp4_i2c.c	/^static const struct i2c_device_id cyttsp4_i2c_id[] = {$/;"	v	typeref:struct:i2c_device_id	file:
+cyttsp4_i2c_init	cyttsp4_i2c.c	/^module_init(cyttsp4_i2c_init);$/;"	v
+cyttsp4_i2c_init	cyttsp4_i2c.c	/^static int __init cyttsp4_i2c_init(void)$/;"	f	file:
+cyttsp4_i2c_of_match	cyttsp4_i2c.c	/^static struct of_device_id cyttsp4_i2c_of_match[] = {$/;"	v	typeref:struct:of_device_id	file:
+cyttsp4_i2c_probe	cyttsp4_i2c.c	/^static int cyttsp4_i2c_probe(struct i2c_client *client,$/;"	f	file:
+cyttsp4_i2c_read	cyttsp4_i2c.c	/^static int cyttsp4_i2c_read(struct cyttsp4_adapter *adap, u16 addr,$/;"	f	file:
+cyttsp4_i2c_read_block_data	cyttsp4_i2c.c	/^EXPORT_SYMBOL_GPL( cyttsp4_i2c_read_block_data );$/;"	v
+cyttsp4_i2c_read_block_data	cyttsp4_i2c.c	/^int cyttsp4_i2c_read_block_data(struct cyttsp4_i2c *ts_i2c, u16 addr,$/;"	f
+cyttsp4_i2c_remove	cyttsp4_i2c.c	/^static int cyttsp4_i2c_remove(struct i2c_client *client)$/;"	f	file:
+cyttsp4_i2c_write	cyttsp4_i2c.c	/^static int cyttsp4_i2c_write(struct cyttsp4_adapter *adap, u16 addr,$/;"	f	file:
+cyttsp4_i2c_write_block_data	cyttsp4_i2c.c	/^EXPORT_SYMBOL_GPL( cyttsp4_i2c_write_block_data );$/;"	v
+cyttsp4_i2c_write_block_data	cyttsp4_i2c.c	/^int cyttsp4_i2c_write_block_data(struct cyttsp4_i2c *ts_i2c, u16 addr,$/;"	f
+cyttsp4_ic_ebid	cyttsp4_regs.h	/^enum cyttsp4_ic_ebid {$/;"	g
+cyttsp4_ic_grpdata_show	cyttsp4_device_access.c	/^static ssize_t cyttsp4_ic_grpdata_show(struct device *dev,$/;"	f	file:
+cyttsp4_ic_grpdata_store	cyttsp4_device_access.c	/^static ssize_t cyttsp4_ic_grpdata_store(struct device *dev,$/;"	f	file:
+cyttsp4_ic_grpnum	cyttsp4_regs.h	/^enum cyttsp4_ic_grpnum {$/;"	g
+cyttsp4_ic_grpnum_show	cyttsp4_device_access.c	/^static ssize_t cyttsp4_ic_grpnum_show(struct device *dev,$/;"	f	file:
+cyttsp4_ic_grpnum_store	cyttsp4_device_access.c	/^static ssize_t cyttsp4_ic_grpnum_store(struct device *dev,$/;"	f	file:
+cyttsp4_ic_grpoffset_show	cyttsp4_device_access.c	/^static ssize_t cyttsp4_ic_grpoffset_show(struct device *dev,$/;"	f	file:
+cyttsp4_ic_grpoffset_store	cyttsp4_device_access.c	/^static ssize_t cyttsp4_ic_grpoffset_store(struct device *dev,$/;"	f	file:
+cyttsp4_ic_parse_input	cyttsp4_device_access.c	/^static int cyttsp4_ic_parse_input(struct device *dev, const char *buf,$/;"	f	file:
+cyttsp4_ic_ver_show	cyttsp4_core.c	/^static ssize_t cyttsp4_ic_ver_show(struct device *dev,$/;"	f	file:
+cyttsp4_idac_check	cyttsp4_device_access.c	/^static int cyttsp4_idac_check(int type, int value)$/;"	f	file:
+cyttsp4_idac_print	cyttsp4_device_access.c	/^static ssize_t cyttsp4_idac_print(struct device *dev, char *buf, int print_idx, enum cyttsp4_idac_type type)$/;"	f	file:
+cyttsp4_idac_type	cyttsp4_device_access.h	/^enum cyttsp4_idac_type {$/;"	g
+cyttsp4_init	cyttsp4_platform.c	/^int cyttsp4_init(struct cyttsp4_core_platform_data *pdata,$/;"	f
+cyttsp4_init_function_ptrs	cyttsp4_mta.c	/^void cyttsp4_init_function_ptrs(struct cyttsp4_mt_data *md)$/;"	f
+cyttsp4_init_function_ptrs	cyttsp4_mtb.c	/^void cyttsp4_init_function_ptrs(struct cyttsp4_mt_data *md)$/;"	f
+cyttsp4_initialize_core	cyttsp4_bus.c	/^static void cyttsp4_initialize_core(struct cyttsp4_core *core,$/;"	f	file:
+cyttsp4_initialize_device	cyttsp4_bus.c	/^static void cyttsp4_initialize_device(struct cyttsp4_device *dev,$/;"	f	file:
+cyttsp4_input_register_device	cyttsp4_mta.c	/^static int cyttsp4_input_register_device(struct input_dev *input, int max_slots)$/;"	f	file:
+cyttsp4_input_register_device	cyttsp4_mtb.c	/^static int cyttsp4_input_register_device(struct input_dev *input, int max_slots)$/;"	f	file:
+cyttsp4_input_report	cyttsp4_mta.c	/^static void cyttsp4_input_report(struct input_dev *input, int sig,$/;"	f	file:
+cyttsp4_input_report	cyttsp4_mtb.c	/^static void cyttsp4_input_report(struct input_dev *input, int sig,$/;"	f	file:
+cyttsp4_input_sync	cyttsp4_mta.c	/^static void cyttsp4_input_sync(struct input_dev *input)$/;"	f	file:
+cyttsp4_int_state	cyttsp4_regs.h	/^enum cyttsp4_int_state {$/;"	g
+cyttsp4_interrupt_count_show	cyttsp4_debug.c	/^static ssize_t cyttsp4_interrupt_count_show(struct device *dev,$/;"	f	file:
+cyttsp4_interrupt_count_store	cyttsp4_debug.c	/^static ssize_t cyttsp4_interrupt_count_store(struct device *dev,$/;"	f	file:
+cyttsp4_irq	cyttsp4_core.c	/^static irqreturn_t cyttsp4_irq(int irq, void *handle)$/;"	f	file:
+cyttsp4_irq_stat	cyttsp4_platform.c	/^int cyttsp4_irq_stat(struct cyttsp4_core_platform_data *pdata,$/;"	f
+cyttsp4_lift_all	cyttsp4_mt_common.c	/^static void cyttsp4_lift_all(struct cyttsp4_mt_data *md)$/;"	f	file:
+cyttsp4_limit	cyttsp4_device_access.c	/^struct cyttsp4_limit {$/;"	s	file:
+cyttsp4_load_status_and_touch_regs	cyttsp4_core.c	/^static int cyttsp4_load_status_and_touch_regs(struct cyttsp4_core_data *cd,$/;"	f	file:
+cyttsp4_loader_attention	cyttsp4_loader.c	/^static int cyttsp4_loader_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_loader_data	cyttsp4_loader.c	/^struct cyttsp4_loader_data {$/;"	s	file:
+cyttsp4_loader_driver	cyttsp4_loader.c	/^static struct cyttsp4_driver cyttsp4_loader_driver = {$/;"	v	typeref:struct:cyttsp4_driver	file:
+cyttsp4_loader_exit	cyttsp4_loader.c	/^module_exit(cyttsp4_loader_exit);$/;"	v
+cyttsp4_loader_exit	cyttsp4_loader.c	/^static void __exit cyttsp4_loader_exit(void)$/;"	f	file:
+cyttsp4_loader_infos	cyttsp4_loader.c	/^static struct cyttsp4_device_info cyttsp4_loader_infos[CY_MAX_NUM_CORE_DEVS];$/;"	v	typeref:struct:cyttsp4_device_info	file:
+cyttsp4_loader_init	cyttsp4_loader.c	/^module_init(cyttsp4_loader_init);$/;"	v
+cyttsp4_loader_init	cyttsp4_loader.c	/^static int __init cyttsp4_loader_init(void)$/;"	f	file:
+cyttsp4_loader_name	cyttsp4_loader.c	/^static const char cyttsp4_loader_name[] = CYTTSP4_LOADER_NAME;$/;"	v	file:
+cyttsp4_loader_probe	cyttsp4_loader.c	/^static int cyttsp4_loader_probe(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_loader_release	cyttsp4_loader.c	/^static int cyttsp4_loader_release(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_log_btn_data	cyttsp4_btn.c	/^static void cyttsp4_log_btn_data(struct cyttsp4_btn_data *bd)$/;"	f	file:
+cyttsp4_manual_upgrade_store	cyttsp4_loader.c	/^static ssize_t cyttsp4_manual_upgrade_store(struct device *dev,$/;"	f	file:
+cyttsp4_match_dev	cyttsp4_bus.c	/^static int cyttsp4_match_dev(struct device *dev, void *data)$/;"	f	file:
+cyttsp4_mode	cyttsp4_regs.h	/^enum cyttsp4_mode {$/;"	g
+cyttsp4_monitor_status	cyttsp4_debug.c	/^enum cyttsp4_monitor_status {$/;"	g	file:
+cyttsp4_mt_a-y	Makefile	/^cyttsp4_mt_a-y := cyttsp4_mta.o cyttsp4_mt_common.o$/;"	m
+cyttsp4_mt_attention	cyttsp4_mt_common.c	/^static int cyttsp4_mt_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_mt_b-y	Makefile	/^cyttsp4_mt_b-y := cyttsp4_mtb.o cyttsp4_mt_common.o$/;"	m
+cyttsp4_mt_close	cyttsp4_mt_common.c	/^static void cyttsp4_mt_close(struct input_dev *input)$/;"	f	file:
+cyttsp4_mt_data	cyttsp4_mt_common.h	/^struct cyttsp4_mt_data {$/;"	s
+cyttsp4_mt_driver	cyttsp4_mt_common.c	/^struct cyttsp4_driver cyttsp4_mt_driver = {$/;"	v	typeref:struct:cyttsp4_driver
+cyttsp4_mt_early_suspend	cyttsp4_mt_common.c	/^static void cyttsp4_mt_early_suspend(struct early_suspend *h)$/;"	f	file:
+cyttsp4_mt_exit	cyttsp4_mta.c	/^module_exit(cyttsp4_mt_exit);$/;"	v
+cyttsp4_mt_exit	cyttsp4_mta.c	/^static void __exit cyttsp4_mt_exit(void)$/;"	f	file:
+cyttsp4_mt_exit	cyttsp4_mtb.c	/^module_exit(cyttsp4_mt_exit);$/;"	v
+cyttsp4_mt_exit	cyttsp4_mtb.c	/^static void __exit cyttsp4_mt_exit(void)$/;"	f	file:
+cyttsp4_mt_function	cyttsp4_mt_common.h	/^struct cyttsp4_mt_function {$/;"	s
+cyttsp4_mt_init	cyttsp4_mta.c	/^module_init(cyttsp4_mt_init);$/;"	v
+cyttsp4_mt_init	cyttsp4_mta.c	/^static int __init cyttsp4_mt_init(void)$/;"	f	file:
+cyttsp4_mt_init	cyttsp4_mtb.c	/^module_init(cyttsp4_mt_init);$/;"	v
+cyttsp4_mt_init	cyttsp4_mtb.c	/^static int __init cyttsp4_mt_init(void)$/;"	f	file:
+cyttsp4_mt_late_resume	cyttsp4_mt_common.c	/^static void cyttsp4_mt_late_resume(struct early_suspend *h)$/;"	f	file:
+cyttsp4_mt_open	cyttsp4_mt_common.c	/^static int cyttsp4_mt_open(struct input_dev *input)$/;"	f	file:
+cyttsp4_mt_pm_ops	cyttsp4_mt_common.c	/^static const struct dev_pm_ops cyttsp4_mt_pm_ops = {$/;"	v	typeref:struct:dev_pm_ops	file:
+cyttsp4_mt_probe	cyttsp4_mt_common.c	/^static int cyttsp4_mt_probe(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_mt_process_touch	cyttsp4_mt_common.c	/^static void cyttsp4_mt_process_touch(struct cyttsp4_mt_data *md,$/;"	f	file:
+cyttsp4_mt_release	cyttsp4_mt_common.c	/^static int cyttsp4_mt_release(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_mt_resume	cyttsp4_mt_common.c	/^static int cyttsp4_mt_resume(struct device *dev)$/;"	f	file:
+cyttsp4_mt_rt_resume	cyttsp4_mt_common.c	/^static int cyttsp4_mt_rt_resume(struct device *dev)$/;"	f	file:
+cyttsp4_mt_rt_suspend	cyttsp4_mt_common.c	/^static int cyttsp4_mt_rt_suspend(struct device *dev)$/;"	f	file:
+cyttsp4_mt_send_dummy_event	cyttsp4_mt_common.c	/^static void cyttsp4_mt_send_dummy_event(struct cyttsp4_mt_data *md)$/;"	f	file:
+cyttsp4_mt_suspend	cyttsp4_mt_common.c	/^static int cyttsp4_mt_suspend(struct device *dev)$/;"	f	file:
+cyttsp4_mt_wake_attention	cyttsp4_mt_common.c	/^static int cyttsp4_mt_wake_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_null_test_cmd_code	cyttsp4_regs.h	/^enum cyttsp4_null_test_cmd_code {$/;"	g
+cyttsp4_object_id	cyttsp4_regs.h	/^enum cyttsp4_object_id {$/;"	g
+cyttsp4_opcfg	cyttsp4_regs.h	/^struct cyttsp4_opcfg {$/;"	s
+cyttsp4_opmode	cyttsp4_core.c	/^enum cyttsp4_opmode {$/;"	g	file:
+cyttsp4_panel_id_show	cyttsp4_core.c	/^static ssize_t	cyttsp4_panel_id_show( struct device *dev, struct device_attribute *attr, char *buf )$/;"	f	file:
+cyttsp4_param_addr	cyttsp4_params.h	/^static const uint8_t cyttsp4_param_addr[] = {$/;"	v
+cyttsp4_param_endianess	cyttsp4_params.h	/^static const uint8_t cyttsp4_param_endianess = 0;$/;"	v
+cyttsp4_param_regs	cyttsp4_params.h	/^static const uint8_t cyttsp4_param_regs[] = {$/;"	v
+cyttsp4_param_size	cyttsp4_params.h	/^static const uint16_t cyttsp4_param_size[] = {$/;"	v
+cyttsp4_pcfg	cyttsp4_regs.h	/^struct cyttsp4_pcfg {$/;"	s
+cyttsp4_ping_hw	cyttsp4_i2c.c	/^static int cyttsp4_ping_hw(struct cyttsp4_i2c *ts_i2c)$/;"	f	file:
+cyttsp4_platform_detect_read	cyttsp4_core.c	/^static int cyttsp4_platform_detect_read(struct device *dev, u16 addr,$/;"	f	file:
+cyttsp4_pm_resume	cyttsp4_bus.c	/^static int cyttsp4_pm_resume(struct device *dev)$/;"	f	file:
+cyttsp4_pm_resume	cyttsp4_bus.c	593;"	d	file:
+cyttsp4_pm_rt_suspend	cyttsp4_bus.c	597;"	d	file:
+cyttsp4_pm_rt_suspend	cyttsp4_bus.c	601;"	d	file:
+cyttsp4_pm_suspend	cyttsp4_bus.c	/^static int cyttsp4_pm_suspend(struct device *dev)$/;"	f	file:
+cyttsp4_pm_suspend	cyttsp4_bus.c	592;"	d	file:
+cyttsp4_power	cyttsp4_platform.c	/^int cyttsp4_power(struct cyttsp4_core_platform_data *pdata,$/;"	f
+cyttsp4_pr_buf	cyttsp4_core.c	/^EXPORT_SYMBOL_GPL(cyttsp4_pr_buf);$/;"	v
+cyttsp4_pr_buf	cyttsp4_core.c	/^void cyttsp4_pr_buf(struct device *dev, u8 *pr_buf, u8 *dptr, int size,$/;"	f
+cyttsp4_pr_buf_op_mode	cyttsp4_debug.c	/^static void cyttsp4_pr_buf_op_mode(struct device *dev, u8 *pr_buf,$/;"	f	file:
+cyttsp4_proximity_attention	cyttsp4_proximity.c	/^static int cyttsp4_proximity_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_proximity_data	cyttsp4_proximity.c	/^struct cyttsp4_proximity_data {$/;"	s	file:
+cyttsp4_proximity_driver	cyttsp4_proximity.c	/^static struct cyttsp4_driver cyttsp4_proximity_driver = {$/;"	v	typeref:struct:cyttsp4_driver	file:
+cyttsp4_proximity_enable_show	cyttsp4_proximity.c	/^static ssize_t cyttsp4_proximity_enable_show(struct device *dev,$/;"	f	file:
+cyttsp4_proximity_enable_store	cyttsp4_proximity.c	/^static ssize_t cyttsp4_proximity_enable_store(struct device *dev,$/;"	f	file:
+cyttsp4_proximity_exit	cyttsp4_proximity.c	/^module_exit(cyttsp4_proximity_exit);$/;"	v
+cyttsp4_proximity_exit	cyttsp4_proximity.c	/^static void __exit cyttsp4_proximity_exit(void)$/;"	f	file:
+cyttsp4_proximity_init	cyttsp4_proximity.c	/^module_init(cyttsp4_proximity_init);$/;"	v
+cyttsp4_proximity_init	cyttsp4_proximity.c	/^static int __init cyttsp4_proximity_init(void)$/;"	f	file:
+cyttsp4_proximity_pm_ops	cyttsp4_proximity.c	/^static const struct dev_pm_ops cyttsp4_proximity_pm_ops = {$/;"	v	typeref:struct:dev_pm_ops	file:
+cyttsp4_proximity_probe	cyttsp4_proximity.c	/^static int cyttsp4_proximity_probe(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_proximity_release	cyttsp4_proximity.c	/^static int cyttsp4_proximity_release(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_proximity_resume	cyttsp4_proximity.c	/^static int cyttsp4_proximity_resume(struct device *dev)$/;"	f	file:
+cyttsp4_proximity_suspend	cyttsp4_proximity.c	/^static int cyttsp4_proximity_suspend(struct device *dev)$/;"	f	file:
+cyttsp4_queue_startup	cyttsp4_core.c	/^static void cyttsp4_queue_startup(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_queue_startup_	cyttsp4_core.c	/^static void cyttsp4_queue_startup_(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_raw_data_show	cyttsp4_device_access.c	/^static ssize_t cyttsp4_raw_data_show(struct device *dev, struct device_attribute *attr, char *buf)$/;"	f	file:
+cyttsp4_raw_data_store	cyttsp4_device_access.c	/^static ssize_t cyttsp4_raw_data_store(struct device *dev,$/;"	f	file:
+cyttsp4_raw_mutual_limit_show	cyttsp4_device_access.c	/^static ssize_t cyttsp4_raw_mutual_limit_show(struct device *dev,$/;"	f	file:
+cyttsp4_raw_mutual_limit_store	cyttsp4_device_access.c	/^static ssize_t cyttsp4_raw_mutual_limit_store(struct device *dev,$/;"	f	file:
+cyttsp4_read_	cyttsp4_core.c	/^static int cyttsp4_read_(struct cyttsp4_device *ttsp, int mode, u16 addr,$/;"	f	file:
+cyttsp4_read_config_block	cyttsp4_core.c	/^static int cyttsp4_read_config_block(struct cyttsp4_core_data *cd, u8 ebid,$/;"	f	file:
+cyttsp4_register_core_device	cyttsp4_bus.c	/^EXPORT_SYMBOL_GPL(cyttsp4_register_core_device);$/;"	v
+cyttsp4_register_core_device	cyttsp4_bus.c	/^int cyttsp4_register_core_device(struct cyttsp4_core_info const *core_info)$/;"	f
+cyttsp4_register_core_driver	cyttsp4_bus.c	/^EXPORT_SYMBOL_GPL(cyttsp4_register_core_driver);$/;"	v
+cyttsp4_register_core_driver	cyttsp4_bus.c	/^int cyttsp4_register_core_driver(struct cyttsp4_core_driver *drv)$/;"	f
+cyttsp4_register_device	cyttsp4_bus.c	/^EXPORT_SYMBOL_GPL(cyttsp4_register_device);$/;"	v
+cyttsp4_register_device	cyttsp4_bus.c	/^int cyttsp4_register_device(struct cyttsp4_device_info const *dev_info)$/;"	f
+cyttsp4_register_driver	cyttsp4_bus.c	/^EXPORT_SYMBOL_GPL(cyttsp4_register_driver);$/;"	v
+cyttsp4_register_driver	cyttsp4_bus.c	/^int cyttsp4_register_driver(struct cyttsp4_driver *drv)$/;"	f
+cyttsp4_release_exclusive_	cyttsp4_core.c	/^static int cyttsp4_release_exclusive_(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_report_proximity	cyttsp4_proximity.c	/^static void cyttsp4_report_proximity(struct cyttsp4_proximity_data *pd,$/;"	f	file:
+cyttsp4_report_slot_liftoff	cyttsp4_mta.c	/^static void cyttsp4_report_slot_liftoff(struct cyttsp4_mt_data *md,$/;"	f	file:
+cyttsp4_report_slot_liftoff	cyttsp4_mtb.c	/^static void cyttsp4_report_slot_liftoff(struct cyttsp4_mt_data *md,$/;"	f	file:
+cyttsp4_request_config_row_size_	cyttsp4_core.c	/^static int cyttsp4_request_config_row_size_(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_request_disable_scan_type_	cyttsp4_core.c	/^static int cyttsp4_request_disable_scan_type_(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_request_enable_scan_type_	cyttsp4_core.c	/^static int cyttsp4_request_enable_scan_type_(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_request_exclusive_	cyttsp4_core.c	/^static int cyttsp4_request_exclusive_(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_request_exec_cmd_	cyttsp4_core.c	/^static int cyttsp4_request_exec_cmd_(struct cyttsp4_device *ttsp, u8 mode,$/;"	f	file:
+cyttsp4_request_handshake_	cyttsp4_core.c	/^static int cyttsp4_request_handshake_(struct cyttsp4_device *ttsp, u8 mode)$/;"	f	file:
+cyttsp4_request_loader_pdata_	cyttsp4_core.c	/^static struct cyttsp4_loader_platform_data *cyttsp4_request_loader_pdata_($/;"	f	file:
+cyttsp4_request_reset_	cyttsp4_core.c	/^static int cyttsp4_request_reset_(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_request_restart_	cyttsp4_core.c	/^static int cyttsp4_request_restart_(struct cyttsp4_device *ttsp, bool wait)$/;"	f	file:
+cyttsp4_request_set_mode_	cyttsp4_core.c	/^static int cyttsp4_request_set_mode_(struct cyttsp4_device *ttsp, int mode)$/;"	f	file:
+cyttsp4_request_stop_wd_	cyttsp4_core.c	/^static int cyttsp4_request_stop_wd_(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_request_sysinfo_	cyttsp4_core.c	/^static struct cyttsp4_sysinfo *cyttsp4_request_sysinfo_($/;"	f	file:
+cyttsp4_request_toggle_lowpower_	cyttsp4_core.c	/^static int cyttsp4_request_toggle_lowpower_(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_request_write_config_	cyttsp4_core.c	/^static int cyttsp4_request_write_config_(struct cyttsp4_device *ttsp, u8 ebid,$/;"	f	file:
+cyttsp4_reset_and_wait	cyttsp4_core.c	/^static int cyttsp4_reset_and_wait(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_scan_data_type	cyttsp4_device_access.h	/^enum cyttsp4_scan_data_type {$/;"	g
+cyttsp4_scan_type	cyttsp4_regs.h	/^enum cyttsp4_scan_type {$/;"	g
+cyttsp4_sensor_monitor	cyttsp4_debug.c	/^struct cyttsp4_sensor_monitor {$/;"	s	file:
+cyttsp4_set_initial_scantype	cyttsp4_core.c	/^static int cyttsp4_set_initial_scantype(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_set_mode_store	cyttsp4_core.c	/^static ssize_t	cyttsp4_set_mode_store( struct device *dev, struct device_attribute *attr, const char *buf, size_t size )$/;"	f	file:
+cyttsp4_set_new_scan_type	cyttsp4_core.c	/^static int cyttsp4_set_new_scan_type(struct cyttsp4_core_data *cd,$/;"	f	file:
+cyttsp4_set_parameter	cyttsp4_core.c	/^static int cyttsp4_set_parameter(struct cyttsp4_core_data *cd, u8 param_id,$/;"	f	file:
+cyttsp4_set_scantype	cyttsp4_core.c	/^static int cyttsp4_set_scantype(struct cyttsp4_core_data *cd, u8 scantype)$/;"	f	file:
+cyttsp4_sett_param_regs	cyttsp4_platform.c	/^static struct touch_settings cyttsp4_sett_param_regs = {$/;"	v	typeref:struct:touch_settings	file:
+cyttsp4_sett_param_size	cyttsp4_platform.c	/^static struct touch_settings cyttsp4_sett_param_size = {$/;"	v	typeref:struct:touch_settings	file:
+cyttsp4_setup_early_suspend	cyttsp4_mt_common.c	/^static void cyttsp4_setup_early_suspend(struct cyttsp4_mt_data *md)$/;"	f	file:
+cyttsp4_setup_input_attention	cyttsp4_btn.c	/^static int cyttsp4_setup_input_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_setup_input_attention	cyttsp4_mt_common.c	/^static int cyttsp4_setup_input_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_setup_input_attention	cyttsp4_proximity.c	/^static int cyttsp4_setup_input_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_setup_input_device	cyttsp4_btn.c	/^static int cyttsp4_setup_input_device(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_setup_input_device	cyttsp4_mt_common.c	/^static int cyttsp4_setup_input_device(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_setup_input_device_and_sysfs	cyttsp4_proximity.c	/^static int cyttsp4_setup_input_device_and_sysfs(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_setup_sysfs	cyttsp4_device_access.c	/^static int cyttsp4_setup_sysfs(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_setup_sysfs_attention	cyttsp4_device_access.c	/^static int cyttsp4_setup_sysfs_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_show_function	cyttsp4_device_access.c	/^typedef int (*cyttsp4_show_function) (struct device *dev, u8 *ic_buf,$/;"	t	file:
+cyttsp4_si_data_offsets	cyttsp4_core.c	/^static int cyttsp4_si_data_offsets(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_si_get_btn_data	cyttsp4_core.c	/^static int cyttsp4_si_get_btn_data(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_si_get_cydata	cyttsp4_core.c	/^static int cyttsp4_si_get_cydata(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_si_get_ddata	cyttsp4_core.c	/^static int cyttsp4_si_get_ddata(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_si_get_mdata	cyttsp4_core.c	/^static int cyttsp4_si_get_mdata(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_si_get_op_data_ptrs	cyttsp4_core.c	/^static int cyttsp4_si_get_op_data_ptrs(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_si_get_opcfg_data	cyttsp4_core.c	/^static int cyttsp4_si_get_opcfg_data(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_si_get_pcfg_data	cyttsp4_core.c	/^static int cyttsp4_si_get_pcfg_data(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_si_get_test_data	cyttsp4_core.c	/^static int cyttsp4_si_get_test_data(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_si_put_log_data	cyttsp4_core.c	/^static void cyttsp4_si_put_log_data(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_signal_disparity	cyttsp4_core.c	/^enum cyttsp4_signal_disparity {$/;"	g	file:
+cyttsp4_signal_disparity_show	cyttsp4_core.c	/^static ssize_t cyttsp4_signal_disparity_show(struct device *dev,$/;"	f	file:
+cyttsp4_signal_disparity_store	cyttsp4_core.c	/^static ssize_t cyttsp4_signal_disparity_store(struct device *dev,$/;"	f	file:
+cyttsp4_sleep	cyttsp4_platform.c	/^static int cyttsp4_sleep(struct cyttsp4_core_platform_data *pdata,$/;"	f	file:
+cyttsp4_sleep_state	cyttsp4_core.c	/^enum cyttsp4_sleep_state {$/;"	g	file:
+cyttsp4_sleep_status_show	cyttsp4_core.c	/^static ssize_t cyttsp4_sleep_status_show(struct device *dev,$/;"	f	file:
+cyttsp4_spi	cyttsp4_spi.c	/^struct cyttsp4_spi {$/;"	s	file:
+cyttsp4_spi_driver	cyttsp4_spi.c	/^static struct spi_driver cyttsp4_spi_driver = {$/;"	v	typeref:struct:spi_driver	file:
+cyttsp4_spi_exit	cyttsp4_spi.c	/^module_exit(cyttsp4_spi_exit);$/;"	v
+cyttsp4_spi_exit	cyttsp4_spi.c	/^static void __exit cyttsp4_spi_exit(void)$/;"	f	file:
+cyttsp4_spi_id	cyttsp4_spi.c	/^static const struct spi_device_id cyttsp4_spi_id[] = {$/;"	v	typeref:struct:spi_device_id	file:
+cyttsp4_spi_init	cyttsp4_spi.c	/^module_init(cyttsp4_spi_init);$/;"	v
+cyttsp4_spi_init	cyttsp4_spi.c	/^static int __init cyttsp4_spi_init(void)$/;"	f	file:
+cyttsp4_spi_of_match	cyttsp4_spi.c	/^static struct of_device_id cyttsp4_spi_of_match[] = {$/;"	v	typeref:struct:of_device_id	file:
+cyttsp4_spi_probe	cyttsp4_spi.c	/^static int cyttsp4_spi_probe(struct spi_device *spi)$/;"	f	file:
+cyttsp4_spi_read	cyttsp4_spi.c	/^static int cyttsp4_spi_read(struct cyttsp4_adapter *adap, u16 addr,$/;"	f	file:
+cyttsp4_spi_read_block_data	cyttsp4_spi.c	/^static s32 cyttsp4_spi_read_block_data(struct cyttsp4_spi *ts, u16 addr,$/;"	f	file:
+cyttsp4_spi_remove	cyttsp4_spi.c	/^static int cyttsp4_spi_remove(struct spi_device *spi)$/;"	f	file:
+cyttsp4_spi_write	cyttsp4_spi.c	/^static int cyttsp4_spi_write(struct cyttsp4_adapter *adap, u16 addr,$/;"	f	file:
+cyttsp4_spi_write_block_data	cyttsp4_spi.c	/^static s32 cyttsp4_spi_write_block_data(struct cyttsp4_spi *ts, u16 addr,$/;"	f	file:
+cyttsp4_spi_xfer	cyttsp4_spi.c	/^static int cyttsp4_spi_xfer(u8 op, struct cyttsp4_spi *ts,$/;"	f	file:
+cyttsp4_start_wd_timer	cyttsp4_core.c	/^static void cyttsp4_start_wd_timer(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_startup	cyttsp4_core.c	/^static int cyttsp4_startup(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_startup_	cyttsp4_core.c	/^static int cyttsp4_startup_(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_startup_attention	cyttsp4_btn.c	/^static int cyttsp4_startup_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_startup_attention	cyttsp4_mt_common.c	/^static int cyttsp4_startup_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_startup_attention	cyttsp4_proximity.c	/^static int cyttsp4_startup_attention(struct cyttsp4_device *ttsp)$/;"	f	file:
+cyttsp4_startup_state	cyttsp4_core.c	/^enum cyttsp4_startup_state {$/;"	g	file:
+cyttsp4_startup_work_function	cyttsp4_core.c	/^static void cyttsp4_startup_work_function(struct work_struct *work)$/;"	f	file:
+cyttsp4_stop_wd_timer	cyttsp4_core.c	/^static void cyttsp4_stop_wd_timer(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_store_function	cyttsp4_device_access.c	/^typedef int (*cyttsp4_store_function) (struct device *dev, u8 *ic_buf,$/;"	t	file:
+cyttsp4_subscribe_attention_	cyttsp4_core.c	/^static int cyttsp4_subscribe_attention_(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_sysinfo	cyttsp4_regs.h	/^struct cyttsp4_sysinfo {$/;"	s
+cyttsp4_sysinfo_data	cyttsp4_regs.h	/^struct cyttsp4_sysinfo_data {$/;"	s
+cyttsp4_sysinfo_ofs	cyttsp4_regs.h	/^struct cyttsp4_sysinfo_ofs {$/;"	s
+cyttsp4_sysinfo_ptr	cyttsp4_regs.h	/^struct cyttsp4_sysinfo_ptr {$/;"	s
+cyttsp4_tch_abs	cyttsp4_regs.h	/^enum cyttsp4_tch_abs {	\/* for ordering within the extracted touch data array *\/$/;"	g
+cyttsp4_tch_abs_params	cyttsp4_regs.h	/^struct cyttsp4_tch_abs_params {$/;"	s
+cyttsp4_tch_abs_string	cyttsp4_regs.h	/^static const char * const cyttsp4_tch_abs_string[] = {$/;"	v
+cyttsp4_tch_rec_params	cyttsp4_regs.h	/^struct cyttsp4_tch_rec_params {$/;"	s
+cyttsp4_test	cyttsp4_regs.h	/^struct cyttsp4_test {$/;"	s
+cyttsp4_test_cmd_mode	cyttsp4_device_access.c	/^static int cyttsp4_test_cmd_mode(struct cyttsp4_device_access_data *dad,$/;"	f	file:
+cyttsp4_test_device_access_api_exit	cyttsp4_test_device_access_api.c	/^module_exit(cyttsp4_test_device_access_api_exit);$/;"	v
+cyttsp4_test_device_access_api_exit	cyttsp4_test_device_access_api.c	/^static void __exit cyttsp4_test_device_access_api_exit(void)$/;"	f	file:
+cyttsp4_test_device_access_api_init	cyttsp4_test_device_access_api.c	/^module_init(cyttsp4_test_device_access_api_init);$/;"	v
+cyttsp4_test_device_access_api_init	cyttsp4_test_device_access_api.c	/^static int __init cyttsp4_test_device_access_api_init(void)$/;"	f	file:
+cyttsp4_test_mode	cyttsp4_regs.h	/^enum cyttsp4_test_mode {$/;"	g
+cyttsp4_test_mode_params	cyttsp4_regs.h	/^struct cyttsp4_test_mode_params {$/;"	s
+cyttsp4_test_tthe_cmd_mode	cyttsp4_device_access.c	/^static int cyttsp4_test_tthe_cmd_mode(struct cyttsp4_device_access_data *dad,$/;"	f	file:
+cyttsp4_toggle_low_power	cyttsp4_core.c	/^static int cyttsp4_toggle_low_power(struct cyttsp4_core_data *cd, u8 mode)$/;"	f	file:
+cyttsp4_toggle_low_power_	cyttsp4_core.c	/^static int cyttsp4_toggle_low_power_(struct cyttsp4_core_data *cd, u8 mode)$/;"	f	file:
+cyttsp4_touch	cyttsp4_regs.h	/^struct cyttsp4_touch {$/;"	s
+cyttsp4_tp_id_show	cyttsp4_core.c	/^static ssize_t cyttsp4_tp_id_show(struct device *dev,$/;"	f	file:
+cyttsp4_ttconfig	cyttsp4_platform.c	/^static struct cyttsp4_touch_config cyttsp4_ttconfig = {$/;"	v	typeref:struct:cyttsp4_touch_config	file:
+cyttsp4_ttconfig	cyttsp4_regs.h	/^struct cyttsp4_ttconfig {$/;"	s
+cyttsp4_ttconfig_ver_show	cyttsp4_core.c	/^static ssize_t cyttsp4_ttconfig_ver_show(struct device *dev,$/;"	f	file:
+cyttsp4_unregister_core_driver	cyttsp4_bus.c	/^EXPORT_SYMBOL_GPL(cyttsp4_unregister_core_driver);$/;"	v
+cyttsp4_unregister_core_driver	cyttsp4_bus.c	/^void cyttsp4_unregister_core_driver(struct cyttsp4_core_driver *drv)$/;"	f
+cyttsp4_unregister_device	cyttsp4_bus.c	/^EXPORT_SYMBOL_GPL(cyttsp4_unregister_device);$/;"	v
+cyttsp4_unregister_device	cyttsp4_bus.c	/^int cyttsp4_unregister_device(char const *name, char const *core_id)$/;"	f
+cyttsp4_unregister_driver	cyttsp4_bus.c	/^EXPORT_SYMBOL_GPL(cyttsp4_unregister_driver);$/;"	v
+cyttsp4_unregister_driver	cyttsp4_bus.c	/^void cyttsp4_unregister_driver(struct cyttsp4_driver *drv)$/;"	f
+cyttsp4_unsubscribe_attention_	cyttsp4_core.c	/^static int cyttsp4_unsubscribe_attention_(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_upgrade_firmware	cyttsp4_loader.c	/^static int cyttsp4_upgrade_firmware(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_upgrade_ttconfig	cyttsp4_loader.c	/^static int cyttsp4_upgrade_ttconfig(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_verify_config_block_crc	cyttsp4_core.c	/^static int cyttsp4_verify_config_block_crc(struct cyttsp4_core_data *cd,$/;"	f	file:
+cyttsp4_verify_ttconfig_binary	cyttsp4_loader.c	/^static int cyttsp4_verify_ttconfig_binary(struct cyttsp4_device *ttsp,$/;"	f	file:
+cyttsp4_virtual_keys	cyttsp4_devtree.c	/^struct cyttsp4_virtual_keys {$/;"	s	file:
+cyttsp4_wait_bl_heartbeat	cyttsp4_core.c	/^static int cyttsp4_wait_bl_heartbeat(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_wait_sysinfo_mode	cyttsp4_core.c	/^static int cyttsp4_wait_sysinfo_mode(struct cyttsp4_core_data *cd)$/;"	f	file:
+cyttsp4_wakeup	cyttsp4_platform.c	/^static int cyttsp4_wakeup(struct cyttsp4_core_platform_data *pdata,$/;"	f	file:
+cyttsp4_watchdog_timer	cyttsp4_core.c	/^static void cyttsp4_watchdog_timer(unsigned long handle)$/;"	f	file:
+cyttsp4_watchdog_work	cyttsp4_core.c	/^static void cyttsp4_watchdog_work(struct work_struct *work)$/;"	f	file:
+cyttsp4_write_	cyttsp4_core.c	/^static int cyttsp4_write_(struct cyttsp4_device *ttsp, int mode, u16 addr,$/;"	f	file:
+cyttsp4_write_config	cyttsp4_core.c	/^static int cyttsp4_write_config(struct cyttsp4_core_data *cd, u8 ebid,$/;"	f	file:
+cyttsp4_write_config_block	cyttsp4_core.c	/^static int cyttsp4_write_config_block(struct cyttsp4_core_data *cd, u8 ebid,$/;"	f	file:
+cyttsp4_write_config_common	cyttsp4_core.c	/^static int cyttsp4_write_config_common(struct cyttsp4_core_data *cd, u8 ebid,$/;"	f	file:
+cyttsp4_xres	cyttsp4_platform.c	/^int cyttsp4_xres(struct cyttsp4_core_platform_data *pdata,$/;"	f
+cyttsp4_xy_worker	cyttsp4_btn.c	/^static int cyttsp4_xy_worker(struct cyttsp4_btn_data *bd)$/;"	f	file:
+cyttsp4_xy_worker	cyttsp4_debug.c	/^static int cyttsp4_xy_worker(struct cyttsp4_debug_data *dd)$/;"	f	file:
+cyttsp4_xy_worker	cyttsp4_mt_common.c	/^static int cyttsp4_xy_worker(struct cyttsp4_mt_data *md)$/;"	f	file:
+cyttsp4_xy_worker	cyttsp4_proximity.c	/^static int cyttsp4_xy_worker(struct cyttsp4_proximity_data *pd)$/;"	f	file:
+cyttsp_cmd_bits	cyttsp4_regs.h	/^enum cyttsp_cmd_bits {$/;"	g
+cyytsp4_pm_rt_idle	cyttsp4_bus.c	599;"	d	file:
+cyytsp4_pm_rt_idle	cyttsp4_bus.c	603;"	d	file:
+cyytsp4_pm_rt_resume	cyttsp4_bus.c	598;"	d	file:
+cyytsp4_pm_rt_resume	cyttsp4_bus.c	602;"	d	file:
+data	cyttsp4_devtree.c	/^	u16 *data;$/;"	m	struct:cyttsp4_virtual_keys	file:
+data_size	cyttsp4_regs.h	/^	size_t data_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+data_type	cyttsp4_device_access.c	/^	enum cyttsp4_scan_data_type data_type; \/* raw, base, diff *\/$/;"	m	struct:heatmap_param	typeref:enum:heatmap_param::cyttsp4_scan_data_type	file:
+ddata	cyttsp4_regs.h	/^	struct cyttsp4_ddata *ddata;$/;"	m	struct:cyttsp4_sysinfo_ptr	typeref:struct:cyttsp4_sysinfo_ptr::cyttsp4_ddata
+ddata_ofs	cyttsp4_regs.h	/^	size_t ddata_ofs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+ddata_ofsh	cyttsp4_regs.h	/^	u8 ddata_ofsh;$/;"	m	struct:cyttsp4_sysinfo_data
+ddata_ofsl	cyttsp4_regs.h	/^	u8 ddata_ofsl;$/;"	m	struct:cyttsp4_sysinfo_data
+ddata_size	cyttsp4_regs.h	/^	size_t ddata_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+debug_dev_name	cyttsp4_debug.c	/^	char const *debug_dev_name;$/;"	m	struct:cyttsp4_debug_platform_data	file:
+default_scantype	cyttsp4_core.c	/^	u8 default_scantype;$/;"	m	struct:cyttsp4_core_data	file:
+dev	cyttsp4_core.c	/^	struct device *dev;$/;"	m	struct:cyttsp4_core_data	typeref:struct:cyttsp4_core_data::device	file:
+device_access_dev_name	cyttsp4_device_access.h	/^	char const *device_access_dev_name;$/;"	m	struct:cyttsp4_device_access_platform_data
+device_access_devices	cyttsp4_device_access.c	/^static struct cyttsp4_device *device_access_devices[CY_MAX_NUM_CORE_DEVS];$/;"	v	typeref:struct:cyttsp4_device	file:
+device_info	cyttsp4_regs.h	/^	u8 device_info;$/;"	m	struct:cyttsp4_cydata
+device_names	cyttsp4_devtree.c	/^static const char *device_names[DEVICE_TYPE_MAX] = {$/;"	v	file:
+device_pdata_funcs	cyttsp4_devtree.c	/^static struct cyttsp4_device_pdata_func device_pdata_funcs[DEVICE_TYPE_MAX] = {$/;"	v	typeref:struct:cyttsp4_device_pdata_func	file:
+df_close	file_node_control/file_node_function.h	/^static inline bool df_close( struct file *file_pointer )$/;"	f
+df_open	file_node_control/file_node_function.h	/^static inline bool df_open( const char *file_name, int access, umode_t mode, struct file **file_pointer )$/;"	f
+df_read	file_node_control/file_node_function.h	/^static inline bool df_read( struct file *file_pointer, char *buffer, unsigned length, unsigned *return_count )$/;"	f
+df_seek	file_node_control/file_node_function.h	/^static inline void df_seek( struct file *file_pointer, unsigned offset, unsigned whence )$/;"	f
+df_write	file_node_control/file_node_function.h	/^static inline bool df_write( struct file *file_pointer, char *buffer, unsigned length, unsigned *return_count )$/;"	f
+easy_wakeup_gesture	cyttsp4_core.c	/^	u8 easy_wakeup_gesture;$/;"	m	struct:cyttsp4_core_data	file:
+electrodes_x	cyttsp4_regs.h	/^	u8 electrodes_x;$/;"	m	struct:cyttsp4_pcfg
+electrodes_y	cyttsp4_regs.h	/^	u8 electrodes_y;$/;"	m	struct:cyttsp4_pcfg
+enable_count	cyttsp4_proximity.c	/^	int enable_count;$/;"	m	struct:cyttsp4_proximity_data	file:
+enabled	cyttsp4_regs.h	/^	bool enabled;$/;"	m	struct:cyttsp4_btn
+es	cyttsp4_btn.c	/^	struct early_suspend es;$/;"	m	struct:cyttsp4_btn_data	typeref:struct:cyttsp4_btn_data::early_suspend	file:
+es	cyttsp4_mt_common.h	/^	struct early_suspend es;$/;"	m	struct:cyttsp4_mt_data	typeref:struct:cyttsp4_mt_data::early_suspend
+exclusive_dev	cyttsp4_core.c	/^	void *exclusive_dev;$/;"	m	struct:cyttsp4_core_data	file:
+exclusive_waits	cyttsp4_core.c	/^	int exclusive_waits;$/;"	m	struct:cyttsp4_core_data	file:
+fb_notif	cyttsp4_mt_common.h	/^	struct notifier_block fb_notif;$/;"	m	struct:cyttsp4_mt_data	typeref:struct:cyttsp4_mt_data::notifier_block
+fb_notifier_callback	cyttsp4_mt_common.c	/^static int fb_notifier_callback(struct notifier_block *self,$/;"	f	file:
+file_node_control_device_driver	file_node_control/file_node_control.c	/^static struct platform_driver	file_node_control_device_driver =$/;"	v	typeref:struct:platform_driver	file:
+file_node_control_exit	file_node_control/file_node_control.c	/^module_exit( file_node_control_exit );$/;"	v
+file_node_control_exit	file_node_control/file_node_control.c	/^static void __exit	file_node_control_exit( void )$/;"	f	file:
+file_node_control_init	file_node_control/file_node_control.c	/^late_initcall( file_node_control_init );$/;"	v
+file_node_control_init	file_node_control/file_node_control.c	/^static int __init	file_node_control_init( void )$/;"	f	file:
+file_node_control_probe	file_node_control/file_node_control.c	/^static int file_node_control_probe( struct platform_device *pdev )$/;"	f	file:
+file_node_control_remove	file_node_control/file_node_control.c	/^static int file_node_control_remove( struct platform_device *pdev )$/;"	f	file:
+final_sync	cyttsp4_mt_common.h	/^	void (*final_sync)(struct input_dev *input, int max_slots,$/;"	m	struct:cyttsp4_mt_function
+find_adapter	cyttsp4_bus.c	/^static struct cyttsp4_adapter *find_adapter(char const *adap_id)$/;"	f	file:
+find_core	cyttsp4_bus.c	/^static struct cyttsp4_core *find_core(char const *core_id)$/;"	f	file:
+find_core_with_driver	cyttsp4_bus.c	/^static struct cyttsp4_core *find_core_with_driver(char const *core_id)$/;"	f	file:
+find_device	cyttsp4_bus.c	/^static struct cyttsp4_device *find_device(char const *name,$/;"	f	file:
+formated_output	cyttsp4_debug.c	/^	uint32_t formated_output;$/;"	m	struct:cyttsp4_debug_data	file:
+free_btn_pdata	cyttsp4_devtree.c	/^static void free_btn_pdata(void *pdata)$/;"	f	file:
+free_core_pdata	cyttsp4_devtree.c	/^static void free_core_pdata(struct cyttsp4_core_platform_data *pdata)$/;"	f	file:
+free_device_pdata	cyttsp4_devtree.c	/^static inline void free_device_pdata(void *pdata,$/;"	f	file:
+free_mt_pdata	cyttsp4_devtree.c	/^static void free_mt_pdata(void *pdata)$/;"	f	file:
+free_pdata	cyttsp4_devtree.c	/^	void (*free_pdata)(void *);$/;"	m	struct:cyttsp4_device_pdata_func	file:
+free_proximity_pdata	cyttsp4_devtree.c	/^static void free_proximity_pdata(void *pdata)$/;"	f	file:
+free_touch_framework	cyttsp4_devtree.c	/^static void free_touch_framework(struct touch_framework *frmwrk)$/;"	f	file:
+free_touch_setting	cyttsp4_devtree.c	/^static void free_touch_setting(struct touch_settings *setting)$/;"	f	file:
+free_virtual_keys	cyttsp4_devtree.c	/^static void free_virtual_keys(struct cyttsp4_virtual_keys *vkeys)$/;"	f	file:
+func	cyttsp4_core.c	/^	int (*func)(struct cyttsp4_device *);$/;"	m	struct:atten_node	file:
+fw_and_config_upgrade	cyttsp4_loader.c	/^	struct work_struct fw_and_config_upgrade;$/;"	m	struct:cyttsp4_loader_data	typeref:struct:cyttsp4_loader_data::work_struct	file:
+fw_ver_major	cyttsp4_regs.h	/^	u8 fw_ver_major;$/;"	m	struct:cyttsp4_cydata
+fw_ver_minor	cyttsp4_regs.h	/^	u8 fw_ver_minor;$/;"	m	struct:cyttsp4_cydata
+get_bootloader_mode_state	file_node_control/file_node_function.h	/^static void	get_bootloader_mode_state( void *file_node_data, struct command_parameter *parameter_data )$/;"	f
+get_device_type	cyttsp4_devtree.c	/^static int get_device_type(struct device_node *dev_node,$/;"	f	file:
+get_firmware_version	file_node_control/file_node_function.h	/^static void	get_firmware_version( void *file_node_data, struct command_parameter *parameter_data )$/;"	f
+get_group_data	file_node_control/file_node_function.h	/^static inline bool get_group_data( char *store_buffer, unsigned buffer_size )$/;"	f
+get_inp_dev_name	cyttsp4_devtree.c	/^static inline int get_inp_dev_name(struct device_node *dev_node,$/;"	f	file:
+get_mode	file_node_control/file_node_function.h	/^static void	get_mode( void *file_node_data, struct command_parameter *parameter_data )$/;"	f
+get_sensor_id	file_node_control/file_node_function.h	/^static void	get_sensor_id( void *file_node_data, struct command_parameter *parameter_data )$/;"	f
+glove_en	cyttsp4_core.c	/^	int glove_en;$/;"	m	struct:cyttsp4_core_data	file:
+glove_mode	cyttsp4_core.c	/^EXPORT_SYMBOL( glove_mode );$/;"	v
+glove_mode	cyttsp4_core.c	/^bool	glove_mode = false;$/;"	v
+heartbeat_count	cyttsp4_core.c	/^	u8 heartbeat_count;$/;"	m	struct:cyttsp4_core_data	file:
+heatmap	cyttsp4_device_access.c	/^	struct heatmap_param heatmap;$/;"	m	struct:cyttsp4_device_access_data	typeref:struct:cyttsp4_device_access_data::heatmap_param	file:
+heatmap_param	cyttsp4_device_access.c	/^struct heatmap_param {$/;"	s	file:
+hst_mode	cyttsp4_regs.h	/^	u8 hst_mode;$/;"	m	struct:cyttsp4_sysinfo_data
+i2c_read	file_node_control/file_node_function.h	/^static inline int i2c_read(struct cyttsp4_i2c *ts, u16 addr, void *buf, int size, int max_xfer)$/;"	f
+i2c_write	file_node_control/file_node_function.h	/^static inline int i2c_write(struct cyttsp4_i2c *ts, u16 addr, const void *buf, int size, int max_xfer)$/;"	f
+ic_buf	cyttsp4_device_access.c	/^	u8 ic_buf[CY_MAX_PRBUF_SIZE];$/;"	m	struct:cyttsp4_device_access_data	file:
+ic_grpnum	cyttsp4_device_access.c	/^	uint32_t ic_grpnum;$/;"	m	struct:cyttsp4_device_access_data	file:
+ic_grpoffset	cyttsp4_device_access.c	/^	uint32_t ic_grpoffset;$/;"	m	struct:cyttsp4_device_access_data	file:
+id	cyttsp4_i2c.c	/^	char const *id;$/;"	m	struct:cyttsp4_i2c	file:
+id	cyttsp4_spi.c	/^	char const *id;$/;"	m	struct:cyttsp4_spi	file:
+id	file_node_control/file_node_function.h	/^	char const *id;$/;"	m	struct:cyttsp4_i2c
+idac_global_max	cyttsp4_device_access.c	/^	int idac_global_max;$/;"	m	struct:cyttsp4_limit	file:
+idac_global_min	cyttsp4_device_access.c	/^	int idac_global_min;$/;"	m	struct:cyttsp4_limit	file:
+idac_local_max	cyttsp4_device_access.c	/^	int idac_local_max;$/;"	m	struct:cyttsp4_limit	file:
+idac_local_min	cyttsp4_device_access.c	/^	int idac_local_min;$/;"	m	struct:cyttsp4_limit	file:
+ignore_irq	cyttsp4_core.c	/^	atomic_t ignore_irq;$/;"	m	struct:cyttsp4_core_data	file:
+input	cyttsp4_btn.c	/^	struct input_dev *input;$/;"	m	struct:cyttsp4_btn_data	typeref:struct:cyttsp4_btn_data::input_dev	file:
+input	cyttsp4_mt_common.h	/^	struct input_dev *input;$/;"	m	struct:cyttsp4_mt_data	typeref:struct:cyttsp4_mt_data::input_dev
+input	cyttsp4_proximity.c	/^	struct input_dev *input;$/;"	m	struct:cyttsp4_proximity_data	typeref:struct:cyttsp4_proximity_data::input_dev	file:
+input_device_registered	cyttsp4_btn.c	/^	bool input_device_registered;$/;"	m	struct:cyttsp4_btn_data	file:
+input_device_registered	cyttsp4_mt_common.h	/^	bool input_device_registered;$/;"	m	struct:cyttsp4_mt_data
+input_device_registered	cyttsp4_proximity.c	/^	bool input_device_registered;$/;"	m	struct:cyttsp4_proximity_data	file:
+input_register_device	cyttsp4_mt_common.h	/^	int (*input_register_device)(struct input_dev *input, int max_slots);$/;"	m	struct:cyttsp4_mt_function
+input_report	cyttsp4_mt_common.h	/^	void (*input_report)(struct input_dev *input, int sig, int t,$/;"	m	struct:cyttsp4_mt_function
+input_sync	cyttsp4_mt_common.h	/^	void (*input_sync)(struct input_dev *input);$/;"	m	struct:cyttsp4_mt_function
+insert_da_device	cyttsp4_device_access.c	/^static void insert_da_device(struct cyttsp4_device *ttsp)$/;"	f	file:
+int_running	cyttsp4_loader.c	/^	struct completion int_running;$/;"	m	struct:cyttsp4_loader_data	typeref:struct:cyttsp4_loader_data::completion	file:
+int_status	cyttsp4_core.c	/^	int int_status;$/;"	m	struct:cyttsp4_core_data	file:
+interrupt_count	cyttsp4_debug.c	/^	uint32_t interrupt_count;$/;"	m	struct:cyttsp4_debug_data	file:
+invalid_touch_app	cyttsp4_core.c	/^	bool invalid_touch_app;$/;"	m	struct:cyttsp4_core_data	file:
+irq	cyttsp4_core.c	/^	int irq;$/;"	m	struct:cyttsp4_core_data	file:
+irq_enabled	cyttsp4_core.c	/^	bool irq_enabled;$/;"	m	struct:cyttsp4_core_data	file:
+irq_wake	cyttsp4_core.c	/^	bool irq_wake;$/;"	m	struct:cyttsp4_core_data	file:
+is_suspended	cyttsp4_btn.c	/^	bool is_suspended;$/;"	m	struct:cyttsp4_btn_data	file:
+is_suspended	cyttsp4_mt_common.h	/^	bool is_suspended;$/;"	m	struct:cyttsp4_mt_data
+is_suspended	cyttsp4_proximity.c	/^	bool is_suspended;$/;"	m	struct:cyttsp4_proximity_data	file:
+jtag_si_id0	cyttsp4_regs.h	/^	u8 jtag_si_id0;$/;"	m	struct:cyttsp4_cydata
+jtag_si_id1	cyttsp4_regs.h	/^	u8 jtag_si_id1;$/;"	m	struct:cyttsp4_cydata
+jtag_si_id2	cyttsp4_regs.h	/^	u8 jtag_si_id2;$/;"	m	struct:cyttsp4_cydata
+jtag_si_id3	cyttsp4_regs.h	/^	u8 jtag_si_id3;$/;"	m	struct:cyttsp4_cydata
+key_code	cyttsp4_regs.h	/^	int key_code;$/;"	m	struct:cyttsp4_btn
+kobj_attr	cyttsp4_devtree.c	/^	struct kobj_attribute kobj_attr;$/;"	m	struct:cyttsp4_virtual_keys	typeref:struct:cyttsp4_virtual_keys::kobj_attribute	file:
+ldr_err_app	cyttsp4_core.c	/^static const u8 ldr_err_app[] = {$/;"	v	file:
+ldr_exit	cyttsp4_core.c	/^static const u8 ldr_exit[] = {$/;"	v	file:
+ldr_status	cyttsp4_loader.c	/^enum ldr_status {$/;"	g	file:
+len_xh	cyttsp4_regs.h	/^	u8 len_xh;$/;"	m	struct:cyttsp4_pcfg
+len_xl	cyttsp4_regs.h	/^	u8 len_xl;$/;"	m	struct:cyttsp4_pcfg
+len_yh	cyttsp4_regs.h	/^	u8 len_yh;$/;"	m	struct:cyttsp4_pcfg
+len_yl	cyttsp4_regs.h	/^	u8 len_yl;$/;"	m	struct:cyttsp4_pcfg
+length	cyttsp4_regs.h	/^	u16 length;$/;"	m	struct:cyttsp4_ttconfig
+limit	cyttsp4_device_access.c	/^	struct cyttsp4_limit limit;$/;"	m	struct:cyttsp4_device_access_data	typeref:struct:cyttsp4_device_access_data::cyttsp4_limit	file:
+loader_pdata	cyttsp4_loader.c	/^	struct cyttsp4_loader_platform_data *loader_pdata;$/;"	m	struct:cyttsp4_loader_data	typeref:struct:cyttsp4_loader_data::cyttsp4_loader_platform_data	file:
+loc	cyttsp4_regs.h	/^	u8 loc;$/;"	m	struct:cyttsp4_tch_rec_params
+lock	cyttsp4_i2c.c	/^	struct mutex lock;$/;"	m	struct:cyttsp4_i2c	typeref:struct:cyttsp4_i2c::mutex	file:
+lock	cyttsp4_spi.c	/^	struct mutex lock;$/;"	m	struct:cyttsp4_spi	typeref:struct:cyttsp4_spi::mutex	file:
+lock	file_node_control/file_node_function.h	/^	struct mutex lock;$/;"	m	struct:cyttsp4_i2c	typeref:struct:cyttsp4_i2c::mutex
+map_sz	cyttsp4_regs.h	/^	size_t map_sz;$/;"	m	struct:cyttsp4_sysinfo_ofs
+map_szh	cyttsp4_regs.h	/^	u8 map_szh;$/;"	m	struct:cyttsp4_sysinfo_data
+map_szl	cyttsp4_regs.h	/^	u8 map_szl;$/;"	m	struct:cyttsp4_sysinfo_data
+max	cyttsp4_regs.h	/^	size_t max;	\/* max value *\/$/;"	m	struct:cyttsp4_tch_abs_params
+max_length	cyttsp4_regs.h	/^	u16 max_length;$/;"	m	struct:cyttsp4_ttconfig
+max_p	cyttsp4_regs.h	/^	size_t max_p;$/;"	m	struct:cyttsp4_sysinfo_ofs
+max_tchs	cyttsp4_regs.h	/^	size_t max_tchs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+max_tchs	cyttsp4_regs.h	/^	u8 max_tchs;$/;"	m	struct:cyttsp4_opcfg
+max_x	cyttsp4_regs.h	/^	size_t max_x;$/;"	m	struct:cyttsp4_sysinfo_ofs
+max_xfer	cyttsp4_core.c	/^	int max_xfer;$/;"	m	struct:cyttsp4_core_data	file:
+max_y	cyttsp4_regs.h	/^	size_t max_y;$/;"	m	struct:cyttsp4_sysinfo_ofs
+max_zh	cyttsp4_regs.h	/^	u8 max_zh;$/;"	m	struct:cyttsp4_pcfg
+max_zl	cyttsp4_regs.h	/^	u8 max_zl;$/;"	m	struct:cyttsp4_pcfg
+mdata	cyttsp4_regs.h	/^	struct cyttsp4_mdata *mdata;$/;"	m	struct:cyttsp4_sysinfo_ptr	typeref:struct:cyttsp4_sysinfo_ptr::cyttsp4_mdata
+mdata_ofs	cyttsp4_regs.h	/^	size_t mdata_ofs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+mdata_ofsh	cyttsp4_regs.h	/^	u8 mdata_ofsh;$/;"	m	struct:cyttsp4_sysinfo_data
+mdata_ofsl	cyttsp4_regs.h	/^	u8 mdata_ofsl;$/;"	m	struct:cyttsp4_sysinfo_data
+mdata_size	cyttsp4_regs.h	/^	size_t mdata_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+merge_bytes	cyttsp4_core.c	/^static inline size_t merge_bytes(u8 high, u8 low)$/;"	f	file:
+mfg_id	cyttsp4_regs.h	/^	u8 mfg_id[];$/;"	m	struct:cyttsp4_cydata
+mfgid_sz	cyttsp4_regs.h	/^	u8 mfgid_sz;$/;"	m	struct:cyttsp4_cydata
+mntr_status	cyttsp4_debug.c	/^	enum cyttsp4_monitor_status mntr_status;$/;"	m	struct:cyttsp4_sensor_monitor	typeref:enum:cyttsp4_sensor_monitor::cyttsp4_monitor_status	file:
+modalias_show	cyttsp4_bus.c	/^static ssize_t modalias_show(struct device *dev, struct device_attribute *a,$/;"	f	file:
+mode	cyttsp4_core.c	/^	enum cyttsp4_mode mode;$/;"	m	struct:cyttsp4_core_data	typeref:enum:cyttsp4_core_data::cyttsp4_mode	file:
+mode	cyttsp4_core.c	/^	int mode;$/;"	m	struct:atten_node	file:
+mode_size	cyttsp4_regs.h	/^	size_t mode_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+monitor	cyttsp4_debug.c	/^	struct cyttsp4_sensor_monitor monitor;$/;"	m	struct:cyttsp4_debug_data	typeref:struct:cyttsp4_debug_data::cyttsp4_sensor_monitor	file:
+mt_function	cyttsp4_mt_common.h	/^	struct cyttsp4_mt_function mt_function;$/;"	m	struct:cyttsp4_mt_data	typeref:struct:cyttsp4_mt_data::cyttsp4_mt_function
+mt_probe	cyttsp4_mt_common.h	/^	int (*mt_probe)(struct cyttsp4_device *ttsp,$/;"	m	struct:cyttsp4_mt_function
+mt_release	cyttsp4_mt_common.h	/^	int (*mt_release)(struct cyttsp4_device *ttsp);$/;"	m	struct:cyttsp4_mt_function
+node	cyttsp4_core.c	/^	struct list_head node;$/;"	m	struct:atten_node	typeref:struct:atten_node::list_head	file:
+noise_data_ofs	cyttsp4_regs.h	/^	size_t noise_data_ofs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+noise_data_ofs	cyttsp4_regs.h	/^	u8 noise_data_ofs;$/;"	m	struct:cyttsp4_opcfg
+noise_data_sz	cyttsp4_regs.h	/^	size_t noise_data_sz;$/;"	m	struct:cyttsp4_sysinfo_ofs
+noise_data_sz	cyttsp4_regs.h	/^	u8 noise_data_sz;$/;"	m	struct:cyttsp4_opcfg
+num_btn_regs	cyttsp4_regs.h	/^	size_t num_btn_regs;	\/* ceil(num_btns\/4) *\/$/;"	m	struct:cyttsp4_sysinfo_ofs
+num_btns	cyttsp4_regs.h	/^	size_t num_btns;$/;"	m	struct:cyttsp4_sysinfo_ofs
+num_btns	cyttsp4_regs.h	/^	u8 num_btns;$/;"	m	struct:cyttsp4_opcfg
+num_core_ids	cyttsp4_debug.c	/^static int num_core_ids = 1;$/;"	v	file:
+num_core_ids	cyttsp4_device_access.c	/^static int num_core_ids = 1;$/;"	v	file:
+num_core_ids	cyttsp4_loader.c	/^static int num_core_ids = 1;$/;"	v	file:
+num_element	cyttsp4_device_access.c	/^	int num_element;$/;"	m	struct:heatmap_param	file:
+num_prv_rec	cyttsp4_mt_common.h	/^	int num_prv_rec; \/* Number of previous touch records *\/$/;"	m	struct:cyttsp4_mt_data
+obj_cfg0	cyttsp4_regs.h	/^	size_t obj_cfg0;$/;"	m	struct:cyttsp4_sysinfo_ofs
+obj_cfg0	cyttsp4_regs.h	/^	u8 obj_cfg0;$/;"	m	struct:cyttsp4_opcfg
+ofs	cyttsp4_regs.h	/^	size_t ofs;	\/* abs byte offset *\/$/;"	m	struct:cyttsp4_tch_abs_params
+opcfg	cyttsp4_regs.h	/^	struct cyttsp4_opcfg *opcfg;$/;"	m	struct:cyttsp4_sysinfo_ptr	typeref:struct:cyttsp4_sysinfo_ptr::cyttsp4_opcfg
+opcfg_ofs	cyttsp4_regs.h	/^	size_t opcfg_ofs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+opcfg_ofsh	cyttsp4_regs.h	/^	u8 opcfg_ofsh;$/;"	m	struct:cyttsp4_sysinfo_data
+opcfg_ofsl	cyttsp4_regs.h	/^	u8 opcfg_ofsl;$/;"	m	struct:cyttsp4_sysinfo_data
+opcfg_size	cyttsp4_regs.h	/^	size_t opcfg_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+opmode	cyttsp4_core.c	/^	enum cyttsp4_opmode opmode;$/;"	m	struct:cyttsp4_core_data	typeref:enum:cyttsp4_core_data::cyttsp4_opmode	file:
+ops	cyttsp4_i2c.c	/^static struct cyttsp4_ops ops = {$/;"	v	typeref:struct:cyttsp4_ops	file:
+ops	cyttsp4_spi.c	/^static struct cyttsp4_ops ops = {$/;"	v	typeref:struct:cyttsp4_ops	file:
+out_of_range	cyttsp4_device_access.c	/^static int out_of_range(enum cyttsp4_scan_data_type type, int value)$/;"	f	file:
+own_exclusive	cyttsp4_device_access.c	/^	bool own_exclusive;$/;"	m	struct:cyttsp4_device_access_data	file:
+panel_info0	cyttsp4_regs.h	/^	u8 panel_info0;$/;"	m	struct:cyttsp4_pcfg
+pcfg	cyttsp4_regs.h	/^	struct cyttsp4_pcfg *pcfg;$/;"	m	struct:cyttsp4_sysinfo_ptr	typeref:struct:cyttsp4_sysinfo_ptr::cyttsp4_pcfg
+pcfg_ofs	cyttsp4_regs.h	/^	size_t pcfg_ofs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+pcfg_ofsh	cyttsp4_regs.h	/^	u8 pcfg_ofsh;$/;"	m	struct:cyttsp4_sysinfo_data
+pcfg_ofsl	cyttsp4_regs.h	/^	u8 pcfg_ofsl;$/;"	m	struct:cyttsp4_sysinfo_data
+pcfg_size	cyttsp4_regs.h	/^	size_t pcfg_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+pdata	cyttsp4_btn.c	/^	struct cyttsp4_btn_platform_data *pdata;$/;"	m	struct:cyttsp4_btn_data	typeref:struct:cyttsp4_btn_data::cyttsp4_btn_platform_data	file:
+pdata	cyttsp4_core.c	/^	struct cyttsp4_core_platform_data *pdata;$/;"	m	struct:cyttsp4_core_data	typeref:struct:cyttsp4_core_data::cyttsp4_core_platform_data	file:
+pdata	cyttsp4_debug.c	/^	struct cyttsp4_debug_platform_data *pdata;$/;"	m	struct:cyttsp4_debug_data	typeref:struct:cyttsp4_debug_data::cyttsp4_debug_platform_data	file:
+pdata	cyttsp4_device_access.c	/^	struct cyttsp4_device_access_platform_data *pdata;$/;"	m	struct:cyttsp4_device_access_data	typeref:struct:cyttsp4_device_access_data::cyttsp4_device_access_platform_data	file:
+pdata	cyttsp4_devtree.c	/^	struct cyttsp4_mt_platform_data pdata;$/;"	m	struct:cyttsp4_extended_mt_platform_data	typeref:struct:cyttsp4_extended_mt_platform_data::cyttsp4_mt_platform_data	file:
+pdata	cyttsp4_mt_common.h	/^	struct cyttsp4_mt_platform_data *pdata;$/;"	m	struct:cyttsp4_mt_data	typeref:struct:cyttsp4_mt_data::cyttsp4_mt_platform_data
+pdata	cyttsp4_proximity.c	/^	struct cyttsp4_proximity_platform_data *pdata;$/;"	m	struct:cyttsp4_proximity_data	typeref:struct:cyttsp4_proximity_data::cyttsp4_proximity_platform_data	file:
+phys	cyttsp4_btn.c	/^	char phys[NAME_MAX];$/;"	m	struct:cyttsp4_btn_data	file:
+phys	cyttsp4_mt_common.h	/^	char phys[NAME_MAX];$/;"	m	struct:cyttsp4_mt_data
+phys	cyttsp4_proximity.c	/^	char phys[NAME_MAX];$/;"	m	struct:cyttsp4_proximity_data	file:
+pinctrl_init	cyttsp4_devtree.c	/^static bool	pinctrl_init( struct device *dev )$/;"	f	file:
+post_codeh	cyttsp4_regs.h	/^	u8 post_codeh;$/;"	m	struct:cyttsp4_test
+post_codel	cyttsp4_regs.h	/^	u8 post_codel;$/;"	m	struct:cyttsp4_test
+pr_buf	cyttsp4_btn.c	/^	u8 pr_buf[CY_MAX_PRBUF_SIZE];$/;"	m	struct:cyttsp4_btn_data	file:
+pr_buf	cyttsp4_core.c	/^	u8 pr_buf[CY_MAX_PRBUF_SIZE];$/;"	m	struct:cyttsp4_core_data	file:
+pr_buf	cyttsp4_debug.c	/^	u8 pr_buf[CY_MAX_PRBUF_SIZE];$/;"	m	struct:cyttsp4_debug_data	file:
+pr_buf	cyttsp4_device_access.c	/^	u8 pr_buf[CY_MAX_PRBUF_SIZE];$/;"	m	struct:cyttsp4_device_access_data	file:
+pr_buf	cyttsp4_mt_common.h	/^	u8 pr_buf[CY_MAX_PRBUF_SIZE];$/;"	m	struct:cyttsp4_mt_data
+pr_buf	cyttsp4_proximity.c	/^	u8 pr_buf[CY_MAX_PRBUF_SIZE];$/;"	m	struct:cyttsp4_proximity_data	file:
+proximity_en	cyttsp4_core.c	/^	int proximity_en;$/;"	m	struct:cyttsp4_core_data	file:
+prv_tch_type	cyttsp4_mt_common.h	/^	int prv_tch_type;$/;"	m	struct:cyttsp4_mt_data
+raw_mutual_max	cyttsp4_device_access.c	/^	int raw_mutual_max;$/;"	m	struct:cyttsp4_limit	file:
+raw_mutual_min	cyttsp4_device_access.c	/^	int raw_mutual_min;$/;"	m	struct:cyttsp4_limit	file:
+raw_self_max	cyttsp4_device_access.c	/^	int raw_self_max;$/;"	m	struct:cyttsp4_limit	file:
+raw_slef_min	cyttsp4_device_access.c	/^	int raw_slef_min;$/;"	m	struct:cyttsp4_limit	file:
+read_from_i2c	file_node_control/file_node_function.h	/^static void	read_from_i2c( void *file_node_data, struct command_parameter *parameter_data )$/;"	f
+ready	cyttsp4_regs.h	/^	bool ready;$/;"	m	struct:cyttsp4_sysinfo
+register_core_device	cyttsp4_devtree.c	/^static int register_core_device(struct device_node *core_node,$/;"	f	file:
+register_device	cyttsp4_devtree.c	/^static int register_device(struct device_node *dev_node,$/;"	f	file:
+release_exclusive	cyttsp4_core.c	/^static int release_exclusive(struct cyttsp4_core_data *cd, void *ownptr)$/;"	f	file:
+remove_da_device	cyttsp4_device_access.c	/^static void remove_da_device(struct cyttsp4_device *ttsp)$/;"	f	file:
+remove_sysfs_interfaces	cyttsp4_core.c	/^static void remove_sysfs_interfaces(struct cyttsp4_core_data *cd,$/;"	f	file:
+rep_hdr_size	cyttsp4_regs.h	/^	size_t rep_hdr_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+rep_ofs	cyttsp4_regs.h	/^	size_t rep_ofs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+rep_ofs	cyttsp4_regs.h	/^	u8 rep_ofs;$/;"	m	struct:cyttsp4_opcfg
+rep_sz	cyttsp4_regs.h	/^	size_t rep_sz;$/;"	m	struct:cyttsp4_sysinfo_ofs
+rep_szh	cyttsp4_regs.h	/^	u8 rep_szh;$/;"	m	struct:cyttsp4_opcfg
+rep_szl	cyttsp4_regs.h	/^	u8 rep_szl;$/;"	m	struct:cyttsp4_opcfg
+report_lock	cyttsp4_btn.c	/^	struct mutex report_lock;$/;"	m	struct:cyttsp4_btn_data	typeref:struct:cyttsp4_btn_data::mutex	file:
+report_lock	cyttsp4_mt_common.h	/^	struct mutex report_lock;$/;"	m	struct:cyttsp4_mt_data	typeref:struct:cyttsp4_mt_data::mutex
+report_lock	cyttsp4_proximity.c	/^	struct mutex report_lock;$/;"	m	struct:cyttsp4_proximity_data	typeref:struct:cyttsp4_proximity_data::mutex	file:
+report_slot_liftoff	cyttsp4_mt_common.h	/^	void (*report_slot_liftoff)(struct cyttsp4_mt_data *md, int max_slots);$/;"	m	struct:cyttsp4_mt_function
+request_exclusive	cyttsp4_core.c	/^static int request_exclusive(struct cyttsp4_core_data *cd, void *ownptr,$/;"	f	file:
+res_xh	cyttsp4_regs.h	/^	u8 res_xh;$/;"	m	struct:cyttsp4_pcfg
+res_xl	cyttsp4_regs.h	/^	u8 res_xl;$/;"	m	struct:cyttsp4_pcfg
+res_yh	cyttsp4_regs.h	/^	u8 res_yh;$/;"	m	struct:cyttsp4_pcfg
+res_yl	cyttsp4_regs.h	/^	u8 res_yl;$/;"	m	struct:cyttsp4_pcfg
+rescan_cores	cyttsp4_bus.c	/^static void rescan_cores(struct cyttsp4_adapter *adap)$/;"	f	file:
+rescan_devices	cyttsp4_bus.c	/^static void rescan_devices(struct cyttsp4_core *core)$/;"	f	file:
+reserved	cyttsp4_regs.h	/^	u8 reserved;$/;"	m	struct:cyttsp4_sysinfo_data
+return_buf	cyttsp4_device_access.c	/^	u8 return_buf[CY_MAX_PRBUF_SIZE];$/;"	m	struct:cyttsp4_device_access_data	file:
+rev_id	cyttsp4_loader.c	/^	u8 rev_id;$/;"	m	struct:cyttsp4_dev_id	file:
+revctrl	cyttsp4_regs.h	/^	u8 revctrl[CY_NUM_REVCTRL];$/;"	m	struct:cyttsp4_cydata
+row_data	cyttsp4_loader.c	/^	u8 row_data[CY_DATA_ROW_SIZE];$/;"	m	struct:cyttsp4_hex_image	file:
+row_num	cyttsp4_loader.c	/^	u16 row_num;$/;"	m	struct:cyttsp4_hex_image	file:
+row_size	cyttsp4_loader.c	/^	u16 row_size;$/;"	m	struct:cyttsp4_hex_image	file:
+scan_start	cyttsp4_device_access.c	/^	bool scan_start;$/;"	m	struct:heatmap_param	file:
+scan_type	cyttsp4_device_access.c	/^	uint32_t scan_type;$/;"	m	struct:cyttsp4_device_access_data	file:
+security_key	cyttsp4_core.c	/^static const u8 security_key[] = {$/;"	v	file:
+sensor_data	cyttsp4_debug.c	/^	u8 sensor_data[150];		\/* operational sensor data *\/$/;"	m	struct:cyttsp4_sensor_monitor	file:
+set_group_data	file_node_control/file_node_function.h	/^static inline bool set_group_data( unsigned *command_buffer, unsigned buffer_size )$/;"	f
+set_group_offset	file_node_control/file_node_function.h	/^static inline bool set_group_offset( unsigned group, unsigned offset )$/;"	f
+set_mode	cyttsp4_core.c	/^static int set_mode(struct cyttsp4_core_data *cd, int new_mode)$/;"	f	file:
+set_touch_ic_mode	file_node_control/file_node_function.h	/^static void	set_touch_ic_mode( void *file_node_data, struct command_parameter *parameter_data )$/;"	f
+setup_virtual_keys	cyttsp4_devtree.c	/^static int setup_virtual_keys(struct device_node *dev_node,$/;"	f	file:
+show_information	file_node_control/file_node_function.h	/^static void	show_information( void *file_node_data, struct command_parameter *parameter_data )$/;"	f
+si	cyttsp4_btn.c	/^	struct cyttsp4_sysinfo *si;$/;"	m	struct:cyttsp4_btn_data	typeref:struct:cyttsp4_btn_data::cyttsp4_sysinfo	file:
+si	cyttsp4_debug.c	/^	struct cyttsp4_sysinfo *si;$/;"	m	struct:cyttsp4_debug_data	typeref:struct:cyttsp4_debug_data::cyttsp4_sysinfo	file:
+si	cyttsp4_device_access.c	/^	struct cyttsp4_sysinfo *si;$/;"	m	struct:cyttsp4_device_access_data	typeref:struct:cyttsp4_device_access_data::cyttsp4_sysinfo	file:
+si	cyttsp4_loader.c	/^	struct cyttsp4_sysinfo *si;$/;"	m	struct:cyttsp4_loader_data	typeref:struct:cyttsp4_loader_data::cyttsp4_sysinfo	file:
+si	cyttsp4_mt_common.h	/^	struct cyttsp4_sysinfo *si;$/;"	m	struct:cyttsp4_mt_data	typeref:struct:cyttsp4_mt_data::cyttsp4_sysinfo
+si	cyttsp4_proximity.c	/^	struct cyttsp4_sysinfo *si;$/;"	m	struct:cyttsp4_proximity_data	typeref:struct:cyttsp4_proximity_data::cyttsp4_sysinfo	file:
+si_data	cyttsp4_regs.h	/^	struct cyttsp4_sysinfo_data si_data;$/;"	m	struct:cyttsp4_sysinfo	typeref:struct:cyttsp4_sysinfo::cyttsp4_sysinfo_data
+si_ofs	cyttsp4_regs.h	/^	struct cyttsp4_sysinfo_ofs si_ofs;$/;"	m	struct:cyttsp4_sysinfo	typeref:struct:cyttsp4_sysinfo::cyttsp4_sysinfo_ofs
+si_ptrs	cyttsp4_regs.h	/^	struct cyttsp4_sysinfo_ptr si_ptrs;$/;"	m	struct:cyttsp4_sysinfo	typeref:struct:cyttsp4_sysinfo::cyttsp4_sysinfo_ptr
+silicon_id	cyttsp4_loader.c	/^	u32 silicon_id;$/;"	m	struct:cyttsp4_dev_id	file:
+size	cyttsp4_devtree.c	/^	int size;$/;"	m	struct:cyttsp4_virtual_keys	file:
+size	cyttsp4_regs.h	/^	size_t size;	\/* size in bits *\/$/;"	m	struct:cyttsp4_tch_abs_params
+size	cyttsp4_regs.h	/^	u8 size;$/;"	m	struct:cyttsp4_tch_rec_params
+sleep_state	cyttsp4_core.c	/^	enum cyttsp4_sleep_state sleep_state;$/;"	m	struct:cyttsp4_core_data	typeref:enum:cyttsp4_core_data::cyttsp4_sleep_state	file:
+spinlock	cyttsp4_core.c	/^	spinlock_t spinlock;$/;"	m	struct:cyttsp4_core_data	file:
+startup_state	cyttsp4_core.c	/^	enum cyttsp4_startup_state startup_state;$/;"	m	struct:cyttsp4_core_data	typeref:enum:cyttsp4_core_data::cyttsp4_startup_state	file:
+startup_work	cyttsp4_core.c	/^	struct work_struct startup_work;$/;"	m	struct:cyttsp4_core_data	typeref:struct:cyttsp4_core_data::work_struct	file:
+state	cyttsp4_regs.h	/^	int state;	\/* CY_BTN_PRESSED, CY_BTN_RELEASED *\/$/;"	m	struct:cyttsp4_btn
+status_buf	cyttsp4_loader.c	/^	u8 status_buf[CY_MAX_STATUS_SIZE];$/;"	m	struct:cyttsp4_loader_data	file:
+store_device	cyttsp4_core.c	/^struct device	*store_device = 0;$/;"	v	typeref:struct:device
+stylus_en	cyttsp4_core.c	/^	int stylus_en;$/;"	m	struct:cyttsp4_core_data	file:
+sysfs_lock	cyttsp4_debug.c	/^	struct mutex sysfs_lock;$/;"	m	struct:cyttsp4_debug_data	typeref:struct:cyttsp4_debug_data::mutex	file:
+sysfs_lock	cyttsp4_device_access.c	/^	struct mutex sysfs_lock;$/;"	m	struct:cyttsp4_device_access_data	typeref:struct:cyttsp4_device_access_data::mutex	file:
+sysfs_lock	cyttsp4_proximity.c	/^	struct mutex sysfs_lock;$/;"	m	struct:cyttsp4_proximity_data	typeref:struct:cyttsp4_proximity_data::mutex	file:
+sysfs_nodes_created	cyttsp4_device_access.c	/^	bool sysfs_nodes_created;$/;"	m	struct:cyttsp4_device_access_data	file:
+sysinfo	cyttsp4_core.c	/^	struct cyttsp4_sysinfo sysinfo;$/;"	m	struct:cyttsp4_core_data	typeref:struct:cyttsp4_core_data::cyttsp4_sysinfo	file:
+system_lock	cyttsp4_core.c	/^	struct mutex system_lock;$/;"	m	struct:cyttsp4_core_data	typeref:struct:cyttsp4_core_data::mutex	file:
+tch_abs	cyttsp4_regs.h	/^	struct cyttsp4_tch_abs_params tch_abs[CY_TCH_NUM_ABS];$/;"	m	struct:cyttsp4_sysinfo_ofs	typeref:struct:cyttsp4_sysinfo_ofs::cyttsp4_tch_abs_params
+tch_rec_new	cyttsp4_regs.h	/^	struct cyttsp4_tch_rec_params tch_rec_new[CY_NUM_EXT_TCH_FIELDS];$/;"	m	struct:cyttsp4_opcfg	typeref:struct:cyttsp4_opcfg::cyttsp4_tch_rec_params
+tch_rec_old	cyttsp4_regs.h	/^	struct cyttsp4_tch_rec_params tch_rec_old[CY_NUM_TCH_FIELDS];$/;"	m	struct:cyttsp4_opcfg	typeref:struct:cyttsp4_opcfg::cyttsp4_tch_rec_params
+tch_rec_size	cyttsp4_regs.h	/^	size_t tch_rec_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+tch_rec_size	cyttsp4_regs.h	/^	u8 tch_rec_size;$/;"	m	struct:cyttsp4_opcfg
+test	cyttsp4_device_access.c	/^	struct cyttsp4_test_mode_params test;$/;"	m	struct:cyttsp4_device_access_data	typeref:struct:cyttsp4_device_access_data::cyttsp4_test_mode_params	file:
+test	cyttsp4_regs.h	/^	struct cyttsp4_test *test;$/;"	m	struct:cyttsp4_sysinfo_ptr	typeref:struct:cyttsp4_sysinfo_ptr::cyttsp4_test
+test_ofs	cyttsp4_regs.h	/^	size_t test_ofs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+test_ofsh	cyttsp4_regs.h	/^	u8 test_ofsh;$/;"	m	struct:cyttsp4_sysinfo_data
+test_ofsl	cyttsp4_regs.h	/^	u8 test_ofsl;$/;"	m	struct:cyttsp4_sysinfo_data
+test_size	cyttsp4_regs.h	/^	size_t test_size;$/;"	m	struct:cyttsp4_sysinfo_ofs
+touch_command_id	file_node_control/file_node_function.h	/^enum	touch_command_id$/;"	g
+touch_sensor	cyttsp4_i2c.c	/^	struct qpnp_vadc_chip *touch_sensor;$/;"	m	struct:cyttsp4_i2c	typeref:struct:cyttsp4_i2c::qpnp_vadc_chip	file:
+touch_sensor	file_node_control/file_node_function.h	/^	struct qpnp_vadc_chip *touch_sensor;$/;"	m	struct:cyttsp4_i2c	typeref:struct:cyttsp4_i2c::qpnp_vadc_chip
+touch_setting_names	cyttsp4_devtree.c	/^static char *touch_setting_names[CY_IC_GRPNUM_NUM] = {$/;"	v	file:
+tt_stat_ofs	cyttsp4_regs.h	/^	size_t tt_stat_ofs;$/;"	m	struct:cyttsp4_sysinfo_ofs
+tt_stat_ofs	cyttsp4_regs.h	/^	u8 tt_stat_ofs;$/;"	m	struct:cyttsp4_opcfg
+ttconfig	cyttsp4_regs.h	/^	struct cyttsp4_ttconfig ttconfig;$/;"	m	struct:cyttsp4_sysinfo	typeref:struct:cyttsp4_sysinfo::cyttsp4_ttconfig
+ttconfig_fw_ver	cyttsp4_params.h	/^static u8 ttconfig_fw_ver[] = {$/;"	v
+ttpidh	cyttsp4_regs.h	/^	u8 ttpidh;$/;"	m	struct:cyttsp4_cydata
+ttpidl	cyttsp4_regs.h	/^	u8 ttpidl;$/;"	m	struct:cyttsp4_cydata
+ttsp	cyttsp4_btn.c	/^	struct cyttsp4_device *ttsp;$/;"	m	struct:cyttsp4_btn_data	typeref:struct:cyttsp4_btn_data::cyttsp4_device	file:
+ttsp	cyttsp4_core.c	/^	struct cyttsp4_device *ttsp;$/;"	m	struct:atten_node	typeref:struct:atten_node::cyttsp4_device	file:
+ttsp	cyttsp4_debug.c	/^	struct cyttsp4_device *ttsp;$/;"	m	struct:cyttsp4_debug_data	typeref:struct:cyttsp4_debug_data::cyttsp4_device	file:
+ttsp	cyttsp4_device_access.c	/^	struct cyttsp4_device *ttsp;$/;"	m	struct:cyttsp4_device_access_data	typeref:struct:cyttsp4_device_access_data::cyttsp4_device	file:
+ttsp	cyttsp4_loader.c	/^	struct cyttsp4_device *ttsp;$/;"	m	struct:cyttsp4_loader_data	typeref:struct:cyttsp4_loader_data::cyttsp4_device	file:
+ttsp	cyttsp4_mt_common.h	/^	struct cyttsp4_device *ttsp;$/;"	m	struct:cyttsp4_mt_data	typeref:struct:cyttsp4_mt_data::cyttsp4_device
+ttsp	cyttsp4_proximity.c	/^	struct cyttsp4_device *ttsp;$/;"	m	struct:cyttsp4_proximity_data	typeref:struct:cyttsp4_proximity_data::cyttsp4_device	file:
+ttsp_ver_major	cyttsp4_regs.h	/^	u8 ttsp_ver_major;$/;"	m	struct:cyttsp4_cydata
+ttsp_ver_minor	cyttsp4_regs.h	/^	u8 ttsp_ver_minor;$/;"	m	struct:cyttsp4_cydata
+upgrade_firmware_from_builtin	cyttsp4_loader.c	/^static int upgrade_firmware_from_builtin(struct cyttsp4_device *ttsp)$/;"	f	file:
+upgrade_firmware_from_class	cyttsp4_loader.c	/^static int upgrade_firmware_from_class(struct cyttsp4_device *ttsp)$/;"	f	file:
+upgrade_firmware_from_platform	cyttsp4_loader.c	/^static int upgrade_firmware_from_platform(struct cyttsp4_device *ttsp,$/;"	f	file:
+upgrade_now_store	cyttsp4_loader.c	/^static ssize_t upgrade_now_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)$/;"	f	file:
+upgrade_step_show	cyttsp4_loader.c	/^static ssize_t upgrade_step_show(struct device *dev, struct device_attribute *attr, char *buf )$/;"	f	file:
+upgrade_ttconfig_from_platform	cyttsp4_loader.c	/^static int upgrade_ttconfig_from_platform(struct cyttsp4_device *ttsp)$/;"	f	file:
+verify_core_type	cyttsp4_bus.c	/^static struct cyttsp4_core *verify_core_type(struct device *dev)$/;"	f	file:
+verify_device_type	cyttsp4_bus.c	/^static struct cyttsp4_device *verify_device_type(struct device *dev)$/;"	f	file:
+version	cyttsp4_regs.h	/^	u16 version;$/;"	m	struct:cyttsp4_ttconfig
+virtual_keys_show	cyttsp4_devtree.c	/^static ssize_t virtual_keys_show(struct kobject *kobj,$/;"	f	file:
+vkeys	cyttsp4_devtree.c	/^	struct cyttsp4_virtual_keys vkeys;$/;"	m	struct:cyttsp4_extended_mt_platform_data	typeref:struct:cyttsp4_extended_mt_platform_data::cyttsp4_virtual_keys	file:
+wait_q	cyttsp4_core.c	/^	wait_queue_head_t wait_q;$/;"	m	struct:cyttsp4_core_data	file:
+wait_q	cyttsp4_device_access.c	/^	wait_queue_head_t wait_q;$/;"	m	struct:cyttsp4_device_access_data	file:
+wake_initiated_by_device	cyttsp4_core.c	/^	bool wake_initiated_by_device;$/;"	m	struct:cyttsp4_core_data	file:
+watchdog_timer	cyttsp4_core.c	/^	struct timer_list watchdog_timer;$/;"	m	struct:cyttsp4_core_data	typeref:struct:cyttsp4_core_data::timer_list	file:
+watchdog_work	cyttsp4_core.c	/^	struct work_struct watchdog_work;$/;"	m	struct:cyttsp4_core_data	typeref:struct:cyttsp4_core_data::work_struct	file:
+wr_buf	cyttsp4_i2c.c	/^	u8 wr_buf[CY_I2C_DATA_SIZE];$/;"	m	struct:cyttsp4_i2c	file:
+wr_buf	file_node_control/file_node_function.h	/^	u8 wr_buf[CY_I2C_DATA_SIZE];$/;"	m	struct:cyttsp4_i2c
+write_to_i2c	file_node_control/file_node_function.h	/^static void	write_to_i2c( void *file_node_data, struct command_parameter *parameter_data )$/;"	f
+x_origin	cyttsp4_regs.h	/^	size_t x_origin;	\/* left or right corner *\/$/;"	m	struct:cyttsp4_sysinfo_ofs
+xy_data	cyttsp4_regs.h	/^	u8 *xy_data;			\/* operational touch regs *\/$/;"	m	struct:cyttsp4_sysinfo
+xy_mode	cyttsp4_regs.h	/^	u8 *xy_mode;			\/* operational mode and status regs *\/$/;"	m	struct:cyttsp4_sysinfo
+y_origin	cyttsp4_regs.h	/^	size_t y_origin;	\/* upper or lower corner *\/$/;"	m	struct:cyttsp4_sysinfo_ofs

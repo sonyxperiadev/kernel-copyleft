@@ -53,6 +53,7 @@
 
 #include "mdss_fb.h"
 #include "mdss_mdp_splash_logo.h"
+#include "mdss_dsi.h"/* MM-GL-DISPLAY-panel-00+ */
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
@@ -66,8 +67,8 @@
 
 #define MAX_FBI_LIST 32
 
-#define BLANK_FLAG_LP	FB_BLANK_NORMAL
-#define BLANK_FLAG_ULP	FB_BLANK_VSYNC_SUSPEND
+#define BLANK_FLAG_LP	FB_BLANK_VSYNC_SUSPEND
+#define BLANK_FLAG_ULP	FB_BLANK_NORMAL
 
 static struct fb_info *fbi_list[MAX_FBI_LIST];
 static int fbi_list_index;
@@ -234,11 +235,42 @@ static int mdss_fb_notify_update(struct msm_fb_data_type *mfd,
 
 static int lcd_backlight_registered;
 
+#define MAX_BACKLIGHT_BRIGHTNESS 255/* MM-GL-DISPLAY-panel-00+ */
 static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 				      enum led_brightness value)
 {
 	struct msm_fb_data_type *mfd = dev_get_drvdata(led_cdev->dev->parent);
 	int bl_lvl;
+	/* MM-GL-DISPLAY-panel-00+[ */
+    char bkl_lut[MAX_BACKLIGHT_BRIGHTNESS + 1] = {
+		0x00, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13,
+		0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13, 0x13,
+		0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14,
+		0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14,
+		0x14, 0x14, 0x14, 0x14, 0x14, 0x15, 0x15, 0x15, 0x15, 0x15,
+		0x15, 0x15, 0x15, 0x15, 0x15, 0x15, 0x15, 0x16, 0x16, 0x16,
+		0x16, 0x16, 0x16, 0x16, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17,
+		0x18, 0x18, 0x18, 0x18, 0x18, 0x19, 0x19, 0x19, 0x19, 0x1A,
+		0x1A, 0x1A, 0x1A, 0x1B, 0x1B, 0x1B, 0x1C, 0x1C, 0x1C, 0x1D,
+		0x1D, 0x1D, 0x1E, 0x1E, 0x1E, 0x1F, 0x1F, 0x20, 0x20, 0x20,
+		0x22, 0x22, 0x22, 0x22, 0x23, 0x23, 0x24, 0x24, 0x25, 0x25,
+		0x26, 0x26, 0x27, 0x27, 0x28, 0x28, 0x29, 0x2A, 0x2A, 0x2B,
+		0x2B, 0x2C, 0x2D, 0x2D, 0x2E, 0x2F, 0x2F, 0x30, 0x31, 0x32,
+		0x32, 0x33, 0x34, 0x35, 0x35, 0x36, 0x37, 0x38, 0x39, 0x39,
+		0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x41, 0x42, 0x43,
+		0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D,
+		0x4E, 0x4F, 0x50, 0x51, 0x53, 0x54, 0x55, 0x56, 0x57, 0x59,
+		0x5A, 0x5B, 0x5C, 0x5E, 0x5F, 0x60, 0x62, 0x63, 0x64, 0x66,
+		0x66, 0x69, 0x6A, 0x6C, 0x6D, 0x6E, 0x70, 0x71, 0x73, 0x74,
+		0x76, 0x78, 0x79, 0x7B, 0x7C, 0x7E, 0x80, 0x81, 0x83, 0x85,
+		0x86, 0x88, 0x8A, 0x8C, 0x8D, 0x8F, 0x91, 0x93, 0x95, 0x97,
+		0x97, 0x9A, 0x9C, 0x9E, 0xA0, 0xA2, 0xA4, 0xA6, 0xA8, 0xAA,
+		0xAC, 0xAE, 0xB0, 0xB2, 0xB4, 0xB7, 0xB9, 0xBB, 0xBD, 0xBF,
+		0xC0, 0xC4, 0xC6, 0xC8, 0xCB, 0xCD, 0xCF, 0xD2, 0xD4, 0xD6,
+		0xD9, 0xDB, 0xDE, 0xE0, 0xE2, 0xE5, 0xE7, 0xEA, 0xED, 0xEF,
+		0xF2, 0xF4, 0xF7, 0xFA, 0xFC, 0xFF,
+    };
+	/* MM-GL-DISPLAY-panel-00+] */
 
 	if (mfd->boot_notification_led) {
 		led_trigger_event(mfd->boot_notification_led, 0);
@@ -253,6 +285,11 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
 				mfd->panel_info->brightness_max);
 
+    /* MM-GL-DISPLAY-panel-00+[ */
+	/*Base on display backlight propert, setup the mapping table
+    and ignore default driver algorithms*/
+    bl_lvl = bkl_lut[value];
+	/* MM-GL-DISPLAY-panel-00+] */
 	if (!bl_lvl && value)
 		bl_lvl = 1;
 
@@ -748,6 +785,7 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	struct fb_info *fbi;
 	const char *data;
 	int rc;
+	u32 cell_index = 0;
 
 	if (fbi_list_index >= MAX_FBI_LIST)
 		return -ENOMEM;
@@ -755,6 +793,11 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	pdata = dev_get_platdata(&pdev->dev);
 	if (!pdata)
 		return -EPROBE_DEFER;
+
+	of_property_read_u32(pdev->dev.of_node, "cell-index", &cell_index);
+	if (cell_index > fbi_list_index)
+		return -EPROBE_DEFER;
+
 
 	/*
 	 * alloc framebuffer info + par data
@@ -778,7 +821,7 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	mfd->ext_ad_ctrl = -1;
 	mfd->bl_level = 0;
 	mfd->bl_scale = 1024;
-	mfd->bl_min_lvl = 30;
+	mfd->bl_min_lvl = 19;/* MM-GL-DISPLAY-panel-00+ */
 	mfd->ad_bl_level = 0;
 	mfd->fb_imgType = MDP_RGBA_8888;
 
@@ -1317,16 +1360,16 @@ static int mdss_fb_blank_blank(struct msm_fb_data_type *mfd,
 	complete(&mfd->no_update.comp);
 
 	mfd->op_enable = false;
-	mutex_lock(&mfd->bl_lock);
 	if (mdss_panel_is_power_off(req_power_state)) {
 		/* Stop Display thread */
 		if (mfd->disp_thread)
 			mdss_fb_stop_disp_thread(mfd);
+		mutex_lock(&mfd->bl_lock);
 		mdss_fb_set_backlight(mfd, 0);
 		mfd->bl_updated = 0;
+		mutex_unlock(&mfd->bl_lock);
 	}
 	mfd->panel_power_state = req_power_state;
-	mutex_unlock(&mfd->bl_lock);
 
 	ret = mfd->mdp.off_fnc(mfd);
 	if (ret)
@@ -1445,7 +1488,7 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 		break;
 	case BLANK_FLAG_LP:
 		req_power_state = MDSS_PANEL_POWER_LP1;
-		pr_debug(" power mode requested\n");
+		pr_debug(" low power mode requested\n");
 
 		/*
 		 * If low power mode is requested when panel is already off,
@@ -1894,7 +1937,19 @@ static int mdss_fb_alloc_fbmem(struct msm_fb_data_type *mfd)
 		return -ENOMEM;
 	}
 }
+#if 0
+/* MM-GL-DISPLAY-panel-00+[ */
+static ssize_t mdss_manufactory_id_show(struct device *dev,
+               struct device_attribute *attr, char *buf)
+{
+       unsigned char manufactoryID = mdss_manufacture_id_read();
 
+       return snprintf(buf, PAGE_SIZE, "%x\n", manufactoryID);
+}
+
+static DEVICE_ATTR(manufactory_id, 0644, mdss_manufactory_id_show, NULL);
+/* MM-GL-DISPLAY-panel-00+] */
+#endif
 static int mdss_fb_register(struct msm_fb_data_type *mfd)
 {
 	int ret = -ENODEV;
@@ -2129,8 +2184,20 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 	mdss_panel_debugfs_init(panel_info);
 	pr_info("FrameBuffer[%d] %dx%d registered successfully!\n", mfd->index,
 					fbi->var.xres, fbi->var.yres);
+	/* MM-GL-DISPLAY-panel-00+[ */
+#if 0
+	if (mfd->index == 0) {
+		// File node: /sys/class/graphics/fb?/manufactory_id //
 
+		ret = device_create_file(fbi->dev, &dev_attr_manufactory_id);
+		if (ret) {
+			printk(KERN_ERR "[DISPLAY]%s: create dev_attr_manufactory_id failed, ret <%d>\n",
+				__func__, ret);
+		}
+	}
+#endif
 	return 0;
+	/* MM-GL-DISPLAY-panel-00+] */
 }
 
 /**
@@ -2278,7 +2345,7 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct mdss_fb_proc_info *pinfo = NULL, *temp_pinfo = NULL;
 	struct mdss_fb_proc_info *proc_info = NULL;
-	int ret = 0;
+	int ret = 0, ad_ret = 0;
 	int pid = current->tgid;
 	bool unknown_pid = true, release_needed = false;
 	struct task_struct *task = current->group_leader;
@@ -2306,7 +2373,7 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 		unknown_pid = false;
 
 		pr_debug("found process %s pid=%d mfd->ref=%d pinfo->ref=%d\n",
-			task->comm, mfd->ref_cnt, pinfo->pid, pinfo->ref_cnt);
+			task->comm, pinfo->pid, mfd->ref_cnt, pinfo->ref_cnt);
 
 		proc_info = mdss_fb_release_file_entry(info, pinfo,
 								release_all);
@@ -2330,10 +2397,6 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 			pinfo->ref_cnt--;
 			pm_runtime_put(info->dev);
 		} while (release_all && pinfo->ref_cnt);
-
-		/* we need to stop display thread before release */
-		if (release_all && mfd->disp_thread)
-			mdss_fb_stop_disp_thread(mfd);
 
 		if (pinfo->ref_cnt == 0) {
 			list_del(&pinfo->list);
@@ -2365,30 +2428,17 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 		}
 	}
 
-	if (release_needed) {
-		pr_debug("current process=%s pid=%d known pid=%d mfd->ref=%d\n",
-			task->comm, current->tgid, pid, mfd->ref_cnt);
+	if (!mfd->ref_cnt || release_all) {
+		/* resources (if any) will be released during blank */
+		if (mfd->mdp.release_fnc)
+			mfd->mdp.release_fnc(mfd, true, pid);
 
-		if (mfd->mdp.release_fnc) {
-			ret = mfd->mdp.release_fnc(mfd, false, pid);
-			if (ret)
-				pr_err("error releasing fb%d for current pid=%d known pid=%d\n",
-					mfd->index, current->tgid, pid);
+		if (mfd->mdp.ad_shutdown_cleanup) {
+			ad_ret = (*mfd->mdp.ad_shutdown_cleanup)(mfd);
+			if (ad_ret)
+				pr_err("AD shutdown cleanup failed ret = %d\n",
+									ad_ret);
 		}
-	} else if (release_all && mfd->ref_cnt) {
-		pr_err("reference count mismatch with proc list entries\n");
-	}
-
-	if (!mfd->ref_cnt) {
-		if (mfd->mdp.release_fnc) {
-			ret = mfd->mdp.release_fnc(mfd, true, pid);
-			if (ret)
-				pr_err("error fb%d release current process=%s pid=%d known pid=%d\n",
-				    mfd->index, task->comm, current->tgid, pid);
-		}
-
-		if (mfd->fb_ion_handle)
-			mdss_fb_free_fb_ion_memory(mfd);
 
 		ret = mdss_fb_blank_sub(FB_BLANK_POWERDOWN, info,
 			mfd->op_enable);
@@ -2397,7 +2447,22 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 			      mfd->index, ret, task->comm, current->tgid, pid);
 			return ret;
 		}
+
+		if (mfd->fb_ion_handle)
+			mdss_fb_free_fb_ion_memory(mfd);
+
 		atomic_set(&mfd->ioctl_ref_cnt, 0);
+	} else if (release_needed) {
+		pr_debug("current process=%s pid=%d known pid=%d mfd->ref=%d\n",
+			task->comm, current->tgid, pid, mfd->ref_cnt);
+
+		if (mfd->mdp.release_fnc) {
+			ret = mfd->mdp.release_fnc(mfd, false, pid);
+
+			/* display commit is needed to release resources */
+			if (ret)
+				mdss_fb_pan_display(&mfd->fbi->var, mfd->fbi);
+		}
 	}
 
 	return ret;
@@ -2961,26 +3026,16 @@ static int mdss_fb_check_var(struct fb_var_screeninfo *var,
 		return -EINVAL;
 
 	if (mfd->panel_info) {
-		struct mdss_panel_info *panel_info;
 		int rc;
-		panel_info = kzalloc(sizeof(struct mdss_panel_info),
-				GFP_KERNEL);
-		if (!panel_info) {
-			pr_err("panel info is NULL\n");
-			return -ENOMEM;
-		}
 
-		memcpy(panel_info, mfd->panel_info,
-				sizeof(struct mdss_panel_info));
-		mdss_fb_var_to_panelinfo(var, panel_info);
+		memcpy(&mfd->reconfig_panel_info, mfd->panel_info,
+				sizeof(mfd->reconfig_panel_info));
+		mdss_fb_var_to_panelinfo(var, &mfd->reconfig_panel_info);
 		rc = mdss_fb_send_panel_event(mfd, MDSS_EVENT_CHECK_PARAMS,
-			panel_info);
-		if (IS_ERR_VALUE(rc)) {
-			kfree(panel_info);
+			&mfd->reconfig_panel_info);
+		if (IS_ERR_VALUE(rc))
 			return rc;
-		}
 		mfd->panel_reconfig = rc;
-		kfree(panel_info);
 	}
 
 	return 0;

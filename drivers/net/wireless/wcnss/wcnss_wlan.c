@@ -2667,6 +2667,7 @@ wcnss_trigger_config(struct platform_device *pdev)
 {
 	int ret;
 	int rc;
+	struct clk *snoc_qosgen;
 	struct qcom_wcnss_opts *pdata;
 	struct resource *res;
 	int is_pronto_vt;
@@ -2999,6 +3000,18 @@ wcnss_trigger_config(struct platform_device *pdev)
 		penv->fw_vbatt_state = WCNSS_CONFIG_UNSPECIFIED;
 	}
 
+	snoc_qosgen = clk_get(&pdev->dev, "snoc_qosgen");
+
+	if (IS_ERR(snoc_qosgen)) {
+		pr_err("Couldn't get snoc_qosgen\n");
+	} else {
+		if (clk_prepare_enable(snoc_qosgen)) {
+			pr_err("snoc_qosgen enable failed\n");
+		} else {
+			pr_info("snoc_qosgen configured successfully\n");
+		}
+	}
+
 	if (penv->wlan_config.is_pronto_v3) {
 		penv->vadc_dev = qpnp_get_vadc(&penv->pdev->dev, "wcnss");
 
@@ -3073,6 +3086,16 @@ void wcnss_flush_work(struct work_struct *work)
 		cancel_work_sync(cnss_work);
 }
 EXPORT_SYMBOL(wcnss_flush_work);
+
+/* wlan prop driver cannot invoke show_stack
+ * function directly, so to invoke this function it
+ * call wcnss_dump_stack function
+ */
+void wcnss_dump_stack(struct task_struct *task)
+{
+	show_stack(task, NULL);
+}
+EXPORT_SYMBOL(wcnss_dump_stack);
 
 /* wlan prop driver cannot invoke cancel_delayed_work_sync
  * function directly, so to invoke this function it call

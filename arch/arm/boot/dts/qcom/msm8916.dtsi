@@ -332,6 +332,14 @@
 			< 1094400000 6>,
 			< 1152000000 7>;
 
+		qcom,speed3-bin-v0 =
+			<          0 0>,
+			<  200000000 1>,
+			<  400000000 2>,
+			<  533333000 3>,
+			<  800000000 4>,
+			<  998400000 5>;
+
 		qcom,speed0-bin-v1 =
 			<          0 0>,
 			<  200000000 1>,
@@ -354,6 +362,14 @@
 			< 1152000000 7>,
 			< 1209600000 8>,
 			< 1363200000 9>;
+
+		qcom,speed3-bin-v1 =
+			<          0 0>,
+			<  200000000 1>,
+			<  400000000 2>,
+			<  533333000 3>,
+			<  800000000 4>,
+			<  998400000 5>;
 	};
 
 	cpubw: qcom,cpubw {
@@ -457,6 +473,29 @@
 			 <&clock_gcc clk_gcc_blsp1_ahb_clk>;
 		clock-names = "core_clk", "iface_clk";
 	};
+	
+/* CORE-KH-New_Ram_Console-00-a[ */
+        qcom,ram_console {
+                compatible = "qcom,ram_console";
+                reg = <0xA0000000 0x20000>;
+        };
+/* CORE-KH-DbgCfgTool-LogcatCrashCmd-00-m[ */
+        qcom,alog_ram_console {
+                compatible = "qcom,alog_ram_console";
+                reg = <0xA0020000 0x20000>,
+                        <0xA0040000 0x20000>,
+                        <0xA0060000 0x20000>,
+                        <0xA0080000 0x20000>,
+                        <0xA00A0000 0x20000>;
+                reg-names = "alog_main_buffer",
+                        "alog_radio_buffer",
+                        "alog_events_buffer",
+                        "alog_system_buffer",
+                        "alog_crash_buffer";
+        };
+/* CORE-KH-DbgCfgTool-LogcatCrashCmd-00-m] */
+/* CORE-KH-New_Ram_Console-00-a] */
+
 
 	qcom,usbbam@78c4000 {
 		compatible = "qcom,usb-bam-msm";
@@ -1031,6 +1070,11 @@
 			qcom,msm-dai-q6-dev-id = <12289>;
 		};
 
+		bt_a2dp_rx: qcom,msm-dai-q6-bt-a2dp-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <12290>;
+		};
+
 		int_fm_rx: qcom,msm-dai-q6-int-fm-rx {
 			compatible = "qcom,msm-dai-q6-dev";
 			qcom,msm-dai-q6-dev-id = <12292>;
@@ -1343,7 +1387,7 @@
 		interrupts = <0 145 0 0 146 0>;
 		interrupt-names = "wcnss_wlantx_irq", "wcnss_wlanrx_irq";
 
-		qcom,pronto-vddmx-supply = <&pm8916_l3>;
+		qcom,pronto-vddmx-supply = <&pm8916_l3_corner_ao>;
 		qcom,pronto-vddcx-supply = <&pm8916_s1_corner>;
 		qcom,pronto-vddpx-supply = <&pm8916_l7>;
 		qcom,iris-vddxo-supply   = <&pm8916_l7>;
@@ -1363,8 +1407,10 @@
 		clocks = <&clock_rpm clk_xo_wlan_clk>,
 			 <&clock_rpm clk_rf_clk2>,
 			 <&clock_debug clk_gcc_debug_mux>,
-			 <&clock_gcc clk_wcnss_m_clk>;
-		clock-names = "xo", "rf_clk", "measure", "wcnss_debug";
+			 <&clock_gcc clk_wcnss_m_clk>,
+			 <&clock_gcc clk_gcc_snoc_qosgen_clk>;
+		clock-names = "xo", "rf_clk", "measure", "wcnss_debug",
+				"snoc_qosgen";
 
 		qcom,has-autodetect-xo;
 		qcom,wlan-rx-buff-count = <512>;
@@ -1438,7 +1484,7 @@
 		clocks = <&clock_gcc clk_gcc_blsp1_ahb_clk>,
 			 <&clock_gcc clk_gcc_blsp1_qup2_i2c_apps_clk>;
 		clock-names = "iface_clk", "core_clk";
-		qcom,clk-freq-out = <100000>;
+		qcom,clk-freq-out = <400000>;
 		qcom,clk-freq-in  = <19200000>;
 		pinctrl-names = "i2c_active", "i2c_sleep";
 		pinctrl-0 = <&i2c_0_active>;
@@ -1462,7 +1508,7 @@
 		clocks = <&clock_gcc clk_gcc_blsp1_ahb_clk>,
 			 <&clock_gcc clk_gcc_blsp1_qup5_i2c_apps_clk>;
 		clock-names = "iface_clk", "core_clk";
-		qcom,clk-freq-out = <100000>;
+		qcom,clk-freq-out = <400000>;
 		qcom,clk-freq-in  = <19200000>;
 		pinctrl-names = "i2c_active", "i2c_sleep";
 		pinctrl-0 = <&i2c_5_active>;

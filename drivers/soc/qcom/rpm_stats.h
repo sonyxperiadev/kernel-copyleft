@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -39,4 +40,19 @@ struct msm_rpm_master_stats_platform_data {
 	 u32 master_offset;
 	 u32 version;
 };
+
+//CORE-PK-RPMStatsLog-00+[
+#ifdef CONFIG_FIH_FEATURE_RPM_STATS_LOG
+struct msm_rpmstats_mode_data {
+	u32 xosd_count;
+	u64 xosd_time_in_last_mode;
+	u64 xosd_time_since_last_mode;
+	u64 xosd_actual_last_sleep;
+	u32 vmin_count;
+	u64 vmin_time_in_last_mode;
+	u64 vmin_time_since_last_mode;
+	u64 vmin_actual_last_sleep;
+};
+#endif
+//CORE-PK-RPMStatsLog-00+]
 #endif

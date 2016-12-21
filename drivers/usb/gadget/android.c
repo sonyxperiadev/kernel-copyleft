@@ -36,9 +36,15 @@
 
 #include "gadget_chips.h"
 
+/* Wait time (ms) before sending CONFIGURED uevent */
+#define WAIT_TIME_BEFORE_SENDING_CONFIGURED		(50)
+
 #include "f_fs.c"
 #ifdef CONFIG_SND_PCM
 #include "f_audio_source.c"
+#endif
+#ifdef CONFIG_SND_RAWMIDI
+#include "f_midi.c"
 #endif
 #include "f_mass_storage.c"
 #define USB_ETH_RNDIS y
@@ -77,6 +83,13 @@
 #include "f_ncm.c"
 #include "f_charger.c"
 
+#define F_CDROM  1/*CONN-EH-PCCOMPANION-00+*/
+
+#undef pr_debug
+#define pr_debug pr_info
+#undef dev_dbg
+#define dev_dbg dev_info
+
 MODULE_AUTHOR("Mike Lockwood");
 MODULE_DESCRIPTION("Android Composite USB Driver");
 MODULE_LICENSE("GPL");
@@ -89,6 +102,11 @@ static const char longname[] = "Gadget Android";
 #define PRODUCT_ID		0x0001
 
 #define ANDROID_DEVICE_NODE_NAME_LENGTH 11
+/* f_midi configuration */
+#define MIDI_INPUT_PORTS    1
+#define MIDI_OUTPUT_PORTS   1
+#define MIDI_BUFFER_SIZE    1024
+#define MIDI_QUEUE_LENGTH   32
 
 struct android_usb_function {
 	char *name;
@@ -2406,6 +2424,11 @@ static int mass_storage_function_init(struct android_usb_function *f,
 	int err;
 	int i, n;
 	char name[FSG_MAX_LUNS][MAX_LUN_NAME];
+/*CONN-EH-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	int nluns;
+#endif
+/*CONN-EH-PCCOMPANION-00+}*/
 	u8 uicc_nluns = dev->pdata ? dev->pdata->uicc_nluns : 0;
 
 	config = kzalloc(sizeof(struct mass_storage_function_config),
@@ -2439,6 +2462,44 @@ static int mass_storage_function_init(struct android_usb_function *f,
 		config->fsg.nluns++;
 	}
 
+        /*CONN-EH-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	if (config->fsg.nluns > FSG_MAX_LUNS)
+		config->fsg.nluns = FSG_MAX_LUNS;
+
+	config->fsg.cdrom_nluns = 1;
+	if (config->fsg.cdrom_nluns > FSG_MAX_LUNS - config->fsg.nluns)
+		config->fsg.cdrom_nluns = FSG_MAX_LUNS - config->fsg.nluns;
+
+	nluns = config->fsg.nluns + config->fsg.cdrom_nluns;
+	if (nluns <= 0) {
+		kfree(config);
+		return -EINVAL;
+	}
+	for (i = 0; i < nluns; i++) {
+		config->fsg.luns[i].removable = 1;
+		if (i < config->fsg.nluns) {
+			/* Mass storage lun */
+			config->fsg.luns[i].ro = 0;
+			config->fsg.luns[i].cdrom = 0;
+		} else {
+			/* CD-ROM lun */
+			config->fsg.luns[i].ro = 1;
+			config->fsg.luns[i].cdrom = 1;
+		}
+	}
+
+	if (dev->pdata && dev->pdata->can_stall) {
+		config->fsg.can_stall = dev->pdata->can_stall;
+	}
+
+	config->fsg.vendor_name = "SONY";
+	config->fsg.product_name = "Mass storage";
+#else
+        config->fsg.vendor_name = "SONY";/*CONN-EH-USBPORTING-00+*/
+        config->fsg.product_name = "Mass storage";/*CONN-EH-USBPORTING-00+*/
+#endif
+/*CONN-EH-PCCOMPANION-00+}*/
 	common = fsg_common_init(NULL, cdev, &config->fsg);
 	if (IS_ERR(common)) {
 		kfree(config);
@@ -2574,6 +2635,22 @@ static int mass_storage_function_bind_config(struct android_usb_function *f,
 {
 	struct mass_storage_function_config *config = f->config;
 	int ret;
+/*CONN-EH-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	int err;
+	//printk(KERN_INFO "USB:mass_storage_function_bind_config");
+
+	config->common->storage_mode = STORAGE_MODE_MSC;
+	fsg_common_setup_luns(config->common);
+	sysfs_remove_link(&f->dev->kobj, "lun");
+
+	err = sysfs_create_link(&f->dev->kobj,
+				&config->common->luns[0].dev.kobj,
+				"lun");
+	if (err)
+		return err;
+#endif
+/*CONN-EH-PCCOMPANION-00+}*/
 
 	ret = fsg_bind_config(c->cdev, c, config->common);
 	if (ret)
@@ -2597,9 +2674,18 @@ static ssize_t mass_storage_inquiry_store(struct device *dev,
 	struct mass_storage_function_config *config = f->config;
 	if (size >= sizeof(config->common->inquiry_string))
 		return -EINVAL;
+/*CONN-EH-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+        return snprintf(config->common->inquiry_string,
+			sizeof(config->common->inquiry_string),
+			"%28s",
+			buf);
+#else
 	if (sscanf(buf, "%28s", config->common->inquiry_string) != 1)
 		return -EINVAL;
 	return size;
+#endif
+/*CONN-EH-PCCOMPANION-00+}*/
 }
 
 static DEVICE_ATTR(inquiry_string, S_IRUGO | S_IWUSR,
@@ -2639,6 +2725,73 @@ static struct android_usb_function mass_storage_function = {
 	.enable		= mass_storage_function_enable,
 };
 
+/*CONN-EH-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+static int cdrom_function_init(struct android_usb_function *f,
+				struct usb_composite_dev *cdev)
+{
+	printk(KERN_INFO "USB:cdrom_function_init");
+	f->config = mass_storage_function.config;
+	return 0;
+}
+
+static int cdrom_function_bind_config(struct android_usb_function *f,
+					struct usb_configuration *c)
+{
+	struct mass_storage_function_config *config = f->config;
+	int err;
+
+	printk(KERN_INFO "USB:cdrom_function_bind_config");
+	config->common->storage_mode = STORAGE_MODE_CDROM;
+	fsg_common_setup_luns(config->common);
+	sysfs_remove_link(&mass_storage_function.dev->kobj, "lun");
+	err = sysfs_create_link(&mass_storage_function.dev->kobj,
+				&config->common->luns[0].dev.kobj,
+				"lun");
+	if (err)
+		return err;
+	return fsg_bind_config(c->cdev, c, config->common);
+}
+
+static ssize_t cdrom_inquiry_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	return snprintf(buf, PAGE_SIZE, "%s\n",
+			config->common->cdrom_inquiry_string);
+}
+
+static ssize_t cdrom_inquiry_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	if (size >= sizeof(config->common->cdrom_inquiry_string))
+		return -EINVAL;
+	return snprintf(config->common->cdrom_inquiry_string,
+			sizeof(config->common->inquiry_string),
+			"%28s",
+			buf);
+}
+
+static DEVICE_ATTR(cdrom_inquiry_string, S_IRUGO | S_IWUSR,
+					cdrom_inquiry_show,
+					cdrom_inquiry_store);
+
+static struct device_attribute *cdrom_function_attributes[] = {
+	&dev_attr_cdrom_inquiry_string,
+	NULL
+};
+
+static struct android_usb_function cdrom_function = {
+	.name		= "cdrom",
+	.init		= cdrom_function_init,
+	.bind_config	= cdrom_function_bind_config,
+	.attributes	= cdrom_function_attributes,
+};
+#endif
+/*CONN-EH-PCCOMPANION-00+}*/
 
 static int accessory_function_init(struct android_usb_function *f,
 					struct usb_composite_dev *cdev)
@@ -2716,7 +2869,8 @@ static ssize_t audio_source_pcm_show(struct device *dev,
 	struct audio_source_config *config = f->config;
 
 	/* print PCM card and device numbers */
-	return sprintf(buf, "%d %d\n", config->card, config->device);
+	return snprintf(buf, PAGE_SIZE,
+			"%d %d\n", config->card, config->device);
 }
 
 static DEVICE_ATTR(pcm, S_IRUGO, audio_source_pcm_show, NULL);
@@ -2782,6 +2936,61 @@ static struct android_usb_function uasp_function = {
 	.bind_config	= uasp_function_bind_config,
 };
 
+#ifdef CONFIG_SND_RAWMIDI
+static int midi_function_init(struct android_usb_function *f,
+					struct usb_composite_dev *cdev)
+{
+	struct midi_alsa_config *config;
+
+	config = kzalloc(sizeof(struct midi_alsa_config), GFP_KERNEL);
+	f->config = config;
+	if (!config)
+		return -ENOMEM;
+	config->card = -1;
+	config->device = -1;
+	return 0;
+}
+
+static void midi_function_cleanup(struct android_usb_function *f)
+{
+	kfree(f->config);
+}
+
+static int midi_function_bind_config(struct android_usb_function *f,
+						struct usb_configuration *c)
+{
+	struct midi_alsa_config *config = f->config;
+
+	return f_midi_bind_config(c, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1,
+			MIDI_INPUT_PORTS, MIDI_OUTPUT_PORTS, MIDI_BUFFER_SIZE,
+			MIDI_QUEUE_LENGTH, config);
+}
+
+static ssize_t midi_alsa_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct midi_alsa_config *config = f->config;
+
+	/* print ALSA card and device numbers */
+	return sprintf(buf, "%d %d\n", config->card, config->device);
+}
+
+static DEVICE_ATTR(alsa, S_IRUGO, midi_alsa_show, NULL);
+
+static struct device_attribute *midi_function_attributes[] = {
+	&dev_attr_alsa,
+	NULL
+};
+
+static struct android_usb_function midi_function = {
+	.name		= "midi",
+	.init		= midi_function_init,
+	.cleanup	= midi_function_cleanup,
+	.bind_config	= midi_function_bind_config,
+	.attributes	= midi_function_attributes,
+};
+#endif
 static struct android_usb_function *supported_functions[] = {
 	&ffs_function,
 	&mbim_function,
@@ -2810,6 +3019,14 @@ static struct android_usb_function *supported_functions[] = {
 #endif
 	&uasp_function,
 	&charger_function,
+/*CONN-EH-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	&cdrom_function,
+#endif
+/*CONN-EH-PCCOMPANION-00+}*/
+#ifdef CONFIG_SND_RAWMIDI
+	&midi_function,
+#endif
 	NULL
 };
 
@@ -3501,6 +3718,7 @@ static int android_bind(struct usb_composite_dev *cdev)
 		return id;
 	strings_dev[STRING_SERIAL_IDX].id = id;
 	device_desc.iSerialNumber = id;
+    device_desc.bcdDevice = get_default_bcdDevice();
 
 	if (gadget_is_otg(cdev->gadget))
 		list_for_each_entry(conf, &dev->configs, list_item)

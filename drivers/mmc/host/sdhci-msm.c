@@ -41,6 +41,9 @@
 #include <linux/iopoll.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/msm-bus.h>
+/* BSP-AlwaysChen-Enable_ExSD-01+[ */
+#include <linux/fih_hw_info.h>
+/* BSP-AlwaysChen-Enable_ExSD-01]+ */
 
 #include "sdhci-pltfm.h"
 
@@ -103,6 +106,11 @@ enum sdc_mpm_pin_state {
 #define CORE_HC_SELECT_IN_EN	(1 << 18)
 #define CORE_HC_SELECT_IN_HS400	(6 << 19)
 #define CORE_HC_SELECT_IN_MASK	(7 << 19)
+
+#define CORE_VENDOR_SPEC_FUNC2 0x110
+#define HC_SW_RST_WAIT_IDLE_DIS	(1 << 20)
+#define HC_SW_RST_REQ (1 << 21)
+#define CORE_ONE_MID_EN     (1 << 25)
 
 #define CORE_VENDOR_SPEC_CAPABILITIES0	0x11C
 #define CORE_8_BIT_SUPPORT		(1 << 18)
@@ -1660,6 +1668,24 @@ out:
 	return -EINVAL;
 }
 
+/* BSP-AlwaysChen-Enable_ExSD-01+[ */
+static bool sdhci_msm_check_active_high(void)
+{
+        int phase = fih_get_product_phase();
+        switch (phase) {
+               case PHASE_EVM2:
+               case PHASE_EVM3:
+               case PHASE_PD1:
+               case PHASE_PD2:
+               case PHASE_PD4:
+                       return false;
+               default:
+                       return true;
+                }
+}
+/* BSP-AlwaysChen-Enable_ExSD-01+] */
+
+
 /* Parse platform data */
 static struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev,
 						struct sdhci_host *host)
@@ -1679,8 +1705,11 @@ static struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev,
 	}
 
 	pdata->status_gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
-	if (gpio_is_valid(pdata->status_gpio) & !(flags & OF_GPIO_ACTIVE_LOW))
+        /* BSP-AlwaysChen-Enable_ExSD-01*[ */
+       /*if (gpio_is_valid(pdata->status_gpio) & !(flags & OF_GPIO_ACTIVE_LOW))*/
+       if (gpio_is_valid(pdata->status_gpio) & (!(flags & OF_GPIO_ACTIVE_LOW) | sdhci_msm_check_active_high()))
 		pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+        /* BSP-AlwaysChen-Enable_ExSD-01*] */
 
 	of_property_read_u32(np, "qcom,bus-width", &bus_width);
 	if (bus_width == 8)
@@ -3084,6 +3113,8 @@ void sdhci_msm_dump_vendor_regs(struct sdhci_host *host)
 		readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC),
 		readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_ADMA_ERR_ADDR0),
 		readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_ADMA_ERR_ADDR1));
+	pr_info("Vndr func2: 0x%08x\n",
+		readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_FUNC2));
 
 	/*
 	 * tbsel indicates [2:0] bits and tbsel2 indicates [7:4] bits
@@ -3115,6 +3146,48 @@ void sdhci_msm_dump_vendor_regs(struct sdhci_host *host)
 			CORE_TESTBUS_CONFIG);
 }
 
+void sdhci_msm_reset_workaround(struct sdhci_host *host, u32 enable)
+{
+	u32 vendor_func2;
+	unsigned long timeout;
+
+	vendor_func2 = readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_FUNC2);
+
+	if (enable) {
+		writel_relaxed(vendor_func2 | HC_SW_RST_REQ, host->ioaddr +
+				CORE_VENDOR_SPEC_FUNC2);
+		timeout = 10000;
+		while (readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_FUNC2) &
+				HC_SW_RST_REQ) {
+			if (timeout == 0) {
+				pr_info("%s: Applying wait idle disable workaround\n",
+					mmc_hostname(host->mmc));
+				/*
+				 * Apply the reset workaround to not wait for
+				 * pending data transfers on AXI before
+				 * resetting the controller. This could be
+				 * risky if the transfers were stuck on the
+				 * AXI bus.
+				 */
+				vendor_func2 = readl_relaxed(host->ioaddr +
+						CORE_VENDOR_SPEC_FUNC2);
+				writel_relaxed(vendor_func2 |
+					HC_SW_RST_WAIT_IDLE_DIS,
+					host->ioaddr + CORE_VENDOR_SPEC_FUNC2);
+				host->reset_wa_t = ktime_get();
+				return;
+			}
+			timeout--;
+			udelay(10);
+		}
+		pr_info("%s: waiting for SW_RST_REQ is successful\n",
+				mmc_hostname(host->mmc));
+	} else {
+		writel_relaxed(vendor_func2 & ~HC_SW_RST_WAIT_IDLE_DIS,
+				host->ioaddr + CORE_VENDOR_SPEC_FUNC2);
+	}
+}
+
 static struct sdhci_ops sdhci_msm_ops = {
 	.set_uhs_signaling = sdhci_msm_set_uhs_signaling,
 	.check_power_status = sdhci_msm_check_power_status,
@@ -3128,6 +3201,7 @@ static struct sdhci_ops sdhci_msm_ops = {
 	.dump_vendor_regs = sdhci_msm_dump_vendor_regs,
 	.config_auto_tuning_cmd = sdhci_msm_config_auto_tuning_cmd,
 	.enable_controller_clock = sdhci_msm_enable_controller_clock,
+	.reset_workaround = sdhci_msm_reset_workaround,
 };
 
 static int sdhci_msm_cfg_mpm_pin_wakeup(struct sdhci_host *host, unsigned mode)
@@ -3168,6 +3242,7 @@ static void sdhci_set_default_hw_caps(struct sdhci_msm_host *msm_host,
 	u32 version, caps;
 	u16 minor;
 	u8 major;
+	u32 val;
 
 	version = readl_relaxed(msm_host->core_mem + CORE_MCI_VERSION);
 	major = (version & CORE_VERSION_MAJOR_MASK) >>
@@ -3197,6 +3272,16 @@ static void sdhci_set_default_hw_caps(struct sdhci_msm_host *msm_host,
 			caps), host->ioaddr + CORE_VENDOR_SPEC_CAPABILITIES0);
 	}
 
+	/*
+	 * Enable one MID mode for SDCC5 (major 1) on 8916/8939 (minor 0x2e) and
+	 * on 8992 (minor 0x3e) as a workaround to reset for data stuck issue.
+	 */
+	if (major == 1 && (minor == 0x2e || minor == 0x3e)) {
+		host->quirks2 |= SDHCI_QUIRK2_USE_RESET_WORKAROUND;
+		val = readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_FUNC2);
+		writel_relaxed((val | CORE_ONE_MID_EN),
+			host->ioaddr + CORE_VENDOR_SPEC_FUNC2);
+	}
 	/*
 	 * SDCC 5 controller with major version 1, minor version 0x34 and later
 	 * with HS 400 mode support will use CM DLL instead of CDC LP 533 DLL.
@@ -3484,6 +3569,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	/* Set host capabilities */
 	msm_host->mmc->caps |= msm_host->pdata->mmc_bus_width;
 	msm_host->mmc->caps |= msm_host->pdata->caps;
+	msm_host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
 	msm_host->mmc->caps2 |= msm_host->pdata->caps2;
 	msm_host->mmc->caps2 |= MMC_CAP2_CORE_RUNTIME_PM;
 	msm_host->mmc->caps2 |= MMC_CAP2_PACKED_WR;
@@ -3514,6 +3600,13 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 		 */
 		sdhci_msm_setup_pins(msm_host->pdata, true);
 
+		/*BSP-ELuo-CardDetect-00+[*/
+		/*
+		 * This delay is needed for stabilizing the card detect GPIO
+		 * line after changing the pull configs.
+		 */
+		usleep_range(100000, 105000);
+		/*BSP-ELuo-CardDetect-00]+*/
 		ret = mmc_gpio_request_cd(msm_host->mmc,
 				msm_host->pdata->status_gpio);
 		if (ret) {

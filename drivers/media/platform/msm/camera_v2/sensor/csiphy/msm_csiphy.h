@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -82,6 +82,7 @@ struct csiphy_device {
 	int32_t ref_count;
 	uint16_t lane_mask[MAX_CSIPHY];
 	uint32_t is_3_1_20nm_hw;
+	uint32_t is_3_1_rev3;
 	uint32_t csiphy_clk_index;
 	uint32_t csiphy_max_clk;
 	uint32_t csiphy_sof_freeze;

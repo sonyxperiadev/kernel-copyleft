@@ -95,7 +95,7 @@ struct afe_ctl {
 	struct mutex afe_cmd_lock;
 };
 
-static atomic_t afe_ports_mad_type[SLIMBUS_PORT_LAST - SLIMBUS_0_RX];
+static atomic_t afe_ports_mad_type[SLIMBUS_PORT_LAST + 2 - SLIMBUS_0_RX];
 static unsigned long afe_configured_cmd;
 
 static struct afe_ctl this_afe;
@@ -822,7 +822,6 @@ fail_cmd:
 	pr_debug("%s: port_id 0x%x rate %u delay_usec %d status %d\n",
 	__func__, port_id, rate, delay_entry.delay_usec, ret);
 	return ret;
-
 }
 
 static void remap_cal_data(struct cal_block_data *cal_block, int cal_index)
@@ -1311,8 +1310,10 @@ int afe_port_set_mad_type(u16 port_id, enum afe_mad_type mad_type)
 		mad_type = MAD_SW_AUDIO;
 		return 0;
 	}
-
-	i = port_id - SLIMBUS_0_RX;
+	if (port_id == AFE_PORT_ID_QUATERNARY_MI2S_TX)
+		i = (SLIMBUS_PORT_LAST + 1) - SLIMBUS_0_RX;
+	else
+		i = port_id - SLIMBUS_0_RX;
 	if (i < 0 || i >= ARRAY_SIZE(afe_ports_mad_type)) {
 		pr_err("%s: Invalid port_id 0x%x\n", __func__, port_id);
 		return -EINVAL;
@@ -1327,8 +1328,10 @@ enum afe_mad_type afe_port_get_mad_type(u16 port_id)
 
 	if (port_id == AFE_PORT_ID_TERTIARY_MI2S_TX)
 		return MAD_SW_AUDIO;
-
-	i = port_id - SLIMBUS_0_RX;
+	if (port_id == AFE_PORT_ID_QUATERNARY_MI2S_TX)
+		i = (SLIMBUS_PORT_LAST + 1) - SLIMBUS_0_RX;
+	else
+		i = port_id - SLIMBUS_0_RX;
 	if (i < 0 || i >= ARRAY_SIZE(afe_ports_mad_type)) {
 		pr_debug("%s: Non Slimbus port_id 0x%x\n", __func__, port_id);
 		return MAD_HW_NONE;
@@ -1836,6 +1839,7 @@ int afe_port_start(u16 port_id, union afe_port_config *afe_config,
 		cfg_type = AFE_PARAM_ID_RT_PROXY_CONFIG;
 		break;
 	case INT_BT_SCO_RX:
+	case INT_BT_A2DP_RX:
 	case INT_BT_SCO_TX:
 	case INT_FM_RX:
 	case INT_FM_TX:

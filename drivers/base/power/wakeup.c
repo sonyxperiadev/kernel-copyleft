@@ -16,6 +16,12 @@
 #include <linux/debugfs.h>
 #include <trace/events/power.h>
 
+//CORE-KC-PMSWakelockInfo-00+[
+#ifdef CONFIG_FIH_DUMP_WAKELOCK
+#include <linux/fb.h>
+#endif
+//CORE-KC-PMSWakelockInfo-00+]
+
 #include "power.h"
 
 /*
@@ -47,6 +53,19 @@ static unsigned int saved_count;
 
 static DEFINE_SPINLOCK(events_lock);
 
+//CORE-KC-PMSWakelockInfo-00+[
+#ifdef CONFIG_FIH_DUMP_WAKELOCK
+static DEFINE_SPINLOCK(pms_list_lock);
+static LIST_HEAD(pms_locks);
+
+#define POLLING_DUMP_WAKELOCK_SECS	(45)
+#define POLLING_DUMP_WAKELOCK_1ST_SECS	(1)
+
+static void dump_wakelocks(unsigned long data);
+static DEFINE_TIMER(dump_wakelock_timer, dump_wakelocks, 0, 0);
+static s64 pms_wl_ms=0;
+#endif
+//CORE-KC-PMSWakelockInfo-00+]
 static void pm_wakeup_timer_fn(unsigned long data);
 
 static LIST_HEAD(wakeup_sources);
@@ -713,6 +732,221 @@ bool pm_wakeup_pending(void)
 	return ret;
 }
 
+//CORE-KC-PMSWakelockInfo-00+[
+#ifdef CONFIG_FIH_DUMP_WAKELOCK
+struct pms_wake_lock {
+	struct list_head	link;
+	char				*pid;
+	char				*tag;
+	ktime_t				acquire_time;
+};
+
+void pms_add_wakelock_info(char *pid, char *tag) 
+{
+	unsigned long irqflags;
+	struct pms_wake_lock *lock;
+	int pid_len,tag_len;
+
+	if (!*pid) {
+		pr_err("[PMSWL]add_pms_wakelock_info: pid is empty\n");
+		return;
+	}
+	if (!*tag) {
+		pr_err("[PMSWL]add_pms_wakelock_info: tag is empty\n");
+		return;
+	}
+	
+	spin_lock_irqsave(&pms_list_lock, irqflags);	
+	lock = kzalloc(sizeof(*lock), GFP_ATOMIC);
+	if (!lock) {
+		pr_err("[PMSWL]no memory to allocate pms_lock size:%lu\n",sizeof(*lock));
+		goto exit_add;
+	}
+	pid_len=strlen(pid)+1;
+	lock->pid = kzalloc(pid_len, GFP_ATOMIC);
+	if (!lock->pid) {
+		pr_err("[PMSWL]no memory to allocate pms_lock->pid size:%d\n", pid_len);
+		kfree(lock);
+		goto exit_add;
+	}
+	strncpy(lock->pid,pid,pid_len);
+	
+	tag_len=strlen(tag)+1;
+	lock->tag = kzalloc(tag_len, GFP_ATOMIC);
+	if (!lock->tag) {
+		pr_err("[PMSWL]no memory to allocate pms_lock->tag size:%d\n", tag_len);
+		kfree(lock->pid);
+		kfree(lock);
+		goto exit_add;
+	}	
+	strncpy(lock->tag,tag,tag_len);
+
+	lock->acquire_time = ktime_get();
+	list_add(&lock->link,&pms_locks);
+
+exit_add:	
+	spin_unlock_irqrestore(&pms_list_lock, irqflags);	
+}
+EXPORT_SYMBOL(pms_add_wakelock_info);
+
+void pms_remove_wakelock_info(char *pid, char * tag)
+{
+	unsigned long irqflags;
+	
+	struct pms_wake_lock *lock,*lock_temp;
+	
+	spin_lock_irqsave(&pms_list_lock, irqflags);
+	list_for_each_entry_safe(lock, lock_temp, &pms_locks, link) {
+		if (!strcmp(lock->tag,tag) && !strcmp(lock->pid,pid)) {
+
+			list_del(&lock->link);
+			kfree(lock->pid);
+			kfree(lock->tag);
+			kfree(lock);
+			goto exit_remove;
+		}
+	}
+	
+exit_remove:
+	spin_unlock_irqrestore(&pms_list_lock, irqflags);
+}
+EXPORT_SYMBOL(pms_remove_wakelock_info);
+
+static void print_active_pms_locks(void)
+{
+	 struct pms_wake_lock *lock,*lock_temp;
+ 
+	 unsigned long irqflags;
+ 
+	 spin_lock_irqsave(&pms_list_lock, irqflags);
+	 
+	 list_for_each_entry_safe(lock, lock_temp, &pms_locks, link) {
+		ktime_t now = ktime_get();
+		ktime_t active_time = ktime_sub(now, lock->acquire_time);
+		if ( ktime_to_ms(active_time) <= pms_wl_ms+1000) { 
+			s64 ns = ktime_to_ns(active_time);
+			s64 s = ns;			
+			ns = do_div(s, NSEC_PER_SEC);
+			pr_info("[PMSWL]active PMS wake lock: %s %s %lld.%lld secs\n", lock->pid, lock->tag, s, ns);
+		} else { 
+			list_del(&lock->link);
+			kfree(lock->pid);
+			kfree(lock->tag);
+			kfree(lock);		
+		}
+	 }
+ 	 pms_wl_ms = 0;
+
+	 spin_unlock_irqrestore(&pms_list_lock, irqflags);
+ }
+
+static int print_active_wakeup_source_stats(struct wakeup_source *ws)
+{
+	unsigned long flags;
+	ktime_t total_time;
+	ktime_t max_time;
+	unsigned long active_count;
+	ktime_t active_time;
+	ktime_t prevent_sleep_time;
+	int ret = 0;
+
+	spin_lock_irqsave(&ws->lock, flags);
+
+	total_time = ws->total_time;
+	max_time = ws->max_time;
+	prevent_sleep_time = ws->prevent_sleep_time;
+	active_count = ws->active_count;
+	if (ws->active) {
+		ktime_t now = ktime_get();
+
+		active_time = ktime_sub(now, ws->last_time);
+
+		pr_info("[PM]active wake lock %s, active_time=%lld ms\n",
+			ws->name, 
+			ktime_to_ms(active_time));
+		if (!strncmp(ws->name, "PowerManagerService.WakeLocks", 29))
+			pms_wl_ms = ktime_to_ms(active_time);
+	}
+
+	spin_unlock_irqrestore(&ws->lock, flags);
+
+	return ret;
+}
+
+ /* Caller must acquire the list_lock spinlock */
+static void print_active_locks(void)
+{
+	struct wakeup_source *ws;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(ws, &wakeup_sources, entry)
+		print_active_wakeup_source_stats(ws);
+	rcu_read_unlock();
+
+	print_active_pms_locks();
+}
+
+static void dump_wakelocks(unsigned long data)
+{
+	pr_info("[PM]--- dump_wakelocks ---\n");
+
+	print_active_locks();
+
+	mod_timer(&dump_wakelock_timer, jiffies + POLLING_DUMP_WAKELOCK_SECS*HZ);
+}
+
+static int fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank = NULL;
+	static bool add = false;
+
+	if (event != FB_EVENT_BLANK) {
+		printk("pms XXXXX event = %lu\n", event);
+		return 0;
+	}
+	if (!evdata || !evdata->data) {
+		printk("pms !data\n");
+		return 0;
+	}
+	blank = evdata->data;
+	if (*blank != FB_BLANK_POWERDOWN && *blank != FB_BLANK_UNBLANK) {
+		printk("pms XXXXX *blank = %d\n", *blank);
+		return 0;
+	}
+	if (*blank==FB_BLANK_POWERDOWN) {
+		if (!add) {
+			pr_info("[PM] add dump_wakelock_timer\n");
+			mod_timer(&dump_wakelock_timer, jiffies + POLLING_DUMP_WAKELOCK_1ST_SECS*HZ);
+			add = true;
+		}
+	}
+	else if (*blank==FB_BLANK_UNBLANK) {
+		if (del_timer(&dump_wakelock_timer)) {
+			pr_info("[PM] del dump_wakelock_timer\n");
+			add = false;
+		}
+	}
+
+	return 0;
+}
+
+static struct notifier_block pms_fb_notif;
+static void setup_wakelock_dump(void)
+{
+	int retval = 0;
+
+	memset(&pms_fb_notif, 0, sizeof(pms_fb_notif));
+	pms_fb_notif.notifier_call = fb_notifier_callback;
+
+	retval = fb_register_client(&pms_fb_notif);
+	if (retval)
+		pr_err("%s: Unable to register fb_notifier: %d\n", __func__, retval);
+	return;
+}
+#endif
+//CORE-KC-PMSWakelockInfo-00+]
 /**
  * pm_get_wakeup_count - Read the number of registered wakeup events.
  * @count: Address to store the value at.
@@ -892,6 +1126,11 @@ static int __init wakeup_sources_debugfs_init(void)
 {
 	wakeup_sources_stats_dentry = debugfs_create_file("wakeup_sources",
 			S_IRUGO, NULL, NULL, &wakeup_sources_stats_fops);
+//CORE-KC-PMSWakelockInfo-00+[
+#ifdef CONFIG_FIH_DUMP_WAKELOCK
+	setup_wakelock_dump();
+#endif
+//CORE-KC-PMSWakelockInfo-00+]
 	return 0;
 }
 

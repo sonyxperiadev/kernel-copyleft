@@ -34,6 +34,11 @@
 
 #include "peripheral-loader.h"
 
+/* CORE-EL-power_on_cause-01+[ */
+#include <linux/fih_sw_info.h>
+extern void write_pwron_cause (int pwron_cause);
+/* CORE-EL-power_on_cause-01+] */
+
 #define XO_FREQ			19200000
 #define PROXY_TIMEOUT_MS	10000
 #define MAX_SSR_REASON_LEN	81U
@@ -741,6 +746,7 @@ static struct pil_reset_ops pil_ops_trusted = {
 	.proxy_unvote = pil_remove_proxy_vote,
 };
 
+/* CORE-EL-AddInitStringForMtbf-01*[ */
 static void log_failure_reason(const struct pil_tz_data *d)
 {
 	u32 size;
@@ -755,19 +761,26 @@ static void log_failure_reason(const struct pil_tz_data *d)
 	if (!smem_reason || !size) {
 		pr_err("%s SFR: (unknown, smem_get_entry_no_rlock failed).\n",
 									name);
+		log_ss_failure_reason(name, 0,  "unknown, smem_get_entry_no_rlock failed");
 		return;
 	}
 	if (!smem_reason[0]) {
 		pr_err("%s SFR: (unknown, empty string found).\n", name);
+		log_ss_failure_reason(name, 0,  "unknown, empty string found");
 		return;
 	}
 
 	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
+
+	log_ss_failure_reason(name, min(size, MAX_SSR_REASON_LEN),  smem_reason);
+
 	pr_err("%s subsystem failure reason: %s.\n", name, reason);
 
 	smem_reason[0] = '\0';
 	wmb();
 }
+/* CORE-EL-AddInitStringForMtbf-01*] */
+
 
 static int subsys_shutdown(const struct subsys_desc *subsys, bool force_stop)
 {
@@ -839,6 +852,12 @@ static irqreturn_t subsys_err_fatal_intr_handler (int irq, void *dev_id)
 							d->subsys_desc.name);
 		return IRQ_HANDLED;
 	}
+
+	/* CORE-EL-power_on_cause-00+[ */
+	pr_err("WCNSS Fatal Error. Let's note! %d\n", irq);
+	write_pwron_cause(MODEM_FATAL_ERR);
+	/* CORE-EL-power_on_cause-00+] */
+	
 	subsys_set_crash_status(d->subsys, true);
 	log_failure_reason(d);
 	subsystem_restart_dev(d->subsys);
@@ -856,6 +875,12 @@ static irqreturn_t subsys_wdog_bite_irq_handler(int irq, void *dev_id)
 							d->subsys_desc.name);
 		return IRQ_HANDLED;
 	}
+
+	/* CORE-EL-power_on_cause-01*[ */	
+	pr_err("WCNSS WDOG timeout. Let's note! %d\n", irq);
+	write_pwron_cause(MODEM_SW_WDOG_EXPIRED);
+	/* CORE-EL-power_on_cause-01*] */	
+	
 
 	if (d->subsys_desc.system_debug &&
 			!gpio_get_value(d->subsys_desc.err_fatal_gpio))
@@ -884,6 +909,7 @@ static int pil_tz_driver_probe(struct platform_device *pdev)
 	int len, rc;
 
 	d = devm_kzalloc(&pdev->dev, sizeof(*d), GFP_KERNEL);
+
 	if (!d)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, d);

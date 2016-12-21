@@ -38,6 +38,7 @@ struct android_usb_platform_data {
 	int  streaming_func_count;
 	u8 uicc_nluns;
 	bool cdrom;
+	char can_stall;
 };
 
 #ifndef CONFIG_TARGET_CORE

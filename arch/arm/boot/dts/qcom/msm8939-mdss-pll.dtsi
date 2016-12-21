@@ -21,6 +21,7 @@
 		reg-names = "pll_base", "gdsc_base";
 
 		gdsc-supply = <&gdsc_mdss>;
+		/* MM-VH-DISPLAY-00* */
 		vddio-supply = <&pm8916_l6>;
 
 		clocks = <&clock_gcc clk_gcc_mdss_ahb_clk>;

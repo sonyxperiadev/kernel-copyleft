@@ -207,6 +207,12 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(system_temp_level),
 	POWER_SUPPLY_ATTR(resistance),
 	POWER_SUPPLY_ATTR(resistance_capacitive),
+	/* CORE-EL-22589-00+[ */
+	POWER_SUPPLY_ATTR(enable_llk),
+	POWER_SUPPLY_ATTR(llk_socmax),
+	POWER_SUPPLY_ATTR(llk_socmin),
+	POWER_SUPPLY_ATTR(delay_fake_soc),
+	/* CORE-EL-22589-00+] */
 	POWER_SUPPLY_ATTR(resistance_id),
 	POWER_SUPPLY_ATTR(resistance_now),
 	/* Local extensions */
@@ -214,6 +220,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(usb_otg),
 	POWER_SUPPLY_ATTR(charge_enabled),
 	POWER_SUPPLY_ATTR(flash_current_max),
+	POWER_SUPPLY_ATTR(usbin_det),
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_ATTR(charge_counter_ext),
 	/* Properties of type `const char *' */
@@ -221,6 +228,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(manufacturer),
 	POWER_SUPPLY_ATTR(serial_number),
 	POWER_SUPPLY_ATTR(battery_type),
+	POWER_SUPPLY_ATTR(charger_type),
 };
 
 static struct attribute *

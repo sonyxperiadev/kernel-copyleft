@@ -3774,6 +3774,7 @@ int mmc_resume_host(struct mmc_host *host)
 		if (!mmc_card_keep_power(host)) {
 			mmc_claim_host(host);
 			mmc_power_up(host);
+			mmc_power_cycle(host);
 			mmc_release_host(host);
 			mmc_select_voltage(host, host->ocr);
 			/*

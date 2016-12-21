@@ -83,6 +83,23 @@ static int has_device_tree(void)
 }
 #endif
 
+//[somc][MTBF]add method to trigger modem crash
+//modem Packet Data: 4b 25 03 00 92 3a 7e
+//wcnss Packet Data: 4b 25 03 20 01 63 75 7e
+void diag_process_hdlc(void *data, unsigned len);
+static char modem_assert_cmd[7]={0x4b,0x25,0x03,0x00,0x92,0x3a,0x7e};
+static char wcnss_assert_cmd[8]={0x4b,0x25,0x03,0x20,0x01,0x63,0x75,0x7e};
+void dbgcontrol_assert_modem(void)
+{
+  diag_process_hdlc(modem_assert_cmd,sizeof(modem_assert_cmd));
+  return ;
+}
+void dbgcontrol_assert_wcnss(void)
+{
+  diag_process_hdlc(wcnss_assert_cmd,sizeof(wcnss_assert_cmd));
+  return;
+}
+
 int chk_config_get_id(void)
 {
 	switch (socinfo_get_msm_cpu()) {

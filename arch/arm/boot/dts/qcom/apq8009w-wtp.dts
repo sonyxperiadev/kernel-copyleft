@@ -27,6 +27,18 @@
 	qcom,board-id= <8 0x105>;
 };
 
+&external_image_mem {
+	reg = <0x0 0x87a00000 0x0 0x0600000>;
+};
+
+&modem_adsp_mem {
+	reg = <0x0 0x88000000 0x0 0x02c00000>;
+};
+
+&peripheral_mem {
+	reg = <0x0 0x8ac00000 0x0 0x0500000>;
+};
+
 &mdss_dsi0 {
 	qcom,dsi-pref-prim-pan = <&dsi_hx8394d_480_vid>;
 };
@@ -63,6 +75,7 @@
 			ite,palm-detect-keycode = <142>;
 			ite,fw-name = "it7260_fw.bin";
 			ite,cfg-name = "it7260_cfg.bin";
+			ite,avdd-lpm-cur = <3000>;
 		};
 	};
 

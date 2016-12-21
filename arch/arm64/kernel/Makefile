@@ -33,7 +33,14 @@ arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
 arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
 arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
 
+obj-y += fih_hwid_init.o fih_gpio_init.o
 obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
+
+# CORE-KH-DebugToolPorting-00-a[
+obj-y += dbgcfgtool.o
+#obj-$(CONFIG_FEATURE_FIH_SW3_LAST_ALOG) += alog_ram_console.o
+obj-y	+= fih_sw_info.o
+# CORE-KH-DebugToolPorting-00-a]
 
 obj-$(CONFIG_PCI)                      += pcibios.o
 obj-y					+= $(arm64-obj-y) vdso/

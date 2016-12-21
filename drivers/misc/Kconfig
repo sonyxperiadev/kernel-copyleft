@@ -625,6 +625,13 @@ config UID_CPUTIME
 	help
 	  Per UID based cpu time statistics exported to /proc/uid_cputime
 
+config PN544_I2C_NFC
+	tristate "NFC PN544 i2c support"
+	depends on I2C
+	---help---
+	  This module adds support for the NXP pn544 i2c interface.
+	  Select this if your platform is using the i2c bus.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

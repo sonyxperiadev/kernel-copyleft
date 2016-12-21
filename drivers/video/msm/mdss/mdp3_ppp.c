@@ -450,13 +450,7 @@ static u64 mdp3_clk_round_off(u64 clk_rate)
 {
 	u64 clk_round_off;
 
-	if (clk_rate < MDP_CORE_CLK_RATE_WEARABLE_NOM)
-		clk_round_off = MDP_CORE_CLK_RATE_WEARABLE_NOM;
-	else if (clk_rate < MDP_CORE_CLK_RATE_WEARABLE_SVS)
-		clk_round_off = MDP_CORE_CLK_RATE_WEARABLE_SVS;
-	else if (clk_rate < MDP_CORE_CLK_RATE_WEARABLE_SUPER_SVS)
-		clk_round_off = MDP_CORE_CLK_RATE_WEARABLE_SUPER_SVS;
-	else if (clk_rate < MDP_CORE_CLK_RATE_SVS)
+	if (clk_rate < MDP_CORE_CLK_RATE_SVS)
 		clk_round_off = MDP_CORE_CLK_RATE_SVS;
 	else if (clk_rate < MDP_CORE_CLK_RATE_SUPER_SVS)
 		clk_round_off = MDP_CORE_CLK_RATE_SUPER_SVS;
@@ -498,8 +492,8 @@ u32 mdp3_clk_calc(struct msm_fb_data_type *mfd,
 							req->dst_rect.h;
 			}
 			scale = max(scale_x, scale_y);
-			scale = scale >= 100 ? scale : 100;
 		}
+		scale = scale >= 100 ? scale : 100;
 		if (mdp3_is_blend(req))
 			scale = max(scale, blend_l);
 

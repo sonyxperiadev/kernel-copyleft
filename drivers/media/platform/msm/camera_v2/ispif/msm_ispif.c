@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -67,16 +67,21 @@ static inline int msm_ispif_is_intf_valid(uint32_t csid_version,
 
 static struct msm_cam_clk_info ispif_8626_reset_clk_info[] = {
 	{"ispif_ahb_clk", NO_SET_RATE},
+	{"camss_top_ahb_clk", NO_SET_RATE},
+	{"csi0_ahb_clk", NO_SET_RATE},
 	{"csi0_src_clk", NO_SET_RATE},
+	{"csi0_phy_clk", NO_SET_RATE},
 	{"csi0_clk", NO_SET_RATE},
 	{"csi0_pix_clk", NO_SET_RATE},
 	{"csi0_rdi_clk", NO_SET_RATE},
+	{"csi1_ahb_clk", NO_SET_RATE},
 	{"csi1_src_clk", NO_SET_RATE},
+	{"csi1_phy_clk", NO_SET_RATE},
 	{"csi1_clk", NO_SET_RATE},
 	{"csi1_pix_clk", NO_SET_RATE},
 	{"csi1_rdi_clk", NO_SET_RATE},
-	{"camss_vfe_vfe0_clk", NO_SET_RATE},
-	{"camss_csi_vfe0_clk", NO_SET_RATE},
+	{"camss_vfe_vfe_clk", NO_SET_RATE},
+	{"camss_csi_vfe_clk", NO_SET_RATE},
 };
 
 static struct msm_cam_clk_info ispif_8974_ahb_clk_info[ISPIF_CLK_INFO_MAX];
@@ -810,20 +815,9 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 		rc = -EPERM;
 		return rc;
 	}
-	if (params->num > MAX_PARAM_ENTRIES) {
-		pr_err("%s: invalid param entries %d\n", __func__,
-			params->num);
-		rc = -EINVAL;
-		return rc;
-	}
 
 	for (i = 0; i < params->num; i++) {
 		vfe_intf = params->entries[i].vfe_intf;
-		if (vfe_intf >= VFE_MAX) {
-			pr_err("%s: %d invalid i %d vfe_intf %d\n", __func__,
-				__LINE__, i, vfe_intf);
-			return -EINVAL;
-		}
 		vfe_mask |= (1 << vfe_intf);
 	}
 
@@ -1170,8 +1164,7 @@ static int msm_ispif_set_vfe_info(struct ispif_device *ispif,
 	struct msm_ispif_vfe_info *vfe_info)
 {
 	memcpy(&ispif->vfe_info, vfe_info, sizeof(struct msm_ispif_vfe_info));
-	if (ispif->vfe_info.num_vfe > ispif->hw_num_isps)
-		return -EINVAL;
+
 	return 0;
 }
 
