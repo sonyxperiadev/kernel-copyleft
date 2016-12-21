@@ -62,6 +62,7 @@ struct fg_somc_params {
 	u32			vfloat_arrangement_threshold;
 	int			soc_magnification;
 	bool			aging_mode;
+	bool			batt_aging;
 	bool			integrity_bit;
 	u8			soc_restart;
 	int			capacity;
