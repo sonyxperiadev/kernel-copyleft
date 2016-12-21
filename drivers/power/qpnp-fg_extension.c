@@ -179,7 +179,8 @@ void somc_fg_set_aging_mode(struct fg_somc_params *params, struct device *dev,
 {
 	int rc;
 
-	if (somc_fg_aging_mode_check(params, learned_cc_uah, nom_cap_uah)) {
+	if (params->batt_aging ||
+	    somc_fg_aging_mode_check(params, learned_cc_uah, nom_cap_uah)) {
 		if (params->aging_mode)
 			return;
 		pr_info("start aging mode\n");
