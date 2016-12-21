@@ -319,6 +319,18 @@ config WCNSS_REGISTER_DUMP_ON_BITE
 	 register access failures. So this feature is to enable/disable the
 	 register dump on WCNSS WDOG bite.
 
+config BROADCOM_WIFI_RESERVED_MEM
+	bool "BROADCOM Reserved memory for wifi device"
+	depends on SOMC_WIFI_CONTROL
+	default n
+	---help---
+	  This is a configuration for broadcom WLAN driver.
+
+config SOMC_WIFI_CONTROL
+	bool "Enable/disable SOMC WiFi control function"
+	---help---
+	  A SOMC adaptation for the WLAN driver module
+
 source "drivers/net/wireless/b43legacy/Kconfig"
 source "drivers/net/wireless/brcm80211/Kconfig"
 source "drivers/net/wireless/hostap/Kconfig"

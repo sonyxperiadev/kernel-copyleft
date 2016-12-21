@@ -8,6 +8,11 @@
  * the Free Software Foundation; either version 2 of the License, or (at
  * your option) any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_SDHCI_H
 #define LINUX_MMC_SDHCI_H
 
@@ -301,6 +306,7 @@ struct sdhci_host {
 	struct mutex qos_lock;
 
 	struct sdhci_next next_data;
+	spinlock_t next_lock;	/* Mutex for next_data */
 	ktime_t data_start_time;
 	struct mutex ios_mutex;
 	enum sdhci_power_policy power_policy;
@@ -317,7 +323,7 @@ struct sdhci_host {
 	ktime_t reset_wa_t; /* time when the reset workaround is applied */
 	int reset_wa_cnt; /* total number of times workaround is used */
 	struct cmdq_host *cq_host;
-
+	int slot_no;
 	unsigned long private[0] ____cacheline_aligned;
 };
 #endif /* LINUX_MMC_SDHCI_H */

@@ -9,23 +9,33 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/bitops.h>
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
+#include <linux/limits.h>
 
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/mmc.h>
 #include <linux/pm_runtime.h>
 #include <linux/reboot.h>
+#ifdef CONFIG_MMC_FFU
+#include <linux/firmware.h>
+#endif
 
 #include "core.h"
 #include "bus.h"
 #include "mmc_ops.h"
 #include "sd_ops.h"
 
+void mmc_log_cmd_history(struct mmc_host *host, struct mmc_request *mrq, int state, int err);
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
 	0,		0,		0,		0
@@ -313,7 +323,6 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		}
 	}
 
-	card->ext_csd.raw_strobe_support = ext_csd[EXT_CSD_STROBE_SUPPORT];
 	/*
 	 * The EXT_CSD format is meant to be forward compatible. As long
 	 * as CSD_STRUCTURE does not change, all values for EXT_CSD_REV
@@ -598,8 +607,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 			card->ext_csd.data_tag_unit_size = 0;
 		}
 
-		card->ext_csd.max_packed_writes =
-			ext_csd[EXT_CSD_MAX_PACKED_WRITES];
+		card->ext_csd.max_packed_writes = 8;
 		card->ext_csd.max_packed_reads =
 			ext_csd[EXT_CSD_MAX_PACKED_READS];
 	} else {
@@ -631,6 +639,17 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.cmdq_depth = 0;
 	}
 
+	/* eMMC v5 or later */
+	if (card->ext_csd.rev >= 7) {
+		memcpy(card->ext_csd.fwrev, &ext_csd[EXT_CSD_FIRMWARE_VERSION],
+		       MMC_FIRMWARE_LEN);
+		card->ext_csd.ffu_capable =
+			(ext_csd[EXT_CSD_SUPPORTED_MODE] & 0x1) &&
+			!(ext_csd[EXT_CSD_FW_CONFIG] & 0x1);
+#ifdef CONFIG_MMC_FFU
+		card->ext_csd.ffu_mode_op = ext_csd[EXT_CSD_FFU_FEATURES];
+#endif
+	}
 out:
 	return err;
 }
@@ -706,7 +725,7 @@ MMC_DEV_ATTR(csd, "%08x%08x%08x%08x\n", card->raw_csd[0], card->raw_csd[1],
 MMC_DEV_ATTR(date, "%02d/%04d\n", card->cid.month, card->cid.year);
 MMC_DEV_ATTR(erase_size, "%u\n", card->erase_size << 9);
 MMC_DEV_ATTR(preferred_erase_size, "%u\n", card->pref_erase << 9);
-MMC_DEV_ATTR(fwrev, "0x%x\n", card->cid.fwrev);
+MMC_DEV_ATTR(ffu_capable, "%d\n", card->ext_csd.ffu_capable);
 MMC_DEV_ATTR(hwrev, "0x%x\n", card->cid.hwrev);
 MMC_DEV_ATTR(manfid, "0x%06x\n", card->cid.manfid);
 MMC_DEV_ATTR(name, "%s\n", card->cid.prod_name);
@@ -721,6 +740,22 @@ MMC_DEV_ATTR(enhanced_rpmb_supported, "%#x\n",
 		card->ext_csd.enhanced_rpmb_supported);
 MMC_DEV_ATTR(rel_sectors, "%#x\n", card->ext_csd.rel_sectors);
 
+static ssize_t mmc_fwrev_show(struct device *dev,
+			      struct device_attribute *attr,
+			      char *buf)
+{
+	struct mmc_card *card = mmc_dev_to_card(dev);
+
+	if (card->ext_csd.rev < 7) {
+		return sprintf(buf, "0x%x\n", card->cid.fwrev);
+	} else {
+		return sprintf(buf, "0x%*phN\n", MMC_FIRMWARE_LEN,
+			       card->ext_csd.fwrev);
+	}
+}
+
+static DEVICE_ATTR(fwrev, S_IRUGO, mmc_fwrev_show, NULL);
+
 static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_cid.attr,
 	&dev_attr_csd.attr,
@@ -728,6 +763,7 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_erase_size.attr,
 	&dev_attr_preferred_erase_size.attr,
 	&dev_attr_fwrev.attr,
+	&dev_attr_ffu_capable.attr,
 	&dev_attr_hwrev.attr,
 	&dev_attr_manfid.attr,
 	&dev_attr_name.attr,
@@ -1125,98 +1161,6 @@ out:
 	return err;
 }
 
-static int mmc_select_hs400_strobe(struct mmc_card *card, u8 *ext_csd)
-{
-	int err = 0, ret = 0;
-	struct mmc_host *host = card->host;
-
-	if (!(host->caps2 & MMC_CAP2_HS400) || !host->ops->enhanced_strobe ||
-		!(card->ext_csd.card_type & EXT_CSD_CARD_TYPE_HS400) ||
-		!mmc_card_strobe(card)) {
-		err = -EOPNOTSUPP;
-		goto err;
-	}
-
-	if ((card->ext_csd.card_type & EXT_CSD_CARD_TYPE_HS400_1_2V)
-	    && (host->caps2 & MMC_CAP2_HS400_1_2V))
-		if (__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_120))
-				err = __mmc_set_signal_voltage(host,
-						MMC_SIGNAL_VOLTAGE_180);
-	/* If fails try again during next card power cycle */
-	if (err) {
-		pr_err("%s: err in __mmc_set_signal_voltage failed\n",
-			mmc_hostname(host));
-		goto err;
-	}
-
-	/*
-	 * For HS400 enhanced strobe mode following sequence is being followed:
-	 * - switch to HS mode.
-	 * - select DDR bus width along with enhanced strobe mode enabled.
-	 * - switch to HS400 mode and set clock to max.
-	 * - call for host specific ops to enable enhanced strobe at host side.
-	 */
-	err = mmc_select_hs(card, ext_csd);
-	if (err) {
-		pr_warn("%s: switch to high-speed failed, err:%d\n",
-			mmc_hostname(host), err);
-		goto err;
-	}
-	mmc_card_clr_highspeed(card);
-
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			 EXT_CSD_BUS_WIDTH,
-			 0x86,
-			 card->ext_csd.generic_cmd6_time);
-	if (err) {
-		pr_warn("%s: switch to DDR bus width with enhanced strobe for hs400 failed, err:%d\n",
-			mmc_hostname(host), err);
-		goto err;
-	}
-
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			   EXT_CSD_HS_TIMING,
-			   0x3,
-			   card->ext_csd.generic_cmd6_time);
-	if (err) {
-		pr_warn("%s: switch to hs400 failed, err:%d\n",
-			 mmc_hostname(host), err);
-		goto err;
-	}
-
-	mmc_set_timing(host, MMC_TIMING_MMC_HS400);
-	mmc_set_clock(host, MMC_HS400_MAX_DTR);
-	mmc_card_set_hs400(card);
-
-	mmc_host_clk_hold(host);
-	err = host->ops->enhanced_strobe(host);
-	mmc_host_clk_release(host);
-
-	/*
-	 * Fall back to HS mode if hs400 enhanced
-	 * strobe is unsuccessful.
-	 * Lower the clock and adjust the timing
-	 * to be able to switch to HighSpeed mode
-	 */
-	if (err) {
-		pr_debug("%s: strobe execution failed %d\n",
-				mmc_hostname(host), err);
-		mmc_card_clr_hs400(card);
-
-		mmc_set_timing(host, MMC_TIMING_LEGACY);
-		mmc_set_clock(host, MMC_HIGH_26_MAX_DTR);
-
-		ret = mmc_select_hs(card, ext_csd);
-		if (ret)
-			pr_warn("%s: select highspeed mode failed %d\n",
-					__func__, ret);
-		goto err;
-	}
-	mmc_card_set_hs400_strobe(card);
-err:
-	return err;
-}
-
 static int mmc_select_hs400(struct mmc_card *card, u8 *ext_csd)
 {
 	int err = 0;
@@ -1245,6 +1189,7 @@ static int mmc_select_hs400(struct mmc_card *card, u8 *ext_csd)
 	mmc_card_set_hs400(card);
 	err = mmc_select_hs200(card, ext_csd);
 	if (err)
+
 		goto out;
 	mmc_card_clr_hs200(card);
 
@@ -1336,11 +1281,7 @@ int mmc_set_clock_bus_speed(struct mmc_card *card, unsigned long freq)
 			mmc_set_timing(card->host, MMC_TIMING_LEGACY);
 			mmc_set_clock(card->host, MMC_HIGH_26_MAX_DTR);
 		}
-		if (mmc_card_hs400_strobe(card))
-			err = mmc_select_hs400_strobe(card,
-					card->cached_ext_csd);
-		else
-			err = mmc_select_hs400(card, card->cached_ext_csd);
+		err = mmc_select_hs400(card, card->cached_ext_csd);
 	}
 
 	return err;
@@ -1439,8 +1380,7 @@ static int mmc_select_bus_speed(struct mmc_card *card, u8 *ext_csd)
 	int err = 0;
 
 	BUG_ON(!card);
-	if (!mmc_select_hs400_strobe(card, ext_csd))
-		goto out;
+
 	if (!mmc_select_hs400(card, ext_csd))
 		goto out;
 	if (!mmc_select_hs200(card, ext_csd))
@@ -1474,9 +1414,13 @@ static int mmc_select_cmdq(struct mmc_card *card)
 	ret = mmc_set_blocklen(card, MMC_CARD_CMDQ_BLK_SIZE);
 	if (ret)
 		goto out;
-
+	
+	#define CMDQ_SEL_START_ID	0xFF09
+	#define CMDQ_SEL_END_ID		0xFF0A
+	mmc_log_cmd_history(card->host, NULL, CMDQ_SEL_START_ID, 0);
 	ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_CMDQ, 1,
 			 card->ext_csd.generic_cmd6_time);
+	mmc_log_cmd_history(card->host, NULL, CMDQ_SEL_END_ID, ret);
 	if (ret)
 		goto out;
 
@@ -1499,6 +1443,82 @@ static int mmc_select_cmdq(struct mmc_card *card)
 out:
 	return ret;
 }
+
+#ifdef CONFIG_MMC_FFU
+static char *mmc_ffu_load_catalog(struct mmc_host *host)
+{
+	int err;
+	char *catalog = NULL;
+	const char *catalog_path = "/emmc/catalog.txt";
+	const struct firmware *fw = NULL;
+
+	err = request_firmware(&fw, catalog_path, NULL);
+	if (err) {
+		pr_info("FFU: %s: Firmware catalog was not found %s %d\n",
+			mmc_hostname(host), catalog_path, err);
+		return NULL;
+	}
+
+	if (!fw) {
+		pr_info("FFU: %s: Couldn't acquire a handle "
+			"from request_firmware()", mmc_hostname(host));
+		return NULL;
+	}
+
+	if (fw->size <= 0) {
+		pr_info("FFU: %s: Firmware catalog size is ZERO\n",
+			mmc_hostname(host));
+		return NULL;
+	}
+
+	catalog = kzalloc(fw->size + 1, GFP_KERNEL);
+	if (!catalog) {
+		release_firmware(fw);
+		return NULL;
+	}
+	memcpy(catalog, fw->data, fw->size);
+	release_firmware(fw);
+
+	return catalog;
+}
+
+static bool mmc_ffu_check_fw(struct mmc_host *host)
+{
+	static bool ffu_done;
+	char *token;
+	char *catalog;
+	char *cur_pos;
+	bool res = false;
+
+	if (ffu_done)
+		return false;
+	ffu_done = true;
+
+	catalog = mmc_ffu_load_catalog(host);
+	if (!catalog) {
+		pr_info("FFU: %s: Loading firmware catalog failed\n",
+			mmc_hostname(host));
+		return false;
+	}
+
+	cur_pos = catalog;
+	while ((token = strsep(&cur_pos, "\n")) && *token != '\0') {
+		if (strnlen(token, PATH_MAX) > 512) {
+			pr_err("FFU: %s: %.20s is not a valid argument\n",
+				mmc_hostname(host), token);
+			continue;
+		}
+
+		if (mmc_ffu_check_compatibility(host->card, token)) {
+			res = true;
+			break;
+		}
+	}
+	kfree(catalog);
+
+	return res;
+}
+#endif
 
 /*
  * Handle the detection and initialisation of a card.
@@ -1590,6 +1610,9 @@ reinit:
 		card->rca = 1;
 		memcpy(card->raw_cid, cid, sizeof(card->raw_cid));
 		card->reboot_notify.notifier_call = mmc_reboot_notify;
+#ifdef CONFIG_MMC_FFU
+		card->need_ffu = true;
+#endif
 		host->card = card;
 	}
 
@@ -1732,9 +1755,11 @@ reinit:
 	}
 
 	/*
-	 * Enable power_off_notification byte in the ext_csd register
+	 * If the host supports the power_off_notify capability then
+	 * set the notification byte in the ext_csd register of device
 	 */
-	if (card->ext_csd.rev >= 6) {
+	if ((host->caps2 & MMC_CAP2_FULL_PWR_CYCLE) &&
+	    (card->ext_csd.rev >= 6)) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				 EXT_CSD_POWER_OFF_NOTIFICATION,
 				 EXT_CSD_POWER_ON,
@@ -1878,6 +1903,16 @@ reinit:
 		}
 	}
 
+#ifdef CONFIG_MMC_FFU
+	if (card->ext_csd.ffu_capable && card->need_ffu &&
+	    mmc_ffu_check_fw(host)) {
+		card->host->caps2 &= ~MMC_CAP2_CMD_QUEUE;
+	} else {
+		card->need_ffu = false;
+		card->host->caps2 |= MMC_CAP2_CMD_QUEUE;
+	}
+#endif
+
 	if (card->ext_csd.cmdq_support && (card->host->caps2 &
 					   MMC_CAP2_CMD_QUEUE)) {
 		err = mmc_select_cmdq(card);
@@ -1890,6 +1925,9 @@ reinit:
 		}
 	}
 
+	mmc_host_clk_hold(host);
+	memcpy(&host->cached_ios, &host->ios, sizeof(host->cached_ios));
+	mmc_host_clk_release(host);
 	return 0;
 
 free_card:
@@ -2026,7 +2064,7 @@ static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
 	if (!mmc_try_claim_host(host))
 		return -EBUSY;
 
-	err = mmc_flush_cache(host->card);
+	err = mmc_cache_ctrl(host, 0);
 	if (err)
 		goto out;
 
@@ -2052,28 +2090,53 @@ static int mmc_suspend(struct mmc_host *host)
 	return _mmc_suspend(host, true);
 }
 
-/*
- * Resume callback from host.
- *
- * This function tries to determine if the same card is still present
- * and, if so, restore all state to it.
- */
-static int mmc_resume(struct mmc_host *host)
+static int mmc_partial_init(struct mmc_host *host)
+{
+	int err = 0;
+	struct mmc_card *card = host->card;
+	u32 tuning_cmd;
+
+	pr_debug("%s: %s: bw: %d timing: %d clock: %d\n", mmc_hostname(host),
+		__func__,  host->cached_ios.bus_width,  host->cached_ios.timing,
+		host->cached_ios.clock);
+
+	mmc_set_bus_width(host, host->cached_ios.bus_width);
+	mmc_set_timing(host, host->cached_ios.timing);
+	mmc_set_clock(host, host->cached_ios.clock);
+
+	if (host->ops->execute_tuning && (mmc_card_hs200(card) ||
+					  mmc_card_hs400(card))) {
+		mmc_host_clk_hold(host);
+
+		if (mmc_card_hs200(card))
+			tuning_cmd = MMC_SEND_TUNING_BLOCK_HS200;
+		else if (mmc_card_hs400(card))
+			tuning_cmd = MMC_SEND_TUNING_BLOCK_HS400;
+
+		err = host->ops->execute_tuning(host,
+				tuning_cmd);
+
+		mmc_host_clk_release(host);
+	}
+	if (err)
+		pr_err("%s: tuning execution failed\n",
+			   mmc_hostname(host));
+	return err;
+}
+
+static int mmc_resume_init_card(struct mmc_host *host)
 {
 	int err;
 	int retries;
 
-	BUG_ON(!host);
-	BUG_ON(!host->card);
-
-	mmc_claim_host(host);
 	retries = 3;
 	while (retries) {
 		err = mmc_init_card(host, host->ocr, host->card);
 
 		if (err) {
-			pr_err("%s: MMC card re-init failed rc = %d (retries = %d)\n",
-			       mmc_hostname(host), err, retries);
+			pr_err(
+			 "%s: MMC card re-init failed rc = %d (retries = %d)\n",
+			 mmc_hostname(host), err, retries);
 			retries--;
 			mmc_power_off(host);
 			usleep_range(5000, 5500);
@@ -2083,6 +2146,47 @@ static int mmc_resume(struct mmc_host *host)
 		}
 		break;
 	}
+	return err;
+}
+
+/*
+ * Resume callback from host.
+ *
+ * This function tries to determine if the same card is still present
+ * and, if so, restore all state to it.
+ */
+static int mmc_resume(struct mmc_host *host)
+{
+	int err;
+
+	BUG_ON(!host);
+	BUG_ON(!host->card);
+
+	mmc_claim_host(host);
+
+	if (host->caps2 & MMC_CAP2_AWAKE_SUPP) {
+		err = mmc_card_awake(host);
+		if (err) {
+			pr_err("%s: %s: failed (%d) awake using CMD5\n",
+			       mmc_hostname(host),  __func__, err);
+
+			err = mmc_resume_init_card(host);
+		} else {
+			err = mmc_partial_init(host);
+			if (!err) {
+				err = mmc_cache_ctrl(host, 1);
+				if (err) {
+					pr_err("%s: %s faild (%d) cache_ctrl\n",
+					    mmc_hostname(host), __func__, err);
+
+					err = mmc_resume_init_card(host);
+				}
+			} else
+				err = mmc_resume_init_card(host);
+		}
+	} else
+		err = mmc_resume_init_card(host);
+
 	mmc_release_host(host);
 
 	/*
@@ -2202,6 +2306,71 @@ static void mmc_attach_bus_ops(struct mmc_host *host)
 	mmc_attach_bus(host, bus_ops);
 }
 
+#ifdef CONFIG_MMC_FFU
+static int mmc_ffu_ops(struct mmc_host *host)
+{
+	static bool ffu_done;
+	int err;
+	char *token;
+	char *catalog;
+	char *cur_pos;
+
+	/* ffu_ops must be handled once */
+	if (ffu_done)
+		return 0;
+	ffu_done = true;
+
+	catalog = mmc_ffu_load_catalog(host);
+	if (!catalog) {
+		pr_info("FFU: %s: Loading firmware catalog failed\n",
+			mmc_hostname(host));
+		return 0;
+	}
+
+	cur_pos = catalog;
+	while ((token = strsep(&cur_pos, "\n")) && *token != '\0') {
+		err = mmc_ffu_invoke(host->card, token);
+		/* Error handling */
+		if (err == -EOPNOTSUPP)
+			break; /* exit from this loop now */
+		else if (err == -EINVAL)
+			continue; /* try next fw */
+		/* else: The case which needs reinitialization of the card */
+
+		mmc_remove_card(host->card);
+		host->card = NULL;
+
+		/* Restart the eMMC */
+		mmc_power_off(host);
+		usleep_range(5000, 5500);
+		mmc_power_up(host);
+		mmc_select_voltage(host, host->ocr);
+
+		if (mmc_init_card(host, host->ocr, NULL)) {
+			/* Reinit error occured */
+			kfree(catalog);
+			return -EINVAL;
+		}
+
+		/* Check err code of mmc_ffu_invoke() */
+		if (err)
+			continue; /* try next fw */
+		/* else: mmc_ffu_invoke() successfully done (err == 0) */
+
+		if (mmc_ffu_check_status(host->card))
+			continue;
+
+		pr_info("FFU: %s: End FFU operation name=%s current=0x%02x\n",
+			mmc_hostname(host), token,
+			host->card->ext_csd.fwrev[0]);
+
+	}
+	kfree(catalog);
+
+	return 0;
+}
+#endif
+
 /*
  * Starting point for MMC card init.
  */
@@ -2261,6 +2430,14 @@ int mmc_attach_mmc(struct mmc_host *host)
 	err = mmc_init_card(host, host->ocr, NULL);
 	if (err)
 		goto err;
+
+#ifdef CONFIG_MMC_FFU
+	if (host->card->ext_csd.ffu_capable && host->card->need_ffu) {
+		err = mmc_ffu_ops(host);
+		if (err)
+			goto err;
+	}
+#endif
 
 	mmc_release_host(host);
 	err = mmc_add_card(host->card);

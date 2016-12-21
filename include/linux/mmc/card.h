@@ -7,6 +7,11 @@
  *
  *  Card driver specific definitions.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_CARD_H
 #define LINUX_MMC_CARD_H
 
@@ -93,12 +98,16 @@ struct mmc_ext_csd {
 	unsigned int            data_tag_unit_size;     /* DATA TAG UNIT size */
 	unsigned int		boot_ro_lock;		/* ro lock support */
 	bool			boot_ro_lockable;
+	bool			ffu_capable;	/* Firmware upgrade support */
+#ifdef CONFIG_MMC_FFU
+	bool			ffu_mode_op;	/* FFU mode operation */
+#endif
+#define MMC_FIRMWARE_LEN 8
+	u8			fwrev[MMC_FIRMWARE_LEN];  /* FW version */
 	u8			raw_exception_status;	/* 54 */
 	u8			raw_partition_support;	/* 160 */
 	u8			raw_rpmb_size_mult;	/* 168 */
 	u8			raw_erased_mem_count;	/* 181 */
-	u8			raw_strobe_support;	/* 184 */
-#define MMC_STROBE_SUPPORT	(1 << 0)
 	u8			raw_ext_csd_structure;	/* 194 */
 	u8			raw_card_type;		/* 196 */
 	u8			raw_drive_strength;	/* 197 */
@@ -144,8 +153,13 @@ struct sd_switch_caps {
 #define HIGH_SPEED_MAX_DTR	50000000
 #define UHS_SDR104_MAX_DTR	208000000
 #define UHS_SDR50_MAX_DTR	100000000
+#ifndef CONFIG_MMC_DDR50_MAX_DTR_LMT
 #define UHS_DDR50_MAX_DTR	50000000
 #define UHS_SDR25_MAX_DTR	UHS_DDR50_MAX_DTR
+#else
+#define UHS_DDR50_MAX_DTR	40000000
+#define UHS_SDR25_MAX_DTR	50000000
+#endif
 #define UHS_SDR12_MAX_DTR	25000000
 	unsigned int		sd3_bus_mode;
 #define UHS_SDR12_BUS_SPEED	0
@@ -218,6 +232,7 @@ enum mmc_blk_status {
 	MMC_BLK_URGENT,
 	MMC_BLK_URGENT_DONE,
 	MMC_BLK_NO_REQ_TO_STOP,
+	MMC_BLK_RETRY_SINGLE,
 };
 
 enum mmc_packed_stop_reasons {
@@ -328,6 +343,25 @@ enum mmc_pon_type {
 
 #define MMC_QUIRK_CMDQ_DELAY_BEFORE_DCMD 6 /* microseconds */
 
+#ifdef CONFIG_MMC_CMD_DEBUG
+#define CMD_QUEUE_SIZE CONFIG_MMC_CMD_QUEUE_SIZE
+#endif
+
+#ifdef CONFIG_MMC_CMD_DEBUG
+struct mmc_cmdq {
+	u32		opcode;
+	u32		arg;
+	u32		flags;
+	u64		timestamp;
+};
+
+struct mmc_cmd_stats {
+	u32 next_idx;
+	u32 wrapped;
+	struct mmc_cmdq cmdq[CMD_QUEUE_SIZE];
+};
+#endif
+
 /*
  * MMC device
  */
@@ -355,7 +389,6 @@ struct mmc_card {
 #define MMC_STATE_NEED_BKOPS	(1<<11)		/* card needs to do BKOPS */
 #define MMC_STATE_CMDQ		(1<<12)         /* card is in cmd queue mode */
 #define MMC_STATE_SUSPENDED     (1<<13)         /* card is suspended */
-#define MMC_STATE_HS400_STROBE	(1<<14)         /* card is in strobe mode */
 	unsigned int		quirks; 	/* card quirks */
 #define MMC_QUIRK_LENIENT_FN0	(1<<0)		/* allow SDIO FN0 writes outside of the VS CCCR range */
 #define MMC_QUIRK_BLKSZ_FOR_BYTE_MODE (1<<1)	/* use func->cur_blksize */
@@ -423,6 +456,12 @@ struct mmc_card {
 	enum mmc_pon_type pon_type;
 	u8 *cached_ext_csd;
 	bool cmdq_init;
+#ifdef CONFIG_MMC_FFU
+	bool need_ffu;
+#endif
+#ifdef CONFIG_MMC_CMD_DEBUG
+	struct mmc_cmd_stats cmd_stats;
+#endif
 };
 
 /*
@@ -552,9 +591,6 @@ struct mmc_fixup {
 		    card->cid.year,	  \
 		    card->cid.month)
 
-#define mmc_card_strobe(c) (((c)->ext_csd).raw_strobe_support & \
-				MMC_STROBE_SUPPORT)
-
 /*
  * Unconditionally quirk add/remove.
  */
@@ -578,7 +614,6 @@ static inline void __maybe_unused remove_quirk(struct mmc_card *card, int data)
 #define mmc_card_highspeed(c)	((c)->state & MMC_STATE_HIGHSPEED)
 #define mmc_card_hs200(c)	((c)->state & MMC_STATE_HIGHSPEED_200)
 #define mmc_card_hs400(c)	((c)->state & MMC_STATE_HIGHSPEED_400)
-#define mmc_card_hs400_strobe(c)	((c)->state & MMC_STATE_HS400_STROBE)
 #define mmc_card_blockaddr(c)	((c)->state & MMC_STATE_BLOCKADDR)
 #define mmc_card_ddr_mode(c)	((c)->state & MMC_STATE_HIGHSPEED_DDR)
 #define mmc_card_uhs(c)		((c)->state & MMC_STATE_ULTRAHIGHSPEED)
@@ -598,8 +633,6 @@ static inline void __maybe_unused remove_quirk(struct mmc_card *card, int data)
 #define mmc_card_clr_hs200(c)	((c)->state &= ~MMC_STATE_HIGHSPEED_200)
 #define mmc_card_set_hs400(c)	((c)->state |= MMC_STATE_HIGHSPEED_400)
 #define mmc_card_clr_hs400(c)	((c)->state &= ~MMC_STATE_HIGHSPEED_400)
-#define mmc_card_set_hs400_strobe(c)	((c)->state |= MMC_STATE_HS400_STROBE)
-#define mmc_card_clr_hs400_strobe(c)	((c)->state &= ~MMC_STATE_HS400_STROBE)
 #define mmc_card_set_blockaddr(c) ((c)->state |= MMC_STATE_BLOCKADDR)
 #define mmc_card_set_ddr_mode(c) ((c)->state |= MMC_STATE_HIGHSPEED_DDR)
 #define mmc_card_clr_ddr_mode(c) ((c)->state &= ~MMC_STATE_HIGHSPEED_DDR)

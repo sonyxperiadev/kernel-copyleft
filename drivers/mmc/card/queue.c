@@ -9,6 +9,11 @@
  * published by the Free Software Foundation.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/blkdev.h>
@@ -103,8 +108,8 @@ static int mmc_cmdq_thread(void *d)
 		req = blk_peek_request(q);
 		if (req) {
 			ret = blk_queue_start_tag(q, req);
-			spin_unlock_irqrestore(q->queue_lock, flags);
 			if (ret) {
+				spin_unlock_irqrestore(q->queue_lock, flags);
 				test_and_set_bit(0, &ctx->req_starved);
 				up(&mq->thread_sem);
 				schedule_timeout(HZ / 100);
@@ -112,7 +117,6 @@ static int mmc_cmdq_thread(void *d)
 			} else {
 				if (!mmc_cmdq_should_pull_reqs(host, ctx,
 							       req)) {
-					spin_lock_irqsave(q->queue_lock, flags);
 					blk_requeue_request(q, req);
 					spin_unlock_irqrestore(q->queue_lock,
 							       flags);
@@ -121,6 +125,9 @@ static int mmc_cmdq_thread(void *d)
 					schedule_timeout(HZ / 100);
 					down(&mq->thread_sem);
 					continue;
+				} else {
+					spin_unlock_irqrestore(q->queue_lock,
+								flags);
 				}
 				set_current_state(TASK_RUNNING);
 				ret = mq->cmdq_issue_fn(mq, req);

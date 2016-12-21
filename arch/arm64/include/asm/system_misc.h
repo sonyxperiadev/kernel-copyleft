@@ -24,6 +24,7 @@
 #include <linux/linkage.h>
 #include <linux/irqflags.h>
 #include <linux/reboot.h>
+#include <linux/signal.h>
 
 struct pt_regs;
 
@@ -50,6 +51,30 @@ extern char* (*arch_read_hardware_id)(void);
 #define UDBG_BADABORT	(1 << 2)
 #define UDBG_SEGV	(1 << 3)
 #define UDBG_BUS	(1 << 4)
+
+extern unsigned int user_debug;
+extern int show_unhandled_signals;
+
+static inline bool print_user_debug(unsigned int signum, unsigned int mask)
+{
+	int ret = 0;
+	bool sig_assert = false;
+
+	ret |= show_unhandled_signals &&
+		(signum ? unhandled_signal(current, signum) : 1);
+	if (mask & UDBG_SEGV) {
+		sig_assert = true;
+		ret |= (user_debug & mask) && signum == SIGSEGV;
+	}
+	if (mask & UDBG_BUS) {
+		sig_assert = true;
+		ret |= (user_debug & mask) && signum == SIGBUS;
+	}
+	if (sig_assert)
+		ret |= (user_debug & mask);
+
+	return ret ? printk_ratelimit() : false;
+}
 
 #endif	/* __ASSEMBLY__ */
 

@@ -15,6 +15,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/time.h>
 #include <linux/hrtimer.h>
 #include <linux/timerqueue.h>
@@ -26,6 +31,9 @@
 #include <linux/workqueue.h>
 #include <linux/freezer.h>
 #include <linux/workqueue.h>
+
+#include <linux/suspend.h>
+#include <linux/moduleparam.h>
 
 #ifdef CONFIG_MSM_PM
 #include "lpm-levels.h"
@@ -53,6 +61,9 @@ static DEFINE_SPINLOCK(freezer_delta_lock);
 static struct wakeup_source *ws;
 static struct delayed_work work;
 static struct workqueue_struct *power_off_alarm_workqueue;
+
+static int suspend_threshold = 2;
+module_param(suspend_threshold, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 #ifdef CONFIG_RTC_CLASS
 /* rtc timer and device for setting alarm wakeups at suspend */
@@ -349,6 +360,34 @@ ktime_t alarm_expires_remaining(const struct alarm *alarm)
 	return ktime_sub(alarm->node.expires, base->gettime());
 }
 
+static ktime_t alarm_next_expires_remaining(void)
+{
+	ktime_t next_alarm = ktime_set(0, 0);
+	unsigned long flags;
+	int i;
+
+	/*
+	 * find the soonest timer to expire
+	 */
+	for (i = 0; i < ALARM_NUMTYPE; i++) {
+		struct alarm_base *base = &alarm_bases[i];
+		struct timerqueue_node *next;
+		ktime_t delta;
+
+		spin_lock_irqsave(&base->lock, flags);
+		next = timerqueue_getnext(&base->timerqueue);
+		spin_unlock_irqrestore(&base->lock, flags);
+
+		if (next) {
+			delta = ktime_sub(next->expires, base->gettime());
+			if (!next_alarm.tv64 || (delta.tv64 < next_alarm.tv64))
+				next_alarm = delta;
+		}
+	}
+
+	return next_alarm;
+}
+
 #ifdef CONFIG_RTC_CLASS
 /**
  * alarmtimer_suspend - Suspend time callback
@@ -367,7 +406,6 @@ static int alarmtimer_suspend(struct device *dev)
 	ktime_t min, now;
 	unsigned long flags;
 	struct rtc_device *rtc;
-	int i;
 	int ret = 0;
 
 	cancel_delayed_work_sync(&work);
@@ -382,26 +420,15 @@ static int alarmtimer_suspend(struct device *dev)
 	if (!rtc)
 		return 0;
 
-	/* Find the soonest timer to expire*/
-	for (i = 0; i < ALARM_NUMTYPE; i++) {
-		struct alarm_base *base = &alarm_bases[i];
-		struct timerqueue_node *next;
-		ktime_t delta;
-
-		spin_lock_irqsave(&base->lock, flags);
-		next = timerqueue_getnext(&base->timerqueue);
-		spin_unlock_irqrestore(&base->lock, flags);
-		if (!next)
-			continue;
-		delta = ktime_sub(next->expires, base->gettime());
-		if (!min.tv64 || (delta.tv64 < min.tv64))
-			min = delta;
-	}
+	min = alarm_next_expires_remaining();
 	if (min.tv64 == 0)
 		return 0;
 
-	if (ktime_to_ns(min) < 2 * NSEC_PER_SEC) {
+	if (ktime_to_ns(min) < suspend_threshold * NSEC_PER_SEC) {
 		__pm_wakeup_event(ws, 2 * MSEC_PER_SEC);
+		pr_info("[2] alarm about to go off in %lld msec\n",
+				ktime_to_ms(min));
+
 		return -EBUSY;
 	}
 
@@ -431,7 +458,6 @@ static int alarmtimer_suspend(struct device *dev)
 	ktime_t min, now;
 	unsigned long flags;
 	struct rtc_device *rtc;
-	int i;
 	int ret;
 
 	cancel_delayed_work_sync(&work);
@@ -446,26 +472,15 @@ static int alarmtimer_suspend(struct device *dev)
 	if (!rtc)
 		return 0;
 
-	/* Find the soonest timer to expire*/
-	for (i = 0; i < ALARM_NUMTYPE; i++) {
-		struct alarm_base *base = &alarm_bases[i];
-		struct timerqueue_node *next;
-		ktime_t delta;
-
-		spin_lock_irqsave(&base->lock, flags);
-		next = timerqueue_getnext(&base->timerqueue);
-		spin_unlock_irqrestore(&base->lock, flags);
-		if (!next)
-			continue;
-		delta = ktime_sub(next->expires, base->gettime());
-		if (!min.tv64 || (delta.tv64 < min.tv64))
-			min = delta;
-	}
+	min = alarm_next_expires_remaining();
 	if (min.tv64 == 0)
 		return 0;
 
-	if (ktime_to_ns(min) < 2 * NSEC_PER_SEC) {
+	if (ktime_to_ns(min) < suspend_threshold * NSEC_PER_SEC) {
 		__pm_wakeup_event(ws, 2 * MSEC_PER_SEC);
+		pr_info("[2] alarm about to go off in %lld msec\n",
+				ktime_to_ms(min));
+
 		return -EBUSY;
 	}
 
@@ -1044,6 +1059,37 @@ static struct platform_driver alarmtimer_driver = {
 	}
 };
 
+static int alarm_pm_notifier(struct notifier_block *nb, unsigned long event,
+							 void *dummy)
+{
+	ktime_t min;
+
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
+		min = alarm_next_expires_remaining();
+		if (min.tv64) {
+			if (ktime_to_ns(min) < suspend_threshold * NSEC_PER_SEC) {
+				__pm_wakeup_event(ws, 2 * MSEC_PER_SEC);
+				pr_info("[1] alarm about to go off in %lld msec\n",
+						ktime_to_ms(min));
+
+				return NOTIFY_BAD;
+			}
+		}
+
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block alarm_pm_nb = {
+	.notifier_call = alarm_pm_notifier,
+	.priority = INT_MIN,
+};
+
 /**
  * alarmtimer_init - Initialize alarm timer code
  *
@@ -1110,6 +1156,7 @@ static int __init alarmtimer_init(void)
 		goto out_wq;
 	}
 
+	register_pm_notifier(&alarm_pm_nb);
 	return 0;
 
 out_wq:
