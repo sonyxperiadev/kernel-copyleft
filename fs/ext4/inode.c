@@ -811,7 +811,7 @@ int ext4_get_block(struct inode *inode, sector_t iblock,
  * `handle' can be NULL if create is zero
  */
 struct buffer_head *ext4_getblk(handle_t *handle, struct inode *inode,
-				ext4_lblk_t block, int create, int *errp)
+				ext4_lblk_t block, int create)
 {
 	struct ext4_map_blocks map;
 	struct buffer_head *bh;
@@ -825,19 +825,14 @@ struct buffer_head *ext4_getblk(handle_t *handle, struct inode *inode,
 			      create ? EXT4_GET_BLOCKS_CREATE : 0);
 
 	/* ensure we send some value back into *errp */
-	*errp = 0;
-
-	if (create && err == 0)
-		err = -ENOSPC;	/* should never happen */
+	if (err == 0)
+		return create ? ERR_PTR(-ENOSPC) : NULL;
 	if (err < 0)
-		*errp = err;
-	if (err <= 0)
-		return NULL;
+		return ERR_PTR(err);
 
 	bh = sb_getblk(inode->i_sb, map.m_pblk);
 	if (unlikely(!bh)) {
-		*errp = -ENOMEM;
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 	if (map.m_flags & EXT4_MAP_NEW) {
 		J_ASSERT(create != 0);
@@ -866,7 +861,6 @@ struct buffer_head *ext4_getblk(handle_t *handle, struct inode *inode,
 		BUFFER_TRACE(bh, "not a new buffer");
 	}
 	if (fatal) {
-		*errp = fatal;
 		brelse(bh);
 		bh = NULL;
 	}
@@ -874,22 +868,21 @@ struct buffer_head *ext4_getblk(handle_t *handle, struct inode *inode,
 }
 
 struct buffer_head *ext4_bread(handle_t *handle, struct inode *inode,
-			       ext4_lblk_t block, int create, int *err)
+			       ext4_lblk_t block, int create)
 {
 	struct buffer_head *bh;
 
-	bh = ext4_getblk(handle, inode, block, create, err);
-	if (!bh)
+	bh = ext4_getblk(handle, inode, block, create);
+	if (IS_ERR(bh))
 		return bh;
-	if (buffer_uptodate(bh))
+	if (!bh || buffer_uptodate(bh))
 		return bh;
 	ll_rw_block(READ | REQ_META | REQ_PRIO, 1, &bh);
 	wait_on_buffer(bh);
 	if (buffer_uptodate(bh))
 		return bh;
 	put_bh(bh);
-	*err = -EIO;
-	return NULL;
+	return ERR_PTR(-EIO);
 }
 
 int ext4_walk_page_buffers(handle_t *handle,
@@ -3592,6 +3585,7 @@ int ext4_can_truncate(struct inode *inode)
 
 int ext4_punch_hole(struct file *file, loff_t offset, loff_t length)
 {
+#if 0
 	struct inode *inode = file_inode(file);
 	struct super_block *sb = inode->i_sb;
 	ext4_lblk_t first_block, stop_block;
@@ -3777,6 +3771,12 @@ out_dio:
 out_mutex:
 	mutex_unlock(&inode->i_mutex);
 	return ret;
+#else
+	/*
+	* Disabled as per b/28760453
+	*/
+	return -EOPNOTSUPP;
+#endif
 }
 
 /*

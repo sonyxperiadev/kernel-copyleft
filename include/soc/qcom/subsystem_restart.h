@@ -10,12 +10,19 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __SUBSYS_RESTART_H
 #define __SUBSYS_RESTART_H
 
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
+
+#define SUBSYS_CRASH_REASON_LEN 512
 
 struct subsys_device;
 
@@ -98,6 +105,7 @@ struct notif_data {
 #if defined(CONFIG_MSM_SUBSYSTEM_RESTART)
 
 extern int subsys_get_restart_level(struct subsys_device *dev);
+extern void subsys_set_restart_level(struct subsys_device *dev, int new_level);
 extern int subsystem_restart_dev(struct subsys_device *dev);
 extern int subsystem_restart(const char *name);
 extern int subsystem_crashed(const char *name);
@@ -112,14 +120,34 @@ extern void subsys_unregister(struct subsys_device *dev);
 extern void subsys_default_online(struct subsys_device *dev);
 extern void subsys_set_crash_status(struct subsys_device *dev, bool crashed);
 extern bool subsys_get_crash_status(struct subsys_device *dev);
+extern bool subsys_is_ramdump_enabled(struct subsys_device *dev);
+
+extern int subsystem_crash_reason(const char *name, char *reason);
+#if defined(CONFIG_DEBUG_FS)
+extern void update_crash_reason(struct subsys_device *dev, char *, int);
+#else
+static inline void update_crash_reason(struct subsys_device *dev,
+						char *reason, int size) { }
+#endif
 void notify_proxy_vote(struct device *device);
 void notify_proxy_unvote(struct device *device);
 #else
+
+static inline void update_crash_reason(struct subsys_device *dev,
+						char *reason, int size) { }
+
+static inline int subsystem_crash_reason(const char *name, char *reason)
+{
+	return 0;
+}
 
 static inline int subsys_get_restart_level(struct subsys_device *dev)
 {
 	return 0;
 }
+
+static inline void subsys_set_restart_level(struct subsys_device *dev,
+						int new_level) {}
 
 static inline int subsystem_restart_dev(struct subsys_device *dev)
 {
@@ -160,6 +188,10 @@ static inline void subsys_default_online(struct subsys_device *dev) { }
 static inline
 void subsys_set_crash_status(struct subsys_device *dev, bool crashed) { }
 static inline bool subsys_get_crash_status(struct subsys_device *dev)
+{
+	return false;
+}
+static inline bool subsys_is_ramdump_enabled(struct subsys_device *dev)
 {
 	return false;
 }

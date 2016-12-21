@@ -1,4 +1,4 @@
-/* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -39,7 +39,7 @@ static inline int msm_dcvs_count_active_instances(struct msm_vidc_core *core)
 	struct msm_vidc_inst *inst = NULL;
 
 	if (!core) {
-		dprintk(VIDC_ERR, "%s: Invalid args: %p\n", __func__, core);
+		dprintk(VIDC_ERR, "%s: Invalid args: %pK\n", __func__, core);
 		return -EINVAL;
 	}
 
@@ -115,7 +115,7 @@ static void msm_dcvs_dec_check_and_scale_clocks(struct msm_vidc_inst *inst)
 void msm_dcvs_check_and_scale_clocks(struct msm_vidc_inst *inst, bool is_etb)
 {
 	if (!inst) {
-		dprintk(VIDC_ERR, "%s Invalid args: %p\n", __func__, inst);
+		dprintk(VIDC_ERR, "%s Invalid args: %pK\n", __func__, inst);
 		return;
 	}
 
@@ -136,17 +136,8 @@ static inline int get_pending_bufs_fw(struct msm_vidc_inst *inst)
 
 	if (inst->state >= MSM_VIDC_OPEN_DONE &&
 			inst->state < MSM_VIDC_STOP_DONE) {
-		struct buffer_info *temp = NULL;
-
 		fw_out_qsize = inst->count.ftb - inst->count.fbd;
-
-		list_for_each_entry(temp, &inst->registeredbufs.list, list) {
-			if (temp->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
-					!temp->inactive &&
-					atomic_read(&temp->ref_count) == 2) {
-				buffers_in_driver++;
-			}
-		}
+		buffers_in_driver = inst->buffers_held_in_driver;
 	}
 
 	return fw_out_qsize + buffers_in_driver;
@@ -178,7 +169,7 @@ void msm_dcvs_init_load(struct msm_vidc_inst *inst)
 	dprintk(VIDC_DBG, "Init DCVS Load\n");
 
 	if (!inst || !inst->core) {
-		dprintk(VIDC_ERR, "%s Invalid args: %p\n", __func__, inst);
+		dprintk(VIDC_ERR, "%s Invalid args: %pK\n", __func__, inst);
 		return;
 	}
 
@@ -243,7 +234,7 @@ void msm_dcvs_init(struct msm_vidc_inst *inst)
 	dprintk(VIDC_DBG, "Init DCVS Struct\n");
 
 	if (!inst) {
-		dprintk(VIDC_ERR, "%s Invalid args: %p\n", __func__, inst);
+		dprintk(VIDC_ERR, "%s Invalid args: %pK\n", __func__, inst);
 		return;
 	}
 
@@ -260,7 +251,7 @@ void msm_dcvs_monitor_buffer(struct msm_vidc_inst *inst)
 	struct hal_buffer_requirements *output_buf_req;
 
 	if (!inst) {
-		dprintk(VIDC_ERR, "%s Invalid args: %p\n", __func__, inst);
+		dprintk(VIDC_ERR, "%s Invalid args: %pK\n", __func__, inst);
 		return;
 	}
 	dcvs = &inst->dcvs;
@@ -269,7 +260,7 @@ void msm_dcvs_monitor_buffer(struct msm_vidc_inst *inst)
 	output_buf_req = get_buff_req_buffer(inst,
 				msm_comm_get_hal_output_buffer(inst));
 	if (!output_buf_req) {
-		dprintk(VIDC_ERR, "%s : Get output buffer req failed %p\n",
+		dprintk(VIDC_ERR, "%s : Get output buffer req failed %pK\n",
 			__func__, inst);
 		mutex_unlock(&inst->lock);
 		return;
