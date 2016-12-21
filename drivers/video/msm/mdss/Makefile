@@ -29,7 +29,13 @@ obj-$(CONFIG_FB_MSM_MDSS_MDP3) += dsi-v2.o
 endif
 
 mdss-dsi-objs := mdss_dsi.o mdss_dsi_host.o mdss_dsi_cmd.o mdss_dsi_status.o
+ifeq ($(CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL),y)
+mdss-dsi-objs += mdss_dsi_panel_driver.o
 mdss-dsi-objs += mdss_dsi_panel.o
+mdss-dsi-objs += mdss_dsi_panel_debugfs.o
+else
+mdss-dsi-objs += mdss_dsi_panel.o
+endif
 mdss-dsi-objs += msm_mdss_io_8974.o
 mdss-dsi-objs += mdss_dsi_phy.o
 obj-$(CONFIG_FB_MSM_MDSS) += mdss-dsi.o
@@ -53,5 +59,5 @@ mdss-qpic-objs := mdss_qpic.o mdss_fb.o mdss_qpic_panel.o
 obj-$(CONFIG_FB_MSM_QPIC) += mdss-qpic.o
 obj-$(CONFIG_FB_MSM_QPIC_ILI_QVGA_PANEL) += qpic_panel_ili_qvga.o
 
-obj-$(CONFIG_FB_MSM_MDSS) += mdss_fb.o mdss_util.o
+obj-$(CONFIG_FB_MSM_MDSS) += mdss_fb.o mdss_util.o incell.o
 obj-$(CONFIG_COMPAT) += mdss_compat_utils.o

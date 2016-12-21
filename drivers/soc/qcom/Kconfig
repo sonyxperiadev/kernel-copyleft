@@ -388,6 +388,13 @@ config MSM_WATCHDOG_V2
 	  deadlocks. It does not run during the bootup process, so it will
 	  not catch any early lockups.
 
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on MSM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
+
 config MSM_FORCE_WDOG_BITE_ON_PANIC
 	bool "MSM force watchdog bite"
 	depends on MSM_WATCHDOG_V2
@@ -696,6 +703,14 @@ config MSM_VSENS
 	  crossed.
 
 	  Say yes to support these devices.
+
+config SUBSYS_LAST_ERR_LOG
+	bool "support last error log for subsystems"
+	help
+	  When fatal errors are encountered in subsystems, few subsystems
+	  export the error log into SMEM. This driver supports the mechanism
+	  to read these logs and export them to user through proc entries.
+	  If unsure, say N
 
 source "drivers/soc/qcom/memshare/Kconfig"
 

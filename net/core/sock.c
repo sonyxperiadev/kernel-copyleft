@@ -88,6 +88,11 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -1203,6 +1208,23 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 	case SO_SELECT_ERR_QUEUE:
 		v.val = sock_flag(sk, SOCK_SELECT_ERR_QUEUE);
 		break;
+
+	case SO_SIZEHINT:
+	{
+		struct sock_sizehint hint;
+
+		if (len > sizeof(hint))
+			len = sizeof(hint);
+
+		hint.order_zero_size = PAGE_SIZE -
+			SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+		hint.cache_size =  KMALLOC_MAX_CACHE_SIZE -
+			SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+
+		if (copy_to_user(optval, &hint, len))
+			return -EFAULT;
+		goto lenout;
+	}
 
 	default:
 		return -ENOPROTOOPT;

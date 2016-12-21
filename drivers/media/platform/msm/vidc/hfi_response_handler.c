@@ -10,12 +10,18 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
 #include <linux/hash.h>
 #include <soc/qcom/smem.h>
+#include <soc/qcom/subsystem_restart.h>
 #include "vidc_hfi_helper.h"
 #include "vidc_hfi_io.h"
 #include "msm_vidc_debug.h"
@@ -240,6 +246,8 @@ static void hfi_process_event_notify(msm_vidc_callback callback, u32 device_id,
 		struct hal_session *session,
 		struct hfi_msg_event_notify_packet *pkt)
 {
+	char msg[SUBSYS_CRASH_REASON_LEN];
+
 	dprintk(VIDC_DBG, "Received: EVENT_NOTIFY\n");
 
 	if (!callback || !pkt ||
@@ -252,6 +260,9 @@ static void hfi_process_event_notify(msm_vidc_callback callback, u32 device_id,
 	case HFI_EVENT_SYS_ERROR:
 		dprintk(VIDC_ERR, "HFI_EVENT_SYS_ERROR: %d, 0x%x\n",
 			pkt->event_data1, pkt->event_data2);
+		snprintf(msg, sizeof(msg), "HFI_EVENT_SYS_ERROR: %d, 0x%x\n",
+			pkt->event_data1, pkt->event_data2);
+		subsystem_crash_reason("venus", msg);
 		hfi_process_sys_error(callback, device_id);
 		break;
 	case HFI_EVENT_SESSION_PROPERTY_CHANGED:
