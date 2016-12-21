@@ -1,0 +1,87 @@
+/* arch/arm/boot/dts/qcom/msm8994-kitakami_r1_common.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2015 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+&soc {
+	sound {
+		qcom,audio-routing =
+			"AIF4 VI", "MCLK",
+			"RX_BIAS", "MCLK",
+			"LDO_H", "MCLK",
+			"MADINPUT", "MCLK",
+			"AMIC1", "LDO_H",
+			"LDO_H", "AHC ISNS",
+			"AMIC2", "MIC BIAS2 External",
+			"MIC BIAS2 External", "Headset Mic",
+			"MIC BIAS2 External", "ANCRight Headset Mic",
+			"AMIC3", "MIC BIAS3 External",
+			"MIC BIAS3 External", "ANCLeft Headset Mic",
+			"AMIC4", "LDO_H",
+			"LDO_H", "AHC VSNS",
+			"DMIC1", "MIC BIAS1 External",
+			"MIC BIAS1 External", "Digital Mic1",
+			"DMIC2", "MIC BIAS1 External",
+			"MIC BIAS1 External", "Digital Mic2";
+	};
+
+	qcom,sensor-information {
+		/* msm_therm */
+		sensor_information17: qcom,sensor-information@17 {
+			qcom,scaling-factor = <10>;
+		};
+
+		/* emmc_therm */
+		sensor_information18: qcom,sensor-information@18 {
+			qcom,scaling-factor = <10>;
+		};
+
+		/* quiet_therm */
+		sensor_information21: qcom,sensor-information@21 {
+			qcom,alias-name = "bl_therm";
+		};
+
+		sensor_information100: qcom,sensor-information@100 {
+			qcom,sensor-type = "adc";
+			qcom,sensor-name = "bms";
+			qcom,alias-name = "batt_therm";
+			qcom,scaling-factor = <1000>;
+		};
+
+		sensor_information101: qcom,sensor-information@101 {
+			qcom,sensor-type = "adc";
+			qcom,sensor-name = "xo_therm";
+		};
+	};
+};
+
+&slim_msm {
+	tomtom_codec {
+		qcom,cdc-micbias-ldoh-v = <0x3>;
+		qcom,cdc-micbias-cfilt1-mv = <1800>;
+		qcom,cdc-micbias-cfilt2-mv = <2700>;
+		qcom,cdc-micbias-cfilt3-mv = <2700>;
+		qcom,cdc-micbias1-cfilt-sel = <0x0>;
+		qcom,cdc-micbias2-cfilt-sel = <0x1>;
+		qcom,cdc-micbias3-cfilt-sel = <0x2>;
+		qcom,cdc-micbias4-cfilt-sel = <0x0>;
+		qcom,cdc-micbias1-ext-cap;
+		/delete-property/ qcom,cdc-micbias2-ext-cap;
+		/delete-property/ qcom,cdc-micbias3-ext-cap;
+		/delete-property/ qcom,cdc-micbias4-ext-cap;
+	};
+};

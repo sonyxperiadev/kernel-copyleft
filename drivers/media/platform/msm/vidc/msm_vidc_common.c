@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/jiffies.h>
 #include <linux/sched.h>
@@ -1303,6 +1308,9 @@ int buf_ref_get(struct msm_vidc_inst *inst, struct buffer_info *binfo)
 		dprintk(VIDC_DBG, "%s: invalid ref_cnt: %d\n", __func__, cnt);
 		cnt = -EINVAL;
 	}
+	if (cnt == 2)
+		inst->buffers_held_in_driver++;
+
 	dprintk(VIDC_DBG, "REF_GET[%d] fd[0] = %d\n", cnt, binfo->fd[0]);
 
 	return cnt;
@@ -1350,6 +1358,7 @@ int buf_ref_put(struct msm_vidc_inst *inst, struct buffer_info *binfo)
 			binfo->fd[0]);
 		binfo->pending_deletion = true;
 	} else if (qbuf_again) {
+		inst->buffers_held_in_driver--;
 		rc = qbuf_dynamic_buf(inst, binfo);
 		if (!rc)
 			return rc;
@@ -1878,6 +1887,7 @@ static int msm_comm_session_abort(struct msm_vidc_inst *inst)
 {
 	int rc = 0, abort_completion = 0;
 	struct hfi_device *hdev;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
 
 	if (!inst || !inst->core || !inst->core->device) {
 		dprintk(VIDC_ERR, "%s invalid params\n", __func__);
@@ -1900,6 +1910,10 @@ static int msm_comm_session_abort(struct msm_vidc_inst *inst)
 		dprintk(VIDC_ERR,
 				"%s: Wait interrupted or timed out [%p]: %d\n",
 				__func__, inst, abort_completion);
+		snprintf(crash_reason, sizeof(crash_reason),
+			  "%s: Wait interrupted or timed out [%p]: %d",
+			  __func__, inst, abort_completion);
+		subsystem_crash_reason("venus", crash_reason);
 		rc = -EBUSY;
 	} else {
 		rc = 0;

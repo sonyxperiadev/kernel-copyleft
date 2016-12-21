@@ -378,6 +378,13 @@ config MSM_WATCHDOG_V2
 	  deadlocks. It does not run during the bootup process, so it will
 	  not catch any early lockups.
 
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on MSM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
+
 config MSM_FORCE_WDOG_BITE_ON_PANIC
 	bool "MSM force watchdog bite"
 	depends on MSM_WATCHDOG_V2
@@ -573,6 +580,15 @@ config MSM_CACHE_DUMP_ON_PANIC
 	  want to dump the L1 and L2 caches on panic before any flush occurs.
 	  If unsure, say N
 
+config SONY_SSM
+	bool "Support Super Stamina Mode"
+	default n
+	help
+	  This enables support for power mode notifications, required by Super
+	  Stamina Mode. The driver will let a user space application register
+	  for notifications when the device is ready to switch into a new
+	  power mode.
+
 config MSM_CPUSS_DUMP
 	bool "CPU Subsystem Dumping support"
 	help
@@ -642,6 +658,14 @@ config KERNEL_TEXT_MPU_PROT
 	  sections early in boot. Read access is permitted to
 	  all masters; Write access is only permited to the
 	  secure world.
+
+config AMSS_ERR_LOG
+	bool "support last amss log"
+	help
+	  when ever there is modem fatal, Export amss error log as last_amss
+	  log in procfs. last_amss is export in both system dump and sub-system
+	  dump. Data in last_amss log is not available once it is read.
+	  If unsure, say N
 
 source "drivers/soc/qcom/memshare/Kconfig"
 

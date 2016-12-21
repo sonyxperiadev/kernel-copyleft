@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
 #include <asm/div64.h>
@@ -27,7 +32,7 @@ int msm_isp_axi_create_stream(
 	struct msm_vfe_axi_shared_data *axi_data,
 	struct msm_vfe_axi_stream_request_cmd *stream_cfg_cmd)
 {
-	int i = stream_cfg_cmd->stream_src;
+	uint32_t i = stream_cfg_cmd->stream_src;
 	if (i >= VFE_AXI_SRC_MAX) {
 		pr_err("%s:%d invalid stream_src %d\n", __func__, __LINE__,
 			stream_cfg_cmd->stream_src);
@@ -270,8 +275,13 @@ static uint32_t msm_isp_axi_get_plane_size(
 			size = plane_cfg[plane_idx].output_height *
 				plane_cfg[plane_idx].output_width;
 		else
+#if defined(CONFIG_SONY_CAM_V4L2)
+			size = plane_cfg[plane_idx].output_height *
+				plane_cfg[plane_idx].output_width / 2;
+#else
 			size = plane_cfg[plane_idx].output_height *
 				plane_cfg[plane_idx].output_width;
+#endif
 		break;
 	case V4L2_PIX_FMT_NV14:
 	case V4L2_PIX_FMT_NV41:
@@ -1062,6 +1072,12 @@ void msm_isp_axi_stream_update(struct vfe_device *vfe_dev,
 			axi_data->stream_info[i].state =
 				axi_data->stream_info[i].state ==
 				START_PENDING ? STARTING : STOPPING;
+#if defined(CONFIG_SONY_CAM_V4L2)
+				if (axi_data->stream_info[i].state == STOPPING) {
+					axi_data->stream_info[i].state = INACTIVE;
+					vfe_dev->axi_data.stream_update[frame_src] = 1;
+				}
+#endif
 		} else if (axi_data->stream_info[i].state == STARTING ||
 			axi_data->stream_info[i].state == STOPPING) {
 			axi_data->stream_info[i].state =
@@ -1721,9 +1737,15 @@ static int msm_isp_axi_wait_for_cfg_done(struct vfe_device *vfe_dev,
 		vfe_dev->axi_data.pipeline_update = camif_update;
 	}
 	spin_unlock_irqrestore(&vfe_dev->shared_data_lock, flags);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	rc = wait_for_completion_timeout(
+		&vfe_dev->stream_config_complete,
+		msecs_to_jiffies(vfe_dev->timeout));
+#else
 	rc = wait_for_completion_timeout(
 		&vfe_dev->stream_config_complete,
 		msecs_to_jiffies(VFE_MAX_CFG_TIMEOUT));
+#endif
 	if (rc == 0) {
 		for (i = 0; i < VFE_SRC_MAX; i++) {
 			if (src_mask & (1 << i)) {
@@ -1735,6 +1757,9 @@ static int msm_isp_axi_wait_for_cfg_done(struct vfe_device *vfe_dev,
 			}
 		}
 		pr_err("%s: wait timeout\n", __func__);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		vfe_dev->timeout = 100;
+#endif
 		rc = -EBUSY;
 	} else {
 		rc = 0;
@@ -2248,6 +2273,7 @@ static int msm_isp_return_empty_buffer(struct vfe_device *vfe_dev,
 		&vfe_dev->axi_data.src_info[frame_src].time_stamp, frame_id,
 		stream_info->runtime_output_format);
 
+	memset(&error_event, 0, sizeof(error_event));
 	error_event.frame_id = frame_id;
 	error_event.timestamp =
 		vfe_dev->axi_data.src_info[frame_src].time_stamp;
