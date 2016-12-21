@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __MSM_CAMERA_IO_UTIL_H
 #define __MSM_CAMERA_IO_UTIL_H
@@ -31,9 +36,25 @@ struct msm_gpio_set_tbl {
 	uint32_t delay;
 };
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+static inline void msm_camera_io_w(u32 data, void __iomem *addr)
+{
+	writel_relaxed_no_log((data), (addr));
+}
+#else
 void msm_camera_io_w(u32 data, void __iomem *addr);
+#endif
 void msm_camera_io_w_mb(u32 data, void __iomem *addr);
+#if defined(CONFIG_SONY_CAM_V4L2)
+static inline u32 msm_camera_io_r(void __iomem *addr)
+{
+	uint32_t data = readl_relaxed_no_log(addr);
+	return data;
+}
+#else
 u32 msm_camera_io_r(void __iomem *addr);
+#endif
+
 u32 msm_camera_io_r_mb(void __iomem *addr);
 void msm_camera_io_dump(void __iomem *addr, int size);
 void msm_camera_io_memcpy(void __iomem *dest_addr,
