@@ -243,6 +243,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(stop_usb_host_function),
 	POWER_SUPPLY_ATTR(vfloat_mv),
 	POWER_SUPPLY_ATTR(fv_cmp_cfg),
+	POWER_SUPPLY_ATTR(batt_aging),
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_ATTR(charge_counter_ext),
 	/* Properties of type `const char *' */
