@@ -11,6 +11,7 @@ libcomposite-y			+= composite.o functions.o u_f.o
 
 obj-y				+= debug.o
 g_android-y			:= android.o
+CFLAGS_android.o := -I$(src)
 
 obj-$(CONFIG_USB_GADGET)	+= udc/ function/ legacy/
 

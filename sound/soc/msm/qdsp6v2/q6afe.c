@@ -114,6 +114,7 @@ struct afe_ctl {
 	struct afe_sp_ex_vi_get_param_resp	ex_vi_resp;
 	int vi_tx_port;
 	int vi_rx_port;
+	bool fbsp_mono_right;
 	uint32_t afe_sample_rates[AFE_MAX_PORTS];
 	struct aanc_data aanc_info;
 	struct mutex afe_cmd_lock;
@@ -1015,12 +1016,21 @@ static void afe_send_cal_spkr_prot_tx(int port_id)
 			afe_spk_config.vi_proc_cfg.operation_mode =
 					    Q6AFE_MSM_SPKR_FTM_MODE;
 		afe_spk_config.vi_proc_cfg.minor_version = 1;
-		afe_spk_config.vi_proc_cfg.r0_cali_q24[SP_V2_SPKR_1] =
-			(uint32_t) this_afe.prot_cfg.r0[SP_V2_SPKR_1];
+		if (this_afe.fbsp_mono_right) {
+			pr_info("%s: Right Channel R0T0 used in Mono case\n",
+				 __func__);
+			afe_spk_config.vi_proc_cfg.r0_cali_q24[SP_V2_SPKR_1] =
+				(uint32_t) this_afe.prot_cfg.r0[SP_V2_SPKR_2];
+			afe_spk_config.vi_proc_cfg.t0_cali_q6[SP_V2_SPKR_1] =
+				(uint32_t) this_afe.prot_cfg.t0[SP_V2_SPKR_2];
+		} else {
+			afe_spk_config.vi_proc_cfg.r0_cali_q24[SP_V2_SPKR_1] =
+				(uint32_t) this_afe.prot_cfg.r0[SP_V2_SPKR_1];
+			afe_spk_config.vi_proc_cfg.t0_cali_q6[SP_V2_SPKR_1] =
+				(uint32_t) this_afe.prot_cfg.t0[SP_V2_SPKR_1];
+		}
 		afe_spk_config.vi_proc_cfg.r0_cali_q24[SP_V2_SPKR_2] =
 			(uint32_t) this_afe.prot_cfg.r0[SP_V2_SPKR_2];
-		afe_spk_config.vi_proc_cfg.t0_cali_q6[SP_V2_SPKR_1] =
-			(uint32_t) this_afe.prot_cfg.t0[SP_V2_SPKR_1];
 		afe_spk_config.vi_proc_cfg.t0_cali_q6[SP_V2_SPKR_2] =
 			(uint32_t) this_afe.prot_cfg.t0[SP_V2_SPKR_2];
 		if (this_afe.prot_cfg.mode != MSM_SPKR_PROT_NOT_CALIBRATED) {
@@ -5573,6 +5583,10 @@ int afe_spk_prot_feed_back_cfg(int src_port, int dst_port,
 		prot_config.feedback_path_cfg.chan_info[index++] = 4;
 	}
 	prot_config.feedback_path_cfg.num_channels = index;
+	if (index == 2)
+		this_afe.fbsp_mono_right = true;
+	else
+		this_afe.fbsp_mono_right = false;
 	pr_debug("%s no of channels: %d\n", __func__, index);
 	prot_config.feedback_path_cfg.minor_version = 1;
 	ret = afe_spk_prot_prepare(src_port, dst_port,

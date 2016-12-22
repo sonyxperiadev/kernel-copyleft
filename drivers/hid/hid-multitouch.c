@@ -19,6 +19,11 @@
  *  Copyright (c) 2010      Canonical, Ltd.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  * This program is free software; you can redistribute it and/or modify it
@@ -104,6 +109,7 @@ struct mt_device {
 	int cc_value_index;	/* contact count value index in the field */
 	unsigned last_slot_field;	/* the last field of a slot */
 	unsigned mt_report_id;	/* the report ID of the multitouch device */
+	unsigned pen_report_id;	/* the report ID of the pen device */
 	__s16 inputmode;	/* InputMode HID feature, -1 if non-existent */
 	__s16 inputmode_index;	/* InputMode HID feature index in the report */
 	__s16 maxcontact_report_id;	/* Maximum Contact Number HID feature,
@@ -360,6 +366,53 @@ static void mt_store_field(struct hid_usage *usage, struct mt_device *td,
 		return;
 
 	f->usages[f->length++] = usage->hid;
+}
+
+static int mt_pen_input_mapping(struct hid_device *hdev, struct hid_input *hi,
+		struct hid_field *field, struct hid_usage *usage,
+		unsigned long **bit, int *max)
+{
+	struct mt_device *td = hid_get_drvdata(hdev);
+
+	td->pen_report_id = field->report->id;
+
+	return 0;
+}
+
+static int mt_pen_input_mapped(struct hid_device *hdev, struct hid_input *hi,
+		struct hid_field *field, struct hid_usage *usage,
+		unsigned long **bit, int *max)
+{
+	return 0;
+}
+
+static int mt_pen_event(struct hid_device *hid, struct hid_field *field,
+				struct hid_usage *usage, __s32 value)
+{
+	/* let hid-input handle it */
+	return 0;
+}
+
+static void mt_pen_report(struct hid_device *hid, struct hid_report *report)
+{
+	struct hid_field *field = report->field[0];
+
+	input_sync(field->hidinput->input);
+}
+
+static void mt_generic_report(struct hid_device *hid, struct hid_report *report)
+{
+	struct hid_input *hidinput;
+
+	list_for_each_entry(hidinput, &hid->inputs, list)
+		input_sync(hidinput->input);
+}
+
+static void mt_pen_input_configured(struct hid_device *hdev,
+					struct hid_input *hi)
+{
+	/* force BTN_STYLUS to allow tablet matching in udev */
+	__set_bit(BTN_STYLUS, hi->input->keybit);
 }
 
 static int mt_touch_input_mapping(struct hid_device *hdev, struct hid_input *hi,
@@ -767,14 +820,14 @@ static int mt_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 	    field->application != HID_DG_TOUCHSCREEN &&
 	    field->application != HID_DG_PEN &&
 	    field->application != HID_DG_TOUCHPAD)
-		return -1;
+		return 0;
 
 	/*
 	 * some egalax touchscreens have "application == HID_DG_TOUCHSCREEN"
 	 * for the stylus.
 	 */
 	if (field->physical == HID_DG_STYLUS)
-		return 0;
+		return mt_pen_input_mapping(hdev, hi, field, usage, bit, max);
 
 	if (field->application == HID_DG_TOUCHSCREEN ||
 	    field->application == HID_DG_TOUCHPAD)
@@ -788,12 +841,17 @@ static int mt_input_mapped(struct hid_device *hdev, struct hid_input *hi,
 		struct hid_field *field, struct hid_usage *usage,
 		unsigned long **bit, int *max)
 {
+	if (field->application != HID_DG_TOUCHSCREEN &&
+	    field->application != HID_DG_PEN &&
+	    field->application != HID_DG_TOUCHPAD)
+		return 0;
+
 	/*
 	 * some egalax touchscreens have "application == HID_DG_TOUCHSCREEN"
 	 * for the stylus.
 	 */
 	if (field->physical == HID_DG_STYLUS)
-		return 0;
+		return mt_pen_input_mapped(hdev, hi, field, usage, bit, max);
 
 	if (field->application == HID_DG_TOUCHSCREEN ||
 	    field->application == HID_DG_TOUCHPAD)
@@ -811,22 +869,29 @@ static int mt_event(struct hid_device *hid, struct hid_field *field,
 	if (field->report->id == td->mt_report_id)
 		return mt_touch_event(hid, field, usage, value);
 
+	if (field->report->id == td->pen_report_id)
+		return mt_pen_event(hid, field, usage, value);
+
+	/* let hid-input handle it */
 	return 0;
 }
 
 static void mt_report(struct hid_device *hid, struct hid_report *report)
 {
 	struct mt_device *td = hid_get_drvdata(hid);
-	struct hid_field *field = report->field[0];
 
 	if (!(hid->claimed & HID_CLAIMED_INPUT))
 		return;
 
 	if (report->id == td->mt_report_id)
-		return mt_touch_report(hid, report);
+		mt_touch_report(hid, report);
 
-	if (field && field->hidinput && field->hidinput->input)
-		input_sync(field->hidinput->input);
+	if (report->id == td->pen_report_id)
+		mt_pen_report(hid, report);
+
+	if ((report->id != td->mt_report_id) &&
+	    (report->id != td->pen_report_id))
+		mt_generic_report(hid, report);
 }
 
 static void mt_set_input_mode(struct hid_device *hdev)
@@ -954,6 +1019,7 @@ static int mt_input_configured(struct hid_device *hdev, struct hid_input *hi)
 			suffix = "UNKNOWN";
 			break;
 		}
+		mt_pen_input_configured(hdev, hi);
 	}
 
 	if (suffix) {
@@ -1018,6 +1084,7 @@ static int mt_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	td->inputmode_value = MT_INPUTMODE_TOUCHSCREEN;
 	td->cc_index = -1;
 	td->mt_report_id = -1;
+	td->pen_report_id = -1;
 	hid_set_drvdata(hdev, td);
 
 	td->fields = devm_kzalloc(&hdev->dev, sizeof(struct mt_fields),

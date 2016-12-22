@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -1096,6 +1101,73 @@ static int pp_pcc_get_config(char __iomem *base_addr, void *cfg_data,
 
 	return 0;
 }
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+int __pp_pcc_get_config(char __iomem *base_addr, void *cfg_data,
+			u32 block_type, u32 disp_num)
+{
+	char __iomem *addr;
+	struct mdp_pcc_cfg_data *pcc_cfg = NULL;
+	struct mdp_pcc_data_v1_7 pcc_data;
+
+	if (!base_addr || !cfg_data) {
+		pr_err("invalid params base_addr %p cfg_data %p\n",
+		       base_addr, cfg_data);
+		return -EINVAL;
+	}
+
+	pcc_cfg = (struct mdp_pcc_cfg_data *) cfg_data;
+	if (pcc_cfg->version != mdp_pcc_v1_7) {
+		pr_err("unsupported version of pcc %d\n",
+		       pcc_cfg->version);
+		return -EINVAL;
+	}
+
+	addr = base_addr + PCC_CONST_COEFF_OFF;
+	pcc_data.r.c = readl_relaxed(addr) & PCC_CONST_COEFF_MASK;
+	pcc_data.g.c = readl_relaxed(addr + 4) & PCC_CONST_COEFF_MASK;
+	pcc_data.b.c = readl_relaxed(addr + 8) & PCC_CONST_COEFF_MASK;
+
+	addr = base_addr + PCC_R_COEFF_OFF;
+	pcc_data.r.r = readl_relaxed(addr) & PCC_COEFF_MASK;
+	pcc_data.g.r = readl_relaxed(addr + 4) & PCC_COEFF_MASK;
+	pcc_data.b.r = readl_relaxed(addr + 8) & PCC_COEFF_MASK;
+
+	addr = base_addr + PCC_G_COEFF_OFF;
+	pcc_data.r.g = readl_relaxed(addr) & PCC_COEFF_MASK;
+	pcc_data.g.g = readl_relaxed(addr + 4) & PCC_COEFF_MASK;
+	pcc_data.b.g = readl_relaxed(addr + 8) & PCC_COEFF_MASK;
+
+	addr = base_addr + PCC_B_COEFF_OFF;
+	pcc_data.r.b = readl_relaxed(addr) & PCC_COEFF_MASK;
+	pcc_data.g.b = readl_relaxed(addr + 4) & PCC_COEFF_MASK;
+	pcc_data.b.b = readl_relaxed(addr + 8) & PCC_COEFF_MASK;
+
+	addr = base_addr + PCC_RG_COEFF_OFF;
+	pcc_data.r.rg = readl_relaxed(addr) & PCC_COEFF_MASK;
+	pcc_data.g.rg = readl_relaxed(addr + 4) & PCC_COEFF_MASK;
+	pcc_data.b.rg = readl_relaxed(addr + 8) & PCC_COEFF_MASK;
+
+	addr = base_addr + PCC_RB_COEFF_OFF;
+	pcc_data.r.rb = readl_relaxed(addr) & PCC_COEFF_MASK;
+	pcc_data.g.rb = readl_relaxed(addr + 4) & PCC_COEFF_MASK;
+	pcc_data.b.rb = readl_relaxed(addr + 8) & PCC_COEFF_MASK;
+
+	addr = base_addr + PCC_GB_COEFF_OFF;
+	pcc_data.r.gb = readl_relaxed(addr) & PCC_COEFF_MASK;
+	pcc_data.g.gb = readl_relaxed(addr + 4) & PCC_COEFF_MASK;
+	pcc_data.b.gb = readl_relaxed(addr + 8) & PCC_COEFF_MASK;
+
+	addr = base_addr + PCC_RGB_COEFF_OFF;
+	pcc_data.r.rgb = readl_relaxed(addr) & PCC_COEFF_MASK;
+	pcc_data.g.rgb = readl_relaxed(addr + 4) & PCC_COEFF_MASK;
+	pcc_data.b.rgb = readl_relaxed(addr + 8) & PCC_COEFF_MASK;
+
+	memcpy(pcc_cfg->cfg_payload, &pcc_data, sizeof(pcc_data));
+
+	return 0;
+}
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 static void pp_pa_set_global_adj_regs(char __iomem *base_addr,
 				struct mdp_pa_data_v1_7 *pa_data, u32 flags,

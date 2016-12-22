@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef USB_F_MASS_STORAGE_H
 #define USB_F_MASS_STORAGE_H
 
@@ -15,17 +20,19 @@ struct fsg_module_parameters {
 	unsigned int	nofua_count;
 	unsigned int	luns;	/* nluns */
 	bool		stall;	/* can_stall */
+	char		*vendor_name;
+	char		*product_name;
 };
 
 #define _FSG_MODULE_PARAM_ARRAY(prefix, params, name, type, desc)	\
 	module_param_array_named(prefix ## name, params.name, type,	\
 				 &prefix ## params.name ## _count,	\
-				 S_IRUGO);				\
+				 S_IRUGO | S_IWUSR);			\
 	MODULE_PARM_DESC(prefix ## name, desc)
 
 #define _FSG_MODULE_PARAM(prefix, params, name, type, desc)		\
 	module_param_named(prefix ## name, params.name, type,		\
-			   S_IRUGO);					\
+			   S_IRUGO | S_IWUSR);				\
 	MODULE_PARM_DESC(prefix ## name, desc)
 
 #define __FSG_MODULE_PARAMETERS(prefix, params)				\
@@ -42,7 +49,11 @@ struct fsg_module_parameters {
 	_FSG_MODULE_PARAM(prefix, params, luns, uint,			\
 			  "number of LUNs");				\
 	_FSG_MODULE_PARAM(prefix, params, stall, bool,			\
-			  "false to prevent bulk stalls")
+			  "false to prevent bulk stalls");		\
+	_FSG_MODULE_PARAM(prefix, params, vendor_name, charp,		\
+			  "vendor name");				\
+	_FSG_MODULE_PARAM(prefix, params, product_name, charp,		\
+			  "product name")
 
 #ifdef CONFIG_USB_GADGET_DEBUG_FILES
 

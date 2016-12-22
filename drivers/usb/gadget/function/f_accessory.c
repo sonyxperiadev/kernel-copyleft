@@ -14,6 +14,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /* #define DEBUG */
 /* #define VERBOSE_DEBUG */
@@ -448,12 +453,19 @@ static void acc_hid_close(struct hid_device *hid)
 {
 }
 
+static int acc_hid_raw_request(struct hid_device *hid, unsigned char reportnum,
+	__u8 *buf, size_t len, unsigned char rtype, int reqtype)
+{
+	return 0;
+}
+
 static struct hid_ll_driver acc_hid_ll_driver = {
 	.parse = acc_hid_parse,
 	.start = acc_hid_start,
 	.stop = acc_hid_stop,
 	.open = acc_hid_open,
 	.close = acc_hid_close,
+	.raw_request = acc_hid_raw_request,
 };
 
 static struct acc_hid_dev *acc_hid_new(struct acc_dev *dev,
@@ -882,7 +894,9 @@ int acc_ctrlrequest(struct usb_composite_dev *cdev,
 		if (b_request == ACCESSORY_START) {
 			dev->start_requested = 1;
 			schedule_delayed_work(
-				&dev->start_work, msecs_to_jiffies(10));
+				&dev->start_work,
+				msecs_to_jiffies(50 +
+					WAIT_TIME_BEFORE_SENDING_CONFIGURED));
 			value = 0;
 		} else if (b_request == ACCESSORY_SEND_STRING) {
 			dev->string_index = w_index;

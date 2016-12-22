@@ -493,4 +493,12 @@ config DM_LOG_WRITES
 	  be called dm-log-writes.
 
 	  If unsure, say N.
+
+config PANIC_ON_DM_VERITY_ERRORS
+	bool "panic on dm verity errors"
+	depends on DM_VERITY = y
+	default n
+	---help---
+	  This enables panic on hash mismatch dm-verity errors.
+
 endif # MD

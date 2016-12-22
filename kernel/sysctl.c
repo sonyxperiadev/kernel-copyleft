@@ -17,6 +17,11 @@
  * The list_for_each() macro wasn't appropriate for the sysctl loop.
  *  Removed it and replaced it with older style, 03/23/00, Bill Wendling
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/mm.h>
@@ -113,6 +118,9 @@ extern int latencytop_enabled;
 extern int sysctl_nr_open_min, sysctl_nr_open_max;
 #ifndef CONFIG_MMU
 extern int sysctl_nr_trim_pages;
+#endif
+#ifdef CONFIG_SWAP_CONSIDER_CMA_FREE
+extern int swap_thresh_cma_free_pages;
 #endif
 
 /* Constants used for minimum and  maximum */
@@ -276,6 +284,10 @@ static int max_sched_tunable_scaling = SCHED_TUNABLESCALING_END-1;
 #ifdef CONFIG_COMPACTION
 static int min_extfrag_threshold;
 static int max_extfrag_threshold = 1000;
+#endif
+
+#ifdef CONFIG_SWAP_CONSIDER_CMA_FREE
+static int max_swap_thresh_cma_free_pages = INT_MAX;
 #endif
 
 static struct ctl_table kern_table[] = {
@@ -1604,6 +1616,15 @@ static struct ctl_table vm_table[] = {
 		.extra1		= &min_extfrag_threshold,
 		.extra2		= &max_extfrag_threshold,
 	},
+	{
+		.procname	= "compact_unevictable_allowed",
+		.data		= &sysctl_compact_unevictable_allowed,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
 
 #endif /* CONFIG_COMPACTION */
 	{
@@ -1841,6 +1862,17 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= (void *)&mmap_rnd_compat_bits_min,
 		.extra2		= (void *)&mmap_rnd_compat_bits_max,
+	},
+#endif
+#ifdef CONFIG_SWAP_CONSIDER_CMA_FREE
+	{
+		.procname	= "swap_thresh_cma_free_pages",
+		.data		= &swap_thresh_cma_free_pages,
+		.maxlen		= sizeof(swap_thresh_cma_free_pages),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &max_swap_thresh_cma_free_pages,
 	},
 #endif
 	{ }

@@ -386,14 +386,6 @@ static inline bool is_dynamic_output_buffer_mode(struct v4l2_buffer *b,
 		inst->buffer_mode_set[CAPTURE_PORT] == HAL_BUFFER_MODE_DYNAMIC;
 }
 
-
-static inline bool is_encoder_input_buffer(struct v4l2_buffer *b,
-				struct msm_vidc_inst *inst)
-{
-	return b->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE &&
-			inst->session_type == MSM_VIDC_ENCODER;
-}
-
 static inline void save_v4l2_buffer(struct v4l2_buffer *b,
 						struct buffer_info *binfo)
 {
@@ -916,8 +908,7 @@ int msm_vidc_dqbuf(void *instance, struct v4l2_buffer *b)
 
 	for (i = b->length - 1; i >= 0 ; i--) {
 		if (EXTRADATA_IDX(b->length) &&
-			(i == EXTRADATA_IDX(b->length)) &&
-			!b->m.planes[i].m.userptr) {
+			i == EXTRADATA_IDX(b->length)) {
 			continue;
 		}
 		buffer_info = device_to_uvaddr(&inst->registeredbufs,

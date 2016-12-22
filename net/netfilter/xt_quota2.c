@@ -11,6 +11,11 @@
  *	it under the terms of the GNU General Public License; either
  *	version 2 of the License, as published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/list.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>
@@ -274,7 +279,7 @@ quota_mt2(const struct sk_buff *skb, struct xt_action_param *par)
 		}
 		ret = true;
 	} else {
-		if (e->quota >= skb->len) {
+		if (e->quota > skb->len) {
 			if (!(q->flags & XT_QUOTA_NO_CHANGE))
 				e->quota -= (q->flags & XT_QUOTA_PACKET) ? 1 : skb->len;
 			ret = !ret;

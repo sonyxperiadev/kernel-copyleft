@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __LINUX_MSM_CAM_SENSOR_H
 #define __LINUX_MSM_CAM_SENSOR_H
 
@@ -101,6 +106,9 @@ struct msm_eeprom_cfg_data32 {
 };
 
 struct msm_camera_i2c_seq_reg_setting32 {
+/* extension begin */
+	uint16_t slave_addr;
+/* extension end */
 	compat_uptr_t reg_setting;
 	uint16_t size;
 	enum msm_camera_i2c_reg_addr_type addr_type;
