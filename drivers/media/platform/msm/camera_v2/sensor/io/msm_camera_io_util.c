@@ -42,6 +42,7 @@ void msm_camera_io_w_mb(u32 data, void __iomem *addr)
 u32 msm_camera_io_r(void __iomem *addr)
 {
 	uint32_t data = readl_relaxed(addr);
+
 	CDBG("%s: 0x%pK %08x\n", __func__,  (addr), (data));
 	return data;
 }
@@ -49,6 +50,7 @@ u32 msm_camera_io_r(void __iomem *addr)
 u32 msm_camera_io_r_mb(void __iomem *addr)
 {
 	uint32_t data;
+
 	rmb();
 	data = readl_relaxed(addr);
 	rmb();
@@ -73,6 +75,7 @@ void msm_camera_io_dump(void __iomem *addr, int size)
 	int i;
 	u32 *p = (u32 *) addr;
 	u32 data;
+
 	CDBG("%s: %pK %d\n", __func__, addr, size);
 	line_str[0] = '\0';
 	p_str = line_str;
@@ -152,6 +155,7 @@ int msm_cam_clk_enable(struct device *dev, struct msm_cam_clk_info *clk_info,
 	int i;
 	int rc = 0;
 	long clk_rate;
+
 	if (enable) {
 		for (i = 0; i < num_clk; i++) {
 			CDBG("%s enable %s\n", __func__, clk_info[i].clk_name);
@@ -258,6 +262,12 @@ int msm_camera_config_vreg(struct device *dev, struct camera_vreg_t *cam_vreg,
 		pr_err("%s:%d vreg sequence invalid\n", __func__, __LINE__);
 		return -EINVAL;
 	}
+
+	if (cam_vreg == NULL) {
+		pr_err("%s:%d cam_vreg sequence invalid\n", __func__, __LINE__);
+		return -EINVAL;
+	}
+
 	if (!num_vreg_seq)
 		num_vreg_seq = num_vreg;
 
@@ -434,6 +444,7 @@ void msm_camera_bus_scale_cfg(uint32_t bus_perf_client,
 		enum msm_bus_perf_setting perf_setting)
 {
 	int rc = 0;
+
 	if (!bus_perf_client) {
 		pr_err("%s: Bus Client NOT Registered!!!\n", __func__);
 		return;
