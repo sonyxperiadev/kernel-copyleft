@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/pm_runtime.h>
@@ -21,6 +26,9 @@
 #include "mdss_debug.h"
 #include "mdss_mdp_trace.h"
 #include "mdss_dsi_clk.h"
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+#include "mdss_dsi_panel_driver.h"
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 #define MAX_RECOVERY_TRIALS 10
 #define MAX_SESSIONS 2
@@ -105,6 +113,10 @@ struct mdss_mdp_cmd_ctx {
 
 struct mdss_mdp_cmd_ctx mdss_mdp_cmd_ctx_list[MAX_SESSIONS];
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+static bool disp_on_in_hs;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+
 static int mdss_mdp_cmd_do_notifier(struct mdss_mdp_cmd_ctx *ctx);
 static inline void mdss_mdp_cmd_clk_on(struct mdss_mdp_cmd_ctx *ctx);
 static inline void mdss_mdp_cmd_clk_off(struct mdss_mdp_cmd_ctx *ctx);
@@ -180,7 +192,11 @@ exit:
 	return cnt;
 }
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+int mdss_mdp_tearcheck_enable(struct mdss_mdp_ctl *ctl, bool enable)
+#else
 static int mdss_mdp_tearcheck_enable(struct mdss_mdp_ctl *ctl, bool enable)
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 {
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 	struct mdss_mdp_ctl *sctl;
@@ -1828,6 +1844,11 @@ static int mdss_mdp_cmd_remove_vsync_handler(struct mdss_mdp_ctl *ctl,
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
 
 	if (disable_vsync_irq) {
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		if (ctx->vsync_irq_cnt == 0)
+			return 0;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+
 		/* disable rd_ptr interrupt and clocks */
 		mdss_mdp_setup_vsync(ctx, false);
 		complete(&ctx->stop_comp);
@@ -1876,6 +1897,10 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 	struct mdss_panel_data *pdata;
 	unsigned long flags;
 	int rc = 0;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct mdss_panel_specific_pdata *spec_pdata;
+	struct incell_ctrl *incell = incell_get_info();
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	ctx = (struct mdss_mdp_cmd_ctx *) ctl->intf_ctx[MASTER_CTX];
 	if (!ctx) {
@@ -1900,6 +1925,12 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 
 	if (rc <= 0) {
 		u32 status, mask;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		spec_pdata = mdss_panel2spec_pdata(pdata);
+		if (spec_pdata->blackscreen_det)
+			spec_pdata->blackscreen_det();
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+
 		mask = mdss_mdp_get_irq_mask(MDSS_MDP_IRQ_TYPE_PING_PONG_COMP,
 				ctx->current_pp_num);
 		status = mask & readl_relaxed(ctl->mdata->mdp_base +
@@ -1925,10 +1956,21 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 				ctl->num, rc, ctx->pp_timeout_report_cnt,
 				atomic_read(&ctx->koff_cnt));
 		if (ctx->pp_timeout_report_cnt == 0) {
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			if (!incell)
+				pr_err("%s: Invalid incell data\n", __func__);
+			else
+				pr_err("%s: incell.status:%d\n",
+					 __func__, ((int)(incell->state)));
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 			MDSS_XLOG(0xbad);
 			MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0_ctrl", "dsi0_phy",
 				"dsi1_ctrl", "dsi1_phy", "vbif", "vbif_nrt",
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+				"dbg_bus", "vbif_dbg_bus");
+#else
 				"dbg_bus", "vbif_dbg_bus", "panic");
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 		} else if (ctx->pp_timeout_report_cnt == MAX_RECOVERY_TRIALS) {
 			MDSS_XLOG(0xbad2);
 			MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0_ctrl", "dsi0_phy",
@@ -2083,11 +2125,16 @@ static int mdss_mdp_cmd_panel_on(struct mdss_mdp_ctl *ctl,
 			WARN(rc, "intf %d panel on error (%d)\n",
 					ctl->intf_num, rc);
 
-		}
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			disp_on_in_hs =
+				mdss_dsi_panel_driver_check_disp_on_in_hs(ctl);
+#else
 
-		rc = mdss_mdp_tearcheck_enable(ctl, true);
-		WARN(rc, "intf %d tearcheck enable error (%d)\n",
-				ctl->intf_num, rc);
+			rc = mdss_mdp_tearcheck_enable(ctl, true);
+			WARN(rc, "intf %d tearcheck enable error (%d)\n",
+					ctl->intf_num, rc);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+		}
 
 		ctx->panel_power_state = MDSS_PANEL_POWER_ON;
 		if (sctx)
@@ -2766,6 +2813,13 @@ static int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 
 	MDSS_XLOG(ctl->num, ctx->current_pp_num,
 		sctx ? sctx->current_pp_num : -1, atomic_read(&ctx->koff_cnt));
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	if (disp_on_in_hs) {
+		disp_on_in_hs = false;
+		mdss_dsi_panel_driver_post_on_event(ctl);
+	}
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	return 0;
 }
 

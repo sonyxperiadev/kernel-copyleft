@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/bitops.h>
 #include "ipa_i.h"
@@ -691,8 +696,8 @@ err:
 int __ipa_commit_rt_v2(enum ipa_ip_type ip)
 {
 	struct ipa_desc desc[2];
-	struct ipa_mem_buffer body;
-	struct ipa_mem_buffer head;
+	struct ipa_mem_buffer body = {0};
+	struct ipa_mem_buffer head = {0};
 	struct ipa_hw_imm_cmd_dma_shared_mem *cmd1 = NULL;
 	struct ipa_hw_imm_cmd_dma_shared_mem *cmd2 = NULL;
 	u16 avail;

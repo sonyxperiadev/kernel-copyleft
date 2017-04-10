@@ -126,4 +126,24 @@ config DWC3_HOST_USB3_LPM_ENABLE
 	help
 	  Select this when you want to enable USB3 LPM with dwc3 xhci host.
 
+comment "Other features"
+
+config USB_DWC3_MSM_ID_POLL
+	bool "Support ID polling function on DesignWare USB Controller for MSM"
+	depends on USB_DWC3_DUAL_ROLE
+	depends on USB_DWC3_MSM
+	default n
+	help
+	  Say Y here to enable the ID polling function on the DesignWare USB3.0
+	  (DRD) Controller for MSM driver.
+
+config USB_USE_POWER_SUPPLY_PROP_USB_OTG
+	bool "Enable ID notification via property of power_supply interface"
+	depends on USB_DWC3_DUAL_ROLE
+	depends on USB_DWC3_MSM
+	default n
+	help
+	  Say Y here to enable the ID notification via the set/get property of
+	  the power_supply interface.
+
 endif

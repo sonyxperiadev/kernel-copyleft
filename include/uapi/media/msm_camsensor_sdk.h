@@ -362,6 +362,9 @@ struct msm_camera_i2c_seq_reg_array {
 };
 
 struct msm_camera_i2c_seq_reg_setting {
+/* extension begin */
+	unsigned short slave_addr;
+/* extension end */
 	struct msm_camera_i2c_seq_reg_array *reg_setting;
 	unsigned short size;
 	enum msm_camera_i2c_reg_addr_type addr_type;

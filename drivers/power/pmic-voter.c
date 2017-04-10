@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/spinlock.h>
 #include <linux/errno.h>
@@ -18,7 +23,7 @@
 
 #include "pmic-voter.h"
 
-#define NUM_MAX_CLIENTS	8
+#define NUM_MAX_CLIENTS	10
 
 struct client_vote {
 	int	state;
