@@ -986,7 +986,7 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 
 	if (level->notify_rpm) {
 		struct cpumask nextcpu, *cpumask;
-		uint32_t us;
+		uint64_t us;
 		uint64_t sec;
 		uint64_t nsec;
 
@@ -1003,7 +1003,6 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 		clear_predict_history();
 		clear_cl_predict_history();
 
-		us = us + 1;
 		sec = us;
 		do_div(sec, USEC_PER_SEC);
 		nsec = us - sec * USEC_PER_SEC;
@@ -1014,7 +1013,7 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 			do_div(nsec, NSEC_PER_SEC/SCLK_HZ);
 		}
 		us = sec + nsec;
-		msm_mpm_enter_sleep((uint32_t)us, from_idle, cpumask);
+		msm_mpm_enter_sleep(us, from_idle, cpumask);
 	}
 
 	/* Notify cluster enter event after successfully config completion */

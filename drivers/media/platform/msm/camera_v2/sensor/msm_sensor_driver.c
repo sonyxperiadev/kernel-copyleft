@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015,2017 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -103,7 +103,11 @@ static int32_t msm_sensor_driver_create_i2c_v4l_subdev
 	s_ctrl->msm_sd.sd.entity.name =	s_ctrl->msm_sd.sd.name;
 	s_ctrl->sensordata->sensor_info->session_id = session_id;
 	s_ctrl->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x3;
-	msm_sd_register(&s_ctrl->msm_sd);
+	rc = msm_sd_register(&s_ctrl->msm_sd);
+	if (rc < 0) {
+		pr_err("failed: msm_sd_register rc %d", rc);
+		return rc;
+	}
 	CDBG("%s:%d\n", __func__, __LINE__);
 	return rc;
 }
@@ -133,7 +137,11 @@ static int32_t msm_sensor_driver_create_v4l_subdev
 	s_ctrl->msm_sd.sd.entity.group_id = MSM_CAMERA_SUBDEV_SENSOR;
 	s_ctrl->msm_sd.sd.entity.name = s_ctrl->msm_sd.sd.name;
 	s_ctrl->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x3;
-	msm_sd_register(&s_ctrl->msm_sd);
+	rc = msm_sd_register(&s_ctrl->msm_sd);
+	if (rc < 0) {
+		pr_err("failed: msm_sd_register rc %d", rc);
+		return rc;
+	}
 	msm_sensor_v4l2_subdev_fops = v4l2_subdev_fops;
 #ifdef CONFIG_COMPAT
 	msm_sensor_v4l2_subdev_fops.compat_ioctl32 =
@@ -933,12 +941,6 @@ CSID_TG:
 	pr_err("%s probe succeeded", slave_info->sensor_name);
 
 	/*
-	  Set probe succeeded flag to 1 so that no other camera shall
-	 * probed on this slot
-	 */
-	s_ctrl->is_probe_succeed = 1;
-
-	/*
 	 * Update the subdevice id of flash-src based on availability in kernel.
 	 */
 	if (strlen(slave_info->flash_name) == 0) {
@@ -990,6 +992,11 @@ CSID_TG:
 
 	msm_sensor_fill_sensor_info(s_ctrl, probed_info, entity_name);
 
+	/*
+	 * Set probe succeeded flag to 1 so that no other camera shall
+	 * probed on this slot
+	 */
+	s_ctrl->is_probe_succeed = 1;
 	return rc;
 
 camera_power_down:
