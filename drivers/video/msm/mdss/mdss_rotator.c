@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -500,6 +500,12 @@ static int mdss_rotator_import_buffer(struct mdp_layer_buffer *buffer,
 		dir = DMA_FROM_DEVICE;
 
 	memset(planes, 0, sizeof(planes));
+
+	if (buffer->plane_count > MAX_PLANES) {
+		pr_err("buffer plane_count exceeds MAX_PLANES limit:%d\n",
+				buffer->plane_count);
+		return -EINVAL;
+	}
 
 	for (i = 0; i < buffer->plane_count; i++) {
 		planes[i].memory_id = buffer->planes[i].fd;
@@ -2059,10 +2065,12 @@ static int mdss_rotator_config_session(struct mdss_rot_mgr *mgr,
 		return ret;
 	}
 
+	mutex_lock(&mgr->lock);
 	perf = mdss_rotator_find_session(private, config.session_id);
 	if (!perf) {
 		pr_err("No session with id=%u could be found\n",
 			config.session_id);
+		mutex_unlock(&mgr->lock);
 		return -EINVAL;
 	}
 
@@ -2085,6 +2093,7 @@ static int mdss_rotator_config_session(struct mdss_rot_mgr *mgr,
 		config.output.format);
 done:
 	ATRACE_END(__func__);
+	mutex_unlock(&mgr->lock);
 	return ret;
 }
 
@@ -2094,6 +2103,20 @@ struct mdss_rot_entry_container *mdss_rotator_req_init(
 {
 	struct mdss_rot_entry_container *req;
 	int size, i;
+
+	/*
+	 * Check input and output plane_count from each given item
+	 * are within the MAX_PLANES limit
+	 */
+	for (i = 0 ; i < count; i++) {
+		if ((items[i].input.plane_count > MAX_PLANES) ||
+				(items[i].output.plane_count > MAX_PLANES)) {
+			pr_err("Input/Output plane_count exceeds MAX_PLANES limit, input:%d, output:%d\n",
+					items[i].input.plane_count,
+					items[i].output.plane_count);
+			return ERR_PTR(-EINVAL);
+		}
+	}
 
 	size = sizeof(struct mdss_rot_entry_container);
 	size += sizeof(struct mdss_rot_entry) * count;

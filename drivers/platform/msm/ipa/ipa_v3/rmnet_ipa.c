@@ -133,6 +133,7 @@ struct rmnet_ipa3_context {
 	struct mutex ipa_to_apps_pipe_handle_guard;
 };
 
+static struct mutex add_mux_channel_lock;
 static struct rmnet_ipa3_context *rmnet_ipa3_ctx;
 
 /**
@@ -1423,10 +1424,12 @@ static int ipa3_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					rmnet_mux_val.mux_id);
 				return rc;
 			}
+			mutex_lock(&add_mux_channel_lock);
 			if (rmnet_ipa3_ctx->rmnet_index
 				>= MAX_NUM_OF_MUX_CHANNEL) {
 				IPAWANERR("Exceed mux_channel limit(%d)\n",
 				rmnet_ipa3_ctx->rmnet_index);
+				mutex_unlock(&add_mux_channel_lock);
 				return -EFAULT;
 			}
 			IPAWANDBG("ADD_MUX_CHANNEL(%d, name: %s)\n",
@@ -1442,6 +1445,9 @@ static int ipa3_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				extend_ioctl_data.u.rmnet_mux_val.vchannel_name,
 				sizeof(mux_channel[rmnet_index]
 					.vchannel_name));
+			mux_channel[rmnet_index].vchannel_name[
+				IFNAMSIZ - 1] = '\0';
+
 			IPAWANDBG("cashe device[%s:%d] in IPA_wan[%d]\n",
 				mux_channel[rmnet_index].vchannel_name,
 				mux_channel[rmnet_index].mux_id,
@@ -1457,6 +1463,7 @@ static int ipa3_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					IPAWANERR("device %s reg IPA failed\n",
 						extend_ioctl_data.u.
 						rmnet_mux_val.vchannel_name);
+					mutex_unlock(&add_mux_channel_lock);
 					return -ENODEV;
 				}
 				mux_channel[rmnet_index].mux_channel_set = true;
@@ -1469,6 +1476,7 @@ static int ipa3_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				mux_channel[rmnet_index].ul_flt_reg = false;
 			}
 			rmnet_ipa3_ctx->rmnet_index++;
+			mutex_unlock(&add_mux_channel_lock);
 			break;
 		case RMNET_IOCTL_SET_EGRESS_DATA_FORMAT:
 			IPAWANDBG("get RMNET_IOCTL_SET_EGRESS_DATA_FORMAT\n");
@@ -2888,6 +2896,7 @@ static int __init ipa3_wwan_init(void)
 	atomic_set(&rmnet_ipa3_ctx->is_initialized, 0);
 	atomic_set(&rmnet_ipa3_ctx->is_ssr, 0);
 
+	mutex_init(&add_mux_channel_lock);
 	mutex_init(&rmnet_ipa3_ctx->ipa_to_apps_pipe_handle_guard);
 	rmnet_ipa3_ctx->ipa3_to_apps_hdl = -1;
 	/* Register for Modem SSR */
@@ -2910,6 +2919,7 @@ static void __exit ipa3_wwan_cleanup(void)
 		IPAWANERR(
 		"Error subsys_notif_unregister_notifier system %s, ret=%d\n",
 		SUBSYS_MODEM, ret);
+	mutex_destroy(&add_mux_channel_lock);
 	platform_driver_unregister(&rmnet_ipa_driver);
 	kfree(rmnet_ipa3_ctx);
 	rmnet_ipa3_ctx = NULL;
