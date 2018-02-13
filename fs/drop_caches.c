@@ -1,6 +1,11 @@
 /*
  * Implement the manual drop-all-pagecache function
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -36,6 +41,7 @@ void drop_pagecache_sb(struct super_block *sb, void *unused)
 	spin_unlock(&inode_sb_list_lock);
 	iput(toput_inode);
 }
+EXPORT_SYMBOL(drop_pagecache_sb);
 
 static void drop_slab(void)
 {

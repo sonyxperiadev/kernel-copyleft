@@ -302,4 +302,8 @@ config MSM_11AD
 
 source "drivers/platform/msm/spmi/Kconfig"
 
+config PON_SOMC_ORG
+	bool "SoMC specific power on interface"
+	help
+		This option enables SoMC specific power on interface.
 endmenu

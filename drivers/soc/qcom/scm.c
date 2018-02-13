@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/io.h>
@@ -662,10 +667,6 @@ int scm_call2(u32 fn_id, struct scm_desc *desc)
 
 		desc->ret[0] = desc->ret[1] = desc->ret[2] = 0;
 
-		pr_debug("scm_call: func id %#llx, args: %#x, %#llx, %#llx, %#llx, %#llx\n",
-			x0, desc->arginfo, desc->args[0], desc->args[1],
-			desc->args[2], desc->x5);
-
 		trace_scm_call_start(x0, desc);
 
 		if (scm_version == SCM_ARMV8_64)
@@ -695,11 +696,8 @@ int scm_call2(u32 fn_id, struct scm_desc *desc)
 	}  while (ret == SCM_V2_EBUSY && (retry_count++ < SCM_EBUSY_MAX_RETRY));
 
 	if (ret < 0)
-		pr_err("scm_call failed: func id %#llx, arginfo: %#x, args: %#llx, %#llx, %#llx, %#llx, ret: %d, syscall returns: %#llx, %#llx, %#llx\n",
-			x0, desc->arginfo, desc->args[0], desc->args[1],
-			desc->args[2], desc->x5, ret, desc->ret[0],
-			desc->ret[1], desc->ret[2]);
-
+		pr_err("scm_call failed: func id %#llx, ret: %d, syscall returns: %#llx, %#llx, %#llx\n",
+			x0, ret, desc->ret[0], desc->ret[1], desc->ret[2]);
 	if (arglen > N_REGISTER_ARGS)
 		kfree(desc->extra_arg_buf);
 	if (ret < 0)
@@ -724,6 +722,9 @@ int scm_call2_atomic(u32 fn_id, struct scm_desc *desc)
 
 	if (unlikely(!is_scm_armv8()))
 		return -ENODEV;
+
+	if (unlikely(oops_in_progress && mutex_is_locked(&scm_lock)))
+		return -EBUSY;
 
 	ret = allocate_extra_arg_buffer(desc, GFP_ATOMIC);
 	if (ret)

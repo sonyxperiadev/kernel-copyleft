@@ -620,6 +620,13 @@ config MSM_GLINK_PKT
 	  This enable the usersapce clients to read and write to
 	  some glink packets channel.
 
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on MSM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
+
 config MSM_TZ_SMMU
 	bool "Helper functions for SMMU configuration through TZ"
 	depends on ARCH_MSMTHULIUM || ARCH_MSM8953
@@ -806,6 +813,14 @@ config MSM_KERNEL_PROTECT_TEST
           Attempts to write to the kernel text after making the kernel text
           read-only.  This test is FATAL whether it passes or fails!
           Success is signaled by a stage-2 fault.
+
+config SUBSYS_LAST_ERR_LOG
+	bool "support last error log for subsystems"
+	help
+	  When a fatal error is encountered, few subsystems export the
+	  error log into SMEM. This driver supports the mechanism to read
+	  these logs and exports them to user via procfs.
+	  If unsure, say N
 
 config MSM_REMOTEQDSS
 	bool "Allow debug tools to enable events on other processors"

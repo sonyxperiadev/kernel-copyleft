@@ -1,0 +1,55 @@
+/* arch/arm/boot/dts/qcom/msm8996-tone-dora_sbm.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2015 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+&soc {
+	i2c@75b6000 {
+		felica_ldo@1e {
+			compatible = "rohm,bd7602";
+			reg = <0x1e>;
+		};
+		felica@29 {
+			compatible = "sony,cxd224x";
+			reg = <0x29>;
+			interrupt-parent = <&tlmm>;
+			interrupts = <9 0x2002>;
+			cxd224x,irq_gpio = <&tlmm 9 0>;
+			cxd224x,wake_gpio = <&tlmm 12 0>;
+
+			pinctrl-names = "felica_active","felica_suspend";
+			pinctrl-0 = <&msm_gpio_9>;
+			pinctrl-1 = <&msm_gpio_9>;
+
+			clocks = <&clock_gcc clk_bb_clk2_pin>;
+			clock-names = "felica_clk";
+		};
+	};
+
+	dtv_tuner: ew105 {
+		compatible = "sony,ew105";
+		interrupt-parent = <&tlmm>;
+		interrupts = <77 0>;
+		gpios = <&pmi8994_gpios 5 0>, /* ANT_POWER   */
+			<&pmi8994_gpios 4 0>, /* ANT_SWITCH  */
+			<&tlmm 74 0>,  /* DTV_ACTIVE  */
+			<&tlmm 73 0>,  /* DTV_RESET_N */
+			<&tlmm 77 0>;  /* DTV_INT     */
+		tuner_vddl-supply = <&pm8994_l11>;
+		tuner_avdh-supply = <&pm8994_l14>;
+	};
+};
