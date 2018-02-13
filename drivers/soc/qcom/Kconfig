@@ -292,6 +292,16 @@ config MSM_CACHE_M4M_ERP64_PANIC_ON_UE
          Say 'Y' here to cause kernel panic when uncorrectable cache/M4M errors
          are detected.
 
+config MSM_L2_IA_DEBUG
+       bool "Enable MSM L2 Indirect Access Debug"
+       depends on DEBUG_FS
+       default n
+       help
+         This option enables L2 indirect access debug
+         capability. It exposes L2 indirect access
+         debugfs interface to get/set data, address,
+         and target cpus.
+
 config MSM_RPM_SMD
 	bool "RPM driver using SMD protocol"
 	help
@@ -620,6 +630,13 @@ config MSM_GLINK_PKT
 	  This enable the usersapce clients to read and write to
 	  some glink packets channel.
 
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on MSM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
+
 config MSM_TZ_SMMU
 	bool "Helper functions for SMMU configuration through TZ"
 	depends on ARCH_MSMTHULIUM || ARCH_MSM8953
@@ -707,14 +724,6 @@ config ICNSS
 	  control messages to FW over QMI channel. It is also responsible for
 	  handling WLAN PD restart notifications.
 
-config MSM_CORE_CTL_HELPER
-	tristate "Core control helper functions for dynamically hotplug CPUs"
-	help
-	  Provide helper functions for core control driver. Core control
-	  driver dynamically hotplugs CPUs from kernel based on current
-	  system load and state. It also supports limiting min and
-	  max online CPUs from userspace.
-
 config MSM_BAM_DMUX
 	bool "BAM Data Mux Driver"
 	depends on SPS
@@ -782,7 +791,7 @@ config MSM_PACMAN
 	  peripheral (BLSP) ownership.
 
 config MSM_KERNEL_PROTECT
-	bool "Protect kernel text by removing write permissions in stage-2"
+	bool "Protect kernel text by removing write permissions"
         depends on !FUNCTION_TRACER
         help
           On hypervisor-enabled targets, this option will make a call into
@@ -795,6 +804,18 @@ config MSM_KERNEL_PROTECT
           aarch64_insn_patch_text_nosync, etc. including the various CPU
           errata workarounds in arch/arm64/kernel/cpu_errata.c).
 
+	  For MPU based protection-enabled targets please refer to
+	  MSM_KERNEL_PROTECT_MPU
+
+config MSM_KERNEL_PROTECT_MPU
+	bool "Protect kernel text from other masters by MPU"
+	depends on MSM_KERNEL_PROTECT
+	help
+	  On MPU based protection enabled targets, this option will make a call
+	  into TrustZone to request that the kernel text be ptotected for any
+	  write access from external bus masters. This protects against
+	  malicious devices rewriting kernel code.
+
 config MSM_KERNEL_PROTECT_TEST
 	bool "Bootup test of kernel protection (INTENTIONAL CRASH)"
         depends on MSM_KERNEL_PROTECT
@@ -802,6 +823,14 @@ config MSM_KERNEL_PROTECT_TEST
           Attempts to write to the kernel text after making the kernel text
           read-only.  This test is FATAL whether it passes or fails!
           Success is signaled by a stage-2 fault.
+
+config SUBSYS_LAST_ERR_LOG
+	bool "support last error log for subsystems"
+	help
+	  When a fatal error is encountered, few subsystems export the
+	  error log into SMEM. This driver supports the mechanism to read
+	  these logs and exports them to user via procfs.
+	  If unsure, say N
 
 config MSM_REMOTEQDSS
 	bool "Allow debug tools to enable events on other processors"

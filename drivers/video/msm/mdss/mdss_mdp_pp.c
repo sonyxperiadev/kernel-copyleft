@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -22,6 +27,10 @@
 #include <linux/msm-bus.h>
 #include <linux/msm-bus-board.h>
 #include "mdss_mdp_pp_cache_config.h"
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+#include "mdss_dsi_panel_driver.h"
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 struct mdp_csc_cfg mdp_csc_8bit_convert[MDSS_MDP_MAX_CSC] = {
 	[MDSS_MDP_CSC_YUV2RGB_601L] = {
@@ -1158,7 +1167,7 @@ static int pp_rgb_pipe_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 	int ret = 0;
 
 	if (!pipe) {
-		pr_err("invalid param pipe %p\n", pipe);
+		pr_err("invalid param pipe %pK\n", pipe);
 		return -EINVAL;
 	}
 	if (pipe->flags & MDP_OVERLAY_PP_CFG_EN &&
@@ -1176,7 +1185,7 @@ static int pp_dma_pipe_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 	int ret = 0;
 
 	if (!pipe) {
-		pr_err("invalid param pipe %p\n", pipe);
+		pr_err("invalid param pipe %pK\n", pipe);
 		return -EINVAL;
 	}
 	if (pipe->flags & MDP_OVERLAY_PP_CFG_EN &&
@@ -1793,7 +1802,7 @@ void mdss_mdp_pipe_pp_clear(struct mdss_mdp_pipe *pipe)
 	struct pp_hist_col_info *hist_info;
 
 	if (!pipe) {
-		pr_err("Invalid pipe context passed, %p\n",
+		pr_err("Invalid pipe context passed, %pK\n",
 			pipe);
 		return;
 	}
@@ -1919,7 +1928,7 @@ static int pp_mixer_setup(struct mdss_mdp_mixer *mixer)
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
 	if (!mixer || !mixer->ctl || !mixer->ctl->mfd || !mdata) {
-		pr_err("invalid parameters, mixer %p ctl %p mfd %p mdata %p\n",
+		pr_err("invalid parameters, mixer %pK ctl %pK mfd %pK mdata %pK\n",
 			mixer, (mixer ? mixer->ctl : NULL),
 			(mixer ? (mixer->ctl ? mixer->ctl->mfd : NULL) : NULL),
 			mdata);
@@ -2568,7 +2577,7 @@ int mdss_mdp_pp_resume(struct msm_fb_data_type *mfd)
 	struct mdp_pa_v2_cfg_data *pa_v2_cache_cfg = NULL;
 
 	if (!mfd) {
-		pr_err("invalid input: mfd = 0x%p\n", mfd);
+		pr_err("invalid input: mfd = 0x%pK\n", mfd);
 		return -EINVAL;
 	}
 
@@ -2658,7 +2667,7 @@ int mdss_mdp_pp_resume(struct msm_fb_data_type *mfd)
 			mfd->index);
 		return 0;
 	} else if (ret || !ad) {
-		pr_err("Failed to get ad info: ret = %d, ad = 0x%p.\n",
+		pr_err("Failed to get ad info: ret = %d, ad = 0x%pK\n",
 			ret, ad);
 		return ret;
 	}
@@ -2799,7 +2808,7 @@ static int mdss_mdp_pp_dt_parse(struct device *dev)
 			ret = 0;
 		}
 	} else {
-		pr_err("invalid dev %p mdata %p\n", dev, mdata);
+		pr_err("invalid dev %pK mdata %pK\n", dev, mdata);
 		ret = -EINVAL;
 	}
 bail_out:
@@ -2933,7 +2942,7 @@ int mdss_mdp_pp_overlay_init(struct msm_fb_data_type *mfd)
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
 	if (!mfd || !mdata) {
-		pr_err("Invalid mfd %p mdata %p\n", mfd, mdata);
+		pr_err("Invalid mfd %pK mdata %pK\n", mfd, mdata);
 		return -EPERM;
 	}
 	if (mfd->index >= (MDP_BLOCK_MAX - MDP_LOGICAL_BLOCK_DISP_0))
@@ -2951,7 +2960,7 @@ int mdss_mdp_pp_default_overlay_config(struct msm_fb_data_type *mfd,
 	int ret = 0;
 
 	if (!mfd || !pdata) {
-		pr_err("Invalid parameters mfd %p pdata %p\n", mfd, pdata);
+		pr_err("Invalid parameters mfd %pK pdata %pK\n", mfd, pdata);
 		return -EINVAL;
 	}
 
@@ -3004,7 +3013,7 @@ static int pp_ad_calc_bl(struct msm_fb_data_type *mfd, int bl_in, int *bl_out,
 			mfd->index);
 		return 0;
 	} else if (ret || !ad) {
-		pr_err("Failed to get ad info: ret = %d, ad = 0x%p.\n",
+		pr_err("Failed to get ad info: ret = %d, ad = 0x%pK.\n",
 			ret, ad);
 		return ret;
 	}
@@ -3023,7 +3032,7 @@ static int pp_ad_calc_bl(struct msm_fb_data_type *mfd, int bl_in, int *bl_out,
 
 	if (!ad->bl_mfd || !ad->bl_mfd->panel_info ||
 		!ad->bl_att_lut) {
-		pr_err("Invalid ad info: bl_mfd = 0x%p, ad->bl_mfd->panel_info = 0x%p, bl_att_lut = 0x%p\n",
+		pr_err("Invalid ad info: bl_mfd = 0x%pK, ad->bl_mfd->panel_info = 0x%pK, bl_att_lut = 0x%pK\n",
 			ad->bl_mfd,
 			(!ad->bl_mfd) ? NULL : ad->bl_mfd->panel_info,
 			ad->bl_att_lut);
@@ -3482,9 +3491,15 @@ static void pp_update_pcc_regs(char __iomem *addr,
 	writel_relaxed(cfg_ptr->b.rgb_1, addr + 8);
 }
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+int mdss_mdp_pcc_config(struct msm_fb_data_type *mfd,
+				struct mdp_pcc_cfg_data *config,
+				u32 *copyback, u32 copy_from_kernel)
+#else
 int mdss_mdp_pcc_config(struct msm_fb_data_type *mfd,
 				struct mdp_pcc_cfg_data *config,
 				u32 *copyback)
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 {
 	int ret = 0;
 	u32 disp_num, dspp_num = 0;
@@ -3520,7 +3535,7 @@ int mdss_mdp_pcc_config(struct msm_fb_data_type *mfd,
 		if (pp_ops[PCC].pp_get_config) {
 			addr = mdss_mdp_get_dspp_addr_off(disp_num);
 			if (IS_ERR_OR_NULL(addr)) {
-				pr_err("invalid dspp base_addr %p\n",
+				pr_err("invalid dspp base_addr %pK\n",
 					addr);
 				ret = -EINVAL;
 				goto pcc_clk_off;
@@ -3532,8 +3547,14 @@ int mdss_mdp_pcc_config(struct msm_fb_data_type *mfd,
 				goto pcc_clk_off;
 			}
 			addr += mdata->pp_block_off.dspp_pcc_off;
-			ret = pp_ops[PCC].pp_get_config(addr, config,
-					DSPP, disp_num);
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			if (copy_from_kernel)
+				ret = __pp_pcc_get_config(addr, config,
+							  DSPP, disp_num);
+			else
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+				ret = pp_ops[PCC].pp_get_config(addr, config,
+								DSPP, disp_num);
 			if (ret)
 				pr_err("pcc get config failed %d\n", ret);
 			goto pcc_clk_off;
@@ -3551,7 +3572,12 @@ pcc_clk_off:
 			res_cache.block = DSPP;
 			res_cache.mdss_pp_res = mdss_pp_res;
 			res_cache.pipe_res = NULL;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			ret = pp_pcc_cache_params(config, &res_cache, copy_from_kernel);
+#else
 			ret = pp_pcc_cache_params(config, &res_cache);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+
 			if (ret) {
 				pr_err("pcc config failed version %d ret %d\n",
 					config->version, ret);
@@ -4208,7 +4234,7 @@ int mdss_mdp_hist_lut_config(struct msm_fb_data_type *mfd,
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
 		base_addr = mdss_mdp_get_dspp_addr_off(dspp_num);
 		if (IS_ERR_OR_NULL(base_addr)) {
-			pr_err("invalid base addr %p\n",
+			pr_err("invalid base addr %pK\n",
 				base_addr);
 			ret = -EINVAL;
 			goto hist_lut_clk_off;
@@ -4462,7 +4488,7 @@ int mdss_mdp_gamut_config(struct msm_fb_data_type *mfd,
 		if (pp_ops[GAMUT].pp_get_config) {
 			addr = mdss_mdp_get_dspp_addr_off(disp_num);
 			if (IS_ERR_OR_NULL(addr)) {
-				pr_err("invalid dspp base addr %p\n",
+				pr_err("invalid dspp base addr %pK\n",
 				       addr);
 				ret = -EINVAL;
 				goto gamut_clk_off;
@@ -4648,7 +4674,7 @@ static int pp_hist_enable(struct pp_hist_col_info *hist_info,
 	spin_lock_irqsave(&hist_info->hist_lock, flag);
 	if (hist_info->col_en) {
 		spin_unlock_irqrestore(&hist_info->hist_lock, flag);
-		pr_err("%s Hist collection has already been enabled %p\n",
+		pr_err("%s Hist collection has already been enabled %pK\n",
 			__func__, hist_info->base);
 		ret = -EBUSY;
 		goto exit;
@@ -4797,7 +4823,7 @@ static int pp_hist_disable(struct pp_hist_col_info *hist_info)
 	spin_lock_irqsave(&hist_info->hist_lock, flag);
 	if (hist_info->col_en == false) {
 		spin_unlock_irqrestore(&hist_info->hist_lock, flag);
-		pr_debug("Histogram already disabled (%p)\n", hist_info->base);
+		pr_debug("Histogram already disabled (%pK)\n", hist_info->base);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -4894,7 +4920,7 @@ int mdss_mdp_hist_intr_req(struct mdss_intr *intr, u32 bits, bool en)
 	unsigned long flag;
 	int ret = 0;
 	if (!intr) {
-		pr_err("NULL addr passed, %p\n", intr);
+		pr_err("NULL addr passed, %pK\n", intr);
 		return -EINVAL;
 	}
 
@@ -5458,7 +5484,7 @@ static int mdss_mdp_get_ad(struct msm_fb_data_type *mfd,
 
 	*ret_ad = NULL;
 	if (!mfd) {
-		pr_err("invalid parameter mfd %p\n", mfd);
+		pr_err("invalid parameter mfd %pK\n", mfd);
 		return -EINVAL;
 	}
 	mdata = mfd_to_mdata(mfd);
@@ -5505,7 +5531,7 @@ static int pp_ad_invalidate_input(struct msm_fb_data_type *mfd)
 			mfd->index);
 		return 0;
 	} else if (ret || !ad) {
-		pr_err("Failed to get ad info: ret = %d, ad = 0x%p.\n",
+		pr_err("Failed to get ad info: ret = %d, ad = 0x%pK\n",
 			ret, ad);
 		return ret;
 	}
@@ -5540,7 +5566,7 @@ int mdss_mdp_ad_config(struct msm_fb_data_type *mfd,
 			mfd->index);
 		return ret;
 	} else if (ret || !ad) {
-		pr_err("Failed to get ad info: ret = %d, ad = 0x%p.\n",
+		pr_err("Failed to get ad info: ret = %d, ad = 0x%pK\n",
 			ret, ad);
 		return ret;
 	}
@@ -5657,7 +5683,7 @@ int mdss_mdp_ad_input(struct msm_fb_data_type *mfd,
 			mfd->index);
 		return ret;
 	} else if (ret || !ad) {
-		pr_err("Failed to get ad info: ret = %d, ad = 0x%p.\n",
+		pr_err("Failed to get ad info: ret = %d, ad = 0x%pK\n",
 			ret, ad);
 		return ret;
 	}
@@ -6016,7 +6042,7 @@ static int mdss_mdp_ad_ipc_reset(struct msm_fb_data_type *mfd)
 	struct mdss_ad_info *ad;
 
 	if (!mfd) {
-		pr_err("mfd = 0x%p\n", mfd);
+		pr_err("mfd = 0x%pK\n", mfd);
 		return -EINVAL;
 	}
 
@@ -6026,7 +6052,7 @@ static int mdss_mdp_ad_ipc_reset(struct msm_fb_data_type *mfd)
 			mfd->index);
 		return 0;
 	} else if (ret || !ad) {
-		pr_err("Failed to get ad info: ret = %d, ad = 0x%p.\n",
+		pr_err("Failed to get ad info: ret = %d, ad = 0x%pK\n",
 			ret, ad);
 		return ret;
 	}
@@ -6050,13 +6076,13 @@ static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd)
 	u32 width;
 
 	if (!mfd) {
-		pr_err("mfd = 0x%p\n", mfd);
+		pr_err("mfd = 0x%pK\n", mfd);
 		return -EINVAL;
 	}
 
 	ctl = mfd_to_ctl(mfd);
 	if (!ctl) {
-		pr_err("ctl = 0x%p\n", ctl);
+		pr_err("ctl = 0x%pK\n", ctl);
 		return -EINVAL;
 	}
 	sctl = mdss_mdp_get_split_ctl(ctl);
@@ -6067,7 +6093,7 @@ static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd)
 			mfd->index);
 		return 0;
 	} else if (ret || !ad) {
-		pr_err("Failed to get ad info: ret = %d, ad = 0x%p.\n",
+		pr_err("Failed to get ad info: ret = %d, ad = 0x%pK\n",
 			ret, ad);
 		return ret;
 	}
@@ -6254,7 +6280,7 @@ static void pp_ad_calc_worker(struct work_struct *work)
 	}
 	mdp5_data = mfd_to_mdp5_data(ad->mfd);
 	if (!mdp5_data) {
-		pr_err("mdp5_data = 0x%p\n", mdp5_data);
+		pr_err("mdp5_data = 0x%pK\n", mdp5_data);
 		mutex_unlock(&ad->lock);
 		return;
 	}
@@ -6262,7 +6288,7 @@ static void pp_ad_calc_worker(struct work_struct *work)
 	ctl = mfd_to_ctl(ad->mfd);
 	mdata = mfd_to_mdata(ad->mfd);
 	if (!ctl || !mdata || ad->calc_hw_num >= mdata->nad_cfgs) {
-		pr_err("ctl = 0x%p, mdata = 0x%p, ad->calc_hw_num = %d, mdata->nad_cfg = %d\n",
+		pr_err("ctl = 0x%pK, mdata = 0x%pK, ad->calc_hw_num = %d, mdata->nad_cfg = %d\n",
 			ctl, mdata, ad->calc_hw_num,
 			(!mdata ? 0 : mdata->nad_cfgs));
 		mutex_unlock(&ad->lock);
@@ -6873,7 +6899,7 @@ static int sspp_cache_location(u32 pipe_type, enum pp_config_block *block)
 	int ret = 0;
 
 	if (!block) {
-		pr_err("invalid params %p\n", block);
+		pr_err("invalid params %pK\n", block);
 		return -EINVAL;
 	}
 	switch (pipe_type) {
@@ -6900,9 +6926,12 @@ int mdss_mdp_pp_sspp_config(struct mdss_mdp_pipe *pipe)
 	struct mdp_pp_cache_res cache_res;
 	u32 len = 0;
 	int ret = 0;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	u32 copy_from_kernel = 0;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	if (!pipe) {
-		pr_err("invalid params, pipe %p\n", pipe);
+		pr_err("invalid params, pipe %pK\n", pipe);
 		return -EINVAL;
 	}
 
@@ -7000,8 +7029,13 @@ int mdss_mdp_pp_sspp_config(struct mdss_mdp_pipe *pipe)
 	}
 	if (pipe->pp_cfg.config_ops & MDP_OVERLAY_PP_PCC_CFG
 	    && pp_ops[PCC].pp_set_config) {
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		ret = pp_pcc_cache_params(&pipe->pp_cfg.pcc_cfg_data,
+					  &cache_res, copy_from_kernel);
+#else
 		ret = pp_pcc_cache_params(&pipe->pp_cfg.pcc_cfg_data,
 					  &cache_res);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 		if (ret) {
 			pr_err("failed to cache the pcc params ret %d\n", ret);
 			goto exit_fail;
@@ -7024,7 +7058,7 @@ static int pp_update_pcc_pipe_setup(struct mdss_mdp_pipe *pipe, u32 location)
 	char __iomem *pipe_base = NULL;
 
 	if (!pipe) {
-		pr_err("invalid param pipe %p\n", pipe);
+		pr_err("invalid param pipe %pK\n", pipe);
 		return -EINVAL;
 	}
 
@@ -7076,7 +7110,7 @@ int mdss_mdp_pp_get_version(struct mdp_pp_feature_version *version)
 	u32 ver_info = mdp_pp_legacy;
 
 	if (!version) {
-		pr_err("invalid param version %p\n", version);
+		pr_err("invalid param version %pK\n", version);
 		ret = -EINVAL;
 		goto exit_version;
 	}
@@ -7157,7 +7191,7 @@ int mdss_mdp_copy_layer_pp_info(struct mdp_input_layer *layer)
 	uint32_t ops;
 
 	if (!layer) {
-		pr_err("invalid layer pointer passed %p\n", layer);
+		pr_err("invalid layer pointer passed %pK\n", layer);
 		return -EFAULT;
 	}
 
@@ -7169,7 +7203,7 @@ int mdss_mdp_copy_layer_pp_info(struct mdp_input_layer *layer)
 	ret = copy_from_user(pp_info, layer->pp_info,
 			sizeof(struct mdp_overlay_pp_params));
 	if (ret) {
-		pr_err("layer list copy from user failed, pp_info = %p\n",
+		pr_err("layer list copy from user failed, pp_info = %pK\n",
 			layer->pp_info);
 		ret = -EFAULT;
 		goto exit_pp_info;
@@ -7278,7 +7312,7 @@ static int pp_mfd_release_all(struct msm_fb_data_type *mfd)
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 	int ret = 0;
 	if (!mfd || !mdata) {
-		pr_err("Invalid mfd %p mdata %p\n", mfd, mdata);
+		pr_err("Invalid mfd %pK mdata %pK\n", mfd, mdata);
 		return -EPERM;
 	}
 
@@ -7309,7 +7343,7 @@ static int pp_mfd_ad_release_all(struct msm_fb_data_type *mfd)
 	int ret = 0;
 
 	if (!mdata || !mfd) {
-		pr_err("invalid params mdata %p mfd %p\n", mdata, mfd);
+		pr_err("invalid params mdata %pK mfd %pK\n", mdata, mfd);
 		return -EINVAL;
 	}
 	if (!mdata->ad_calc_wq)
@@ -7417,7 +7451,7 @@ static int pp_ppb_setup(struct mdss_mdp_mixer *mixer)
 	int ret = 0;
 
 	if (!mixer || !mixer->ctl || !mixer->ctl->mfd) {
-		pr_err("invalid parameters, mixer %p ctl %p mfd %p\n",
+		pr_err("invalid parameters, mixer %pK ctl %pK mfd %pK\n",
 			mixer, (mixer ? mixer->ctl : NULL),
 		       (mixer ? (mixer->ctl ? mixer->ctl->mfd : NULL) : NULL));
 		return -EINVAL;

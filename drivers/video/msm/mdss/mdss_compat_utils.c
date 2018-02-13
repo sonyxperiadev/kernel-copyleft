@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
  * Copyright (C) 1994 Martin Schaller
  *
  * 2001 - Documented with DocBook
@@ -150,7 +150,7 @@ static struct mdp_input_layer32 *__create_layer_list32(
 			compat_ptr(commit32->commit_v1.input_layers),
 			sizeof(struct mdp_input_layer32) * layer_count);
 	if (ret) {
-		pr_err("layer list32 copy from user failed, ptr %p\n",
+		pr_err("layer list32 copy from user failed, ptr %pK\n",
 			compat_ptr(commit32->commit_v1.input_layers));
 		kfree(layer_list32);
 		ret = -EFAULT;
@@ -182,7 +182,7 @@ static int __copy_scale_params(struct mdp_input_layer *layer,
 			sizeof(struct mdp_scale_data));
 	if (ret) {
 		kfree(scale);
-		pr_err("scale param copy from user failed, ptr %p\n",
+		pr_err("scale param copy from user failed, ptr %pK\n",
 			compat_ptr(layer32->scale));
 		ret = -EFAULT;
 	} else {
@@ -307,7 +307,7 @@ static int __compat_atomic_commit(struct fb_info *info, unsigned int cmd,
 	ret = copy_from_user(&commit32, (void __user *)argp,
 		sizeof(struct mdp_layer_commit32));
 	if (ret) {
-		pr_err("%s:copy_from_user failed, ptr %p\n", __func__,
+		pr_err("%s:copy_from_user failed, ptr %pK\n", __func__,
 			(void __user *)argp);
 		ret = -EFAULT;
 		return ret;
@@ -325,7 +325,7 @@ static int __compat_atomic_commit(struct fb_info *info, unsigned int cmd,
 				compat_ptr(commit32.commit_v1.output_layer),
 				buffer_size);
 		if (ret) {
-			pr_err("fail to copy output layer from user, ptr %p\n",
+			pr_err("fail to copy output layer from user, ptr %pK\n",
 				compat_ptr(commit32.commit_v1.output_layer));
 			ret = -EFAULT;
 			goto layer_list_err;
@@ -846,6 +846,7 @@ static int __from_user_pcc_coeff_v17(
 		return -EFAULT;
 	}
 
+	memset(&pcc_cfg_payload, 0, sizeof(pcc_cfg_payload));
 	pcc_cfg_payload.r.b = pcc_cfg_payload32.r.b;
 	pcc_cfg_payload.r.g = pcc_cfg_payload32.r.g;
 	pcc_cfg_payload.r.c = pcc_cfg_payload32.r.c;
@@ -934,6 +935,7 @@ static int __to_user_pcc_coeff_v1_7(
 	struct mdp_pcc_data_v1_7_32 pcc_cfg_payload32;
 	struct mdp_pcc_data_v1_7 pcc_cfg_payload;
 
+	memset(&pcc_cfg_payload32, 0, sizeof(pcc_cfg_payload32));
 	if (copy_from_user(&pcc_cfg_payload,
 			   pcc_cfg->cfg_payload,
 			   sizeof(struct mdp_pcc_data_v1_7))) {
@@ -1127,6 +1129,8 @@ static int __from_user_igc_lut_data_v17(
 		pr_err("failed to copy payload from user for igc\n");
 		return -EFAULT;
 	}
+
+	memset(&igc_cfg_payload, 0, sizeof(igc_cfg_payload));
 	igc_cfg_payload.c0_c1_data = compat_ptr(igc_cfg_payload_32.c0_c1_data);
 	igc_cfg_payload.c2_data = compat_ptr(igc_cfg_payload_32.c2_data);
 	igc_cfg_payload.len = igc_cfg_payload_32.len;
@@ -1261,6 +1265,7 @@ static int __from_user_pgc_lut_data_v1_7(
 		pr_err("failed to copy from user the pgc32 payload\n");
 		return -EFAULT;
 	}
+	memset(&pgc_cfg_payload, 0, sizeof(pgc_cfg_payload));
 	pgc_cfg_payload.c0_data = compat_ptr(pgc_cfg_payload_32.c0_data);
 	pgc_cfg_payload.c1_data = compat_ptr(pgc_cfg_payload_32.c1_data);
 	pgc_cfg_payload.c2_data = compat_ptr(pgc_cfg_payload_32.c2_data);
@@ -1470,6 +1475,7 @@ static int __from_user_hist_lut_data_v1_7(
 		return -EFAULT;
 	}
 
+	memset(&hist_lut_cfg_payload, 0, sizeof(hist_lut_cfg_payload));
 	hist_lut_cfg_payload.len = hist_lut_cfg_payload32.len;
 	hist_lut_cfg_payload.data = compat_ptr(hist_lut_cfg_payload32.data);
 
@@ -2024,6 +2030,7 @@ static int __from_user_pa_data_v1_7(
 		return -EFAULT;
 	}
 
+	memset(&pa_cfg_payload, 0, sizeof(pa_cfg_payload));
 	pa_cfg_payload.mode = pa_cfg_payload32.mode;
 	pa_cfg_payload.global_hue_adj = pa_cfg_payload32.global_hue_adj;
 	pa_cfg_payload.global_sat_adj = pa_cfg_payload32.global_sat_adj;
@@ -2124,6 +2131,7 @@ static int __to_user_pa_data_v1_7(
 	struct mdp_pa_data_v1_7_32 pa_cfg_payload32;
 	struct mdp_pa_data_v1_7 pa_cfg_payload;
 
+	memset(&pa_cfg_payload32, 0, sizeof(pa_cfg_payload32));
 	if (copy_from_user(&pa_cfg_payload,
 			pa_v2_cfg->cfg_payload,
 			sizeof(pa_cfg_payload))) {
@@ -2280,6 +2288,8 @@ static int __from_user_gamut_cfg_data_v17(
 		pr_err("failed to copy the gamut payload from userspace\n");
 		return -EFAULT;
 	}
+
+	memset(&gamut_cfg_payload, 0, sizeof(gamut_cfg_payload));
 	gamut_cfg_payload.mode = gamut_cfg_payload32.mode;
 	for (i = 0; i < MDP_GAMUT_TABLE_NUM_V1_7; i++) {
 		gamut_cfg_payload.tbl_size[i] =
@@ -3418,7 +3428,7 @@ static int __copy_layer_igc_lut_data_v1_7(
 			cfg_payload32,
 			sizeof(struct mdp_igc_lut_data_v1_7_32));
 	if (ret) {
-		pr_err("copy from user failed, IGC cfg payload = %p\n",
+		pr_err("copy from user failed, IGC cfg payload = %pK\n",
 			cfg_payload32);
 		ret = -EFAULT;
 		goto exit;
@@ -3493,7 +3503,7 @@ static int __copy_layer_hist_lut_data_v1_7(
 			cfg_payload32,
 			sizeof(struct mdp_hist_lut_data_v1_7_32));
 	if (ret) {
-		pr_err("copy from user failed, hist lut cfg_payload = %p\n",
+		pr_err("copy from user failed, hist lut cfg_payload = %pK\n",
 			cfg_payload32);
 		ret = -EFAULT;
 		goto exit;
@@ -3565,7 +3575,7 @@ static int __copy_layer_pa_data_v1_7(
 			cfg_payload32,
 			sizeof(struct mdp_pa_data_v1_7_32));
 	if (ret) {
-		pr_err("copy from user failed, pa cfg_payload = %p\n",
+		pr_err("copy from user failed, pa cfg_payload = %pK\n",
 			cfg_payload32);
 		ret = -EFAULT;
 		goto exit;
@@ -3707,7 +3717,7 @@ static int __copy_layer_pp_info_pcc_params(
 			compat_ptr(pp_info32->pcc_cfg_data.cfg_payload),
 			sizeof(struct mdp_pcc_data_v1_7));
 		if (ret) {
-			pr_err("compat copy of PCC cfg payload failed, ptr %p\n",
+			pr_err("compat copy of PCC cfg payload failed, ptr %pK\n",
 				compat_ptr(
 				pp_info32->pcc_cfg_data.cfg_payload));
 			ret = -EFAULT;
@@ -3741,7 +3751,7 @@ static int __copy_layer_pp_info_params(struct mdp_input_layer *layer,
 			compat_ptr(layer32->pp_info),
 			sizeof(struct mdp_overlay_pp_params32));
 	if (ret) {
-		pr_err("pp info copy from user failed, pp_info %p\n",
+		pr_err("pp info copy from user failed, pp_info %pK\n",
 			compat_ptr(layer32->pp_info));
 		ret = -EFAULT;
 		goto exit;

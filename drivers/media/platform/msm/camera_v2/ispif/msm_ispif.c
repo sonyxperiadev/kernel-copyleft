@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -837,7 +842,7 @@ static uint16_t msm_ispif_get_cids_mask_from_cfg(
 	uint16_t cids_mask = 0;
 	BUG_ON(!entry);
 
-	for (i = 0; i < entry->num_cids; i++)
+	for (i = 0; i < entry->num_cids && i < MAX_CID_CH_v2; i++)
 		cids_mask |= (1 << entry->cids[i]);
 
 	return cids_mask;
@@ -967,7 +972,7 @@ static void msm_ispif_intf_cmd(struct ispif_device *ispif, uint32_t cmd_bits,
 			pr_err("%s: invalid interface type\n", __func__);
 			return;
 		}
-		if (params->entries[i].num_cids > MAX_CID_CH) {
+		if (params->entries[i].num_cids > MAX_CID_CH_v2) {
 			pr_err("%s: out of range of cid_num %d\n",
 				__func__, params->entries[i].num_cids);
 			return;
@@ -1320,7 +1325,8 @@ static inline void msm_ispif_read_irq_status(struct ispif_irq_status *out,
 	}
 
 	if (fatal_err == true) {
-		pr_err("%s: fatal error, stop ispif immediately\n", __func__);
+		pr_err_ratelimited("%s: fatal error, stop ispif immediately\n",
+			__func__);
 		for (i = 0; i < ispif->vfe_info.num_vfe; i++) {
 			msm_camera_io_w(ISPIF_STOP_INTF_IMMEDIATELY,
 				ispif->base + ISPIF_VFE_m_INTF_CMD_0(i));
@@ -1411,6 +1417,14 @@ static void msm_ispif_release(struct ispif_device *ispif)
 {
 	BUG_ON(!ispif);
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+	if (ispif->ispif_state != ISPIF_POWER_UP) {
+		pr_err("%s: ispif invalid state %d\n", __func__,
+		ispif->ispif_state);
+		return;
+	}
+#endif
+
 	msm_ispif_reset(ispif);
 	msm_ispif_reset_hw(ispif);
 
@@ -1485,9 +1499,20 @@ static long msm_ispif_subdev_ioctl_unlocked(struct v4l2_subdev *sd,
 {
 	struct ispif_device *ispif =
 		(struct ispif_device *)v4l2_get_subdevdata(sd);
+#if defined(CONFIG_SONY_CAM_V4L2)
+	struct ispif_cfg_data *pcdata = (struct ispif_cfg_data *)arg;
+#endif
 
 	switch (cmd) {
 	case VIDIOC_MSM_ISPIF_CFG:
+#if defined(CONFIG_SONY_CAM_V4L2)
+		if (pcdata->cfg_type == ISPIF_RELEASE) {
+			ispif->ispif_sof_debug = 0;
+			ispif->ispif_rdi0_debug = 0;
+			ispif->ispif_rdi1_debug = 0;
+			ispif->ispif_rdi2_debug = 0;
+		}
+#endif
 		return msm_ispif_cmd(sd, arg);
 	case VIDIOC_MSM_ISPIF_CFG_EXT:
 		return msm_ispif_cmd_ext(sd, arg);

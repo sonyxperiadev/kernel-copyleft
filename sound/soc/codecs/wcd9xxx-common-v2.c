@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -194,8 +199,13 @@ void wcd_clsh_imped_config(struct snd_soc_codec *codec, int imped, bool reset)
 		return;
 	}
 	index = get_impedance_index(imped);
-	if (index >= ARRAY_SIZE(imped_index)) {
+	if (index >= (ARRAY_SIZE(imped_index) - 1)) {
 		pr_debug("%s, impedance not in range = %d\n", __func__, imped);
+		return;
+	}
+	if (index >= ARRAY_SIZE(imped_table)) {
+		pr_debug("%s, impedance index not in range = %d\n", __func__,
+			index);
 		return;
 	}
 	for (i = 0; i < MAX_IMPED_PARAMS; i++)

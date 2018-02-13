@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -28,6 +28,8 @@ struct q6audio_effects {
 
 	struct audio_client             *ac;
 	struct msm_hwacc_effects_config  config;
+
+	struct mutex			lock;
 
 	atomic_t			in_count;
 	atomic_t			out_count;
@@ -99,7 +101,7 @@ static void audio_effects_event_handler(uint32_t opcode, uint32_t token,
 	struct q6audio_effects *effects;
 
 	if (!payload || !priv) {
-		pr_err("%s: invalid data to handle events, payload: %p, priv: %p\n",
+		pr_err("%s: invalid data to handle events, payload: %pK, priv: %pK\n",
 			__func__, payload, priv);
 		return;
 	}
@@ -230,8 +232,11 @@ static int audio_effects_shared_ioctl(struct file *file, unsigned cmd,
 		uint32_t idx = 0;
 		uint32_t size = 0;
 
+		mutex_lock(&effects->lock);
+
 		if (!effects->started) {
 			rc = -EFAULT;
+			mutex_unlock(&effects->lock);
 			goto ioctl_fail;
 		}
 
@@ -241,11 +246,13 @@ static int audio_effects_shared_ioctl(struct file *file, unsigned cmd,
 		if (!rc) {
 			pr_err("%s: write wait_event_timeout\n", __func__);
 			rc = -EFAULT;
+			 mutex_unlock(&effects->lock);
 			goto ioctl_fail;
 		}
 		if (!atomic_read(&effects->out_count)) {
 			pr_err("%s: pcm stopped out_count 0\n", __func__);
 			rc = -EFAULT;
+			mutex_unlock(&effects->lock);
 			goto ioctl_fail;
 		}
 
@@ -255,6 +262,7 @@ static int audio_effects_shared_ioctl(struct file *file, unsigned cmd,
 				copy_from_user(bufptr, (void *)arg,
 					effects->config.buf_cfg.output_len)) {
 				rc = -EFAULT;
+				mutex_unlock(&effects->lock);
 				goto ioctl_fail;
 			}
 			rc = q6asm_write(effects->ac,
@@ -262,6 +270,7 @@ static int audio_effects_shared_ioctl(struct file *file, unsigned cmd,
 					 0, 0, NO_TIMESTAMP);
 			if (rc < 0) {
 				rc = -EFAULT;
+				mutex_unlock(&effects->lock);
 				goto ioctl_fail;
 			}
 			atomic_dec(&effects->out_count);
@@ -269,6 +278,7 @@ static int audio_effects_shared_ioctl(struct file *file, unsigned cmd,
 			pr_err("%s: AUDIO_EFFECTS_WRITE: Buffer dropped\n",
 				__func__);
 		}
+		mutex_unlock(&effects->lock);
 		break;
 	}
 	case AUDIO_EFFECTS_READ: {
@@ -466,6 +476,7 @@ static long audio_effects_ioctl(struct file *file, unsigned int cmd,
 		break;
 	}
 	case AUDIO_EFFECTS_SET_BUF_LEN: {
+		mutex_lock(&effects->lock);
 		if (copy_from_user(&effects->config.buf_cfg, (void *)arg,
 				   sizeof(effects->config.buf_cfg))) {
 			pr_err("%s: copy from user for AUDIO_EFFECTS_SET_BUF_LEN failed\n",
@@ -475,6 +486,7 @@ static long audio_effects_ioctl(struct file *file, unsigned int cmd,
 		pr_debug("%s: write buf len: %d, read buf len: %d\n",
 			 __func__, effects->config.buf_cfg.output_len,
 			 effects->config.buf_cfg.input_len);
+		mutex_unlock(&effects->lock);
 		break;
 	}
 	case AUDIO_EFFECTS_GET_BUF_AVAIL: {
@@ -630,6 +642,8 @@ static long audio_effects_compat_ioctl(struct file *file, unsigned int cmd,
 	case AUDIO_EFFECTS_GET_BUF_AVAIL32: {
 		struct msm_hwacc_buf_avail32 buf_avail;
 
+		memset(&buf_avail, 0, sizeof(buf_avail));
+
 		buf_avail.input_num_avail = atomic_read(&effects->in_count);
 		buf_avail.output_num_avail = atomic_read(&effects->out_count);
 		pr_debug("%s: write buf avail: %d, read buf avail: %d\n",
@@ -703,7 +717,7 @@ static int audio_effects_release(struct inode *inode, struct file *file)
 				__func__);
 		rc = q6asm_cmd(effects->ac, CMD_CLOSE);
 		if (rc < 0)
-			pr_err("%s[%p]:Failed to close the session rc=%d\n",
+			pr_err("%s[%pK]:Failed to close the session rc=%d\n",
 				__func__, effects, rc);
 		effects->opened = 0;
 		effects->started = 0;
@@ -717,6 +731,7 @@ static int audio_effects_release(struct inode *inode, struct file *file)
 	}
 	q6asm_audio_client_free(effects->ac);
 
+	mutex_destroy(&effects->lock);
 	kfree(effects);
 
 	pr_debug("%s: close session success\n", __func__);
@@ -747,6 +762,7 @@ static int audio_effects_open(struct inode *inode, struct file *file)
 
 	init_waitqueue_head(&effects->read_wait);
 	init_waitqueue_head(&effects->write_wait);
+	mutex_init(&effects->lock);
 
 	effects->opened = 0;
 	effects->started = 0;
