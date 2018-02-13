@@ -98,18 +98,29 @@ static struct page *ion_page_pool_remove(struct ion_page_pool *pool, bool high,
 	if (high) {
 		BUG_ON(!pool->high_count);
 		page = list_first_entry(&pool->high_items, struct page, lru);
-		pool->high_count--;
 	} else {
 		BUG_ON(!pool->low_count);
 		page = list_first_entry(&pool->low_items, struct page, lru);
-		pool->low_count--;
 	}
-	clear_bit(ION_PAGE_CACHE, &page->private);
+
 	/*
-	 * We own this page and this function os called under pool->lock.
-	 * No need to take page_lock here.
+	 * We can hit a very rare case (~1/10^9) when the page is being
+	 * isolated exactly at this point. This function is called under
+	 * spin lock so we can't wait here and we have to return NULL
+	 * therefore.
 	 */
+	if (!trylock_page(page))
+		return NULL;
+
+	clear_bit(ION_PAGE_CACHE, &page->private);
 	__ClearPageMovable(page);
+	unlock_page(page);
+
+	/* process the counters */
+	if (high)
+		pool->high_count--;
+	else
+		pool->low_count--;
 
 	if (prefetch) {
 		BUG_ON(!pool->nr_unreserved);
@@ -245,6 +256,8 @@ int ion_page_pool_shrink(struct ion_page_pool *pool, gfp_t gfp_mask,
 			break;
 		}
 		spin_unlock(&pool->lock);
+		if (!page)
+			continue;
 		ion_page_pool_free_pages(pool, page);
 		freed += (1 << pool->order);
 	}
