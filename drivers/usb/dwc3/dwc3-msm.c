@@ -2585,6 +2585,9 @@ static const char *get_charger_type_string(struct power_supply *psy)
 		else if (mdwc->sub_type ==
 				POWER_SUPPLY_SUB_TYPE_PROPRIETARY_500MA)
 			ret = "USB_PROPRIETARY_500MA";
+		else if (mdwc->sub_type == POWER_SUPPLY_SUB_TYPE_INVALID &&
+			 mdwc->typec_current_max)
+			ret = "TYPE-C_DPDM_FLOATED_CHARGER";
 		else if (mdwc->sub_type == POWER_SUPPLY_SUB_TYPE_INVALID)
 			ret = "UNKNOWN_CHARGER";
 		else
@@ -4290,15 +4293,17 @@ static void dwc3_ivld_chg_det_work(struct work_struct *w)
 
 	if ((mdwc->chg_type == DWC3_SDP_CHARGER) &&
 			(mdwc->max_power != CONFIG_USB_GADGET_VBUS_DRAW)) {
-		if (mdwc->chg_det_cnt < USB_CHG_DET_RETRY_MAX) {
+		if (mdwc->chg_det_cnt < USB_CHG_DET_RETRY_MAX &&
+			!(mdwc->chg_det_cnt > 0 && mdwc->typec_current_max >= 1500)) {
 			mdwc->chg_det_cnt++;
-			dev_warn(mdwc->dev, "detect FLOATED, retry=%d\n",
-							mdwc->chg_det_cnt);
+			dev_warn(mdwc->dev, "detect FLOATED,type-c=%u, retry=%d\n",
+				 mdwc->typec_current_max, mdwc->chg_det_cnt);
 			mdwc->chg_det_retrying = 2;
 			mdwc->chg_type = DWC3_RETRY_DET_CHARGER;
 			dwc3_msm_gadget_vbus_draw(mdwc, 0);
 		} else if (mdwc->sub_type == POWER_SUPPLY_SUB_TYPE_FLOATED) {
-			dev_warn(mdwc->dev, "detect INVALD CHARGER.\n");
+			dev_warn(mdwc->dev, "detect INVALD CHARGER(type-c=%u)\n",
+				 mdwc->typec_current_max);
 			mdwc->chg_det_retrying = 0;
 			mdwc->sub_type = POWER_SUPPLY_SUB_TYPE_INVALID;
 			mdwc->chg_type = DWC3_DCP_CHARGER;
@@ -4435,8 +4440,15 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			case DWC3_PROPRIETARY_CHARGER:
 				if (mdwc->sub_type ==
 						POWER_SUPPLY_SUB_TYPE_INVALID) {
-					dev_dbg_wl(mdwc->dev, "lpm, INVLD\n");
-					dwc3_msm_gadget_vbus_draw(mdwc, 500);
+					dev_dbg_wl(mdwc->dev,
+						"lpm, INVLD(type-c=%u)\n",
+						mdwc->typec_current_max);
+					if (mdwc->typec_current_max >= 1500)
+						dwc3_msm_gadget_vbus_draw(mdwc,
+									1500);
+					else
+						dwc3_msm_gadget_vbus_draw(mdwc,
+									500);
 					break;
 				}
 				dev_dbg_wl(mdwc->dev, "lpm, DCP charger\n");
