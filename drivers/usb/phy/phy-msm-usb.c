@@ -3591,16 +3591,18 @@ static void msm_otg_sm_work(struct work_struct *w)
 				if ((USB_SDP_CHARGER != motg->chg_type) &&
 							motg->chg_det_cnt) {
 					if (motg->chg_det_cnt <=
-							USB_CHG_DET_RETRY_MAX) {
-						pr_info("chg det retry=%u\n",
+						USB_CHG_DET_RETRY_MAX &&
+						!(motg->chg_det_cnt > 1 &&
+						motg->typec_current_max >= 1500)) {
+						pr_warn("chg det retry=%u\n",
 							motg->chg_det_cnt);
 						motg->chg_type =
 							USB_RETRY_DET_CHARGER;
 						motg->chg_det_retrying = 2;
 					} else {
-						pr_warn("retry expired=%u\n",
-							motg->chg_det_cnt);
-						pr_warn("INVALID(FLOATED)");
+						pr_warn("retry=%u, typec=%u\n",
+							motg->chg_det_cnt,
+							motg->typec_current_max);
 						motg->chg_type =
 							USB_INVALID_CHARGER;
 						motg->chg_det_retrying = 0;
@@ -3668,7 +3670,16 @@ static void msm_otg_sm_work(struct work_struct *w)
 					motg->chg_type = USB_DCP_CHARGER;
 					motg->sub_type =
 						POWER_SUPPLY_SUB_TYPE_INVALID;
-					msm_otg_notify_charger(motg, 500);
+					if (motg->typec_current_max >= 1500) {
+						pr_warn("TYPEC(FLOATED) %u\n",
+						motg->typec_current_max);
+						msm_otg_notify_charger(motg,
+									1500);
+					} else {
+						pr_warn("INVALID(FLOATED)\n");
+						msm_otg_notify_charger(motg,
+									500);
+					}
 					work = 0;
 					msm_otg_dbg_log_event(&motg->phy,
 					"PM RUNTIME: INVCHG PUT",
@@ -5105,9 +5116,12 @@ static const char *get_charger_type_string(struct power_supply *psy)
 		else if (motg->sub_type ==
 				POWER_SUPPLY_SUB_TYPE_PROPRIETARY_500MA)
 			ret = "USB_PROPRIETARY_500MA";
-		else if (motg->sub_type == POWER_SUPPLY_SUB_TYPE_INVALID)
-			ret = "UNKNOWN_CHARGER";
-		else
+		else if (motg->sub_type == POWER_SUPPLY_SUB_TYPE_INVALID) {
+			if (motg->typec_current_max)
+				ret = "TYPE-C_DPDM_FLOATED_CHARGER";
+			else
+				ret = "UNKNOWN_CHARGER";
+		} else
 			ret = chg_to_string(motg->chg_type);
 	} else {
 		ret = chg_to_string(motg->chg_type);
