@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -563,7 +568,7 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 
 	if (level->notify_rpm) {
 		struct cpumask nextcpu, *cpumask;
-		uint32_t us;
+		uint64_t us;
 		uint64_t sec;
 		uint64_t nsec;
 
@@ -575,7 +580,6 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 			pr_info("Failed msm_rpm_enter_sleep() rc = %d\n", ret);
 			goto failed_set_mode;
 		}
-		us = us + 1;
 		sec = us;
 		do_div(sec, USEC_PER_SEC);
 		nsec = us - sec * USEC_PER_SEC;
@@ -586,7 +590,7 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 			do_div(nsec, NSEC_PER_SEC/SCLK_HZ);
 		}
 		us = sec + nsec;
-		msm_mpm_enter_sleep((uint32_t)us, from_idle, cpumask);
+		msm_mpm_enter_sleep(us, from_idle, cpumask);
 	}
 
 	/* Notify cluster enter event after successfully config completion */
