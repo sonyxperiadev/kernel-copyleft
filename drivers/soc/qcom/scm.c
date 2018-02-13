@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/io.h>
@@ -718,6 +723,9 @@ int scm_call2_atomic(u32 fn_id, struct scm_desc *desc)
 
 	if (unlikely(!is_scm_armv8()))
 		return -ENODEV;
+
+	if (unlikely(oops_in_progress && mutex_is_locked(&scm_lock)))
+		return -EBUSY;
 
 	ret = allocate_extra_arg_buffer(desc, GFP_ATOMIC);
 	if (ret)
