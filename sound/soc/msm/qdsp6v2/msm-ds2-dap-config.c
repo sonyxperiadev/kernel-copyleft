@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
 * only version 2 as published by the Free Software Foundation.
@@ -8,6 +8,11 @@
 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 * GNU General Public License for more details.
 */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/err.h>
 #include <linux/module.h>
@@ -333,14 +338,10 @@ int qti_set_custom_stereo_on(int port_id, int copp_idx,
 	pr_debug("%s: port 0x%x, copp_idx %d, is_custom_stereo_on %d\n",
 		 __func__, port_id, copp_idx, is_custom_stereo_on);
 	if (is_custom_stereo_on) {
-		op_FL_ip_FL_weight =
-			Q14_GAIN_ZERO_POINT_FIVE;
-		op_FL_ip_FR_weight =
-			Q14_GAIN_ZERO_POINT_FIVE;
-		op_FR_ip_FL_weight =
-			Q14_GAIN_ZERO_POINT_FIVE;
-		op_FR_ip_FR_weight =
-			Q14_GAIN_ZERO_POINT_FIVE;
+		op_FL_ip_FL_weight = 0;
+		op_FL_ip_FR_weight = Q14_GAIN_UNITY;
+		op_FR_ip_FL_weight = Q14_GAIN_UNITY;
+		op_FR_ip_FR_weight = 0;
 	} else {
 		op_FL_ip_FL_weight = Q14_GAIN_UNITY;
 		op_FL_ip_FR_weight = 0;
@@ -1642,6 +1643,7 @@ static int msm_ds2_dap_param_visualizer_control_get(u32 cmd, void *arg)
 		ret = 0;
 		dolby_data->length = 0;
 		pr_err("%s Incorrect VCNB length", __func__);
+		return -EINVAL;
 	}
 
 	params_length = (2*length + DOLBY_VIS_PARAM_HEADER_SIZE) *

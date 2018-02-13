@@ -9,6 +9,11 @@
  *		Christoph Lameter <christoph@lameter.com>
  *  Copyright (C) 2008-2014 Christoph Lameter
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/err.h>
@@ -762,6 +767,7 @@ const char * const vmstat_text[] = {
 	"nr_active_file",
 	"nr_unevictable",
 	"nr_mlock",
+	"nr_mlock_file",
 	"nr_anon_pages",
 	"nr_mapped",
 	"nr_file_pages",

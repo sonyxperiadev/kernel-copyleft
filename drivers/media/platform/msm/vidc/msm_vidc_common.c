@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/jiffies.h>
 #include <linux/sched.h>
@@ -1619,6 +1624,10 @@ static void handle_sys_error(enum hal_command_response cmd, void *data)
 
 	dprintk(VIDC_WARN, "SYS_ERROR %d received for core %pK\n", cmd, core);
 	msm_comm_clean_notify_client(core);
+
+#ifdef SYSTEM_RESET_WITH_VENUS_CRASH
+	panic("internal panic for Venus SSR\n");
+#endif
 
 	hdev = core->device;
 	mutex_lock(&core->lock);

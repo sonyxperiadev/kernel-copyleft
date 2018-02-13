@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -3849,6 +3854,12 @@ static int mdss_mdp_hw_cursor_pipe_update(struct msm_fb_data_type *mfd,
 	req->transp_mask = img->bg_color & ~(0xff << var->transp.offset);
 
 	if (mfd->cursor_buf && (cursor->set & FB_CUR_SETIMAGE)) {
+		if (img->width * img->height * 4 > cursor_frame_size) {
+			pr_err("cursor image size is too large\n");
+			ret = -EINVAL;
+			goto done;
+		}
+
 		ret = copy_from_user(mfd->cursor_buf, img->data,
 				     img->width * img->height * 4);
 		if (ret) {
@@ -4113,8 +4124,14 @@ static int mdss_mdp_pp_ioctl(struct msm_fb_data_type *mfd,
 		break;
 
 	case mdp_op_pcc_cfg:
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		ret = mdss_mdp_pcc_config(mfd, &mdp_pp.data.pcc_cfg_data,
+					&copyback, copy_from_kernel);
+#else
 		ret = mdss_mdp_pcc_config(mfd, &mdp_pp.data.pcc_cfg_data,
 					&copyback);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 		break;
 
 	case mdp_op_lut_cfg:
@@ -4711,6 +4728,10 @@ static int mdss_mdp_overlay_ioctl_handler(struct msm_fb_data_type *mfd,
 	struct msmfb_overlay_data data;
 	struct mdp_set_cfg cfg;
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	if (mfd->spec_mfd.off_sts)
+		return 0;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	switch (cmd) {
 	case MSMFB_MDP_PP:
 		ret = mdss_mdp_pp_ioctl(mfd, argp);
