@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2110,6 +2110,12 @@ int mdss_mdp_layer_pre_commit_wfd(struct msm_fb_data_type *mfd,
 	if (commit->output_layer) {
 		wfd = mdp5_data->wfd;
 		output_layer = commit->output_layer;
+
+		if (output_layer->buffer.plane_count > MAX_PLANES) {
+			pr_err("Output buffer plane_count exceeds MAX_PLANES limit:%d\n",
+					output_layer->buffer.plane_count);
+			return -EINVAL;
+		}
 
 		data = mdss_mdp_wfd_add_data(wfd, output_layer);
 		if (IS_ERR_OR_NULL(data))
