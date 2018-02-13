@@ -1840,7 +1840,9 @@ static int smbchg_set_usb_current_max(struct smbchg_chip *chip,
 	switch (chip->usb_supply_type) {
 	case POWER_SUPPLY_TYPE_USB:
 #ifdef CONFIG_QPNP_SMBCHARGER_EXTENSION
-		if (current_ma > CURRENT_400_MA)
+		if (current_ma >= CURRENT_1500_MA)
+			current_ma = CURRENT_1500_MA;
+		else if (current_ma >= CURRENT_400_MA)
 			current_ma = CURRENT_400_MA;
 		/* fall through */
 #else
