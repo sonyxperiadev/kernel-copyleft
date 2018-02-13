@@ -288,6 +288,13 @@ Optional Properties:
 - qcom,override-usb-current		A boolean property to override the ICL limit
 					for USB charger(SDP) based on the current
 					reported by USB driver.
+- qcom,external-typec		A boolean property to be used when an external
+				USB TypeC module is used with charger.
+- qcom,typec-psy-name		The psy name to use for external typec. If
+				'qcom,external-typec' is present then this is
+				a required property.
+- qcom,otg-pinctrl:		A boolean property to be used when OTG enable
+				control is configured in pin control mode.
 - qcom,max-pulse-allowed	The maximum number of pulses allowed in
 				HVDCP3 mode. It can be used to restrict VBUS
 				to a value.

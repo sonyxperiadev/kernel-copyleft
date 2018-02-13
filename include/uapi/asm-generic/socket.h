@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __ASM_GENERIC_SOCKET_H
 #define __ASM_GENERIC_SOCKET_H
 
@@ -75,5 +80,10 @@
 #define SO_LOCK_FILTER		44
 
 #define SO_SELECT_ERR_QUEUE	45
+
+/* mainline kernel is using up to 53, select a number that is far
+ * above to be on the safe side. We will try to get this number
+ * into mainline but it will take a while. */
+#define SO_SIZEHINT		100
 
 #endif /* __ASM_GENERIC_SOCKET_H */

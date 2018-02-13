@@ -1378,7 +1378,7 @@ static int qcom_ice_config(struct platform_device *pdev, struct request *req,
 	struct ice_device *ice_dev;
 	union map_info *info;
 
-	if (!pdev || !req || !setting) {
+	if (!pdev || !req) {
 		pr_err("%s: Invalid params passed\n", __func__);
 		return -EINVAL;
 	}

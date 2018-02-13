@@ -1,5 +1,12 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _UAPI_LINUX_SOCKET_H
 #define _UAPI_LINUX_SOCKET_H
+
+#include <linux/types.h>
 
 /*
  * Desired design of maximum size and alignment (see RFC2553)
@@ -17,5 +24,13 @@ struct __kernel_sockaddr_storage {
 				/* space to achieve desired size, */
 				/* _SS_MAXSIZE value minus size of ss_family */
 } __attribute__ ((aligned(_K_SS_ALIGNSIZE)));	/* force desired alignment */
+
+struct sock_sizehint {
+	__u32	order_zero_size;
+		/* max size that can fit into one page in kernel */
+	__u32	cache_size;
+		/* max size that can fit in socket cache */
+};
+
 
 #endif /* _UAPI_LINUX_SOCKET_H */

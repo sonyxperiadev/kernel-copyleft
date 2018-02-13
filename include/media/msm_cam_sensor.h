@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __LINUX_MSM_CAM_SENSOR_H
 #define __LINUX_MSM_CAM_SENSOR_H
 
@@ -26,8 +31,8 @@ struct msm_sensor_power_setting_array32 {
 };
 
 struct msm_camera_sensor_slave_info32 {
-	char sensor_name[32];
-	char eeprom_name[32];
+	char sensor_name[MAX_SENSOR_NAME];
+	char eeprom_name[MAX_EEPROM_NAME];
 	char actuator_name[32];
 	char ois_name[32];
 	char flash_name[32];
@@ -92,7 +97,7 @@ struct msm_eeprom_cfg_data32 {
 	enum eeprom_cfg_type_t cfgtype;
 	uint8_t is_supported;
 	union {
-		char eeprom_name[MAX_SENSOR_NAME];
+		char eeprom_name[MAX_EEPROM_NAME];
 		struct eeprom_get_t get_data;
 		struct eeprom_read_t32 read_data;
 		struct eeprom_write_t32 write_data;
@@ -101,6 +106,9 @@ struct msm_eeprom_cfg_data32 {
 };
 
 struct msm_camera_i2c_seq_reg_setting32 {
+/* extension begin */
+	uint16_t slave_addr;
+/* extension end */
 	compat_uptr_t reg_setting;
 	uint16_t size;
 	enum msm_camera_i2c_reg_addr_type addr_type;

@@ -5,6 +5,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_CORE_H
 #define LINUX_MMC_CORE_H
 
@@ -190,6 +195,7 @@ extern unsigned int mmc_align_data_size(struct mmc_card *, unsigned int);
 
 extern int __mmc_claim_host(struct mmc_host *host, atomic_t *abort);
 extern void mmc_release_host(struct mmc_host *host);
+extern int mmc_try_claim_host_delay(struct mmc_host *host, unsigned int delay_ms);
 extern int mmc_try_claim_host(struct mmc_host *host);
 extern void mmc_set_ios(struct mmc_host *host);
 extern int mmc_flush_cache(struct mmc_card *);
@@ -214,5 +220,23 @@ static inline void mmc_claim_host(struct mmc_host *host)
 }
 
 extern u32 mmc_vddrange_to_ocrmask(int vdd_min, int vdd_max);
+
+/*
+ * eMMC5.0 Field Firmware Update (FFU) opcodes
+ */
+#ifdef CONFIG_MMC_FFU
+#define MMC_FFU_INVOKE_OP 302
+
+#define MMC_FFU_MODE_SET 0x1
+#define MMC_FFU_MODE_NORMAL 0x0
+#define MMC_FFU_INSTALL_SET 0x2
+
+#define MMC_FFU_FEATURES 0x1
+#define FFU_FEATURES(ffu_features) (ffu_features & MMC_FFU_FEATURES)
+
+u8 mmc_ffu_check_compatibility(struct mmc_card *card, const char *name);
+int mmc_ffu_check_status(struct mmc_card *card);
+int mmc_ffu_invoke(struct mmc_card *card, const char *name);
+#endif
 
 #endif /* LINUX_MMC_CORE_H */
