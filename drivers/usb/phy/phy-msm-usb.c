@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/device.h>
@@ -52,6 +57,12 @@
 
 #include <linux/msm-bus.h>
 
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+#include <linux/usb/host_ext_event.h>
+#endif
+
+#define NOT_USE_TYPEC_CURRENT
+
 #define MSM_USB_BASE	(motg->regs)
 #define MSM_USB_PHY_CSR_BASE (motg->phy_csr_regs)
 
@@ -80,6 +91,12 @@
 
 #define PM_QOS_SAMPLE_SEC	2
 #define PM_QOS_THRESHOLD	400
+#define USB_SWITCH_PORT_USB1 0
+#define USB_SWITCH_PORT_USB2 1
+
+#define USB_VBUS_WAIT_VOLT	900	/* mV */
+#define USB_VBUS_WAIT_ITVL	5	/* mS */
+#define USB_VBUS_WAIT_TMOUT	200	/* mS */
 
 enum msm_otg_phy_reg_mode {
 	USB_PHY_REG_OFF,
@@ -88,10 +105,33 @@ enum msm_otg_phy_reg_mode {
 	USB_PHY_REG_LPM_OFF,
 };
 
+#define USB_PHY_PARAMETER_OVERRIDE_A	0x80
+#define USB_PHY_PARAMETER_OVERRIDE_B	0x81
+#define USB_PHY_PARAMETER_OVERRIDE_C	0x82
+#define USB_PHY_PARAMETER_OVERRIDE_D	0x83
+
+#define USB_PHY_TXFSLSTUNE		0x0F	/* D 3:0 */
+#define USB_PHY_TXRESTUNE		0x30	/* D 5:4 */
+#define USB_PHY_TXHSXVTUNE		0x03	/* C 1:0 */
+#define USB_PHY_TXRISETUNE		0x0C	/* C 3:2 */
+#define USB_PHY_TXPREEMPAMPTUNE	0x30	/* C 5:4 */
+#define USB_PHY_TXPREEMPPULSETUNE	0x40	/* C 6:6 */
+#define USB_PHY_TXVREFTUNE		0x0F	/* B 3:0 */
+#define USB_PHY_SQRXTUNE		0x70	/* B 6:4 */
+#define USB_PHY_OTGTUNE		0x07	/* A 2:0 */
+#define USB_PHY_COMPDISTUNE		0x70	/* A 6:4 */
+
+#define USB_CHG_DET_RETRY_MAX		2
+
 static char *override_phy_init;
 module_param(override_phy_init, charp, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(override_phy_init,
 	"Override HSUSB PHY Init Settings");
+
+static char *override_phy_init_host;
+module_param(override_phy_init_host, charp, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(override_phy_init_host,
+	"Override HSUSB PHY Init Host Settings");
 
 unsigned int lpm_disconnect_thresh = 1000;
 module_param(lpm_disconnect_thresh , uint, S_IRUGO | S_IWUSR);
@@ -174,6 +214,24 @@ msm_otg_dbg_log_event(struct usb_phy *phy, char *event, int d1, int d2)
 	motg->dbg_idx++;
 	motg->dbg_idx = motg->dbg_idx % DEBUG_MAX_MSG;
 	write_unlock_irqrestore(&motg->dbg_lock, flags);
+}
+
+static void msm_otg_select_usb_switch(struct msm_otg *motg)
+{
+	int out;
+
+	if (!gpio_is_valid(motg->pdata->usb_switch_sel_gpio)) {
+		dev_dbg(motg->phy.dev, "gpio for usb switch is invalid\n");
+		return;
+	}
+
+	if (!motg->id_state || motg->usbin_state)
+		out = USB_SWITCH_PORT_USB1;
+	else
+		out = USB_SWITCH_PORT_USB2;
+
+	gpio_set_value(motg->pdata->usb_switch_sel_gpio, out);
+	dev_info(motg->phy.dev, "select port USB%d\n", out + 1);
 }
 
 static int msm_hsusb_ldo_init(struct msm_otg *motg, int init)
@@ -467,19 +525,77 @@ static struct usb_phy_io_ops msm_otg_io_ops = {
 	.write = ulpi_write,
 };
 
-static void ulpi_init(struct msm_otg *motg)
+static inline u32 get_field_value(u32 val, const u32 mask)
+{
+	u32 shift = find_first_bit((void *)&mask, 8);
+
+	val &= mask;		/* clear other bits */
+	val >>= shift;
+	return val;
+}
+
+static void msm_otg_phy_dump(struct msm_otg *motg)
+{
+	u32 val;
+
+	val = ulpi_read(&motg->phy, USB_PHY_PARAMETER_OVERRIDE_D);
+	dev_dbg(motg->phy.dev, "TXFSLSTUNE       \tD 0x%02x\n",
+			get_field_value(val, USB_PHY_TXFSLSTUNE));
+	dev_dbg(motg->phy.dev, "TXRESTUNE        \tD 0x%02x\n",
+			get_field_value(val, USB_PHY_TXRESTUNE));
+
+	val = ulpi_read(&motg->phy, USB_PHY_PARAMETER_OVERRIDE_C);
+	dev_dbg(motg->phy.dev, "TXHSXVTUNE       \tC 0x%02x\n",
+			get_field_value(val, USB_PHY_TXHSXVTUNE));
+	dev_dbg(motg->phy.dev, "TXRISETUNE       \tC 0x%02x\n",
+			get_field_value(val, USB_PHY_TXRISETUNE));
+	dev_dbg(motg->phy.dev, "TXPREEMPAMPTUNE  \tC 0x%02x\n",
+			get_field_value(val, USB_PHY_TXPREEMPAMPTUNE));
+	dev_dbg(motg->phy.dev, "TXPREEMPPULSETUNE\tC 0x%02x\n",
+			get_field_value(val, USB_PHY_TXPREEMPPULSETUNE));
+
+	val = ulpi_read(&motg->phy, USB_PHY_PARAMETER_OVERRIDE_B);
+	dev_dbg(motg->phy.dev, "TXVREFTUNE       \tB 0x%02x\n",
+			get_field_value(val, USB_PHY_TXVREFTUNE));
+	dev_dbg(motg->phy.dev, "SQRXTUNE         \tB 0x%02x\n",
+			get_field_value(val, USB_PHY_SQRXTUNE));
+
+	val = ulpi_read(&motg->phy, USB_PHY_PARAMETER_OVERRIDE_A);
+	dev_dbg(motg->phy.dev, "OTGTUNE          \tA 0x%02x\n",
+			get_field_value(val, USB_PHY_OTGTUNE));
+	dev_dbg(motg->phy.dev, "COMPDISTUNE      \tA 0x%02x\n",
+			get_field_value(val, USB_PHY_COMPDISTUNE));
+}
+
+static void ulpi_init(struct msm_otg *motg, enum usb_mode_type mode)
 {
 	struct msm_otg_platform_data *pdata = motg->pdata;
 	int aseq[10];
 	int *seq = NULL;
 
-	if (override_phy_init) {
-		pr_debug("%s(): HUSB PHY Init:%s\n", __func__,
-				override_phy_init);
-		get_options(override_phy_init, ARRAY_SIZE(aseq), aseq);
-		seq = &aseq[1];
-	} else {
-		seq = pdata->phy_init_seq;
+	switch (mode) {
+	case USB_HOST:
+		if (override_phy_init_host) {
+			pr_info("%s(): HUSB PHY Init Host override:%s\n",
+					__func__, override_phy_init_host);
+			get_options(override_phy_init_host, ARRAY_SIZE(aseq),
+									aseq);
+			seq = &aseq[1];
+		} else {
+			seq = pdata->phy_init_seq_host;
+		}
+		break;
+	case USB_PERIPHERAL:
+	default:
+		if (override_phy_init) {
+			pr_info("%s(): HUSB PHY Init override:%s\n",
+					__func__, override_phy_init);
+			get_options(override_phy_init, ARRAY_SIZE(aseq), aseq);
+			seq = &aseq[1];
+		} else {
+			seq = pdata->phy_init_seq;
+		}
+		break;
 	}
 
 	if (!seq)
@@ -496,6 +612,8 @@ static void ulpi_init(struct msm_otg *motg)
 		ulpi_write(&motg->phy, seq[0], seq[1]);
 		seq += 2;
 	}
+
+	msm_otg_phy_dump(motg);
 }
 
 static int msm_otg_phy_clk_reset(struct msm_otg *motg)
@@ -793,7 +911,7 @@ static int msm_otg_reset(struct usb_phy *phy)
 	msm_usb_phy_reset(motg);
 
 	/* Program USB PHY Override registers. */
-	ulpi_init(motg);
+	ulpi_init(motg, USB_PERIPHERAL);
 
 	/*
 	 * It is required to reset USB PHY after programming
@@ -1374,6 +1492,7 @@ static int msm_otg_suspend(struct msm_otg *motg)
 	u32 func_ctrl;
 	int phcd_retry_cnt = 0, ret;
 	unsigned phy_suspend_timeout;
+	bool invalid_charger;
 
 	cnt = 0;
 	msm_otg_dbg_log_event(phy, "LPM ENTER START",
@@ -1413,6 +1532,8 @@ lpm_start:
 	dcp = (motg->chg_type == USB_DCP_CHARGER) && !motg->is_ext_chg_dcp;
 	prop_charger = motg->chg_type == USB_PROPRIETARY_CHARGER;
 	floated_charger = motg->chg_type == USB_FLOATED_CHARGER;
+	invalid_charger = (motg->chg_type == USB_INVALID_CHARGER) &&
+				(motg->chg_state == USB_CHG_STATE_DETECTED);
 
 	/* !BSV, but its handling is in progress by otg sm_work */
 	sm_work_busy = !test_bit(B_SESS_VLD, &motg->inputs) &&
@@ -1443,7 +1564,7 @@ lpm_start:
 
 	if ((test_bit(B_SESS_VLD, &motg->inputs) &&
 		!device_bus_suspend && !dcp && !motg->is_ext_chg_dcp &&
-		!prop_charger && !floated_charger) ||
+		!prop_charger && !floated_charger && !invalid_charger) ||
 		test_bit(A_BUS_REQ, &motg->inputs) || sm_work_busy) {
 		msm_otg_dbg_log_event(phy, "LPM ENTER ABORTED",
 				motg->inputs, motg->chg_type);
@@ -1988,6 +2109,8 @@ static int msm_otg_notify_chg_type(struct msm_otg *motg)
 		motg->chg_type == USB_ACA_B_CHARGER ||
 		motg->chg_type == USB_ACA_C_CHARGER))
 		charger_type = POWER_SUPPLY_TYPE_USB_ACA;
+	else if (motg->chg_type == USB_RETRY_DET_CHARGER)
+		charger_type = POWER_SUPPLY_TYPE_RETRY_DET;
 	else
 		charger_type = POWER_SUPPLY_TYPE_UNKNOWN;
 
@@ -2072,7 +2195,12 @@ static void msm_otg_notify_charger(struct msm_otg *motg, unsigned mA)
 
 	/* Override mA if type-c charger used (use hvdcp/bc1.2 if it is 500) */
 	if (motg->typec_current_max > 500 && mA < motg->typec_current_max)
+#ifndef NOT_USE_TYPEC_CURRENT
 		mA = motg->typec_current_max;
+#else
+		dev_info(motg->phy.dev, "not use max-type-c:%u\n",
+						 motg->typec_current_max);
+#endif
 
 	if (msm_otg_notify_chg_type(motg))
 		dev_err(motg->phy.dev,
@@ -2201,6 +2329,7 @@ static void msm_otg_start_host(struct usb_otg *otg, int on)
 			val &= ~APF_CTRL_EN;
 			writel_relaxed(val, USB_HS_APF_CTRL);
 		}
+		ulpi_init(motg, USB_HOST);
 		usb_add_hcd(hcd, hcd->irq, IRQF_SHARED);
 #ifdef CONFIG_SMP
 		motg->pm_qos_req_dma.type = PM_QOS_REQ_AFFINE_IRQ;
@@ -2318,6 +2447,21 @@ out:
 	return NOTIFY_OK;
 }
 
+/**
+ * msm_hsusb_ocp_notification - ocp notification callback from regulator.
+ * @ctxt: Pointer to the msm_otg context
+ *
+ * NOTE: This can be called in interrupt context.
+ */
+static void msm_hsusb_ocp_notification(void *ctxt)
+{
+	struct msm_otg *motg = (struct msm_otg *)ctxt;
+
+	set_bit(A_VBUS_DROP_DET, &motg->inputs);
+	pr_info("%s: receive ocp notification\n", __func__);
+	queue_work(motg->otg_wq, &motg->sm_work);
+}
+
 static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 {
 	int ret;
@@ -2346,7 +2490,13 @@ static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 	 * current from the source.
 	 */
 	if (on) {
+		struct regulator_ocp_notification ocp_ntf = {
+					msm_hsusb_ocp_notification, motg};
 		msm_otg_notify_host_mode(motg, on);
+		/* register ocp notification */
+		ret = regulator_register_ocp_notification(vbus_otg, &ocp_ntf);
+		if (ret)
+			pr_err("unable to register ocp\n");
 		ret = regulator_enable(vbus_otg);
 		if (ret) {
 			pr_err("unable to enable vbus_otg\n");
@@ -2359,6 +2509,10 @@ static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 			pr_err("unable to disable vbus_otg\n");
 			return;
 		}
+		/* unregister ocp notification */
+		ret = regulator_register_ocp_notification(vbus_otg, NULL);
+		if (ret)
+			pr_err("unable to unregister ocp\n");
 		msm_otg_notify_host_mode(motg, on);
 		vbus_is_on = false;
 	}
@@ -2447,6 +2601,8 @@ static void msm_otg_start_peripheral(struct usb_otg *otg, int on)
 		msm_otg_dbg_log_event(&motg->phy, "GADGET ON",
 				motg->inputs, otg->phy->state);
 
+		ulpi_init(motg, USB_PERIPHERAL);
+
 		/* Configure BUS performance parameters for MAX bandwidth */
 		if (debug_bus_voting_enabled)
 			msm_otg_bus_vote(motg, USB_MAX_PERF_VOTE);
@@ -2483,6 +2639,7 @@ static void msm_otg_start_peripheral(struct usb_otg *otg, int on)
 		msm_otg_dbg_log_event(&motg->phy, "GADGET OFF",
 			motg->inputs, otg->phy->state);
 		usb_gadget_vbus_disconnect(otg->gadget);
+		clear_bit(A_BUS_SUSPEND, &motg->inputs);
 		/* Configure BUS performance parameters to default */
 		msm_otg_bus_vote(motg, USB_MIN_PERF_VOTE);
 
@@ -3105,9 +3262,26 @@ static const char *chg_to_string(enum usb_chg_type chg_type)
 	case USB_ACA_DOCK_CHARGER:	return "USB_ACA_DOCK_CHARGER";
 	case USB_PROPRIETARY_CHARGER:	return "USB_PROPRIETARY_CHARGER";
 	case USB_FLOATED_CHARGER:	return "USB_FLOATED_CHARGER";
-	default:			return "INVALID_CHARGER";
+	case USB_RETRY_DET_CHARGER:	return "USB_RETRY_DET_CHARGER";
+	default:			return "UNKNOWN_CHARGER";
 	}
 }
+
+#define MSM_CHG_DP_GND_THR		50000		/* 50mV */
+static inline bool is_dp_gnd(struct msm_otg *motg, int dp)
+{
+	struct usb_phy *phy = &motg->phy;
+	bool ret = false;
+
+	if (!IS_ERR_VALUE(dp) && 0 <= dp && dp < MSM_CHG_DP_GND_THR) {
+		dev_info(phy->dev, "D+ is grounded. uV=%d\n", dp);
+		ret = true;
+	}
+
+	return ret;
+}
+
+static int get_prop_usb_dp_voltage_now(struct msm_otg *motg);
 
 #define MSM_CHG_DCD_TIMEOUT		(750 * HZ/1000) /* 750 msec */
 #define MSM_CHG_DCD_POLL_TIME		(50 * HZ/1000) /* 50 msec */
@@ -3121,6 +3295,7 @@ static void msm_chg_detect_work(struct work_struct *w)
 	static bool dcd;
 	u32 line_state, dm_vlgc;
 	unsigned long delay;
+	static int dp;
 
 	dev_dbg(phy->dev, "chg detection work\n");
 	msm_otg_dbg_log_event(phy, "CHG DETECTION WORK",
@@ -3171,6 +3346,7 @@ static void msm_chg_detect_work(struct work_struct *w)
 				dcd = true;
 			else
 				dcd = false;
+			dp = get_prop_usb_dp_voltage_now(motg);
 			msm_chg_disable_dcd(motg);
 			msm_chg_enable_primary_det(motg);
 			delay = MSM_CHG_PRIMARY_DET_TIME;
@@ -3209,8 +3385,12 @@ static void msm_chg_detect_work(struct work_struct *w)
 
 			if (line_state) /* DP > VLGC or/and DM > VLGC */
 				motg->chg_type = USB_PROPRIETARY_CHARGER;
+			else if (is_dp_gnd(motg, dp))
+				motg->chg_type = USB_INVALID_CHARGER;
 			else if (!dcd && floated_charger_enable)
 				motg->chg_type = USB_FLOATED_CHARGER;
+			else if (!dcd)
+				motg->chg_type = USB_INVALID_CHARGER;
 			else
 				motg->chg_type = USB_SDP_CHARGER;
 
@@ -3485,9 +3665,30 @@ static void msm_otg_sm_work(struct work_struct *w)
 					motg->inputs, otg->phy->state);
 			switch (motg->chg_state) {
 			case USB_CHG_STATE_UNDEFINED:
+				motg->chg_det_cnt++;
 				msm_chg_detect_work(&motg->chg_work.work);
 				break;
 			case USB_CHG_STATE_DETECTED:
+				if ((USB_SDP_CHARGER != motg->chg_type) &&
+							motg->chg_det_cnt) {
+					if (motg->chg_det_cnt <=
+						USB_CHG_DET_RETRY_MAX &&
+						!(motg->chg_det_cnt > 1 &&
+						motg->typec_current_max >= 1500)) {
+						pr_warn("chg det retry=%u\n",
+							motg->chg_det_cnt);
+						motg->chg_type =
+							USB_RETRY_DET_CHARGER;
+						motg->chg_det_retrying = 2;
+					} else {
+						pr_warn("retry=%u, typec=%u\n",
+							motg->chg_det_cnt,
+							motg->typec_current_max);
+						motg->chg_type =
+							USB_INVALID_CHARGER;
+						motg->chg_det_retrying = 0;
+					}
+				}
 				switch (motg->chg_type) {
 				case USB_DCP_CHARGER:
 					/* fall through */
@@ -3545,6 +3746,31 @@ static void msm_otg_sm_work(struct work_struct *w)
 						OTG_STATE_B_PERIPHERAL;
 					mod_timer(&motg->chg_check_timer,
 							CHG_RECHECK_DELAY);
+					break;
+				case USB_INVALID_CHARGER:
+					motg->chg_type = USB_DCP_CHARGER;
+					motg->sub_type =
+						POWER_SUPPLY_SUB_TYPE_INVALID;
+					if (motg->typec_current_max >= 1500) {
+						pr_warn("TYPEC(FLOATED) %u\n",
+						motg->typec_current_max);
+						msm_otg_notify_charger(motg,
+									1500);
+					} else {
+						pr_warn("INVALID(FLOATED)\n");
+						msm_otg_notify_charger(motg,
+									500);
+					}
+					work = 0;
+					msm_otg_dbg_log_event(&motg->phy,
+					"PM RUNTIME: INVCHG PUT",
+					get_pm_runtime_counter(otg->phy->dev),
+					0);
+					pm_runtime_put_sync(otg->phy->dev);
+					break;
+				case USB_RETRY_DET_CHARGER:
+					msm_otg_notify_charger(motg, 0);
+					work = 0;
 					break;
 				default:
 					break;
@@ -3820,12 +4046,19 @@ static void msm_otg_sm_work(struct work_struct *w)
 					motg->inputs, otg->phy->state);
 			otg->default_a = 0;
 			clear_bit(A_BUS_DROP, &motg->inputs);
+			clear_bit(A_VBUS_DROP_DET, &motg->inputs);
 			otg->phy->state = OTG_STATE_B_IDLE;
 			del_timer_sync(&motg->id_timer);
 			msm_otg_link_reset(motg);
 			msm_chg_enable_aca_intr(motg);
 			msm_otg_notify_charger(motg, 0);
 			work = 1;
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+			host_send_uevent(USB_HOST_EXT_EVENT_NONE);
+#endif
+		} else if (test_bit(A_VBUS_DROP_DET, &motg->inputs)) {
+			pr_debug("vbus_drop_det\n");
+			/* staying on here until exit from A-Device */
 		} else if (!test_bit(A_BUS_DROP, &motg->inputs) &&
 				(test_bit(A_SRP_DET, &motg->inputs) ||
 				 test_bit(A_BUS_REQ, &motg->inputs))) {
@@ -3935,6 +4168,19 @@ static void msm_otg_sm_work(struct work_struct *w)
 				msm_hsusb_vbus_power(motg, 0);
 			otg->phy->state = OTG_STATE_A_WAIT_VFALL;
 			msm_otg_start_timer(motg, TA_WAIT_VFALL, A_WAIT_VFALL);
+		} else if (test_bit(A_VBUS_DROP_DET, &motg->inputs)) {
+			pr_debug("vbus_drop_det\n");
+			msm_otg_dbg_log_event(&motg->phy, "A_VBUS_DROP_DET",
+					motg->inputs, otg->phy->state);
+			clear_bit(B_CONN, &motg->inputs);
+			clear_bit(A_BUS_REQ, &motg->inputs);
+			msm_otg_del_timer(motg);
+			otg->phy->state = OTG_STATE_A_IDLE;
+			msm_otg_start_host(otg, 0);
+			msm_hsusb_vbus_power(motg, 0);
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+			host_send_uevent(USB_HOST_EXT_EVENT_VBUS_DROP);
+#endif
 		} else if (!test_bit(A_VBUS_VLD, &motg->inputs)) {
 			pr_debug("!a_vbus_vld\n");
 			msm_otg_dbg_log_event(&motg->phy, "!A_VBUS_VLD",
@@ -3978,6 +4224,22 @@ static void msm_otg_sm_work(struct work_struct *w)
 			if (!test_bit(ID_A, &motg->inputs))
 				msm_hsusb_vbus_power(motg, 0);
 			msm_otg_start_timer(motg, TA_WAIT_VFALL, A_WAIT_VFALL);
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+			host_send_uevent(USB_HOST_EXT_EVENT_NONE);
+#endif
+		} else if (test_bit(A_VBUS_DROP_DET, &motg->inputs)) {
+			pr_debug("vbus_drop_det\n");
+			msm_otg_dbg_log_event(&motg->phy, "A_VBUS_DROP_DET",
+					motg->inputs, otg->phy->state);
+			clear_bit(B_CONN, &motg->inputs);
+			clear_bit(A_BUS_REQ, &motg->inputs);
+			msm_otg_del_timer(motg);
+			otg->phy->state = OTG_STATE_A_IDLE;
+			msm_otg_start_host(otg, 0);
+			msm_hsusb_vbus_power(motg, 0);
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+			host_send_uevent(USB_HOST_EXT_EVENT_VBUS_DROP);
+#endif
 		} else if (!test_bit(A_VBUS_VLD, &motg->inputs)) {
 			pr_debug("!a_vbus_vld\n");
 			msm_otg_dbg_log_event(&motg->phy, "!A_VBUS_VLD",
@@ -4434,6 +4696,21 @@ out:
 			motg->chg_state = USB_CHG_STATE_UNDEFINED;
 			motg->chg_type = USB_INVALID_CHARGER;
 			msm_otg_notify_charger(motg, 0);
+
+			if (wake_lock_active(&motg->wlock)) {
+				pr_warn("%s: WARN: wake_lock %s is active.\n",
+						__func__, motg->wlock.ws.name);
+				pm_runtime_put_noidle(motg->phy.dev);
+				/*
+				 * Only if autosuspend was enabled in probe, it
+				 * will be used here. Otherwise, no delay will
+				 * be used.
+				 */
+				pm_runtime_mark_last_busy(motg->phy.dev);
+				pm_runtime_autosuspend(motg->phy.dev);
+				motg->pm_done = 1;
+				wake_unlock(&motg->wlock);
+			}
 		}
 		return;
 	}
@@ -4463,6 +4740,8 @@ static void msm_id_status_w(struct work_struct *w)
 		motg->id_state = gpio_get_value(motg->pdata->usb_id_gpio);
 	else if (motg->phy_irq)
 		motg->id_state = msm_otg_read_phy_id_state(motg);
+
+	msm_otg_select_usb_switch(motg);
 
 	if (motg->err_event_seen)
 		return;
@@ -4845,6 +5124,29 @@ otg_get_prop_usbin_voltage_now(struct msm_otg *motg)
 	}
 }
 
+#define USB_DP		67
+static int get_prop_usb_dp_voltage_now(struct msm_otg *motg)
+{
+	struct qpnp_vadc_result results;
+	int rc;
+
+	if (IS_ERR_OR_NULL(motg->vadc_dev)) {
+		motg->vadc_dev = qpnp_get_vadc(motg->phy.dev, "usbin");
+		if (IS_ERR(motg->vadc_dev))
+			return PTR_ERR(motg->vadc_dev);
+	}
+
+	rc = qpnp_vadc_read(motg->vadc_dev, USB_DP, &results);
+	if (rc) {
+		pr_err("Unable to read usb_dp rc=%d\n", rc);
+		return rc;
+	} else if (results.physical < INT_MIN || INT_MAX < results.physical) {
+		return -EOVERFLOW;
+	} else {
+		return results.physical;
+	}
+}
+
 static int msm_otg_pmic_dp_dm(struct msm_otg *motg, int value)
 {
 	int ret = 0;
@@ -4878,6 +5180,57 @@ static int msm_otg_pmic_dp_dm(struct msm_otg *motg, int value)
 	return ret;
 }
 
+static const char *get_charger_type_string(struct power_supply *psy)
+{
+	struct msm_otg *motg = container_of(psy, struct msm_otg, usb_psy);
+	const char *ret;
+
+	if (motg->chg_type == USB_DCP_CHARGER) {
+		if (psy->type == POWER_SUPPLY_TYPE_USB_HVDCP)
+			ret = "USB_HVDCP_CHARGER";
+		else if (psy->type == POWER_SUPPLY_TYPE_USB_HVDCP_3)
+			ret = "USB_HVDCP_3_CHARGER";
+		else if (motg->sub_type == POWER_SUPPLY_SUB_TYPE_PROPRIETARY)
+			ret = "USB_PROPRIETARY_CHARGER";
+		else if (motg->sub_type ==
+				POWER_SUPPLY_SUB_TYPE_PROPRIETARY_1000MA)
+			ret = "USB_PROPRIETARY_1000MA";
+		else if (motg->sub_type ==
+				POWER_SUPPLY_SUB_TYPE_PROPRIETARY_500MA)
+			ret = "USB_PROPRIETARY_500MA";
+		else if (motg->sub_type == POWER_SUPPLY_SUB_TYPE_INVALID) {
+			if (motg->typec_current_max)
+				ret = "TYPE-C_DPDM_FLOATED_CHARGER";
+			else
+				ret = "UNKNOWN_CHARGER";
+		} else
+			ret = chg_to_string(motg->chg_type);
+	} else {
+		ret = chg_to_string(motg->chg_type);
+	}
+
+	return ret;
+}
+
+#define MICRO_5V    5000000
+#define MICRO_9V    9000000
+static int get_prop_usb_voltage_max(struct power_supply *psy)
+{
+	int val = 0;
+
+	switch (psy->type) {
+	case POWER_SUPPLY_TYPE_USB_HVDCP:
+	case POWER_SUPPLY_TYPE_USB_HVDCP_3:
+		val = MICRO_9V;
+		break;
+	default:
+		val = MICRO_5V;
+		break;
+	}
+
+	return val;
+}
+
 static int otg_power_get_property_usb(struct power_supply *psy,
 				  enum power_supply_property psp,
 				  union power_supply_propval *val)
@@ -4891,7 +5244,7 @@ static int otg_power_get_property_usb(struct power_supply *psy,
 			val->intval = POWER_SUPPLY_SCOPE_DEVICE;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
-		val->intval = motg->voltage_max;
+		val->intval = get_prop_usb_voltage_max(psy);
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		val->intval = motg->current_max;
@@ -4921,6 +5274,13 @@ static int otg_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_USB_OTG:
 		val->intval = !motg->id_state;
 		break;
+	case POWER_SUPPLY_PROP_SUB_TYPE:
+		val->intval = motg->sub_type;
+		break;
+	case POWER_SUPPLY_PROP_CHARGER_TYPE:
+		val->strval = get_charger_type_string(psy);
+		break;
+
 	default:
 		return -EINVAL;
 	}
@@ -4943,6 +5303,12 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_DP_DM:
 		msm_otg_pmic_dp_dm(motg, val->intval);
 		break;
+	case POWER_SUPPLY_PROP_USBIN_DET:
+		dev_dbg(motg->phy.dev, "%s: notify ext_bsv event %d\n",
+							__func__, val->intval);
+		motg->usbin_state = val->intval ? true : false;
+		msm_otg_select_usb_switch(motg);
+		return 0;
 	/* Process PMIC notification in PRESENT prop */
 	case POWER_SUPPLY_PROP_PRESENT:
 		msm_otg_set_vbus_state(val->intval);
@@ -4961,13 +5327,18 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 		motg->typec_current_max = val->intval;
 		msm_otg_dbg_log_event(&motg->phy, "type-c charger",
 					val->intval, motg->bc1p2_current_max);
+#ifndef NOT_USE_TYPEC_CURRENT
 		/* Update chg_current as per type-c charger detection on VBUS */
 		if (motg->chg_type != USB_INVALID_CHARGER) {
 			dev_dbg(motg->phy.dev, "update type-c charger\n");
 			msm_otg_notify_charger(motg, motg->bc1p2_current_max);
 		}
+#endif
 		break;
 	case POWER_SUPPLY_PROP_TYPE:
+		if (motg->sub_type == POWER_SUPPLY_SUB_TYPE_INVALID &&
+					val->intval == POWER_SUPPLY_TYPE_USB)
+			break;
 		psy->type = val->intval;
 
 		/*
@@ -4984,6 +5355,7 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 		if (motg->chg_state == USB_CHG_STATE_DETECTED)
 			break;
 
+		motg->sub_type = POWER_SUPPLY_SUB_TYPE_UNKNOWN;
 		switch (psy->type) {
 		case POWER_SUPPLY_TYPE_USB:
 			motg->chg_type = USB_SDP_CHARGER;
@@ -5006,10 +5378,30 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 			break;
 		}
 
+		if (motg->chg_type == USB_INVALID_CHARGER &&
+						motg->chg_det_retrying) {
+			dev_dbg(motg->phy.dev, "%s: decriment retrying=%u\n",
+					__func__, motg->chg_det_retrying);
+			motg->chg_det_retrying--;
+		}
+
+		if ((motg->chg_type == USB_SDP_CHARGER) &&
+				(motg->chg_state != USB_CHG_STATE_DETECTED)) {
+			dev_dbg(motg->phy.dev, "%s: SDP/FLOATED\n", __func__);
+			motg->chg_type = USB_INVALID_CHARGER;
+		}
+
 		if (motg->chg_type != USB_INVALID_CHARGER) {
 			if (motg->chg_type == USB_DCP_CHARGER)
 				motg->is_ext_chg_dcp = true;
 			motg->chg_state = USB_CHG_STATE_DETECTED;
+			motg->chg_det_retrying = 0;
+		}
+
+		if (!motg->chg_det_retrying) {
+			dev_info(motg->phy.dev, "%s: clear retry count=%u\n",
+						 __func__, motg->chg_det_cnt);
+			motg->chg_det_cnt = 0;
 		}
 
 		dev_dbg(motg->phy.dev, "%s: charger type = %s\n", __func__,
@@ -5019,6 +5411,11 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		motg->usbin_health = val->intval;
+		break;
+	case POWER_SUPPLY_PROP_SUB_TYPE:
+		if (motg->sub_type == POWER_SUPPLY_SUB_TYPE_INVALID)
+			break;
+		motg->sub_type = val->intval;
 		break;
 	default:
 		return -EINVAL;
@@ -5064,6 +5461,8 @@ static enum power_supply_property otg_pm_power_props_usb[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_DP_DM,
 	POWER_SUPPLY_PROP_USB_OTG,
+	POWER_SUPPLY_PROP_SUB_TYPE,
+	POWER_SUPPLY_PROP_CHARGER_TYPE,
 };
 
 const struct file_operations msm_otg_bus_fops = {
@@ -5561,6 +5960,36 @@ static ssize_t dpdm_pulldown_enable_store(struct device *dev,
 static DEVICE_ATTR(dpdm_pulldown_enable, S_IRUGO | S_IWUSR,
 		dpdm_pulldown_enable_show, dpdm_pulldown_enable_store);
 
+static void msm_otg_phy_init_dump(char *log, int num, int *init_seq)
+{
+	#define PARAM_STRFMT "0x%08x, "
+	#define PARAM_STRLEN 12
+	char *params;
+	int i;
+	int length;
+
+	if (!log || !init_seq)
+		return;
+
+	params = kzalloc(PARAM_STRLEN * num + 1, GFP_KERNEL);
+	if (!params)
+		return;
+
+	length = 0;
+	for (i = 0; i < num; i++) {
+		int ret = snprintf(&params[length],
+				PARAM_STRLEN + 1,
+				PARAM_STRFMT,
+				init_seq[i]);
+		if (ret < 0)
+			break;
+		length += ret;
+	}
+
+	pr_info("%s: num=%d: %s\n", log, num, params);
+	kfree(params);
+}
+
 struct msm_otg_platform_data *msm_otg_dt_to_pdata(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
@@ -5581,6 +6010,24 @@ struct msm_otg_platform_data *msm_otg_dt_to_pdata(struct platform_device *pdev)
 		of_property_read_u32_array(node, "qcom,hsusb-otg-phy-init-seq",
 				pdata->phy_init_seq,
 				len/sizeof(*pdata->phy_init_seq));
+		msm_otg_phy_init_dump("HUSB PHY Init",
+					len / sizeof(*pdata->phy_init_seq),
+					pdata->phy_init_seq);
+	}
+	len = 0;
+	of_get_property(node, "qcom,hsusb-otg-phy-init-seq-host", &len);
+	if (len) {
+		pdata->phy_init_seq_host = devm_kzalloc(&pdev->dev, len,
+								GFP_KERNEL);
+		if (!pdata->phy_init_seq_host)
+			return NULL;
+		of_property_read_u32_array(node,
+				"qcom,hsusb-otg-phy-init-seq-host",
+				pdata->phy_init_seq_host,
+				len / sizeof(*pdata->phy_init_seq_host));
+		msm_otg_phy_init_dump("HUSB PHY Init Host",
+					len / sizeof(*pdata->phy_init_seq_host),
+					pdata->phy_init_seq_host);
 	}
 	of_property_read_u32(node, "qcom,hsusb-otg-power-budget",
 				&pdata->power_budget);
@@ -5626,6 +6073,11 @@ struct msm_otg_platform_data *msm_otg_dt_to_pdata(struct platform_device *pdev)
 			of_get_named_gpio(node, "qcom,sw-sel-gpio", 0);
 	if (pdata->switch_sel_gpio < 0)
 		pr_debug("switch_sel_gpio is not available\n");
+
+	pdata->usb_switch_sel_gpio =
+			of_get_named_gpio(node, "qcom,usb-switch-sel-gpio", 0);
+	if (pdata->usb_switch_sel_gpio < 0)
+		pr_debug("usb_switch_sel_gpio is not available\n");
 
 	pdata->usb_id_gpio =
 			of_get_named_gpio(node, "qcom,usbid-gpio", 0);
@@ -6526,12 +6978,36 @@ static int msm_otg_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void msm_otg_wait_vbus_settled_down(struct msm_otg *motg, int mv,
+							int itvl, int tmout)
+{
+	int rc;
+	int cnt = 0;
+	int usbin = mv;
+
+	do {
+		msleep(itvl);
+		rc = otg_get_prop_usbin_voltage_now(motg);
+		if (IS_ERR_VALUE(rc))
+			goto waitremain;
+		usbin = rc / 1000;
+		cnt++;
+	} while (usbin >= mv && tmout > (cnt * itvl));
+waitremain:
+	if (usbin >= mv && tmout > (cnt * itvl))
+		msleep(tmout - (cnt * itvl));
+}
+
 static void msm_otg_shutdown(struct platform_device *pdev)
 {
 	struct msm_otg *motg = platform_get_drvdata(pdev);
 
 	dev_dbg(&pdev->dev, "OTG shutdown\n");
 	msm_hsusb_vbus_power(motg, 0);
+	if (!motg->usbin_state)
+		msm_otg_wait_vbus_settled_down(motg, USB_VBUS_WAIT_VOLT,
+				USB_VBUS_WAIT_ITVL, USB_VBUS_WAIT_TMOUT);
+
 }
 
 #ifdef CONFIG_PM_RUNTIME

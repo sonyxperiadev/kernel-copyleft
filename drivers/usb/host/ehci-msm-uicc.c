@@ -1,6 +1,6 @@
 /* ehci-msm-uicc.c - UICC (Full-Speed) Host Controller Driver Implementation
  *
- * Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2008-2014, 2016, The Linux Foundation. All rights reserved.
  *
  * Partly derived from ehci-fsl.c and ehci-hcd.c
  * Copyright (c) 2000-2004 by David Brownell
@@ -35,6 +35,7 @@
 #include <linux/clk/msm-clk.h>
 #include <linux/msm-bus.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
 
 #include <linux/usb.h>
@@ -42,10 +43,6 @@
 #include <linux/usb/msm_hsusb_hw.h>
 
 #include "ehci.h"
-
-static bool uicc_card_present;
-module_param(uicc_card_present, bool, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(uicc_card_present, "UICC card is inserted");
 
 #define MSM_USB_BASE (hcd->regs)
 
@@ -60,6 +57,7 @@ struct uicc_hcd {
 	struct clk *alt_core_clk;
 	bool clocks_on;
 	uint32_t bus_voter;
+	struct regulator *hsusb_3p3;
 };
 
 static struct uicc_hcd *hcd_to_uhcd(struct usb_hcd *hcd)
@@ -173,36 +171,24 @@ out:
 
 static int ehci_msm_uicc_bus_suspend(struct usb_hcd *hcd)
 {
-	struct uicc_hcd *uhcd = hcd_to_uhcd(hcd);
 	int ret;
 
+	pr_debug("ehci-msm-uicc bus suspend\n");
 	ret = ehci_bus_suspend(hcd);
 	if (ret < 0) {
 		pr_err("Fail to suspend the bus\n");
 		goto out;
 	}
-	ehci_msm_uicc_disable_clocks(uhcd);
-	pinctrl_select_state(uhcd->pinctrl, uhcd->sleep_ps);
 
-	if (uhcd->bus_voter)
-		msm_bus_scale_client_update_request(uhcd->bus_voter, 0);
-	pm_relax(uhcd->dev);
 out:
 	return ret;
 }
 
 static int ehci_msm_uicc_bus_resume(struct usb_hcd *hcd)
 {
-	struct uicc_hcd *uhcd = hcd_to_uhcd(hcd);
 	int ret;
 
-	pm_stay_awake(uhcd->dev);
-	if (uhcd->bus_voter)
-		msm_bus_scale_client_update_request(uhcd->bus_voter, 1);
-
-	pinctrl_select_state(uhcd->pinctrl, uhcd->active_ps);
-
-	ehci_msm_uicc_enable_clocks(uhcd);
+	pr_debug("ehci-msm-uicc bus resume\n");
 
 	ret = ehci_bus_resume(hcd);
 	if (ret < 0)
@@ -262,11 +248,84 @@ out:
 
 static const struct ehci_driver_overrides ehci_msm_uicc_overrides = {
 	.extra_priv_size = sizeof(struct uicc_hcd),
-	.flags = HCD_MEMORY | HCD_USB11,
+	.flags = HCD_MEMORY | HCD_USB2,
 	.reset = ehci_msm_uicc_reset,
 	.bus_suspend = ehci_msm_uicc_bus_suspend,
 	.bus_resume = ehci_msm_uicc_bus_resume,
 };
+
+#define FSUSB_PHY_3P3_VOL_MIN		3050000 /* uV */
+#define FSUSB_PHY_3P3_VOL_MAX		3300000 /* uV */
+#define FSUSB_PHY_3P3_HPM_LOAD		50000	/* uA */
+
+static int ehci_msm_uicc_ldo_init(struct uicc_hcd *uhcd, int init)
+{
+	int rc = 0;
+
+	if (!init)
+		goto deinit;
+
+	uhcd->hsusb_3p3 = devm_regulator_get(uhcd->dev, "HSUSB_3p3");
+	if (IS_ERR(uhcd->hsusb_3p3)) {
+		dev_err(uhcd->dev, "unable to get hsusb 3p3\n");
+		return PTR_ERR(uhcd->hsusb_3p3);
+	}
+
+	rc = regulator_set_voltage(uhcd->hsusb_3p3,
+			FSUSB_PHY_3P3_VOL_MAX, FSUSB_PHY_3P3_VOL_MAX);
+	if (rc) {
+		dev_err(uhcd->dev, "unable to set voltage level for LDO\n");
+		return rc;
+	}
+	return 0;
+
+deinit:
+	regulator_set_voltage(uhcd->hsusb_3p3, 0, FSUSB_PHY_3P3_VOL_MAX);
+	return 0;
+}
+
+static int ehci_msm_ldo_enable(struct uicc_hcd *uhcd, int on)
+{
+	int ret = 0;
+
+	if (IS_ERR(uhcd->hsusb_3p3)) {
+		dev_err(uhcd->dev, "%s: HSUSB_3p3 is not initialized\n",
+								__func__);
+		return 0;
+	}
+
+	if (on) {
+		ret = regulator_set_optimum_mode(uhcd->hsusb_3p3,
+						FSUSB_PHY_3P3_HPM_LOAD);
+		if (ret < 0) {
+			dev_err(uhcd->dev, "%s: Unable to set HPM\n", __func__);
+			return ret;
+		}
+
+		ret = regulator_enable(uhcd->hsusb_3p3);
+		if (ret) {
+			dev_err(uhcd->dev, "%s: unable to enable the LDO\n",
+								__func__);
+			regulator_set_optimum_mode(uhcd->hsusb_3p3, 0);
+			return ret;
+		}
+
+	} else {
+		ret = regulator_disable(uhcd->hsusb_3p3);
+		if (ret) {
+			dev_err(uhcd->dev, "%s: unable to disable LDO\n",
+								__func__);
+			return ret;
+		}
+		ret = regulator_set_optimum_mode(uhcd->hsusb_3p3, 0);
+		if (ret < 0)
+			dev_err(uhcd->dev, "%s: Unable to set LPM\n", __func__);
+	}
+
+	dev_dbg(uhcd->dev, "reg (%s)\n", on ? "HPM" : "LPM");
+
+	return ret < 0 ? ret : 0;
+}
 
 static u64 ehci_msm_uicc_dma_mask = DMA_BIT_MASK(64);
 static struct hc_driver ehci_msm_uicc_hc_driver;
@@ -278,12 +337,6 @@ static int ehci_msm_uicc_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct msm_bus_scale_pdata *table;
 	int ret;
-
-	if (!uicc_card_present) {
-		pr_debug("UICC card is not inserted\n");
-		ret = -ENODEV;
-		goto out;
-	}
 
 	pdev->dev.dma_mask = &ehci_msm_uicc_dma_mask;
 	ehci_init_driver(&ehci_msm_uicc_hc_driver, &ehci_msm_uicc_overrides);
@@ -372,8 +425,14 @@ static int ehci_msm_uicc_probe(struct platform_device *pdev)
 		goto disable_clk_bus;
 	}
 
-	hcd_to_bus(hcd)->skip_resume = true;
-
+	ret = ehci_msm_uicc_ldo_init(uhcd, 1);
+	if (ret) {
+		dev_err(&pdev->dev, "hsusb vreg configuration failed\n");
+	} else {
+		ret = ehci_msm_ldo_enable(uhcd, 1);
+		if (ret)
+			dev_err(&pdev->dev, "hsusb vreg enable failed\n");
+	}
 	/*
 	 * We manage the clocks and gpio as part of
 	 * the root hub PM. The platform driver runtime
@@ -391,7 +450,6 @@ static int ehci_msm_uicc_probe(struct platform_device *pdev)
 	 * use to control the system sleep.
 	 */
 	device_init_wakeup(&pdev->dev, 1);
-	pm_stay_awake(&pdev->dev);
 
 	return 0;
 
@@ -428,23 +486,64 @@ static int ehci_msm_uicc_remove(struct platform_device *pdev)
 
 	pm_runtime_put_noidle(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
-	pm_relax(&pdev->dev);
 
 	return 0;
 }
 
 static const struct of_device_id ehci_msm2_dt_match[] = {
-	{ .compatible = "qcom,ehci-uicc-host",
+	{ .compatible = "qcom,ehci-host",
 	},
 	{}
 };
 
+#ifdef CONFIG_PM_SLEEP
+static int ehci_msm_uicc_pm_suspend(struct device *dev)
+{
+	struct usb_hcd *hcd = dev_get_drvdata(dev);
+	struct uicc_hcd *uhcd = hcd_to_uhcd(hcd);
+
+	dev_dbg(dev, "ehci-msm-uicc PM suspend\n");
+	ehci_msm_uicc_disable_clocks(uhcd);
+	pinctrl_select_state(uhcd->pinctrl, uhcd->sleep_ps);
+
+	if (uhcd->bus_voter)
+		msm_bus_scale_client_update_request(uhcd->bus_voter, 0);
+
+	return 0;
+}
+
+static int ehci_msm_uicc_pm_resume(struct device *dev)
+{
+	struct usb_hcd *hcd = dev_get_drvdata(dev);
+	struct uicc_hcd *uhcd = hcd_to_uhcd(hcd);
+
+	dev_dbg(dev, "ehci-msm-uicc PM resume\n");
+
+	if (uhcd->bus_voter)
+		msm_bus_scale_client_update_request(uhcd->bus_voter, 1);
+
+	pinctrl_select_state(uhcd->pinctrl, uhcd->active_ps);
+
+	ehci_msm_uicc_enable_clocks(uhcd);
+
+	return 0;
+}
+#endif
+#ifdef CONFIG_PM
+static const struct dev_pm_ops ehci_msm_uicc_dev_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(ehci_msm_uicc_pm_suspend,
+				ehci_msm_uicc_pm_resume)
+};
+#endif
 static struct platform_driver ehci_msm_uicc_driver = {
 	.probe = ehci_msm_uicc_probe,
 	.remove = ehci_msm_uicc_remove,
 	.driver = {
 		.name = "msm_ehci_uicc",
 		.owner = THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm = &ehci_msm_uicc_dev_pm_ops,
+#endif
 		.of_match_table = ehci_msm2_dt_match,
 	},
 };

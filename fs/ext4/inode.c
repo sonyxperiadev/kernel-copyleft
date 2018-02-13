@@ -17,6 +17,11 @@
  *
  *  Assorted race fixes, rewrite of ext4_get_block() by Al Viro, 2000
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/fs.h>
 #include <linux/time.h>
@@ -825,7 +830,7 @@ int ext4_get_block(struct inode *inode, sector_t iblock,
  * `handle' can be NULL if create is zero
  */
 struct buffer_head *ext4_getblk(handle_t *handle, struct inode *inode,
-				ext4_lblk_t block, int create, int *errp)
+				ext4_lblk_t block, int create)
 {
 	struct ext4_map_blocks map;
 	struct buffer_head *bh;
@@ -839,19 +844,14 @@ struct buffer_head *ext4_getblk(handle_t *handle, struct inode *inode,
 			      create ? EXT4_GET_BLOCKS_CREATE : 0);
 
 	/* ensure we send some value back into *errp */
-	*errp = 0;
-
-	if (create && err == 0)
-		err = -ENOSPC;	/* should never happen */
+	if (err == 0)
+		return create ? ERR_PTR(-ENOSPC) : NULL;
 	if (err < 0)
-		*errp = err;
-	if (err <= 0)
-		return NULL;
+		return ERR_PTR(err);
 
 	bh = sb_getblk(inode->i_sb, map.m_pblk);
 	if (unlikely(!bh)) {
-		*errp = -ENOMEM;
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 	if (map.m_flags & EXT4_MAP_NEW) {
 		J_ASSERT(create != 0);
@@ -880,7 +880,6 @@ struct buffer_head *ext4_getblk(handle_t *handle, struct inode *inode,
 		BUFFER_TRACE(bh, "not a new buffer");
 	}
 	if (fatal) {
-		*errp = fatal;
 		brelse(bh);
 		bh = NULL;
 	}
@@ -888,22 +887,21 @@ struct buffer_head *ext4_getblk(handle_t *handle, struct inode *inode,
 }
 
 struct buffer_head *ext4_bread(handle_t *handle, struct inode *inode,
-			       ext4_lblk_t block, int create, int *err)
+			       ext4_lblk_t block, int create)
 {
 	struct buffer_head *bh;
 
-	bh = ext4_getblk(handle, inode, block, create, err);
-	if (!bh)
+	bh = ext4_getblk(handle, inode, block, create);
+	if (IS_ERR(bh))
 		return bh;
-	if (buffer_uptodate(bh))
+	if (!bh || buffer_uptodate(bh))
 		return bh;
 	ll_rw_block(READ | REQ_META | REQ_PRIO, 1, &bh);
 	wait_on_buffer(bh);
 	if (buffer_uptodate(bh))
 		return bh;
 	put_bh(bh);
-	*err = -EIO;
-	return NULL;
+	return ERR_PTR(-EIO);
 }
 
 int ext4_walk_page_buffers(handle_t *handle,
@@ -3097,7 +3095,7 @@ static void ext4_end_io_dio(struct kiocb *iocb, loff_t offset,
 	if (!(io_end->flag & EXT4_IO_END_UNWRITTEN)) {
 		ext4_free_io_end(io_end);
 out:
-		inode_dio_done(inode);
+		inode_dio_end(inode);
 		if (is_async)
 			aio_complete(iocb, ret, 0);
 		return;
@@ -3155,7 +3153,7 @@ static ssize_t ext4_ext_direct_IO(int rw, struct kiocb *iocb,
 	overwrite = *((int *)iocb->private);
 
 	if (overwrite) {
-		atomic_inc(&inode->i_dio_count);
+		inode_dio_begin(inode);
 		down_read(&EXT4_I(inode)->i_data_sem);
 		mutex_unlock(&inode->i_mutex);
 	}
@@ -3248,7 +3246,7 @@ static ssize_t ext4_ext_direct_IO(int rw, struct kiocb *iocb,
 retake_lock:
 	/* take i_mutex locking again if we do a ovewrite dio */
 	if (overwrite) {
-		inode_dio_done(inode);
+		inode_dio_end(inode);
 		up_read(&EXT4_I(inode)->i_data_sem);
 		mutex_lock(&inode->i_mutex);
 	}
@@ -5237,6 +5235,11 @@ int ext4_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	sb_start_pagefault(inode->i_sb);
 	file_update_time(vma->vm_file);
+
+	ret = ext4_convert_inline_data(inode);
+	if (ret)
+		goto out_ret;
+
 	/* Delalloc case is easy... */
 	if (test_opt(inode->i_sb, DELALLOC) &&
 	    !ext4_should_journal_data(inode) &&

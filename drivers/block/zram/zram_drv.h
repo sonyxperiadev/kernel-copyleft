@@ -11,12 +11,17 @@
  * Released under the terms of GNU General Public License Version 2.0
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _ZRAM_DRV_H_
 #define _ZRAM_DRV_H_
 
 #include <linux/spinlock.h>
-#include <linux/zsmalloc.h>
+#include <linux/zpool.h>
 
 #include "zcomp.h"
 
@@ -67,7 +72,8 @@ static const size_t max_zpage_size = PAGE_SIZE / 10 * 9;
 enum zram_pageflags {
 	/* Page consists entirely of zeros */
 	ZRAM_ZERO = ZRAM_FLAG_SHIFT,
-        ZRAM_ACCESS,    /* page is now accessed */
+	ZRAM_ACCESS,	/* page is now accessed */
+
 	__NR_ZRAM_PAGEFLAGS,
 };
 
@@ -95,31 +101,29 @@ struct zram_stats {
 
 struct zram_meta {
 	struct zram_table_entry *table;
-	struct zs_pool *mem_pool;
+	struct zpool *mem_pool;
 };
-
 
 struct zram {
 	struct zram_meta *meta;
 	struct zcomp *comp;
 	struct gendisk *disk;
-
 	/* Prevent concurrent execution of device init */
 	struct rw_semaphore init_lock;
 	/*
 	 * the number of pages zram can consume for storing compressed data
 	 */
 	unsigned long limit_pages;
-	int max_comp_streams;
+
 	struct zram_stats stats;
 	atomic_t refcount; /* refcount for zram_meta */
-        /* wait all IO under all of cpu are done */
-        wait_queue_head_t io_done;
+	/* wait all IO under all of cpu are done */
+	wait_queue_head_t io_done;
 	/*
 	 * This is the limit on amount of *uncompressed* worth of data
-         * we can store in a disk.
+	 * we can store in a disk.
 	 */
-	u64 disksize;   /* bytes */
+	u64 disksize;	/* bytes */
 	char compressor[10];
 };
 #endif

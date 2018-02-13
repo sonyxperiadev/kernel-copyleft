@@ -49,6 +49,11 @@
  *	This module is a difficult issue. It's clearly inet code but it's also clearly
  *	driver code belonging close to PPP and SLIP
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/slab.h>

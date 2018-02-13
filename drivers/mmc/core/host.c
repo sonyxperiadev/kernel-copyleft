@@ -12,6 +12,11 @@
  *
  *  MMC host class device management
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/device.h>
 #include <linux/err.h>
@@ -133,6 +138,9 @@ static int mmc_host_runtime_resume(struct device *dev)
 		goto out;
 
 	if (host->card && !ret && mmc_card_cmdq(host->card)) {
+		mmc_host_clk_hold(host);
+		host->cmdq_ops->enable(host);
+		mmc_host_clk_release(host);
 		ret = mmc_cmdq_halt(host, false);
 		if (ret)
 			pr_err("%s: un-halt: failed: %d\n", __func__, ret);
@@ -249,6 +257,9 @@ static int mmc_host_resume(struct device *dev)
 			pr_err("%s: %s: failed: ret: %d\n", mmc_hostname(host),
 			       __func__, ret);
 		} else if (host->card && mmc_card_cmdq(host->card)) {
+			mmc_host_clk_hold(host);
+			host->cmdq_ops->enable(host);
+			mmc_host_clk_release(host);
 			ret = mmc_cmdq_halt(host, false);
 			if (ret)
 				pr_err("%s: un-halt: failed: %d\n",
@@ -692,6 +703,12 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 
 	dev_set_name(&host->class_dev, "mmc%d", host->index);
 
+	host->dbg_hist = kzalloc(sizeof(struct cmd_history) *
+			MAX_DBG_CMD_HISTORY_ENTRIES, GFP_KERNEL);
+	if (!host->dbg_hist)
+		goto free;
+	host->dbg_hist_index = 0;
+
 	host->parent = dev;
 	host->class_dev.parent = dev;
 	host->class_dev.class = &mmc_host_class;
@@ -704,6 +721,9 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 
 	spin_lock_init(&host->lock);
 	init_waitqueue_head(&host->wq);
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	init_waitqueue_head(&host->defer_wq);
+#endif
 	host->wlock_name = kasprintf(GFP_KERNEL,
 			"%s_detect", mmc_hostname(host));
 	wake_lock_init(&host->detect_wake_lock, WAKE_LOCK_SUSPEND,

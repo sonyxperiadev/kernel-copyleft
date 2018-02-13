@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/interrupt.h>
@@ -2294,7 +2299,11 @@ int mdss_dsi_cmd_mdp_busy(struct mdss_dsi_ctrl_pdata *ctrl)
 			if (mdss_dsi_mdp_busy_tout_check(ctrl)) {
 				pr_err("%s: timeout error\n", __func__);
 				MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0_ctrl",
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+				"dsi0_phy", "dsi1_ctrl", "dsi1_phy");
+#else
 				"dsi0_phy", "dsi1_ctrl", "dsi1_phy", "panic");
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 			}
 		}
 	}

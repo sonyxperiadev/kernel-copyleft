@@ -1,6 +1,11 @@
 /*
  * CPU subsystem support
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -277,6 +282,42 @@ static ssize_t __ref store_sched_mostly_idle_nr_run(struct device *dev,
 	return err;
 }
 
+static ssize_t show_sched_mostly_occupied_load(struct device *dev,
+		 struct device_attribute *attr, char *buf)
+{
+	struct cpu *cpu = container_of(dev, struct cpu, dev);
+	ssize_t rc;
+	int cpunum;
+	int mostly_occupied_pct;
+
+	cpunum = cpu->dev.id;
+
+	mostly_occupied_pct = sched_get_cpu_mostly_occupied_load(cpunum);
+
+	rc = snprintf(buf, PAGE_SIZE-2, "%d\n", mostly_occupied_pct);
+
+	return rc;
+}
+
+static ssize_t __ref store_sched_mostly_occupied_load(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct cpu *cpu = container_of(dev, struct cpu, dev);
+	int cpuid = cpu->dev.id;
+	int mostly_occupied_load, err;
+
+	err = kstrtoint(strstrip((char *)buf), 0, &mostly_occupied_load);
+	if (err)
+		return err;
+
+	err = sched_set_cpu_mostly_occupied_load(cpuid, mostly_occupied_load);
+	if (err >= 0)
+		err = count;
+
+	return err;
+}
+
 static ssize_t show_sched_prefer_idle(struct device *dev,
 		 struct device_attribute *attr, char *buf)
 {
@@ -317,6 +358,9 @@ static DEVICE_ATTR(sched_mostly_idle_freq, 0664, show_sched_mostly_idle_freq,
 						store_sched_mostly_idle_freq);
 static DEVICE_ATTR(sched_mostly_idle_load, 0664, show_sched_mostly_idle_load,
 						store_sched_mostly_idle_load);
+static DEVICE_ATTR(sched_mostly_occupied_load, 0664,
+		   show_sched_mostly_occupied_load,
+		   store_sched_mostly_occupied_load);
 static DEVICE_ATTR(sched_mostly_idle_nr_run, 0664,
 		show_sched_mostly_idle_nr_run, store_sched_mostly_idle_nr_run);
 static DEVICE_ATTR(sched_prefer_idle, 0664,
@@ -498,6 +542,9 @@ int __cpuinit register_cpu(struct cpu *cpu, int num)
 	if (!error)
 		error = device_create_file(&cpu->dev,
 					 &dev_attr_sched_mostly_idle_load);
+	if (!error)
+		error = device_create_file(&cpu->dev,
+					 &dev_attr_sched_mostly_occupied_load);
 	if (!error)
 		error = device_create_file(&cpu->dev,
 					 &dev_attr_sched_mostly_idle_nr_run);

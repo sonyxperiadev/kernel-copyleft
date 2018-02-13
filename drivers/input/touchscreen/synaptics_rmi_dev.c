@@ -309,6 +309,11 @@ static ssize_t rmidev_read(struct file *filp, char __user *buf,
 		goto unlock;
 	}
 
+	tmpbuf = kzalloc(count + 1, GFP_KERNEL);
+	if (!tmpbuf)
+		return -ENOMEM;
+
+
 	if (*f_pos > REG_ADDR_LIMIT) {
 		retval = -EFAULT;
 		goto unlock;
@@ -371,6 +376,10 @@ static ssize_t rmidev_write(struct file *filp, const char __user *buf,
 	if (count == 0) {
 		retval = 0;
 		goto unlock;
+	}
+
+	if (copy_from_user(tmpbuf, buf, count)) {
+		kfree(tmpbuf);
 	}
 
 	tmpbuf = kzalloc(count + 1, GFP_KERNEL);

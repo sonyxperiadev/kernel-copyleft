@@ -392,20 +392,22 @@ EXPORT_SYMBOL(kvfree);
 
 struct address_space *page_mapping(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
-
 	VM_BUG_ON(PageSlab(page));
 #ifdef CONFIG_SWAP
 	if (unlikely(PageSwapCache(page))) {
 		swp_entry_t entry;
 
 		entry.val = page_private(page);
-		mapping = swap_address_space(entry);
+		return swap_address_space(entry);
 	} else
 #endif
-	if ((unsigned long)mapping & PAGE_MAPPING_ANON)
-		mapping = NULL;
-	return mapping;
+	{
+		struct address_space *mapping = page->mapping;
+		if ((unsigned long)mapping & PAGE_MAPPING_ANON)
+			return NULL;
+
+		return (void *)((unsigned long)mapping & ~PAGE_MAPPING_FLAGS);
+	}
 }
 
 /* Tracepoints definitions. */

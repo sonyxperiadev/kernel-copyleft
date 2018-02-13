@@ -1,0 +1,24 @@
+Ramdump Debug Memory
+
+Debug memory contains necessary information for ramdump to dump
+the memory.This memory is used as a bridge between Android and
+ramdump.
+
+This memory is used by the modules mentioned below:
+a) Rdtags
+b) Ramdump Memory Descriptors
+
+
+Required Properties:
+-compatible: "qcom,debug_region"
+-reg: Specifies the physical address of the debug memory region and its size
+
+Example:
+	debug_region: debug_region@0 {
+		compatible = "qcom,debug_memory";
+		linux,reserve-contiguous-region;
+		linux,reserve-region;
+		linux,remove-completely;
+		reg = <0 0x57E00000 0 0x100000>;
+		label = "debug_mem";
+	};

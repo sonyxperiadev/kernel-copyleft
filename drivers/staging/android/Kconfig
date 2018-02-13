@@ -35,14 +35,54 @@ config ANDROID_LOW_MEMORY_KILLER
 	---help---
 	  Registers processes to be killed when memory is low
 
+config ANDROID_LOW_MEMORY_KILLER_TNG
+	bool "Android Low Memory Killer TNG"
+	select OOM_SCORE_NOTIFIER
+
+	---help---
+	  The NEXT generation (TNG) lowmemorykiller.
+	  Registers processes to be killed when low memory conditions, this is useful
+	  as there is no particular swap space on android.
+
+	  The registered process will kills according to the priorities in android init
+	  scripts (/init.rc), and it defines priority values with minimum free memory size
+	  for each priority.
+
 config ANDROID_LOW_MEMORY_KILLER_AUTODETECT_OOM_ADJ_VALUES
 	bool "Android Low Memory Killer: detect oom_adj values"
-	depends on ANDROID_LOW_MEMORY_KILLER
+	depends on ANDROID_LOW_MEMORY_KILLER || ANDROID_LOW_MEMORY_KILLER_TNG
 	default y
 	---help---
 	  Detect oom_adj values written to
 	  /sys/module/lowmemorykiller/parameters/adj and convert them
 	  to oom_score_adj values.
+
+config ANDROID_LOW_MEMORY_KILLER_CONSIDER_SWAP
+	bool "Android Low Memory Killer: consider swap free size"
+	depends on ANDROID_LOW_MEMORY_KILLER && SWAP
+	default n
+	---help---
+	  Use freeswap as otherfile when watermark is grater than
+	  low_watermark. This helps to make use of zram swap.
+
+config ANDROID_INTF_ALARM_DEV
+	bool "Android alarm driver"
+	depends on RTC_CLASS
+	default n
+	---help---
+	  Provides non-wakeup and rtc backed wakeup alarms based on rtc or
+	  elapsed realtime, and a non-wakeup alarm on the monotonic clock.
+	  Also exports the alarm interface to user-space.
+
+config ANDROID_LOW_MEMORY_KILLER_STATS
+	bool "Android Low Memory Killer: collect statistics"
+	default n
+	help
+	  Create a file in /proc/lmkstats that includes
+	  collected statistics about kills, scans and counts
+	  and  interaction with the shrinker. Its content
+	  will be different depending on lmk implementation used
+	  in TNG lowmemorykiller.
 
 config SYNC
 	bool "Synchronization framework"

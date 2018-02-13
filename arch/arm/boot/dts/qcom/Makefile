@@ -1,5 +1,6 @@
 ifeq ($(CONFIG_OF),y)
 
+ifneq ($(CONFIG_ARCH_SONY_LOIRE),y)
 dtb-$(CONFIG_ARCH_MSM8974) += msm8974-v1-cdp.dtb \
 	msm8974-v1-fluid.dtb \
 	msm8974-v1-liquid.dtb \
@@ -315,6 +316,16 @@ dtb-$(CONFIG_ARCH_MSM8992) += msm8992-sim.dtb \
 	msm8992-pmi8994-pm8004-cdp.dtb \
 	msm8992-pmi8994-pm8004-mtp.dtb
 dtb-$(CONFIG_ARCH_MDMFERMIUM) += mdmfermium-rumi.dtb
+else
+dtb-$(CONFIG_MACH_SONY_SUZU) += msm8956-loire-suzu_generic.dtb \
+	msm8976-loire-suzu_generic.dtb \
+	msm8956-v1.1-loire-suzu_generic.dtb \
+	msm8976-v1.1-loire-suzu_generic.dtb
+dtb-$(CONFIG_MACH_SONY_KUGO) += msm8956-loire-kugo_generic.dtb \
+	msm8976-loire-kugo_generic.dtb \
+	msm8956-v1.1-loire-kugo_generic.dtb \
+	msm8976-v1.1-loire-kugo_generic.dtb
+endif
 
 DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES))
 ifneq ($(DTB_NAMES),)

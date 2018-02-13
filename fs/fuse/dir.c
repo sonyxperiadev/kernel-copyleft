@@ -5,6 +5,11 @@
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "fuse_i.h"
 
@@ -1714,6 +1719,12 @@ int fuse_flush_mtime(struct file *file, bool nofail)
 	return err;
 }
 
+static bool fuse_allow_set_time(struct fuse_conn *fc, struct inode *inode)
+{
+	return (fc->flags & FUSE_ALLOW_UTIME_GRP && inode->i_mode & S_IWGRP &&
+	    current_uid() != inode->i_uid && in_group_p(inode->i_gid));
+}
+
 /*
  * Set attributes, and at the same time refresh them.
  *
@@ -1733,13 +1744,22 @@ int fuse_do_setattr(struct inode *inode, struct iattr *attr,
 	bool is_truncate = false;
 	bool is_wb = fc->writeback_cache;
 	loff_t oldsize;
+	unsigned int ia_valid;
 	int err;
 	bool trust_local_mtime = is_wb && S_ISREG(inode->i_mode);
 
 	if (!(fc->flags & FUSE_DEFAULT_PERMISSIONS))
 		attr->ia_valid |= ATTR_FORCE;
 
+	ia_valid = attr->ia_valid;
+	if (ia_valid & (ATTR_MTIME_SET | ATTR_ATIME_SET | ATTR_TIMES_SET) &&
+	    fuse_allow_set_time(fc, inode)) {
+		attr->ia_valid &= ~(ATTR_MTIME_SET | ATTR_ATIME_SET |
+				    ATTR_TIMES_SET);
+	}
+
 	err = inode_change_ok(inode, attr);
+	attr->ia_valid = ia_valid;
 	if (err)
 		return err;
 

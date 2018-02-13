@@ -1,6 +1,7 @@
 config ARM64
 	def_bool y
 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+	select ARCH_HAS_CRASH_NOTES if CRASH_NOTES
 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
 	select ARCH_SUPPORTS_ATOMIC_RMW
 	select ARCH_USE_CMPXCHG_LOCKREF
@@ -235,6 +236,33 @@ config ARCH_MSM8916
 	help
 	  This enables support for the MSM8916 chipset. If you dont
 	  know what do here, say N
+
+config ARCH_SONY_LOIRE
+    bool "Sony Mobile Loire platform"
+    depends on ARCH_MSM8916
+    help
+      Support for the SONY Mobile Loire platform
+      which is based on QCOM MSM8956 chipset.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_SUZU
+    bool "Sony Mobile SUZU"
+    depends on ARCH_SONY_LOIRE
+    help
+      Support for the SONY Mobile Suzu device
+      which is based on SONY Loire platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_KUGO
+    bool "Sony Mobile KUGO"
+    depends on ARCH_SONY_LOIRE
+    help
+      Support for the SONY Mobile Kugo device
+      which is based on SONY Loire platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
 
 config ARCH_MSM8994
 	bool "Enable Support for Qualcomm MSM8994"
@@ -582,6 +610,15 @@ config SECCOMP
 	  defined by each seccomp mode.
 
 
+config ARM64_FLUSH_CONSOLE_ON_RESTART
+	bool "Force flush the console on restart"
+	help
+	  If the console is locked while the system is rebooted, the messages
+	  in the temporary logbuffer would not have propogated to all the
+	  console drivers. This option forces the console lock to be
+	  released if it failed to be acquired, which will cause all the
+	  pending messages to be flushed.
+
 endmenu
 
 menu "Boot options"
@@ -647,6 +684,17 @@ config EFI
           clock, and platform reset). A UEFI stub is also provided to
 	  allow the kernel to be booted as an EFI application. This
 	  is only useful on systems that have UEFI firmware.
+
+config ARCH_HAS_CRASH_NOTES
+	bool
+
+config CRASH_NOTES
+	bool "Support storing crash notes at panic"
+	depends on !KEXEC
+	help
+	  Generate kdump style crash notes at the time of a panic and fill it
+	  with the crashed context to support analysis of the memory dump with
+	  tools like Redhat CRASH.
 
 endmenu
 

@@ -17,6 +17,11 @@
 #define IPA_PKT_FLUSH_TO_US 100
 #define IPA_UC_POLL_SLEEP_USEC 100
 #define IPA_UC_POLL_MAX_RETRY 10000
+#define HOLB_WORKQUEUE_NAME "ipa_holb_wq"
+
+static struct workqueue_struct *ipa_holb_wq;
+static void ipa_start_monitor_holb(struct work_struct *work);
+static DECLARE_WORK(ipa_holb_work, ipa_start_monitor_holb);
 
 /**
  * enum ipa_cpu_2_hw_commands - Values that represent the commands from the CPU
@@ -458,8 +463,11 @@ static void ipa_uc_response_hdlr(enum ipa_irq_type interrupt,
 			if (uc_hdlrs[i].ipa_uc_loaded_hdlr)
 				uc_hdlrs[i].ipa_uc_loaded_hdlr();
 		}
-		/* Enable holb monitoring on IPA-USB Producer pipe if valid. */
-		ipa_uc_monitor_holb(IPA_CLIENT_USB_CONS, true);
+		/* Queue the work to enable holb monitoring on IPA-USB Producer
+		* pipe if valid.
+		*/
+		if (ipa_ctx->ipa_hw_type == IPA_HW_v2_6L)
+			queue_work(ipa_holb_wq, &ipa_holb_work);
 	} else if (ipa_ctx->uc_ctx.uc_sram_mmio->responseOp ==
 		   IPA_HW_2_CPU_RESPONSE_CMD_COMPLETED) {
 		uc_rsp.raw32b = ipa_ctx->uc_ctx.uc_sram_mmio->responseParams;
@@ -497,6 +505,12 @@ int ipa_uc_interface_init(void)
 		return 0;
 	}
 
+	ipa_holb_wq = create_singlethread_workqueue(
+					HOLB_WORKQUEUE_NAME);
+	if (!ipa_holb_wq) {
+		IPAERR("HOLB workqueue creation failed\n");
+		return -ENOMEM;
+	}
 	mutex_init(&ipa_ctx->uc_ctx.uc_lock);
 
 	if (ipa_ctx->ipa_hw_type >= IPA_HW_v2_5) {
@@ -785,12 +799,29 @@ int ipa_uc_monitor_holb(enum ipa_client_type ipa_client, bool enable)
 
 	ret = ipa_uc_send_cmd(cmd.raw32b,
 				IPA_CPU_2_HW_CMD_UPDATE_HOLB_MONITORING, 0,
-				true, 10*HZ);
+				false, 10*HZ);
 
 	return ret;
 }
 EXPORT_SYMBOL(ipa_uc_monitor_holb);
 
+/**
+ * ipa_start_monitor_holb() - Send HOLB command to monitor IPA-USB
+ * producer pipe.
+ *
+ * This function is called after uc is loaded to start monitoring
+ * IPA pipe towrds USB in case if USB is already connected.
+ *
+ * Return codes:
+ * None
+ */
+static void ipa_start_monitor_holb(struct work_struct *work)
+{
+	IPADBG("starting holb monitoring on IPA_CLIENT_USB_CONS\n");
+	ipa_inc_client_enable_clks();
+	ipa_uc_monitor_holb(IPA_CLIENT_USB_CONS, true);
+	ipa_dec_client_disable_clks();
+}
 
 /**
  * ipa_uc_notify_clk_state() - notify to uC of clock enable / disable

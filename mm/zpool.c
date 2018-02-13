@@ -6,6 +6,11 @@
  * This is a common frontend for memory storage pool implementations.
  * Typically, this is used to store compressed memory.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -129,7 +134,7 @@ static void zpool_put_driver(struct zpool_driver *driver)
 /**
  * zpool_create_pool() - Create a new zpool
  * @type	The type of the zpool to create (e.g. zbud, zsmalloc)
- * @name       The name of the zpool (e.g. zram0, zswap)
+ * @name	The name of the zpool (e.g. zram0, zswap)
  * @gfp		The GFP flags to use when allocating the pool.
  * @ops		The optional ops callback.
  *
@@ -345,6 +350,20 @@ void zpool_unmap_handle(struct zpool *zpool, unsigned long handle)
 u64 zpool_get_total_size(struct zpool *zpool)
 {
 	return zpool->driver->total_size(zpool->pool);
+}
+
+/**
+ * zpool_compact() - trigger backend-specific pool compaction
+ * @pool	The zpool to compact
+ *
+ * This returns the total size in bytes of the pool.
+ *
+ * Returns: Number of pages compacted
+ */
+unsigned long zpool_compact(struct zpool *zpool)
+{
+	return zpool->driver->compact ?
+		zpool->driver->compact(zpool->pool) : 0;
 }
 
 static int __init init_zpool(void)
