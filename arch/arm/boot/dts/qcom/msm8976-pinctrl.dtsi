@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 &soc {
 	tlmm_pinmux: pinctrl@1000000 {
@@ -1446,7 +1451,7 @@
 			qcom,pin-func = <0>;
 			label = "wsa-spkr-sd";
 			wsa_spkr_sd_act: lines_on {
-					 drive-strength = <8>;
+					 drive-strength = <2>;
 					 output-high;
 					 bias-pull-down;
 			};
@@ -1488,20 +1493,6 @@
 			};
 
 			wsa_vi_sus: vi_sense_off {
-				drive-strength = <2>;
-				bias-pull-down;
-			};
-		};
-
-		pri-tlmm-lines {
-			qcom,pins = <&gp 123>, <&gp 124>, <&gp 125>;
-			qcom,num-grp-pins = <3>;
-			qcom,pin-func = <1>;
-			label = "pri-tlmm-lines";
-			pri_tlmm_lines_act: pri_tlmm_lines_act {
-				drive-strength = <8>;
-			};
-			pri_tlmm_lines_sus:  pri_tlmm_lines_sus {
 				drive-strength = <2>;
 				bias-pull-down;
 			};

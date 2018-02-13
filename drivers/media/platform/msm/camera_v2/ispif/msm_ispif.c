@@ -1468,11 +1468,6 @@ static long msm_ispif_subdev_ioctl(struct v4l2_subdev *sd,
 		return 0;
 	}
 	case MSM_SD_SHUTDOWN: {
-		if (ispif && ispif->base) {
-			mutex_lock(&ispif->mutex);
-			msm_ispif_release(ispif);
-			mutex_unlock(&ispif->mutex);
-		}
 		return 0;
 	}
 	default:

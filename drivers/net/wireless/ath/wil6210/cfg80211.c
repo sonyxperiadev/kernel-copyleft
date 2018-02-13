@@ -13,6 +13,11 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "wil6210.h"
 #include "wmi.h"
@@ -815,14 +820,12 @@ static int wil_cfg80211_stop_ap(struct wiphy *wiphy,
 }
 
 static int wil_cfg80211_del_station(struct wiphy *wiphy,
-				    struct net_device *dev,
-				    struct station_del_parameters *params)
+				    struct net_device *dev, u8 *mac)
 {
 	struct wil6210_priv *wil = wiphy_to_wil(wiphy);
 
 	mutex_lock(&wil->mutex);
-	wil6210_disconnect(wil, (u8 *)params->mac, WLAN_REASON_UNSPECIFIED,
-			   false);
+	wil6210_disconnect(wil, mac, WLAN_REASON_UNSPECIFIED, false);
 	mutex_unlock(&wil->mutex);
 
 	return 0;
