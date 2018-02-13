@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __QDSP6VOICE_H__
 #define __QDSP6VOICE_H__
 
@@ -141,7 +146,7 @@ struct share_mem_buf {
 struct mem_map_table {
 	dma_addr_t		phys;
 	void			*data;
-	uint32_t		size; /* size of buffer */
+	size_t			size; /* size of buffer */
 	struct ion_handle	*handle;
 	struct ion_client	*client;
 };
@@ -1740,6 +1745,7 @@ int voc_set_tx_mute(uint32_t session_id, uint32_t dir, uint32_t mute,
 		    uint32_t ramp_duration);
 int voc_set_device_mute(uint32_t session_id, uint32_t dir, uint32_t mute,
 			uint32_t ramp_duration);
+int voc_get_tx_device_mute(uint32_t session_id);
 int voc_get_rx_device_mute(uint32_t session_id);
 int voc_set_route_flag(uint32_t session_id, uint8_t path_dir, uint8_t set);
 uint8_t voc_get_route_flag(uint32_t session_id, uint8_t path_dir);
