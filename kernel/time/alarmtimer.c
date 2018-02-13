@@ -438,11 +438,9 @@ static int alarmtimer_suspend(struct device *dev)
 	now = rtc_tm_to_ktime(tm);
 	now = ktime_add(now, min);
 	if (poweron_alarm) {
-		struct rtc_time tm_val;
-		unsigned long secs;
-		tm_val = rtc_ktime_to_tm(min);
-		rtc_tm_to_time(&tm_val, &secs);
-		lpm_suspend_wake_time(secs);
+		uint64_t msec = 0;
+		msec = ktime_to_ms(min);
+		lpm_suspend_wake_time(msec);
 	} else {
 		/* Set alarm, if in the past reject suspend briefly to handle */
 		ret = rtc_timer_start(rtc, &rtctimer, now, ktime_set(0, 0));
