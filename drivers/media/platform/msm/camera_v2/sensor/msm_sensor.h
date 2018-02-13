@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef MSM_SENSOR_H
 #define MSM_SENSOR_H
@@ -92,6 +97,12 @@ struct msm_sensor_ctrl_t {
 };
 
 int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp);
+
+#if defined(CONFIG_SONY_CAM_V4L2)
+#ifdef CONFIG_COMPAT
+int msm_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp);
+#endif
+#endif
 
 int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl);
 

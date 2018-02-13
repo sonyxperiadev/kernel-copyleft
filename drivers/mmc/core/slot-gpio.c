@@ -7,6 +7,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/err.h>
 #include <linux/gpio.h>
@@ -22,10 +27,15 @@ struct mmc_gpio {
 	int cd_gpio;
 	char *ro_label;
 	bool status;
+	int uim2_gpio;
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	bool pending_detect;
+	bool suspended;
+#endif
 	char cd_label[0]; /* Must be last entry */
 };
 
-static int mmc_gpio_get_status(struct mmc_host *host)
+int mmc_gpio_get_status(struct mmc_host *host)
 {
 	int ret = -ENOSYS;
 	struct mmc_gpio *ctx = host->slot.handler_priv;
@@ -39,12 +49,40 @@ out:
 	return ret;
 }
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+void mmc_cd_prepare_suspend(struct mmc_host *host, bool pending_detect)
+{
+	struct mmc_gpio *ctx = host->slot.handler_priv;
+
+	if (!ctx)
+		return;
+
+	ctx->suspended = true;
+	ctx->pending_detect = pending_detect;
+}
+EXPORT_SYMBOL(mmc_cd_prepare_suspend);
+#endif
+
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+bool mmc_cd_is_pending_detect(struct mmc_host *host)
+{
+	struct mmc_gpio *ctx = host->slot.handler_priv;
+	if (!ctx)
+		return false;
+
+	return ctx->pending_detect;
+}
+EXPORT_SYMBOL(mmc_cd_is_pending_detect);
+#endif
 
 static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 {
 	/* Schedule a card detection after a debounce timeout */
 	struct mmc_host *host = dev_id;
 	struct mmc_gpio *ctx = host->slot.handler_priv;
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	unsigned long flags;
+#endif
 	int status;
 
 	/*
@@ -61,6 +99,31 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 	status = mmc_gpio_get_status(host);
 	if (unlikely(status < 0))
 		goto out;
+
+	if (status == 0)
+		mmc_gpio_set_uim2_en(host, 0);
+
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	if (ctx->suspended) {
+		/*
+		 * host->rescan_disable is normally set to 0 in mmc_resume_bus
+		 * but in case of a deferred resume we might get IRQ before
+		 * it is called.
+		 */
+		spin_lock_irqsave(&host->lock, flags);
+		host->rescan_disable = 0;
+		spin_unlock_irqrestore(&host->lock, flags);
+
+		/*
+		 * We've got IRQ just after resuming device but the status
+		 * did not change; card might have been swapped, force
+		 * redetection.
+		 */
+		if (status == ctx->status)
+			status = 2;
+	}
+	ctx->suspended = false;
+#endif
 
 	if (status ^ ctx->status) {
 		pr_info("%s: slot status change detected (%d -> %d), GPIO_ACTIVE_%s\n",
@@ -99,6 +162,7 @@ static int mmc_gpio_alloc(struct mmc_host *host)
 			snprintf(ctx->ro_label, len, "%s ro", dev_name(host->parent));
 			ctx->cd_gpio = -EINVAL;
 			ctx->ro_gpio = -EINVAL;
+			ctx->uim2_gpio = -EINVAL;
 			host->slot.handler_priv = ctx;
 		}
 	}
@@ -224,6 +288,11 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
 
 	ctx->status = ret;
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	ctx->pending_detect = false;
+	ctx->suspended = false;
+#endif
+
 	if (irq >= 0) {
 		ret = devm_request_threaded_irq(&host->class_dev, irq,
 			NULL, mmc_gpio_cd_irqt,
@@ -231,6 +300,10 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
 			ctx->cd_label, host);
 		if (ret < 0)
 			irq = ret;
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+		else
+			irq_set_irq_wake(irq, 1);
+#endif
 	}
 
 	if (irq < 0)
@@ -288,3 +361,41 @@ void mmc_gpio_free_cd(struct mmc_host *host)
 	devm_gpio_free(&host->class_dev, gpio);
 }
 EXPORT_SYMBOL(mmc_gpio_free_cd);
+
+void mmc_gpio_init_uim2(struct mmc_host *host, unsigned int gpio)
+{
+	struct mmc_gpio *ctx;
+
+	ctx = host->slot.handler_priv;
+
+	ctx->uim2_gpio = gpio;
+
+	pr_info("## %s: %s: gpio=%d\n", mmc_hostname(host), __func__, gpio);
+
+	mmc_gpio_set_uim2_en(host, 0);
+}
+EXPORT_SYMBOL(mmc_gpio_init_uim2);
+
+void mmc_gpio_set_uim2_en(struct mmc_host *host, int value)
+{
+	struct mmc_gpio *ctx = host->slot.handler_priv;
+
+	if (!ctx || !gpio_is_valid(ctx->uim2_gpio)) {
+		pr_err("## %s: gpio_set failure: ctx=%p, uim2_gpio=%d\n",
+			mmc_hostname(host), ctx, ctx ? ctx->uim2_gpio : 0);
+		return;
+	}
+	gpio_set_value(ctx->uim2_gpio, value);
+	pr_info("## %s: %s: gpio=%d value=%d\n", mmc_hostname(host), __func__,
+			ctx->uim2_gpio, value);
+}
+EXPORT_SYMBOL(mmc_gpio_set_uim2_en);
+
+void mmc_gpio_tray_close_set_uim2(struct mmc_host *host, int value)
+{
+	struct mmc_gpio *ctx = host->slot.handler_priv;
+
+	if (ctx && ctx->status)
+		mmc_gpio_set_uim2_en(host, value);
+}
+EXPORT_SYMBOL(mmc_gpio_tray_close_set_uim2);
