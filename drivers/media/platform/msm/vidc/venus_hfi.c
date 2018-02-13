@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/workqueue.h>
@@ -266,7 +271,7 @@ static int venus_hfi_acquire_regulator(struct regulator_info *rinfo)
 					rinfo->name);
 		}
 	}
-	WARN_ON(!regulator_is_enabled(rinfo->regulator));
+	WARN_ON(!regulator_is_enabled(rinfo->regulator) && (msm_vidc_debug & VIDC_INFO));
 	return rc;
 }
 
@@ -3407,6 +3412,8 @@ static void venus_hfi_pm_hndlr(struct work_struct *work)
 	u32 ctrl_status = 0;
 	struct venus_hfi_device *device = list_first_entry(
 			&hal_ctxt.dev_head, struct venus_hfi_device, list);
+	char msg[SUBSYS_CRASH_REASON_LEN];
+
 	if (!device) {
 		dprintk(VIDC_ERR, "%s: NULL device\n", __func__);
 		return;
@@ -3435,6 +3442,9 @@ static void venus_hfi_pm_hndlr(struct work_struct *work)
 	rc = venus_hfi_prepare_pc(device);
 	if (rc) {
 		dprintk(VIDC_ERR, "Failed to prepare for PC, rc : %d\n", rc);
+		snprintf(msg, sizeof(msg),
+			"Failed to prepare for PC, rc : %d\n", rc);
+		subsystem_crash_reason("venus", msg);
 		return;
 	}
 
@@ -3499,6 +3509,15 @@ skip_power_off:
 	return;
 }
 
+static void venus_hfi_crash_reason(struct hfi_sfr_struct *vsfr)
+{
+	char msg[SUBSYS_CRASH_REASON_LEN];
+
+	snprintf(msg, sizeof(msg), "SFR Message from FW : %s",
+						vsfr->rg_data);
+	subsystem_crash_reason("venus", msg);
+}
+
 static void venus_hfi_process_msg_event_notify(
 	struct venus_hfi_device *device, void *packet)
 {
@@ -3534,6 +3553,7 @@ static void venus_hfi_process_msg_event_notify(
 				vsfr->rg_data[vsfr->bufSize - 1] = '\0';
 			dprintk(VIDC_ERR, "SFR Message from FW : %s\n",
 				vsfr->rg_data);
+			venus_hfi_crash_reason(vsfr);
 		}
 	}
 }
@@ -3687,10 +3707,12 @@ static void venus_hfi_response_handler(struct venus_hfi_device *device)
 				__func__);
 			vsfr = (struct hfi_sfr_struct *)
 					device->sfr.align_virtual_addr;
-			if (vsfr)
+			if (vsfr) {
 				dprintk(VIDC_ERR,
 					"SFR Message from FW : %s\n",
 						vsfr->rg_data);
+				venus_hfi_crash_reason(vsfr);
+			}
 			venus_hfi_process_sys_watchdog_timeout(device);
 		}
 
@@ -4357,7 +4379,7 @@ static int venus_hfi_disable_regulator(struct regulator_info *rinfo)
 disable_regulator_failed:
 
 	/* Bring attention to this issue */
-	WARN_ON(1);
+	WARN_ON(msm_vidc_debug & VIDC_INFO);
 	return rc;
 }
 

@@ -88,6 +88,11 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -727,7 +732,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 		val = min_t(u32, val, sysctl_wmem_max);
 set_sndbuf:
 		sk->sk_userlocks |= SOCK_SNDBUF_LOCK;
-		sk->sk_sndbuf = max_t(u32, val * 2, SOCK_MIN_SNDBUF);
+		sk->sk_sndbuf = max_t(int, val * 2, SOCK_MIN_SNDBUF);
 		/* Wake up sending tasks if we upped the value. */
 		sk->sk_write_space(sk);
 		break;
@@ -763,7 +768,7 @@ set_rcvbuf:
 		 * returning the value we actually used in getsockopt
 		 * is the most desirable behavior.
 		 */
-		sk->sk_rcvbuf = max_t(u32, val * 2, SOCK_MIN_RCVBUF);
+		sk->sk_rcvbuf = max_t(int, val * 2, SOCK_MIN_RCVBUF);
 		break;
 
 	case SO_RCVBUFFORCE:
@@ -1203,6 +1208,23 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 	case SO_SELECT_ERR_QUEUE:
 		v.val = sock_flag(sk, SOCK_SELECT_ERR_QUEUE);
 		break;
+
+	case SO_SIZEHINT:
+	{
+		struct sock_sizehint hint;
+
+		if (len > sizeof(hint))
+			len = sizeof(hint);
+
+		hint.order_zero_size = PAGE_SIZE -
+			SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+		hint.cache_size =  KMALLOC_MAX_CACHE_SIZE -
+			SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+
+		if (copy_to_user(optval, &hint, len))
+			return -EFAULT;
+		goto lenout;
+	}
 
 	default:
 		return -ENOPROTOOPT;

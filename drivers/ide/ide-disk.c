@@ -5,6 +5,11 @@
  *  Copyright (C) 2003		   Red Hat
  *  Copyright (C) 2003-2005, 2007  Bartlomiej Zolnierkiewicz
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  *  Mostly written by Mark Lord <mlord@pobox.com>
