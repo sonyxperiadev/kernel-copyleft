@@ -337,6 +337,7 @@ static int rfcomm_sock_bind(struct socket *sock, struct sockaddr *addr, int addr
 {
 	struct sockaddr_rc sa;
 	struct sock *sk = sock->sk;
+	int chan;
 	int len, err = 0;
 
 	if (!addr || addr->sa_family != AF_BLUETOOTH)
@@ -345,8 +346,9 @@ static int rfcomm_sock_bind(struct socket *sock, struct sockaddr *addr, int addr
 	memset(&sa, 0, sizeof(sa));
 	len = min_t(unsigned int, sizeof(sa), addr_len);
 	memcpy(&sa, addr, len);
+	chan = sa.rc_channel;
 
-	BT_DBG("sk %p %pMR", sk, &sa.rc_bdaddr);
+	BT_DBG("sk %pK %pMR", sk, &sa.rc_bdaddr);
 
 	lock_sock(sk);
 

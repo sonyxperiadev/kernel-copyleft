@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
 #include <asm/div64.h>
@@ -3160,6 +3165,12 @@ static int msm_isp_stop_axi_stream(struct vfe_device *vfe_dev,
 				vfe_dev->buf_mgr, vfe_dev->pdev->id,
 				bufq_handle, MSM_ISP_BUFFER_FLUSH_ALL,
 				&timestamp.buf_time, 0);
+#if defined(CONFIG_SONY_CAM_V4L2)
+			if (rc < 0) {
+				pr_err("%s: flush_buf: rc %d\n",
+					__func__, rc);
+			}
+#endif
 			if (rc == -EFAULT) {
 				msm_isp_halt_send_error(vfe_dev,
 					ISP_EVENT_BUF_FATAL_ERROR);
@@ -3196,6 +3207,10 @@ int msm_isp_cfg_axi_stream(struct vfe_device *vfe_dev, void *arg)
 
 		rc = msm_isp_start_axi_stream(
 			vfe_dev, stream_cfg_cmd, camif_update);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		pr_info("%s: msm_isp_start_axi_stream: rc %d\n",
+			__func__, rc);
+#endif
 	} else {
 		rc = msm_isp_stop_axi_stream(
 			vfe_dev, stream_cfg_cmd, camif_update, halt);
@@ -3213,13 +3228,23 @@ int msm_isp_cfg_axi_stream(struct vfe_device *vfe_dev, void *arg)
 		ret = msm_isp_update_dual_HW_ms_info_at_stop(
 			vfe_dev, stream_cfg_cmd, camif_update);
 		if (ret < 0)
+#if defined(CONFIG_SONY_CAM_V4L2)
+			pr_warn("%s: Warning! Update dual_cam failed: ret %d\n",
+				__func__, ret);
+#else
 			pr_warn("%s: Warning! Update dual_cam failed\n",
 				__func__);
+#endif
 	}
 
 	if (rc < 0)
+#if defined(CONFIG_SONY_CAM_V4L2)
+		pr_err("%s: start/stop %d stream failed: rc %d\n", __func__,
+			stream_cfg_cmd->cmd, rc);
+#else
 		pr_err("%s: start/stop %d stream failed\n", __func__,
 			stream_cfg_cmd->cmd);
+#endif
 	return rc;
 }
 

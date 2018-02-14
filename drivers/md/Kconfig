@@ -510,4 +510,27 @@ config DM_LOG_WRITES
 	  be called dm-log-writes.
 
 	  If unsure, say N.
+
+config PANIC_ON_DM_VERITY_ERRORS
+	bool "panic on dm verity errors"
+	depends on DM_VERITY = y
+	default n
+	---help---
+	  This enables panic on hash mismatch dm-verity errors.
+
+config DM_LOG_WRITES
+	tristate "Log writes target support"
+	depends on BLK_DEV_DM
+	---help---
+	  This device-mapper target takes two devices, one device to use
+	  normally, one to log all write operations done to the first device.
+	  This is for use by file system developers wishing to verify that
+	  their fs is writing a consitent file system at all times by allowing
+	  them to replay the log in a variety of ways and to check the
+	  contents.
+
+	  To compile this code as a module, choose M here: the module will
+	  be called dm-log-writes.
+
+	  If unsure, say N.
 endif # MD

@@ -10,9 +10,12 @@
  * GNU General Public License for more details.
  */
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/mutex.h>
 #include <linux/mfd/wcd9xxx/wcd9xxx-slimslave.h>
 #include <linux/mfd/wcd9xxx/wcd9xxx_registers.h>
+
+#define SLIM_RETRY_MAX 3
 
 struct wcd9xxx_slim_sch {
 	u16 rx_port_ch_reg_base;
@@ -425,6 +428,7 @@ int wcd9xxx_close_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 	int ch_cnt = 0 ;
 	int ret = 0;
 	struct wcd9xxx_ch *rx;
+	u32 retry = 0;
 
 	list_for_each_entry(rx, wcd9xxx_ch_list, list)
 		sph[ch_cnt++] = rx->sph;
@@ -434,7 +438,16 @@ int wcd9xxx_close_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 
 	/* slim_control_ch (REMOVE) */
 	pr_debug("%s before slim_control_ch grph %d\n", __func__, grph);
-	ret = slim_control_ch(wcd9xxx->slim, grph, SLIM_CH_REMOVE, true);
+	do {
+		ret = slim_control_ch(wcd9xxx->slim, grph,
+				SLIM_CH_REMOVE, true);
+		if (ret < 0) {
+			retry++;
+			pr_err("%s: failed ret[%d] retry_cnt:%d\n",
+				__func__, ret, retry);
+			usleep_range(5000, 5100);
+		}
+	} while (ret < 0 && (retry < SLIM_RETRY_MAX));
 	if (ret < 0) {
 		pr_err("%s: slim_control_ch failed ret[%d]\n", __func__, ret);
 		goto err;
@@ -452,6 +465,7 @@ int wcd9xxx_close_slim_sch_tx(struct wcd9xxx *wcd9xxx,
 	int ret = 0;
 	int ch_cnt = 0 ;
 	struct wcd9xxx_ch *tx;
+	u32 retry = 0;
 
 	pr_debug("%s\n", __func__);
 	list_for_each_entry(tx, wcd9xxx_ch_list, list)
@@ -460,7 +474,16 @@ int wcd9xxx_close_slim_sch_tx(struct wcd9xxx *wcd9xxx,
 	pr_debug("%s ch_cht %d, sph[0] %d sph[1] %d\n",
 		__func__, ch_cnt, sph[0], sph[1]);
 	/* slim_control_ch (REMOVE) */
-	ret = slim_control_ch(wcd9xxx->slim, grph, SLIM_CH_REMOVE, true);
+	do {
+		ret = slim_control_ch(wcd9xxx->slim, grph,
+				SLIM_CH_REMOVE, true);
+		if (ret < 0) {
+			retry++;
+			pr_err("%s: failed ret[%d] retry_cnt:%d\n",
+				__func__, ret, retry);
+			usleep_range(5000, 5100);
+		}
+	} while (ret < 0 && (retry < SLIM_RETRY_MAX));
 	if (ret < 0) {
 		pr_err("%s: slim_control_ch failed ret[%d]\n",
 			__func__, ret);

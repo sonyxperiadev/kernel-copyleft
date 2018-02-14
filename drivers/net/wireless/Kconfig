@@ -325,6 +325,41 @@ config CNSS_CRYPTO
 	  from cnss platform driver. This crypto APIs used to generate cipher
 	  key and add support for the WLAN driver module security protocol.
 
+config BCMDHD_PCIE
+	bool "PCIe bus interface support"
+	depends on PCI
+	---help---
+	  Use PCIe bus interface
+
+config BROADCOM_WIFI_RESERVED_MEM
+	bool "BROADCOM Reserved memory for wifi device"
+	depends on SOMC_WIFI_CONTROL
+	default n
+	---help---
+	  This is a configuration for broadcom WLAN driver.
+
+config BCMDHD_DEBUG_PAGEALLOC
+	bool "Enable Memory Pagealloc Debugging Support"
+	depends on BCMDHD_PCIE
+	depends on BROADCOM_WIFI_RESERVED_MEM
+	default n
+	---help---
+	  Enable Memory Pagealloc Debugging
+
+config BCMDHD_PREALLOC_PKTIDMAP
+	bool "Enable Memory Pagealloc PKTID Map Support"
+	depends on BCMDHD_PCIE
+	depends on BROADCOM_WIFI_RESERVED_MEM
+	default n
+	---help---
+	  Enable Memory Pagealloc PKTID Map
+
+config SOMC_WIFI_CONTROL
+	bool "Enable/disable SOMC WiFi control function"
+	depends on PCI
+	---help---
+	  A SOMC adaptation for the WLAN driver module
+
 source "drivers/net/wireless/ath/Kconfig"
 source "drivers/net/wireless/b43/Kconfig"
 source "drivers/net/wireless/b43legacy/Kconfig"
