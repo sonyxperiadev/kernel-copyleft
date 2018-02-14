@@ -408,16 +408,26 @@ static void msm_hs_resource_unvote(struct msm_hs_port *msm_uport)
 		return;
 	}
 	atomic_dec(&msm_uport->clk_count);
-	pm_runtime_mark_last_busy(uport->dev);
-	pm_runtime_put_autosuspend(uport->dev);
+	rc = atomic_read(&msm_uport->clk_count);
+	if (rc <= 0) {
+		pm_runtime_mark_last_busy(uport->dev);
+		pm_runtime_put_autosuspend(uport->dev);
+	} else {
+		MSM_HS_WARN("%s(): already suspended. clk_count=%d", __func__, rc);
+	}
 }
 
  /* Vote for resources before accessing them */
 static void msm_hs_resource_vote(struct msm_hs_port *msm_uport)
 {
 	struct uart_port *uport = &(msm_uport->uport);
-	pm_runtime_get_sync(uport->dev);
+	int rc = atomic_read(&msm_uport->clk_count);
+
 	atomic_inc(&msm_uport->clk_count);
+	if (rc <= 0)
+		pm_runtime_get_sync(uport->dev);
+	 else
+		MSM_HS_WARN("%s(): Skip pm_runtime_get_sync(), clk_count=%d", __func__, rc);
 }
 
 /* Check if the uport line number matches with user id stored in pdata.
