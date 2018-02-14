@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/clk.h>
 #include <linux/compat.h>
@@ -3677,6 +3682,7 @@ void ipa_suspend_handler(enum ipa_irq_type interrupt,
 				 * pipe will be unsuspended as part of
 				 * enabling IPA clocks
 				 */
+				mutex_lock(&ipa_ctx->sps_pm.sps_pm_lock);
 				if (!atomic_read(
 					&ipa_ctx->sps_pm.dec_clients)
 					) {
@@ -3689,6 +3695,7 @@ void ipa_suspend_handler(enum ipa_irq_type interrupt,
 						1);
 					ipa_sps_process_irq_schedule_rel();
 				}
+				mutex_unlock(&ipa_ctx->sps_pm.sps_pm_lock);
 			} else {
 				resource = ipa2_get_rm_resource_from_ep(i);
 				res = ipa_rm_request_resource_with_timer(

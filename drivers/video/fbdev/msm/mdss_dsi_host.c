@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/interrupt.h>
@@ -1174,12 +1179,22 @@ int mdss_dsi_reg_status_check(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	int ret = 0;
 	struct mdss_dsi_ctrl_pdata *sctrl_pdata = NULL;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct mipi_panel_info *mipi = NULL;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	if (ctrl_pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return 0;
 	}
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	mipi = &ctrl_pdata->panel_data.panel_info.mipi;
+	if (mipi->switch_mode_pending == true) {
+		pr_err("%s: Skip status check, Pending switch mode\n", __func__);
+		return 0;
+	}
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	pr_debug("%s: Checking Register status\n", __func__);
 
 	mdss_dsi_clk_ctrl(ctrl_pdata, ctrl_pdata->dsi_clk_handle,
@@ -2527,7 +2542,11 @@ void mdss_dsi_cmd_mdp_busy(struct mdss_dsi_ctrl_pdata *ctrl)
 				MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0_ctrl",
 					"dsi0_phy", "dsi1_ctrl", "dsi1_phy",
 					"vbif", "vbif_nrt", "dbg_bus",
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+					"vbif_dbg_bus");
+#else
 					"vbif_dbg_bus", "panic");
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 			}
 		}
 	}

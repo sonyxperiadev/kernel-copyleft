@@ -412,6 +412,10 @@ config TI_DAC7512
 	  This driver can also be built as a module. If so, the module
 	  will be called ti_dac7512.
 
+config UID_STAT
+	bool "UID based statistics tracking exported to /proc/uid_stat"
+	default n
+
 config VMWARE_BALLOON
 	tristate "VMware Balloon Driver"
 	depends on VMWARE_VMCI && X86 && HYPERVISOR_GUEST
@@ -561,6 +565,98 @@ config MEMORY_STATE_TIME
 	help
 	  Memory time statistics exported to /sys/kernel/memory_state_time
 
+config NFC_PN547
+	tristate "NFC driver for PN547"
+	depends on I2C
+	default n
+	help
+	  his option enables device driver for PN547.
+	  GPIO, and PMIC GPIO configurations are controlled.
+	  The sysfs files provides the interface to send and receive
+	  the data, response and notification.
+
+config LDO_VIBRATOR
+	tristate "LDO Vibrator"
+	default n
+	help
+	  This option enables device driver support for the vibrator
+	  on the LDO line. The vibrator is controlled using the
+	  timed output class.
+
+config SIM_DETECT
+	tristate "SIM_DETECT driver support"
+	default n
+	help
+	  Say Y here
+	  if you want to support SIM_DETECT as detection device.
+	  This driver can be used for sending notifications via
+	  switch_class when sim card is inserted or removed.
+
+config RAMDUMP_TAGS
+	bool "Ramdump tags to communicate between kernel and ramdump"
+	default n
+	depends on !RAMDUMP_CRASH_LOGS
+	help
+	  This option enables a driver which can be interacted with to
+	  supply the ramdumper with more information about the current
+	  state of the crashing kernel such as build info, HWWD registers,
+	  additional CPU registers not stored in crash_notes, crashing
+	  application info etc. A small amount of memory will be set
+	  aside to hold the information which will later be used by
+	  the ramdump application.
+
+config RAMDUMP_MEMDESC
+	bool "Ramdump memory descriptors"
+	default n
+	help
+	  This is a ramdump_mem_desc driver which adds the
+	  memory descriptors in Normal mode into a piece of debug memory
+	  and split the contents and exports it as /proc/mem_desc
+	  in Ramdump mode to support ramdump functionality
+
+config POWERKEY_FORCECRASH
+	tristate "Force a crash on powerkey long press"
+	default n
+	help
+	  Say Y here if you want force crash functionality through power
+	  key. Triggers panic if power key is hold for more than 10secs.
+
+config CXD224X_NFC
+	bool "CXD224X driver for FeliCa and NFC"
+	depends on I2C
+	default n
+	help
+	  This option enables device driver support for Sony CXD224X
+	  series. This driver enables the control of CXD224X series
+	  device by using I2C. Furthermore, this driver enables the
+	  control of PON using device file.
+
+config BD7602_POWER_IC
+	bool "BD7602 Power IC control"
+	depends on I2C
+	default n
+	help
+	  This option enables device driver support for BD7602 Power IC
+	  control device.
+
+config SENSORS_TCS3490
+	tristate "AMS TCS3490 Sensor Driver"
+	depends on I2C
+	default n
+	help
+	  If you say yes here you get support for the AMS tcs3490,
+	  ALS and color light sensors.
+	  This driver can also be build as module.
+
+config TOF_SENSOR
+	tristate "ToF Sensor"
+	depends on I2C
+	---help---
+	  Say Y here if you want to use ToF sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called tof_sensor.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
@@ -574,4 +670,5 @@ source "drivers/misc/mic/Kconfig"
 source "drivers/misc/genwqe/Kconfig"
 source "drivers/misc/echo/Kconfig"
 source "drivers/misc/cxl/Kconfig"
+source "drivers/misc/mm_tuner/Kconfig"
 endmenu

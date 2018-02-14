@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "f_gsi.h"
 #include "rndis.h"
@@ -2499,6 +2504,14 @@ static int gsi_bind(struct usb_configuration *c, struct usb_function *f)
 
 	switch (gsi->prot_id) {
 	case IPA_USB_RNDIS:
+		/* "Wireless" RNDIS6; auto-detected by Windows */
+		rndis_gsi_control_intf.bInterfaceClass = USB_CLASS_MISC;
+		rndis_gsi_control_intf.bInterfaceSubClass = 0x04;
+		rndis_gsi_control_intf.bInterfaceProtocol = 0x01;
+		rndis_gsi_iad_descriptor.bFunctionClass = USB_CLASS_MISC;
+		rndis_gsi_iad_descriptor.bFunctionSubClass = 0x04;
+		rndis_gsi_iad_descriptor.bFunctionProtocol = 0x01;
+
 		info.string_defs = rndis_gsi_string_defs;
 		info.ctrl_desc = &rndis_gsi_control_intf;
 		info.ctrl_str_idx = 0;

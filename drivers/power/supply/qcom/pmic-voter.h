@@ -9,12 +9,20 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __PMIC_VOTER_H
 #define __PMIC_VOTER_H
 
 #include <linux/mutex.h>
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define NUM_MAX_CLIENTS	20
+#endif
 struct votable;
 
 enum votable_type {
@@ -43,5 +51,9 @@ struct votable *create_votable(const char *name,
 void destroy_votable(struct votable *votable);
 void lock_votable(struct votable *votable);
 void unlock_votable(struct votable *votable);
-
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+ssize_t somc_output_voter_param(struct votable *votable,
+						char *buf, size_t size);
+int somc_get_vote_clients(struct votable *votable, char *clients[]);
+#endif
 #endif /* __PMIC_VOTER_H */
