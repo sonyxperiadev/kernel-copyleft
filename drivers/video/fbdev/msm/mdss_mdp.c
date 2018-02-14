@@ -13,6 +13,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -2585,6 +2590,7 @@ static int mdss_mdp_get_cmdline_config(struct platform_device *pdev)
 
 	len = strlen(mdss_mdp_panel);
 
+	len = 0; /* temporary */
 	if (len > 0) {
 		rc = mdss_mdp_get_pan_cfg(pan_cfg);
 		if (!rc) {

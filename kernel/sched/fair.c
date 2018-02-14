@@ -19,6 +19,11 @@
  *  Adaptive scheduling granularity, math enhancements by Peter Zijlstra
  *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/latencytop.h>
 #include <linux/sched.h>
@@ -5410,6 +5415,10 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se) {
 		add_nr_running(rq, 1);
+
+		if (unlikely(p->nr_cpus_allowed == 1))
+			rq->nr_pinned_tasks++;
+
 		inc_rq_hmp_stats(rq, p, 1);
 	}
 
@@ -5517,6 +5526,10 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se) {
 		sub_nr_running(rq, 1);
+
+		if (unlikely(p->nr_cpus_allowed == 1))
+			rq->nr_pinned_tasks--;
+
 		dec_rq_hmp_stats(rq, p, 1);
 	}
 
@@ -7955,6 +7968,14 @@ redo:
 		if (env->idle != CPU_NOT_IDLE && env->src_rq->nr_running <= 1)
 			break;
 
+		/*
+		 * Another CPU can place tasks, since we do not hold dst_rq lock
+		 * while doing balancing. If newly idle CPU already got something,
+		 * give up to reduce a latency.
+		 */
+		if (env->idle == CPU_NEWLY_IDLE && env->dst_rq->nr_running > 0)
+			break;
+
 		p = list_first_entry(tasks, struct task_struct, se.group_node);
 
 		env->loop++;
@@ -7977,8 +7998,9 @@ redo:
 		if (sched_feat(LB_MIN) && load < 16 && !env->sd->nr_balance_failed)
 			goto next;
 
-		if ((load / 2) > env->imbalance)
-			goto next;
+		if (env->idle != CPU_NEWLY_IDLE)
+			if ((load / 2) > env->imbalance)
+				goto next;
 
 		detach_task(p, env);
 		list_add(&p->se.group_node, &env->tasks);
@@ -8743,6 +8765,15 @@ static bool update_sd_pick_busiest(struct lb_env *env,
 	if (sgs->group_type < busiest->group_type)
 		return false;
 
+	if (sgs->avg_load <= busiest->avg_load)
+		return false;
+
+	/*
+	 * Group has no more than one task per CPU
+	 */
+	if (sgs->sum_nr_running <= sgs->group_weight)
+		return false;
+
 	if (energy_aware()) {
 		/*
 		 * Candidate sg doesn't face any serious load-balance problems
@@ -8750,9 +8781,6 @@ static bool update_sd_pick_busiest(struct lb_env *env,
 		 */
 		if (sgs->group_type == group_other &&
 		    !group_has_capacity(env, &sds->local_stat))
-			return false;
-
-		if (sgs->avg_load <= busiest->avg_load)
 			return false;
 
 		/*
@@ -9557,7 +9585,6 @@ redo:
 		 * correctly treated as an imbalance.
 		 */
 		env.flags |= LBF_ALL_PINNED;
-		env.loop_max  = min(sysctl_sched_nr_migrate, busiest->nr_running);
 
 more_balance:
 		raw_spin_lock_irqsave(&busiest->lock, flags);
@@ -9568,6 +9595,12 @@ more_balance:
 			env.flags &= ~LBF_ALL_PINNED;
 			goto no_move;
 		}
+
+		/*
+		 * Set loop_max when rq's lock is taken to prevent a race.
+		 */
+		env.loop_max = min(sysctl_sched_nr_migrate,
+							busiest->cfs.h_nr_running);
 
 		/*
 		 * cur_ld_moved - load moved in current iteration
@@ -10455,6 +10488,22 @@ static inline int _nohz_kick_needed_hmp(struct rq *rq, int cpu, int *type)
 	if (!sysctl_sched_restrict_cluster_spill ||
 			sched_boost_policy() == SCHED_BOOST_ON_ALL)
 		return 1;
+
+	if (unlikely(rq->nr_pinned_tasks > 0)) {
+		int delta = rq->nr_running - rq->nr_pinned_tasks;
+
+		/*
+		 * Check if it is possible to "unload" this CPU in case
+		 * of having pinned/affine tasks. Do not disturb idle
+		 * core if one of the below condition is true:
+		 *
+		 * - there is one pinned task and it is not "current"
+		 * - all tasks are pinned to this CPU
+		 */
+		if (delta < 2)
+			if (current->nr_cpus_allowed > 1 || !delta)
+				return 0;
+	}
 
 	if (cpu_max_power_cost(cpu) == max_power_cost)
 		return 1;

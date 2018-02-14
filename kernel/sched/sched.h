@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/sched.h>
 #include <linux/sched/sysctl.h>
@@ -671,6 +676,7 @@ struct rq {
 	 * remote CPUs use both these fields when doing load calculation.
 	 */
 	unsigned int nr_running;
+	unsigned int nr_pinned_tasks;
 #ifdef CONFIG_NUMA_BALANCING
 	unsigned int nr_numa_running;
 	unsigned int nr_preferred_running;
@@ -1069,9 +1075,13 @@ enum sched_boost_policy {
 #define WINDOW_STATS_MAX		1
 #define WINDOW_STATS_MAX_RECENT_AVG	2
 #define WINDOW_STATS_AVG		3
-#define WINDOW_STATS_INVALID_POLICY	4
+#define WINDOW_STATS_MAX_RECENT_WMA	4
+#define WINDOW_STATS_WMA		5
+#define WINDOW_STATS_MAX_RECENT_EWA	6
+#define WINDOW_STATS_EWA		7
+#define WINDOW_STATS_INVALID_POLICY	8
 
-#define SCHED_UPMIGRATE_MIN_NICE 15
+#define SCHED_UPMIGRATE_MIN_NICE 9
 #define EXITING_TASK_MARKER	0xdeaddead
 
 #define UP_MIGRATION		1

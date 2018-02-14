@@ -335,6 +335,18 @@ static struct clk_freq_tbl ftbl_blsp_qup_spi_apps_clk_src[] = {
 	F_END
 };
 
+static struct clk_freq_tbl ftbl_blsp2_qup3_spi_apps_clk_src[] = {
+	F(    960000,    cxo_clk_src,   10,    1,     2),
+	F(   4800000,    cxo_clk_src,    4,    0,     0),
+	F(   9600000,    cxo_clk_src,    2,    0,     0),
+	F(  15000000, gpll0_out_main,   10,    1,     4),
+	F(  19200000,    cxo_clk_src,    1,    0,     0),
+	F(  25000000, gpll0_out_main,   12,    1,     2),
+	F(  30000000, gpll0_out_main,   10,    1,     2),
+	F(  50000000, gpll0_out_main,   12,    0,     0),
+	F_END
+};
+
 static struct rcg_clk blsp1_qup1_spi_apps_clk_src = {
 	.cmd_rcgr_reg = GCC_BLSP1_QUP1_SPI_APPS_CMD_RCGR,
 	.set_rate = set_rate_mnd,
@@ -634,7 +646,7 @@ static struct rcg_clk blsp2_qup3_i2c_apps_clk_src = {
 static struct rcg_clk blsp2_qup3_spi_apps_clk_src = {
 	.cmd_rcgr_reg = GCC_BLSP2_QUP3_SPI_APPS_CMD_RCGR,
 	.set_rate = set_rate_mnd,
-	.freq_tbl = ftbl_blsp_qup_spi_apps_clk_src,
+	.freq_tbl = ftbl_blsp2_qup3_spi_apps_clk_src,
 	.current_freq = &rcg_dummy_freq,
 	.base = &virt_base,
 	.c = {

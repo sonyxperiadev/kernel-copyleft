@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -54,6 +59,24 @@ enum core_ldo_levels {
 #define SW_PORTSELECT		BIT(0)
 /* port select mux: 1 - sw control. 0 - HW control*/
 #define SW_PORTSELECT_MX	BIT(1)
+
+#define SSUSB3PHY_TXA_DRV_LVL		0x21c
+#define SSUSB3PHY_TXB_DRV_LVL		0x61c
+#define SSUSB3PHY_TXA_EMP_POST1_LVL	0x20c
+#define SSUSB3PHY_TXB_EMP_POST1_LVL	0x60c
+
+unsigned int ssphy_txa_drv_lvl;
+unsigned int ssphy_txb_drv_lvl;
+unsigned int ssphy_txa_emp_post1_lvl;
+unsigned int ssphy_txb_emp_post1_lvl;
+module_param(ssphy_txa_drv_lvl, uint, S_IRUGO | S_IWUSR);
+module_param(ssphy_txb_drv_lvl, uint, S_IRUGO | S_IWUSR);
+module_param(ssphy_txa_emp_post1_lvl, uint, S_IRUGO | S_IWUSR);
+module_param(ssphy_txb_emp_post1_lvl, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(ssphy_txa_drv_lvl, "SSUSB3PHY QSERDES TXA DRV LVL");
+MODULE_PARM_DESC(ssphy_txb_drv_lvl, "SSUSB3PHY QSERDES TXB DRV LVL");
+MODULE_PARM_DESC(ssphy_txa_emp_post1_lvl, "SSUSB3PHY QSERDES TXA EMP POST1 LVL");
+MODULE_PARM_DESC(ssphy_txb_emp_post1_lvl, "SSUSB3PHY QSERDES TXB EMP POST1 LVL");
 
 enum qmp_phy_rev_reg {
 	USB3_PHY_PCS_STATUS,
@@ -253,6 +276,21 @@ unconfig_vdd:
 	return rc < 0 ? rc : 0;
 }
 
+static void msm_ssphy_param_output(struct usb_phy *uphy)
+{
+	struct msm_ssphy_qmp *phy = container_of(uphy, struct msm_ssphy_qmp,
+					phy);
+
+	dev_dbg(uphy->dev, "SS_USB3PHY_QSERDES_TXA_TX_DEV_LVL:0x%02x\n",
+		readb_relaxed(phy->base + SSUSB3PHY_TXA_DRV_LVL));
+	dev_dbg(uphy->dev, "SS_USB3PHY_QSERDES_TXB_TX_DEV_LVL:0x%02x\n",
+		readb_relaxed(phy->base + SSUSB3PHY_TXB_DRV_LVL));
+	dev_dbg(uphy->dev, "SS_USB3PHY_QSERDES_TXA_TX_EMP_POST1_LVL:0x%02x\n",
+		readb_relaxed(phy->base + SSUSB3PHY_TXA_EMP_POST1_LVL));
+	dev_dbg(uphy->dev, "SS_USB3PHY_QSERDES_TXB_TX_EMP_POST1_LVL:0x%02x\n",
+		readb_relaxed(phy->base + SSUSB3PHY_TXB_EMP_POST1_LVL));
+}
+
 static int configure_phy_regs(struct usb_phy *uphy,
 				const struct qmp_reg_val *reg)
 {
@@ -270,6 +308,23 @@ static int configure_phy_regs(struct usb_phy *uphy,
 			usleep_range(reg->delay, reg->delay + 10);
 		reg++;
 	}
+
+	/* ssusb phy dynamic set */
+	if (ssphy_txa_drv_lvl)
+		writel_relaxed(ssphy_txa_drv_lvl,
+				phy->base + SSUSB3PHY_TXA_DRV_LVL);
+	if (ssphy_txb_drv_lvl)
+		writel_relaxed(ssphy_txb_drv_lvl,
+				phy->base + SSUSB3PHY_TXB_DRV_LVL);
+	if (ssphy_txa_emp_post1_lvl)
+		writel_relaxed(ssphy_txa_emp_post1_lvl,
+				phy->base + SSUSB3PHY_TXA_EMP_POST1_LVL);
+	if (ssphy_txb_emp_post1_lvl)
+		writel_relaxed(ssphy_txb_emp_post1_lvl,
+				phy->base + SSUSB3PHY_TXB_EMP_POST1_LVL);
+
+	/* parameter output */
+	msm_ssphy_param_output(uphy);
 	return 0;
 }
 
