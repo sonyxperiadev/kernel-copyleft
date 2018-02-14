@@ -13,6 +13,11 @@
  * Syed Rameez Mustafa, Olav haugan, Joonwoo Park, Pavan Kumar Kondeti
  * and Vikram Mulukutla
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/cpufreq.h>
 #include <linux/list_sort.h>
@@ -2613,7 +2618,7 @@ static void update_history(struct rq *rq, struct task_struct *p,
 	u32 *hist = &p->ravg.sum_history[0];
 	int ridx, widx;
 	u32 max = 0, avg, demand, pred_demand;
-	u64 sum = 0;
+	u64 sum = 0, wma = 0, ewa = 0;
 
 	/* Ignore windows where task had no activity */
 	if (!runtime || is_idle_task(p) || exiting_task(p) || !samples)
@@ -2625,6 +2630,8 @@ static void update_history(struct rq *rq, struct task_struct *p,
 	for (; ridx >= 0; --widx, --ridx) {
 		hist[widx] = hist[ridx];
 		sum += hist[widx];
+		wma += hist[widx] * (sched_ravg_hist_size - widx);
+		ewa += hist[widx] << (sched_ravg_hist_size - widx - 1);
 		if (hist[widx] > max)
 			max = hist[widx];
 	}
@@ -2632,6 +2639,8 @@ static void update_history(struct rq *rq, struct task_struct *p,
 	for (widx = 0; widx < samples && widx < sched_ravg_hist_size; widx++) {
 		hist[widx] = runtime;
 		sum += hist[widx];
+		wma += hist[widx] * (sched_ravg_hist_size - widx);
+		ewa += hist[widx] << (sched_ravg_hist_size - widx - 1);
 		if (hist[widx] > max)
 			max = hist[widx];
 	}
@@ -2644,8 +2653,34 @@ static void update_history(struct rq *rq, struct task_struct *p,
 		demand = max;
 	} else {
 		avg = div64_u64(sum, sched_ravg_hist_size);
+		wma = div64_u64(wma, (sched_ravg_hist_size * (sched_ravg_hist_size + 1)) / 2);
+		ewa = div64_u64(ewa, (1 << sched_ravg_hist_size) - 1);
+
 		if (sched_window_stats_policy == WINDOW_STATS_AVG)
 			demand = avg;
+		else if (sched_window_stats_policy == WINDOW_STATS_MAX_RECENT_WMA)
+			/*
+			 * WMA stands for weighted moving average. It helps
+			 * to smooth load curve and react faster while ramping
+			 * down comparing with basic averaging. We do it only
+			 * when load trend goes down. See below example (4 HS):
+			 *
+			 * WMA = (P0 * 4 + P1 * 3 + P2 * 2 + P3 * 1) / (4 + 3 + 2 + 1)
+			 *
+			 * This is done for power saving. Means when load disappears
+			 * or becomes low, this algorithm caches real bottom load faster
+			 * (because of weights) then taking AVG values.
+			 */
+			demand = max((u32) wma, runtime);
+		else if (sched_window_stats_policy == WINDOW_STATS_WMA)
+			demand = (u32) wma;
+		else if (sched_window_stats_policy == WINDOW_STATS_MAX_RECENT_EWA)
+			/*
+			 * EWA stands for exponential weighted average
+			 */
+			demand = max((u32) ewa, runtime);
+		else if (sched_window_stats_policy == WINDOW_STATS_EWA)
+			demand = (u32) ewa;
 		else
 			demand = max(avg, runtime);
 	}

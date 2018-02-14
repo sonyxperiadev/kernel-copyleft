@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -909,9 +914,10 @@ static int pp_gamut_set_config(char __iomem *base_addr,
 			gamut_val = gamut_data->c1_c2_data[i][j + 1];
 			gamut_val = (gamut_val << 32) |
 					gamut_data->c0_data[i][j];
-			writeq_relaxed(gamut_val,
+			writeq_relaxed_no_log(gamut_val,
 					base_addr + GAMUT_TABLE_UPPER_R);
 		}
+
 		writel_relaxed(gamut_data->c0_data[i][j],
 					base_addr + GAMUT_TABLE_UPPER_R);
 		if ((i >= MDP_GAMUT_SCALE_OFF_TABLE_NUM) ||
@@ -1762,11 +1768,11 @@ static int pp_igc_set_config(char __iomem *base_addr,
 	data &= ~IGC_INDEX_UPDATE;
 	/* update the index for c0, c1 , c2 */
 	for (i = 1; i < IGC_LUT_ENTRIES; i++) {
-		writel_relaxed((lut_data->c0_c1_data[i] & IGC_DATA_MASK)
+		writel_relaxed_no_log((lut_data->c0_c1_data[i] & IGC_DATA_MASK)
 			       | data, c0);
-		writel_relaxed(((lut_data->c0_c1_data[i] >> 16)
+		writel_relaxed_no_log(((lut_data->c0_c1_data[i] >> 16)
 				& IGC_DATA_MASK) | data, c1);
-		writel_relaxed((lut_data->c2_data[i] & IGC_DATA_MASK)
+		writel_relaxed_no_log((lut_data->c2_data[i] & IGC_DATA_MASK)
 				| data, c2);
 	}
 bail_out:
@@ -1917,15 +1923,15 @@ static int pp_pgc_set_config(char __iomem *base_addr,
 		val = pgc_data_v17->c0_data[i] & PGC_DATA_MASK;
 		val |= (pgc_data_v17->c0_data[i + 1] & PGC_DATA_MASK) <<
 			PGC_ODD_SHIFT;
-		writel_relaxed(val, c0);
+		writel_relaxed_no_log(val, c0);
 		val = pgc_data_v17->c1_data[i] & PGC_DATA_MASK;
 		val |= (pgc_data_v17->c1_data[i + 1] & PGC_DATA_MASK) <<
 			PGC_ODD_SHIFT;
-		writel_relaxed(val, c1);
+		writel_relaxed_no_log(val, c1);
 		val = pgc_data_v17->c2_data[i] & PGC_DATA_MASK;
 		val |= (pgc_data_v17->c2_data[i + 1] & PGC_DATA_MASK) <<
 			PGC_ODD_SHIFT;
-		writel_relaxed(val, c2);
+		writel_relaxed_no_log(val, c2);
 	}
 	if (block_type == DSPP) {
 		val = PGC_SWAP;

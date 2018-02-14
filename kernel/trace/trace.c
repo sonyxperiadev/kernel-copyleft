@@ -11,6 +11,11 @@
  *  Copyright (C) 2004-2006 Ingo Molnar
  *  Copyright (C) 2004 Nadia Yvette Chambers
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/ring_buffer.h>
 #include <generated/utsrelease.h>
 #include <linux/stacktrace.h>
@@ -1633,7 +1638,7 @@ static void __trace_find_cmdline(int pid, char comm[])
 
 	map = savedcmd->map_pid_to_cmdline[pid];
 	if (map != NO_CMDLINE_MAP)
-		strcpy(comm, get_saved_cmdlines(map));
+		strlcpy(comm, get_saved_cmdlines(map), TASK_COMM_LEN-1);
 	else
 		strcpy(comm, "<...>");
 }
@@ -2053,6 +2058,7 @@ static char *get_trace_buf(void)
 	return this_cpu_ptr(&percpu_buffer->buffer[0]);
 }
 
+#ifdef CONFIG_TRACE_PRINTK
 static int alloc_percpu_trace_buffer(void)
 {
 	struct trace_buffer_struct *buffers;
@@ -2093,11 +2099,13 @@ static int alloc_percpu_trace_buffer(void)
 	WARN(1, "Could not allocate percpu trace_printk buffer");
 	return -ENOMEM;
 }
+#endif
 
 static int buffers_allocated;
 
 void trace_printk_init_buffers(void)
 {
+#ifdef CONFIG_TRACE_PRINTK
 	if (buffers_allocated)
 		return;
 
@@ -2134,6 +2142,9 @@ void trace_printk_init_buffers(void)
 	 */
 	if (global_trace.trace_buffer.buffer)
 		tracing_start_cmdline_record();
+#else
+	return;
+#endif
 }
 
 void trace_printk_start_comm(void)

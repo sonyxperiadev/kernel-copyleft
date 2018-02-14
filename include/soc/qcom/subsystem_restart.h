@@ -10,12 +10,19 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __SUBSYS_RESTART_H
 #define __SUBSYS_RESTART_H
 
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
+
+#define SUBSYS_CRASH_REASON_LEN 512
 
 struct subsys_device;
 
@@ -129,11 +136,27 @@ extern void subsys_default_online(struct subsys_device *dev);
 extern void subsys_set_crash_status(struct subsys_device *dev,
 					enum crash_status crashed);
 extern enum crash_status subsys_get_crash_status(struct subsys_device *dev);
+
+extern int subsystem_crash_reason(const char *name, char *reason);
+#if defined(CONFIG_DEBUG_FS)
+extern void update_crash_reason(struct subsys_device *dev, char *, int);
+#else
+static inline void update_crash_reason(struct subsys_device *dev,
+						char *reason, int size) { }
+#endif
 void notify_proxy_vote(struct device *device);
 void notify_proxy_unvote(struct device *device);
 void complete_err_ready(struct subsys_device *subsys);
 extern int wait_for_shutdown_ack(struct subsys_desc *desc);
 #else
+
+static inline void update_crash_reason(struct subsys_device *dev,
+						char *reason, int size) { }
+
+static inline int subsystem_crash_reason(const char *name, char *reason)
+{
+	return 0;
+}
 
 static inline int subsys_get_restart_level(struct subsys_device *dev)
 {

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
 #include <asm/div64.h>
@@ -3209,6 +3214,10 @@ int msm_isp_cfg_axi_stream(struct vfe_device *vfe_dev, void *arg)
 
 		rc = msm_isp_start_axi_stream(
 			vfe_dev, stream_cfg_cmd);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		pr_info("%s: msm_isp_start_axi_stream: rc %d\n",
+			__func__, rc);
+#endif
 	} else {
 		rc = msm_isp_stop_axi_stream(
 			vfe_dev, stream_cfg_cmd);
@@ -3231,8 +3240,13 @@ int msm_isp_cfg_axi_stream(struct vfe_device *vfe_dev, void *arg)
 	}
 
 	if (rc < 0)
+#if defined(CONFIG_SONY_CAM_V4L2)
+		pr_err("%s: start/stop %d stream failed: rc %d\n", __func__,
+			stream_cfg_cmd->cmd, rc);
+#else
 		pr_err("%s: start/stop %d stream failed\n", __func__,
 			stream_cfg_cmd->cmd);
+#endif
 	return rc;
 }
 

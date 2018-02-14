@@ -7,6 +7,11 @@
  *
  *  Card driver specific definitions.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_CARD_H
 #define LINUX_MMC_CARD_H
 
@@ -235,6 +240,7 @@ enum mmc_blk_status {
 	MMC_BLK_ECC_ERR,
 	MMC_BLK_NOMEDIUM,
 	MMC_BLK_NEW_REQUEST,
+	MMC_BLK_RETRY_SINGLE,
 };
 
 enum mmc_packed_stop_reasons {
@@ -435,6 +441,8 @@ struct mmc_card {
 	u8 *cached_ext_csd;
 	bool cmdq_init;
 	struct mmc_bkops_info bkops;
+	bool err_in_sdr104;
+	bool sdr104_blocked;
 };
 
 /*
