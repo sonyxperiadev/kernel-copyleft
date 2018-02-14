@@ -2611,6 +2611,7 @@ static u32 __compute_runnable_contrib(u64 n)
 #define SBC_FLAG_BEST_SIBLING				0x200
 #define SBC_FLAG_WAKER_CPU				0x400
 #define SBC_FLAG_PACK_TASK				0x800
+#define SBC_FLAG_SKIP_RT_TASK				0x1000
 
 /* Cluster selection flag */
 #define SBC_FLAG_COLOC_CLUSTER				0x10000
@@ -2891,6 +2892,17 @@ next_best_cluster(struct sched_cluster *cluster, struct cpu_select_env *env,
 	return next;
 }
 
+/*
+ * Returns true, if a current task has RT/DL class:
+ * SCHED_FIFO + SCHED_RR + SCHED_DEADLINE
+ */
+static inline int
+is_current_high_prio_class_task(int cpu)
+{
+	struct task_struct *curr = READ_ONCE(cpu_rq(cpu)->curr);
+	return (task_has_rt_policy(curr) | task_has_dl_policy(curr));
+}
+
 #ifdef CONFIG_SCHED_HMP_CSTATE_AWARE
 static void __update_cluster_stats(int cpu, struct cluster_cpu_stats *stats,
 				   struct cpu_select_env *env, int cpu_cost)
@@ -2929,6 +2941,25 @@ static void __update_cluster_stats(int cpu, struct cluster_cpu_stats *stats,
 		env->sbc_best_flag = SBC_FLAG_CPU_COST;
 		return;
 	}
+
+	/*
+	 * We try to escape of selecting CPUs with running RT
+	 * class tasks, if a power coast is the same. A reason
+	 * is to reduce a latency, since RT task may not be
+	 * preempted for a long time.
+	 */
+	if (is_current_high_prio_class_task(stats->best_cpu) &&
+			!is_current_high_prio_class_task(cpu)) {
+		stats->best_cpu_wakeup_latency = wakeup_latency;
+		stats->best_load = env->cpu_load;
+		stats->best_cpu = cpu;
+		env->sbc_best_flag = SBC_FLAG_SKIP_RT_TASK;
+		return;
+	}
+
+	if (!is_current_high_prio_class_task(stats->best_cpu) &&
+			is_current_high_prio_class_task(cpu))
+		return;
 
 	/* CPU cost is the same. Start breaking the tie by C-state */
 

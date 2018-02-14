@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2011-2014, 2017 The Linux Foundataion. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -426,13 +426,13 @@ int msm_camera_config_vreg(struct device *dev, struct camera_vreg_t *cam_vreg,
 		return -EINVAL;
 	}
 
-	if (cam_vreg == NULL) {
-		pr_err("%s:%d cam_vreg sequence invalid\n", __func__, __LINE__);
-		return -EINVAL;
-	}
-
 	if (!num_vreg_seq)
 		num_vreg_seq = num_vreg;
+
+	if ((cam_vreg == NULL) && num_vreg_seq) {
+		pr_err("%s:%d cam_vreg NULL\n", __func__, __LINE__);
+		return -EINVAL;
+	}
 
 	if (config) {
 		for (i = 0; i < num_vreg_seq; i++) {

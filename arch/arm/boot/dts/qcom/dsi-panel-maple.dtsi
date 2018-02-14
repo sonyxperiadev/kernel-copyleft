@@ -27,7 +27,7 @@
 
 	dsi_dual_default_cmd_config1: config1 {
 		qcom,mdss-dsc-encoders = <1>;
-		qcom,mdss-dsc-slice-height = <32>;
+		qcom,mdss-dsc-slice-height = <16>;
 		qcom,mdss-dsc-slice-width = <1080>;
 		qcom,mdss-dsc-slice-per-pkt = <1>;
 		qcom,mdss-dsc-bit-per-component = <8>;
