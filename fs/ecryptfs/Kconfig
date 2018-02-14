@@ -20,3 +20,10 @@ config ECRYPT_FS_MESSAGING
 	  Enables the /dev/ecryptfs entry for use by ecryptfsd. This allows
 	  for userspace to wrap/unwrap file encryption keys by other
 	  backends, like OpenSSL.
+
+config WTL_ENCRYPTION_FILTER
+	bool "Enables filtering for some files not to encrypt on eCryptfs"
+	default y
+	depends on ECRYPT_FS
+	help
+	Modification of encrypted filesystem for SD card encryption

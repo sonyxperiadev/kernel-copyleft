@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/completion.h>
 #include <linux/delay.h>
@@ -27,6 +32,7 @@
 #include <linux/extcon.h>
 #include <linux/usb/class-dual-role.h>
 #include <linux/usb/usbpd.h>
+#include <linux/regulator/consumer.h>
 #include "usbpd.h"
 
 enum usbpd_state {
@@ -190,6 +196,10 @@ static void *usbpd_ipc_log;
 #define PD_MSG_HDR(type, dr, pr, id, cnt, rev) \
 	(((type) & 0xF) | ((dr) << 5) | (rev << 6) | \
 	 ((pr) << 8) | ((id) << 9) | ((cnt) << 12))
+#define USB_VBUS_WAIT_VOLT	900	/* mV */
+#define USB_VBUS_WAIT_ITVL	5	/* mS */
+#define USB_VBUS_WAIT_TMOUT	200	/* mS */
+
 #define PD_MSG_HDR_COUNT(hdr) (((hdr) >> 12) & 7)
 #define PD_MSG_HDR_TYPE(hdr) ((hdr) & 0xF)
 #define PD_MSG_HDR_ID(hdr) (((hdr) >> 9) & 7)
@@ -276,7 +286,7 @@ module_param(check_vsafe0v, bool, S_IRUSR | S_IWUSR);
 static int min_sink_current = 900;
 module_param(min_sink_current, int, S_IRUSR | S_IWUSR);
 
-static const u32 default_src_caps[] = { 0x36019096 };	/* VSafe5V @ 1.5A */
+static const u32 default_src_caps[] = { 0x3601905A };	/* VSafe5V @ 0.9A */
 static const u32 default_snk_caps[] = { 0x2601912C };	/* VSafe5V @ 3A */
 
 struct vdm_tx {
@@ -310,6 +320,9 @@ struct usbpd {
 
 	u32			received_pdos[7];
 	u16			src_cap_id;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	u32			org_received_pdos[7];
+#endif
 	u8			selected_pdo;
 	u8			requested_pdo;
 	u32			rdo;	/* can be either source or sink */
@@ -375,11 +388,27 @@ static const unsigned int usbpd_extcon_cable[] = {
 	EXTCON_USB_HOST,
 	EXTCON_USB_CC,
 	EXTCON_USB_SPEED,
+	EXTCON_VBUS_DROP,
 	EXTCON_NONE,
 };
 
 /* EXTCON_USB and EXTCON_USB_HOST are mutually exclusive */
 static const u32 usbpd_extcon_exclusive[] = {0x3, 0};
+
+/**
+ * usbpd_ocp_notification - ocp notification callback from regulator.
+ * @ctxt: Pointer to the dwc3_msm context
+ *
+ * NOTE: This can be called in interrupt context.
+ */
+static void usbpd_ocp_notification(void *ctxt)
+{
+	struct usbpd *pd = (struct usbpd *)ctxt;
+
+	extcon_set_cable_state_(pd->extcon, EXTCON_VBUS_DROP, 1);
+	extcon_set_cable_state_(pd->extcon, EXTCON_VBUS_DROP, 0);
+	pr_info("%s: receive ocp notification\n", __func__);
+}
 
 enum plug_orientation usbpd_get_plug_orientation(struct usbpd *pd)
 {
@@ -545,10 +574,33 @@ static int pd_select_pdo(struct usbpd *pd, int pdo_pos, int uv, int ua)
 	return 0;
 }
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define ACCEPTABLE_SRC_VOLTAGE_9V 9000
+#endif
 static int pd_eval_src_caps(struct usbpd *pd)
 {
 	union power_supply_propval val;
 	u32 first_pdo = pd->received_pdos[0];
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	u32 *pdo = pd->received_pdos;
+	u32 *org_pdo = pd->org_received_pdos;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(pd->received_pdos); i++)
+		org_pdo[i] = pdo[i];
+
+	/* If PDO2 is 9V, accept it */
+	i = 1;
+	if (PD_SRC_PDO_TYPE(pdo[i]) == PD_SRC_PDO_TYPE_FIXED &&
+				PD_SRC_PDO_FIXED_VOLTAGE(pdo[i]) * 50 ==
+						ACCEPTABLE_SRC_VOLTAGE_9V)
+		i++;
+
+	usbpd_dbg(&pd->dev, "Clear PDOs from %d to %d\n",
+				i + 1, (int)ARRAY_SIZE(pd->received_pdos));
+	for (; i < ARRAY_SIZE(pd->received_pdos); i++)
+		pdo[i] = 0;
+#endif
 
 	if (PD_SRC_PDO_TYPE(first_pdo) != PD_SRC_PDO_TYPE_FIXED) {
 		usbpd_err(&pd->dev, "First src_cap invalid! %08x\n", first_pdo);
@@ -677,9 +729,41 @@ static void phy_msg_received(struct usbpd *pd, enum pd_msg_type type,
 	kick_sm(pd, 0);
 }
 
+static void phy_wait_vbus_settled_down(struct usbpd *pd, int mv,
+							int itvl, int tmout)
+{
+	int rc;
+	int cnt = 0;
+	int usbin = mv;
+
+	do {
+		union power_supply_propval pval;
+
+		msleep(itvl);
+		rc = power_supply_get_property(pd->usb_psy,
+				POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
+		if (IS_ERR_VALUE(rc))
+			goto waitremain;
+		usbin = pval.intval / 1000;
+		cnt++;
+	} while (usbin >= mv && tmout > (cnt * itvl));
+waitremain:
+	if (usbin >= mv && tmout > (cnt * itvl))
+		msleep(tmout - (cnt * itvl));
+}
+
+
 static void phy_shutdown(struct usbpd *pd)
 {
 	usbpd_dbg(&pd->dev, "shutdown");
+
+	if (regulator_is_enabled(pd->vbus)) {
+		usbpd_info(&pd->dev, "turn off VBUS");
+		regulator_disable(pd->vbus);
+		phy_wait_vbus_settled_down(pd,
+				USB_VBUS_WAIT_VOLT, USB_VBUS_WAIT_ITVL,
+				USB_VBUS_WAIT_TMOUT);
+	}
 }
 
 static enum hrtimer_restart pd_timeout(struct hrtimer *timer)
@@ -1417,7 +1501,6 @@ static void dr_swap(struct usbpd *pd)
 	}
 
 	pd_phy_update_roles(pd->current_dr, pd->current_pr);
-	dual_role_instance_changed(pd->dual_role);
 }
 
 
@@ -1556,6 +1639,10 @@ static void usbpd_sm(struct work_struct *w)
 		pd->requested_current = 0;
 		pd->selected_pdo = pd->requested_pdo = 0;
 		memset(&pd->received_pdos, 0, sizeof(pd->received_pdos));
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		memset(&pd->org_received_pdos, 0,
+					sizeof(pd->org_received_pdos));
+#endif
 		rx_msg_cleanup(pd);
 
 		val.intval = 0;
@@ -2391,6 +2478,20 @@ static int psy_changed(struct notifier_block *nb, unsigned long evt, void *ptr)
 	if (pd->typec_mode == typec_mode)
 		return 0;
 
+	switch (typec_mode) {
+	/* Sink states */
+	case POWER_SUPPLY_TYPEC_SOURCE_DEFAULT:
+	case POWER_SUPPLY_TYPEC_SOURCE_MEDIUM:
+	case POWER_SUPPLY_TYPEC_SOURCE_HIGH:
+		if (pd->psy_type == POWER_SUPPLY_TYPE_UNKNOWN) {
+			usbpd_dbg(&pd->dev, "SNK states but APSD is not done yet.\n");
+			return 0;
+		}
+		break;
+	default:
+		break;
+	}
+
 	pd->typec_mode = typec_mode;
 
 	usbpd_dbg(&pd->dev, "typec mode:%d present:%d type:%d orientation:%d\n",
@@ -2657,17 +2758,12 @@ static int usbpd_dr_set_property(struct dual_role_phy_instance *dual_role,
 static int usbpd_dr_prop_writeable(struct dual_role_phy_instance *dual_role,
 		enum dual_role_property prop)
 {
-	struct usbpd *pd = dual_role_get_drvdata(dual_role);
-
 	switch (prop) {
 	case DUAL_ROLE_PROP_MODE:
 		return 1;
 	case DUAL_ROLE_PROP_DR:
 	case DUAL_ROLE_PROP_PR:
-		if (pd)
-			return pd->current_state == PE_SNK_READY ||
-				pd->current_state == PE_SRC_READY;
-		break;
+		return 0;
 	default:
 		break;
 	}
@@ -3052,6 +3148,81 @@ static ssize_t hard_reset_store(struct device *dev,
 }
 static DEVICE_ATTR_WO(hard_reset);
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+static ssize_t org_pdo_h_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+	struct usbpd *pd = dev_get_drvdata(dev);
+	int i;
+	ssize_t cnt = 0;
+
+	for (i = 0; i < ARRAY_SIZE(pd->org_received_pdos); i++) {
+		u32 pdo = pd->org_received_pdos[i];
+
+		if (pdo == 0)
+			break;
+
+		cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt, "PDO %d\n", i + 1);
+
+		if (PD_SRC_PDO_TYPE(pdo) == PD_SRC_PDO_TYPE_FIXED) {
+			cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt,
+					"\tFixed supply\n"
+					"\tDual-Role Power:%d\n"
+					"\tUSB Suspend Supported:%d\n"
+					"\tExternally Powered:%d\n"
+					"\tUSB Communications Capable:%d\n"
+					"\tData Role Swap:%d\n"
+					"\tPeak Current:%d\n"
+					"\tVoltage:%d (mV)\n"
+					"\tMax Current:%d (mA)\n",
+					PD_SRC_PDO_FIXED_PR_SWAP(pdo),
+					PD_SRC_PDO_FIXED_USB_SUSP(pdo),
+					PD_SRC_PDO_FIXED_EXT_POWERED(pdo),
+					PD_SRC_PDO_FIXED_USB_COMM(pdo),
+					PD_SRC_PDO_FIXED_DR_SWAP(pdo),
+					PD_SRC_PDO_FIXED_PEAK_CURR(pdo),
+					PD_SRC_PDO_FIXED_VOLTAGE(pdo) * 50,
+					PD_SRC_PDO_FIXED_MAX_CURR(pdo) * 10);
+		} else if (PD_SRC_PDO_TYPE(pdo) == PD_SRC_PDO_TYPE_BATTERY) {
+			cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt,
+					"\tBattery supply\n"
+					"\tMax Voltage:%d (mV)\n"
+					"\tMin Voltage:%d (mV)\n"
+					"\tMax Power:%d (mW)\n",
+					PD_SRC_PDO_VAR_BATT_MAX_VOLT(pdo) * 50,
+					PD_SRC_PDO_VAR_BATT_MIN_VOLT(pdo) * 50,
+					PD_SRC_PDO_VAR_BATT_MAX(pdo) * 250);
+		} else if (PD_SRC_PDO_TYPE(pdo) == PD_SRC_PDO_TYPE_VARIABLE) {
+			cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt,
+					"\tVariable supply\n"
+					"\tMax Voltage:%d (mV)\n"
+					"\tMin Voltage:%d (mV)\n"
+					"\tMax Current:%d (mA)\n",
+					PD_SRC_PDO_VAR_BATT_MAX_VOLT(pdo) * 50,
+					PD_SRC_PDO_VAR_BATT_MIN_VOLT(pdo) * 50,
+					PD_SRC_PDO_VAR_BATT_MAX(pdo) * 10);
+		} else if (PD_SRC_PDO_TYPE(pdo) == PD_SRC_PDO_TYPE_AUGMENTED) {
+			cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt,
+					"\tProgrammable Power supply\n"
+					"\tMax Voltage:%d (mV)\n"
+					"\tMin Voltage:%d (mV)\n"
+					"\tMax Current:%d (mA)\n",
+					PD_APDO_MAX_VOLT(pdo) * 100,
+					PD_APDO_MIN_VOLT(pdo) * 100,
+					PD_APDO_MAX_CURR(pdo) * 50);
+		} else {
+			cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt,
+					"Invalid PDO\n");
+		}
+
+		buf[cnt++] = '\n';
+	}
+
+	return cnt;
+}
+static DEVICE_ATTR_RO(org_pdo_h);
+
+#endif
 static struct attribute *usbpd_attrs[] = {
 	&dev_attr_contract.attr,
 	&dev_attr_initial_pr.attr,
@@ -3071,6 +3242,9 @@ static struct attribute *usbpd_attrs[] = {
 	&dev_attr_rdo.attr,
 	&dev_attr_rdo_h.attr,
 	&dev_attr_hard_reset.attr,
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	&dev_attr_org_pdo_h.attr,
+#endif
 	NULL,
 };
 ATTRIBUTE_GROUPS(usbpd);
@@ -3157,6 +3331,7 @@ struct usbpd *usbpd_create(struct device *parent)
 {
 	int ret;
 	struct usbpd *pd;
+	struct regulator_ocp_notification ocp_ntf;
 
 	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
 	if (!pd)
@@ -3219,6 +3394,11 @@ struct usbpd *usbpd_create(struct device *parent)
 		ret = PTR_ERR(pd->vbus);
 		goto put_psy;
 	}
+
+	ocp_ntf.notify = usbpd_ocp_notification;
+	ocp_ntf.ctxt = pd;
+	ret = regulator_register_ocp_notification(pd->vbus, &ocp_ntf);
+
 
 	pd->vconn = devm_regulator_get(parent, "vconn");
 	if (IS_ERR(pd->vconn)) {

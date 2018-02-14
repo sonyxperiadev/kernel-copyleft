@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/clk.h>
 #include <linux/compat.h>
@@ -1878,6 +1883,45 @@ static void ipa3_q6_avoid_holb(void)
 	}
 }
 
+static void ipa3_halt_q6_cons_gsi_channels(void)
+{
+	int ep_idx;
+	int client_idx;
+	struct ipa_gsi_ep_config *gsi_ep_cfg;
+	int ret;
+	int code = 0;
+
+	for (client_idx = 0; client_idx < IPA_CLIENT_MAX; client_idx++) {
+		if (IPA_CLIENT_IS_Q6_CONS(client_idx)) {
+			ep_idx = ipa3_get_ep_mapping(client_idx);
+			if (ep_idx == -1)
+				continue;
+
+			gsi_ep_cfg = ipa3_get_gsi_ep_info(ep_idx);
+			if (!gsi_ep_cfg) {
+				IPAERR("failed to get GSI config\n");
+				ipa_assert();
+				return;
+			}
+
+			ret = gsi_halt_channel_ee(
+				gsi_ep_cfg->ipa_gsi_chan_num, gsi_ep_cfg->ee,
+				&code);
+			if (ret == GSI_STATUS_SUCCESS)
+				IPADBG("halted gsi ch %d ee %d with code %d\n",
+				gsi_ep_cfg->ipa_gsi_chan_num,
+				gsi_ep_cfg->ee,
+				code);
+			else
+				IPAERR("failed to halt ch %d ee %d code %d\n",
+				gsi_ep_cfg->ipa_gsi_chan_num,
+				gsi_ep_cfg->ee,
+				code);
+		}
+	}
+}
+
+
 static int ipa3_q6_clean_q6_flt_tbls(enum ipa_ip_type ip,
 	enum ipa_rule_type rlt)
 {
@@ -2312,6 +2356,7 @@ void ipa3_q6_post_shutdown_cleanup(void)
 
 	/* Handle the issue where SUSPEND was removed for some reason */
 	ipa3_q6_avoid_holb();
+	ipa3_halt_q6_cons_gsi_channels();
 
 	for (client_idx = 0; client_idx < IPA_CLIENT_MAX; client_idx++)
 		if (IPA_CLIENT_IS_Q6_PROD(client_idx)) {
@@ -3543,6 +3588,8 @@ void ipa3_suspend_handler(enum ipa_irq_type interrupt,
 				 * pipe will be unsuspended as part of
 				 * enabling IPA clocks
 				 */
+				mutex_lock(&ipa3_ctx->transport_pm.
+					transport_pm_mutex);
 				if (!atomic_read(
 					&ipa3_ctx->transport_pm.dec_clients)
 					) {
@@ -3555,6 +3602,8 @@ void ipa3_suspend_handler(enum ipa_irq_type interrupt,
 					1);
 					ipa3_sps_process_irq_schedule_rel();
 				}
+				mutex_unlock(&ipa3_ctx->transport_pm.
+					transport_pm_mutex);
 			} else {
 				resource = ipa3_get_rm_resource_from_ep(i);
 				res =

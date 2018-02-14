@@ -17,6 +17,11 @@
  * Author:  Andrew Christian
  *          28 May 2002
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/moduleparam.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -1511,12 +1516,19 @@ static int get_card_status(struct mmc_card *card, u32 *status, int retries)
 	return err;
 }
 
+#define EXE_ERRORS \
+	(R1_OUT_OF_RANGE |   /* Command argument out of range */ \
+	 R1_ADDRESS_ERROR |   /* Misaligned address */ \
+	 R1_WP_VIOLATION |    /* Tried to write to protected block */ \
+	 R1_CARD_ECC_FAILED | /* ECC error */ \
+	 R1_ERROR)            /* General/unknown error */
+
 static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 		bool hw_busy_detect, struct request *req, int *gen_err)
 {
 	unsigned long timeout = jiffies + msecs_to_jiffies(timeout_ms);
 	int err = 0;
-	u32 status;
+	u32 status, first_status = 0;
 
 	do {
 		err = get_card_status(card, &status, 5);
@@ -1525,6 +1537,9 @@ static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 			       req->rq_disk->disk_name, err);
 			return err;
 		}
+
+		if (!first_status)
+			first_status = status;
 
 		if (status & R1_ERROR) {
 			pr_err("%s: %s: error sending status cmd, status %#x\n",
@@ -1555,6 +1570,14 @@ static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 		 */
 	} while (!(status & R1_READY_FOR_DATA) ||
 		 (R1_CURRENT_STATE(status) == R1_STATE_PRG));
+
+	/* Check for errors during cmd execution. In this case
+	 * the execution was terminated. */
+	if (first_status & EXE_ERRORS) {
+		pr_err("%s: error during r/w command, err status %#x, status %#x\n",
+		       req->rq_disk->disk_name, first_status, status);
+		return MMC_BLK_ABORT;
+	}
 
 	return err;
 }
@@ -2189,6 +2212,17 @@ static int mmc_blk_err_check(struct mmc_card *card,
 	int need_retune = card->host->need_retune;
 	int ecc_err = 0, gen_err = 0;
 
+	if (card->host->sdr104_wa && mmc_card_sd(card) &&
+	    (card->host->ios.timing == MMC_TIMING_UHS_SDR104) &&
+	    !card->sdr104_blocked &&
+	    (brq->data.error == -EILSEQ ||
+	     brq->data.error == -EIO ||
+	     brq->data.error == -ETIMEDOUT ||
+	     brq->cmd.error == -EILSEQ ||
+	     brq->cmd.error == -EIO ||
+	     brq->cmd.error == -ETIMEDOUT))
+		card->err_in_sdr104 = true;
+
 	/*
 	 * sbc.error indicates a problem with the set block count
 	 * command.  No data will have been transferred.
@@ -2224,12 +2258,25 @@ static int mmc_blk_err_check(struct mmc_card *card,
 		return MMC_BLK_ABORT;
 	}
 
+	/* Check execution mode errors. If stop cmd was sent, these
+	 * errors would be reported in response to it. In this case
+	 * the execution is retried using single-block read. */
+	if (brq->stop.resp[0] & EXE_ERRORS) {
+		pr_err("%s: error during r/w command, stop response %#x\n",
+		       req->rq_disk->disk_name, brq->stop.resp[0]);
+		return MMC_BLK_RETRY_SINGLE;
+	}
+
 	/*
 	 * Everything else is either success, or a data error of some
 	 * kind.  If it was a write, we may have transitioned to
 	 * program mode, which we have to wait for it to complete.
+	 * If pre defined block count (CMD23) was used, no stop
+	 * cmd was sent and we need to read status to check
+	 * for errors during cmd execution.
 	 */
-	if (!mmc_host_is_spi(card->host) && rq_data_dir(req) != READ) {
+	if (!mmc_host_is_spi(card->host) &&
+	    (rq_data_dir(req) != READ || brq->sbc.opcode == MMC_SET_BLOCK_COUNT)) {
 		int err;
 
 		/* Check stop command response */
@@ -3645,6 +3692,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 	struct mmc_async_req *areq;
 	const u8 packed_nr = 2;
 	u8 reqs = 0;
+	bool reset = false;
 #ifdef CONFIG_MMC_SIMULATE_MAX_SPEED
 	unsigned long waitfor = jiffies;
 #endif
@@ -3690,6 +3738,26 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 		type = rq_data_dir(req) == READ ? MMC_BLK_READ : MMC_BLK_WRITE;
 		mmc_queue_bounce_post(mq_rq);
 
+		if (card->err_in_sdr104) {
+			/*
+			 * Data CRC/timeout errors will manifest as CMD/DATA
+			 * ERR. But we'd like to retry these too.
+			 * Moreover, no harm done if this fails too for multiple
+			 * times, we anyway reduce the bus-speed and retry the
+			 * same request.
+			 * If that fails too, we don't override this status.
+			 */
+			if (status == MMC_BLK_ABORT ||
+			    status == MMC_BLK_CMD_ERR ||
+			    status == MMC_BLK_DATA_ERR ||
+			    status == MMC_BLK_RETRY)
+				/* reset on all of these errors and retry */
+				reset = true;
+
+			status = MMC_BLK_RETRY;
+			card->err_in_sdr104 = false;
+		}
+
 		switch (status) {
 		case MMC_BLK_SUCCESS:
 		case MMC_BLK_PARTIAL:
@@ -3730,8 +3798,32 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 			break;
 		case MMC_BLK_RETRY:
 			retune_retry_done = brq->retune_retry_done;
-			if (retry++ < MMC_BLK_MAX_RETRIES)
+			if (retry++ < MMC_BLK_MAX_RETRIES) {
 				break;
+			} else if (reset) {
+				reset = false;
+				/*
+				 * If we exhaust all the retries due to
+				 * CRC/timeout errors in SDR140 mode with UHS SD
+				 * cards, re-configure the card in SDR50
+				 * bus-speed mode.
+				 * All subsequent re-init of this card will be
+				 * in SDR50 mode, unless it is removed and
+				 * re-inserted. When new UHS SD cards are
+				 * inserted, it may start at SDR104 mode if
+				 * supported by the card.
+				 */
+				pr_err("%s: blocked SDR104, lower the bus-speed (SDR50 / DDR50)\n",
+					req->rq_disk->disk_name);
+				mmc_host_clear_sdr104(card->host);
+				mmc_suspend_clk_scaling(card->host);
+				mmc_blk_reset(md, card->host, type);
+				/* SDR104 mode is blocked from now on */
+				card->sdr104_blocked = true;
+				/* retry 5 times again */
+				retry = 0;
+				break;
+			}
 			/* Fall through */
 		case MMC_BLK_ABORT:
 			if (!mmc_blk_reset(md, card->host, type) &&
@@ -3746,6 +3838,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 				break;
 			goto cmd_abort;
 		}
+		case MMC_BLK_RETRY_SINGLE:
 		case MMC_BLK_ECC_ERR:
 			if (brq->data.blocks > 1) {
 				/* Redo read one sector at a time */
@@ -4563,6 +4656,9 @@ static int mmc_blk_probe(struct mmc_card *card)
 
 	dev_set_drvdata(&card->dev, md);
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	mmc_set_bus_resume_policy(card->host, 1);
+#endif
 	if (mmc_add_disk(md))
 		goto out;
 
@@ -4572,7 +4668,13 @@ static int mmc_blk_probe(struct mmc_card *card)
 	}
 
 	pm_runtime_use_autosuspend(&card->dev);
-	pm_runtime_set_autosuspend_delay(&card->dev, MMC_AUTOSUSPEND_DELAY_MS);
+
+	if (mmc_card_sd(card))
+		pm_runtime_set_autosuspend_delay(&card->dev,
+			MMC_SDCARD_AUTOSUSPEND_DELAY_MS);
+	else
+		pm_runtime_set_autosuspend_delay(&card->dev, MMC_AUTOSUSPEND_DELAY_MS);
+
 	pm_runtime_use_autosuspend(&card->dev);
 
 	/*
@@ -4606,6 +4708,9 @@ static void mmc_blk_remove(struct mmc_card *card)
 	pm_runtime_put_noidle(&card->dev);
 	mmc_blk_remove_req(md);
 	dev_set_drvdata(&card->dev, NULL);
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	mmc_set_bus_resume_policy(card->host, 0);
+#endif
 }
 
 static int _mmc_blk_suspend(struct mmc_card *card, bool wait)

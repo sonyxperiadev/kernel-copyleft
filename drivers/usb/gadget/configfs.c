@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/configfs.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -1341,7 +1346,12 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 
 		gi->cdev.desc.iManufacturer = s[USB_GADGET_MANUFACTURER_IDX].id;
 		gi->cdev.desc.iProduct = s[USB_GADGET_PRODUCT_IDX].id;
+#ifdef CONFIG_USB_ANDROID_PRODUCTION
+		/* Set id to 0 to comply with Sony production tools */
+		gi->cdev.desc.iSerialNumber = 0;
+#else
 		gi->cdev.desc.iSerialNumber = s[USB_GADGET_SERIAL_IDX].id;
+#endif
 	}
 
 	if (gi->use_os_desc) {

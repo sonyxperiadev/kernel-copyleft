@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/firmware.h>
@@ -1189,6 +1194,9 @@ static irqreturn_t svass_exception_irq(int irq, void *data)
 			dev_err(core->dev,
 				"%s: CPE SSR event,err_status = 0x%02x\n",
 				__func__, status);
+			core->ssr_entry.err_status = status;
+			core->ssr_entry.err_data_ready = 1;
+			wake_up(&core->ssr_entry.err_status_debug_q);
 			wcd_cpe_ssr_event(core, WCD_CPE_SSR_EVENT);
 			/*
 			 * If fatal interrupt is received,
@@ -1673,6 +1681,44 @@ done:
 	return ret;
 }
 
+static ssize_t cpe_err_status_read(struct file *filp, char __user *ubuf,
+		size_t cnt, loff_t *ppos)
+{
+	int r;
+	char buf[32];
+	size_t size;
+	struct wcd_cpe_core *core = filp->private_data;
+	struct wcd_cpe_ssr_entry *ssr_entry = &core->ssr_entry;
+
+	r = snprintf(buf, sizeof(buf),
+			"err_status = 0x%02x", ssr_entry->err_status);
+	size = simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+	if (*ppos == r)
+		ssr_entry->err_data_ready = 0;
+
+	return size;
+}
+
+static unsigned int cpe_err_status_poll(struct file *filp,
+					struct poll_table_struct *wait)
+{
+	struct wcd_cpe_core *core = filp->private_data;
+	struct wcd_cpe_ssr_entry *ssr_entry = &core->ssr_entry;
+	unsigned int mask = 0;
+
+	if (ssr_entry->err_data_ready)
+		mask |= (POLLIN | POLLRDNORM);
+
+	poll_wait(filp, &ssr_entry->err_status_debug_q, wait);
+	return mask;
+}
+
+static const struct file_operations cpe_err_status_fops = {
+	.open = simple_open,
+	.read = cpe_err_status_read,
+	.poll = cpe_err_status_poll,
+};
+
 static int wcd_cpe_debugfs_init(struct wcd_cpe_core *core)
 {
 	int rc = 0;
@@ -1707,6 +1753,18 @@ static int wcd_cpe_debugfs_init(struct wcd_cpe_core *core)
 		rc = -ENODEV;
 		goto err_create_entry;
 	}
+
+	if (!debugfs_create_file("err_status", S_IRUGO,
+				dir, core, &cpe_err_status_fops)) {
+		dev_err(core->dev, "%s: Failed to create debugfs node %s\n",
+			__func__, "err_status");
+		rc = -ENODEV;
+		goto err_create_entry;
+	}
+
+	init_waitqueue_head(&core->ssr_entry.err_status_debug_q);
+
+	return 0;
 
 err_create_entry:
 	debugfs_remove(dir);

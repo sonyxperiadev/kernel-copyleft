@@ -9,3 +9,4 @@ obj-$(CONFIG_BATTERY_BCL) += battery_current_limit.o
 obj-$(CONFIG_QPNP_SMB2)		+= qpnp-smb2.o smb-lib.o pmic-voter.o storm-watch.o battery.o
 obj-$(CONFIG_SMB138X_CHARGER)	+= smb138x-charger.o smb-lib.o pmic-voter.o storm-watch.o battery.o
 obj-$(CONFIG_QPNP_QNOVO)	+= qpnp-qnovo.o battery.o
+obj-$(CONFIG_QNS_SYSTEM)	+= qns_system.o

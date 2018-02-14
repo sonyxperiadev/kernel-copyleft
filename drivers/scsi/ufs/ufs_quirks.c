@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "ufshcd.h"
 #include "ufs_quirks.h"
@@ -30,6 +35,14 @@ static struct ufs_card_fix ufs_fixups[] = {
 		UFS_DEVICE_QUIRK_HOST_PA_TACTIVATE),
 	UFS_FIX(UFS_VENDOR_HYNIX, UFS_ANY_MODEL,
 		UFS_DEVICE_QUIRK_HOST_PA_SAVECONFIGTIME),
+	UFS_FIX_REVISION(UFS_VENDOR_HYNIX, UFS_MODEL_HYNIX_32GB,
+		UFS_REVISION_HYNIX, UFS_DEVICE_QUIRK_NO_PURGE),
+	UFS_FIX_REVISION(UFS_VENDOR_HYNIX, UFS_MODEL_HYNIX_64GB,
+		UFS_REVISION_HYNIX, UFS_DEVICE_QUIRK_NO_PURGE),
+	UFS_FIX_REVISION(UFS_VENDOR_SAMSUNG, UFS_MODEL_SAMSUNG_64GB,
+		UFS_REVISION_SAMSUNG, UFS_DEVICE_QUIRK_NO_PURGE),
+	UFS_FIX(UFS_VENDOR_HYNIX, UFS_ANY_MODEL,
+		UFS_DEVICE_QUIRK_EXTEND_SYNC_LENGTH),
 
 	END_FIX
 };
@@ -39,6 +52,7 @@ static int ufs_get_device_info(struct ufs_hba *hba,
 {
 	int err;
 	u8 model_index;
+	u8 revision_index;
 	u8 str_desc_buf[QUERY_DESC_STRING_MAX_SIZE + 1];
 	u8 desc_buf[QUERY_DESC_DEVICE_MAX_SIZE];
 
@@ -54,7 +68,11 @@ static int ufs_get_device_info(struct ufs_hba *hba,
 	card_data->wmanufacturerid = desc_buf[DEVICE_DESC_PARAM_MANF_ID] << 8 |
 				     desc_buf[DEVICE_DESC_PARAM_MANF_ID + 1];
 
+	card_data->specver = desc_buf[DEVICE_DESC_PARAM_SPEC_VER] << 8 |
+				     desc_buf[DEVICE_DESC_PARAM_SPEC_VER + 1];
+
 	model_index = desc_buf[DEVICE_DESC_PARAM_PRDCT_NAME];
+	revision_index = desc_buf[DEVICE_DESC_PARAM_PRODUCT_REVISION];
 
 	memset(str_desc_buf, 0, QUERY_DESC_STRING_MAX_SIZE);
 	err = ufshcd_read_string_desc(hba, model_index, str_desc_buf,
@@ -69,6 +87,22 @@ static int ufs_get_device_info(struct ufs_hba *hba,
 	/* Null terminate the model string */
 	card_data->model[MAX_MODEL_LEN] = '\0';
 
+	memset(str_desc_buf, 0, QUERY_DESC_STRING_MAX_SIZE);
+	err = ufshcd_read_string_desc(hba, revision_index, str_desc_buf,
+					QUERY_DESC_STRING_MAX_SIZE, ASCII_STD);
+	if (err)
+		goto out;
+
+	str_desc_buf[QUERY_DESC_STRING_MAX_SIZE] = '\0';
+	strlcpy(card_data->revision, (str_desc_buf + QUERY_DESC_HDR_SIZE),
+		min_t(u8, str_desc_buf[QUERY_DESC_LENGTH_OFFSET],
+		      MAX_REVISION_LEN));
+	/* Null terminate the model string */
+	card_data->model[MAX_REVISION_LEN] = '\0';
+
+	dev_err(hba->dev, "%s : vid=%04x, model=%s, spec ver=%04x , fw ver=%s\n",
+		 __func__, card_data->wmanufacturerid, card_data->model,
+		 card_data->specver, card_data->revision);
 out:
 	return err;
 }
@@ -80,8 +114,13 @@ void ufs_advertise_fixup_device(struct ufs_hba *hba)
 	struct ufs_card_info card_data;
 
 	card_data.wmanufacturerid = 0;
+	card_data.specver = 0;
 	card_data.model = kmalloc(MAX_MODEL_LEN + 1, GFP_KERNEL);
 	if (!card_data.model)
+		goto out;
+
+	card_data.revision = kmalloc(MAX_REVISION_LEN + 1, GFP_KERNEL);
+	if (!card_data.revision)
 		goto out;
 
 	/* get device data*/
@@ -91,16 +130,24 @@ void ufs_advertise_fixup_device(struct ufs_hba *hba)
 		goto out;
 	}
 
+	if (card_data.specver < UFS_PURGE_SPEC_VER)
+		hba->dev_quirks |= UFS_DEVICE_QUIRK_NO_PURGE;
+
 	for (f = ufs_fixups; f->quirk; f++) {
 		/* if same wmanufacturerid */
 		if (((f->card.wmanufacturerid == card_data.wmanufacturerid) ||
 		     (f->card.wmanufacturerid == UFS_ANY_VENDOR)) &&
 		    /* and same model */
 		    (STR_PRFX_EQUAL(f->card.model, card_data.model) ||
-		     !strcmp(f->card.model, UFS_ANY_MODEL)))
+		     !strncmp(f->card.model, UFS_ANY_MODEL, strlen(UFS_ANY_MODEL))) &&
+		    /* and same fw revision*/
+		    (STR_PRFX_EQUAL(f->card.revision, card_data.revision) ||
+		     !strncmp(f->card.revision, UFS_ANY_VER, strlen(UFS_ANY_VER)))) {
 			/* update quirks */
 			hba->dev_quirks |= f->quirk;
+		}
 	}
 out:
 	kfree(card_data.model);
+	kfree(card_data.revision);
 }

@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "RRADC: %s: " fmt, __func__
 
@@ -222,7 +227,22 @@ enum rradc_channel_id {
 	RR_ADC_MAX
 };
 
+enum rradc_reg_data_idx {
+	RR_ADC_REG_DATA_ADDR = 0,
+	RR_ADC_REG_DATA_MASK,
+	RR_ADC_REG_DATA_VALUE,
+	RR_ADC_REG_DATA_IDX_MAX
+};
+
+struct rradc_reg_cfg {
+	uint32_t	addr;
+	uint32_t	mask;
+	uint32_t	val;
+};
+
 struct rradc_chip {
+	const struct rradc_reg_cfg	*reg_cfg;
+	int				reg_cfg_num;
 	struct device			*dev;
 	struct mutex			lock;
 	struct regmap			*regmap;
@@ -937,6 +957,8 @@ static const struct iio_info rradc_info = {
 
 static int rradc_get_dt_data(struct rradc_chip *chip, struct device_node *node)
 {
+	const uint32_t *prop_buf;
+	int reg_cfg_size = 0;
 	const struct rradc_channels *rradc_chan;
 	struct iio_chan_spec *iio_chan;
 	unsigned int i = 0, base;
@@ -980,6 +1002,19 @@ static int rradc_get_dt_data(struct rradc_chip *chip, struct device_node *node)
 		}
 	}
 
+	prop_buf = of_get_property(node, "somc,reg-cfg", &reg_cfg_size);
+	if (prop_buf) {
+		if ((reg_cfg_size / sizeof(uint32_t))
+			% RR_ADC_REG_DATA_IDX_MAX) {
+			pr_err("Register config data is invalid size\n");
+			return -EINVAL;
+		}
+
+		chip->reg_cfg = (struct rradc_reg_cfg *)prop_buf;
+		chip->reg_cfg_num = reg_cfg_size / sizeof(uint32_t)
+						/ RR_ADC_REG_DATA_IDX_MAX;
+	}
+
 	iio_chan = chip->iio_chans;
 
 	for (i = 0; i < RR_ADC_MAX; i++) {
@@ -1005,6 +1040,7 @@ static int rradc_get_dt_data(struct rradc_chip *chip, struct device_node *node)
 
 static int rradc_probe(struct platform_device *pdev)
 {
+	int i;
 	struct device_node *node = pdev->dev.of_node;
 	struct device *dev = &pdev->dev;
 	struct iio_dev *indio_dev;
@@ -1028,6 +1064,23 @@ static int rradc_probe(struct platform_device *pdev)
 	rc = rradc_get_dt_data(chip, node);
 	if (rc)
 		return rc;
+
+	for (i = 0; i < chip->reg_cfg_num; i++) {
+		rc = rradc_masked_write(chip,
+				(u16)be32_to_cpu(chip->reg_cfg[i].addr),
+				 (u8)be32_to_cpu(chip->reg_cfg[i].mask),
+				 (u8)be32_to_cpu(chip->reg_cfg[i].val));
+		if (rc < 0) {
+			pr_err("Failed in register write (addr=0x%02x)\n",
+				(u16)be32_to_cpu(chip->reg_cfg[i].addr));
+			return -EIO;
+		}
+
+		pr_debug("Write register (addr=0x%02x mask=0x%02x value=0x%02x)\n",
+			(u16)be32_to_cpu(chip->reg_cfg[i].addr),
+			 (u8)be32_to_cpu(chip->reg_cfg[i].mask),
+			 (u8)be32_to_cpu(chip->reg_cfg[i].val));
+	}
 
 	indio_dev->dev.parent = dev;
 	indio_dev->dev.of_node = node;
