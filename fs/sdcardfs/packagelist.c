@@ -17,6 +17,11 @@
  * under the terms of the Apache 2.0 License OR version 2 of the GNU
  * General Public License.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "sdcardfs.h"
 #include <linux/hashtable.h>
@@ -173,6 +178,19 @@ int check_caller_access_to_name(struct inode *parent_node, const struct qstr *na
 
 	/* No extra permissions to enforce */
 	return 1;
+}
+
+/* This function is used when file opening. The open flags must be
+ * checked before calling check_caller_access_to_name()
+ */
+int open_flags_to_access_mode(int open_flags)
+{
+	if ((open_flags & O_ACCMODE) == O_RDONLY)
+		return 0; /* R_OK */
+	if ((open_flags & O_ACCMODE) == O_WRONLY)
+		return 1; /* W_OK */
+	/* Probably O_RDRW, but treat as default to be safe */
+		return 1; /* R_OK | W_OK */
 }
 
 static struct hashtable_entry *alloc_hashtable_entry(const struct qstr *key,

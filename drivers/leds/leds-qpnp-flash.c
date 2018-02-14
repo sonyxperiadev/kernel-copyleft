@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -32,6 +37,7 @@
 #include "leds.h"
 
 #define FLASH_LED_PERIPHERAL_SUBTYPE(base)			(base + 0x05)
+#define FLASH_LED_FAULT_STATUS(base)				(base + 0x08)
 #define FLASH_SAFETY_TIMER(base)				(base + 0x40)
 #define FLASH_MAX_CURRENT(base)					(base + 0x41)
 #define FLASH_LED0_CURRENT(base)				(base + 0x42)
@@ -132,6 +138,7 @@
 #define	FLASH_LED_MIN_CURRENT_MA				13
 #define FLASH_SUBTYPE_DUAL					0x01
 #define FLASH_SUBTYPE_SINGLE					0x02
+#define FLASH_LED_INIT_CONTROL					0x03
 
 /*
  * ID represents physical LEDs for individual control purpose.
@@ -867,6 +874,63 @@ static ssize_t qpnp_flash_led_max_current_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%u\n", max_curr_avail_ma);
 }
 
+static ssize_t qpnp_led_duration_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct qpnp_flash_led *led;
+	struct flash_node_data *flash_node;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+	flash_node = container_of(led_cdev, struct flash_node_data, cdev);
+	led = dev_get_drvdata(&flash_node->spmi_dev->dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", flash_node->duration);
+}
+
+static ssize_t qpnp_led_duration_store(struct device *dev,
+			struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	struct qpnp_flash_led *led;
+	struct flash_node_data *flash_node;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	ssize_t ret;
+	unsigned long state;
+
+	flash_node = container_of(led_cdev, struct flash_node_data, cdev);
+	led = dev_get_drvdata(&flash_node->spmi_dev->dev);
+
+	ret = kstrtoul(buf, 10, &state);
+	if (ret)
+		return ret;
+
+	flash_node->duration = state;
+
+	return count;
+}
+
+static ssize_t qpnp_led_fault_status_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct flash_node_data *flash_node;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct qpnp_flash_led *led;
+	int rc;
+	u8 val;
+
+	flash_node = container_of(led_cdev, struct flash_node_data, cdev);
+	led = dev_get_drvdata(&flash_node->spmi_dev->dev);
+
+	rc = spmi_ext_register_readl(led->spmi_dev->ctrl,
+		led->spmi_dev->sid, FLASH_LED_FAULT_STATUS(led->base), &val, 1);
+	if (rc) {
+		dev_err(&led->spmi_dev->dev,
+			"Unable to read fault status rc(%d)\n", rc);
+		return rc;
+	}
+	return scnprintf(buf, PAGE_SIZE, "%d\n", val);
+}
+
 static struct device_attribute qpnp_flash_led_attrs[] = {
 	__ATTR(strobe, (S_IRUGO | S_IWUSR | S_IWGRP),
 				NULL,
@@ -883,6 +947,12 @@ static struct device_attribute qpnp_flash_led_attrs[] = {
 	__ATTR(enable_die_temp_current_derate, (S_IRUGO | S_IWUSR | S_IWGRP),
 				NULL,
 				qpnp_flash_led_die_temp_store),
+	__ATTR(duration, (S_IRUGO | S_IWUSR | S_IWGRP),
+				qpnp_led_duration_show,
+				qpnp_led_duration_store),
+	__ATTR(fault_status, S_IRUSR | S_IRGRP,
+				qpnp_led_fault_status_show,
+				NULL),
 };
 
 static u32 qpnp_flash_led_get_thermal_derate_rate(const char *rate)
@@ -994,6 +1064,7 @@ static int qpnp_flash_led_module_disable(struct qpnp_flash_led *led,
 	union power_supply_propval psy_prop;
 	int rc;
 	u8 val, tmp;
+	u8 tmp_mask;
 
 	rc = spmi_ext_register_readl(led->spmi_dev->ctrl,
 				led->spmi_dev->sid,
@@ -1005,7 +1076,8 @@ static int qpnp_flash_led_module_disable(struct qpnp_flash_led *led,
 		return -EINVAL;
 	}
 
-	tmp = (~flash_node->trigger) & val;
+	tmp_mask = flash_node->trigger | FLASH_LED_INIT_CONTROL;
+	tmp = ~tmp_mask & val;
 	if (!tmp) {
 		if (flash_node->type == TORCH) {
 			rc = qpnp_led_masked_write(led->spmi_dev,
@@ -1879,6 +1951,8 @@ static void qpnp_flash_led_brightness_set(struct led_classdev *led_cdev,
 		return;
 	}
 
+	mutex_lock(&led->flash_led_lock);
+
 	if (value > flash_node->cdev.max_brightness)
 		value = flash_node->cdev.max_brightness;
 
@@ -1915,6 +1989,7 @@ static void qpnp_flash_led_brightness_set(struct led_classdev *led_cdev,
 				prgm_current2 =
 				flash_node->prgm_current;
 
+			mutex_unlock(&led->flash_led_lock);
 			return;
 		} else if (flash_node->id == FLASH_LED_SWITCH) {
 			if (!value) {
@@ -1928,6 +2003,7 @@ static void qpnp_flash_led_brightness_set(struct led_classdev *led_cdev,
 		flash_node->prgm_current = value;
 	}
 
+	mutex_unlock(&led->flash_led_lock);
 	queue_work(led->ordered_workq, &flash_node->work);
 
 	return;
@@ -1949,7 +2025,7 @@ static int qpnp_flash_led_init_settings(struct qpnp_flash_led *led)
 
 	rc = qpnp_led_masked_write(led->spmi_dev,
 			FLASH_LED_STROBE_CTRL(led->base),
-			FLASH_STROBE_MASK, FLASH_LED_DISABLE);
+			FLASH_STROBE_MASK, FLASH_LED_INIT_CONTROL);
 	if (rc) {
 		dev_err(&led->spmi_dev->dev, "Strobe disable failed\n");
 		return rc;

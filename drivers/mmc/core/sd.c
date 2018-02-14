@@ -9,6 +9,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/err.h>
 #include <linux/sizes.h>
@@ -307,12 +312,8 @@ static int mmc_read_switch(struct mmc_card *card)
 		return -ENOMEM;
 	}
 
-	/*
-	 * Find out the card's support bits with a mode 0 operation.
-	 * The argument does not matter, as the support bits do not
-	 * change with the arguments.
-	 */
-	err = mmc_sd_switch(card, 0, 0, 0, status);
+	/* Find out the supported Bus Speed Modes. */
+	err = mmc_sd_switch(card, 0, 0, 1, status);
 	if (err) {
 		/*
 		 * If the host or the card can't do the switch,
@@ -468,26 +469,30 @@ static void sd_update_bus_speed_mode(struct mmc_card *card)
 	if ((card->host->caps & MMC_CAP_UHS_SDR104) &&
 	    (card->sw_caps.sd3_bus_mode & SD_MODE_UHS_SDR104) &&
 	    (card->host->f_max > UHS_SDR104_MIN_DTR)) {
-			card->sd_bus_speed = UHS_SDR104_BUS_SPEED;
-	} else if ((card->host->caps & MMC_CAP_UHS_DDR50) &&
-		   (card->sw_caps.sd3_bus_mode & SD_MODE_UHS_DDR50) &&
-		    (card->host->f_max > UHS_DDR50_MIN_DTR)) {
-			card->sd_bus_speed = UHS_DDR50_BUS_SPEED;
+#ifdef CONFIG_MMC_DISABLE_SD_SDR104
+		card->sd_bus_speed = UHS_DDR50_BUS_SPEED;
+#else
+		card->sd_bus_speed = UHS_SDR104_BUS_SPEED;
+#endif
 	} else if ((card->host->caps & (MMC_CAP_UHS_SDR104 |
 		    MMC_CAP_UHS_SDR50)) && (card->sw_caps.sd3_bus_mode &
 		    SD_MODE_UHS_SDR50) &&
 		    (card->host->f_max > UHS_SDR50_MIN_DTR)) {
-			card->sd_bus_speed = UHS_SDR50_BUS_SPEED;
+		card->sd_bus_speed = UHS_SDR50_BUS_SPEED;
+	} else if ((card->host->caps & MMC_CAP_UHS_DDR50) &&
+		   (card->sw_caps.sd3_bus_mode & SD_MODE_UHS_DDR50) &&
+		    (card->host->f_max > UHS_DDR50_MIN_DTR)) {
+		card->sd_bus_speed = UHS_DDR50_BUS_SPEED;
 	} else if ((card->host->caps & (MMC_CAP_UHS_SDR104 |
 		    MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_SDR25)) &&
 		   (card->sw_caps.sd3_bus_mode & SD_MODE_UHS_SDR25) &&
 		 (card->host->f_max > UHS_SDR25_MIN_DTR)) {
-			card->sd_bus_speed = UHS_SDR25_BUS_SPEED;
+		card->sd_bus_speed = UHS_SDR25_BUS_SPEED;
 	} else if ((card->host->caps & (MMC_CAP_UHS_SDR104 |
 		    MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_SDR25 |
 		    MMC_CAP_UHS_SDR12)) && (card->sw_caps.sd3_bus_mode &
 		    SD_MODE_UHS_SDR12)) {
-			card->sd_bus_speed = UHS_SDR12_BUS_SPEED;
+		card->sd_bus_speed = UHS_SDR12_BUS_SPEED;
 	}
 }
 

@@ -2,6 +2,7 @@ config ARM64
 	def_bool y
 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
 	select ARCH_HAS_ELF_RANDOMIZE
+	select ARCH_HAS_CRASH_NOTES if CRASH_NOTES
 	select ARCH_HAS_SG_CHAIN
 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
 	select ARCH_USE_CMPXCHG_LOCKREF
@@ -343,6 +344,24 @@ config ARCH_MSM8996
 	help
 	  This enables support for the MSM8996 chipset. If you don't
 	  know what to do here, say N
+
+config ARCH_SONY_TONE
+    bool "Sony Mobile Tone platform"
+    depends on ARCH_MSM8996
+    help
+      Support for the SONY Mobile Tone platform
+      which is based on QCOM MSM8996 chipset.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_KEYAKI_SBM
+    bool "Sony Mobile KEYAKI SoftBank"
+    depends on ARCH_SONY_TONE
+    help
+      Support for the SONY Mobile Keyaki SoftBank device
+      which is based on SONY Tone platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
 
 config ARCH_MSMCOBALT
 	bool "Enable Support for Qualcomm MSMCOBALT"
@@ -916,6 +935,15 @@ config ARM64_UAO
 	  regular load/store instructions if the cpu does not implement the
 	  feature.
 
+config ARM64_FLUSH_CONSOLE_ON_RESTART
+	bool "Force flush the console on restart"
+	help
+	  If the console is locked while the system is rebooted, the messages
+	  in the temporary logbuffer would not have propogated to all the
+	  console drivers. This option forces the console lock to be
+	  released if it failed to be acquired, which will cause all the
+	  pending messages to be flushed.
+
 endmenu
 
 menu "Boot options"
@@ -1013,6 +1041,17 @@ config BUILD_ARM64_UNCOMPRESSED_KERNEL
 
 endchoice
 
+
+config ARCH_HAS_CRASH_NOTES
+	bool
+
+config CRASH_NOTES
+	bool "Support storing crash notes at panic"
+	depends on !KEXEC
+	help
+	  Generate kdump style crash notes at the time of a panic and fill it
+	  with the crashed context to support analysis of the memory dump with
+	  tools like Redhat CRASH.
 
 config DMI
 	bool "Enable support for SMBIOS (DMI) tables"

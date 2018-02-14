@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -44,6 +49,8 @@
 #define SCM_DLOAD_MODE			0X10
 #define SCM_EDLOAD_MODE			0X01
 #define SCM_DLOAD_CMD			0x10
+
+#define SUPPORT_DISABLE_RAMDUMP
 
 
 static int restart_mode;
@@ -95,9 +102,19 @@ struct reset_attribute {
 module_param_call(download_mode, dload_set, param_get_int,
 			&download_mode, 0644);
 
+#ifdef SUPPORT_DISABLE_RAMDUMP
+static int disable_ramdump;
+static int ramdump_disable_set(const char *val, struct kernel_param *kp);
+module_param_call(disable_ramdump, ramdump_disable_set, param_get_int,
+			&disable_ramdump, 0644);
+#endif
+
 static int panic_prep_restart(struct notifier_block *this,
 			      unsigned long event, void *ptr)
 {
+#ifdef SUPPORT_DISABLE_RAMDUMP
+	if (!disable_ramdump)
+#endif
 	in_panic = 1;
 	return NOTIFY_DONE;
 }
@@ -147,11 +164,38 @@ static void set_dload_mode(int on)
 	dload_mode_enabled = on;
 }
 
-static bool get_dload_mode(void)
+#ifdef SUPPORT_DISABLE_RAMDUMP
+static int ramdump_disable_set(const char *val, struct kernel_param *kp)
 {
-	return dload_mode_enabled;
-}
+	int ret;
+	int old_val = disable_ramdump;
 
+	if (disable_ramdump) {
+		pr_err("do not handle this action since ramdump is disabled\n");
+		return 0;
+	}
+
+	ret = param_set_int(val, kp);
+
+	if (ret)
+		return ret;
+
+	/* If download_mode is not zero or one, ignore. */
+	if (disable_ramdump >> 1) {
+		disable_ramdump = old_val;
+		return -EINVAL;
+	}
+	if (disable_ramdump) {
+		set_dload_mode(0);
+		scm_disable_sdi();
+		__raw_writel(0x776655AA, restart_reason);
+		pr_err("disable ramdump\n");
+	}
+	return 0;
+}
+#endif
+
+#if 0
 static void enable_emergency_dload_mode(void)
 {
 	int ret;
@@ -176,6 +220,7 @@ static void enable_emergency_dload_mode(void)
 	if (ret)
 		pr_err("Failed to set secure EDLOAD mode: %d\n", ret);
 }
+#endif
 
 static int dload_set(const char *val, struct kernel_param *kp)
 {
@@ -266,8 +311,6 @@ static void halt_spmi_pmic_arbiter(void)
 
 static void msm_restart_prepare(const char *cmd)
 {
-	bool need_warm_reset = false;
-
 #ifdef CONFIG_MSM_DLOAD_MODE
 
 	/* Write download mode flags if we're panic'ing
@@ -279,25 +322,15 @@ static void msm_restart_prepare(const char *cmd)
 			(in_panic || restart_mode == RESTART_DLOAD));
 #endif
 
-	if (qpnp_pon_check_hard_reset_stored()) {
-		/* Set warm reset as true when device is in dload mode */
-		if (get_dload_mode() ||
-			((cmd != NULL && cmd[0] != '\0') &&
-			!strcmp(cmd, "edl")))
-			need_warm_reset = true;
-	} else {
-		need_warm_reset = (get_dload_mode() ||
-				(cmd != NULL && cmd[0] != '\0'));
-	}
+	qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 
-	/* Hard reset the PMIC unless memory contents must be maintained. */
-	if (need_warm_reset) {
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
-	} else {
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
-	}
+	if (in_panic) {
+		u32 prev_reason;
 
-	if (cmd != NULL) {
+		prev_reason = __raw_readl(restart_reason);
+		if (prev_reason != 0xABADF00D)
+			__raw_writel(0xC0DEDEAD, restart_reason);
+	} else if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_BOOTLOADER);
@@ -329,11 +362,15 @@ static void msm_restart_prepare(const char *cmd)
 			if (!ret)
 				__raw_writel(0x6f656d00 | (code & 0xff),
 					     restart_reason);
+#if 0
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
+#endif
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}
+	} else {
+		__raw_writel(0x776655AA, restart_reason);
 	}
 
 	flush_cache_all();
@@ -399,6 +436,7 @@ static void do_msm_poweroff(void)
 	set_dload_mode(0);
 	scm_disable_sdi();
 	qpnp_pon_system_pwr_off(PON_POWER_OFF_SHUTDOWN);
+	qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
 
 	halt_spmi_pmic_arbiter();
 	deassert_ps_hold();

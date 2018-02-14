@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/firmware.h>
@@ -187,7 +192,7 @@ module_param(sido_buck_svs_voltage, int,
 MODULE_PARM_DESC(sido_buck_svs_voltage,
 			"setting for SVS voltage for SIDO BUCK");
 
-#define TASHA_TX_UNMUTE_DELAY_MS	25
+#define TASHA_TX_UNMUTE_DELAY_MS	50
 
 static u32 tx_unmute_delay = TASHA_TX_UNMUTE_DELAY_MS;
 module_param(tx_unmute_delay, int,
@@ -1654,7 +1659,7 @@ static inline void tasha_mbhc_get_result_params(struct wcd9xxx *wcd9xxx,
 	if ((c1 < 2) && x1)
 		usleep_range(5000, 5050);
 
-	if (!c1 || !x1) {
+	if (!c1) {
 		dev_dbg(wcd9xxx->dev,
 			"%s: Impedance detect ramp error, c1=%d, x1=0x%x\n",
 			__func__, c1, x1);
@@ -2999,8 +3004,13 @@ static int tasha_codec_enable_slimrx(struct snd_soc_dapm_widget *w,
 					      dai->rate, dai->bit_width,
 					      &dai->grph);
 		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		if (!test_bit(SB_CLK_GEAR, &tasha_p->status_mask)) {
+			tasha_codec_vote_max_bw(codec, true);
+			set_bit(SB_CLK_GEAR, &tasha_p->status_mask);
+		}
+		break;
 	case SND_SOC_DAPM_POST_PMD:
-		tasha_codec_vote_max_bw(codec, true);
 		ret = wcd9xxx_disconnect_port(core, &dai->wcd9xxx_ch_list,
 					      dai->grph);
 		dev_dbg(codec->dev, "%s: Disconnect RX port, ret = %d\n",
@@ -3014,7 +3024,6 @@ static int tasha_codec_enable_slimrx(struct snd_soc_dapm_widget *w,
 				__func__);
 		ret = wcd9xxx_close_slim_sch_rx(core, &dai->wcd9xxx_ch_list,
 						dai->grph);
-		tasha_codec_vote_max_bw(codec, false);
 		break;
 	}
 	return ret;
@@ -10553,23 +10562,28 @@ static const struct snd_soc_dapm_widget tasha_dapm_widgets[] = {
 	SND_SOC_DAPM_OUTPUT("ANC EAR"),
 	SND_SOC_DAPM_AIF_IN_E("AIF1 PB", "AIF1 Playback", 0, SND_SOC_NOPM,
 				AIF1_PB, 0, tasha_codec_enable_slimrx,
-				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD |
+				SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_IN_E("AIF2 PB", "AIF2 Playback", 0, SND_SOC_NOPM,
 				AIF2_PB, 0, tasha_codec_enable_slimrx,
-				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD |
+				SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_IN_E("AIF3 PB", "AIF3 Playback", 0, SND_SOC_NOPM,
 				AIF3_PB, 0, tasha_codec_enable_slimrx,
-				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD |
+				SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_IN_E("AIF4 PB", "AIF4 Playback", 0, SND_SOC_NOPM,
 				AIF4_PB, 0, tasha_codec_enable_slimrx,
-				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD |
+				SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_IN_E("AIF5 PB", "AIF5 Playback", 0, SND_SOC_NOPM,
 				AIF5_PB, 0, tasha_codec_enable_slimrx,
 				SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_IN_E("AIF MIX1 PB", "AIF Mix Playback", 0,
 			       SND_SOC_NOPM, AIF_MIX1_PB, 0,
 			       tasha_codec_enable_slimrx,
-			       SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+			       SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD |
+			       SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MUX("SLIM RX0 MUX", SND_SOC_NOPM, TASHA_RX0, 0,
 				&slim_rx_mux[TASHA_RX0]),
@@ -11476,8 +11490,15 @@ static int tasha_startup(struct snd_pcm_substream *substream,
 static void tasha_shutdown(struct snd_pcm_substream *substream,
 		struct snd_soc_dai *dai)
 {
+	struct tasha_priv *tasha = snd_soc_codec_get_drvdata(dai->codec);
+
 	pr_debug("%s(): substream = %s  stream = %d\n" , __func__,
 		 substream->name, substream->stream);
+	if ((substream->stream == SNDRV_PCM_STREAM_PLAYBACK) &&
+		test_bit(SB_CLK_GEAR, &tasha->status_mask)) {
+		tasha_codec_vote_max_bw(dai->codec, false);
+		clear_bit(SB_CLK_GEAR, &tasha->status_mask);
+	}
 }
 
 static int tasha_set_decimator_rate(struct snd_soc_dai *dai,

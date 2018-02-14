@@ -7,6 +7,11 @@
  *
  *  Card driver specific definitions.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_CARD_H
 #define LINUX_MMC_CARD_H
 
@@ -95,6 +100,12 @@ struct mmc_ext_csd {
 	bool			boot_ro_lockable;
 	u8			raw_ext_csd_cmdq;	/* 15 */
 	u8			raw_ext_csd_cache_ctrl;	/* 33 */
+	bool			ffu_capable;	/* Firmware upgrade support */
+#ifdef CONFIG_MMC_FFU
+	bool			ffu_mode_op;	/* FFU mode operation */
+#endif
+#define MMC_FIRMWARE_LEN 8
+	u8			fwrev[MMC_FIRMWARE_LEN];  /* FW version */
 	u8			raw_exception_status;	/* 54 */
 	u8			raw_partition_support;	/* 160 */
 	u8			raw_rpmb_size_mult;	/* 168 */
@@ -164,8 +175,8 @@ struct sd_switch_caps {
 #define HIGH_SPEED_MAX_DTR	50000000
 #define UHS_SDR104_MAX_DTR	208000000
 #define UHS_SDR50_MAX_DTR	100000000
-#define UHS_DDR50_MAX_DTR	50000000
-#define UHS_SDR25_MAX_DTR	UHS_DDR50_MAX_DTR
+#define UHS_DDR50_MAX_DTR	40000000
+#define UHS_SDR25_MAX_DTR	50000000
 #define UHS_SDR12_MAX_DTR	25000000
 	unsigned int		sd3_bus_mode;
 #define UHS_SDR12_BUS_SPEED	0
@@ -235,6 +246,7 @@ enum mmc_blk_status {
 	MMC_BLK_ECC_ERR,
 	MMC_BLK_NOMEDIUM,
 	MMC_BLK_NEW_REQUEST,
+	MMC_BLK_RETRY_SINGLE,
 };
 
 enum mmc_packed_stop_reasons {
@@ -339,6 +351,25 @@ enum mmc_pon_type {
 
 #define MMC_QUIRK_CMDQ_DELAY_BEFORE_DCMD 6 /* microseconds */
 
+#ifdef CONFIG_MMC_CMD_DEBUG
+#define CMD_QUEUE_SIZE CONFIG_MMC_CMD_QUEUE_SIZE
+#endif
+
+#ifdef CONFIG_MMC_CMD_DEBUG
+struct mmc_cmdq {
+	u32		opcode;
+	u32		arg;
+	u32		flags;
+	u64		timestamp;
+};
+
+struct mmc_cmd_stats {
+	u32 next_idx;
+	u32 wrapped;
+	struct mmc_cmdq cmdq[CMD_QUEUE_SIZE];
+};
+#endif
+
 /*
  * MMC device
  */
@@ -431,6 +462,12 @@ struct mmc_card {
 	u8 *cached_ext_csd;
 	bool cmdq_init;
 	struct mmc_bkops_info bkops;
+#ifdef CONFIG_MMC_FFU
+	bool need_ffu;
+#endif
+#ifdef CONFIG_MMC_CMD_DEBUG
+	struct mmc_cmd_stats cmd_stats;
+#endif
 };
 
 /*

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/debugfs.h>
 #include <linux/spinlock.h>
@@ -288,6 +293,20 @@ int get_effective_result(struct votable *votable)
 	value = get_effective_result_locked(votable);
 	unlock_votable(votable);
 	return value;
+}
+
+int get_effective_client_id(struct votable *votable)
+{
+	int id;
+	lock_votable(votable);
+	id = get_effective_client_id_locked(votable);
+	unlock_votable(votable);
+	return id;
+}
+
+int get_effective_client_id_locked(struct votable *votable)
+{
+	return votable->effective_client_id;
 }
 
 /**

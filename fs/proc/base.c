@@ -46,6 +46,11 @@
  *  Paul Mundt <paul.mundt@nokia.com>:
  *  Overall revision about smaps.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <asm/uaccess.h>
 
@@ -87,6 +92,7 @@
 #include <linux/slab.h>
 #include <linux/flex_array.h>
 #include <linux/posix-timers.h>
+#include <linux/oom_score_notifier.h>
 #ifdef CONFIG_HARDWALL
 #include <asm/hardwall.h>
 #endif
@@ -845,6 +851,7 @@ static ssize_t oom_adj_write(struct file *file, const char __user *buf,
 	int oom_adj;
 	unsigned long flags;
 	int err;
+	int old_oom_score_adj;
 
 	memset(buffer, 0, sizeof(buffer));
 	if (count > sizeof(buffer) - 1)
@@ -902,8 +909,16 @@ static ssize_t oom_adj_write(struct file *file, const char __user *buf,
 	pr_warn_once("%s (%d): /proc/%d/oom_adj is deprecated, please use /proc/%d/oom_score_adj instead.\n",
 		  current->comm, task_pid_nr(current), task_pid_nr(task),
 		  task_pid_nr(task));
-
+	old_oom_score_adj = task->signal->oom_score_adj;
 	task->signal->oom_score_adj = oom_adj;
+#ifdef CONFIG_OOM_SCORE_NOTIFIER
+	err = oom_score_notify_update(task, old_oom_score_adj);
+	if (err) {
+		/* rollback and error handle. */
+		task->signal->oom_score_adj = old_oom_score_adj;
+		goto err_sighand;
+	}
+#endif
 	trace_oom_score_adj_update(task);
 err_sighand:
 	unlock_task_sighand(task, &flags);
@@ -948,6 +963,7 @@ static ssize_t oom_score_adj_write(struct file *file, const char __user *buf,
 	unsigned long flags;
 	int oom_score_adj;
 	int err;
+	int old_oom_score_adj;
 
 	memset(buffer, 0, sizeof(buffer));
 	if (count > sizeof(buffer) - 1)
@@ -989,7 +1005,16 @@ static ssize_t oom_score_adj_write(struct file *file, const char __user *buf,
 		goto err_sighand;
 	}
 
+	old_oom_score_adj = task->signal->oom_score_adj;
 	task->signal->oom_score_adj = (short)oom_score_adj;
+#ifdef CONFIG_OOM_SCORE_NOTIFIER
+	err = oom_score_notify_update(task, old_oom_score_adj);
+	if (err) {
+		/* rollback and error handle. */
+		task->signal->oom_score_adj = old_oom_score_adj;
+		goto err_sighand;
+	}
+#endif
 	if (has_capability_noaudit(current, CAP_SYS_RESOURCE))
 		task->signal->oom_score_adj_min = (short)oom_score_adj;
 	trace_oom_score_adj_update(task);
