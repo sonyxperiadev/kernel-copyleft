@@ -1,3 +1,4 @@
+ifneq ($(CONFIG_ARCH_SONY_TONE),y)
 dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-cdp.dtb \
 	msm8996-v2-pmi8994-mtp.dtb \
 	msm8996-v2-pmi8994-pmk8001-cdp.dtb \
@@ -127,6 +128,20 @@ dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-cdp.dtb \
 	apq8096-v3-pmi8996-mdm9x55-i2s-mtp.dtb \
 	apq8096-v3-pmi8996-mdm9x55-slimbus-mtp.dtb \
 	apq8096-v3-pmi8996-dragonboard.dtb
+else
+dtb-$(CONFIG_MACH_SONY_DORA) += msm8996-v3.0-tone-dora_generic.dtb \
+	msm8996-v3.0-pmi8996-tone-dora_generic.dtb \
+	msm8996-v3-tone-dora_generic.dtb \
+	msm8996-v3-pmi8996-tone-dora_generic.dtb
+dtb-$(CONFIG_MACH_SONY_KAGURA) += msm8996-v3.0-tone-kagura_generic.dtb \
+	msm8996-v3.0-pmi8996-tone-kagura_generic.dtb \
+	msm8996-v3-tone-kagura_generic.dtb \
+	msm8996-v3-pmi8996-tone-kagura_generic.dtb
+dtb-$(CONFIG_MACH_SONY_KEYAKI) += msm8996-v3.0-tone-keyaki_generic.dtb \
+	msm8996-v3.0-pmi8996-tone-keyaki_generic.dtb \
+	msm8996-v3-tone-keyaki_generic.dtb \
+	msm8996-v3-pmi8996-tone-keyaki_generic.dtb
+endif
 
 dtb-$(CONFIG_MSM_GVM_QUIN) += vplatform-lfv-msm8996.dtb
 

@@ -380,6 +380,9 @@ static ssize_t rmidev_write(struct file *filp, const char __user *buf,
 		retval = 0;
 		goto unlock;
 	}
+	if (copy_from_user(tmpbuf, buf, count)) {
+		kfree(tmpbuf);
+	}
 
 	tmpbuf = kzalloc(count + 1, GFP_KERNEL);
 	if (!tmpbuf) {

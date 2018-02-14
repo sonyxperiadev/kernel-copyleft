@@ -37,3 +37,25 @@ config MMC_PARANOID_SD_INIT
 	  about re-trying SD init requests. This can be a useful
 	  work-around for buggy controllers and hardware. Enable
 	  if you are experiencing issues with SD detection.
+
+config MMC_CMD_DEBUG
+	bool "Debug feature to get mmc command issued"
+	default n
+	help
+	  This is a debug feature to get the mmc command issued
+	  in order to debug certain issues from the logs.
+
+config MMC_CMD_QUEUE_SIZE
+	int "mmc command queue size"
+	depends on MMC_CMD_DEBUG
+	default 256
+	help
+	  Select the size of the circular queue to store the MMC command
+	  issued.
+
+config MMC_DISABLE_SD_SDR104
+	bool "Disable SD card speed bus mode SDR104"
+	default y
+	help
+	  If you say N here, the SD layer uses a speed bus mode
+	  of SDR104.

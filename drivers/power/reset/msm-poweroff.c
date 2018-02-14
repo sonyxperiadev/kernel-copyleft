@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -147,11 +152,6 @@ static void set_dload_mode(int on)
 	dload_mode_enabled = on;
 }
 
-static bool get_dload_mode(void)
-{
-	return dload_mode_enabled;
-}
-
 static void enable_emergency_dload_mode(void)
 {
 	int ret;
@@ -266,8 +266,6 @@ static void halt_spmi_pmic_arbiter(void)
 
 static void msm_restart_prepare(const char *cmd)
 {
-	bool need_warm_reset = false;
-
 #ifdef CONFIG_MSM_DLOAD_MODE
 
 	/* Write download mode flags if we're panic'ing
@@ -279,25 +277,15 @@ static void msm_restart_prepare(const char *cmd)
 			(in_panic || restart_mode == RESTART_DLOAD));
 #endif
 
-	if (qpnp_pon_check_hard_reset_stored()) {
-		/* Set warm reset as true when device is in dload mode */
-		if (get_dload_mode() ||
-			((cmd != NULL && cmd[0] != '\0') &&
-			!strcmp(cmd, "edl")))
-			need_warm_reset = true;
-	} else {
-		need_warm_reset = (get_dload_mode() ||
-				(cmd != NULL && cmd[0] != '\0'));
-	}
+	qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 
-	/* Hard reset the PMIC unless memory contents must be maintained. */
-	if (need_warm_reset) {
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
-	} else {
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
-	}
+	if (in_panic) {
+		u32 prev_reason;
 
-	if (cmd != NULL) {
+		prev_reason = __raw_readl(restart_reason);
+		if (prev_reason != 0xABADF00D)
+			__raw_writel(0xC0DEDEAD, restart_reason);
+	} else if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_BOOTLOADER);
@@ -334,6 +322,8 @@ static void msm_restart_prepare(const char *cmd)
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}
+	} else {
+		__raw_writel(0x776655AA, restart_reason);
 	}
 
 	flush_cache_all();
@@ -399,6 +389,7 @@ static void do_msm_poweroff(void)
 	set_dload_mode(0);
 	scm_disable_sdi();
 	qpnp_pon_system_pwr_off(PON_POWER_OFF_SHUTDOWN);
+	qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
 
 	halt_spmi_pmic_arbiter();
 	deassert_ps_hold();

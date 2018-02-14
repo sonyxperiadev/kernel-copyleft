@@ -25,6 +25,11 @@
  *			:       add ip6_append_data and related functions
  *				for datagram xmit
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -960,11 +965,6 @@ static int ip6_dst_lookup_tail(struct sock *sk,
 		}
 	}
 #endif
-	if (ipv6_addr_v4mapped(&fl6->saddr) &&
-	    !(ipv6_addr_v4mapped(&fl6->daddr) || ipv6_addr_any(&fl6->daddr))) {
-		err = -EAFNOSUPPORT;
-		goto out_err_release;
-	}
 
 	return 0;
 
