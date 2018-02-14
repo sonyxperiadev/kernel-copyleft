@@ -15,6 +15,7 @@
 #include "msm8920-qrd.dtsi"
 #include "msm8937-mdss-panels.dtsi"
 #include "msm8917-camera-sensor-qrd.dtsi"
+#include "msm8940-camera-sensor-qrd.dtsi"
 
 / {
 	qrd_batterydata: qcom,battery-data {
@@ -60,8 +61,8 @@
 			reg = <0x38>;
 			interrupt-parent = <&tlmm>;
 			interrupts = <65 0x2>;
-			vdd-supply = <&pm8917_l10>;
-			vcc_i2c-supply = <&pm8917_l5>;
+			vdd-supply = <&pm8937_l10>;
+			vcc_i2c-supply = <&pm8937_l5>;
 			/* pins used by touchscreen */
 			pinctrl-names = "pmx_ts_active",
 						"pmx_ts_suspend",

@@ -17,6 +17,11 @@
  * under the terms of the Apache 2.0 License OR version 2 of the GNU
  * General Public License.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "sdcardfs.h"
 #include <linux/module.h>
@@ -364,34 +369,41 @@ out:
 	return err;
 }
 
-struct sdcardfs_mount_private {
-	struct vfsmount *mnt;
-	const char *dev_name;
-	void *raw_data;
-};
+/* A feature which supports mount_nodev() with options */
+static struct dentry *mount_nodev_with_options(struct vfsmount *mnt,
+			struct file_system_type *fs_type, int flags,
+			const char *dev_name, void *data,
+			int (*fill_super)(struct vfsmount *, struct super_block *,
+						const char *, void *, int))
 
-static int __sdcardfs_fill_super(
-	struct super_block *sb,
-	void *_priv, int silent)
 {
-	struct sdcardfs_mount_private *priv = _priv;
+	int error;
+	struct super_block *s = sget(fs_type, NULL, set_anon_super, flags, NULL);
 
-	return sdcardfs_read_super(priv->mnt,
-		sb, priv->dev_name, priv->raw_data, silent);
+	if (IS_ERR(s))
+		return ERR_CAST(s);
+
+	s->s_flags = flags;
+
+	error = fill_super(mnt, s, dev_name, data, flags & MS_SILENT ? 1 : 0);
+	if (error) {
+		deactivate_locked_super(s);
+		return ERR_PTR(error);
+	}
+	s->s_flags |= MS_ACTIVE;
+	return dget(s->s_root);
 }
 
 static struct dentry *sdcardfs_mount(struct vfsmount *mnt,
 		struct file_system_type *fs_type, int flags,
 			    const char *dev_name, void *raw_data)
 {
-	struct sdcardfs_mount_private priv = {
-		.mnt = mnt,
-		.dev_name = dev_name,
-		.raw_data = raw_data
-	};
-
-	return mount_nodev(fs_type, flags,
-		&priv, __sdcardfs_fill_super);
+	/*
+	 * dev_name is a lower_path_name,
+	 * raw_data is a option string.
+	 */
+	return mount_nodev_with_options(mnt, fs_type, flags, dev_name,
+						raw_data, sdcardfs_read_super);
 }
 
 static struct dentry *sdcardfs_mount_wrn(struct file_system_type *fs_type,
@@ -416,7 +428,7 @@ void sdcardfs_kill_sb(struct super_block *sb)
 		list_del(&sbi->list);
 		mutex_unlock(&sdcardfs_super_list_lock);
 	}
-	kill_anon_super(sb);
+	generic_shutdown_super(sb);
 }
 
 static struct file_system_type sdcardfs_fs_type = {

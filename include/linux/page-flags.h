@@ -129,6 +129,9 @@ enum pageflags {
 
 	/* SLOB */
 	PG_slob_free = PG_private,
+
+	/* non-lru isolated movable page */
+	PG_isolated = PG_reclaim,
 };
 
 #ifndef __GENERATING_BOUNDS_H
@@ -483,6 +486,86 @@ static inline int PageTransTail(struct page *page)
 	return 0;
 }
 #endif
+
+static inline struct page *compound_head_by_tail(struct page *tail)
+{
+	struct page *head = tail->first_page;
+
+	/*
+	 * page->first_page may be a dangling pointer to an old
+	 * compound page, so recheck that it is still a tail
+	 * page before returning.
+	 */
+	smp_rmb();
+	if (likely(PageTail(tail)))
+		return head;
+	return tail;
+}
+
+static inline struct page *compound_head(struct page *page)
+{
+	if (unlikely(PageTail(page)))
+		return compound_head_by_tail(page);
+	return page;
+}
+
+/*
+ * On an anonymous page mapped into a user virtual memory area,
+ * page->mapping points to its anon_vma, not to a struct address_space;
+ * with the PAGE_MAPPING_ANON bit set to distinguish it.  See rmap.h.
+ *
+ * On an anonymous page in a VM_MERGEABLE area, if CONFIG_KSM is enabled,
+ * the PAGE_MAPPING_MOVABLE bit may be set along with the PAGE_MAPPING_ANON
+ * bit; and then page->mapping points, not to an anon_vma, but to a private
+ * structure which KSM associates with that merged page.  See ksm.h.
+ *
+ * PAGE_MAPPING_KSM without PAGE_MAPPING_ANON is used for non-lru movable
+ * page and then page->mapping points a struct address_space.
+ *
+ * Please note that, confusingly, "page_mapping" refers to the inode
+ * address_space which maps the page from disk; whereas "page_mapped"
+ * refers to user virtual address space into which the page is mapped.
+ */
+#define PAGE_MAPPING_ANON	0x1
+#define PAGE_MAPPING_MOVABLE	0x2
+#define PAGE_MAPPING_KSM	(PAGE_MAPPING_ANON | PAGE_MAPPING_MOVABLE)
+#define PAGE_MAPPING_FLAGS	(PAGE_MAPPING_ANON | PAGE_MAPPING_MOVABLE)
+
+static __always_inline int PageMappingFlags(struct page *page)
+{
+	return ((unsigned long)page->mapping & PAGE_MAPPING_FLAGS) != 0;
+}
+
+static __always_inline int PageAnon(struct page *page)
+{
+	page = compound_head(page);
+	return ((unsigned long)page->mapping & PAGE_MAPPING_ANON) != 0;
+}
+
+static __always_inline int __PageMovable(struct page *page)
+{
+	return ((unsigned long)page->mapping & PAGE_MAPPING_FLAGS) ==
+				PAGE_MAPPING_MOVABLE;
+}
+
+#ifdef CONFIG_KSM
+/*
+ * A KSM page is one of those write-protected "shared pages" or "merged pages"
+ * which KSM maps into multiple mms, wherever identical anonymous page content
+ * is found in VM_MERGEABLE vmas.  It's a PageAnon page, pointing not to any
+ * anon_vma, but to that page's node of the stable tree.
+ */
+static __always_inline int PageKsm(struct page *page)
+{
+	return ((unsigned long)page->mapping & PAGE_MAPPING_FLAGS) ==
+				PAGE_MAPPING_KSM;
+}
+#else
+TESTPAGEFLAG_FALSE(Ksm)
+#endif
+
+
+__PAGEFLAG(Isolated, isolated);
 
 /*
  * If network-based swap is enabled, sl*b must keep track of whether pages

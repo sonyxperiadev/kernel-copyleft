@@ -695,6 +695,14 @@ int __ipa3_del_hdr(u32 hdr_hdl, bool by_user)
 	if (by_user)
 		entry->user_deleted = true;
 
+	if (by_user && entry->user_deleted) {
+		IPAERR("proc_ctx already deleted by user\n");
+		return -EINVAL;
+	}
+
+	if (by_user)
+		entry->user_deleted = true;
+
 	if (--entry->ref_cnt) {
 		IPADBG("hdr_hdl %x ref_cnt %d\n", hdr_hdl, entry->ref_cnt);
 		return 0;
@@ -1140,6 +1148,10 @@ int ipa3_get_hdr(struct ipa_ioc_get_hdr *lookup)
 	mutex_unlock(&ipa3_ctx->lock);
 
 	return result;
+}
+
+/**
+ * __ipa3_release_hdr() - drop reference to header and cause
 }
 
 /**

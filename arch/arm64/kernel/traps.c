@@ -32,6 +32,7 @@
 #include <linux/syscalls.h>
 
 #include <asm/atomic.h>
+#include <asm/barrier.h>
 #include <asm/debug-monitors.h>
 #include <asm/esr.h>
 #include <asm/traps.h>
@@ -51,6 +52,14 @@ static const char *handler[]= {
 };
 
 int show_unhandled_signals = 1;
+unsigned int user_debug;
+
+static int __init user_debug_setup(char *str)
+{
+	get_option(&str, &user_debug);
+	return 1;
+}
+__setup("user_debug=", user_debug_setup);
 
 /*
  * Dump out the contents of some memory nicely...
@@ -384,8 +393,7 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 
 	trace_undef_instr(regs, (void *)pc);
 
-	if (user_mode(regs) && show_unhandled_signals &&
-		unhandled_signal(current, SIGILL) && printk_ratelimit()) {
+	if (user_mode(regs) && print_user_debug(SIGILL, UDBG_UNDEFINED)) {
 		pr_info("%s[%d]: undefined instruction: pc=%p\n",
 			current->comm, task_pid_nr(current), pc);
 		dump_instr(KERN_INFO, regs);
@@ -397,6 +405,38 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 	info.si_addr  = pc;
 
 	arm64_notify_die("Oops - undefined instruction", regs, &info, 0);
+}
+
+static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
+{
+	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
+
+	isb();
+	if (rt != 31)
+		regs->regs[rt] = arch_counter_get_cntvct();
+	regs->pc += 4;
+}
+
+static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
+{
+	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
+
+	if (rt != 31)
+		regs->regs[rt] = read_sysreg(cntfrq_el0);
+	regs->pc += 4;
+}
+
+asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
+{
+	if ((esr & ESR_ELx_SYS64_ISS_SYS_OP_MASK) == ESR_ELx_SYS64_ISS_SYS_CNTVCT) {
+		cntvct_read_handler(esr, regs);
+		return;
+	} else if ((esr & ESR_ELx_SYS64_ISS_SYS_OP_MASK) == ESR_ELx_SYS64_ISS_SYS_CNTFRQ) {
+		cntfrq_read_handler(esr, regs);
+		return;
+	}
+
+	do_undefinstr(regs);
 }
 
 long compat_arm_syscall(struct pt_regs *regs);
@@ -412,7 +452,7 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
 	}
 #endif
 
-	if (show_unhandled_signals && printk_ratelimit()) {
+	if (print_user_debug(0, UDBG_SYSCALL)) {
 		pr_info("%s[%d]: syscall %d\n", current->comm,
 			task_pid_nr(current), (int)regs->syscallno);
 		dump_instr("", regs);

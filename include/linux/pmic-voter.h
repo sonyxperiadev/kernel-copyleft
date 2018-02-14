@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __PMIC_VOTER_H
 #define __PMIC_VOTER_H
@@ -33,6 +38,8 @@ int get_effective_result(struct votable *votable);
 int get_effective_result_locked(struct votable *votable);
 const char *get_effective_client(struct votable *votable);
 const char *get_effective_client_locked(struct votable *votable);
+int get_effective_client_id(struct votable *votable);
+int get_effective_client_id_locked(struct votable *votable);
 int vote(struct votable *votable, const char *client_str, bool state, int val);
 int rerun_election(struct votable *votable);
 struct votable *find_votable(const char *name);
