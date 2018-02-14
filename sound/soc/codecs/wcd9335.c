@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/firmware.h>
@@ -185,7 +190,7 @@ module_param(sido_buck_svs_voltage, int,
 MODULE_PARM_DESC(sido_buck_svs_voltage,
 			"setting for SVS voltage for SIDO BUCK");
 
-#define TASHA_TX_UNMUTE_DELAY_MS	25
+#define TASHA_TX_UNMUTE_DELAY_MS	50
 
 static int tx_unmute_delay = TASHA_TX_UNMUTE_DELAY_MS;
 module_param(tx_unmute_delay, int,
@@ -346,6 +351,12 @@ enum {
 	CPE_NOMINAL,
 	HPH_PA_DELAY,
 	SB_CLK_GEAR,
+	ANC_MIC_AMIC1,
+	ANC_MIC_AMIC2,
+	ANC_MIC_AMIC3,
+	ANC_MIC_AMIC4,
+	ANC_MIC_AMIC5,
+	ANC_MIC_AMIC6,
 };
 
 enum {
@@ -535,6 +546,8 @@ static struct snd_soc_dai_driver tasha_dai[];
 static int wcd9335_get_micb_vout_ctl_val(u32 micb_mv);
 
 static int tasha_config_compander(struct snd_soc_codec *, int, int);
+static void tasha_codec_set_tx_hold(struct snd_soc_codec *, u16, bool);
+static int tasha_spk_amp_enable(struct snd_soc_codec *, bool);
 
 /* Hold instance to soundwire platform device */
 struct tasha_swr_ctrl_data {
@@ -782,6 +795,7 @@ struct tasha_priv {
 
 	int spkr_gain_offset;
 	int spkr_mode;
+	int spk_amp_en_gpio;
 	struct hpf_work tx_hpf_work[TASHA_NUM_DECIMATORS];
 	struct tx_mute_work tx_mute_dwork[TASHA_NUM_DECIMATORS];
 	int hph_l_gain;
@@ -1612,7 +1626,7 @@ static inline void tasha_mbhc_get_result_params(struct wcd9xxx *wcd9xxx,
 	if ((c1 < 2) && x1)
 		usleep_range(5000, 5050);
 
-	if (!c1 || !x1) {
+	if (!c1)  {
 		dev_dbg(wcd9xxx->dev,
 			"%s: Impedance detect ramp error, c1=%d, x1=0x%x\n",
 			__func__, c1, x1);
@@ -3564,7 +3578,7 @@ static int tasha_codec_enable_anc(struct snd_soc_dapm_widget *w,
 					WCD9335_CDC_ANC0_IIR_COEFF_2_CTL);
 			anc_writes_size = anc_cal_size / 2;
 			snd_soc_update_bits(codec,
-			WCD9335_CDC_ANC0_CLK_RESET_CTL, 0x38, 0x38);
+			WCD9335_CDC_ANC0_CLK_RESET_CTL, 0x39, 0x39);
 		} else if (!strcmp(w->name, "RX INT2 DAC") ||
 				!strcmp(w->name, "RX INT4 DAC")) {
 			tasha_realign_anc_coeff(codec,
@@ -3572,7 +3586,7 @@ static int tasha_codec_enable_anc(struct snd_soc_dapm_widget *w,
 					WCD9335_CDC_ANC1_IIR_COEFF_2_CTL);
 			i = anc_cal_size / 2;
 			snd_soc_update_bits(codec,
-			WCD9335_CDC_ANC1_CLK_RESET_CTL, 0x38, 0x38);
+			WCD9335_CDC_ANC1_CLK_RESET_CTL, 0x39, 0x39);
 		}
 
 		for (; i < anc_writes_size; i++) {
@@ -3582,11 +3596,11 @@ static int tasha_codec_enable_anc(struct snd_soc_dapm_widget *w,
 		if (!strcmp(w->name, "RX INT1 DAC") ||
 			!strcmp(w->name, "RX INT3 DAC")) {
 			snd_soc_update_bits(codec,
-			WCD9335_CDC_ANC0_CLK_RESET_CTL, 0x38, 0x00);
+			WCD9335_CDC_ANC0_CLK_RESET_CTL, 0x08, 0x08);
 		} else if (!strcmp(w->name, "RX INT2 DAC") ||
 				!strcmp(w->name, "RX INT4 DAC")) {
 			snd_soc_update_bits(codec,
-			WCD9335_CDC_ANC1_CLK_RESET_CTL, 0x38, 0x00);
+			WCD9335_CDC_ANC1_CLK_RESET_CTL, 0x08, 0x08);
 		}
 
 		if (!hwdep_cal)
@@ -3631,6 +3645,22 @@ err:
 	return ret;
 }
 
+static void tasha_codec_clear_anc_tx_hold(struct tasha_priv *tasha)
+{
+	if (test_and_clear_bit(ANC_MIC_AMIC1, &tasha->status_mask))
+		tasha_codec_set_tx_hold(tasha->codec, WCD9335_ANA_AMIC1, false);
+	if (test_and_clear_bit(ANC_MIC_AMIC2, &tasha->status_mask))
+		tasha_codec_set_tx_hold(tasha->codec, WCD9335_ANA_AMIC2, false);
+	if (test_and_clear_bit(ANC_MIC_AMIC3, &tasha->status_mask))
+		tasha_codec_set_tx_hold(tasha->codec, WCD9335_ANA_AMIC3, false);
+	if (test_and_clear_bit(ANC_MIC_AMIC4, &tasha->status_mask))
+		tasha_codec_set_tx_hold(tasha->codec, WCD9335_ANA_AMIC4, false);
+	if (test_and_clear_bit(ANC_MIC_AMIC5, &tasha->status_mask))
+		tasha_codec_set_tx_hold(tasha->codec, WCD9335_ANA_AMIC5, false);
+	if (test_and_clear_bit(ANC_MIC_AMIC6, &tasha->status_mask))
+		tasha_codec_set_tx_hold(tasha->codec, WCD9335_ANA_AMIC6, false);
+}
+
 static void tasha_codec_hph_post_pa_config(struct tasha_priv *tasha,
 					   int mode, int event)
 {
@@ -3648,6 +3678,13 @@ static void tasha_codec_hph_post_pa_config(struct tasha_priv *tasha,
 		case CLS_H_LOHIFI:
 			scale_val = 0x1;
 			break;
+		}
+		if (tasha->anc_func) {
+			/* Clear Tx FE HOLD if both PAs are enabled */
+			if ((snd_soc_read(tasha->codec, WCD9335_ANA_HPH) &
+			     0xC0) == 0xC0) {
+				tasha_codec_clear_anc_tx_hold(tasha);
+			}
 		}
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
@@ -3735,7 +3772,12 @@ static int tasha_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec,
 					    WCD9335_CDC_RX2_RX_PATH_MIX_CTL,
 					    0x10, 0x00);
-		tasha_codec_override(codec, hph_mode, event);
+
+		if (tasha->anc_func) {
+			/* Remove ANC Rx from reset */
+			snd_soc_update_bits(codec,
+				WCD9335_CDC_ANC1_CLK_RESET_CTL, 0x08, 0x00);
+		}
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		blocking_notifier_call_chain(&tasha->notifier,
@@ -3798,7 +3840,12 @@ static int tasha_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec,
 					    WCD9335_CDC_RX1_RX_PATH_MIX_CTL,
 					    0x10, 0x00);
-		tasha_codec_override(codec, hph_mode, event);
+
+		if (tasha->anc_func) {
+			/* Remove ANC Rx from reset */
+			snd_soc_update_bits(codec,
+				WCD9335_CDC_ANC0_CLK_RESET_CTL, 0x08, 0x00);
+		}
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		blocking_notifier_call_chain(&tasha->notifier,
@@ -3864,6 +3911,7 @@ static int tasha_codec_enable_lineout_pa(struct snd_soc_dapm_widget *w,
 		/* 5ms sleep is required after PA is enabled as per
 		 * HW requirement
 		 */
+		tasha_spk_amp_enable(codec, true);
 		usleep_range(5000, 5500);
 		snd_soc_update_bits(codec, lineout_vol_reg,
 				    0x10, 0x00);
@@ -3878,6 +3926,7 @@ static int tasha_codec_enable_lineout_pa(struct snd_soc_dapm_widget *w,
 		/* 5ms sleep is required after PA is disabled as per
 		 * HW requirement
 		 */
+		tasha_spk_amp_enable(codec, false);
 		usleep_range(5000, 5500);
 		tasha_codec_override(codec, CLS_AB, event);
 		if (!(strcmp(w->name, "ANC LINEOUT1 PA")) ||
@@ -5046,11 +5095,68 @@ static void tasha_codec_set_tx_hold(struct snd_soc_codec *codec,
 	}
 }
 
+static int tasha_set_spk_amp_gpio_init(struct snd_soc_codec *codec, int gpio)
+{
+	struct tasha_priv *priv = snd_soc_codec_get_drvdata(codec);
+	int ret = -EINVAL;
+
+	if (!priv)
+		goto out;
+
+	if (!gpio_is_valid(gpio)) {
+		dev_err(codec->dev, "%s: Invalid gpio: %d\n", __func__, gpio);
+		goto out;
+	}
+
+	ret = gpio_request(gpio, "spk_amp_gpio");
+	if (ret) {
+		if (ret == -EBUSY) {
+			dev_dbg(codec->dev,
+				 "%s: gpio %d is already requested\n",
+				 __func__, gpio);
+			ret = 0;
+		} else {
+			dev_err(codec->dev, "%s: Failed to request gpio %d\n",
+				__func__, gpio);
+			goto out;
+		}
+	}
+	priv->spk_amp_en_gpio = gpio;
+	tasha_spk_amp_enable(codec, false);
+out:
+	return ret;
+}
+
+int tasha_set_spk_amp_gpio(struct snd_soc_codec *codec, int gpio)
+{
+	int ret = 0;
+
+	ret = tasha_set_spk_amp_gpio_init(codec, gpio);
+	if (ret)
+		dev_err(codec->dev, "%s: Failed to init spk_amp_gpio: %d\n",
+			__func__, gpio);
+
+	return ret;
+}
+EXPORT_SYMBOL(tasha_set_spk_amp_gpio);
+
+static int tasha_spk_amp_enable(struct snd_soc_codec *codec, bool spk_amp_en)
+{
+	struct tasha_priv *priv = snd_soc_codec_get_drvdata(codec);
+
+	dev_dbg(codec->dev, "%s: speaker amp enable gpio: %d\n",
+		__func__, spk_amp_en);
+	gpio_set_value(priv->spk_amp_en_gpio, spk_amp_en);
+
+	return 0;
+}
+
 static int tasha_codec_tx_adc_cfg(struct snd_soc_dapm_widget *w,
 				  struct snd_kcontrol *kcontrol, int event)
 {
 	int adc_mux_n = w->shift;
 	struct snd_soc_codec *codec = w->codec;
+	struct tasha_priv *tasha = snd_soc_codec_get_drvdata(codec);
 	int amic_n;
 	u16 amic_reg;
 
@@ -5060,8 +5166,18 @@ static int tasha_codec_tx_adc_cfg(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMU:
 		amic_n = tasha_codec_find_amic_input(codec, adc_mux_n);
 		if (amic_n) {
-			amic_reg = WCD9335_ANA_AMIC1 + amic_n - 1;
-			tasha_codec_set_tx_hold(codec, amic_reg, false);
+			if (!tasha->anc_func) {
+				amic_reg = WCD9335_ANA_AMIC1 + amic_n - 1;
+				tasha_codec_set_tx_hold(codec, amic_reg, false);
+			} else {
+				/*
+				 * Prevent ANC Rx pop by leaving Tx FE in HOLD
+				 * state until PA is up. Track AMIC being used
+				 * so we can release the HOLD later.
+				 */
+				set_bit(ANC_MIC_AMIC1 + amic_n - 1,
+					&tasha->status_mask);
+			}
 		}
 		break;
 	default:
@@ -5258,6 +5374,13 @@ static int tasha_codec_enable_dec(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		snd_soc_update_bits(codec, hpf_gate_reg, 0x01, 0x00);
+
+		if (decimator == 0) {
+			snd_soc_write(codec, WCD9335_MBHC_ZDET_RAMP_CTL, 0x83);
+			snd_soc_write(codec, WCD9335_MBHC_ZDET_RAMP_CTL, 0xA3);
+			snd_soc_write(codec, WCD9335_MBHC_ZDET_RAMP_CTL, 0x83);
+			snd_soc_write(codec, WCD9335_MBHC_ZDET_RAMP_CTL, 0x03);
+		}
 		/* schedule work queue to Remove Mute */
 		schedule_delayed_work(&tasha->tx_mute_dwork[decimator].dwork,
 				      msecs_to_jiffies(tx_unmute_delay));
@@ -5271,9 +5394,20 @@ static int tasha_codec_enable_dec(struct snd_soc_dapm_widget *w,
 			      snd_soc_read(codec, tx_gain_ctl_reg));
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
+		hpf_cut_off_freq =
+			tasha->tx_hpf_work[decimator].hpf_cut_off_freq;
 		snd_soc_update_bits(codec, tx_vol_ctl_reg, 0x10, 0x10);
 		snd_soc_update_bits(codec, dec_cfg_reg, 0x08, 0x00);
-		cancel_delayed_work_sync(&tasha->tx_hpf_work[decimator].dwork);
+		if (cancel_delayed_work_sync(
+		    &tasha->tx_hpf_work[decimator].dwork)) {
+			if (hpf_cut_off_freq != CF_MIN_3DB_150HZ) {
+				tasha_codec_vote_max_bw(codec, true);
+				snd_soc_update_bits(codec, dec_cfg_reg,
+						TX_HPF_CUT_OFF_FREQ_MASK,
+						hpf_cut_off_freq << 5);
+				tasha_codec_vote_max_bw(codec, false);
+			}
+		}
 		cancel_delayed_work_sync(
 				&tasha->tx_mute_dwork[decimator].dwork);
 		break;

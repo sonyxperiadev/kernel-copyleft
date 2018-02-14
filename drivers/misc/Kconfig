@@ -591,6 +591,16 @@ config QPNP_MISC
 	  and the driver provides an API to check if this interrupt
 	  is available on the current PMIC chip.
 
+config NFC_PN547
+	tristate "NFC driver for PN547"
+	depends on I2C
+	default n
+	help
+	  his option enables device driver for PN547.
+	  GPIO, and PMIC GPIO configurations are controlled.
+	  The sysfs files provides the interface to send and receive
+	  the data, response and notification.
+
 config USB_HSIC_SMSC_HUB
 	tristate "Support for HSIC based MSM on-chip SMSC3503 HUB"
 	depends on USB_EHCI_MSM_HSIC
@@ -644,6 +654,110 @@ config UID_CPUTIME
 	depends on PROFILING
 	help
 	  Per UID based cpu time statistics exported to /proc/uid_cputime
+
+config LDO_VIBRATOR
+	tristate "LDO Vibrator"
+	default n
+	help
+	  This option enables device driver support for the vibrator
+	  on the LDO line. The vibrator is controlled using the
+	  timed output class.
+
+config SIM_DETECT
+	tristate "SIM_DETECT driver support"
+	default n
+	help
+	  Say Y here
+	  if you want to support SIM_DETECT as detection device.
+	  This driver can be used for sending notifications via
+	  switch_class when sim card is inserted or removed.
+
+config POWERKEY_FORCECRASH
+	tristate "Force a crash on powerkey long press"
+	default n
+	help
+	  Say Y here if you want force crash functionality through power
+	  key. Triggers panic if power key is hold for more than 10secs.
+
+config RAMDUMP_TAGS
+	bool "Ramdump tags to communicate between kernel and ramdump"
+	default n
+	depends on !RAMDUMP_CRASH_LOGS
+	help
+	  This option enables a driver which can be interacted with to
+	  supply the ramdumper with more information about the current
+	  state of the crashing kernel such as build info, HWWD registers,
+	  additional CPU registers not stored in crash_notes, crashing
+	  application info etc. A small amount of memory will be set
+	  aside to hold the information which will later be used by
+	  the ramdump application.
+
+config RAMDUMP_MEMDESC
+	bool "Ramdump memory descriptors"
+	default n
+	help
+	  This is a ramdump_mem_desc driver which adds the
+	  memory descriptors in Normal mode into a piece of debug memory
+	  and split the contents and exports it as /proc/mem_desc
+	  in Ramdump mode to support ramdump functionality
+
+config BCM_WLAN_RAMDUMP
+	bool "Subsystem ramdump for broadcomm wlan device"
+	default n
+	depends on DEBUG_FS && MSM_SUBSYSTEM_RESTART
+	help
+	  This module create a bcm_wlan ramdump device via
+	  qcom subsystem ramdump and also creates the debugfs entry
+	  to collect the wlan subsystem crash information.
+	  This module causes panic if the ssr feature is not enabled.
+	  The userspace will collect the ramdump info via registred
+	  file operations.
+
+config BD7602_POWER_IC
+	bool "BD7602 Power IC control"
+	depends on I2C
+	default n
+	help
+	  This option enables device driver support for BD7602 Power IC
+	  control device.
+
+config CXD224X_NFC
+	bool "CXD224X driver for FeliCa and NFC"
+	depends on I2C
+	default n
+	help
+	  This option enables device driver support for Sony CXD224X
+	  series. This driver enables the control of CXD224X series
+	  device by using I2C. Furthermore, this driver enables the
+	  control of PON using device file.
+
+config SENSORS_TCS3490_KUGO
+	tristate "AMS TCS3490 Sensor Driver"
+	depends on I2C
+	default n
+	help
+	  If you say yes here you get support for the AMS tcs3490,
+	  ALS and color light sensors.
+	  This driver can also be build as module.
+
+config TOF_SENSOR
+	tristate "ToF Sensor"
+	depends on I2C
+	---help---
+	  Say Y here if you want to use ToF sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called tof_sensor.
+
+config ONESEG_TUNER_SMTVJ19X
+	tristate "ONESEG tuner driver for SMT-VJ19x"
+	default n
+	depends on SPI
+	help
+	  Select this module to enable 1seg Tuner Driver which supports
+	  1seg contents viewing.
+	  This module controls power switching and reset switching of
+	  SMT-VJ19x.
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

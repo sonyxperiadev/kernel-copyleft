@@ -18,6 +18,11 @@
  * 21Jul2003	nathans@sgi.com
  *		added IO completion notifier.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -262,7 +267,8 @@ static ssize_t dio_complete(struct dio *dio, loff_t offset, ssize_t ret, bool is
 		dio->end_io(dio->iocb, offset, transferred,
 			    dio->private, ret, is_async);
 	} else {
-		inode_dio_done(dio->inode);
+		if (!(dio->flags & DIO_SKIP_DIO_COUNT))
+			inode_dio_end(dio->inode);
 		if (is_async)
 			aio_complete(dio->iocb, ret, 0);
 	}
@@ -1146,7 +1152,8 @@ do_blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	/*
 	 * Will be decremented at I/O completion time.
 	 */
-	atomic_inc(&inode->i_dio_count);
+	if (!(dio->flags & DIO_SKIP_DIO_COUNT))
+		inode_dio_begin(inode);
 
 	/*
 	 * For file extending writes updating i_size before data

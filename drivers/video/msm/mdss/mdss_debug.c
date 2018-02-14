@@ -241,8 +241,12 @@ static ssize_t panel_debug_base_reg_read(struct file *file,
 	if (mdata->debug_inf.debug_enable_clock)
 		mdata->debug_inf.debug_enable_clock(0);
 
+	if (len < 0 || len >= sizeof(panel_reg_buf))
+		return 0;
+
 	if ((count < reg_buf_len)
 			|| (copy_to_user(user_buf, panel_reg_buf, len)))
+
 		goto read_reg_fail;
 
 	kfree(rx_buf);

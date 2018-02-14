@@ -141,6 +141,7 @@ source security/smack/Kconfig
 source security/tomoyo/Kconfig
 source security/apparmor/Kconfig
 source security/yama/Kconfig
+source security/sony/Kconfig
 
 source security/integrity/Kconfig
 
@@ -152,6 +153,7 @@ choice
 	default DEFAULT_SECURITY_APPARMOR if SECURITY_APPARMOR
 	default DEFAULT_SECURITY_YAMA if SECURITY_YAMA
 	default DEFAULT_SECURITY_PFT if SECURITY_PFT
+	default DEFAULT_SECURITY_SONY if SECURITY_SONY_RIC
 	default DEFAULT_SECURITY_DAC
 
 	help
@@ -176,6 +178,9 @@ choice
 	config DEFAULT_SECURITY_PFT
 		bool "PFT" if SECURITY_PFT=y
 
+	config DEFAULT_SECURITY_SONY
+		bool "Sony RIC" if SECURITY_SONY_RIC=y
+
 	config DEFAULT_SECURITY_DAC
 		bool "Unix Discretionary Access Controls"
 
@@ -189,6 +194,7 @@ config DEFAULT_SECURITY
 	default "apparmor" if DEFAULT_SECURITY_APPARMOR
 	default "yama" if DEFAULT_SECURITY_YAMA
 	default "pft" if DEFAULT_SECURITY_PFT
+	default "sony_ric" if DEFAULT_SECURITY_SONY
 	default "" if DEFAULT_SECURITY_DAC
 
 endmenu

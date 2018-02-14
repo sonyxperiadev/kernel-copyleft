@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef WCD9335_H
 #define WCD9335_H
 
@@ -159,4 +164,5 @@ extern int tasha_codec_enable_standalone_micbias(struct snd_soc_codec *codec,
 						bool enable);
 extern int tasha_set_spkr_mode(struct snd_soc_codec *codec, int mode);
 extern int tasha_set_spkr_gain_offset(struct snd_soc_codec *codec, int offset);
+extern int tasha_set_spk_amp_gpio(struct snd_soc_codec *codec, int gpio);
 #endif

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __MDSS_DBA_UTILS__
 #define __MDSS_DBA_UTILS__
@@ -38,6 +43,7 @@ struct mdss_dba_utils_init_data {
 	struct mdss_panel_info *pinfo;
 };
 
+int mdss_dba_utils_power_on(void *data, struct mdss_panel_info *pinfo, bool on);
 int mdss_dba_utils_video_on(void *data, struct mdss_panel_info *pinfo);
 int mdss_dba_utils_video_off(void *data);
 void mdss_dba_utils_hdcp_enable(void *data, bool enable);

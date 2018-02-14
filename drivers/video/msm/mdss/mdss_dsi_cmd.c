@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/interrupt.h>
@@ -74,6 +79,9 @@ int mdss_dsi_buf_alloc(struct device *ctrl_dev, struct dsi_buf *dp, int size)
 {
 	dp->start = dma_alloc_writecombine(ctrl_dev, size, &dp->dmap,
 					   GFP_KERNEL);
+
+	pr_debug("%s\n", __func__);
+
 	if (dp->start == NULL) {
 		pr_err("%s:%u\n", __func__, __LINE__);
 		return -ENOMEM;
@@ -580,6 +588,8 @@ int mdss_dsi_cmd_dma_add(struct dsi_buf *dp, struct dsi_cmd_desc *cm)
 	int len = 0;
 
 	dchdr = &cm->dchdr;
+
+	pr_debug("%s:type = 0x%x\n", __func__, dchdr->dtype);
 
 	switch (dchdr->dtype) {
 	case DTYPE_GEN_WRITE:

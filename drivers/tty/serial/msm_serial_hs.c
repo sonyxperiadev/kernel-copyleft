@@ -29,6 +29,11 @@
  * always be lost. RTS will be asserted even while the UART is off in this mode
  * of operation. See msm_serial_hs_platform_data.rx_wakeup_irq.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 
@@ -65,6 +70,7 @@
 #include <linux/msm-sps.h>
 #include <linux/platform_data/msm_serial_hs.h>
 #include <linux/msm-bus.h>
+#include <linux/delay.h>
 
 #include "msm_serial_hs_hwreg.h"
 #define UART_SPS_CONS_PERIPHERAL 0
@@ -73,6 +79,9 @@
 #define IPC_MSM_HS_LOG_PAGES 5
 #define UART_DMA_DESC_NR 8
 #define BUF_DUMP_SIZE 20
+
+#define UART_BLSP1_UART1 "78af000.hsuart"
+#define UART_BLSP1_UART1_SIZE 14
 
 /* If the debug_mask gets set to FATAL_LEV,
  * a fatal error has happened and further IPC logging
@@ -2239,8 +2248,6 @@ void msm_hs_resource_off(struct msm_hs_port *msm_uport)
 		msm_hs_write(uport, UART_DM_DMEN, data);
 		sps_tx_disconnect(msm_uport);
 	}
-	if (!atomic_read(&msm_uport->client_req_state))
-		msm_hs_enable_flow_control(uport, false);
 }
 
 void msm_hs_resource_on(struct msm_hs_port *msm_uport)
@@ -3151,10 +3158,13 @@ static int msm_hs_pm_sys_resume_noirq(struct device *dev)
 static void  msm_serial_hs_rt_init(struct uart_port *uport)
 {
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
+	int delay = 100;
 
 	MSM_HS_INFO("%s(): Enabling runtime pm", __func__);
 	pm_runtime_set_suspended(uport->dev);
-	pm_runtime_set_autosuspend_delay(uport->dev, 100);
+	delay = strncmp(dev_name(uport->dev), UART_BLSP1_UART1, UART_BLSP1_UART1_SIZE) == 0 ? -1 : 100;
+	MSM_HS_INFO("%s(): dev_name=%s, delay=%d", __func__, dev_name(uport->dev), delay);
+	pm_runtime_set_autosuspend_delay(uport->dev, delay);
 	pm_runtime_use_autosuspend(uport->dev);
 	mutex_lock(&msm_uport->mtx);
 	msm_uport->pm_state = MSM_HS_PM_SUSPENDED;
@@ -3190,6 +3200,8 @@ static int msm_hs_probe(struct platform_device *pdev)
 	struct msm_serial_hs_platform_data *pdata = pdev->dev.platform_data;
 	unsigned long data;
 
+    int gpio = 0;
+
 	if (pdev->dev.of_node) {
 		dev_dbg(&pdev->dev, "device tree enabled\n");
 		pdata = msm_hs_dt_to_pdata(pdev);
@@ -3213,6 +3225,19 @@ static int msm_hs_probe(struct platform_device *pdev)
 		}
 		pdev->dev.platform_data = pdata;
 	}
+
+    gpio = of_get_named_gpio_flags(pdev->dev.of_node, "qcom,ext-reset-gpio", 0, NULL);
+    dev_err(&pdev->dev,"uart gpio = %d\n",gpio);
+    if(gpio >= 0) {
+        usleep(100000);
+
+        if(gpio_is_valid(gpio)) {
+            ret = gpio_request(gpio,"UART_EXT_RESET_GPIO");
+            if(ret >= 0) {
+                gpio_set_value(gpio, 1);
+            }
+        }
+    }
 
 	if (pdev->id < 0 || pdev->id >= UARTDM_NR) {
 		dev_err(&pdev->dev, "Invalid plaform device ID = %d\n",

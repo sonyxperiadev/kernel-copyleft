@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 &soc {
 	tlmm_pinmux: pinctrl@1000000 {
@@ -1422,7 +1427,7 @@
 			qcom,pin-func = <0>;
 			label = "wsa-spkr-sd";
 			wsa_spkr_sd_act: lines_on {
-					 drive-strength = <8>;
+					 drive-strength = <2>;
 					 output-high;
 					 bias-pull-down;
 			};
@@ -1469,20 +1474,6 @@
 			};
 		};
 
-		pri-tlmm-lines {
-			qcom,pins = <&gp 123>, <&gp 124>, <&gp 125>;
-			qcom,num-grp-pins = <3>;
-			qcom,pin-func = <1>;
-			label = "pri-tlmm-lines";
-			pri_tlmm_lines_act: pri_tlmm_lines_act {
-				drive-strength = <8>;
-			};
-			pri_tlmm_lines_sus:  pri_tlmm_lines_sus {
-				drive-strength = <2>;
-				bias-pull-down;
-			};
-		};
-
 		wcnss_pmux_5wire: wcnss_pmux_5wire {
 			/* Uses general purpose pins */
 			qcom,pins = <&gp 40>, <&gp 41>,
@@ -1518,15 +1509,19 @@
 		};
 
 		pmx_adv7533_int: pmx_adv7533_int {
+			qcom,pins = <&gp 65>;
+			qcom,pin-func = <0>;
+			qcom,num-grp-pins = <1>;
 			label = "pmx_adv7533_int";
+
 			adv7533_int_active: adv7533_int_active {
-				drive-strength = <16>;
-				bias-disable;
+				drive-strength = <8>;
+				bias-pull-up;
 			};
 
 			adv7533_int_suspend: adv7533_int_suspend {
-				drive-strength = <16>;
-				bias-disable;
+				drive-strength = <2>;
+				bias-pull-down;
 			};
 		};
 

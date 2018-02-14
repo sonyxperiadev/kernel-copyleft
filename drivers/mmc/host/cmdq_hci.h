@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_CQ_HCI_H
 #define LINUX_MMC_CQ_HCI_H
 #include <linux/mmc/core.h>
@@ -202,7 +207,6 @@ struct cmdq_host_ops {
 	void (*write_l)(struct cmdq_host *host, u32 val, int reg);
 	u32 (*read_l)(struct cmdq_host *host, int reg);
 	void (*clear_set_dumpregs)(struct mmc_host *mmc, bool set);
-	void (*enhanced_strobe_mask)(struct mmc_host *mmc, bool set);
 	int (*reset)(struct mmc_host *mmc);
 	int (*crypto_cfg)(struct mmc_host *mmc, struct mmc_request *mrq,
 				u32 slot);

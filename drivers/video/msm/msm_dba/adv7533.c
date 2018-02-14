@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -123,6 +128,12 @@ enum adv7533_cec_buf {
 	ADV7533_CEC_BUF_MAX,
 };
 
+enum {
+	PIN_CTRL_OFF = 0,
+	PIN_CTRL_ON,
+	PIN_CTRL_INIT,
+};
+
 struct adv7533_reg_cfg {
 	u8 i2c_addr;
 	u8 reg;
@@ -149,6 +160,9 @@ struct adv7533 {
 	struct pinctrl *ts_pinctrl;
 	struct pinctrl_state *pinctrl_state_active;
 	struct pinctrl_state *pinctrl_state_suspend;
+	struct pinctrl_state *pinctrl_mipi_active;
+	struct pinctrl_state *pinctrl_mipi_suspend;
+	int pin_ctrl_en;
 	bool audio;
 	bool disable_gpios;
 	bool adv_output;
@@ -164,6 +178,16 @@ struct adv7533 {
 	struct adv7533_cec_msg cec_msg[ADV7533_CEC_BUF_MAX];
 	struct i2c_client *i2c_client;
 	struct mutex ops_mutex;
+};
+
+static struct adv7533_reg_cfg adv7533_int_disable[] = {
+	{I2C_ADDR_MAIN, 0x92, 0x00},
+	{I2C_ADDR_MAIN, 0x93, 0x00},
+	{I2C_ADDR_MAIN, 0x94, 0x00},
+	{I2C_ADDR_MAIN, 0x95, 0x00},
+	{I2C_ADDR_MAIN, 0x96, 0x00},
+	{I2C_ADDR_MAIN, 0x97, 0x00},
+	{I2C_ADDR_MAX}
 };
 
 static struct adv7533_reg_cfg adv7533_init_setup[] = {
@@ -289,6 +313,67 @@ static struct adv7533_reg_cfg I2S_cfg[] = {
 	{I2C_ADDR_MAX}
 };
 
+static int adv7533_start(struct adv7533 *pdata);
+
+static ssize_t adv7533_power_store(struct device *dev,
+			struct device_attribute *attr,
+			const char *buf, size_t len)
+{
+	struct msm_dba_device_info *info = dev_get_drvdata(dev);
+	struct adv7533 *pdata = container_of(info, struct adv7533, dev_info);
+	int ret = -EINVAL;
+	int value;
+
+	if (kstrtoint(buf, 10, &value)) {
+		pr_err("%s: invalid argument\n", __func__);
+		return -EINVAL;
+	}
+
+	pr_debug("%s: value=%d, pin_ctrl_en=%d\n",
+		__func__, value, pdata->pin_ctrl_en);
+
+	if (!value && pdata->pin_ctrl_en == PIN_CTRL_INIT) {
+		if (!IS_ERR_OR_NULL(pdata->ts_pinctrl)) {
+			pr_debug("%s: pinctrl suspend\n", __func__);
+			ret = pinctrl_select_state(pdata->ts_pinctrl,
+				pdata->pinctrl_state_suspend);
+			if (ret < 0)
+				pr_err("%s: Failed to select %s pinstate %d\n",
+					__func__, "mipi_hdmi_suspend", ret);
+		}
+		pdata->pin_ctrl_en = PIN_CTRL_OFF;
+	}
+
+	if (value && pdata->pin_ctrl_en != PIN_CTRL_ON) {
+		if (!IS_ERR_OR_NULL(pdata->ts_pinctrl)) {
+			pr_debug("%s: pinctrl active\n", __func__);
+			ret = pinctrl_select_state(pdata->ts_pinctrl,
+				pdata->pinctrl_mipi_active);
+			if (ret < 0)
+				pr_err("%s: Failed to select %s pinstate %d\n",
+					__func__, "mipi_hdmi_active", ret);
+		}
+		pr_debug("%s: adv7533_start\n", __func__);
+		adv7533_start(pdata);
+		pdata->pin_ctrl_en = PIN_CTRL_ON;
+	}
+
+	return strnlen(buf, PAGE_SIZE);
+}
+
+static struct device_attribute dev_attr_power_on =
+	__ATTR(power_on, S_IWUSR, NULL, adv7533_power_store);
+
+static struct attribute *adv7533_attrs[] = {
+	&dev_attr_power_on.attr,
+	NULL,
+};
+
+static struct attribute_group adv7533_attr_group = {
+	.name = NULL,
+	.attrs = adv7533_attrs,
+};
+
 static void adv7533_parse_vreg_dt(struct device *dev,
 				struct dss_module_power *mp)
 {
@@ -299,12 +384,14 @@ static void adv7533_parse_vreg_dt(struct device *dev,
 
 	of_node = dev->of_node;
 
+	pr_debug("%s\n", __func__);
 	dt_vreg_total = of_property_count_strings(of_node, "qcom,supply-names");
 	if (dt_vreg_total <= 0) {
 		pr_warn("%s: vreg not found. rc=%d\n", __func__,
 					dt_vreg_total);
 		goto end;
 	}
+	pr_debug("%s:dt_vreg_total = %d\n", __func__, dt_vreg_total);
 	mp->num_vreg = dt_vreg_total;
 	mp->vreg_config = devm_kzalloc(dev, sizeof(struct dss_vreg) *
 			dt_vreg_total, GFP_KERNEL);
@@ -325,6 +412,7 @@ static void adv7533_parse_vreg_dt(struct device *dev,
 				__func__, i, rc);
 			goto end;
 		}
+		pr_debug("%s:%s\n", __func__, st);
 		snprintf(mp->vreg_config[i].vreg_name, 32, "%s", st);
 
 		/* vreg-min-voltage */
@@ -337,6 +425,7 @@ static void adv7533_parse_vreg_dt(struct device *dev,
 						__func__, rc);
 			goto end;
 		}
+
 		mp->vreg_config[i].min_voltage = val_array[i];
 
 		/* vreg-max-voltage */
@@ -349,6 +438,7 @@ static void adv7533_parse_vreg_dt(struct device *dev,
 					__func__, rc);
 			goto end;
 		}
+
 		mp->vreg_config[i].max_voltage = val_array[i];
 
 		/* vreg-op-mode */
@@ -384,9 +474,11 @@ static void adv7533_parse_vreg_dt(struct device *dev,
 	}
 
 	devm_kfree(dev, val_array);
+	pr_debug("%s:return\n", __func__);
 	return;
 
 end:
+	pr_debug("%s:end\n", __func__);
 	if (mp->vreg_config) {
 		devm_kfree(dev, mp->vreg_config);
 		mp->vreg_config = NULL;
@@ -404,6 +496,7 @@ static int adv7533_parse_dt(struct device *dev,
 	u32 temp_val;
 	int ret = 0;
 
+	pr_debug("%s\n", __func__);
 	ret = of_property_read_u32(np, "adi,main-addr", &temp_val);
 	pr_debug("%s: DT property %s is %X\n", __func__, "adi,main-addr",
 		temp_val);
@@ -423,6 +516,7 @@ static int adv7533_parse_dt(struct device *dev,
 		temp_val);
 	if (ret)
 		goto end;
+
 	pdata->video_mode = (u8)temp_val;
 
 	pdata->audio = of_property_read_bool(np, "adi,enable-audio");
@@ -437,21 +531,49 @@ static int adv7533_parse_dt(struct device *dev,
 			__func__, ret);
 	}
 
-	pdata->pinctrl_state_active = pinctrl_lookup_state(pdata->ts_pinctrl,
-		"pmx_adv7533_active");
-	if (IS_ERR_OR_NULL(pdata->pinctrl_state_active)) {
-		ret = PTR_ERR(pdata->pinctrl_state_active);
-		pr_err("Can not lookup %s pinstate %d\n",
-			PINCTRL_STATE_ACTIVE, ret);
+	if (!ret) {
+		pdata->pinctrl_state_active = pinctrl_lookup_state(pdata->ts_pinctrl,
+			"pmx_adv7533_active");
+		if (IS_ERR_OR_NULL(pdata->pinctrl_state_active)) {
+			ret = PTR_ERR(pdata->pinctrl_state_active);
+			pr_err("Can not lookup %s pinstate %d\n",
+				PINCTRL_STATE_ACTIVE, ret);
+		}
 	}
 
-	pdata->pinctrl_state_suspend = pinctrl_lookup_state(pdata->ts_pinctrl,
-		"pmx_adv7533_suspend");
-	if (IS_ERR_OR_NULL(pdata->pinctrl_state_suspend)) {
-		ret = PTR_ERR(pdata->pinctrl_state_suspend);
-		pr_err("Can not lookup %s pinstate %d\n",
-			PINCTRL_STATE_SUSPEND, ret);
+	if (!ret) {
+		pdata->pinctrl_state_suspend = pinctrl_lookup_state(pdata->ts_pinctrl,
+			"pmx_adv7533_suspend");
+		if (IS_ERR_OR_NULL(pdata->pinctrl_state_suspend)) {
+			ret = PTR_ERR(pdata->pinctrl_state_suspend);
+			pr_err("Can not lookup %s pinstate %d\n",
+				PINCTRL_STATE_SUSPEND, ret);
+		}
 	}
+
+	if (!ret) {
+		pdata->pinctrl_mipi_active =
+			pinctrl_lookup_state(pdata->ts_pinctrl,
+					"mipi_hdmi_active");
+		if (IS_ERR_OR_NULL(pdata->pinctrl_mipi_active)) {
+			ret = PTR_ERR(pdata->pinctrl_mipi_active);
+			pr_err("Can not lookup %s pinstate %d\n",
+				"mipi_hdmi_active", ret);
+		}
+	}
+
+	if (!ret) {
+		pdata->pinctrl_mipi_suspend =
+			pinctrl_lookup_state(pdata->ts_pinctrl,
+					"mipi_hdmi_suspend");
+		if (IS_ERR_OR_NULL(pdata->pinctrl_mipi_suspend)) {
+			ret = PTR_ERR(pdata->pinctrl_mipi_suspend);
+			pr_err("Can not lookup %s pinstate %d\n",
+				"mipi_hdmi_suspend", ret);
+		}
+	}
+	pdata->pin_ctrl_en = PIN_CTRL_INIT;
+	pr_debug("%s: pin_ctrl_en=%d\n", __func__, pdata->pin_ctrl_en);
 
 	pdata->disable_gpios = of_property_read_bool(np,
 			"adi,disable-gpios");
@@ -459,16 +581,81 @@ static int adv7533_parse_dt(struct device *dev,
 	if (!(pdata->disable_gpios)) {
 		pdata->irq_gpio = of_get_named_gpio_flags(np,
 				"adi,irq-gpio", 0, &pdata->irq_flags);
+		pr_debug("%s:pdata->irq_gpio = %d\n", __func__,pdata->irq_gpio);
 
 		pdata->hpd_irq_gpio = of_get_named_gpio_flags(np,
 				"adi,hpd-irq-gpio", 0,
 				&pdata->hpd_irq_flags);
+		pr_debug("%s:pdata->hpd_irq_gpio = %d\n", __func__,pdata->hpd_irq_gpio);
 
 		pdata->switch_gpio = of_get_named_gpio_flags(np,
 				"adi,switch-gpio", 0, &pdata->switch_flags);
+		pr_debug("%s:pdata->switch_gpio = %d\n", __func__,pdata->switch_gpio);
+	}
+	else{
+		pr_err("%s:disable-gpios is disabled\n", __func__);
 	}
 
 end:
+	pr_debug("%s:end:%d\n", __func__, ret);
+	return ret;
+}
+
+static int adv7533_gpio_start(struct adv7533 *pdata)
+{
+	int ret = 0;
+
+	pr_debug("%s\n", __func__);
+	if (pdata->disable_gpios)
+		return 0;
+
+	if (gpio_is_valid(pdata->irq_gpio)) {
+		ret = gpio_direction_input(pdata->irq_gpio);
+		if (ret) {
+			pr_err("unable to set dir for gpio[%d]\n",
+				pdata->irq_gpio);
+			goto err_irq_gpio;
+		}
+	} else {
+		pr_err("irq gpio not provided\n");
+	}
+
+	if (gpio_is_valid(pdata->hpd_irq_gpio)) {
+		ret = gpio_direction_input(pdata->hpd_irq_gpio);
+		if (ret) {
+			pr_err("unable to set dir for gpio[%d]\n",
+				pdata->hpd_irq_gpio);
+			goto err_hpd_irq_gpio;
+		}
+	} else {
+		pr_err("hpd irq gpio not provided\n");
+	}
+
+	if (gpio_is_valid(pdata->switch_gpio)) {
+		ret = gpio_direction_output(pdata->switch_gpio, 1);
+		if (ret) {
+			pr_err("unable to set dir for gpio [%d]\n",
+				pdata->switch_gpio);
+			goto err_switch_gpio;
+		}
+
+		gpio_set_value(pdata->switch_gpio, 1);
+		msleep(ADV7533_RESET_DELAY);
+	} else{
+		pr_err("switch gpio not provided\n");
+	}
+
+	return 0;
+
+err_switch_gpio:
+	if (gpio_is_valid(pdata->switch_gpio))
+		gpio_free(pdata->switch_gpio);
+err_hpd_irq_gpio:
+	if (gpio_is_valid(pdata->hpd_irq_gpio))
+		gpio_free(pdata->hpd_irq_gpio);
+err_irq_gpio:
+	if (gpio_is_valid(pdata->irq_gpio))
+		gpio_free(pdata->irq_gpio);
 	return ret;
 }
 
@@ -476,6 +663,7 @@ static int adv7533_gpio_configure(struct adv7533 *pdata, bool on)
 {
 	int ret = 0;
 
+	pr_debug("%s\n", __func__);
 	if (pdata->disable_gpios)
 		return 0;
 
@@ -487,15 +675,8 @@ static int adv7533_gpio_configure(struct adv7533 *pdata, bool on)
 					pdata->irq_gpio);
 				goto err_none;
 			}
-			ret = gpio_direction_input(pdata->irq_gpio);
-			if (ret) {
-				pr_err("unable to set dir for gpio[%d]\n",
-					pdata->irq_gpio);
-				goto err_irq_gpio;
-			}
 		} else {
 			pr_err("irq gpio not provided\n");
-			goto err_none;
 		}
 
 		if (gpio_is_valid(pdata->hpd_irq_gpio)) {
@@ -506,15 +687,8 @@ static int adv7533_gpio_configure(struct adv7533 *pdata, bool on)
 					pdata->hpd_irq_gpio);
 				goto err_irq_gpio;
 			}
-			ret = gpio_direction_input(pdata->hpd_irq_gpio);
-			if (ret) {
-				pr_err("unable to set dir for gpio[%d]\n",
-					pdata->hpd_irq_gpio);
-				goto err_hpd_irq_gpio;
-			}
 		} else {
 			pr_err("hpd irq gpio not provided\n");
-			goto err_irq_gpio;
 		}
 
 		if (gpio_is_valid(pdata->switch_gpio)) {
@@ -525,16 +699,9 @@ static int adv7533_gpio_configure(struct adv7533 *pdata, bool on)
 					pdata->switch_gpio);
 				goto err_hpd_irq_gpio;
 			}
-
-			ret = gpio_direction_output(pdata->switch_gpio, 1);
-			if (ret) {
-				pr_err("unable to set dir for gpio [%d]\n",
-					pdata->switch_gpio);
-				goto err_switch_gpio;
-			}
-
-			gpio_set_value(pdata->switch_gpio, 1);
-			msleep(ADV7533_RESET_DELAY);
+		}
+		else{
+			pr_err("switch gpio not provided\n");
 		}
 
 		return 0;
@@ -549,9 +716,6 @@ static int adv7533_gpio_configure(struct adv7533 *pdata, bool on)
 		return 0;
 	}
 
-err_switch_gpio:
-	if (gpio_is_valid(pdata->switch_gpio))
-		gpio_free(pdata->switch_gpio);
 err_hpd_irq_gpio:
 	if (gpio_is_valid(pdata->hpd_irq_gpio))
 		gpio_free(pdata->hpd_irq_gpio);
@@ -568,6 +732,7 @@ static void adv7533_notify_clients(struct msm_dba_device_info *dev,
 	struct msm_dba_client_info *c;
 	struct list_head *pos = NULL;
 
+	pr_debug("%s\n", __func__);
 	if (!dev) {
 		pr_err("%s: invalid input\n", __func__);
 		return;
@@ -589,6 +754,7 @@ u32 adv7533_read_edid(struct adv7533 *pdata, u32 size, char *edid_buf)
 	u32 ret = 0, read_size = size / 2;
 	u8 edid_addr;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata || !edid_buf)
 		return 0;
 
@@ -611,6 +777,7 @@ static int adv7533_cec_prepare_msg(struct adv7533 *pdata, u8 *msg, u32 size)
 	int i, ret = -EINVAL;
 	int op_sz;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata || !msg) {
 		pr_err("%s: invalid input\n", __func__);
 		goto end;
@@ -647,6 +814,7 @@ static int adv7533_rd_cec_msg(struct adv7533 *pdata, u8 *cec_buf, int msg_num)
 	int ret = -EINVAL;
 	u8 reg = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata || !cec_buf) {
 		pr_err("%s: Invalid input\n", __func__);
 		goto end;
@@ -673,6 +841,7 @@ static void adv7533_handle_hdcp_intr(struct adv7533 *pdata, u8 hdcp_status)
 {
 	int ret = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: Invalid input\n", __func__);
 		goto end;
@@ -713,7 +882,7 @@ static void adv7533_handle_hdcp_intr(struct adv7533 *pdata, u8 hdcp_status)
 			pr_err("%s: DDC: MAX CAS EXC\n", __func__);
 			break;
 		default:
-			pr_debug("%s: DDC: UNKNOWN ERROR\n", __func__);
+			pr_err("%s: DDC: UNKNOWN ERROR\n", __func__);
 		}
 	}
 end:
@@ -728,6 +897,7 @@ static void adv7533_handle_cec_intr(struct adv7533 *pdata, u8 cec_status)
 	u8 cec_rx_timestamp = 0;
 	int ret = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: Invalid input\n", __func__);
 		goto end;
@@ -813,6 +983,7 @@ static int adv7533_edid_read_init(struct adv7533 *pdata)
 {
 	int ret = -EINVAL;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid pdata\n", __func__);
 		goto end;
@@ -832,6 +1003,7 @@ static void *adv7533_handle_hpd_intr(struct adv7533 *pdata)
 	u8 hpd_state;
 	u8 connected = 0, disconnected = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid pdata\n", __func__);
 		goto end;
@@ -863,10 +1035,13 @@ static int adv7533_enable_interrupts(struct adv7533 *pdata, int interrupts)
 	int ret = 0;
 	u8 reg_val, init_reg_val;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid input\n", __func__);
 		goto end;
 	}
+	/* do not use interrupt */
+	return ret;
 
 	ADV7533_READ(I2C_ADDR_MAIN, 0x94, &reg_val, 1);
 
@@ -909,10 +1084,13 @@ static int adv7533_disable_interrupts(struct adv7533 *pdata, int interrupts)
 	int ret = 0;
 	u8 reg_val, init_reg_val;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid input\n", __func__);
 		goto end;
 	}
+	/* do not use interrupt */
+	return ret;
 
 	ADV7533_READ(I2C_ADDR_MAIN, 0x94, &reg_val, 1);
 
@@ -960,6 +1138,7 @@ static void adv7533_intr_work(struct work_struct *work)
 	struct adv7533 *pdata;
 	struct delayed_work *dw = to_delayed_work(work);
 
+	pr_debug("%s\n", __func__);
 	pdata = container_of(dw, struct adv7533,
 			adv7533_intr_work_id);
 	if (!pdata) {
@@ -1035,6 +1214,7 @@ static irqreturn_t adv7533_irq(int irq, void *data)
 	struct adv7533 *pdata = data;
 	u32 interrupts = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid input\n", __func__);
 		return IRQ_HANDLED;
@@ -1063,7 +1243,7 @@ static irqreturn_t adv7533_irq(int irq, void *data)
 }
 
 static struct i2c_device_id adv7533_id[] = {
-	{ "adv7533", 0},
+	{ "adv7535", 0},
 	{}
 };
 
@@ -1074,6 +1254,7 @@ static struct adv7533 *adv7533_get_platform_data(void *client)
 	struct msm_dba_client_info *cinfo =
 		(struct msm_dba_client_info *)client;
 
+	pr_debug("%s\n", __func__);
 	if (!cinfo) {
 		pr_err("%s: invalid client data\n", __func__);
 		goto end;
@@ -1098,6 +1279,7 @@ static int adv7533_cec_enable(void *client, bool cec_on, u32 flags)
 	int ret = -EINVAL;
 	struct adv7533 *pdata = adv7533_get_platform_data(client);
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid platform data\n", __func__);
 		goto end;
@@ -1125,9 +1307,9 @@ static int adv7533_check_hpd(void *client, u32 flags)
 	int ret = -EINVAL;
 	struct adv7533 *pdata = adv7533_get_platform_data(client);
 	u8 reg_val = 0;
-	u8 intr_status;
 	int connected = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid platform data\n", __func__);
 		return ret;
@@ -1144,11 +1326,6 @@ static int adv7533_check_hpd(void *client, u32 flags)
 	connected  = (reg_val & BIT(6));
 	if (connected) {
 		pr_debug("%s: cable is connected\n", __func__);
-		/* Clear the interrupts before initiating EDID read */
-		ADV7533_READ(I2C_ADDR_MAIN, 0x96, &intr_status, 1);
-		ADV7533_WRITE(I2C_ADDR_MAIN, 0x96, intr_status);
-		adv7533_enable_interrupts(pdata, (CFG_EDID_INTERRUPTS |
-				CFG_HPD_INTERRUPTS));
 
 		adv7533_edid_read_init(pdata);
 	}
@@ -1163,6 +1340,7 @@ static int adv7533_power_on(void *client, bool on, u32 flags)
 	int ret = -EINVAL;
 	struct adv7533 *pdata = adv7533_get_platform_data(client);
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid platform data\n", __func__);
 		return ret;
@@ -1172,7 +1350,9 @@ static int adv7533_power_on(void *client, bool on, u32 flags)
 	mutex_lock(&pdata->ops_mutex);
 
 	if (on && !pdata->is_power_on) {
+		pr_debug("%s:adv7533_init_setup:start\n", __func__);
 		ADV7533_WRITE_ARRAY(adv7533_init_setup);
+		pr_debug("%s:adv7533_init_setup:end\n", __func__);
 
 		ret = adv7533_enable_interrupts(pdata, CFG_HPD_INTERRUPTS);
 		if (ret) {
@@ -1181,6 +1361,7 @@ static int adv7533_power_on(void *client, bool on, u32 flags)
 			goto end;
 		}
 		pdata->is_power_on = true;
+		pr_debug("%s:power_on success\n", __func__);
 	} else if (!on) {
 		/* power down hdmi */
 		ADV7533_WRITE(I2C_ADDR_MAIN, 0x41, 0x50);
@@ -1201,6 +1382,7 @@ static void adv7533_video_setup(struct adv7533 *pdata,
 	u32 h_total, hpw, hfp, hbp;
 	u32 v_total, vpw, vfp, vbp;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata || !cfg) {
 		pr_err("%s: invalid input\n", __func__);
 		return;
@@ -1271,6 +1453,7 @@ static int adv7533_video_on(void *client, bool on,
 	u8 reg_val = 0;
 	struct adv7533 *pdata = adv7533_get_platform_data(client);
 
+	pr_debug("%s\n", __func__);
 	if (!pdata || !cfg) {
 		pr_err("%s: invalid platform data\n", __func__);
 		return ret;
@@ -1312,6 +1495,7 @@ static int adv7533_video_on(void *client, bool on,
 	}
 
 	ADV7533_WRITE_ARRAY(adv7533_video_en);
+	pr_debug("%s:success\n", __func__);
 end:
 	mutex_unlock(&pdata->ops_mutex);
 	return ret;
@@ -1325,6 +1509,7 @@ static int adv7533_hdcp_enable(void *client, bool hdcp_on,
 	struct adv7533 *pdata =
 		adv7533_get_platform_data(client);
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid platform data\n", __func__);
 		return ret;
@@ -1348,10 +1533,14 @@ static int adv7533_hdcp_enable(void *client, bool hdcp_on,
 
 	pdata->hdcp_enabled = hdcp_on;
 
-	if (pdata->hdcp_enabled)
+	if (pdata->hdcp_enabled){
+		pr_debug("%s:adv7533_enable_interrupts\n", __func__);
 		adv7533_enable_interrupts(pdata, CFG_HDCP_INTERRUPTS);
-	else
+	}else{
+		pr_debug("%s:adv7533_disable_interrupts\n", __func__);
 		adv7533_disable_interrupts(pdata, CFG_HDCP_INTERRUPTS);
+	}
+	pr_debug("%s:success\n", __func__);
 end:
 	mutex_unlock(&pdata->ops_mutex);
 	return ret;
@@ -1383,6 +1572,7 @@ static int adv7533_configure_audio(void *client,
 		{I2C_ADDR_MAX}
 	};
 
+	pr_debug("%s\n", __func__);
 	if (!pdata || !cfg) {
 		pr_err("%s: invalid data\n", __func__);
 		return ret;
@@ -1482,6 +1672,7 @@ static int adv7533_hdmi_cec_write(void *client, u32 size,
 	struct adv7533 *pdata =
 		adv7533_get_platform_data(client);
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid platform data\n", __func__);
 		return ret;
@@ -1507,6 +1698,7 @@ static int adv7533_hdmi_cec_read(void *client, u32 *size, char *buf, u32 flags)
 	struct adv7533 *pdata =
 		adv7533_get_platform_data(client);
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid platform data\n", __func__);
 		return ret;
@@ -1542,6 +1734,7 @@ static int adv7533_get_edid_size(void *client, u32 *size, u32 flags)
 	struct adv7533 *pdata =
 		adv7533_get_platform_data(client);
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("%s: invalid platform data\n", __func__);
 		return ret;
@@ -1566,6 +1759,7 @@ static int adv7533_get_raw_edid(void *client,
 	struct adv7533 *pdata =
 		adv7533_get_platform_data(client);
 
+	pr_debug("%s\n", __func__);
 	if (!pdata || !buf) {
 		pr_err("%s: invalid data\n", __func__);
 		goto end;
@@ -1588,6 +1782,7 @@ static int adv7533_write_reg(struct msm_dba_device_info *dev,
 	int ret = -EINVAL;
 	u8 i2c_addr = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!dev)
 		goto end;
 
@@ -1610,6 +1805,7 @@ static int adv7533_read_reg(struct msm_dba_device_info *dev,
 	u8 i2c_addr = 0;
 	struct adv7533 *pdata;
 
+	pr_debug("%s\n", __func__);
 	if (!dev)
 		goto end;
 
@@ -1632,6 +1828,7 @@ static int adv7533_register_dba(struct adv7533 *pdata)
 	struct msm_dba_ops *client_ops;
 	struct msm_dba_device_ops *dev_ops;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata)
 		return -EINVAL;
 
@@ -1652,7 +1849,7 @@ static int adv7533_register_dba(struct adv7533 *pdata)
 	dev_ops->write_reg = adv7533_write_reg;
 	dev_ops->read_reg = adv7533_read_reg;
 
-	strlcpy(pdata->dev_info.chip_name, "adv7533",
+	strlcpy(pdata->dev_info.chip_name, "adv7535",
 		sizeof(pdata->dev_info.chip_name));
 
 	pdata->dev_info.instance_id = 0;
@@ -1666,6 +1863,7 @@ static int adv7533_register_dba(struct adv7533 *pdata)
 
 static void adv7533_unregister_dba(struct adv7533 *pdata)
 {
+	pr_debug("%s\n", __func__);
 	if (!pdata)
 		return;
 
@@ -1677,6 +1875,7 @@ static int adv7533_config_vreg(struct adv7533 *pdata, int enable)
 	int rc = 0;
 	struct dss_module_power *power_data = NULL;
 
+	pr_debug("%s\n", __func__);
 	if (!pdata) {
 		pr_err("invalid input\n");
 		rc = -EINVAL;
@@ -1713,11 +1912,78 @@ exit:
 
 }
 
+static int adv7533_start(struct adv7533 *pdata)
+{
+	struct i2c_client *client = pdata->i2c_client;
+	int ret = 0;
+	u8 dsi_input = 0;
+
+	pr_debug("%s\n", __func__);
+
+	ret = adv7533_gpio_start(pdata);
+	if (ret) {
+		pr_err("%s: Failed to start GPIOs\n", __func__);
+		goto err_gpio_cfg;
+	}
+
+	if (gpio_is_valid(pdata->switch_gpio))
+		gpio_set_value(pdata->switch_gpio, 0);
+
+	pdata->irq = gpio_to_irq(pdata->irq_gpio);
+
+	ret = request_threaded_irq(pdata->irq, NULL, adv7533_irq,
+		IRQF_TRIGGER_FALLING | IRQF_ONESHOT | IRQF_SHARED,
+		"adv7535", pdata);
+	if (ret) {
+		pr_err("%s: Failed to enable ADV7535 interrupt\n",
+			__func__);
+		goto err_irq;
+	}
+
+	pdata->workq = create_workqueue("adv7533_workq");
+	if (!pdata->workq) {
+		pr_err("%s: workqueue creation failed.\n", __func__);
+		ret = -EPERM;
+		goto err_workqueue;
+	}
+
+	if (pdata->audio) {
+		pr_debug("%s: enabling default audio configs\n", __func__);
+		ADV7533_WRITE_ARRAY(I2S_cfg);
+	}
+
+	INIT_DELAYED_WORK(&pdata->adv7533_intr_work_id, adv7533_intr_work);
+
+	pm_runtime_enable(&client->dev);
+	pm_runtime_set_active(&client->dev);
+	ADV7533_WRITE_ARRAY(adv7533_int_disable);
+	ADV7533_READ(I2C_ADDR_CEC_DSI, 0x38, &dsi_input, 1);
+	dsi_input &= 0x8f;
+	ADV7533_WRITE(I2C_ADDR_CEC_DSI, 0x38, dsi_input);
+
+	pr_info("%s:success\n", __func__);
+	return 0;
+
+end:
+err_workqueue:
+	msm_dba_helper_sysfs_remove(&client->dev);
+	disable_irq(pdata->irq);
+	free_irq(pdata->irq, pdata);
+err_irq:
+	adv7533_gpio_configure(pdata, false);
+err_gpio_cfg:
+	adv7533_unregister_dba(pdata);
+	devm_kfree(&client->dev, pdata);
+	return ret;
+}
+
 static int adv7533_probe(struct i2c_client *client,
 	 const struct i2c_device_id *id)
 {
 	static struct adv7533 *pdata;
 	int ret = 0;
+
+	pr_debug("%s\n", __func__);
 
 	if (!client || !client->dev.of_node) {
 		pr_err("%s: invalid input\n", __func__);
@@ -1754,29 +2020,25 @@ static int adv7533_probe(struct i2c_client *client,
 		goto err_dba_reg;
 	}
 
-	ret = pinctrl_select_state(pdata->ts_pinctrl,
-		pdata->pinctrl_state_active);
-	if (ret < 0)
-		pr_err("%s: Failed to select %s pinstate %d\n",
-			__func__, PINCTRL_STATE_ACTIVE, ret);
+	if (!IS_ERR_OR_NULL(pdata->ts_pinctrl)) {
+		pr_debug("%s:ts_pinctrl is enabled\n", __func__);
+		ret = pinctrl_select_state(pdata->ts_pinctrl,
+			pdata->pinctrl_state_active);
+		if (ret < 0)
+			pr_err("%s: Failed to select %s pinstate %d\n",
+				__func__, PINCTRL_STATE_ACTIVE, ret);
+	}
+
+	ret = sysfs_create_group(&client->dev.kobj, &adv7533_attr_group);
+	if (ret) {
+		pr_err("%s:sysfs_create_group ret = %d\n", __func__, ret);
+		goto err_gpio_cfg;
+	}
 
 	ret = adv7533_gpio_configure(pdata, true);
 	if (ret) {
 		pr_err("%s: Failed to configure GPIOs\n", __func__);
 		goto err_gpio_cfg;
-	}
-
-	if (gpio_is_valid(pdata->switch_gpio))
-		gpio_set_value(pdata->switch_gpio, 0);
-
-	pdata->irq = gpio_to_irq(pdata->irq_gpio);
-
-	ret = request_threaded_irq(pdata->irq, NULL, adv7533_irq,
-		IRQF_TRIGGER_FALLING | IRQF_ONESHOT, "adv7533", pdata);
-	if (ret) {
-		pr_err("%s: Failed to enable ADV7533 interrupt\n",
-			__func__);
-		goto err_irq;
 	}
 
 	dev_set_drvdata(&client->dev, &pdata->dev_info);
@@ -1785,36 +2047,10 @@ static int adv7533_probe(struct i2c_client *client,
 		pr_err("%s: sysfs init failed\n", __func__);
 		goto err_dba_helper;
 	}
-
-	pdata->workq = create_workqueue("adv7533_workq");
-	if (!pdata->workq) {
-		pr_err("%s: workqueue creation failed.\n", __func__);
-		ret = -EPERM;
-		goto err_workqueue;
-	}
-
-	if (pdata->audio) {
-		pr_debug("%s: enabling default audio configs\n", __func__);
-		ADV7533_WRITE_ARRAY(I2S_cfg);
-	}
-
-	INIT_DELAYED_WORK(&pdata->adv7533_intr_work_id, adv7533_intr_work);
-
-	pm_runtime_enable(&client->dev);
-	pm_runtime_set_active(&client->dev);
-
+	pr_info("%s:success\n", __func__);
 	return 0;
 
-end:
-	if (pdata->workq)
-		destroy_workqueue(pdata->workq);
-err_workqueue:
-	msm_dba_helper_sysfs_remove(&client->dev);
 err_dba_helper:
-	disable_irq(pdata->irq);
-	free_irq(pdata->irq, pdata);
-err_irq:
-	adv7533_gpio_configure(pdata, false);
 err_gpio_cfg:
 	adv7533_unregister_dba(pdata);
 err_dba_reg:
@@ -1829,6 +2065,7 @@ static int adv7533_remove(struct i2c_client *client)
 	struct msm_dba_device_info *dev;
 	struct adv7533 *pdata;
 
+	pr_debug("%s\n", __func__);
 	if (!client)
 		goto end;
 
@@ -1856,7 +2093,7 @@ end:
 
 static struct i2c_driver adv7533_driver = {
 	.driver = {
-		.name = "adv7533",
+		.name = "adv7535",
 		.owner = THIS_MODULE,
 	},
 	.probe = adv7533_probe,
@@ -1866,6 +2103,7 @@ static struct i2c_driver adv7533_driver = {
 
 static int __init adv7533_init(void)
 {
+	pr_debug("%s\n", __func__);
 	return i2c_add_driver(&adv7533_driver);
 }
 
