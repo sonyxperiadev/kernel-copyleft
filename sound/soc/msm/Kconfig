@@ -93,6 +93,24 @@ config DOLBY_DAP
 	 device, end point dependent post processing parameters and
 	 the various posrt processing parameters
 
+config AHC
+	bool "Enable Automatic Headset Compensation"
+	depends on SND_SOC_MSM_QDSP6V2_INTF
+	help
+	 To add support for Automatic Headset Compensation post processing.
+	 This support is to configure the post processing parameters
+	 to DSP. The configuration includes enabling and setting up
+	 the IIR tuning filter and MBDRC in the DSP.
+
+config FORCE_24BIT_COPP
+	bool "Configure COPP in ADSP as 24-bit"
+	depends on SND_SOC_MSM_QDSP6V2_INTF
+	default n
+	help
+	 To configure COPP in ADSP as 24bit for media playback.
+	 This can avoid quantization error for 16-bit media playback
+	 when IIR/MBDRC filters are enabled.
+
 config DTS_EAGLE
 	bool "Enable DTS Eagle Support"
 	depends on SND_SOC_MSM_QDSP6V2_INTF
@@ -260,7 +278,6 @@ config SND_SOC_MSM8X16
 	select SND_DYNAMIC_MINORS
 	select QTI_PP
 	select DTS_SRS_TM
-	select DOLBY_DAP
 	select DOLBY_DS2
 	select MSM_QDSP6_APRV2
 	select MSM_QDSP6V2_CODECS

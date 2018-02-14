@@ -13,9 +13,9 @@
 
 #include "zcomp_lz4.h"
 
-static void *zcomp_lz4_create(void)
+static void *zcomp_lz4_create(gfp_t flags)
 {
-	return kzalloc(LZ4_MEM_COMPRESS, GFP_KERNEL);
+	return kzalloc(LZ4_MEM_COMPRESS, flags);
 }
 
 static void zcomp_lz4_destroy(void *private)

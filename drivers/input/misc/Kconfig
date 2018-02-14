@@ -481,6 +481,24 @@ config INPUT_GPIO
 	help
 	  Say Y here if you want to support gpio based keys, wheels etc...
 
+config INPUT_BU520X1NVX
+	tristate "BU520X1NVX driver support"
+	default n
+	help
+	  Say Y here
+	  if you want to
+	  support BU520X1NVX
+	  as bipolar detection device.
+
+config INPUT_S210ST0X
+	tristate "S210ST0X driver support"
+	default n
+	help
+	  Say Y here
+	  if you want to support
+	  S210ST0X as pyroelectric
+	  infrared sensor device.
+
 config INPUT_ISA1200_FF_MEMLESS
 	tristate "ISA1200 haptic ff-memless support"
 	depends on I2C
@@ -862,6 +880,58 @@ config SENSORS_ISL29044A
 	depends on I2C
 	help
 	 This option enables support for the INTERSIL ISL29044A P/L sensor.
+
+config FPC1145_PLATFORM
+	tristate "Platform FPC1145 finger print driver"
+	default n
+	help
+	  Select this module to enable FPC1145 tee finger print driver
+
+config INPUT_ADUX1050
+	tristate "ADUX1050 sensor support"
+	depends on I2C
+	help
+	  Say Y here if you have ADUX1050 hooked to an I2C bus.
+	  To compile this driver as a module, choose M here:
+	  The module will be called adux1050.ko
+
+	if INPUT_ADUX1050
+
+		config ADUX1050_DEBUG
+			bool "Debug :To enable the Basic debug support for the driver"
+			depends on INPUT_ADUX1050
+			default n
+			help
+			  To add the basic debug support of the driver in the build.
+			  Used in printing the debug information on the console.
+
+		config EVAL
+			bool "Eval : To enable the driver in evaluation mode for test "
+			depends on INPUT_ADUX1050
+			default y
+			help
+			  To use the generic sysfs path and modifications for the control attributes.
+
+		config USE_FILP
+			bool "USE_FILP : To make use of the file access from the kernel driver "
+			depends on INPUT_ADUX1050
+			default y
+			help
+			  To enable the file access from the kernel for the purpose of
+			  storing and retrieving the calibration results in/from a file
+			  and further is been enhanced for extraction of configuration
+			  during runtime.
+
+		config ADUX1050_POLL
+			bool "POLL : To make use of the Polling method instead of ISR "
+			depends on INPUT_ADUX1050
+			default n
+			help
+			  To enable the polling and to set the sleep time through the sysfs
+
+		endif
+
+source "drivers/input/misc/vl53L0/Kconfig"
 
 endif
 

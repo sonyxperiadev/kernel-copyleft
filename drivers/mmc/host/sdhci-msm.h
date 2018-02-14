@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __SDHCI_MSM_H__
 #define __SDHCI_MSM_H__
@@ -103,6 +108,7 @@ struct sdhci_msm_pltfm_data {
 	u32 *cpu_dma_latency_us;
 	unsigned int cpu_dma_latency_tbl_sz;
 	int status_gpio; /* card detection GPIO that is configured as IRQ */
+	int uim2_gpio;
 	struct sdhci_msm_bus_voting_data *voting_data;
 	u32 *sup_clk_table;
 	unsigned char sup_clk_cnt;
@@ -115,6 +121,9 @@ struct sdhci_msm_pltfm_data {
 	u32 ice_clk_max;
 	u32 ice_clk_min;
 	bool core_3_0v_support;
+#ifdef CONFIG_SOMC_WIFI_CONTROL
+	bool use_for_wifi;
+#endif
 };
 
 struct sdhci_msm_bus_vote {
@@ -166,7 +175,6 @@ struct sdhci_msm_host {
 	enum dev_state mmc_dev_state;
 	struct sdhci_msm_ice_data ice;
 	u32 ice_clk_rate;
-	bool enhanced_strobe;
 	bool tuning_in_progress;
 };
 #endif /* __SDHCI_MSM_H__ */

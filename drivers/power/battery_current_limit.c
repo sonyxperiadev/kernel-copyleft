@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
 #include <linux/module.h>
@@ -281,7 +286,7 @@ static void update_cpu_freq(void)
 
 static void power_supply_callback(struct power_supply *psy)
 {
-	static struct power_supply *bms_psy;
+	static struct power_supply *lis_psy;
 	union power_supply_propval ret = {0,};
 	int battery_percentage;
 	enum bcl_threshold_state prev_soc_state;
@@ -291,10 +296,10 @@ static void power_supply_callback(struct power_supply *psy)
 		return;
 	}
 
-	if (!bms_psy)
-		bms_psy = power_supply_get_by_name("bms");
-	if (bms_psy) {
-		battery_percentage = bms_psy->get_property(bms_psy,
+	if (!lis_psy)
+		lis_psy = power_supply_get_by_name("lis");
+	if (lis_psy) {
+		battery_percentage = lis_psy->get_property(lis_psy,
 				POWER_SUPPLY_PROP_CAPACITY, &ret);
 		battery_percentage = ret.intval;
 		battery_soc_val = battery_percentage;

@@ -24,6 +24,11 @@
  * Potential future improvements:
  *   generic hard disk support to replace ad-hoc partitioning
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define KMSG_COMPONENT "xpram"
 #define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
