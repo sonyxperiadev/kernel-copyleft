@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "MSM-CPP %s:%d " fmt, __func__, __LINE__
 
@@ -116,6 +121,12 @@ static  int msm_cpp_update_gdscr_status(struct cpp_device *cpp_dev,
 static int msm_cpp_buffer_private_ops(struct cpp_device *cpp_dev,
 	uint32_t buff_mgr_ops, uint32_t id, void *arg);
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+#define CPP_DBG(fmt, args...)
+#define CPP_LOW(fmt, args...)
+#define ERR_USER_COPY(to)
+#define ERR_COPY_FROM_USER()
+#else
 #if CONFIG_MSM_CPP_DBG
 #define CPP_DBG(fmt, args...) pr_err(fmt, ##args)
 #else
@@ -130,6 +141,7 @@ static int msm_cpp_buffer_private_ops(struct cpp_device *cpp_dev,
 #define ERR_USER_COPY(to) pr_err("copy %s user\n", \
 			((to) ? "to" : "from"))
 #define ERR_COPY_FROM_USER() ERR_USER_COPY(0)
+#endif
 
 #define msm_dequeue(queue, member, pop_dir) ({	   \
 	unsigned long flags;		  \
@@ -294,7 +306,11 @@ static void cpp_timer_callback(unsigned long data);
 uint8_t induce_error;
 static int msm_cpp_enable_debugfs(struct cpp_device *cpp_dev);
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+static inline void msm_cpp_write(u32 data, void __iomem *cpp_base)
+#else
 static void msm_cpp_write(u32 data, void __iomem *cpp_base)
+#endif
 {
 	msm_camera_io_w((data), cpp_base + MSM_CPP_MICRO_FIFO_RX_DATA);
 }
@@ -2245,7 +2261,7 @@ static int msm_cpp_cfg_frame(struct cpp_device *cpp_dev,
 	struct msm_buf_mngr_info buff_mgr_info, dup_buff_mgr_info;
 	int32_t in_fd;
 	int32_t num_output_bufs = 1;
-	int32_t stripe_base = 0;
+	uint32_t stripe_base = 0;
 	uint32_t stripe_size;
 	uint8_t tnr_enabled;
 	enum msm_camera_buf_mngr_buf_type buf_type =
@@ -2277,6 +2293,13 @@ static int msm_cpp_cfg_frame(struct cpp_device *cpp_dev,
 	if (cpp_frame_msg[new_frame->msg_len - 1] !=
 		MSM_CPP_MSG_ID_TRAILER) {
 		pr_err("Invalid frame message\n");
+		return -EINVAL;
+	}
+
+	if (stripe_base == UINT_MAX || new_frame->num_strips >
+		(UINT_MAX - 1 - stripe_base) / stripe_size) {
+		pr_err("Invalid frame message,num_strips %d is large\n",
+			new_frame->num_strips);
 		return -EINVAL;
 	}
 

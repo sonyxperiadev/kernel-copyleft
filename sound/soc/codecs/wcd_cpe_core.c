@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/firmware.h>
@@ -822,6 +827,8 @@ static int wcd_cpe_enable(struct wcd_cpe_core *core,
 		bool enable)
 {
 	int ret = 0;
+	int timeout = 0;
+	int err_cnt = 0;
 
 	if (enable) {
 		/* Reset CPE first */
@@ -844,8 +851,19 @@ static int wcd_cpe_enable(struct wcd_cpe_core *core,
 		if (ret)
 			goto fail_boot;
 
-		/* Dload data section */
-		ret = wcd_cpe_load_fw(core, ELF_FLAG_RW);
+		for (err_cnt = 0; err_cnt < 10; err_cnt++) {
+			/* Dload data section */
+			ret = wcd_cpe_load_fw(core, ELF_FLAG_RW);
+			if (ret) {
+				pr_err("%s: wcd_cpe_load_fw error ret=%d. retry.\n", __func__, ret);
+				msleep(5);
+			} else {
+				if (err_cnt > 0) {
+					pr_err("%s: wcd_cpe_load_fw error count=%d.\n", __func__, err_cnt);
+				}
+				break;
+			}
+		}
 		if (ret) {
 			dev_err(core->dev,
 				"%s: Failed to dload data section, err = %d\n",
@@ -874,9 +892,17 @@ static int wcd_cpe_enable(struct wcd_cpe_core *core,
 		dev_dbg(core->dev,
 			"%s: waiting for CPE bootup\n",
 			__func__);
-
+#if 0
 		wait_for_completion(&core->online_compl);
-
+#else
+		timeout = wait_for_completion_timeout(&core->online_compl, msecs_to_jiffies(1000));
+		if (!timeout) {
+			dev_err(core->dev,
+				"%s: Timeout boot CPE.\n",
+				__func__);
+			goto fail_boot;
+		}
+#endif
 		dev_dbg(core->dev,
 			"%s: CPE bootup done\n",
 			__func__);
@@ -1197,6 +1223,9 @@ static irqreturn_t svass_exception_irq(int irq, void *data)
 			dev_err(core->dev,
 				"%s: CPE SSR event,err_status = 0x%02x\n",
 				__func__, status);
+			core->ssr_entry.err_status = status;
+			core->ssr_entry.err_data_ready = 1;
+			wake_up(&core->ssr_entry.err_status_debug_q);
 			wcd_cpe_ssr_event(core, WCD_CPE_SSR_EVENT);
 			/*
 			 * If fatal interrupt is received,
@@ -1681,6 +1710,44 @@ done:
 	return ret;
 }
 
+static ssize_t cpe_err_status_read(struct file *filp, char __user *ubuf,
+		size_t cnt, loff_t *ppos)
+{
+	int r;
+	char buf[32];
+	size_t size;
+	struct wcd_cpe_core *core = filp->private_data;
+	struct wcd_cpe_ssr_entry *ssr_entry = &core->ssr_entry;
+
+	r = snprintf(buf, sizeof(buf),
+			"err_status = 0x%02x", ssr_entry->err_status);
+	size = simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+	if (*ppos == r)
+		ssr_entry->err_data_ready = 0;
+
+	return size;
+}
+
+static unsigned int cpe_err_status_poll(struct file *filp,
+					struct poll_table_struct *wait)
+{
+	struct wcd_cpe_core *core = filp->private_data;
+	struct wcd_cpe_ssr_entry *ssr_entry = &core->ssr_entry;
+	unsigned int mask = 0;
+
+	if (ssr_entry->err_data_ready)
+		mask |= (POLLIN | POLLRDNORM);
+
+	poll_wait(filp, &ssr_entry->err_status_debug_q, wait);
+	return mask;
+}
+
+static const struct file_operations cpe_err_status_fops = {
+	.open = simple_open,
+	.read = cpe_err_status_read,
+	.poll = cpe_err_status_poll,
+};
+
 static int wcd_cpe_debugfs_init(struct wcd_cpe_core *core)
 {
 	int rc = 0;
@@ -1715,6 +1782,18 @@ static int wcd_cpe_debugfs_init(struct wcd_cpe_core *core)
 		rc = -ENODEV;
 		goto err_create_entry;
 	}
+
+	if (!debugfs_create_file("err_status", S_IRUGO,
+				dir, core, &cpe_err_status_fops)) {
+		dev_err(core->dev, "%s: Failed to create debugfs node %s\n",
+			__func__, "err_status");
+		rc = -ENODEV;
+		goto err_create_entry;
+	}
+
+	init_waitqueue_head(&core->ssr_entry.err_status_debug_q);
+
+	return 0;
 
 err_create_entry:
 	debugfs_remove(dir);
