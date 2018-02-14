@@ -141,6 +141,7 @@ struct freq_max_load {
 
 static DEFINE_PER_CPU(struct freq_max_load *, freq_max_load);
 static DEFINE_SPINLOCK(freq_max_load_lock);
+static DEFINE_PER_CPU(u64, prev_group_runnable_sum);
 
 struct cpu_pwr_stats __weak *get_cpu_pwr_stats(void)
 {
@@ -380,7 +381,6 @@ struct sched_cluster init_cluster = {
 	.dstate_wakeup_energy	=	0,
 	.dstate_wakeup_latency	=	0,
 	.exec_scale_factor	=	1024,
-	.notifier_sent		=	0,
 	.wake_up_idle		=	0,
 };
 
@@ -557,7 +557,7 @@ static struct sched_cluster *alloc_new_cluster(const struct cpumask *cpus)
 	if (cluster->efficiency < min_possible_efficiency)
 		min_possible_efficiency = cluster->efficiency;
 
-	cluster->notifier_sent = 0;
+	atomic_set(&cluster->notifier_sent, 0);
 	return cluster;
 }
 
@@ -605,10 +605,16 @@ void update_cluster_topology(void)
 
 void init_clusters(void)
 {
+	int cpu;
+
 	bitmap_clear(all_cluster_ids, 0, NR_CPUS);
 	init_cluster.cpus = *cpu_possible_mask;
+	atomic_set(&init_cluster.notifier_sent, 0);
 	raw_spin_lock_init(&init_cluster.load_lock);
 	INIT_LIST_HEAD(&cluster_head);
+
+	for_each_possible_cpu(cpu)
+		per_cpu(prev_group_runnable_sum, cpu) = 0;
 }
 
 int register_cpu_cycle_counter_cb(struct cpu_cycle_counter_cb *cb)
@@ -1658,6 +1664,16 @@ static inline u64 scale_exec_time(u64 delta, struct rq *rq)
 	u32 freq;
 
 	freq = cpu_cycles_to_freq(rq->cc.cycles, rq->cc.time);
+
+	/*
+	 * For some reason, current frequency estimation
+	 * can be far bigger than max available frequency.
+	 *
+	 * TODO: need to be investigated. As for now, take
+	 * min as a workaround.
+	 */
+	freq = min(freq, max_possible_freq);
+
 	delta = DIV64_U64_ROUNDUP(delta * freq, max_possible_freq);
 	delta *= rq->cluster->exec_scale_factor;
 	delta >>= 10;
@@ -1719,6 +1735,8 @@ static void group_load_in_freq_domain(struct cpumask *cpus,
 }
 
 static inline u64 freq_policy_load(struct rq *rq, u64 load);
+static inline void commit_prev_group_run_sum(struct rq *rq);
+static inline u64 get_prev_group_run_sum(struct rq *rq);
 /*
  * Should scheduler alert governor for changing frequency?
  *
@@ -1735,9 +1753,9 @@ static inline u64 freq_policy_load(struct rq *rq, u64 load);
 static int send_notification(struct rq *rq, int check_pred, int check_groups)
 {
 	unsigned int cur_freq, freq_required;
-	unsigned long flags;
 	int rc = 0;
-	u64 group_load = 0, new_load  = 0;
+	u64 new_load, val = 0;
+	u32 prev_run_sum, group_run_sum;
 
 	if (check_pred) {
 		u64 prev = rq->old_busy_time;
@@ -1756,19 +1774,19 @@ static int send_notification(struct rq *rq, int check_pred, int check_groups)
 		if (freq_required < cur_freq + sysctl_sched_pred_alert_freq)
 			return 0;
 	} else {
-		/*
-		 * Protect from concurrent update of rq->prev_runnable_sum and
-		 * group cpu load
-		 */
-		raw_spin_lock_irqsave(&rq->lock, flags);
+		val = get_prev_group_run_sum(rq);
+		group_run_sum = (u32) (val >> 32);
+		prev_run_sum = (u32) val;
+
 		if (check_groups)
-			group_load = rq->grp_time.prev_runnable_sum;
+			/*
+			 * prev_run_sum and group_run_sum are synced
+			 */
+			new_load = prev_run_sum + group_run_sum;
+		else
+			new_load = prev_run_sum;
 
-		new_load = rq->prev_runnable_sum + group_load;
 		new_load = freq_policy_load(rq, new_load);
-
-		raw_spin_unlock_irqrestore(&rq->lock, flags);
-
 		cur_freq = load_to_freq(rq, rq->old_busy_time);
 		freq_required = load_to_freq(rq, new_load);
 
@@ -1776,14 +1794,11 @@ static int send_notification(struct rq *rq, int check_pred, int check_groups)
 			return 0;
 	}
 
-	raw_spin_lock_irqsave(&rq->lock, flags);
-	if (!rq->cluster->notifier_sent) {
-		rq->cluster->notifier_sent = 1;
+	if (!atomic_cmpxchg(&rq->cluster->notifier_sent, 0, 1)) {
 		rc = 1;
 		trace_sched_freq_alert(cpu_of(rq), check_pred, check_groups, rq,
 				       new_load);
 	}
-	raw_spin_unlock_irqrestore(&rq->lock, flags);
 
 	return rc;
 }
@@ -1791,14 +1806,11 @@ static int send_notification(struct rq *rq, int check_pred, int check_groups)
 /* Alert governor if there is a need to change frequency */
 void check_for_freq_change(struct rq *rq, bool check_pred, bool check_groups)
 {
-	int cpu = cpu_of(rq);
-
-	if (!send_notification(rq, check_pred, check_groups))
-		return;
-
-	atomic_notifier_call_chain(
-		&load_alert_notifier_head, 0,
-		(void *)(long)cpu);
+	if (send_notification(rq, check_pred, check_groups)) {
+		atomic_notifier_call_chain(
+			&load_alert_notifier_head, 0,
+			(void *)(long) cpu_of(rq));
+	}
 }
 
 void notify_migration(int src_cpu, int dest_cpu, bool src_cpu_dead,
@@ -2060,36 +2072,42 @@ void clear_top_tasks_bitmap(unsigned long *bitmap)
 
 /*
  * Special case the last index and provide a fast path for index = 0.
- * Note that sched_load_granule can change underneath us if we are not
- * holding any runqueue locks while calling the two functions below.
  */
-static u32  top_task_load(struct rq *rq)
+static u32 top_task_load(struct rq *rq)
 {
 	int index = rq->prev_top;
 	u8 prev = 1 - rq->curr_table;
+	u32 sched_granule_load;
+	u32 ret_val = 0;
+
+	sched_granule_load = READ_ONCE(sched_load_granule);
 
 	if (!index) {
 		int msb = NUM_LOAD_INDICES - 1;
 
-		if (!test_bit(msb, rq->top_tasks_bitmap[prev]))
-			return 0;
-		else
-			return sched_load_granule;
+		if (test_bit(msb, rq->top_tasks_bitmap[prev]))
+			ret_val = sched_granule_load;
 	} else if (index == NUM_LOAD_INDICES - 1) {
-		return sched_ravg_window;
+		ret_val = sched_ravg_window;
 	} else {
-		return (index + 1) * sched_load_granule;
+		ret_val = (index + 1) * sched_granule_load;
 	}
+
+	return ret_val;
 }
 
 static int load_to_index(u32 load)
 {
-	if (load < sched_load_granule)
+	u32 sched_granule_load;
+
+	sched_granule_load = READ_ONCE(sched_load_granule);
+
+	if (load < sched_granule_load)
 		return 0;
 	else if (load >= sched_ravg_window)
 		return NUM_LOAD_INDICES - 1;
 	else
-		return load / sched_load_granule;
+		return load / sched_granule_load;
 }
 
 static void update_top_tasks(struct task_struct *p, struct rq *rq,
@@ -2264,6 +2282,22 @@ static void rollover_cpu_window(struct rq *rq, bool full_window)
 	rq->nt_curr_runnable_sum = 0;
 	rq->grp_time.curr_runnable_sum = 0;
 	rq->grp_time.nt_curr_runnable_sum = 0;
+}
+
+static inline void
+commit_prev_group_run_sum(struct rq *rq)
+{
+	u64 val;
+
+	val = rq->grp_time.prev_runnable_sum;
+	val = (val << 32) | rq->prev_runnable_sum;
+	WRITE_ONCE(per_cpu(prev_group_runnable_sum, cpu_of(rq)), val);
+}
+
+static inline u64
+get_prev_group_run_sum(struct rq *rq)
+{
+	return READ_ONCE(per_cpu(prev_group_runnable_sum, cpu_of(rq)));
 }
 
 /*
@@ -2487,7 +2521,7 @@ static void update_cpu_busy_time(struct task_struct *p, struct rq *rq,
 		 */
 		if (mark_start > window_start) {
 			*curr_runnable_sum = scale_exec_time(irqtime, rq);
-			return;
+			goto done;
 		}
 
 		/*
@@ -2503,11 +2537,11 @@ static void update_cpu_busy_time(struct task_struct *p, struct rq *rq,
 		/* Process the remaining IRQ busy time in the current window. */
 		delta = wallclock - window_start;
 		rq->curr_runnable_sum = scale_exec_time(delta, rq);
-
-		return;
 	}
 
 done:
+	commit_prev_group_run_sum(rq);
+
 	if (!is_idle_task(p) && !exiting_task(p))
 		update_top_tasks(p, rq, old_curr_window,
 					new_window, full_window);
@@ -3048,7 +3082,7 @@ void reset_all_window_stats(u64 window_start, unsigned int window_size)
 	if (window_size) {
 		sched_ravg_window = window_size * TICK_NSEC;
 		set_hmp_defaults();
-		sched_load_granule = sched_ravg_window / NUM_LOAD_INDICES;
+		WRITE_ONCE(sched_load_granule, sched_ravg_window / NUM_LOAD_INDICES);
 	}
 
 	sched_disable_window_stats = 0;
@@ -3061,6 +3095,12 @@ void reset_all_window_stats(u64 window_start, unsigned int window_size)
 		rq->curr_runnable_sum = rq->prev_runnable_sum = 0;
 		rq->nt_curr_runnable_sum = rq->nt_prev_runnable_sum = 0;
 		memset(&rq->grp_time, 0, sizeof(struct group_cpu_time));
+
+		/*
+		 * just commit zero, since grp_time/prev are 0
+		 */
+		commit_prev_group_run_sum(rq);
+
 		for (i = 0; i < NUM_TRACKED_WINDOWS; i++) {
 			memset(&rq->load_subs[i], 0,
 					sizeof(struct load_subtractions));
@@ -3129,6 +3169,8 @@ static inline void account_load_subtractions(struct rq *rq)
 		ls[i].subs = 0;
 		ls[i].new_subs = 0;
 	}
+
+	commit_prev_group_run_sum(rq);
 
 	BUG_ON((s64)rq->prev_runnable_sum < 0);
 	BUG_ON((s64)rq->curr_runnable_sum < 0);
@@ -3216,16 +3258,6 @@ void sched_get_cpus_busy(struct sched_load *busy,
 			max_busy_cpu = cpu;
 		}
 
-		/*
-		 * sched_get_cpus_busy() is called for all CPUs in a
-		 * frequency domain. So the notifier_sent flag per
-		 * cluster works even when a frequency domain spans
-		 * more than 1 cluster.
-		 */
-		if (rq->cluster->notifier_sent) {
-			notifier_sent = 1;
-			rq->cluster->notifier_sent = 0;
-		}
 		early_detection[i] = (rq->ed_task != NULL);
 		max_freq[i] = cpu_max_freq(cpu);
 		i++;
@@ -3276,8 +3308,20 @@ skip_early:
 		i++;
 	}
 
-	for_each_cpu(cpu, query_cpus)
+	for_each_cpu(cpu, query_cpus) {
+		rq = cpu_rq(cpu);
+
+		/*
+		 * sched_get_cpus_busy() is called for all CPUs in a
+		 * frequency domain. So the notifier_sent flag per
+		 * cluster works even when a frequency domain spans
+		 * more than 1 cluster.
+		 */
+		if (atomic_cmpxchg(&rq->cluster->notifier_sent, 1, 0))
+			notifier_sent = 1;
+
 		raw_spin_unlock(&(cpu_rq(cpu))->lock);
+	}
 
 	local_irq_restore(flags);
 
@@ -3643,6 +3687,9 @@ void fixup_busy_time(struct task_struct *p, int new_cpu)
 			dest_rq->ed_task = p;
 	}
 
+	commit_prev_group_run_sum(src_rq);
+	commit_prev_group_run_sum(dest_rq);
+
 done:
 	if (p->state == TASK_WAKING)
 		double_rq_unlock(src_rq, dest_rq);
@@ -3840,6 +3887,8 @@ static void transfer_busy_time(struct rq *rq, struct related_thread_group *grp,
 	 */
 	p->ravg.curr_window_cpu[cpu] = p->ravg.curr_window;
 	p->ravg.prev_window_cpu[cpu] = p->ravg.prev_window;
+
+	commit_prev_group_run_sum(rq);
 
 	trace_sched_migration_update_sum(p, migrate_type, rq);
 

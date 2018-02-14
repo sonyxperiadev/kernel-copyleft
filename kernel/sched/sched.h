@@ -400,7 +400,7 @@ struct sched_cluster {
 	bool freq_init_done;
 	int dstate, dstate_wakeup_latency, dstate_wakeup_energy;
 	unsigned int static_cluster_pwr_cost;
-	int notifier_sent;
+	atomic_t notifier_sent;
 	bool wake_up_idle;
 };
 

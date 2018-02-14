@@ -2122,7 +2122,7 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 stat:
 	ttwu_stat(p, cpu, wake_flags);
 out:
-	raw_spin_unlock_irqrestore(&p->pi_lock, flags);
+	raw_spin_unlock(&p->pi_lock);
 
 	if (freq_notif_allowed) {
 		if (!same_freq_domain(src_cpu, cpu)) {
@@ -2134,6 +2134,8 @@ out:
 			check_for_freq_change(cpu_rq(cpu), true, false);
 		}
 	}
+
+	local_irq_restore(flags);
 
 	return success;
 }

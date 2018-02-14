@@ -27,19 +27,41 @@
 
 #include "power.h"
 
-/*
- * suspend back-off default values
- */
-#define SBO_SLEEP_MSEC 1100
-#define SBO_TIME 10
-#define SBO_CNT 10
-
-static unsigned suspend_short_count;
-static struct wakeup_source *ws;
-
 DEFINE_MUTEX(pm_mutex);
 
 #ifdef CONFIG_PM_SLEEP
+/*
+ * Enable/Disable suspend back off logic attribute
+ */
+static bool sbo_enabled = true;
+
+/*
+ * For how many percent an alive time is decayed
+ * if suspend back-off keeps ongoing.
+ */
+static u32 sbo_decay_value = 20;
+
+/*
+ * Initial max back-off alive time
+ */
+static u32 sbo_initial_alive_time_msecs = 10000;
+
+/*
+ * A time in milliseconds, before which a short
+ * sleep counter is increased to trigger a back-off.
+ */
+static u32 sbo_short_sleep_msecs = 1100;
+
+/*
+ * This variable regulates starting of suspend
+ * back off functionality, after counter is reached
+ * specified value.
+ */
+static u32 sbo_short_sleep_count = 10;
+
+static u32 decay_alive_time_ms;
+static u32 suspend_short_count;
+static struct wakeup_source *ws;
 
 /* Routines for PM-transition notifications */
 
@@ -437,19 +459,138 @@ static suspend_state_t decode_state(const char *buf, size_t n)
 	return PM_SUSPEND_ON;
 }
 
-static void
-suspend_backoff_range(u32 start, u32 end)
+static inline u32
+decay_val(u32 val, u32 percent)
 {
-	u32 range, timeout;
+	u32 ratio;
 
-	if (end <= start)
+	percent = clamp(percent, 0U, 100U);
+	ratio = 1024 - ((1024 * percent) / 100);
+
+	return (val * ratio) / 1024;
+}
+
+static ssize_t sbo_decay_value_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	if (val > 100)
+		return -EINVAL;
+
+	sbo_decay_value = val;
+	return n;
+}
+
+static ssize_t sbo_decay_value_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", sbo_decay_value);
+}
+
+power_attr(sbo_decay_value);
+
+static ssize_t sbo_short_sleep_msecs_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	sbo_short_sleep_msecs = val;
+	return n;
+}
+
+static ssize_t sbo_short_sleep_msecs_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", sbo_short_sleep_msecs);
+}
+
+power_attr(sbo_short_sleep_msecs);
+
+static ssize_t sbo_short_sleep_count_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	sbo_short_sleep_count = val;
+	return n;
+}
+
+static ssize_t sbo_short_sleep_count_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", sbo_short_sleep_count);
+}
+
+power_attr(sbo_short_sleep_count);
+
+static ssize_t sbo_initial_alive_time_msecs_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	sbo_initial_alive_time_msecs = val;
+	return n;
+}
+
+static ssize_t sbo_initial_alive_time_msecs_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", sbo_initial_alive_time_msecs);
+}
+
+power_attr(sbo_initial_alive_time_msecs);
+
+static ssize_t sbo_enabled_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	if (val > 1)
+		return -EINVAL;
+
+	sbo_enabled = !!val;
+	return n;
+}
+
+static ssize_t sbo_enabled_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", sbo_enabled);
+}
+
+power_attr(sbo_enabled);
+
+static void
+suspend_backoff(u32 timeout_msecs)
+{
+	if (!sbo_enabled)
 		return;
 
-	range = end - start;
-	timeout = get_random_int() % range + start;
+	pr_info("suspend: too many immediate wakeups, back off (%u msecs)\n",
+			timeout_msecs);
 
-	pr_info("suspend: too many immediate wakeups, back off (%u msec)\n", timeout);
-	__pm_wakeup_event(ws, timeout);
+	__pm_wakeup_event(ws, timeout_msecs);
 }
 
 static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -487,15 +628,31 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 		do_div(elapsed_msecs64, NSEC_PER_MSEC);
 		elapsed_msecs32 = elapsed_msecs64;
 
-		if (elapsed_msecs32 <= SBO_SLEEP_MSEC) {
-			if (suspend_short_count == SBO_CNT)
-				suspend_backoff_range((SBO_TIME * MSEC_PER_SEC) / 2,
-						SBO_TIME * MSEC_PER_SEC);
-			else
+		if (elapsed_msecs32 <= sbo_short_sleep_msecs) {
+			if (suspend_short_count == sbo_short_sleep_count) {
+				if (decay_alive_time_ms >= MSEC_PER_SEC) {
+					suspend_backoff(decay_alive_time_ms);
+					decay_alive_time_ms =
+						decay_val(decay_alive_time_ms,
+							sbo_decay_value);
+					goto out;
+				}
+			} else {
 				suspend_short_count++;
-		} else {
-			suspend_short_count = 0;
+				goto out;
+			}
 		}
+
+		/* Start from scratch */
+		suspend_short_count = 0;
+
+		/*
+		 * Randomize a bit an initial alive time value to be
+		 * not synced with any wake up sources, for example
+		 * IRQs.
+		 */
+		decay_alive_time_ms = sbo_initial_alive_time_msecs -
+			get_random_int() % (sbo_initial_alive_time_msecs / 10);
 	} else if (state == PM_SUSPEND_MAX)
 		error = hibernate();
 	else
@@ -735,6 +892,11 @@ static struct attribute * g[] = {
 #ifdef CONFIG_PM_SLEEP
 	&pm_async_attr.attr,
 	&wakeup_count_attr.attr,
+	&sbo_enabled_attr.attr,
+	&sbo_decay_value_attr.attr,
+	&sbo_short_sleep_msecs_attr.attr,
+	&sbo_short_sleep_count_attr.attr,
+	&sbo_initial_alive_time_msecs_attr.attr,
 #ifdef CONFIG_PM_AUTOSLEEP
 	&autosleep_attr.attr,
 #endif
@@ -785,7 +947,9 @@ static int __init pm_init(void)
 		return error;
 	pm_print_times_init();
 
+#ifdef CONFIG_PM_SLEEP
 	ws = wakeup_source_register("suspend_backoff");
+#endif
 	return pm_autosleep_init();
 }
 

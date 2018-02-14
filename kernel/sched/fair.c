@@ -10116,8 +10116,6 @@ out_unlock:
 	if (p)
 		attach_one_task(target_rq, p);
 
-	local_irq_enable();
-
 	if (moved && !same_freq_domain(busiest_cpu, target_cpu)) {
 		int check_groups = !!(env.flags &
 					 LBF_MOVED_RELATED_THREAD_GROUP_TASK);
@@ -10126,6 +10124,8 @@ out_unlock:
 	} else if (moved) {
 		check_for_freq_change(target_rq, true, false);
 	}
+
+	local_irq_enable();
 
 	return 0;
 }

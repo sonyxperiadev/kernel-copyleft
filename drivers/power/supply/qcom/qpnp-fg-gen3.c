@@ -1575,8 +1575,14 @@ static void fg_cap_learning_post_process(struct fg_chip *chip)
 
 static int  fg_cap_learning_process_full_data(struct fg_chip *chip)
 {
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int rc, cc_soc_sw, cc_soc_delta_pct;
 	int64_t delta_cc_uah;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int rc, cc_soc_sw;
+	int64_t cc_soc_delta_100pct, delta_cc_uah, delta_cc_raw;
+#endif
 
 	rc = fg_get_sram_prop(chip, FG_SRAM_CC_SOC_SW, &cc_soc_sw);
 	if (rc < 0) {
@@ -1584,14 +1590,30 @@ static int  fg_cap_learning_process_full_data(struct fg_chip *chip)
 		return rc;
 	}
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	cc_soc_delta_pct = DIV_ROUND_CLOSEST(
 				abs(cc_soc_sw - chip->cl.init_cc_soc_sw) * 100,
 				CC_SOC_30BIT);
 	delta_cc_uah = div64_s64(chip->cl.learned_cc_uah * cc_soc_delta_pct,
 				100);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	delta_cc_raw = (int64_t)(abs(cc_soc_sw - chip->cl.init_cc_soc_sw));
+	cc_soc_delta_100pct = DIV_ROUND_CLOSEST(delta_cc_raw * 10000,
+							CC_SOC_30BIT);
+	delta_cc_uah = div64_s64(chip->cl.learned_cc_uah * cc_soc_delta_100pct,
+				10000);
+#endif
 	chip->cl.final_cc_uah = chip->cl.init_cc_uah + delta_cc_uah;
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	fg_dbg(chip, FG_CAP_LEARN, "Current cc_soc=%d cc_soc_delta_pct=%d total_cc_uah=%lld\n",
 		cc_soc_sw, cc_soc_delta_pct, chip->cl.final_cc_uah);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	fg_dbg(chip, FG_SOMC,
+		"cc_soc_sw=%d cc_soc_delta_100pct=%lld total_cc_uah=%lld\n",
+		cc_soc_sw, cc_soc_delta_100pct, chip->cl.final_cc_uah);
+#endif
 	return 0;
 }
 
