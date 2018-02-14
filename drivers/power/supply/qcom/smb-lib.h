@@ -503,6 +503,9 @@ irqreturn_t smblib_handle_dc_plugin(int irq, void *data);
 irqreturn_t smblib_handle_high_duty_cycle(int irq, void *data);
 irqreturn_t smblib_handle_switcher_power_ok(int irq, void *data);
 irqreturn_t smblib_handle_wdog_bark(int irq, void *data);
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+irqreturn_t smblib_handle_aicl_done(int irq, void *data);
+#endif
 
 #if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 int smblib_get_prop_charging_enabled(struct smb_charger *chg,
