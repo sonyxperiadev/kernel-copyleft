@@ -4582,6 +4582,32 @@ irqreturn_t smblib_handle_wdog_bark(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+irqreturn_t smblib_handle_aicl_done(int irq, void *data)
+{
+	struct smb_irq_data *irq_data = data;
+	struct smb_charger *chg = irq_data->parent_data;
+	u8 stat;
+	int rc;
+
+	smblib_dbg(chg, PR_INTERRUPT, "IRQ: %s\n", irq_data->name);
+
+	rc = smblib_read(chg, AICL_STATUS_REG, &stat);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't read AICL_STATUS rc=%d\n", rc);
+		return IRQ_HANDLED;
+	}
+
+	if (stat & ICL_IMIN_BIT) {
+		smblib_dbg(chg, PR_SOMC,
+				"ICL_IMIN is detected, suspending usbin\n");
+		vote(chg->usb_icl_votable, SOMC_APSD_VOTER, true, 0);
+	}
+
+	return IRQ_HANDLED;
+}
+
+#endif
 /***************
  * Work Queues *
  ***************/

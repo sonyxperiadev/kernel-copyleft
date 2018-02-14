@@ -2318,7 +2318,12 @@ static struct smb_irq_info smb2_irqs[] = {
 	},
 	[AICL_DONE_IRQ] = {
 		.name		= "aicl-done",
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		.handler	= smblib_handle_debug,
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		.handler	= smblib_handle_aicl_done,
+#endif
 	},
 	[HIGH_DUTY_CYCLE_IRQ] = {
 		.name		= "high-duty-cycle",
