@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/devfreq.h>
@@ -26,6 +31,7 @@
 
 static DEFINE_SPINLOCK(tz_lock);
 static DEFINE_SPINLOCK(sample_lock);
+static DEFINE_SPINLOCK(sample_load_lock);
 static DEFINE_SPINLOCK(suspend_lock);
 /*
  * FLOOR is 5msec to capture up to 3 re-draws
@@ -58,9 +64,26 @@ static DEFINE_SPINLOCK(suspend_lock);
 
 #define TAG "msm_adreno_tz: "
 
+#define USEC_PER_MINUTE (1*60*1000*1000)
+#define NMAX (15*60*60+1)
+
+struct gpu_load_data {
+	unsigned long total_time;
+	unsigned long busy_time;
+	u64 update_time;
+};
+
+struct gpu_load_queue {
+	struct gpu_load_data *gpu_load;
+	int head;
+	int tail;
+};
+
 static u64 suspend_time;
 static u64 suspend_start;
 static unsigned long acc_total, acc_relative_busy;
+static unsigned long gpu_load_total, gpu_load_rel_busy;
+static struct gpu_load_queue *gpu_load_infos;
 
 static struct msm_adreno_extended_profile *partner_gpu_profile;
 static void do_partner_start_event(struct work_struct *work);
@@ -109,6 +132,104 @@ static ssize_t gpu_load_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%lu\n", sysfs_busy_perc);
 }
 
+int findItem(int head, int tail, u64 refTime)
+{
+	int low = head, high = tail, middle;
+	u64 update_time;
+
+	while (low < high) {
+		middle = (low + high) / 2;
+		update_time =
+			gpu_load_infos->gpu_load[middle % NMAX].update_time;
+
+		if (update_time <= refTime)
+			low = middle + 1;
+		else if (update_time > refTime)
+			high = middle - 1;
+	}
+
+	update_time = gpu_load_infos->gpu_load[low % NMAX].update_time;
+	if (update_time > refTime)
+		low = low - 1;
+
+	if (low < tail) {
+		u64 l = gpu_load_infos->gpu_load[low % NMAX].update_time;
+		u64 r = gpu_load_infos->gpu_load[(low+1) % NMAX].update_time;
+
+		if (r - refTime < refTime - l)
+			low = low + 1;
+	}
+	return low % NMAX;
+}
+
+unsigned long cal_gpu_load(u64 current_time, u64 update_time,
+				u64 begin_time, int minutes)
+{
+	unsigned long sysfs_busy_perc;
+	unsigned long tmp_act_relative_busy, tmp_act_total;
+	int tail = gpu_load_infos->tail, head = gpu_load_infos->head;
+
+	if (current_time - update_time > minutes * USEC_PER_MINUTE) {
+		sysfs_busy_perc = 0;
+	} else {
+		int tmpIndex = head;
+
+		if (current_time - begin_time <= minutes * USEC_PER_MINUTE) {
+			tmpIndex = head;
+		} else {
+			u64 begin = current_time - minutes * USEC_PER_MINUTE;
+			int tmpTail = (tail < head) ? tail + NMAX : tail;
+
+			tmpIndex = findItem(head, tmpTail-1, begin);
+		}
+
+		tmp_act_relative_busy =
+			gpu_load_infos->gpu_load[tail-1].busy_time -
+			gpu_load_infos->gpu_load[tmpIndex].busy_time;
+
+		tmp_act_total = current_time -
+			gpu_load_infos->gpu_load[tmpIndex].update_time;
+
+		sysfs_busy_perc = (tmp_act_relative_busy * 100) / tmp_act_total;
+	}
+	return sysfs_busy_perc;
+}
+
+static ssize_t gpu_period_load_show(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	unsigned long sysfs_busy_perc[3];
+	int tail, head;
+
+	spin_lock(&sample_load_lock);
+	tail = gpu_load_infos->tail;
+	head = gpu_load_infos->head;
+
+	if (tail == head) {
+		sysfs_busy_perc[0] = 0;
+		sysfs_busy_perc[1] = 0;
+		sysfs_busy_perc[2] = 0;
+	} else {
+		u64 current_time = (u64)ktime_to_us(ktime_get());
+		u64 update_time = gpu_load_infos->gpu_load[tail-1].update_time;
+		u64 begin_time = gpu_load_infos->gpu_load[head].update_time;
+
+		sysfs_busy_perc[0] = cal_gpu_load(current_time,
+					update_time, begin_time, 1);
+		sysfs_busy_perc[1] = cal_gpu_load(current_time,
+					update_time, begin_time, 5);
+		sysfs_busy_perc[2] = cal_gpu_load(current_time,
+					update_time, begin_time, 15);
+	}
+
+	spin_unlock(&sample_load_lock);
+	return snprintf(buf, PAGE_SIZE, "%lu %lu %lu\n",
+		sysfs_busy_perc[0],
+		sysfs_busy_perc[1],
+		sysfs_busy_perc[2]);
+}
+
 /*
  * Returns the time in ms for which gpu was in suspend state
  * since last time the entry is read.
@@ -135,6 +256,7 @@ static ssize_t suspend_time_show(struct device *dev,
 }
 
 static DEVICE_ATTR(gpu_load, 0444, gpu_load_show, NULL);
+static DEVICE_ATTR(gpu_period_load, 0444, gpu_period_load_show, NULL);
 
 static DEVICE_ATTR(suspend_time, 0444,
 		suspend_time_show,
@@ -142,9 +264,27 @@ static DEVICE_ATTR(suspend_time, 0444,
 
 static const struct device_attribute *adreno_tz_attr_list[] = {
 		&dev_attr_gpu_load,
+		&dev_attr_gpu_period_load,
 		&dev_attr_suspend_time,
 		NULL
 };
+
+void store_work_load(unsigned long gpu_load_total, unsigned long gpu_load_busy)
+{
+	/* Queue item to gpu_load_queue */
+	int index = gpu_load_infos->tail;
+	int head = gpu_load_infos->head;
+
+	gpu_load_infos->gpu_load[index].total_time = gpu_load_total;
+	gpu_load_infos->gpu_load[index].busy_time = gpu_load_busy;
+	gpu_load_infos->gpu_load[index].update_time =
+				(u64)ktime_to_us(ktime_get());
+
+	if ((index + 1) % NMAX == head)
+		gpu_load_infos->head = (head + 1) % NMAX;
+
+	gpu_load_infos->tail = (index + 1) % NMAX;
+}
 
 void compute_work_load(struct devfreq_dev_status *stats,
 		struct devfreq_msm_adreno_tz_data *priv,
@@ -160,6 +300,15 @@ void compute_work_load(struct devfreq_dev_status *stats,
 	acc_relative_busy += (stats->busy_time * stats->current_frequency) /
 				devfreq->profile->freq_table[0];
 	spin_unlock(&sample_lock);
+
+	spin_lock(&sample_load_lock);
+	gpu_load_total += stats->total_time;
+	gpu_load_rel_busy += (stats->busy_time * stats->current_frequency) /
+			devfreq->profile->freq_table[0];
+
+	store_work_load(gpu_load_total, gpu_load_rel_busy);
+
+	spin_unlock(&sample_load_lock);
 }
 
 /* Trap into the TrustZone, and call funcs there. */
@@ -230,6 +379,14 @@ static int __secure_tz_update_entry3(unsigned int *scm_data, u32 size_scm_data,
 	return ret;
 }
 
+static void tz_init_gpuloadinfos(void)
+{
+	gpu_load_infos = kzalloc(sizeof(struct gpu_load_queue), GFP_KERNEL);
+	gpu_load_infos->head = gpu_load_infos->tail = 0;
+	gpu_load_infos->gpu_load =
+		kcalloc(NMAX, sizeof(struct gpu_load_data), GFP_KERNEL);
+}
+
 static int tz_init_ca(struct devfreq_msm_adreno_tz_data *priv)
 {
 	unsigned int tz_ca_data[2];
@@ -269,6 +426,8 @@ static int tz_init(struct devfreq_msm_adreno_tz_data *priv,
 			unsigned int *version, u32 size_version)
 {
 	int ret;
+
+	tz_init_gpuloadinfos();
 	/* Make sure all CMD IDs are avaialble */
 	if (scm_is_call_available(SCM_SVC_DCVS, TZ_INIT_ID)) {
 		ret = scm_call(SCM_SVC_DCVS, TZ_INIT_ID, tz_pwrlevels,
