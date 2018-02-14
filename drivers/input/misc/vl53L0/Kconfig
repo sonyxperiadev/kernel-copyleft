@@ -1,0 +1,19 @@
+#
+# vl53L0 driver configuration
+#
+config SENSORS_STMVL53L0
+	tristate "vl53L0 TOF sensor"
+	depends on MSMB_CAMERA
+	help
+	  Say Y here to enable the vl53L0 TOF sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called vl53L0.
+
+config SENSORS_STMVL53L0_USE_CCI
+	tristate "vl53L0 use camera cci"
+	depends on SENSORS_STMVL53L0
+	help
+	  Say Y here to enable the camera cci use in the vl53L0 driver.
+
+	  If unsure, say N.

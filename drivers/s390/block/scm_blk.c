@@ -4,6 +4,11 @@
  * Copyright IBM Corp. 2012
  * Author(s): Sebastian Ott <sebott@linux.vnet.ibm.com>
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define KMSG_COMPONENT "scm_block"
 #define pr_fmt(fmt) KMSG_COMPONENT ": " fmt

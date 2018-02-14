@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -65,7 +70,7 @@ static void msm_ispif_io_dump_reg(struct ispif_device *ispif)
 
 
 static inline int msm_ispif_is_intf_valid(uint32_t csid_version,
-	uint8_t intf_type)
+	enum msm_ispif_vfe_intf intf_type)
 {
 	return ((csid_version <= CSID_VERSION_V22 && intf_type != VFE0) ||
 		(intf_type >= VFE_MAX)) ? false : true;
@@ -92,6 +97,8 @@ static struct msm_cam_clk_info ispif_8626_reset_clk_info[] = {
 
 static struct msm_cam_clk_info ispif_ahb_clk_info[ISPIF_CLK_INFO_MAX];
 static struct msm_cam_clk_info ispif_clk_info[ISPIF_CLK_INFO_MAX];
+
+static uint32_t ref_cnt = 0;
 
 static int msm_ispif_set_regulator(struct ispif_device *ispif_dev,
 	uint8_t enable)
@@ -1296,6 +1303,11 @@ static int msm_ispif_init(struct ispif_device *ispif,
 
 	BUG_ON(!ispif);
 
+	if (ref_cnt) {
+		CDBG("%s: ref_cnt not zero %d\n", __func__, ref_cnt);
+		goto end;
+	}
+
 	if (ispif->ispif_state == ISPIF_POWER_UP) {
 		pr_err("%s: ispif already initted state = %d\n", __func__,
 			ispif->ispif_state);
@@ -1363,12 +1375,23 @@ error_irq:
 	iounmap(ispif->base);
 
 end:
+	if (rc == 0) {
+		ref_cnt++;
+	}
 	return rc;
 }
 
 static void msm_ispif_release(struct ispif_device *ispif)
 {
 	BUG_ON(!ispif);
+
+	if (ref_cnt) {
+		ref_cnt--;
+		if (ref_cnt) {
+			CDBG("%s: ref_cnt not zero %d\n", __func__, ref_cnt);
+			return;
+		}
+	}
 
 	if (!ispif->base) {
 		pr_err("%s: ispif base is NULL\n", __func__);
@@ -1468,11 +1491,7 @@ static long msm_ispif_subdev_ioctl(struct v4l2_subdev *sd,
 		return 0;
 	}
 	case MSM_SD_SHUTDOWN: {
-		if (ispif && ispif->base) {
-			mutex_lock(&ispif->mutex);
-			msm_ispif_release(ispif);
-			mutex_unlock(&ispif->mutex);
-		}
+		ispif->open_cnt = 0;
 		return 0;
 	}
 	default:

@@ -31,6 +31,11 @@
  *	Note: when the logging level is set by the user, it must be greater
  *	than the level indicated above to trigger output.	
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/fs.h>

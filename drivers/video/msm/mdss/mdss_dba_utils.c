@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -56,6 +61,7 @@ static struct mdss_dba_utils_data *mdss_dba_utils_get_data(
 	struct fb_info *fbi;
 	struct mdss_dba_utils_data *udata = NULL;
 
+	pr_debug("%s\n", __func__);
 	if (!device) {
 		pr_err("Invalid device data\n");
 		goto end;
@@ -89,6 +95,7 @@ static void mdss_dba_utils_send_display_notification(
 {
 	int state = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!udata) {
 		pr_err("invalid input\n");
 		return;
@@ -114,6 +121,7 @@ static void mdss_dba_utils_send_audio_notification(
 {
 	int state = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!udata) {
 		pr_err("invalid input\n");
 		return;
@@ -140,6 +148,7 @@ static ssize_t mdss_dba_utils_sysfs_rda_connected(struct device *dev,
 	ssize_t ret;
 	struct mdss_dba_utils_data *udata = NULL;
 
+	pr_debug("%s\n", __func__);
 	if (!dev) {
 		pr_err("invalid device\n");
 		return -EINVAL;
@@ -188,6 +197,7 @@ static ssize_t mdss_dba_utils_sysfs_wta_hpd(struct device *dev,
 	struct mdss_dba_utils_data *udata = NULL;
 	int rc, hpd;
 
+	pr_debug("%s\n", __func__);
 	udata = mdss_dba_utils_get_data(dev);
 	if (!udata) {
 		pr_debug("%s: invalid input\n", __func__);
@@ -202,6 +212,7 @@ static ssize_t mdss_dba_utils_sysfs_wta_hpd(struct device *dev,
 
 	pr_debug("%s: set value: %d hpd state: %d\n", __func__,
 					hpd, udata->hpd_state);
+
 	if (!hpd) {
 		if (udata->ops.power_on)
 			udata->ops.power_on(udata->dba_data, false, 0);
@@ -243,6 +254,7 @@ static int mdss_dba_utils_sysfs_create(struct kobject *kobj)
 {
 	int rc;
 
+	pr_debug("%s\n", __func__);
 	if (!kobj) {
 		pr_err("invalid input\n");
 		return -ENODEV;
@@ -259,6 +271,7 @@ static int mdss_dba_utils_sysfs_create(struct kobject *kobj)
 
 static void mdss_dba_utils_sysfs_remove(struct kobject *kobj)
 {
+	pr_debug("%s\n", __func__);
 	if (!kobj) {
 		pr_err("invalid input\n");
 		return;
@@ -277,6 +290,7 @@ static void mdss_dba_utils_dba_cb(void *data, enum msm_dba_callback_event event)
 	u32 no_of_operands, size, i;
 	u32 operands_offset = MAX_CEC_FRAME_SIZE - MAX_OPERAND_SIZE;
 
+	pr_debug("%s\n", __func__);
 	if (!udata) {
 		pr_err("Invalid data\n");
 		return;
@@ -369,6 +383,7 @@ static int mdss_dba_utils_cec_enable(void *data, bool enable)
 	int ret = -EINVAL;
 	struct mdss_dba_utils_data *udata = data;
 
+	pr_debug("%s\n", __func__);
 	if (!udata) {
 		pr_err("%s: Invalid data\n", __func__);
 		return -EINVAL;
@@ -388,6 +403,7 @@ static int mdss_dba_utils_send_cec_msg(void *data, struct cec_msg *msg)
 
 	u8 buf[MAX_CEC_FRAME_SIZE];
 
+	pr_debug("%s\n", __func__);
 	if (!udata || !msg) {
 		pr_err("%s: Invalid data\n", __func__);
 		return -EINVAL;
@@ -412,6 +428,7 @@ static int mdss_dba_utils_init_switch_dev(struct mdss_dba_utils_data *udata,
 {
 	int rc = -EINVAL, ret;
 
+	pr_debug("%s\n", __func__);
 	if (!udata) {
 		pr_err("invalid input\n");
 		goto end;
@@ -447,6 +464,7 @@ static int mdss_dba_get_vic_panel_info(struct mdss_dba_utils_data *udata,
 	struct hdmi_util_ds_data ds_data;
 	u32 h_total, v_total, vic = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!udata || !pinfo) {
 		pr_err("%s: invalid input\n", __func__);
 		return 0;
@@ -479,6 +497,32 @@ static int mdss_dba_get_vic_panel_info(struct mdss_dba_utils_data *udata,
 	return vic;
 }
 
+
+/**
+ * @data: DBA utils instance which was allocated during registration
+ * @pinfo: detailed panel information like x, y, porch values etc
+ * @on: true : power on / false : power off
+ *
+ * Return: returns the result of the power on/off call on device.
+ */
+int mdss_dba_utils_power_on(void *data, struct mdss_panel_info *pinfo, bool on)
+{
+	struct mdss_dba_utils_data *ud = data;
+	int ret = -EINVAL;
+
+	pr_debug("%s\n", __func__);
+	if (!ud || !pinfo) {
+		pr_err("invalid input\n");
+		goto end;
+	}
+
+	if (ud->ops.video_on)
+		ret = ud->ops.power_on(ud->dba_data, on, 0);
+
+end:
+	return ret;
+}
+
 /**
  * mdss_dba_utils_video_on() - Allow clients to switch on the video
  * @data: DBA utils instance which was allocated during registration
@@ -495,6 +539,7 @@ int mdss_dba_utils_video_on(void *data, struct mdss_panel_info *pinfo)
 	struct msm_dba_video_cfg video_cfg;
 	int ret = -EINVAL;
 
+	pr_debug("%s\n", __func__);
 	if (!ud || !pinfo) {
 		pr_err("invalid input\n");
 		goto end;
@@ -550,6 +595,7 @@ int mdss_dba_utils_video_off(void *data)
 	struct mdss_dba_utils_data *ud = data;
 	int ret = -EINVAL;
 
+	pr_debug("%s\n", __func__);
 	if (!ud) {
 		pr_err("invalid input\n");
 		goto end;
@@ -574,6 +620,7 @@ void mdss_dba_utils_hdcp_enable(void *data, bool enable)
 {
 	struct mdss_dba_utils_data *ud = data;
 
+	pr_debug("%s\n", __func__);
 	if (!ud) {
 		pr_err("invalid input\n");
 		return;
@@ -605,6 +652,7 @@ void *mdss_dba_utils_init(struct mdss_dba_utils_init_data *uid)
 	void *cec_abst_data;
 	int ret = 0;
 
+	pr_debug("%s\n", __func__);
 	if (!uid) {
 		pr_err("invalid input\n");
 		ret = -EINVAL;
@@ -728,6 +776,7 @@ void mdss_dba_utils_deinit(void *data)
 {
 	struct mdss_dba_utils_data *udata = data;
 
+	pr_debug("%s\n", __func__);
 	if (!udata) {
 		pr_err("invalid input\n");
 		return;

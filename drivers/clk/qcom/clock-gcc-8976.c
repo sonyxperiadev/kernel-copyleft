@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -797,8 +802,16 @@ static struct rcg_clk jpeg0_clk_src = {
 };
 
 static struct clk_freq_tbl ftbl_mclk_clk_src[] = {
+#if defined(CONFIG_SONY_CAM_V4L2)
+	F(8000000,  gpll0, 1,  1, 100),
+#endif
 	F(  24000000,      gpll6_out,    1,    1,    45),
 	F(  66670000,          gpll0,   12,    0,     0),
+	F_END
+};
+
+static struct clk_freq_tbl ftbl_cam2clk_clk_src[] = {
+	F(53333333, gpll0, 15, 0, 0),
 	F_END
 };
 
@@ -833,7 +846,7 @@ static struct rcg_clk mclk1_clk_src = {
 static struct rcg_clk mclk2_clk_src = {
 	.cmd_rcgr_reg = MCLK2_CMD_RCGR,
 	.set_rate = set_rate_mnd,
-	.freq_tbl = ftbl_mclk_clk_src,
+	.freq_tbl = ftbl_cam2clk_clk_src,
 	.current_freq = &rcg_dummy_freq,
 	.base = &virt_bases[GCC_BASE],
 	.c = {
@@ -1428,7 +1441,9 @@ static struct clk_freq_tbl ftbl_sdcc2_4_apps_clk_src[] = {
 	F(    400000,             xo,   12,    1,     4),
 	F(  20000000,          gpll0,   10,    1,     4),
 	F(  25000000,          gpll0,   16,    1,     2),
+	F(  40000000,          gpll0,   10,    1,     2),
 	F(  50000000,          gpll0,   16,    0,     0),
+	F(  80000000,          gpll0,   10,    0,     0),
 	F( 100000000,          gpll0,    8,    0,     0),
 	F( 177777778,          gpll0,  4.5,    0,     0),
 	F( 200000000,          gpll0,    4,    0,     0),

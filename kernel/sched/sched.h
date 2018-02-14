@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/sched.h>
 #include <linux/sched/sysctl.h>
@@ -582,6 +587,7 @@ struct rq {
 	 * remote CPUs use both these fields when doing load calculation.
 	 */
 	unsigned int nr_running;
+	unsigned int nr_pinned_tasks;
 	#define CPU_LOAD_IDX_MAX 5
 	unsigned long cpu_load[CPU_LOAD_IDX_MAX];
 	unsigned long last_load_update_tick;
@@ -666,6 +672,7 @@ struct rq {
 	u64 window_start;
 	int prefer_idle;
 	u32 mostly_idle_load;
+	u32 mostly_occupied_load;
 	int mostly_idle_nr_run;
 	int mostly_idle_freq;
 	unsigned long hmp_flags;
@@ -874,7 +881,11 @@ extern void init_new_task_load(struct task_struct *p);
 #define WINDOW_STATS_MAX		1
 #define WINDOW_STATS_MAX_RECENT_AVG	2
 #define WINDOW_STATS_AVG		3
-#define WINDOW_STATS_INVALID_POLICY	4
+#define WINDOW_STATS_MAX_RECENT_WMA	4
+#define WINDOW_STATS_WMA		5
+#define WINDOW_STATS_MAX_RECENT_EWA	6
+#define WINDOW_STATS_EWA		7
+#define WINDOW_STATS_INVALID_POLICY	8
 
 extern struct mutex policy_mutex;
 extern unsigned int sched_ravg_window;
@@ -1013,9 +1024,15 @@ dec_cumulative_runnable_avg(struct hmp_sched_stats *stats,
 	task_load = sched_use_pelt ? p->se.avg.runnable_avg_sum_scaled :
 			(sched_disable_window_stats ? 0 : p->ravg.demand);
 
-	stats->cumulative_runnable_avg -= task_load;
-
-	BUG_ON((s64)stats->cumulative_runnable_avg < 0);
+	/*
+	 * here we add a workaround, since it is not clear so far
+	 * why p->ravg.demand is more than cumulative_runnable_avg
+	 * in rare cases.
+	 */
+	if (task_load <= stats->cumulative_runnable_avg)
+		stats->cumulative_runnable_avg -= task_load;
+	else
+		__WARN();
 }
 
 #define pct_to_real(tunable)	\
