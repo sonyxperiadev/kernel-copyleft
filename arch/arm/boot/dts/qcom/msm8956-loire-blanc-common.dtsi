@@ -173,7 +173,7 @@
 		qcom,clk-freq-out = <100000>;
 		as3668@42 {
 			somc,color_variation_max_num = <1>;
-			somc,max_current_uA = <0 12000 4000 5000 5000 8000 8000>;
+			somc,max_current_uA = <0 100 100 200 200 100 100>;
 		};
 		tof_sensor@29 {
 			compatible = "st,stmvl53l0";
@@ -325,6 +325,9 @@
 	somc,stat1_gpio = <&msm_gpio 114 0x1>;
 	somc,stat2_gpio = <&msm_gpio 115 0x1>;
 	somc,lis-psy-name = "lis";
+	pinctrl-names = "gpio111_act","gpio111_sus";
+	pinctrl-0 = <&msm_gpio_111_act>;
+	pinctrl-1 = <&msm_gpio_111_sus>;
 };
 
 &spmi_bus {
@@ -564,6 +567,29 @@
 			drive-strength = <2>;
 			bias-disable;
 			output-low;
+		};
+	};
+
+	/* GPIO_111: */
+	msm_gpio_111 {
+		qcom,pins = <&gp 111>;
+		qcom,num-grp-pins = <1>;
+		label = "msm_gpio_111";
+		qcom,pin-func = <0>;
+		msm_gpio_111_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+		msm_gpio_111_act: active {
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+		msm_gpio_111_sus: suspend {
+			drive-strength = <2>;
+			bias-disable;
+			output-high;
 		};
 	};
 };

@@ -6569,9 +6569,17 @@ static irqreturn_t batt_pres_handler(int irq, void *_chip)
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t vbat_low_handler(int irq, void *_chip)
+static irqreturn_t stat2_gpio_handler(int irq, void *_chip)
 {
-	pr_warn_ratelimited("vbat low\n");
+	struct smbchg_chip *chip = _chip;
+
+	pr_smb(PR_INTERRUPT, "triggered\n");
+
+	somc_unplug_wakelock(&chip->somc_params);
+	schedule_delayed_work(
+			&chip->somc_params.usb_remove.work,
+			msecs_to_jiffies(REMOVE_DELAY_MS));
+
 	return IRQ_HANDLED;
 }
 
@@ -8145,14 +8153,11 @@ static int smbchg_request_irqs(struct smbchg_chip *chip)
 				"batt-cold", batt_cold_handler, flags, rc);
 			REQUEST_IRQ(chip, spmi_resource, chip->batt_missing_irq,
 				"batt-missing", batt_pres_handler, flags, rc);
-			REQUEST_IRQ(chip, spmi_resource, chip->vbat_low_irq,
-				"batt-low", vbat_low_handler, flags, rc);
 			enable_irq_wake(chip->batt_hot_irq);
 			enable_irq_wake(chip->batt_warm_irq);
 			enable_irq_wake(chip->batt_cool_irq);
 			enable_irq_wake(chip->batt_cold_irq);
 			enable_irq_wake(chip->batt_missing_irq);
-			enable_irq_wake(chip->vbat_low_irq);
 			break;
 		case SMBCHG_USB_CHGPTH_SUBTYPE:
 		case SMBCHG_LITE_USB_CHGPTH_SUBTYPE:
@@ -8449,6 +8454,7 @@ static int smbchg_probe(struct spmi_device *spmi)
 	struct power_supply *usb_psy, *typec_psy = NULL;
 	struct qpnp_vadc_chip *vadc_dev, *vchg_vadc_dev;
 	const char *typec_psy_name;
+	int irq;
 #ifdef CONFIG_QPNP_SMBCHARGER_EXTENSION
 #define TYPEC_PROBE_RETRY_MAX	5
 	static int typec_retry_cnt;
@@ -8710,6 +8716,18 @@ static int smbchg_probe(struct spmi_device *spmi)
 		goto unregister_led_class;
 	}
 
+	irq = gpio_to_irq(chip->stat2_gpio);
+	rc = devm_request_threaded_irq(chip->dev,
+			irq, NULL, stat2_gpio_handler,
+			IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+			"stat2_gpio", chip);
+	if (rc < 0) {
+		dev_err(chip->dev, "Unable to request stat2_gpio irq: %d\n",
+				rc);
+		goto unregister_stat2;
+	}
+	enable_irq_wake(irq);
+
 	if (!chip->skip_usb_notification) {
 		pr_smb(PR_MISC, "setting usb psy present = %d\n",
 			chip->usb_present);
@@ -8727,6 +8745,9 @@ static int smbchg_probe(struct spmi_device *spmi)
 			chip->dc_present, chip->usb_present);
 	return 0;
 
+unregister_stat2:
+	disable_irq(chip->stat2_gpio);
+	free_irq(chip->stat2_gpio, chip);
 unregister_led_class:
 	if (chip->cfg_chg_led_support && chip->schg_version == QPNP_SCHG_LITE)
 		led_classdev_unregister(&chip->led_cdev);
@@ -8750,6 +8771,8 @@ static int smbchg_remove(struct spmi_device *spmi)
 
 	debugfs_remove_recursive(chip->debug_root);
 
+	disable_irq(chip->stat2_gpio);
+	free_irq(chip->stat2_gpio, chip);
 #ifdef CONFIG_QPNP_SMBCHARGER_EXTENSION
 	somc_usb_unregister(chip);
 	somc_chg_unregister(chip);

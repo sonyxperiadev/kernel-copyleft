@@ -233,10 +233,10 @@ static const struct as3668_data as3668_default_data = {
 	.pattern_tp_led = 0,
 	.pattern_fade_out = 0,
 	.cp_clock = 1000,
-	.cp_on = 1,
+	.cp_on = 0,
 	.cp_mode_switching = 0,
 	.cp_mode = 0,
-	.cp_auto_on = 1,
+	.cp_auto_on = 0,
 	.gpio_output_state = 0,
 	.gpio_toggle_enable = 0,
 	.gpio_toggle_frame_nr = 0,
@@ -2576,6 +2576,7 @@ static int as3668_configure(struct i2c_client *client,
 {
 	int err = 0;
 	int i;
+	u8 reg_data;
 
 	data->pdata = pdata;
 	data->num_leds = AS3668_NUM_LEDS;
@@ -2598,6 +2599,14 @@ static int as3668_configure(struct i2c_client *client,
 			(data->pdata->audio_dis_start << 7));
 	AS3668_MODIFY_REG(AS3668_REG_Audio_Ctrl, 0x20,
 			(data->pdata->audio_adc_characteristic << 5));
+
+	AS3668_MODIFY_REG(AS3668_REG_CP_Ctrl, 0x40, data->cp_auto_on << 6);
+	reg_data = AS3668_READ_REG(AS3668_REG_CP_Ctrl);
+	dev_info(&client->dev, "cp_auto_on = 0x%02X\n", reg_data);
+
+	AS3668_MODIFY_REG(AS3668_REG_Reg_Ctrl, 0x04, data->cp_on << 2);
+	reg_data = AS3668_READ_REG(AS3668_REG_Reg_Ctrl);
+	dev_info(&client->dev, "cp_on = 0x%02X\n", reg_data);
 
 	if (data->pdata->vbat_monitor_voltage_mV < AS3668_VMON_MIN_VOLTAGE) {
 		dev_warn(&client->dev,

@@ -3609,6 +3609,17 @@ static void adux1050_hdmi_switch_work(struct work_struct *switch_work)
 		dev_err(adux1050->dev, "I2C READ FAILED %d at %s", err, __func__);
 
 	if (int_status & (0x1 << adux1050->hdmi_switch_stg) && adux1050->hdmi_detect) {
+		if (!adux1050->hdmi.state) {
+			input_event(adux1050->input, EV_KEY, KEY_STOP, 1);
+			input_sync(adux1050->input);
+			input_event(adux1050->input, EV_KEY, KEY_STOP, 0);
+			input_sync(adux1050->input);
+			input_event(adux1050->input, EV_KEY, KEY_HOMEPAGE, 1);
+			input_sync(adux1050->input);
+			input_event(adux1050->input, EV_KEY, KEY_HOMEPAGE, 0);
+			input_sync(adux1050->input);
+		}
+
 		ADUX1050_DRIVER_DBG("hdmi switch: [%d] \n", adux1050->hdmi.state ^ 1);
 		switch_set_state(&adux1050->hdmi, adux1050->hdmi.state ^ 1);
 	}
@@ -4418,6 +4429,8 @@ static int adux1050_probe(struct i2c_client *client,
 	set_bit(KEY_VOLUMEDOWN, input->keybit);
 	set_bit(KEY_VOLUMEUP, input->keybit);
 	set_bit(KEY_SWITCHVIDEOMODE, input->keybit);
+	set_bit(KEY_STOP, input->keybit);
+	set_bit(KEY_HOMEPAGE, input->keybit);
 
 	ret = adux1050_set_switch_device(adux1050);
 	if (ret) {
