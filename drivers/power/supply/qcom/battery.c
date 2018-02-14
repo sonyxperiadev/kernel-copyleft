@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "QCOM-BATT: %s: " fmt, __func__
 
@@ -52,6 +57,9 @@ struct pl_data {
 	struct work_struct	status_change_work;
 	struct work_struct	pl_disable_forever_work;
 	struct delayed_work	pl_taper_work;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	struct delayed_work	voter_reelect_work;
+#endif
 	struct power_supply	*main_psy;
 	struct power_supply	*pl_psy;
 	struct power_supply	*batt_psy;
@@ -784,6 +792,24 @@ static void status_change_work(struct work_struct *work)
 	handle_parallel_in_taper(chip);
 }
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define PL_VOTER_REELECT_WORK_DELAY_MS 100
+static void voter_reelect_work(struct work_struct *work)
+{
+	struct pl_data *chip = container_of(work, struct pl_data,
+						voter_reelect_work.work);
+	if (is_main_available(chip) &&
+	    get_effective_result(chip->fcc_votable) > 0 &&
+	    get_effective_result(chip->fv_votable) > 0) {
+		rerun_election(chip->fcc_votable);
+		rerun_election(chip->fv_votable);
+	} else {
+		schedule_delayed_work(&chip->voter_reelect_work,
+			msecs_to_jiffies(PL_VOTER_REELECT_WORK_DELAY_MS));
+	}
+}
+
+#endif
 static int pl_notifier_call(struct notifier_block *nb,
 		unsigned long ev, void *v)
 {
@@ -845,9 +871,16 @@ static int pl_init(void)
 		goto release_wakeup_source;
 	}
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->fv_votable = create_votable("FV", VOTE_MAX,
 					pl_fv_vote_callback,
 					chip);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	chip->fv_votable = create_votable("FV", VOTE_MIN,
+					pl_fv_vote_callback,
+					chip);
+#endif
 	if (IS_ERR(chip->fv_votable)) {
 		rc = PTR_ERR(chip->fv_votable);
 		goto destroy_votable;
@@ -875,6 +908,11 @@ static int pl_init(void)
 	INIT_WORK(&chip->status_change_work, status_change_work);
 	INIT_DELAYED_WORK(&chip->pl_taper_work, pl_taper_work);
 	INIT_WORK(&chip->pl_disable_forever_work, pl_disable_forever_work);
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	INIT_DELAYED_WORK(&chip->voter_reelect_work, voter_reelect_work);
+	schedule_delayed_work(&chip->voter_reelect_work,
+		msecs_to_jiffies(PL_VOTER_REELECT_WORK_DELAY_MS));
+#endif
 
 	rc = pl_register_notifier(chip);
 	if (rc < 0) {

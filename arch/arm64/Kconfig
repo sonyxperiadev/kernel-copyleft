@@ -6,6 +6,7 @@ config ARM64
 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
 	select ARCH_HAS_ELF_RANDOMIZE
 	select ARCH_HAS_GCOV_PROFILE_ALL
+	select ARCH_HAS_CRASH_NOTES if CRASH_NOTES
 	select ARCH_HAS_SG_CHAIN
 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
 	select ARCH_USE_CMPXCHG_LOCKREF
@@ -850,6 +851,15 @@ config ARM64_LSE_ATOMICS
 	  not support these instructions and requires the kernel to be
 	  built with binutils >= 2.25.
 
+config ARM64_FLUSH_CONSOLE_ON_RESTART
+	bool "Force flush the console on restart"
+	help
+	  If the console is locked while the system is rebooted, the messages
+	  in the temporary logbuffer would not have propogated to all the
+	  console drivers. This option forces the console lock to be
+	  released if it failed to be acquired, which will cause all the
+	  pending messages to be flushed.
+
 endmenu
 
 config ARM64_UAO
@@ -1017,6 +1027,17 @@ config BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES
 	help
 	  Space separated list of names of dtbs to append when
 	  building a concatenated Image.gz-dtb.
+
+config ARCH_HAS_CRASH_NOTES
+	bool
+
+config CRASH_NOTES
+	bool "Support storing crash notes at panic"
+	depends on !KEXEC
+	help
+	  Generate kdump style crash notes at the time of a panic and fill it
+	  with the crashed context to support analysis of the memory dump with
+	  tools like Redhat CRASH.
 
 endmenu
 

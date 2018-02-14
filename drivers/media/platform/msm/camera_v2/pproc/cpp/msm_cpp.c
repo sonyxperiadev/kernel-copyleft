@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "MSM-CPP %s:%d " fmt, __func__, __LINE__
 
@@ -124,6 +129,12 @@ static int msm_cpp_dump_addr(struct cpp_device *cpp_dev,
 	struct msm_cpp_frame_info_t *frame_info);
 static int32_t msm_cpp_reset_vbif_and_load_fw(struct cpp_device *cpp_dev);
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+#define CPP_DBG(fmt, args...)
+#define CPP_LOW(fmt, args...)
+#define ERR_USER_COPY(to)
+#define ERR_COPY_FROM_USER()
+#else
 #if CONFIG_MSM_CPP_DBG
 #define CPP_DBG(fmt, args...) pr_err(fmt, ##args)
 #else
@@ -138,6 +149,7 @@ static int32_t msm_cpp_reset_vbif_and_load_fw(struct cpp_device *cpp_dev);
 #define ERR_USER_COPY(to) pr_err("copy %s user\n", \
 			((to) ? "to" : "from"))
 #define ERR_COPY_FROM_USER() ERR_USER_COPY(0)
+#endif
 
 #define msm_dequeue(queue, member, pop_dir) ({	   \
 	unsigned long flags;		  \
@@ -304,7 +316,11 @@ static void cpp_timer_callback(unsigned long data);
 uint8_t induce_error;
 static int msm_cpp_enable_debugfs(struct cpp_device *cpp_dev);
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+static inline void msm_cpp_write(u32 data, void __iomem *cpp_base)
+#else
 static void msm_cpp_write(u32 data, void __iomem *cpp_base)
+#endif
 {
 	msm_camera_io_w((data), cpp_base + MSM_CPP_MICRO_FIFO_RX_DATA);
 }
@@ -989,6 +1005,14 @@ static int cpp_init_hardware(struct cpp_device *cpp_dev)
 		goto reg_enable_failed;
 	}
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+/* TODO: Temporary fix for cpp poll command fail */
+	rc = msm_cpp_set_micro_clk(cpp_dev);
+	if (rc < 0) {
+		pr_err("%s: reset micro clk failed\n", __func__);
+		goto clk_failed;
+	}
+#else
 	if (cpp_dev->micro_reset) {
 		rc = msm_cpp_set_micro_clk(cpp_dev);
 		if (rc < 0) {
@@ -996,6 +1020,7 @@ static int cpp_init_hardware(struct cpp_device *cpp_dev)
 			goto clk_failed;
 		}
 	}
+#endif
 
 	rc = msm_camera_clk_enable(&cpp_dev->pdev->dev, cpp_dev->clk_info,
 			cpp_dev->cpp_clk, cpp_dev->num_clks, true);
@@ -2542,9 +2567,29 @@ static int msm_cpp_cfg_frame(struct cpp_device *cpp_dev,
 		return -EINVAL;
 	}
 
-	if (stripe_base == UINT_MAX || new_frame->num_strips >
-		(UINT_MAX - 1 - stripe_base) / stripe_size) {
-		pr_err("Invalid frame message,num_strips %d is large\n",
+	/* Stripe index starts at zero */
+	if ((!new_frame->num_strips) ||
+		(new_frame->first_stripe_index >= new_frame->num_strips) ||
+		(new_frame->last_stripe_index  >= new_frame->num_strips) ||
+		(new_frame->first_stripe_index >
+			new_frame->last_stripe_index)) {
+		pr_err("Invalid frame message, #stripes=%d, stripe indices=[%d,%d]\n",
+			new_frame->num_strips,
+			new_frame->first_stripe_index,
+			new_frame->last_stripe_index);
+		return -EINVAL;
+	}
+
+	if (!stripe_size) {
+		pr_err("Invalid frame message, invalid stripe_size (%d)!\n",
+			stripe_size);
+		return -EINVAL;
+	}
+
+	if ((stripe_base == UINT_MAX) ||
+		(new_frame->num_strips >
+			(UINT_MAX - 1 - stripe_base) / stripe_size)) {
+		pr_err("Invalid frame message, num_strips %d is large\n",
 			new_frame->num_strips);
 		return -EINVAL;
 	}
@@ -2785,13 +2830,14 @@ static int msm_cpp_cfg(struct cpp_device *cpp_dev,
 	struct msm_cpp_frame_info_t *frame = NULL;
 	struct msm_cpp_frame_info_t k_frame_info;
 	int32_t rc = 0;
-	int32_t i = 0;
-	int32_t num_buff = sizeof(k_frame_info.output_buffer_info)/
+	uint32_t i = 0;
+	uint32_t num_buff = sizeof(k_frame_info.output_buffer_info) /
 				sizeof(struct msm_cpp_buffer_info_t);
+
 	if (copy_from_user(&k_frame_info,
 			(void __user *)ioctl_ptr->ioctl_ptr,
 			sizeof(k_frame_info)))
-			return -EFAULT;
+		return -EFAULT;
 
 	frame = msm_cpp_get_frame(ioctl_ptr);
 	if (!frame) {
@@ -3883,6 +3929,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 	struct msm_cpp_stream_buff_info_t k_cpp_buff_info;
 	struct msm_cpp_frame_info32_t k32_frame_info;
 	struct msm_cpp_frame_info_t k64_frame_info;
+	struct msm_camera_smmu_attach_type kb_cpp_smmu_attach_info;
 	uint32_t identity_k = 0;
 	bool is_copytouser_req = true;
 	void __user *up = (void __user *)arg;
@@ -4187,11 +4234,23 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 		break;
 	}
 	case VIDIOC_MSM_CPP_IOMMU_ATTACH32:
-		cmd = VIDIOC_MSM_CPP_IOMMU_ATTACH;
-		break;
 	case VIDIOC_MSM_CPP_IOMMU_DETACH32:
-		cmd = VIDIOC_MSM_CPP_IOMMU_DETACH;
+	{
+		if ((kp_ioctl.len != sizeof(struct msm_camera_smmu_attach_type))
+			|| (copy_from_user(&kb_cpp_smmu_attach_info,
+				(void __user *)kp_ioctl.ioctl_ptr,
+				sizeof(kb_cpp_smmu_attach_info)))) {
+			mutex_unlock(&cpp_dev->mutex);
+			return -EINVAL;
+		}
+
+		kp_ioctl.ioctl_ptr = (void *)&kb_cpp_smmu_attach_info;
+		is_copytouser_req = false;
+		cmd = (cmd == VIDIOC_MSM_CPP_IOMMU_ATTACH32) ?
+			VIDIOC_MSM_CPP_IOMMU_ATTACH :
+			VIDIOC_MSM_CPP_IOMMU_DETACH;
 		break;
+	}
 	case MSM_SD_NOTIFY_FREEZE:
 		break;
 	case MSM_SD_UNNOTIFY_FREEZE:

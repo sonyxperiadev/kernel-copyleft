@@ -7,6 +7,11 @@
  *
  *  Host driver specific definitions.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_HOST_H
 #define LINUX_MMC_HOST_H
 
@@ -24,7 +29,10 @@
 #include <linux/mmc/pm.h>
 #include <linux/mmc/ring_buffer.h>
 
+/* Default idle timeout for MMC devices: 3 seconds. */
 #define MMC_AUTOSUSPEND_DELAY_MS	3000
+/* Default idle timeout for SD cards: 5 minutes. */
+#define MMC_SDCARD_AUTOSUSPEND_DELAY_MS 30000
 
 struct mmc_ios {
 	unsigned int	clock;			/* clock rate */
@@ -490,6 +498,7 @@ struct mmc_host {
 	unsigned int		doing_retune:1;	/* re-tuning in progress */
 	unsigned int		retune_now:1;	/* do re-tuning at next req */
 
+	unsigned int doing_host_tuning:1; /* host executing tuning */
 	int			rescan_disable;	/* disable card detection */
 	int			rescan_entered;	/* used with nonremovable devices */
 
@@ -595,6 +604,7 @@ struct mmc_host {
 	struct io_latency_state io_lat_s;
 #endif
 
+	bool sdr104_wa;
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
@@ -726,6 +736,16 @@ static inline int mmc_host_uhs(struct mmc_host *host)
 		(MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 |
 		 MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_SDR104 |
 		 MMC_CAP_UHS_DDR50);
+}
+
+static inline void mmc_host_clear_sdr104(struct mmc_host *host)
+{
+	host->caps &= ~MMC_CAP_UHS_SDR104;
+}
+
+static inline void mmc_host_set_sdr104(struct mmc_host *host)
+{
+	host->caps |= MMC_CAP_UHS_SDR104;
 }
 
 static inline int mmc_host_packed_wr(struct mmc_host *host)

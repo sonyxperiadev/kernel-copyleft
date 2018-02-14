@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -18,6 +23,9 @@
 #include <linux/err.h>
 #include <linux/qpnp/qpnp-revid.h>
 #include <linux/of.h>
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
 
 #define REVID_REVISION1	0x0
 #define REVID_REVISION2	0x1
@@ -126,6 +134,11 @@ static size_t build_pmic_string(char *buf, size_t n, int sid,
 		u8 subtype, u8 rev1, u8 rev2, u8 rev3, u8 rev4)
 {
 	size_t pos = 0;
+#ifdef CONFIG_RAMDUMP_TAGS
+	char tag_name[64];
+	char tag_data[64];
+	int version_pos = 0;
+#endif
 	/*
 	 * In early versions of PM8941 and PM8226, the major revision number
 	 * started incrementing from 0 (eg 0 = v1.0, 1 = v2.0).
@@ -144,11 +157,21 @@ static size_t build_pmic_string(char *buf, size_t n, int sid,
 	else
 		pos += snprintf(buf + pos, n - pos, ": %s",
 				pmic_names[subtype]);
+#ifdef CONFIG_RAMDUMP_TAGS
+	snprintf(tag_name, sizeof(tag_name), "pmic_%s_revision_str",
+		pmic_names[(subtype < ARRAY_SIZE(pmic_names)) ? subtype : 0]);
+	version_pos = pos + 1;
+#endif
 	pos += snprintf(buf + pos, n - pos, " v%d.%d", rev4, rev3);
 	if (rev2 || rev1)
 		pos += snprintf(buf + pos, n - pos, ".%d", rev2);
 	if (rev1)
 		pos += snprintf(buf + pos, n - pos, ".%d", rev1);
+
+#ifdef CONFIG_RAMDUMP_TAGS
+	snprintf(tag_data, sizeof(tag_data), "%s", buf + version_pos);
+	rdtags_add_tag(tag_name, tag_data, strlen(tag_data));
+#endif
 	return pos;
 }
 

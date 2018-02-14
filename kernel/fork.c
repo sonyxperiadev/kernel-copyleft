@@ -3,6 +3,11 @@
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  *  'fork.c' contains the help-routines for the 'fork' system call
@@ -805,8 +810,7 @@ struct mm_struct *mm_access(struct task_struct *task, unsigned int mode)
 
 	mm = get_task_mm(task);
 	if (mm && mm != current->mm &&
-			!ptrace_may_access(task, mode) &&
-			!capable(CAP_SYS_RESOURCE)) {
+			!ptrace_may_access(task, mode)) {
 		mmput(mm);
 		mm = ERR_PTR(-EACCES);
 	}

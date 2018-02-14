@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <asm/arch_timer.h>
 #include <linux/slab.h>
@@ -510,6 +515,13 @@ int ipc_log_string(void *ilctxt, const char *fmt, ...)
 	data_size = vsnprintf((ectxt.buff + ectxt.offset + hdr_size),
 			      avail_size, fmt, arg_list);
 	va_end(arg_list);
+	if (data_size < 0) {
+		pr_err("%s: vsnprintf failed\n", __func__);
+		return -EINVAL;
+	} else if (data_size >= avail_size) {
+		pr_warn("%s: Truncated log output\n", __func__);
+		data_size = avail_size - 1;
+	}
 	tsv_write_header(&ectxt, TSV_TYPE_BYTE_ARRAY, data_size);
 	ectxt.offset += data_size;
 	msg_encode_end(&ectxt);
