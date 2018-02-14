@@ -188,7 +188,7 @@ static int get_property_from_batt(struct lis2xxx_charger *chip,
 	return rc;
 }
 
-static bool is_batt_charging(struct lis2xxx_charger *chip)
+static int get_charging_status(struct lis2xxx_charger *chip)
 {
 	int status;
 	int rc;
@@ -199,8 +199,7 @@ static bool is_batt_charging(struct lis2xxx_charger *chip)
 		status = POWER_SUPPLY_STATUS_DISCHARGING;
 	}
 
-	return (status == POWER_SUPPLY_STATUS_CHARGING ||
-		status == POWER_SUPPLY_STATUS_FULL);
+	return status;
 }
 
 #define LOW_CELL_VOLTAGE	3000		/* 3V */
@@ -243,6 +242,7 @@ static void lis2xxx_get_capacity(int *capacity)
 
 #define DEFAULT_BATT_CAPACITY		50
 #define EMPTY_BATT_CAPACITY		0
+#define FULL_BATT_CAPACITY		100
 #define LOW_BATT_CAPACITY		15
 #define SOC_POOLING_TIME_MS		30000	/* 30 sec */
 #define LOW_BATT_POOLING_TIME_MS	1000	/* 1 sec */
@@ -258,6 +258,7 @@ static void lis2xxx_soc_work(struct work_struct *work)
 	int poll_ms = SOC_POOLING_TIME_MS;
 	int temp = chip->temp;
 	int voltage = chip->voltage;
+	int status = POWER_SUPPLY_STATUS_UNKNOWN;
 	bool is_update = false;
 	bool is_charging = false;
 	bool is_low_vol = false;
@@ -289,7 +290,11 @@ static void lis2xxx_soc_work(struct work_struct *work)
 		if (reg[0] & FULLY_DISCHARGED) {
 			pr_info("batt status is fully discharged\n");
 			fully_discharged = true;
-			is_charging = is_batt_charging(chip);
+			status = get_charging_status(chip);
+			if (status == POWER_SUPPLY_STATUS_CHARGING ||
+			    status == POWER_SUPPLY_STATUS_FULL) {
+				is_charging = true;
+			}
 			pr_debug("battery is %s\n",
 				is_charging ? "charging" : "discharging");
 
@@ -393,6 +398,8 @@ static int lis2xxx_get_prop_batt_capacity(struct lis2xxx_charger *chip)
 {
 	if (chip->fake_battery_soc >= 0)
 		return chip->fake_battery_soc;
+	if (get_charging_status(chip) == POWER_SUPPLY_STATUS_FULL)
+		return FULL_BATT_CAPACITY;
 	return chip->capacity;
 }
 
@@ -448,7 +455,13 @@ static struct device_attribute lis2xxx_attrs[] = {
 	__ATTR(address,	S_IRUGO|S_IWUSR,
 					lis2xxx_param_show,
 					lis2xxx_param_store),
+	__ATTR(cs_address,	S_IRUGO|S_IWUSR,
+					lis2xxx_param_show,
+					lis2xxx_param_store),
 	__ATTR(data,	S_IRUGO|S_IWUSR,
+					lis2xxx_param_show,
+					lis2xxx_param_store),
+	__ATTR(cs_data,	S_IRUGO|S_IWUSR,
 					lis2xxx_param_show,
 					lis2xxx_param_store),
 	__ATTR(dump,	S_IRUGO, lis2xxx_dump_read, NULL),

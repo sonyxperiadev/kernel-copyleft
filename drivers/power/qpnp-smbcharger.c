@@ -115,6 +115,7 @@ struct smbchg_chip {
 	u16				otg_base;
 	u16				misc_base;
 
+	int				fake_battery_status;
 	int				fake_battery_soc;
 	u8				revision[4];
 
@@ -909,6 +910,10 @@ static int get_prop_batt_status(struct smbchg_chip *chip)
 {
 	int val, ret = POWER_SUPPLY_STATUS_DISCHARGING;
 
+	if (chip->fake_battery_status >= 0) {
+		ret = chip->fake_battery_status;
+		goto exit;
+	}
 	if (gpio_is_valid(chip->stat1_gpio)) {
 		val = gpio_get_value_cansleep(chip->stat1_gpio);
 		pr_smb(PR_STATUS, "stat1_gpio = 0x%02X ^ 0x%02X = 0x%02X\n",
@@ -925,6 +930,7 @@ static int get_prop_batt_status(struct smbchg_chip *chip)
 			ret = POWER_SUPPLY_STATUS_FULL;
 	}
 
+exit:
 	pr_smb(PR_STATUS, "status = %d\n", ret);
 	return ret;
 }
@@ -6041,6 +6047,10 @@ static int smbchg_battery_set_property(struct power_supply *psy,
 #endif
 
 	switch (prop) {
+	case POWER_SUPPLY_PROP_STATUS:
+		chip->fake_battery_status = val->intval;
+		power_supply_changed(&chip->batt_psy);
+		break;
 	case POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED:
 		vote(chip->battchg_suspend_votable, BATTCHG_USER_EN_VOTER,
 				!val->intval, 0);
@@ -6180,6 +6190,7 @@ static int smbchg_battery_is_writeable(struct power_supply *psy,
 	int rc;
 
 	switch (prop) {
+	case POWER_SUPPLY_PROP_STATUS:
 	case POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_CAPACITY:
@@ -8567,6 +8578,7 @@ static int smbchg_probe(struct spmi_device *spmi)
 	chip->dev = &spmi->dev;
 	chip->usb_psy = usb_psy;
 	chip->typec_psy = typec_psy;
+	chip->fake_battery_status = -EINVAL;
 	chip->fake_battery_soc = -EINVAL;
 	chip->usb_online = -EINVAL;
 	dev_set_drvdata(&spmi->dev, chip);
