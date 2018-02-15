@@ -205,8 +205,8 @@
 			};
 			S332U {
 				flash_default_timeout_ms = <20000>;
-				calibrate_on_fwflash = <1>;
-				calibration_supported = <1>;
+				calibrate_on_fwflash = <0>;
+				calibration_supported = <0>;
 				hwreset_delay_for_powerup_ms = <220>;
 				interrupt_default_wait_ms = <1000>;
 				charger_only_delay_ms = <200>;
