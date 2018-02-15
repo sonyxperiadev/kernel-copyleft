@@ -375,10 +375,8 @@ static void diag_glink_notify_rx_work_fn(struct work_struct *work)
 			struct diag_glink_read_work, work);
 	struct diag_glink_info *glink_info = read_work->glink_info;
 
-	if (!glink_info || !glink_info->hdl) {
-		kfree(read_work);
+	if (!glink_info || !glink_info->hdl)
 		return;
-	}
 
 	diagfwd_channel_read_done(glink_info->fwd_ctxt,
 			(unsigned char *)(read_work->ptr_read_done),
@@ -390,7 +388,6 @@ static void diag_glink_notify_rx_work_fn(struct work_struct *work)
 		"diag: Rx done for packet %pK of len: %d periph: %d ch: %d\n",
 		read_work->ptr_rx_done, (int)read_work->ptr_read_size,
 		glink_info->peripheral, glink_info->type);
-	kfree(read_work);
 }
 
 static void diag_glink_notify_rx(void *hdl, const void *priv,
@@ -414,7 +411,6 @@ static void diag_glink_notify_rx(void *hdl, const void *priv,
 	if (!read_work) {
 		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
 			"diag: Could not allocate read_work\n");
-		glink_rx_done(glink_info->hdl, ptr, true);
 		return;
 	}
 

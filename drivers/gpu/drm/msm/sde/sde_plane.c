@@ -34,14 +34,6 @@
 #include "sde_plane.h"
 #include "sde_color_processing.h"
 
-static bool suspend_blank = true;
-module_param(suspend_blank, bool, 0400);
-MODULE_PARM_DESC(suspend_blank,
-		"If set, active planes will force their outputs to black,\n"
-		"by temporarily enabling the color fill, when recovering\n"
-		"from a system resume instead of attempting to display the\n"
-		"last provided frame buffer.");
-
 #define SDE_DEBUG_PLANE(pl, fmt, ...) SDE_DEBUG("plane%d " fmt,\
 		(pl) ? (pl)->base.base.id : -1, ##__VA_ARGS__)
 
@@ -146,7 +138,6 @@ struct sde_plane {
 	struct sde_debugfs_regset32 debugfs_src;
 	struct sde_debugfs_regset32 debugfs_scaler;
 	struct sde_debugfs_regset32 debugfs_csc;
-	bool debugfs_default_scale;
 };
 
 #define to_sde_plane(x) container_of(x, struct sde_plane, base)
@@ -695,19 +686,8 @@ static int _sde_plane_setup_scaler3_lut(struct sde_phy_plane *pp,
 		struct sde_plane_state *pstate)
 {
 	struct sde_plane *psde = pp->sde_plane;
-	struct sde_hw_scaler3_cfg *cfg;
+	struct sde_hw_scaler3_cfg *cfg = pp->scaler3_cfg;
 	int ret = 0;
-
-	if (!pp || !pp->scaler3_cfg) {
-		SDE_ERROR("invalid args\n");
-		return -EINVAL;
-	} else if (!pstate) {
-		/* pstate is expected to be null on forced color fill */
-		SDE_DEBUG("null pstate\n");
-		return -EINVAL;
-	}
-
-	cfg = pp->scaler3_cfg;
 
 	cfg->dir_lut = msm_property_get_blob(
 			&psde->property_info,
@@ -743,7 +723,6 @@ static void _sde_plane_setup_scaler3(struct sde_phy_plane *pp,
 	}
 
 	memset(scale_cfg, 0, sizeof(*scale_cfg));
-	memset(&pp->pixel_ext, 0, sizeof(struct sde_hw_pixel_ext));
 
 	decimated = DECIMATED_DIMENSION(src_w,
 			pp->pipe_cfg.horz_decimation);
@@ -1091,8 +1070,7 @@ static void _sde_plane_setup_scaler(struct sde_phy_plane *pp,
 		int error;
 
 		error = _sde_plane_setup_scaler3_lut(pp, pstate);
-		if (error || !pp->pixel_ext_usr ||
-				psde->debugfs_default_scale) {
+		if (error || !pp->pixel_ext_usr) {
 			memset(pe, 0, sizeof(struct sde_hw_pixel_ext));
 			/* calculate default config for QSEED3 */
 			_sde_plane_setup_scaler3(pp,
@@ -1103,8 +1081,7 @@ static void _sde_plane_setup_scaler(struct sde_phy_plane *pp,
 					pp->scaler3_cfg, fmt,
 					chroma_subsmpl_h, chroma_subsmpl_v);
 		}
-	} else if (!pp->pixel_ext_usr || !pstate ||
-			psde->debugfs_default_scale) {
+	} else if (!pp->pixel_ext_usr) {
 		uint32_t deci_dim, i;
 
 		/* calculate default configuration for QSEED2 */
@@ -1724,8 +1701,8 @@ void sde_plane_flush(struct drm_plane *plane)
 	 */
 	list_for_each_entry(pp, &psde->phy_plane_head, phy_plane_list) {
 		if (psde->is_error)
-		/* force white frame with 100% alpha pipe output on error */
-			_sde_plane_color_fill(pp, 0xFFFFFF, 0xFF);
+		/* force white frame with 0% alpha pipe output on error */
+			_sde_plane_color_fill(pp, 0xFFFFFF, 0x0);
 		else if (pp->color_fill & SDE_PLANE_COLOR_FILL_FLAG)
 			/* force 100% alpha */
 			_sde_plane_color_fill(pp, pp->color_fill, 0xFF);
@@ -1733,10 +1710,6 @@ void sde_plane_flush(struct drm_plane *plane)
 					pp->pipe_hw->ops.setup_csc)
 			pp->pipe_hw->ops.setup_csc(pp->pipe_hw, pp->csc_ptr);
 	}
-
-	/* force black color fill during suspend */
-	if (msm_is_suspend_state(plane->dev) && suspend_blank)
-		_sde_plane_color_fill(pp, 0x0, 0x0);
 
 	/* flag h/w flush complete */
 	if (plane->state)
@@ -2609,10 +2582,6 @@ static void _sde_plane_init_debugfs(struct sde_plane *psde,
 		sde_debugfs_create_regset32("scaler_blk", S_IRUGO,
 				psde->debugfs_root,
 				&psde->debugfs_scaler);
-		debugfs_create_bool("default_scaling",
-				0644,
-				psde->debugfs_root,
-				&psde->debugfs_default_scale);
 
 		sde_debugfs_setup_regset32(&psde->debugfs_csc,
 				sblk->csc_blk.base + cfg->base,
