@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __FG_CORE_H__
 #define __FG_CORE_H__
@@ -94,6 +99,9 @@ enum fg_debug_flag {
 	FG_BUS_READ		= BIT(6), /* Show REGMAP reads */
 	FG_CAP_LEARN		= BIT(7), /* Show capacity learning */
 	FG_TTF			= BIT(8), /* Show time to full */
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	FG_SOMC			= BIT(15),
+#endif
 };
 
 /* SRAM access */
@@ -177,6 +185,12 @@ enum fg_sram_param_id {
 	FG_SRAM_ESR_TIGHT_FILTER,
 	FG_SRAM_ESR_BROAD_FILTER,
 	FG_SRAM_SLOPE_LIMIT,
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	FG_SRAM_SOC_SYSTEM,
+	FG_SRAM_SOC_MONOTONIC,
+	FG_SRAM_SOC_CUTOFF,
+	FG_SRAM_SOC_FULL,
+#endif
 	FG_SRAM_MAX,
 };
 
@@ -278,6 +292,11 @@ struct fg_dt_props {
 	int	ki_coeff_hi_dischg[KI_COEFF_SOC_LEVELS];
 	int	slope_limit_coeffs[SLOPE_LIMIT_NUM_COEFFS];
 	u8	batt_therm_coeffs[BATT_THERM_NUM_COEFFS];
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int	therm_coeff_c1;
+	int	therm_coeff_c2;
+	int	therm_coeff_c3;
+#endif
 };
 
 /* parameters from battery profile */
@@ -306,6 +325,17 @@ struct fg_cap_learning {
 	int64_t		final_cc_uah;
 	int64_t		learned_cc_uah;
 	struct mutex	lock;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int		batt_soc_drop;
+	int		cc_soc_drop;
+	int		max_bsoc_during_active;
+	int		max_ccsoc_during_active;
+	s64		max_bsoc_time_ms;
+	s64		start_time_ms;
+	s64		hold_time;
+	s64		total_time;
+	s64		learned_time_ms;
+#endif
 };
 
 struct fg_irq_info {
@@ -369,6 +399,15 @@ static const struct fg_pt fg_tsmc_osc_table[] = {
 	{  80,		439475 },
 	{  90,		444992 },
 };
+
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define ORG_BATT_TYPE_SIZE	9
+#define BATT_TYPE_SIZE		(ORG_BATT_TYPE_SIZE + 2)
+#define BATT_TYPE_FIRST_HYPHEN	4
+#define BATT_TYPE_SECOND_HYPHEN	9
+#define BATT_TYPE_AGING_LEVEL	10
+
+#endif
 
 struct fg_chip {
 	struct device		*dev;
@@ -440,6 +479,21 @@ struct fg_chip {
 	struct work_struct	status_change_work;
 	struct delayed_work	ttf_work;
 	struct delayed_work	sram_dump_work;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	/* Learning */
+	int64_t			charge_full_raw;
+	int			rated_capacity;
+	int			initial_capacity;
+
+	/* Soft Charge */
+	int			batt_aging_level;
+	int			saved_batt_aging_level;
+	char			org_batt_type_str[ORG_BATT_TYPE_SIZE + 1];
+
+	/* Recharge */
+	bool			recharge_starting;
+	int			recharge_voltage_mv;
+#endif
 };
 
 /* Debugfs data structures are below */
