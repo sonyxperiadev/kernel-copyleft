@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef WCD_CPE_CORE_H
 #define WCD_CPE_CORE_H
@@ -95,6 +100,9 @@ struct wcd_cpe_ssr_entry {
 	int offline;
 	u32 offline_change;
 	wait_queue_head_t offline_poll_wait;
+	int err_status;
+	int err_data_ready;
+	wait_queue_head_t err_status_debug_q;
 	struct snd_info_entry *entry;
 };
 
