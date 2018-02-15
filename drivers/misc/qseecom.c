@@ -11,6 +11,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "QSEECOM: %s: " fmt, __func__
 
@@ -2598,6 +2603,11 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 
 	if (!memcmp(data->client.app_name, "keymaste", strlen("keymaste"))) {
 		pr_debug("Do not unload keymaster app from tz\n");
+		goto unload_exit;
+	}
+
+	if (!memcmp(data->client.app_name, "tzxflattest", strlen("tzxflattest"))) {
+		pr_debug("Do not unload tzxflattest app from tz\n");
 		goto unload_exit;
 	}
 
@@ -8434,10 +8444,9 @@ out:
  */
 static int qseecom_check_whitelist_feature(void)
 {
-	u64 version = 0;
-	int ret = scm_get_feat_version(FEATURE_ID_WHITELIST, &version);
+	int version = scm_get_feat_version(FEATURE_ID_WHITELIST);
 
-	return (ret == 0) && (version >= MAKE_WHITELIST_VERSION(1, 0, 0));
+	return version >= MAKE_WHITELIST_VERSION(1, 0, 0);
 }
 
 static int qseecom_probe(struct platform_device *pdev)

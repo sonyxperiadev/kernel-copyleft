@@ -5,6 +5,11 @@
  * Copyright 2013-2014  Intel Mobile Communications GmbH
  * Copyright 2015	Intel Deutschland GmbH
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/if.h>
 #include <linux/module.h>
@@ -302,7 +307,8 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_WPA_VERSIONS] = { .type = NLA_U32 },
 	[NL80211_ATTR_PID] = { .type = NLA_U32 },
 	[NL80211_ATTR_4ADDR] = { .type = NLA_U8 },
-	[NL80211_ATTR_PMKID] = { .len = WLAN_PMKID_LEN },
+	[NL80211_ATTR_PMKID] = { .type = NLA_BINARY,
+				 .len = WLAN_PMKID_LEN },
 	[NL80211_ATTR_DURATION] = { .type = NLA_U32 },
 	[NL80211_ATTR_COOKIE] = { .type = NLA_U64 },
 	[NL80211_ATTR_TX_RATES] = { .type = NLA_NESTED },
@@ -358,7 +364,6 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_SCAN_FLAGS] = { .type = NLA_U32 },
 	[NL80211_ATTR_P2P_CTWINDOW] = { .type = NLA_U8 },
 	[NL80211_ATTR_P2P_OPPPS] = { .type = NLA_U8 },
-	[NL80211_ATTR_LOCAL_MESH_POWER_MODE] = {. type = NLA_U32 },
 	[NL80211_ATTR_ACL_POLICY] = {. type = NLA_U32 },
 	[NL80211_ATTR_MAC_ADDRS] = { .type = NLA_NESTED },
 	[NL80211_ATTR_STA_CAPABILITY] = { .type = NLA_U16 },
@@ -4019,11 +4024,9 @@ static bool nl80211_put_sta_rate(struct sk_buff *msg, struct rate_info *info,
 	bitrate = cfg80211_calculate_bitrate(info);
 	/* report 16-bit bitrate only if we can */
 	bitrate_compat = bitrate < (1UL << 16) ? bitrate : 0;
-	if (bitrate > 0 &&
-	    nla_put_u32(msg, NL80211_RATE_INFO_BITRATE32, bitrate))
+	if (nla_put_u32(msg, NL80211_RATE_INFO_BITRATE32, bitrate))
 		return false;
-	if (bitrate_compat > 0 &&
-	    nla_put_u16(msg, NL80211_RATE_INFO_BITRATE, bitrate_compat))
+	if (nla_put_u16(msg, NL80211_RATE_INFO_BITRATE, bitrate_compat))
 		return false;
 
 	switch (info->bw) {
@@ -6123,10 +6126,6 @@ static int validate_scan_freqs(struct nlattr *freqs)
 {
 	struct nlattr *attr1, *attr2;
 	int n_channels = 0, tmp1, tmp2;
-
-	nla_for_each_nested(attr1, freqs, tmp1)
-		if (nla_len(attr1) != sizeof(u32))
-			return 0;
 
 	nla_for_each_nested(attr1, freqs, tmp1) {
 		n_channels++;

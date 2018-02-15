@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -537,41 +537,12 @@ static int a5xx_preemption_iommu_init(struct adreno_device *adreno_dev)
 		KGSL_MEMFLAGS_GPUREADONLY, KGSL_MEMDESC_PRIVILEGED,
 		"smmu_info");
 }
-
-static void a5xx_preemption_iommu_close(struct adreno_device *adreno_dev)
-{
-	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
-	struct kgsl_iommu *iommu = KGSL_IOMMU_PRIV(device);
-
-	kgsl_free_global(device, &iommu->smmu_info);
-}
-
 #else
 static int a5xx_preemption_iommu_init(struct adreno_device *adreno_dev)
 {
 	return -ENODEV;
 }
-
-static void a5xx_preemption_iommu_close(struct adreno_device *adreno_dev)
-{
-}
 #endif
-
-static void a5xx_preemption_close(struct kgsl_device *device)
-{
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
-	struct adreno_preemption *preempt = &adreno_dev->preempt;
-	struct adreno_ringbuffer *rb;
-	unsigned int i;
-
-	del_timer(&preempt->timer);
-	kgsl_free_global(device, &preempt->counters);
-	a5xx_preemption_iommu_close(adreno_dev);
-
-	FOR_EACH_RINGBUFFER(adreno_dev, rb, i) {
-		kgsl_free_global(device, &rb->preemption_desc);
-	}
-}
 
 int a5xx_preemption_init(struct adreno_device *adreno_dev)
 {
@@ -597,7 +568,7 @@ int a5xx_preemption_init(struct adreno_device *adreno_dev)
 		A5XX_CP_CTXRECORD_PREEMPTION_COUNTER_SIZE, 0, 0,
 		"preemption_counters");
 	if (ret)
-		goto err;
+		return ret;
 
 	addr = preempt->counters.gpuaddr;
 
@@ -605,16 +576,10 @@ int a5xx_preemption_init(struct adreno_device *adreno_dev)
 	FOR_EACH_RINGBUFFER(adreno_dev, rb, i) {
 		ret = a5xx_preemption_ringbuffer_init(adreno_dev, rb, addr);
 		if (ret)
-			goto err;
+			return ret;
 
 		addr += A5XX_CP_CTXRECORD_PREEMPTION_COUNTER_SIZE;
 	}
 
-	ret = a5xx_preemption_iommu_init(adreno_dev);
-
-err:
-	if (ret)
-		a5xx_preemption_close(device);
-
-	return ret;
+	return a5xx_preemption_iommu_init(adreno_dev);
 }

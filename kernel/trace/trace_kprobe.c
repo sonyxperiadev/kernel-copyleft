@@ -659,25 +659,30 @@ static int create_trace_kprobe(int argc, char **argv)
 		pr_info("Probe point is not specified.\n");
 		return -EINVAL;
 	}
-
-	/* try to parse an address. if that fails, try to read the
-	 * input as a symbol. */
-	if (kstrtoul(argv[1], 0, (unsigned long *)&addr)) {
+	if (isdigit(argv[1][0])) {
+		if (is_return) {
+			pr_info("Return probe point must be a symbol.\n");
+			return -EINVAL;
+		}
+		/* an address specified */
+		ret = kstrtoul(&argv[1][0], 0, (unsigned long *)&addr);
+		if (ret) {
+			pr_info("Failed to parse address.\n");
+			return ret;
+		}
+	} else {
 		/* a symbol specified */
 		symbol = argv[1];
 		/* TODO: support .init module functions */
 		ret = traceprobe_split_symbol_offset(symbol, &offset);
 		if (ret) {
-			pr_info("Failed to parse either an address or a symbol.\n");
+			pr_info("Failed to parse symbol.\n");
 			return ret;
 		}
 		if (offset && is_return) {
 			pr_info("Return probe must be used without offset.\n");
 			return -EINVAL;
 		}
-	} else if (is_return) {
-		pr_info("Return probe point must be a symbol.\n");
-		return -EINVAL;
 	}
 	argc -= 2; argv += 2;
 

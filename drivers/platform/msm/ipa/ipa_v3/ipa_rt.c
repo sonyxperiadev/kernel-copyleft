@@ -1479,7 +1479,7 @@ int ipa3_put_rt_tbl(u32 rt_tbl_hdl)
 {
 	struct ipa3_rt_tbl *entry;
 	enum ipa_ip_type ip = IPA_IP_MAX;
-	int result = 0;
+	int result;
 
 	mutex_lock(&ipa3_ctx->lock);
 	entry = ipa3_id_find(rt_tbl_hdl);
@@ -1501,7 +1501,6 @@ int ipa3_put_rt_tbl(u32 rt_tbl_hdl)
 		ip = IPA_IP_v6;
 	else {
 		WARN_ON(1);
-		result = -EINVAL;
 		goto ret;
 	}
 

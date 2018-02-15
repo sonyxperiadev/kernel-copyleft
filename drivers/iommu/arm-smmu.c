@@ -1727,8 +1727,7 @@ static void arm_smmu_pgtbl_unlock(struct arm_smmu_domain *smmu_domain,
 
 static int arm_smmu_restore_sec_cfg(struct arm_smmu_device *smmu)
 {
-	int ret;
-	u64 scm_ret;
+	int ret, scm_ret;
 
 	if (!arm_smmu_is_static_cb(smmu))
 		return 0;

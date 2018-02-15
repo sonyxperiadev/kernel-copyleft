@@ -156,13 +156,10 @@ struct hdmi_edid_ctrl {
 };
 
 static bool hdmi_edid_is_mode_supported(struct hdmi_edid_ctrl *edid_ctrl,
-		struct msm_hdmi_mode_timing_info *timing, u32 out_format)
+			struct msm_hdmi_mode_timing_info *timing)
 {
-	u32 pclk = hdmi_tx_setup_tmds_clk_rate(timing->pixel_freq,
-		out_format, false);
-
 	if (!timing->supported ||
-		pclk > edid_ctrl->init_data.max_pclk_khz)
+		timing->pixel_freq > edid_ctrl->init_data.max_pclk_khz)
 		return false;
 
 	return true;
@@ -939,8 +936,7 @@ static void hdmi_edid_add_sink_y420_format(struct hdmi_edid_ctrl *edid_ctrl,
 	u32 ret = hdmi_get_supported_mode(&timing,
 				&edid_ctrl->init_data.ds_data,
 				video_format);
-	u32 supported = hdmi_edid_is_mode_supported(edid_ctrl,
-				&timing, MDP_Y_CBCR_H2V2);
+	u32 supported = hdmi_edid_is_mode_supported(edid_ctrl, &timing);
 	struct hdmi_edid_sink_data *sink = &edid_ctrl->sink_data;
 
 	if (video_format >= HDMI_VFRMT_MAX) {
@@ -1708,8 +1704,7 @@ static void hdmi_edid_add_sink_video_format(struct hdmi_edid_ctrl *edid_ctrl,
 	u32 ret = hdmi_get_supported_mode(&timing,
 				&edid_ctrl->init_data.ds_data,
 				video_format);
-	u32 supported = hdmi_edid_is_mode_supported(edid_ctrl,
-				&timing, MDP_RGBA_8888);
+	u32 supported = hdmi_edid_is_mode_supported(edid_ctrl, &timing);
 	struct hdmi_edid_sink_data *sink_data = &edid_ctrl->sink_data;
 	struct disp_mode_info *disp_mode_list = sink_data->disp_mode_list;
 	u32 i = 0;

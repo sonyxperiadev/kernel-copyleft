@@ -19,6 +19,11 @@
  *  Adaptive scheduling granularity, math enhancements by Peter Zijlstra
  *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/latencytop.h>
 #include <linux/sched.h>
@@ -2747,6 +2752,7 @@ static u32 __compute_runnable_contrib(u64 n)
 #define SBC_FLAG_BEST_SIBLING				0x200
 #define SBC_FLAG_WAKER_CPU				0x400
 #define SBC_FLAG_PACK_TASK				0x800
+#define SBC_FLAG_SKIP_RT_TASK				0x1000
 
 /* Cluster selection flag */
 #define SBC_FLAG_COLOC_CLUSTER				0x10000
@@ -2983,10 +2989,11 @@ struct cpu_select_env *env, struct cluster_cpu_stats *stats)
 
 		cpumask_and(&search_cpus, &env->search_cpus, &next->cpus);
 		for_each_cpu(i, &search_cpus) {
-			trace_sched_cpu_load_wakeup(cpu_rq(i), idle_cpu(i),
-			sched_irqload(i), power_cost(i, task_load(env->p) +
-					cpu_cravg_sync(i, env->sync)), 0);
-
+			if (trace_sched_cpu_load_wakeup_enabled()) {
+				trace_sched_cpu_load_wakeup(cpu_rq(i), idle_cpu(i),
+				sched_irqload(i), power_cost(i, task_load(env->p) +
+						cpu_cravg_sync(i, env->sync)), 0);
+			}
 			update_spare_capacity(stats, env, i, next->capacity,
 					  cpu_load_sync(i, env->sync));
 		}
@@ -3027,6 +3034,17 @@ next_best_cluster(struct sched_cluster *cluster, struct cpu_select_env *env,
 	return next;
 }
 
+/*
+ * Returns true, if a current task has RT/DL class:
+ * SCHED_FIFO + SCHED_RR + SCHED_DEADLINE
+ */
+static inline int
+is_current_high_prio_class_task(int cpu)
+{
+	struct task_struct *curr = READ_ONCE(cpu_rq(cpu)->curr);
+	return (task_has_rt_policy(curr) | task_has_dl_policy(curr));
+}
+
 #ifdef CONFIG_SCHED_HMP_CSTATE_AWARE
 static void __update_cluster_stats(int cpu, struct cluster_cpu_stats *stats,
 				   struct cpu_select_env *env, int cpu_cost)
@@ -3065,6 +3083,25 @@ static void __update_cluster_stats(int cpu, struct cluster_cpu_stats *stats,
 		env->sbc_best_flag = SBC_FLAG_CPU_COST;
 		return;
 	}
+
+	/*
+	 * We try to escape of selecting CPUs with running RT
+	 * class tasks, if a power coast is the same. A reason
+	 * is to reduce a latency, since RT task may not be
+	 * preempted for a long time.
+	 */
+	if (is_current_high_prio_class_task(stats->best_cpu) &&
+			!is_current_high_prio_class_task(cpu)) {
+		stats->best_cpu_wakeup_latency = wakeup_latency;
+		stats->best_load = env->cpu_load;
+		stats->best_cpu = cpu;
+		env->sbc_best_flag = SBC_FLAG_SKIP_RT_TASK;
+		return;
+	}
+
+	if (!is_current_high_prio_class_task(stats->best_cpu) &&
+			is_current_high_prio_class_task(cpu))
+		return;
 
 	/* CPU cost is the same. Start breaking the tie by C-state */
 
@@ -3160,12 +3197,12 @@ static void find_best_cpu_in_cluster(struct sched_cluster *c,
 
 	for_each_cpu(i, &search_cpus) {
 		env->cpu_load = cpu_load_sync(i, env->sync);
-
-		trace_sched_cpu_load_wakeup(cpu_rq(i), idle_cpu(i),
-			sched_irqload(i),
-			power_cost(i, task_load(env->p) +
-					cpu_cravg_sync(i, env->sync)), 0);
-
+		if (trace_sched_cpu_load_wakeup_enabled()) {
+			trace_sched_cpu_load_wakeup(cpu_rq(i), idle_cpu(i),
+				sched_irqload(i),
+				power_cost(i, task_load(env->p) +
+						cpu_cravg_sync(i, env->sync)), 0);
+		}
 		if (skip_cpu(i, env))
 			continue;
 
@@ -5251,10 +5288,12 @@ static void throttle_cfs_rq(struct cfs_rq *cfs_rq)
 	raw_spin_unlock(&cfs_b->lock);
 
 	/* Log effect on hmp stats after throttling */
-	trace_sched_cpu_load_cgroup(rq, idle_cpu(cpu_of(rq)),
-			     sched_irqload(cpu_of(rq)),
-			     power_cost(cpu_of(rq), 0),
-			     cpu_temp(cpu_of(rq)));
+	if (trace_sched_cpu_load_cgroup_enabled()) {
+		trace_sched_cpu_load_cgroup(rq, idle_cpu(cpu_of(rq)),
+			sched_irqload(cpu_of(rq)),
+			power_cost(cpu_of(rq), 0),
+			cpu_temp(cpu_of(rq)));
+	}
 }
 
 void unthrottle_cfs_rq(struct cfs_rq *cfs_rq)
@@ -5308,10 +5347,12 @@ void unthrottle_cfs_rq(struct cfs_rq *cfs_rq)
 		resched_curr(rq);
 
 	/* Log effect on hmp stats after un-throttling */
-	trace_sched_cpu_load_cgroup(rq, idle_cpu(cpu_of(rq)),
-			     sched_irqload(cpu_of(rq)),
-			     power_cost(cpu_of(rq), 0),
-			     cpu_temp(cpu_of(rq)));
+	if (trace_sched_cpu_load_cgroup_enabled()) {
+		trace_sched_cpu_load_cgroup(rq, idle_cpu(cpu_of(rq)),
+			sched_irqload(cpu_of(rq)),
+			power_cost(cpu_of(rq), 0),
+			cpu_temp(cpu_of(rq)));
+	}
 }
 
 static u64 distribute_cfs_runtime(struct cfs_bandwidth *cfs_b,
@@ -5887,6 +5928,10 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se) {
 		add_nr_running(rq, 1);
+
+		if (unlikely(p->nr_cpus_allowed == 1))
+			rq->nr_pinned_tasks++;
+
 		inc_rq_hmp_stats(rq, p, 1);
 	}
 
@@ -5993,6 +6038,10 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se) {
 		sub_nr_running(rq, 1);
+
+		if (unlikely(p->nr_cpus_allowed == 1))
+			rq->nr_pinned_tasks--;
+
 		dec_rq_hmp_stats(rq, p, 1);
 	}
 
@@ -8537,6 +8586,14 @@ redo:
 		if (env->idle != CPU_NOT_IDLE && env->src_rq->nr_running <= 1)
 			break;
 
+		/*
+		 * Another CPU can place tasks, since we do not hold dst_rq lock
+		 * while doing balancing. If newly idle CPU already got something,
+		 * give up to reduce a latency.
+		 */
+		if (env->idle == CPU_NEWLY_IDLE && env->dst_rq->nr_running > 0)
+			break;
+
 		p = list_first_entry(tasks, struct task_struct, se.group_node);
 
 		env->loop++;
@@ -8559,8 +8616,9 @@ redo:
 		if (sched_feat(LB_MIN) && load < 16 && !env->sd->nr_balance_failed)
 			goto next;
 
-		if ((load / 2) > env->imbalance)
-			goto next;
+		if (env->idle != CPU_NEWLY_IDLE)
+			if ((load / 2) > env->imbalance)
+				goto next;
 
 		detach_task(p, env);
 		list_add(&p->se.group_node, &env->tasks);
@@ -9212,11 +9270,12 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 	for_each_cpu_and(i, sched_group_cpus(group), env->cpus) {
 		struct rq *rq = cpu_rq(i);
 
-		trace_sched_cpu_load_lb(cpu_rq(i), idle_cpu(i),
-				     sched_irqload(i),
-				     power_cost(i, 0),
-				     cpu_temp(i));
-
+		if (trace_sched_cpu_load_lb_enabled()) {
+			trace_sched_cpu_load_lb(cpu_rq(i), idle_cpu(i),
+				sched_irqload(i),
+				power_cost(i, 0),
+				cpu_temp(i));
+		}
 		if (cpu_isolated(i))
 			continue;
 
@@ -9336,6 +9395,15 @@ static bool update_sd_pick_busiest(struct lb_env *env,
 	if (sgs->group_type < busiest->group_type)
 		return false;
 
+	if (sgs->avg_load <= busiest->avg_load)
+		return false;
+
+	/*
+	 * Group has no more than one task per CPU
+	 */
+	if (sgs->sum_nr_running <= sgs->group_weight)
+		return false;
+
 	if (energy_aware()) {
 		/*
 		 * Candidate sg doesn't face any serious load-balance problems
@@ -9343,9 +9411,6 @@ static bool update_sd_pick_busiest(struct lb_env *env,
 		 */
 		if (sgs->group_type == group_other &&
 		    !group_has_capacity(env, &sds->local_stat))
-			return false;
-
-		if (sgs->avg_load <= busiest->avg_load)
 			return false;
 
 		if (!(env->sd->flags & SD_ASYM_CPUCAPACITY))
@@ -10159,7 +10224,6 @@ redo:
 		 * correctly treated as an imbalance.
 		 */
 		env.flags |= LBF_ALL_PINNED;
-		env.loop_max  = min(sysctl_sched_nr_migrate, busiest->nr_running);
 
 more_balance:
 		raw_spin_lock_irqsave(&busiest->lock, flags);
@@ -10170,6 +10234,12 @@ more_balance:
 			env.flags &= ~LBF_ALL_PINNED;
 			goto no_move;
 		}
+
+		/*
+		 * Set loop_max when rq's lock is taken to prevent a race.
+		 */
+		env.loop_max = min(sysctl_sched_nr_migrate,
+							busiest->cfs.h_nr_running);
 
 		/*
 		 * cur_ld_moved - load moved in current iteration
@@ -10654,8 +10724,6 @@ out_unlock:
 	if (p)
 		attach_one_task(target_rq, p);
 
-	local_irq_enable();
-
 	if (moved && !same_freq_domain(busiest_cpu, target_cpu)) {
 		int check_groups = !!(env.flags &
 					 LBF_MOVED_RELATED_THREAD_GROUP_TASK);
@@ -10664,6 +10732,8 @@ out_unlock:
 	} else if (moved) {
 		check_for_freq_change(target_rq, true, false);
 	}
+
+	local_irq_enable();
 
 	return 0;
 }
@@ -11057,6 +11127,22 @@ static inline int _nohz_kick_needed_hmp(struct rq *rq, int cpu, int *type)
 	if (!sysctl_sched_restrict_cluster_spill ||
 			sched_boost_policy() == SCHED_BOOST_ON_ALL)
 		return 1;
+
+	if (unlikely(rq->nr_pinned_tasks > 0)) {
+		int delta = rq->nr_running - rq->nr_pinned_tasks;
+
+		/*
+		 * Check if it is possible to "unload" this CPU in case
+		 * of having pinned/affine tasks. Do not disturb idle
+		 * core if one of the below condition is true:
+		 *
+		 * - there is one pinned task and it is not "current"
+		 * - all tasks are pinned to this CPU
+		 */
+		if (delta < 2)
+			if (current->nr_cpus_allowed > 1 || !delta)
+				return 0;
+	}
 
 	if (cpu_max_power_cost(cpu) == max_power_cost)
 		return 1;
