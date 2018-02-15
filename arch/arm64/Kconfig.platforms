@@ -77,6 +77,51 @@ config ARCH_MSM8998
 	This enables support for the MSM8998 chipset. If you do not
 	wish to build a kernel that runs on this chipset, say 'N' here.
 
+config ARCH_SONY_YOSHINO
+        bool "Sony Mobile Yoshino platform"
+	depends on ARCH_MSM8998
+	help
+	Support for the SONY Mobile Yoshino platform
+	which is based on QCOM MSM8998 chipset.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_POPLAR
+	bool "Sony Mobile Poplar"
+	depends on ARCH_SONY_YOSHINO
+	help
+	Support for the SONY Mobile Poplar device
+	which is based on SONY Yoshino platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_POPLAR_DSDS
+	bool "Sony Mobile Poplar Dsds"
+	depends on ARCH_SONY_YOSHINO
+	help
+	Support for the SONY Mobile Poplar Dsds device
+	which is based on SONY Yoshino platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_POPLAR_SBM
+	bool "Sony Mobile Poplar SoftBank"
+	depends on ARCH_SONY_YOSHINO
+	help
+	Support for the SONY Mobile Poplar SoftBank device
+	which is based on SONY Yoshino platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_LILAC
+	bool "Sony Mobile Lilac"
+	depends on ARCH_SONY_YOSHINO
+	help
+	Support for the SONY Mobile Lilac device
+	which is based on SONY Yoshino platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
 config ARCH_MSMHAMSTER
 	bool "Enable Support for Qualcomm Technologies Inc MSMHAMSTER"
 	depends on ARCH_QCOM

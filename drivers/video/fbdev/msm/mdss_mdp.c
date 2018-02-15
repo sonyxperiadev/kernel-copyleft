@@ -13,6 +13,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -1797,8 +1802,7 @@ static inline int mdss_mdp_irq_clk_register(struct mdss_data_type *mdata,
 
 static void __mdss_restore_sec_cfg(struct mdss_data_type *mdata)
 {
-	int ret;
-	u64 scm_ret = 0;
+	int ret, scm_ret = 0;
 
 	if (test_bit(MDSS_CAPS_SCM_RESTORE_NOT_REQUIRED, mdata->mdss_caps_map))
 		return;
@@ -1809,7 +1813,7 @@ static void __mdss_restore_sec_cfg(struct mdss_data_type *mdata)
 
 	ret = scm_restore_sec_cfg(SEC_DEVICE_MDSS, 0, &scm_ret);
 	if (ret || scm_ret)
-		pr_warn("scm_restore_sec_cfg failed %d %llu\n",
+		pr_warn("scm_restore_sec_cfg failed %d %d\n",
 				ret, scm_ret);
 
 	__mdss_mdp_reg_access_clk_enable(mdata, false);
@@ -2591,6 +2595,7 @@ static int mdss_mdp_get_cmdline_config(struct platform_device *pdev)
 
 	len = strlen(mdss_mdp_panel);
 
+	len = 0; /* temporary */
 	if (len > 0) {
 		rc = mdss_mdp_get_pan_cfg(pan_cfg);
 		if (!rc) {

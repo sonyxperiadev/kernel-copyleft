@@ -636,7 +636,7 @@ repeat:
 		case -1:
 			if (errno == EINTR)
 				continue;
-			__fallthrough;
+			/* Fall trhu */
 		default:
 			c = getc(stdin);
 			tcsetattr(0, TCSAFLUSH, &save);

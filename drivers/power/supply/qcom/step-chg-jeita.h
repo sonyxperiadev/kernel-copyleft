@@ -12,6 +12,6 @@
 
 #ifndef __STEP_CHG_H__
 #define __STEP_CHG_H__
-int qcom_step_chg_init(bool, bool);
+int qcom_step_chg_init(bool);
 void qcom_step_chg_deinit(void);
 #endif /* __STEP_CHG_H__ */

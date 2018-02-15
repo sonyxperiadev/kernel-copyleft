@@ -1668,7 +1668,7 @@ static int msm_pcm_playback_pan_scale_ctl_put(struct snd_kcontrol *kcontrol,
 		for (i = 0; i < pan_param.num_output_channels *
 			pan_param.num_input_channels; i++) {
 			pan_param.gain[i] =
-				!(ucontrol->value.integer.value[len++] > 0) ?
+			!(ucontrol->value.integer.value[len++] > 0) ?
 				0 : 2 << 13;
 		}
 	}
@@ -1679,12 +1679,8 @@ static int msm_pcm_playback_pan_scale_ctl_put(struct snd_kcontrol *kcontrol,
 	       pan_param.num_input_channels;
 	for (i = 0; i < pan_param.num_output_channels *
 		pan_param.num_input_channels; i++) {
-		/*
-		 * The data userspace passes is already in Q14 format.
-		 * For volume gain is in Q28.
-		 */
 		pan_param.gain[i] =
-				ucontrol->value.integer.value[len++] << 14;
+				ucontrol->value.integer.value[len++];
 	}
 	ret = q6asm_set_vol_ctrl_gain_pair(prtd->audio_client,
 					   &pan_param);
@@ -1757,7 +1753,7 @@ static int msm_pcm_playback_dnmix_ctl_put(struct snd_kcontrol *kcontrol,
 	struct msm_audio *prtd;
 	struct asm_stream_pan_ctrl_params dnmix_param;
 
-	int be_id = ucontrol->value.integer.value[len++];
+	int be_id = ucontrol->value.integer.value[len];
 	int stream_id = 0;
 
 	if (!usr_info) {
@@ -1813,7 +1809,7 @@ static int msm_pcm_playback_dnmix_ctl_put(struct snd_kcontrol *kcontrol,
 		for (i = 0; i < dnmix_param.num_output_channels *
 				dnmix_param.num_input_channels; i++) {
 			dnmix_param.gain[i] =
-					ucontrol->value.integer.value[len++];
+				ucontrol->value.integer.value[len++];
 		}
 	}
 	msm_routing_set_downmix_control_data(be_id,

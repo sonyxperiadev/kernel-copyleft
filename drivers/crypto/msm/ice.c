@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -975,8 +980,7 @@ static int qcom_ice_secure_ice_init(struct ice_device *ice_dev)
 
 static int qcom_ice_update_sec_cfg(struct ice_device *ice_dev)
 {
-	int ret = 0;
-	u64 scm_ret = 0;
+	int ret = 0, scm_ret = 0;
 
 	/* scm command buffer structure */
 	struct qcom_scm_cmd_buf {
@@ -1002,7 +1006,7 @@ static int qcom_ice_update_sec_cfg(struct ice_device *ice_dev)
 	cbuf.device_id = ICE_TZ_DEV_ID;
 	ret = scm_restore_sec_cfg(cbuf.device_id, cbuf.spare, &scm_ret);
 	if (ret || scm_ret) {
-		pr_err("%s: failed, ret %d scm_ret %llu\n",
+		pr_err("%s: failed, ret %d scm_ret %d\n",
 						__func__, ret, scm_ret);
 		if (!ret)
 			ret = scm_ret;

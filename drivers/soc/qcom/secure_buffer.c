@@ -424,14 +424,13 @@ const char *msm_secure_vmid_to_string(int secure_vmid)
 
 bool msm_secure_v2_is_supported(void)
 {
-	u64 version;
-	int ret = scm_get_feat_version(FEATURE_ID_CP, &version);
+	int version = scm_get_feat_version(FEATURE_ID_CP);
 
 	/*
 	 * if the version is < 1.1.0 then dynamic buffer allocation is
 	 * not supported
 	 */
-	return (ret == 0) && (version >= MAKE_CP_VERSION(1, 1, 0));
+	return version >= MAKE_CP_VERSION(1, 1, 0);
 }
 
 static int __init alloc_secure_shared_memory(void)
