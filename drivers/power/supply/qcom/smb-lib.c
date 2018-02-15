@@ -4411,6 +4411,19 @@ irqreturn_t smblib_handle_usb_source_change(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+static void smblib_somc_typec_cur_source(struct smb_charger *chg, bool en180UA)
+{
+	int rc;
+	/* change CUR_SOURCE to advertise current */
+	rc = smblib_masked_write(chg, TYPE_C_CFG_2_REG,
+				EN_80UA_180UA_CUR_SOURCE_BIT,
+				en180UA ? EN_80UA_180UA_CUR_SOURCE_BIT: 0);
+	if (rc < 0)
+		dev_err(chg->dev, "Couldn't change cur source rc=%d\n", rc);
+}
+
+#endif
 static void typec_sink_insertion(struct smb_charger *chg)
 {
 	/* when a sink is inserted we should not wait on hvdcp timeout to
@@ -4418,6 +4431,9 @@ static void typec_sink_insertion(struct smb_charger *chg)
 	 */
 	vote(chg->pd_disallowed_votable_indirect, HVDCP_TIMEOUT_VOTER,
 			false, 0);
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	smblib_somc_typec_cur_source(chg, false);
+#endif
 }
 
 static void typec_sink_removal(struct smb_charger *chg)
@@ -4425,6 +4441,9 @@ static void typec_sink_removal(struct smb_charger *chg)
 	smblib_set_charge_param(chg, &chg->param.freq_boost,
 			chg->chg_freq.freq_above_otg_threshold);
 	chg->boost_current_ua = 0;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	smblib_somc_typec_cur_source(chg, true);
+#endif
 }
 
 static void smblib_handle_typec_removal(struct smb_charger *chg)
