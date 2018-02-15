@@ -8,6 +8,11 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /* #define VERBOSE_DEBUG */
 
@@ -35,8 +40,7 @@
 	(speed == USB_SPEED_SUPER ?\
 	SSUSB_GADGET_VBUS_DRAW : CONFIG_USB_GADGET_VBUS_DRAW)
 
-/* disable LPM by default */
-static bool disable_l1_for_hs = true;
+static bool disable_l1_for_hs;
 module_param(disable_l1_for_hs, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(disable_l1_for_hs,
 	"Disable support for L1 LPM for HS devices");
@@ -1691,9 +1695,9 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				value = min(w_length, (u16) value);
 			break;
 		case USB_DT_BOS:
-			if ((gadget_is_superspeed(gadget) &&
-				(gadget->speed >= USB_SPEED_SUPER))
-				 || !disable_l1_for_hs) {
+			if (gadget_is_superspeed(gadget) &&
+				((gadget->speed >= USB_SPEED_SUPER)
+				 || !disable_l1_for_hs)) {
 				value = bos_desc(cdev);
 				value = min(w_length, (u16) value);
 			}
