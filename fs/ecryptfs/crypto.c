@@ -22,6 +22,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/fs.h>
 #include <linux/mount.h>
@@ -144,6 +149,13 @@ static int ecryptfs_crypto_api_algify_cipher_name(char **algified_name,
 	int chaining_modifier_len = strlen(chaining_modifier);
 	int algified_name_len;
 	int rc;
+
+	if (!strncmp(cipher_name, "aes", sizeof("aes")) &&
+	    (!strncmp(chaining_modifier, "cbc", sizeof("cbc")) ||
+	     !strncmp(chaining_modifier, "xts", sizeof("xts")))) {
+		cipher_name = "fipsaes";
+		cipher_name_len = strnlen(cipher_name, sizeof("fipsaes"));
+	}
 
 	algified_name_len = (chaining_modifier_len + cipher_name_len + 3);
 	(*algified_name) = kmalloc(algified_name_len, GFP_KERNEL);

@@ -103,6 +103,15 @@ config INPUT_E3X0_BUTTON
 	  To compile this driver as a module, choose M here: the
 	  module will be called e3x0_button.
 
+config INPUT_BU520X1NVX
+	tristate "BU520X1NVX driver support"
+	default n
+	help
+	  Say Y here
+	  if you want to
+	  support BU520X1NVX
+	  as bipolar detection device.
+
 config INPUT_HBTP_INPUT
 	tristate "HBTP input driver support"
 	help
@@ -843,5 +852,33 @@ config INPUT_STMVL53L0
 
 	 To compile this driver as a module, choose M here: the
 	 module will be called stmvl53l0.
+
+config FPC1145_PLATFORM
+	tristate "Platform FPC1145 finger print driver"
+	default n
+	help
+	  Select this module to enable FPC1145 tee finger print driver
+
+config INPUT_ADUX1050
+	tristate "ADUX1050 sensor support"
+	depends on I2C=y
+	help
+	  Say Y here if you have ADUX1050 hooked to an I2C bus.
+	  To compile this driver as a module, choose M here:
+	  The module will be called adux1050.ko
+
+config ADUX1050_DEBUG
+	bool " Debug :To enable the Basic debug support for the driver"
+	depends on INPUT_ADUX1050
+	default n
+	help
+	  To add the basic debug support of the driver in the build. Used in printing the debug information on the console.
+
+config ADUX1050_EVAL
+	bool "Eval : To enable the driver in evaluation mode for test "
+	depends on INPUT_ADUX1050
+	default n
+	help
+	  To use the generic sysfs path and modifications for the control attributes.
 
 endif
