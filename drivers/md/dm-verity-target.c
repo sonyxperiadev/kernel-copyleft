@@ -13,12 +13,21 @@
  * are on the same disk on different partitions on devices with poor random
  * access behavior.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "dm-verity.h"
 #include "dm-verity-fec.h"
 
 #include <linux/module.h>
 #include <linux/reboot.h>
+
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
 
 #define DM_MSG_PREFIX			"verity"
 
@@ -38,6 +47,11 @@
 static unsigned dm_verity_prefetch_cluster = DM_VERITY_DEFAULT_PREFETCH_SIZE;
 
 module_param_named(prefetch_cluster, dm_verity_prefetch_cluster, uint, S_IRUGO | S_IWUSR);
+
+#ifdef CONFIG_PANIC_ON_DM_VERITY_ERRORS
+static unsigned dm_verity_panic_on_err;
+module_param_named(panic_on_err, dm_verity_panic_on_err, uint, S_IRUGO | S_IWUSR);
+#endif
 
 struct dm_verity_prefetch_work {
 	struct work_struct work;
@@ -188,6 +202,16 @@ static void verity_hash_at_level(struct dm_verity *v, sector_t block, int level,
 		*offset = idx << (v->hash_dev_block_bits - v->hash_per_block_bits);
 }
 
+static void add_verity_block_tag(unsigned long long blk)
+{
+	char verity_blk[64];
+	int count = 0;
+
+	count = snprintf(verity_blk, sizeof(verity_blk), "0x%llx", blk);
+
+	rdtags_add_tag("rdtag_verity_block_nr", verity_blk, count);
+}
+
 /*
  * Handle verification errors.
  */
@@ -220,6 +244,16 @@ static int verity_handle_err(struct dm_verity *v, enum verity_block_type type,
 
 	DMERR("%s: %s block %llu is corrupted", v->data_dev->name, type_str,
 		block);
+
+#ifdef CONFIG_PANIC_ON_DM_VERITY_ERRORS
+	if (dm_verity_panic_on_err) {
+#ifdef CONFIG_RAMDUMP_TAGS
+		add_verity_block_tag(block);
+#endif
+		panic("%s: %s block %llu is corrupted",
+			v->data_dev->name, type_str, block);
+	}
+#endif
 
 	if (v->corrupted_errs == DM_VERITY_MAX_CORRUPTED_ERRS)
 		DMERR("%s: reached maximum errors", v->data_dev->name);

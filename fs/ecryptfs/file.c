@@ -22,6 +22,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/file.h>
 #include <linux/poll.h>
@@ -33,6 +38,12 @@
 #include <linux/fs_stack.h>
 #include <linux/ecryptfs.h>
 #include "ecryptfs_kernel.h"
+#ifdef CONFIG_WTL_ENCRYPTION_FILTER
+#include <linux/ctype.h>
+#define ECRYPTFS_IOCTL_GET_ATTRIBUTES	_IOR('l', 0x10, __u32)
+#define ECRYPTFS_WAS_ENCRYPTED 0x0080
+#define ECRYPTFS_WAS_ENCRYPTED_OTHER_DEVICE 0x0100
+#endif
 
 /**
  * ecryptfs_read_update_atime
@@ -138,6 +149,47 @@ static int read_or_initialize_metadata(struct dentry *dentry)
 	crypt_stat = &ecryptfs_inode_to_private(inode)->crypt_stat;
 	mount_crypt_stat = &ecryptfs_superblock_to_private(
 						inode->i_sb)->mount_crypt_stat;
+
+#ifdef CONFIG_WTL_ENCRYPTION_FILTER
+	if (crypt_stat->flags & ECRYPTFS_STRUCT_INITIALIZED
+		&& crypt_stat->flags & ECRYPTFS_POLICY_APPLIED
+		&& crypt_stat->flags & ECRYPTFS_ENCRYPTED
+		&& !(crypt_stat->flags & ECRYPTFS_KEY_VALID)
+		&& !(crypt_stat->flags & ECRYPTFS_KEY_SET)
+		&& crypt_stat->flags & ECRYPTFS_I_SIZE_INITIALIZED) {
+		crypt_stat->flags |= ECRYPTFS_ENCRYPTED_OTHER_DEVICE;
+	}
+	mutex_lock(&crypt_stat->cs_mutex);
+	if ((mount_crypt_stat->flags & ECRYPTFS_ENABLE_NEW_PASSTHROUGH)
+			&& (crypt_stat->flags & ECRYPTFS_ENCRYPTED)) {
+		if (ecryptfs_read_metadata(dentry)) {
+			crypt_stat->flags &= ~(ECRYPTFS_I_SIZE_INITIALIZED
+					| ECRYPTFS_ENCRYPTED);
+			rc = 0;
+			goto out;
+		}
+	} else if ((mount_crypt_stat->flags & ECRYPTFS_ENABLE_FILTERING)
+			&& (crypt_stat->flags & ECRYPTFS_ENCRYPTED)) {
+		struct dentry *fp_dentry =
+			ecryptfs_inode_to_private(inode)->lower_file->f_path.dentry;
+		char filename[NAME_MAX+1] = {0};
+		if (fp_dentry->d_name.len <= NAME_MAX)
+			memcpy(filename, fp_dentry->d_name.name,
+					fp_dentry->d_name.len + 1);
+
+		if (is_file_name_match(mount_crypt_stat, fp_dentry)
+			|| is_file_ext_match(mount_crypt_stat, filename)) {
+			if (ecryptfs_read_metadata(dentry))
+				crypt_stat->flags &=
+				~(ECRYPTFS_I_SIZE_INITIALIZED
+				| ECRYPTFS_ENCRYPTED);
+			rc = 0;
+			goto out;
+		}
+	}
+	mutex_unlock(&crypt_stat->cs_mutex);
+#endif
+
 	mutex_lock(&crypt_stat->cs_mutex);
 
 	if (crypt_stat->flags & ECRYPTFS_POLICY_APPLIED &&
@@ -384,6 +436,45 @@ ecryptfs_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	struct file *lower_file = ecryptfs_file_to_lower(file);
 	long rc = -ENOTTY;
 
+#ifdef CONFIG_WTL_ENCRYPTION_FILTER
+	if (cmd == ECRYPTFS_IOCTL_GET_ATTRIBUTES) {
+		u32 __user *user_attr = (u32 __user *)arg;
+		u32 attr = 0;
+		char filename[NAME_MAX+1] = {0};
+		struct dentry *ecryptfs_dentry = file->f_path.dentry;
+		struct ecryptfs_mount_crypt_stat *mount_crypt_stat =
+			&ecryptfs_superblock_to_private(ecryptfs_dentry->d_sb)
+				->mount_crypt_stat;
+
+		struct inode *inode = d_inode(ecryptfs_dentry);
+		struct ecryptfs_crypt_stat *crypt_stat =
+			&ecryptfs_inode_to_private(inode)->crypt_stat;
+		struct dentry *fp_dentry =
+			ecryptfs_inode_to_private(inode)->lower_file->f_path.dentry;
+		if (fp_dentry->d_name.len <= NAME_MAX)
+			memcpy(filename, fp_dentry->d_name.name,
+					fp_dentry->d_name.len + 1);
+
+		mutex_lock(&crypt_stat->cs_mutex);
+		if ((crypt_stat->flags & ECRYPTFS_ENCRYPTED
+			|| crypt_stat->flags & ECRYPTFS_ENCRYPTED_OTHER_DEVICE)
+			|| ((mount_crypt_stat->flags
+					& ECRYPTFS_ENABLE_FILTERING)
+				&& (is_file_name_match
+					(mount_crypt_stat, fp_dentry)
+				|| is_file_ext_match
+					(mount_crypt_stat, filename)))) {
+			if (crypt_stat->flags & ECRYPTFS_KEY_VALID)
+				attr = ECRYPTFS_WAS_ENCRYPTED;
+			else
+				attr = ECRYPTFS_WAS_ENCRYPTED_OTHER_DEVICE;
+		}
+		mutex_unlock(&crypt_stat->cs_mutex);
+		put_user(attr, user_attr);
+		return 0;
+	}
+#endif
+
 	if (!lower_file->f_op->unlocked_ioctl)
 		return rc;
 
@@ -424,6 +515,87 @@ ecryptfs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	default:
 		return rc;
 	}
+}
+#endif
+
+#ifdef CONFIG_WTL_ENCRYPTION_FILTER
+int is_file_name_match(struct ecryptfs_mount_crypt_stat *mcs,
+					struct dentry *fp_dentry)
+{
+	int i;
+	char *str = NULL;
+	if (!(strcmp("/", fp_dentry->d_name.name))
+		|| !(strcmp("", fp_dentry->d_name.name)))
+		return 0;
+	str = kzalloc(mcs->max_name_filter_len + 1, GFP_KERNEL);
+	if (!str) {
+		printk(KERN_ERR "%s: Out of memory whilst attempting "
+			       "to kzalloc [%d] bytes\n", __func__,
+			       (mcs->max_name_filter_len + 1));
+		return 0;
+	}
+
+	for (i = 0; i < ENC_NAME_FILTER_MAX_INSTANCE; i++) {
+		int len = 0;
+		struct dentry *p = fp_dentry;
+		if (!strlen(mcs->enc_filter_name[i]))
+			break;
+
+		while (1) {
+			if (len == 0) {
+				len = strlen(p->d_name.name);
+				if (len > mcs->max_name_filter_len)
+					break;
+				strcpy(str, p->d_name.name);
+			} else {
+				len = len + 1 + strlen(p->d_name.name) ;
+				if (len > mcs->max_name_filter_len)
+					break;
+				strcat(str, "/");
+				strcat(str, p->d_name.name);
+			}
+
+			if (strncasecmp(str, mcs->enc_filter_name[i], len))
+				break;
+			p = p->d_parent;
+
+			if (!(strcmp("/", p->d_name.name))
+				|| !(strcmp("", p->d_name.name))) {
+				if (len == strlen(mcs->enc_filter_name[i])) {
+					kfree(str);
+					return 1;
+				}
+				break;
+			}
+		}
+	}
+	kfree(str);
+	return 0;
+}
+
+int is_file_ext_match(struct ecryptfs_mount_crypt_stat *mcs, char *str)
+{
+	int i;
+	char ext[NAME_MAX + 1] = {0};
+
+	char *token;
+	int count = 0;
+	while ((token = strsep(&str, ".")) != NULL) {
+		strncpy(ext, token, NAME_MAX);
+		count++;
+	}
+	if (count <= 1)
+		return 0;
+
+	for (i = 0; i < ENC_EXT_FILTER_MAX_INSTANCE; i++) {
+		if (!strlen(mcs->enc_filter_ext[i]))
+			return 0;
+		if (strlen(ext) != strlen(mcs->enc_filter_ext[i]))
+			continue;
+		if (!strncasecmp(ext, mcs->enc_filter_ext[i], strlen(ext)))
+			return 1;
+	}
+	return 0;
 }
 #endif
 

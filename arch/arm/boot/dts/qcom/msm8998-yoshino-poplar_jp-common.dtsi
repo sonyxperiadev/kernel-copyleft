@@ -1,0 +1,251 @@
+/* arch/arm64/boot/dts/qcom/msm8998-yoshino-poplar_jp-common.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2017 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+#include "msm8998-yoshino-poplar_common.dtsi"
+
+&soc {
+	somc_pinctrl: somc_pinctrl {
+		pinctrl-2 = <&msm_gpio_37 &msm_gpio_49 &msm_gpio_50 &msm_gpio_51 &msm_gpio_52
+			     &msm_gpio_90 &msm_gpio_91 &msm_gpio_92 &msm_gpio_105 &msm_gpio_106
+			     &msm_gpio_107 &msm_gpio_127 &msm_gpio_136 >;
+	};
+
+	/* SPI: BLSP9 */
+	spi@c1b7000 { /* BLSP2 QUP3 */
+		pinctrl-0 = <&msm_gpio_49 &msm_gpio_50 &msm_gpio_51 &msm_gpio_52>;
+		pinctrl-1 = <&msm_gpio_49 &msm_gpio_50 &msm_gpio_51 &msm_gpio_52>;
+		qcom,clk-freq-out = <30000000>;
+		status = "okay";
+	};
+
+	felica,pm-ops {
+		compatible = "sony,cxd224x-pm-ops";
+	};
+};
+
+&pm8998_gpios {
+	/* GPIO_14: DIV_CLK2 */
+	gpio@cd00 {
+		qcom,master-en = <1>;           /* Enable */
+		status = "okay";
+	};
+};
+
+&tlmm{
+/* GPIO_37 : NC */
+	msm_gpio_37: msm_gpio_37 {
+		mux {
+			pins = "gpio37";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio37";
+			drive-strength = <2>;
+			/delete-property/ bias-disable;
+			bias-pull-up;
+			/delete-property/ output-low;
+			input-enable;
+		};
+	};
+
+/* GPIO_49 : DTV_SPI_MOSI */
+	msm_gpio_49: msm_gpio_49 {
+		mux {
+			pins = "gpio49";
+			function = "blsp_spi9";
+		};
+
+		config {
+			pins = "gpio49";
+			drive-strength = <2>;
+			/delete-property/ output-low;
+			bias-disable;
+		};
+	};
+
+/* GPIO_50 : DTV_SPI_MISO */
+	msm_gpio_50: msm_gpio_50 {
+		mux {
+			pins = "gpio50";
+			function = "blsp_spi9";
+		};
+
+		config {
+			pins = "gpio50";
+			drive-strength = <2>;
+			/delete-property/ bias-disable;
+			bias-pull-down;
+			/delete-property/ output-low;
+		};
+	};
+
+/* GPIO_51 : DTV_SPI_CS_N */
+	msm_gpio_51: msm_gpio_51 {
+		mux {
+			pins = "gpio51";
+			function = "blsp_spi9";
+		};
+
+		config {
+			pins = "gpio51";
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+/* GPIO_52 : DTV_SPI_CLK */
+	msm_gpio_52: msm_gpio_52 {
+		mux {
+			pins = "gpio52";
+			function = "blsp_spi9";
+		};
+
+		config {
+			pins = "gpio52";
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+/* GPIO_90 : DTV_RST_N */
+	msm_gpio_90: msm_gpio_90 {
+		mux {
+			pins = "gpio90";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio90";
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+/* GPIO_91 : DTV_INT */
+	msm_gpio_91: msm_gpio_91 {
+		mux {
+			pins = "gpio91";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio91";
+			drive-strength = <2>;
+			/delete-property/ bias-disable;
+			bias-pull-down;
+			/delete-property/ output-low;
+			input-enable;
+		};
+	};
+
+/* GPIO_92 : NFC_IRQ_FELICA_INT_N */
+	msm_gpio_92: msm_gpio_92 {
+		mux {
+			pins = "gpio92";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio92";
+			drive-strength = <2>;
+			/delete-property/ bias-pull-down;
+			bias-disable;
+			input-enable;
+		};
+	};
+
+/* GPIO_105 : NC */
+	msm_gpio_105: msm_gpio_105 {
+		mux {
+			pins = "gpio105";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio105";
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+/* GPIO_106 : NC */
+	msm_gpio_106: msm_gpio_106 {
+		mux {
+			pins = "gpio106";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio106";
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+/* GPIO_107 : NC */
+	msm_gpio_107: msm_gpio_107 {
+		mux {
+			pins = "gpio107";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio107";
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+/* GPIO_127 : NC */
+	msm_gpio_127: msm_gpio_127 {
+		mux {
+			pins = "gpio127";
+			function = "gpio";
+	};
+
+		config {
+			pins = "gpio127";
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+/* GPIO_136 : NC */
+	msm_gpio_136: msm_gpio_136 {
+		mux {
+			pins = "gpio136";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio136";
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+};
