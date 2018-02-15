@@ -12,10 +12,12 @@ obj-$(CONFIG_SND_HWDEP) += msm-pcm-routing-devdep.o
 obj-$(CONFIG_DOLBY_DAP) += msm-dolby-dap-config.o
 obj-$(CONFIG_DOLBY_DS2) += msm-ds2-dap-config.o
 obj-$(CONFIG_DOLBY_LICENSE) += msm-ds2-dap-config.o
+obj-$(CONFIG_AHC) += msm-ahc-config.o
 obj-$(CONFIG_DTS_SRS_TM) += msm-dts-srs-tm-config.o
 obj-$(CONFIG_QTI_PP) += msm-qti-pp-config.o
 obj-y += audio_calibration.o audio_cal_utils.o q6adm.o q6afe.o q6asm.o \
 	q6audio-v2.o q6voice.o q6core.o rtac.o q6lsm.o audio_slimslave.o \
-	msm-pcm-q6-noirq.o
+	msm-pcm-q6-noirq.o \
+	sony-hweffect-params.o msm-sony-hweffect.o
 ocmem-audio-objs += audio_ocmem.o
 obj-$(CONFIG_AUDIO_OCMEM) += ocmem-audio.o
