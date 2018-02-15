@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __QPNP_PWM_H__
 #define __QPNP_PWM_H__
@@ -134,6 +139,7 @@ struct lut_params {
 	int lut_pause_lo;
 	int ramp_step_ms;
 	int flags;
+	bool use_duration;
 };
 
 #if IS_ENABLED(CONFIG_PWM_QPNP)
@@ -154,6 +160,38 @@ int pwm_lut_config(struct pwm_device *pwm, int period_us,
  */
 int pwm_config_us(struct pwm_device *pwm,
 		int duty_us, int period_us);
+
+/*
+ * lut_config: LUT config
+ * @hi_index: LUT high index for ramp
+ * @lo_index: LUT low index for ramp
+ * @pause_hi: pause multiplier at high index
+ * @pause_lo: pause multiplier at low index
+ * @ramp_step_ms: time before loading next LUT pattern [ms]
+ * @lut: LUT array
+ * @flags: control flags (PM_PWM_LUT_XXX)
+ */
+#define INDEX_MAX_EACH_LED 8
+struct lut_config {
+	int hi_index;
+	int lo_index;
+	int lut_pause_hi;
+	int lut_pause_lo;
+	int ramp_step_ms;
+	int lut[INDEX_MAX_EACH_LED];
+	int flags;
+};
+
+int pwm_config_lut(struct pwm_device *pwm,
+		struct lut_config *pwm_lut);
+
+int pwm_start_lut_ramp(struct pwm_device *pwm, int ramp_control);
+
+int pwm_config_period_value(struct pwm_device *pwm,
+			     struct pwm_period_config *pwm_p, int pwm_value);
+
+int pwm_get_max_pwm_value(struct pwm_device *pwm);
+void pwm_set_max_pwm_value(struct pwm_device *pwm, int max);
 
 #else
 static inline int pwm_config_period(struct pwm_device *pwm,

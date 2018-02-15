@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -234,6 +239,13 @@
 #define QPNP_WLED_AVDD_MV_TO_REG(val) \
 		((val - QPNP_WLED_AVDD_MIN_MV) / QPNP_WLED_AVDD_STEP_MV)
 
+#define QPNP_WLED_CURR_SCALE_MAX	100
+#define QPNP_WLED_BL_SCALE_MAX	1000
+#define QPNP_WLED_BUFF_SIZE	128
+
+#define BR_MAX_FIGURE	9
+#define AREA_COUNT_MAX	9999999
+
 /* output feedback mode */
 enum qpnp_wled_fdbk_op {
 	QPNP_WLED_FDBK_AUTO,
@@ -307,6 +319,12 @@ static struct wled_vref_setting vref_setting_pmi8994 = {
 static struct wled_vref_setting vref_setting_pmi8998 = {
 	60000, 397500, 22500, 127500,
 };
+
+static unsigned long *area_count;
+static int *area_count_table;
+static int area_count_table_size;
+static int now_area;
+static unsigned long start_jiffies;
 
 /**
  *  qpnp_wled - wed data structure
@@ -404,7 +422,23 @@ struct qpnp_wled {
 	bool			auto_calib_enabled;
 	bool			auto_calib_done;
 	ktime_t			start_ovp_fault_time;
+	int init_br_ua;
+	bool bl_scale_enabled;
+	int bl_scale;
+	bool calc_curr;
+	int curr_scale;
 };
+
+static bool bl_on_in_boot;
+static int __init continous_splash_setup(char *str)
+{
+	if (!str)
+		return 0;
+	if (!strncmp(str, "on", 2))
+		bl_on_in_boot = true;
+	return 0;
+}
+__setup("display_status=", continous_splash_setup);
 
 /* helper to read a pmic register */
 static int qpnp_wled_read_reg(struct qpnp_wled *wled, u16 addr, u8 *data)
@@ -538,6 +572,16 @@ static int qpnp_wled_set_level(struct qpnp_wled *wled, int level)
 	int i, rc;
 	u8 reg;
 
+	if (wled->calc_curr &&
+		wled->curr_scale != QPNP_WLED_CURR_SCALE_MAX)
+		level = level * wled->curr_scale / QPNP_WLED_CURR_SCALE_MAX;
+
+	if (wled->bl_scale_enabled && wled->bl_scale > 0 &&
+		wled->bl_scale < QPNP_WLED_BL_SCALE_MAX)
+		level = level * wled->bl_scale / QPNP_WLED_BL_SCALE_MAX;
+
+	pr_debug("%s: brightness=%d level=%d\n",
+			__func__, wled->cdev.brightness, level);
 	/* set brightness registers */
 	for (i = 0; i < wled->max_strings; i++) {
 		reg = level & QPNP_WLED_BRIGHT_LSB_MASK;
@@ -895,7 +939,11 @@ static ssize_t qpnp_wled_fs_curr_ua_store(struct device *dev,
 		else if (data > QPNP_WLED_FS_CURR_MAX_UA)
 			data = QPNP_WLED_FS_CURR_MAX_UA;
 
-		reg = data / QPNP_WLED_FS_CURR_STEP_UA;
+		if (wled->calc_curr)
+			reg = (data + (QPNP_WLED_FS_CURR_STEP_UA - 1)) /
+				QPNP_WLED_FS_CURR_STEP_UA;
+		else
+			reg = data / QPNP_WLED_FS_CURR_STEP_UA;
 		rc = qpnp_wled_masked_write_reg(wled,
 			QPNP_WLED_FS_CURR_REG(wled->sink_base, i),
 			QPNP_WLED_FS_CURR_MASK, reg);
@@ -914,6 +962,101 @@ static ssize_t qpnp_wled_fs_curr_ua_store(struct device *dev,
 	return count;
 }
 
+static ssize_t qpnp_wled_bl_scale_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct qpnp_wled *wled = dev_get_drvdata(dev);
+	if (!wled->bl_scale_enabled)
+		wled->bl_scale = QPNP_WLED_BL_SCALE_MAX;
+	dev_dbg(&wled->pdev->dev, "%s: bl_scale = %d\n", __func__, wled->bl_scale);
+
+	return snprintf(buf, QPNP_WLED_BUFF_SIZE, "%u\n", wled->bl_scale);
+}
+
+static ssize_t qpnp_wled_bl_scale_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct qpnp_wled *wled = dev_get_drvdata(dev);
+	unsigned long scale = 0;
+	ssize_t ret = -EINVAL;
+
+	if (!wled->bl_scale_enabled) {
+		wled->bl_scale = QPNP_WLED_BL_SCALE_MAX;
+		dev_err(&wled->pdev->dev, "Sysfs bl_scale is not enabled\n");
+		goto exit;
+	}
+
+	ret = kstrtoul(buf, 10, &scale);
+	if (!ret) {
+		ret = size;
+		if (scale > QPNP_WLED_BL_SCALE_MAX)
+			scale = QPNP_WLED_BL_SCALE_MAX;
+		wled->bl_scale = scale;
+		dev_dbg(&wled->pdev->dev, "%s: bl_scale = %d\n", __func__, wled->bl_scale);
+	} else {
+		dev_err(&wled->pdev->dev, "Failure to set sysfs bl_scale\n");
+		ret = -EINVAL;
+	}
+
+exit:
+	return ret;
+}
+
+static void update_areacount(int new_area)
+{
+	unsigned long now;
+	unsigned long duration;
+
+	now = jiffies;
+	duration = (now - start_jiffies) >= 0 ?
+			(now - start_jiffies) : (now + start_jiffies);
+	area_count[now_area] = area_count[now_area]
+			+ jiffies_to_msecs(duration);
+
+	now_area = new_area;
+	start_jiffies = now;
+}
+
+static ssize_t qpnp_wled_area_count_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct qpnp_wled *wled = dev_get_drvdata(dev);
+	int i;
+	char area_count_str[QPNP_WLED_BUFF_SIZE];
+	char count_data[BR_MAX_FIGURE];
+
+	if (!area_count_table_size)
+		return snprintf(buf, QPNP_WLED_BUFF_SIZE, "area_count is not supported\n");
+
+	mutex_lock(&wled->cdev.led_access);
+	/* fixed statistics */
+	update_areacount(now_area);
+
+	memset(area_count_str, 0, sizeof(char) * QPNP_WLED_BUFF_SIZE);
+	for (i = 0; i < area_count_table_size; i++) {
+		dev_dbg(&wled->pdev->dev, "%ld, ", area_count[i]);
+		memset(count_data, 0, sizeof(char) * BR_MAX_FIGURE);
+		if (area_count[i] > AREA_COUNT_MAX) {
+			/* over 167 min */
+			area_count[i] = AREA_COUNT_MAX;
+		}
+		if (i == 0) {
+			snprintf(count_data, BR_MAX_FIGURE,
+				"%ld", area_count[i]);
+			strlcpy(area_count_str, count_data, QPNP_WLED_BUFF_SIZE);
+		} else {
+			snprintf(count_data, BR_MAX_FIGURE,
+				",%ld", area_count[i]);
+			strlcat(area_count_str, count_data, QPNP_WLED_BUFF_SIZE);
+		}
+	}
+
+	memset(area_count, 0, sizeof(unsigned long) * area_count_table_size);
+	mutex_unlock(&wled->cdev.led_access);
+
+	return snprintf(buf, QPNP_WLED_BUFF_SIZE, "%s\n", area_count_str);
+}
+
 /* sysfs attributes exported by wled */
 static struct device_attribute qpnp_wled_attrs[] = {
 	__ATTR(dump_regs, 0664, qpnp_wled_dump_regs_show, NULL),
@@ -925,7 +1068,38 @@ static struct device_attribute qpnp_wled_attrs[] = {
 	__ATTR(ramp_ms, 0664, qpnp_wled_ramp_ms_show, qpnp_wled_ramp_ms_store),
 	__ATTR(ramp_step, 0664, qpnp_wled_ramp_step_show,
 		qpnp_wled_ramp_step_store),
+	__ATTR(bl_scale, (S_IRUGO | S_IWUSR | S_IWGRP),
+			qpnp_wled_bl_scale_show,
+			qpnp_wled_bl_scale_store),
+	__ATTR(area_count, (S_IRUSR | S_IRGRP),
+			qpnp_wled_area_count_show,
+			NULL),
 };
+
+static int get_area(int level)
+{
+	int i;
+
+	for (i = 0; i < area_count_table_size; i++) {
+		if (i == 0) {
+			if (level == area_count_table[i])
+				break;
+		} else {
+			if (level <= area_count_table[i])
+				break;
+		}
+	}
+
+	return i;
+}
+
+static void qpnp_wled_update_area(int level)
+{
+	int new_area = get_area(level);
+
+	if (now_area != new_area)
+		update_areacount(new_area);
+}
 
 /* worker for setting wled brightness */
 static void qpnp_wled_work(struct work_struct *work)
@@ -936,6 +1110,7 @@ static void qpnp_wled_work(struct work_struct *work)
 	wled = container_of(work, struct qpnp_wled, work);
 
 	level = wled->cdev.brightness;
+	qpnp_wled_update_area(level);
 
 	mutex_lock(&wled->lock);
 
@@ -967,6 +1142,7 @@ static void qpnp_wled_work(struct work_struct *work)
 						level ? "en" : "dis");
 			goto unlock_mutex;
 		}
+		usleep_range(100, 101);
 	}
 
 	wled->prev_state = !!level;
@@ -1857,44 +2033,49 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 	if (rc)
 		return rc;
 
-	/* disable all current sinks and enable selected strings */
-	reg = 0x00;
-	rc = qpnp_wled_write_reg(wled, QPNP_WLED_CURR_SINK_REG(wled->sink_base),
-			reg);
+	if (!bl_on_in_boot) {
+		/* disable all current sinks and enable selected strings */
+		reg = 0x00;
+		rc = qpnp_wled_write_reg(wled, QPNP_WLED_CURR_SINK_REG(wled->sink_base),
+				reg);
 
-	for (i = 0; i < wled->max_strings; i++) {
-		/* SYNC DELAY */
-		if (wled->sync_dly_us > QPNP_WLED_SYNC_DLY_MAX_US)
-			wled->sync_dly_us = QPNP_WLED_SYNC_DLY_MAX_US;
+		for (i = 0; i < wled->max_strings; i++) {
+			/* SYNC DELAY */
+			if (wled->sync_dly_us > QPNP_WLED_SYNC_DLY_MAX_US)
+				wled->sync_dly_us = QPNP_WLED_SYNC_DLY_MAX_US;
 
 		reg = wled->sync_dly_us / QPNP_WLED_SYNC_DLY_STEP_US;
 		mask = QPNP_WLED_SYNC_DLY_MASK;
 		rc = qpnp_wled_masked_write_reg(wled,
 			QPNP_WLED_SYNC_DLY_REG(wled->sink_base, i),
 			mask, reg);
-		if (rc < 0)
-			return rc;
+			if (rc < 0)
+				return rc;
 
-		/* FULL SCALE CURRENT */
-		if (wled->fs_curr_ua > QPNP_WLED_FS_CURR_MAX_UA)
-			wled->fs_curr_ua = QPNP_WLED_FS_CURR_MAX_UA;
+			/* FULL SCALE CURRENT */
+			if (wled->fs_curr_ua > QPNP_WLED_FS_CURR_MAX_UA)
+				wled->fs_curr_ua = QPNP_WLED_FS_CURR_MAX_UA;
 
 		reg = wled->fs_curr_ua / QPNP_WLED_FS_CURR_STEP_UA;
 		mask = QPNP_WLED_FS_CURR_MASK;
 		rc = qpnp_wled_masked_write_reg(wled,
 			QPNP_WLED_FS_CURR_REG(wled->sink_base, i),
 			mask, reg);
-		if (rc < 0)
-			return rc;
+			if (rc < 0)
+				return rc;
+			if (wled->calc_curr)
+				temp = (wled->fs_curr_ua + (QPNP_WLED_FS_CURR_STEP_UA - 1)) /
+					QPNP_WLED_FS_CURR_STEP_UA;
+			else
 
-		/* CABC */
+			/* CABC */
 		reg = wled->en_cabc ? (1  << QPNP_WLED_CABC_SHIFT) : 0;
 		mask = QPNP_WLED_CABC_MASK;
 		rc = qpnp_wled_masked_write_reg(wled,
 			QPNP_WLED_CABC_REG(wled->sink_base, i),
 			mask, reg);
-		if (rc < 0)
-			return rc;
+			if (rc < 0)
+				return rc;
 	}
 
 	/* Settings specific to valid sinks */
@@ -1904,10 +2085,10 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 			return -EINVAL;
 		}
 		/* MODULATOR */
-		rc = qpnp_wled_read_reg(wled,
+			rc = qpnp_wled_read_reg(wled,
 			QPNP_WLED_MOD_EN_REG(wled->sink_base, i), &reg);
-		if (rc < 0)
-			return rc;
+			if (rc < 0)
+				return rc;
 		reg &= QPNP_WLED_MOD_EN_MASK;
 		reg |= (QPNP_WLED_MOD_EN << QPNP_WLED_MOD_EN_SHFT);
 
@@ -1916,10 +2097,10 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 		else
 			reg |= ~QPNP_WLED_GATE_DRV_MASK;
 
-		rc = qpnp_wled_write_reg(wled,
+			rc = qpnp_wled_write_reg(wled,
 			QPNP_WLED_MOD_EN_REG(wled->sink_base, i), reg);
-		if (rc)
-			return rc;
+			if (rc)
+				return rc;
 
 		/* SINK EN */
 		temp = wled->strings[i] + QPNP_WLED_CURR_SINK_SHIFT;
@@ -1933,6 +2114,7 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 		dev_err(&wled->pdev->dev,
 			"Failed to enable WLED sink config rc = %d\n", rc);
 		return rc;
+		}
 	}
 
 	rc = qpnp_wled_sync_reg_toggle(wled);
@@ -2023,6 +2205,39 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 			return rc;
 	}
 
+	return 0;
+}
+
+static void qpnp_wled_set_init_br(struct qpnp_wled *wled)
+{
+	int calc_init_br;
+	if (wled->fs_curr_ua) {
+		calc_init_br = (wled->cdev.max_brightness * wled->init_br_ua)
+			/ wled->fs_curr_ua;
+	} else {
+		calc_init_br = (wled->cdev.max_brightness * wled->init_br_ua)
+			/ QPNP_WLED_FS_CURR_MAX_UA;
+	}
+	qpnp_wled_set(&wled->cdev, calc_init_br);
+}
+
+static int qpnp_wled_set_scale(struct qpnp_wled *wled)
+{
+	u8 reg = 0;
+	int rc, curr;
+
+	wled->curr_scale = QPNP_WLED_CURR_SCALE_MAX;
+	rc = qpnp_wled_read_reg(wled, QPNP_WLED_FS_CURR_REG(wled->sink_base,
+				wled->strings[0]), &reg);
+	if (rc)
+		return rc;
+	reg &= ~QPNP_WLED_FS_CURR_MASK;
+	curr = reg * QPNP_WLED_FS_CURR_STEP_UA;
+	if (curr > wled->fs_curr_ua)
+		wled->curr_scale = (wled->fs_curr_ua *
+			QPNP_WLED_CURR_SCALE_MAX) / curr;
+	dev_dbg(&wled->pdev->dev, "%s: curr = %d fs_curr_ua = %d curr_scale = %d\n",
+		__func__, curr, wled->fs_curr_ua, wled->curr_scale);
 	return 0;
 }
 
@@ -2313,6 +2528,10 @@ static int qpnp_wled_parse_dt(struct qpnp_wled *wled)
 	if (!rc)
 		wled->cons_sync_write_delay_us = temp_val;
 
+	wled->calc_curr = of_property_read_bool(pdev->dev.of_node,
+			"somc,calc-curr");
+	wled->bl_scale_enabled = of_property_read_bool(pdev->dev.of_node,
+			"somc,bl-scale-enabled");
 	wled->en_9b_dim_res = of_property_read_bool(pdev->dev.of_node,
 			"qcom,en-9b-dim-res");
 	wled->en_phase_stag = of_property_read_bool(pdev->dev.of_node,
@@ -2355,6 +2574,50 @@ static int qpnp_wled_parse_dt(struct qpnp_wled *wled)
 
 	wled->auto_calib_enabled = of_property_read_bool(pdev->dev.of_node,
 					"qcom,auto-calibration-enable");
+	wled->init_br_ua = LED_OFF;
+	rc = of_property_read_u32(pdev->dev.of_node,
+					"somc,init-br-ua", &temp_val);
+	if (!rc) {
+		wled->init_br_ua = temp_val;
+	} else if (rc != -EINVAL) {
+		dev_err(&pdev->dev, "Unable to read init ua\n");
+		return rc;
+	}
+
+	rc = of_property_read_u32(pdev->dev.of_node,
+			"somc,area_count_table_size", &temp_val);
+	if (!rc) {
+		area_count_table_size = temp_val;
+	} else if (rc != -EINVAL) {
+		dev_err(&pdev->dev, "Unable to read area_count_table_size\n");
+		return rc;
+	}
+
+	if (area_count_table_size > 0) {
+		area_count_table = devm_kzalloc(&pdev->dev,
+			sizeof(int) * area_count_table_size, GFP_KERNEL);
+		if (!area_count_table)
+			return -ENOMEM;
+
+		area_count = devm_kzalloc(&pdev->dev,
+			sizeof(unsigned long) * area_count_table_size, GFP_KERNEL);
+		if (!area_count_table)
+			return -ENOMEM;
+
+		rc = of_property_read_u32_array(pdev->dev.of_node, "somc,area_count_table",
+					area_count_table, area_count_table_size);
+		if (rc < 0) {
+			dev_err(&pdev->dev, "Unable to read somc,area_count_table\n");
+			temp_val = (WLED_MAX_LEVEL_4095 % (area_count_table_size - 1) > 0 ?
+				((WLED_MAX_LEVEL_4095 / (area_count_table_size - 1)) + 1) :
+				(WLED_MAX_LEVEL_4095 / (area_count_table_size - 1)));
+			area_count_table[0] = 0;
+			for (i = 1; i < area_count_table_size; i++) {
+				area_count_table[i] = temp_val * i;
+			}
+		}
+	}
+
 	return 0;
 }
 
@@ -2429,6 +2692,14 @@ static int qpnp_wled_probe(struct platform_device *pdev)
 		return rc;
 	}
 
+	if (wled->calc_curr) {
+		rc = qpnp_wled_set_scale(wled);
+		if (rc) {
+			dev_err(&pdev->dev, "wled config failed\n");
+			return rc;
+		}
+	}
+
 	INIT_WORK(&wled->work, qpnp_wled_work);
 	wled->ramp_ms = QPNP_WLED_RAMP_DLY_MS;
 	wled->ramp_step = 1;
@@ -2437,6 +2708,8 @@ static int qpnp_wled_probe(struct platform_device *pdev)
 	wled->cdev.brightness_get = qpnp_wled_get;
 
 	wled->cdev.max_brightness = WLED_MAX_LEVEL_4095;
+	now_area = 0;
+	start_jiffies = jiffies;
 
 	rc = led_classdev_register(&pdev->dev, &wled->cdev);
 	if (rc) {
@@ -2452,6 +2725,9 @@ static int qpnp_wled_probe(struct platform_device *pdev)
 			goto sysfs_fail;
 		}
 	}
+
+	if (wled->init_br_ua && !bl_on_in_boot)
+		qpnp_wled_set_init_br(wled);
 
 	return 0;
 
@@ -2477,6 +2753,8 @@ static int qpnp_wled_remove(struct platform_device *pdev)
 
 	led_classdev_unregister(&wled->cdev);
 	cancel_work_sync(&wled->work);
+	devm_kfree(&pdev->dev, area_count_table);
+	devm_kfree(&pdev->dev, area_count);
 	mutex_destroy(&wled->lock);
 
 	return 0;

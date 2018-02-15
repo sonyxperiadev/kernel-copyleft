@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/io.h>
 #include <linux/of.h>
@@ -377,6 +382,7 @@ int ufs_qcom_ice_cfg_start(struct ufs_qcom_host *qcom_host,
 		return -EINVAL;
 	}
 
+	memset(&ice_set, 0, sizeof(ice_set));
 
 	memset(&ice_set, 0, sizeof(ice_set));
 	if (qcom_host->ice.vops->config_start) {
