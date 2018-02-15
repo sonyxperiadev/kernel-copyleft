@@ -321,18 +321,6 @@
 		#size-cells = <2>;
 		ranges;
 
-		wlan_msa_guard: wlan_msa_guard@85600000 {
-			compatible = "removed-dma-pool";
-			no-map;
-			reg = <0x0 0x85600000 0x0 0x100000>;
-		};
-
-		wlan_msa_mem: wlan_msa_mem@85700000 {
-			compatible = "removed-dma-pool";
-			no-map;
-			reg = <0x0 0x85700000 0x0 0x100000>;
-		};
-
 		removed_region: removed_region0@85800000 {
 			compatible = "removed-dma-pool";
 			no-map;
@@ -613,7 +601,6 @@
 			compatible = "qcom,memshare-peripheral";
 			qcom,peripheral-size = <0x0>;
 			qcom,client-id = <1>;
-			qcom,allocate-boot-time;
 			label = "modem";
 		};
 	};
@@ -1166,9 +1153,8 @@
 			< 1113600 762 >,
 			< 1344000 2086 >,
 			< 1670400 2929 >,
-			< 1881600 3879 >,
-			< 2150400 4943 >,
-			< 2380800 5163 >;
+			< 2150400 3879 >,
+			< 2380800 4943 >;
 	};
 
 	devfreq_memlat_4: qcom,arm-memlat-mon-4 {
@@ -1682,7 +1668,6 @@
 		qcom,vdd-1.3-rfa-config = <1200000 1370000>;
 		qcom,vdd-3.3-ch0-config = <3200000 3400000>;
 		qcom,wlan-msa-memory = <0x100000>;
-		qcom,wlan-msa-fixed-region = <&wlan_msa_mem>;
 		qcom,smmu-s1-bypass;
 	};
 
@@ -2032,7 +2017,6 @@
 		qcom,qsee-ce-hw-instance = <0>;
 		qcom,disk-encrypt-pipe-pair = <2>;
 		qcom,support-fde;
-		qcom,fde-key-size;
 		qcom,no-clock-support;
 		qcom,msm-bus,name = "qseecom-noc";
 		qcom,msm-bus,num-cases = <4>;

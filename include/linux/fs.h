@@ -138,6 +138,9 @@ typedef void (dax_iodone_t)(struct buffer_head *bh_map, int uptodate);
 /* Has write method(s) */
 #define FMODE_CAN_WRITE         ((__force fmode_t)0x40000)
 
+/* File hasn't page cache and can't be mmaped, for stackable filesystem */
+#define FMODE_NONMAPPABLE       ((__force fmode_t)0x400000)
+
 /* File was opened by fanotify and shouldn't generate fanotify events */
 #define FMODE_NONOTIFY		((__force fmode_t)0x4000000)
 
@@ -912,10 +915,6 @@ struct file {
 	struct list_head	f_tfile_llink;
 #endif /* #ifdef CONFIG_EPOLL */
 	struct address_space	*f_mapping;
-
-#ifdef CONFIG_FILE_TABLE_DEBUG
-	struct hlist_node f_hash;
-#endif /* #ifdef CONFIG_FILE_TABLE_DEBUG */
 } __attribute__((aligned(4)));	/* lest something weird decides that 2 is OK */
 
 struct file_handle {
@@ -1691,6 +1690,7 @@ struct file_operations {
 #ifndef CONFIG_MMU
 	unsigned (*mmap_capabilities)(struct file *);
 #endif
+	struct file* (*get_lower_file)(struct file *f);
 };
 
 struct inode_operations {

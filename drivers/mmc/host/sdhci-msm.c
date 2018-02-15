@@ -14,6 +14,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/mmc/host.h>
@@ -1139,7 +1144,6 @@ int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
 	bool drv_type_changed = false;
 	struct mmc_card *card = host->mmc->card;
 	int sts_retry;
-	u8 last_good_phase = 0;
 
 	/*
 	 * Tuning is required for SDR104, HS200 and HS400 cards and
@@ -1225,22 +1229,6 @@ retry:
 		mmc_wait_for_req(mmc, &mrq);
 
 		if (card && (cmd.error || data.error)) {
-			/*
-			 * Set the dll to last known good phase while sending
-			 * status command to ensure that status command won't
-			 * fail due to bad phase.
-			 */
-			if (tuned_phase_cnt)
-				last_good_phase =
-					tuned_phases[tuned_phase_cnt-1];
-			else if (msm_host->saved_tuning_phase !=
-					INVALID_TUNING_PHASE)
-				last_good_phase = msm_host->saved_tuning_phase;
-
-			rc = msm_config_cm_dll_phase(host, last_good_phase);
-			if (rc)
-				goto kfree;
-
 			sts_cmd.opcode = MMC_SEND_STATUS;
 			sts_cmd.arg = card->rca << 16;
 			sts_cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
@@ -1842,6 +1830,12 @@ struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev,
 	pdata->status_gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
 	if (gpio_is_valid(pdata->status_gpio) && !(flags & OF_GPIO_ACTIVE_LOW))
 		pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+
+	pdata->uim2_gpio = of_get_named_gpio(np, "uim2-gpios", 0);
+	if (!gpio_is_valid(pdata->uim2_gpio)) {
+		pr_err("## %s: gpio_is_valid(pdata->uim2_gpio)=%d: failure\n",
+			mmc_hostname(msm_host->mmc), pdata->uim2_gpio);
+	}
 
 	of_property_read_u32(np, "qcom,bus-width", &bus_width);
 	if (bus_width == 8)
@@ -4179,10 +4173,8 @@ static void sdhci_set_default_hw_caps(struct sdhci_msm_host *msm_host,
 	/* keep track of the value in SDHCI_CAPABILITIES */
 	msm_host->caps_0 = caps;
 
-	if ((major == 1) && (minor >= 0x6b)) {
+	if ((major == 1) && (minor >= 0x6b))
 		msm_host->ice_hci_support = true;
-		host->cdr_support = true;
-	}
 }
 
 #ifdef CONFIG_MMC_CQ_HCI
@@ -4647,6 +4639,13 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 					__func__, ret);
 			goto vreg_deinit;
 		}
+	}
+
+	if (gpio_is_valid(msm_host->pdata->uim2_gpio)) {
+		mmc_gpio_init_uim2(msm_host->mmc, msm_host->pdata->uim2_gpio);
+	} else {
+		pr_err("## %s: can't set uim2_gpio: %d\n", mmc_hostname(host->mmc),
+			msm_host->pdata->uim2_gpio);
 	}
 
 	if ((sdhci_readl(host, SDHCI_CAPABILITIES) & SDHCI_CAN_64BIT) &&

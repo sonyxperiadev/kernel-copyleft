@@ -527,12 +527,10 @@ int pfk_kc_load_key_start(const unsigned char *key, size_t key_size,
 			kc_update_timestamp(entry);
 			entry->state = ACTIVE_ICE_LOADED;
 
-			if (!strcmp(s_type, (char *)PFK_UFS)) {
-				if (async)
-					entry->loaded_ref_cnt++;
-			} else {
+			if (async && (!strcmp(s_type,
+					(char *)PFK_UFS)))
 				entry->loaded_ref_cnt++;
-			}
+
 			break;
 		}
 	case (FREE):
@@ -546,16 +544,14 @@ int pfk_kc_load_key_start(const unsigned char *key, size_t key_size,
 			entry->state = ACTIVE_ICE_LOADED;
 
 			/*
-			 * In case of UFS only increase ref cnt for async calls,
+			 * only increase ref cnt for async calls,
 			 * sync calls from within work thread do not pass
 			 * requests further to HW
 			 */
-			if (!strcmp(s_type, (char *)PFK_UFS)) {
-				if (async)
-					entry->loaded_ref_cnt++;
-			} else {
+			if (async && (!strcmp(s_type,
+					(char *)PFK_UFS)))
 				entry->loaded_ref_cnt++;
-			}
+
 		}
 		break;
 	case (ACTIVE_ICE_PRELOAD):
@@ -565,12 +561,9 @@ int pfk_kc_load_key_start(const unsigned char *key, size_t key_size,
 	case (ACTIVE_ICE_LOADED):
 		kc_update_timestamp(entry);
 
-		if (!strcmp(s_type, (char *)PFK_UFS)) {
-			if (async)
-				entry->loaded_ref_cnt++;
-		} else {
+		if (async && (!strcmp(s_type,
+				(char *)PFK_UFS)))
 			entry->loaded_ref_cnt++;
-		}
 		break;
 	case(SCM_ERROR):
 		ret = entry->scm_error;
@@ -628,24 +621,36 @@ void pfk_kc_load_key_end(const unsigned char *key, size_t key_size,
 
 		return;
 	}
-	ref_cnt = --entry->loaded_ref_cnt;
+	if (!strcmp(s_type, (char *)PFK_UFS)) {
+		ref_cnt = --entry->loaded_ref_cnt;
 
-	if (ref_cnt < 0)
-		pr_err("internal error, ref count should never be negative\n");
+		if (ref_cnt < 0)
+			pr_err("internal error, ref count should never be negative\n");
 
-	if (!ref_cnt) {
+		if (!ref_cnt) {
+			entry->state = INACTIVE;
+			/*
+			* wake-up invalidation if it's waiting
+			* for the entry to be released
+			*/
+			if (entry->thread_pending) {
+				tmp_pending = entry->thread_pending;
+				entry->thread_pending = NULL;
+
+				kc_spin_unlock();
+				wake_up_process(tmp_pending);
+				return;
+			}
+		}
+	} else {
 		entry->state = INACTIVE;
 		/*
-		* wake-up invalidation if it's waiting
-		* for the entry to be released
-		*/
+		 * wake-up invalidation if it's waiting
+		 * for the entry to be released
+		 */
 		if (entry->thread_pending) {
-			tmp_pending = entry->thread_pending;
+			wake_up_process(entry->thread_pending);
 			entry->thread_pending = NULL;
-
-			kc_spin_unlock();
-			wake_up_process(tmp_pending);
-			return;
 		}
 	}
 

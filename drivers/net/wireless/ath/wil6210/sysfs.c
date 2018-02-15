@@ -291,8 +291,6 @@ int wil6210_sysfs_init(struct wil6210_priv *wil)
 		return err;
 	}
 
-	kobject_uevent(&dev->kobj, KOBJ_CHANGE);
-
 	return 0;
 }
 
@@ -301,5 +299,4 @@ void wil6210_sysfs_remove(struct wil6210_priv *wil)
 	struct device *dev = wil_to_dev(wil);
 
 	sysfs_remove_group(&dev->kobj, &wil6210_attribute_group);
-	kobject_uevent(&dev->kobj, KOBJ_CHANGE);
 }

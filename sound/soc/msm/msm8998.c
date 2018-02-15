@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -177,6 +182,7 @@ struct msm_pinctrl_info {
 struct msm_asoc_mach_data {
 	u32 mclk_freq;
 	int us_euro_gpio; /* used by gpio driver API */
+	int ear_en_gpio;
 	struct device_node *us_euro_gpio_p; /* used by pinctrl API */
 	struct device_node *hph_en1_gpio_p; /* used by pinctrl API */
 	struct device_node *hph_en0_gpio_p; /* used by pinctrl API */
@@ -397,9 +403,8 @@ static struct dev_config aux_pcm_tx_cfg[] = {
 };
 
 static int msm_vi_feed_tx_ch = 2;
-static const char *const slim_rx_ch_text[] = {"One", "Two", "Three", "Four",
-						"Five", "Six", "Seven",
-						"Eight"};
+static int ear_enable_states;
+static const char *const slim_rx_ch_text[] = {"One", "Two"};
 static const char *const slim_tx_ch_text[] = {"One", "Two", "Three", "Four",
 						"Five", "Six", "Seven",
 						"Eight"};
@@ -434,12 +439,12 @@ static char const *tdm_sample_rate_text[] = {"KHZ_8", "KHZ_16", "KHZ_32",
 static const char *const auxpcm_rate_text[] = {"KHZ_8", "KHZ_16"};
 static char const *mi2s_rate_text[] = {"KHZ_8", "KHZ_16",
 				      "KHZ_32", "KHZ_44P1", "KHZ_48",
-				      "KHZ_88P2", "KHZ_96", "KHZ_176P4",
-				      "KHZ_192"};
+				      "KHZ_96", "KHZ_192"};
 static const char *const mi2s_ch_text[] = {"One", "Two", "Three", "Four",
 					   "Five", "Six", "Seven",
 					   "Eight"};
 static const char *const hifi_text[] = {"Off", "On"};
+static const char *const ear_enable_states_text[] = {"Disable", "Enable"};
 
 static SOC_ENUM_SINGLE_EXT_DECL(slim_0_rx_chs, slim_rx_ch_text);
 static SOC_ENUM_SINGLE_EXT_DECL(slim_2_rx_chs, slim_rx_ch_text);
@@ -502,6 +507,7 @@ static SOC_ENUM_SINGLE_EXT_DECL(quat_mi2s_tx_chs, mi2s_ch_text);
 static SOC_ENUM_SINGLE_EXT_DECL(mi2s_rx_format, bit_format_text);
 static SOC_ENUM_SINGLE_EXT_DECL(mi2s_tx_format, bit_format_text);
 static SOC_ENUM_SINGLE_EXT_DECL(hifi_function, hifi_text);
+static SOC_ENUM_SINGLE_EXT_DECL(ear_enable_state, ear_enable_states_text);
 
 static struct platform_device *spdev;
 static int msm_hifi_control;
@@ -539,9 +545,8 @@ static struct wcd_mbhc_config wcd_mbhc_cfg = {
 	.key_code[7] = 0,
 	.linein_th = 5000,
 	.moisture_en = true,
-	.mbhc_micbias = MIC_BIAS_2,
-	.anc_micbias = MIC_BIAS_2,
-	.enable_anc_mic_detect = false,
+	.anc_micbias = MIC_BIAS_3,
+	.enable_anc_mic_detect = true,
 };
 
 static struct snd_soc_dapm_route wcd_audio_paths_tasha[] = {
@@ -556,13 +561,6 @@ static struct snd_soc_dapm_route wcd_audio_paths[] = {
 	{"MIC BIAS2", NULL, "MCLK"},
 	{"MIC BIAS3", NULL, "MCLK"},
 	{"MIC BIAS4", NULL, "MCLK"},
-};
-
-static u32 mi2s_ebit_clk[MI2S_MAX] = {
-	Q6AFE_LPASS_CLK_ID_PRI_MI2S_EBIT,
-	Q6AFE_LPASS_CLK_ID_SEC_MI2S_EBIT,
-	Q6AFE_LPASS_CLK_ID_TER_MI2S_EBIT,
-	Q6AFE_LPASS_CLK_ID_QUAD_MI2S_EBIT,
 };
 
 static struct afe_clk_set mi2s_clk[MI2S_MAX] = {
@@ -1404,6 +1402,61 @@ static int usb_audio_tx_format_put(struct snd_kcontrol *kcontrol,
 	return rc;
 }
 
+static int ear_enable_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int gpio_state = 0;
+
+	switch (ear_enable_states) {
+	case 1:
+		gpio_state = 1;
+		break;
+	case 0:
+	default:
+		gpio_state = 0;
+		break;
+	}
+
+	ucontrol->value.integer.value[0] = gpio_state;
+	pr_debug("%s: ear_enable_states = %d\n", __func__,
+			ear_enable_states);
+
+	return 0;
+}
+
+static int ear_enable_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int ret;
+	struct snd_soc_card *card = platform_get_drvdata(spdev);
+	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+
+	pr_debug("%s: ucontrol value = %ld\n", __func__,
+			ucontrol->value.integer.value[0]);
+
+	if (pdata->ear_en_gpio >= 0) {
+		ret = gpio_request(pdata->ear_en_gpio, "ear_en_gpio");
+		if (ret) {
+			pr_err("%s: request ear_en_gpio failed, ret:%d\n",
+				__func__, ret);
+			return ret;
+		}
+		switch (ucontrol->value.integer.value[0]) {
+		case 1:
+			gpio_set_value(pdata->ear_en_gpio, 1);
+			break;
+		case 0:
+		default:
+			gpio_set_value(pdata->ear_en_gpio, 0);
+			break;
+		}
+		gpio_free(pdata->ear_en_gpio);
+		ear_enable_states = ucontrol->value.integer.value[0];
+	}
+
+	return 0;
+}
+
 static int ext_disp_get_port_idx(struct snd_kcontrol *kcontrol)
 {
 	int idx;
@@ -2229,17 +2282,11 @@ static int mi2s_get_sample_rate_val(int sample_rate)
 	case SAMPLING_RATE_48KHZ:
 		sample_rate_val = 4;
 		break;
-	case SAMPLING_RATE_88P2KHZ:
+	case SAMPLING_RATE_96KHZ:
 		sample_rate_val = 5;
 		break;
-	case SAMPLING_RATE_96KHZ:
-		sample_rate_val = 6;
-		break;
-	case SAMPLING_RATE_176P4KHZ:
-		sample_rate_val = 7;
-		break;
 	case SAMPLING_RATE_192KHZ:
-		sample_rate_val = 8;
+		sample_rate_val = 6;
 		break;
 	default:
 		sample_rate_val = 4;
@@ -2269,15 +2316,9 @@ static int mi2s_get_sample_rate(int value)
 		sample_rate = SAMPLING_RATE_48KHZ;
 		break;
 	case 5:
-		sample_rate = SAMPLING_RATE_88P2KHZ;
-		break;
-	case 6:
 		sample_rate = SAMPLING_RATE_96KHZ;
 		break;
-	case 7:
-		sample_rate = SAMPLING_RATE_176P4KHZ;
-		break;
-	case 8:
+	case 6:
 		sample_rate = SAMPLING_RATE_192KHZ;
 		break;
 	default:
@@ -2809,6 +2850,9 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 			msm_mi2s_tx_format_get, msm_mi2s_tx_format_put),
 	SOC_ENUM_EXT("HiFi Function", hifi_function, msm_hifi_get,
 			msm_hifi_put),
+	SOC_ENUM_EXT("Ear_Enable_States", ear_enable_state,
+		ear_enable_get,
+		ear_enable_put),
 };
 
 static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec,
@@ -3755,7 +3799,7 @@ static void *def_tasha_mbhc_cal(void)
 		return NULL;
 
 #define S(X, Y) ((WCD_MBHC_CAL_PLUG_TYPE_PTR(tasha_wcd_cal)->X) = (Y))
-	S(v_hs_max, 1600);
+	S(v_hs_max, 1700);
 #undef S
 #define S(X, Y) ((WCD_MBHC_CAL_BTN_DET_PTR(tasha_wcd_cal)->X) = (Y))
 	S(num_btn, WCD_MBHC_DEF_BUTTONS);
@@ -3766,7 +3810,7 @@ static void *def_tasha_mbhc_cal(void)
 		(sizeof(btn_cfg->_v_btn_low[0]) * btn_cfg->num_btn);
 
 	btn_high[0] = 75;
-	btn_high[1] = 150;
+	btn_high[1] = 137;
 	btn_high[2] = 237;
 	btn_high[3] = 500;
 	btn_high[4] = 500;
@@ -4528,11 +4572,6 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 	 */
 	mutex_lock(&mi2s_intf_conf[index].lock);
 	if (++mi2s_intf_conf[index].ref_cnt == 1) {
-		/* Check if msm needs to provide the clock to the interface */
-		if (!mi2s_intf_conf[index].msm_is_mi2s_master) {
-			fmt = SND_SOC_DAIFMT_CBM_CFM;
-			mi2s_clk[index].clk_id = mi2s_ebit_clk[index];
-		}
 		ret = msm_mi2s_set_sclk(substream, true);
 		if (IS_ERR_VALUE(ret)) {
 			dev_err(rtd->card->dev,
@@ -4552,6 +4591,9 @@ static int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 			ret = -EINVAL;
 			goto clk_off;
 		}
+		/* Check if msm needs to provide the clock to the interface */
+		if (!mi2s_intf_conf[index].msm_is_mi2s_master)
+			fmt = SND_SOC_DAIFMT_CBM_CFM;
 		ret = snd_soc_dai_set_fmt(cpu_dai, fmt);
 		if (IS_ERR_VALUE(ret)) {
 			pr_err("%s: set fmt cpu dai failed for MI2S (%d), err:%d\n",
@@ -5328,13 +5370,12 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA15,
 	},
 	{
-		.name = MSM_DAILINK_NAME(ULL_NOIRQ_2),
-		.stream_name = "MM_NOIRQ_2",
+		.name = MSM_DAILINK_NAME(Compress9),
+		.stream_name = "Compress9",
 		.cpu_dai_name = "MultiMedia16",
-		.platform_name = "msm-pcm-dsp-noirq",
+		.platform_name = "msm-compress-dsp",
 		.dynamic = 1,
 		.dpcm_playback = 1,
-		.dpcm_capture = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			 SND_SOC_DPCM_TRIGGER_POST},
 		.codec_dai_name = "snd-soc-dummy-dai",
@@ -5519,122 +5560,6 @@ static struct snd_soc_dai_link msm_common_misc_fe_dai_links[] = {
 		.ignore_pmdown_time = 1,
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
-	},
-	{
-		.name = MSM_DAILINK_NAME(Transcode Loopback Playback),
-		.stream_name = "Transcode Loopback Playback",
-		.cpu_dai_name = "MultiMedia26",
-		.platform_name = "msm-transcode-loopback",
-		.dynamic = 1,
-		.dpcm_playback = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			 SND_SOC_DPCM_TRIGGER_POST},
-		.codec_dai_name = "snd-soc-dummy-dai",
-		.codec_name = "snd-soc-dummy",
-		.ignore_suspend = 1,
-		.ignore_pmdown_time = 1,
-		 /* this dainlink has playback support */
-		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA26,
-	},
-	{
-		.name = MSM_DAILINK_NAME(Transcode Loopback Capture),
-		.stream_name = "Transcode Loopback Capture",
-		.cpu_dai_name = "MultiMedia27",
-		.platform_name = "msm-transcode-loopback",
-		.dynamic = 1,
-		.dpcm_capture = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			 SND_SOC_DPCM_TRIGGER_POST},
-		.codec_dai_name = "snd-soc-dummy-dai",
-		.codec_name = "snd-soc-dummy",
-		.ignore_suspend = 1,
-		.ignore_pmdown_time = 1,
-		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA27,
-	},
-	{
-		.name = "MultiMedia21",
-		.stream_name = "MultiMedia21",
-		.cpu_dai_name = "MultiMedia21",
-		.platform_name = "msm-pcm-dsp.0",
-		.dynamic = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
-		.dpcm_playback = 1,
-		.codec_dai_name = "snd-soc-dummy-dai",
-		.codec_name = "snd-soc-dummy",
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ignore_suspend = 1,
-		/* this dainlink has playback support */
-		.ignore_pmdown_time = 1,
-		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA21,
-	},
-	{
-		.name = "MultiMedia22",
-		.stream_name = "MultiMedia22",
-		.cpu_dai_name = "MultiMedia22",
-		.platform_name = "msm-pcm-dsp.0",
-		.dynamic = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
-		.dpcm_playback = 1,
-		.codec_dai_name = "snd-soc-dummy-dai",
-		.codec_name = "snd-soc-dummy",
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ignore_suspend = 1,
-		/* this dainlink has playback support */
-		.ignore_pmdown_time = 1,
-		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA22,
-	},
-	{
-		.name = "MultiMedia23",
-		.stream_name = "MultiMedia23",
-		.cpu_dai_name = "MultiMedia23",
-		.platform_name = "msm-pcm-dsp.0",
-		.dynamic = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
-		.dpcm_playback = 1,
-		.codec_dai_name = "snd-soc-dummy-dai",
-		.codec_name = "snd-soc-dummy",
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ignore_suspend = 1,
-		/* this dainlink has playback support */
-		.ignore_pmdown_time = 1,
-		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA23,
-	},
-	{
-		.name = "MultiMedia24",
-		.stream_name = "MultiMedia24",
-		.cpu_dai_name = "MultiMedia24",
-		.platform_name = "msm-pcm-dsp.0",
-		.dynamic = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
-		.dpcm_playback = 1,
-		.codec_dai_name = "snd-soc-dummy-dai",
-		.codec_name = "snd-soc-dummy",
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ignore_suspend = 1,
-		/* this dainlink has playback support */
-		.ignore_pmdown_time = 1,
-		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA24,
-	},
-	{
-		.name = "MultiMedia25",
-		.stream_name = "MultiMedia25",
-		.cpu_dai_name = "MultiMedia25",
-		.platform_name = "msm-pcm-dsp.0",
-		.dynamic = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
-		.dpcm_playback = 1,
-		.codec_dai_name = "snd-soc-dummy-dai",
-		.codec_name = "snd-soc-dummy",
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ignore_suspend = 1,
-		/* this dainlink has playback support */
-		.ignore_pmdown_time = 1,
-		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA25,
 	},
 };
 
@@ -7479,19 +7404,14 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 			pdev->dev.of_node->full_name);
 		dev_dbg(&pdev->dev, "Jack type properties set to default");
 	} else {
-		if (!strcmp(mbhc_audio_jack_type, "4-pole-jack")) {
-			wcd_mbhc_cfg.enable_anc_mic_detect = false;
+		if (!strcmp(mbhc_audio_jack_type, "4-pole-jack"))
 			dev_dbg(&pdev->dev, "This hardware has 4 pole jack");
-		} else if (!strcmp(mbhc_audio_jack_type, "5-pole-jack")) {
-			wcd_mbhc_cfg.enable_anc_mic_detect = true;
+		else if (!strcmp(mbhc_audio_jack_type, "5-pole-jack"))
 			dev_dbg(&pdev->dev, "This hardware has 5 pole jack");
-		} else if (!strcmp(mbhc_audio_jack_type, "6-pole-jack")) {
-			wcd_mbhc_cfg.enable_anc_mic_detect = true;
+		else if (!strcmp(mbhc_audio_jack_type, "6-pole-jack"))
 			dev_dbg(&pdev->dev, "This hardware has 6 pole jack");
-		} else {
-			wcd_mbhc_cfg.enable_anc_mic_detect = false;
+		else
 			dev_dbg(&pdev->dev, "Unknown value, set to default");
-		}
 	}
 	/*
 	 * Parse US-Euro gpio info from DT. Report no error if us-euro
@@ -7537,6 +7457,17 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		pr_err("%s: Audio notifier register failed ret = %d\n",
 			__func__, ret);
 
+	/* Parse EAR_EN info for NX5L2750C */
+	pdata->ear_en_gpio = of_get_named_gpio(pdev->dev.of_node,
+				"qcom,ear-en-gpios", 0);
+	if (pdata->ear_en_gpio < 0) {
+		dev_err(&pdev->dev, "property %s not detected in node %s",
+			"qcom,ear-en-gpios",
+			pdev->dev.of_node->full_name);
+		ret = -ENODEV;
+		goto err;
+	}
+
 	return 0;
 err:
 	if (pdata->us_euro_gpio > 0) {
@@ -7544,6 +7475,11 @@ err:
 			__func__, pdata->us_euro_gpio);
 		gpio_free(pdata->us_euro_gpio);
 		pdata->us_euro_gpio = 0;
+	}
+	if (pdata->ear_en_gpio > 0) {
+		dev_dbg(&pdev->dev, "%s initialize ear_en gpio %d\n",
+			__func__, pdata->ear_en_gpio);
+		pdata->ear_en_gpio = 0;
 	}
 	msm_release_pinctrl(pdev);
 	devm_kfree(&pdev->dev, pdata);

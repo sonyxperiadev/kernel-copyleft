@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _LINUX_MM_H
 #define _LINUX_MM_H
 
@@ -529,6 +534,7 @@ void put_page(struct page *page);
 void put_pages_list(struct list_head *pages);
 
 void split_page(struct page *page, unsigned int order);
+int split_free_page(struct page *page);
 
 /*
  * Compound pages have a destructor function.  Provide a

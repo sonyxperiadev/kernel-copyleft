@@ -36,6 +36,11 @@
  * The Linux Foundation chooses to take subject only to the GPLv2
  * license terms, and distributes only under these terms.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/async.h>
 #include <scsi/ufs/ioctl.h>
@@ -43,6 +48,8 @@
 #include <linux/nls.h>
 #include <linux/of.h>
 #include <linux/blkdev.h>
+#include <linux/fs.h>
+#include <linux/firmware.h>
 
 #include "ufshcd.h"
 #include "ufshci.h"
@@ -246,7 +253,7 @@ static u32 ufs_query_desc_max_size[] = {
 	QUERY_DESC_RFU_MAX_SIZE,
 	QUERY_DESC_GEOMETRY_MAZ_SIZE,
 	QUERY_DESC_POWER_MAX_SIZE,
-	QUERY_DESC_RFU_MAX_SIZE,
+	QUERY_DESC_DEVICE_HEALTH_MAX_SIZE,
 };
 
 enum {
@@ -1483,7 +1490,7 @@ start:
 		hba->clk_gating.state = REQ_CLKS_ON;
 		trace_ufshcd_clk_gating(dev_name(hba->dev),
 			hba->clk_gating.state);
-		queue_work(hba->clk_gating.clk_gating_workq,
+		queue_work(hba->clk_gating.ungating_workq,
 				&hba->clk_gating.ungate_work);
 		/*
 		 * fall through to check if we should wait for this
@@ -1751,8 +1758,7 @@ static enum hrtimer_restart ufshcd_clkgate_hrtimer_handler(
 	struct ufs_hba *hba = container_of(timer, struct ufs_hba,
 					   clk_gating.gate_hrtimer);
 
-	queue_work(hba->clk_gating.clk_gating_workq,
-				&hba->clk_gating.gate_work);
+	schedule_work(&hba->clk_gating.gate_work);
 
 	return HRTIMER_NORESTART;
 }
@@ -1760,7 +1766,7 @@ static enum hrtimer_restart ufshcd_clkgate_hrtimer_handler(
 static void ufshcd_init_clk_gating(struct ufs_hba *hba)
 {
 	struct ufs_clk_gating *gating = &hba->clk_gating;
-	char wq_name[sizeof("ufs_clk_gating_00")];
+	char wq_name[sizeof("ufs_clk_ungating_00")];
 
 	hba->clk_gating.state = CLKS_ON;
 
@@ -1789,10 +1795,9 @@ static void ufshcd_init_clk_gating(struct ufs_hba *hba)
 	hrtimer_init(&gating->gate_hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	gating->gate_hrtimer.function = ufshcd_clkgate_hrtimer_handler;
 
-	snprintf(wq_name, ARRAY_SIZE(wq_name), "ufs_clk_gating_%d",
+	snprintf(wq_name, ARRAY_SIZE(wq_name), "ufs_clk_ungating_%d",
 			hba->host->host_no);
-	hba->clk_gating.clk_gating_workq =
-		create_singlethread_workqueue(wq_name);
+	hba->clk_gating.ungating_workq = create_singlethread_workqueue(wq_name);
 
 	gating->is_enabled = true;
 
@@ -1856,7 +1861,7 @@ static void ufshcd_exit_clk_gating(struct ufs_hba *hba)
 	device_remove_file(hba->dev, &hba->clk_gating.enable_attr);
 	ufshcd_cancel_gate_work(hba);
 	cancel_work_sync(&hba->clk_gating.ungate_work);
-	destroy_workqueue(hba->clk_gating.clk_gating_workq);
+	destroy_workqueue(hba->clk_gating.ungating_workq);
 }
 
 static void ufshcd_set_auto_hibern8_timer(struct ufs_hba *hba, u32 delay)
@@ -3793,6 +3798,11 @@ int ufshcd_read_device_desc(struct ufs_hba *hba, u8 *buf, u32 size)
 	return ufshcd_read_desc(hba, QUERY_DESC_IDN_DEVICE, 0, buf, size);
 }
 
+int ufshcd_read_device_health_desc(struct ufs_hba *hba, u8 *buf, u32 size)
+{
+	return ufshcd_read_desc(hba, QUERY_DESC_IDN_DEVICE_HEALTH, 0, buf, size);
+}
+
 /**
  * ufshcd_read_string_desc - read string descriptor
  * @hba: pointer to adapter instance
@@ -4694,6 +4704,12 @@ int ufshcd_change_power_mode(struct ufs_hba *hba,
 	ufshcd_dme_set(hba, UIC_ARG_MIB(DME_LocalAFC0ReqTimeOutVal),
 			DL_AFC0ReqTimeOutVal_Default);
 
+	if (hba->dev_quirks & UFS_DEVICE_QUIRK_EXTEND_SYNC_LENGTH) {
+		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TxHsG1SyncLength), 0x48);
+		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TxHsG2SyncLength), 0x48);
+		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TxHsG3SyncLength), 0x48);
+	}
+
 	ret = ufshcd_uic_change_pwr_mode(hba, pwr_mode->pwr_rx << 4
 			| pwr_mode->pwr_tx);
 
@@ -4975,6 +4991,8 @@ static int ufshcd_link_startup(struct ufs_hba *hba)
 	 */
 	if (!ufshcd_is_ufs_dev_active(hba))
 		link_startup_again = true;
+
+	ufshcd_dme_set(hba, UIC_ARG_MIB(PA_AVAILTXDATALANES), 0x1);
 
 link_startup:
 	do {
@@ -7576,8 +7594,9 @@ static void ufshcd_async_scan(void *data, async_cookie_t cookie)
  * It will read the opcode, idn and buf_length parameters, and, put the
  * response in the buffer field while updating the used size in buf_length.
  */
-static int ufshcd_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
+static int ufshcd_query_ioctl(struct scsi_device *dev, u8 lun, void __user *buffer)
 {
+	struct ufs_hba *hba = shost_priv(dev->host);
 	struct ufs_ioctl_query_data *ioctl_data;
 	int err = 0;
 	int length = 0;
@@ -7648,7 +7667,6 @@ static int ufshcd_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
 		case QUERY_ATTR_IDN_ACTIVE_ICC_LVL:
 		case QUERY_ATTR_IDN_OOO_DATA_EN:
 		case QUERY_ATTR_IDN_BKOPS_STATUS:
-		case QUERY_ATTR_IDN_PURGE_STATUS:
 		case QUERY_ATTR_IDN_MAX_DATA_IN:
 		case QUERY_ATTR_IDN_MAX_DATA_OUT:
 		case QUERY_ATTR_IDN_REF_CLK_FREQ:
@@ -7657,11 +7675,19 @@ static int ufshcd_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
 		case QUERY_ATTR_IDN_EE_CONTROL:
 		case QUERY_ATTR_IDN_EE_STATUS:
 		case QUERY_ATTR_IDN_SECONDS_PASSED:
+		case QUERY_ATTR_IDN_FFU_STATUS:
 			index = 0;
 			break;
 		case QUERY_ATTR_IDN_DYN_CAP_NEEDED:
 		case QUERY_ATTR_IDN_CORR_PRG_BLK_NUM:
 			index = lun;
+			break;
+		case QUERY_ATTR_IDN_PURGE_STATUS:
+			index = 0;
+			if (hba->dev_quirks & UFS_DEVICE_QUIRK_NO_PURGE) {
+				err = -EPERM;
+				goto out_release_mem;
+			}
 			break;
 		default:
 			goto out_einval;
@@ -7706,15 +7732,35 @@ static int ufshcd_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
 		case QUERY_FLAG_IDN_PERMANENT_WPE:
 		case QUERY_FLAG_IDN_PWR_ON_WPE:
 		case QUERY_FLAG_IDN_BKOPS_EN:
-		case QUERY_FLAG_IDN_PURGE_ENABLE:
 		case QUERY_FLAG_IDN_FPHYRESOURCEREMOVAL:
 		case QUERY_FLAG_IDN_BUSY_RTC:
+			break;
+		case QUERY_FLAG_IDN_PURGE_ENABLE:
+			if (hba->dev_quirks & UFS_DEVICE_QUIRK_NO_PURGE) {
+				err = -EPERM;
+				goto out_release_mem;
+			}
 			break;
 		default:
 			goto out_einval;
 		}
 		err = ufshcd_query_flag_retry(hba, ioctl_data->opcode,
 				ioctl_data->idn, &flag);
+		break;
+	case UPIU_QUERY_OPCODE_SET_FLAG:
+		switch (ioctl_data->idn) {
+		case QUERY_FLAG_IDN_PURGE_ENABLE:
+			if (hba->dev_quirks & UFS_DEVICE_QUIRK_NO_PURGE) {
+				err = -EPERM;
+				goto out_release_mem;
+			}
+			pm_runtime_disable(&dev->sdev_gendev);
+			break;
+		default:
+			goto out_einval;
+		}
+		err = ufshcd_query_flag_retry(hba, ioctl_data->opcode,
+				ioctl_data->idn, NULL);
 		break;
 	default:
 		goto out_einval;
@@ -7746,6 +7792,7 @@ static int ufshcd_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
 		data_ptr = &flag;
 		break;
 	case UPIU_QUERY_OPCODE_WRITE_ATTR:
+	case UPIU_QUERY_OPCODE_SET_FLAG:
 		goto out_release_mem;
 	default:
 		goto out_einval;
@@ -7776,6 +7823,92 @@ out:
 	return err;
 }
 
+static int ufshcd_write_buffer(struct ufs_hba *hba, void __user *buffer)
+{
+	int err = 0;
+	unsigned char cmd[11] = {WRITE_BUFFER, 0x0E, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	struct ufs_ioctl_write_buffer_data *ioctl_data = NULL;
+	struct ufs_ioctl_write_buffer_data *fw_data = NULL;
+	struct Scsi_Host *shost = NULL;
+	struct scsi_device *sdev = NULL;
+	unsigned char sense[SCSI_SENSE_BUFFERSIZE];
+	struct scsi_sense_hdr sshdr;
+
+	ioctl_data = kmalloc(sizeof(struct ufs_ioctl_write_buffer_data), GFP_KERNEL);
+	if (!ioctl_data) {
+		dev_err(hba->dev, "%s: Failed allocating ioctl_data\n", __func__);
+		err = -ENOMEM;
+		goto out;
+	}
+
+	err = copy_from_user(ioctl_data, buffer, sizeof(struct ufs_ioctl_write_buffer_data));
+	if (err) {
+		dev_err(hba->dev, "%s: Failed copying ioctl_data from user, err %d\n", __func__, err);
+		goto out;
+	}
+
+	fw_data = kmalloc(sizeof(struct ufs_ioctl_write_buffer_data) + ioctl_data->buf_size, GFP_KERNEL);
+	if (!fw_data) {
+		dev_err(hba->dev, "%s: Failed allocating fw_data\n", __func__);
+		err = -ENOMEM;
+		goto out;
+	}
+
+	err = copy_from_user(fw_data, buffer, sizeof(struct ufs_ioctl_write_buffer_data) + ioctl_data->buf_size);
+	if (err) {
+		dev_err(hba->dev, "%s: Failed copying fw_data from user, err %d\n", __func__, err);
+		goto out;
+	}
+
+	cmd[6] = (ioctl_data->buf_size >> 16) & 0xff;
+	cmd[7] = (ioctl_data->buf_size >> 8) & 0xff;
+	cmd[8] = ioctl_data->buf_size & 0xff;
+
+	shost = scsi_host_lookup(0);
+	if (!shost) {
+		dev_err(hba->dev, "%s: Failed to get scsi_host\n", __func__);
+		err = -ENODEV;
+		goto out;
+	}
+
+	sdev = scsi_device_lookup(shost, 0, 0, 0);
+	if (!sdev) {
+		dev_err(hba->dev, "%s: Failed to get scsi_device\n", __func__);
+		err = -ENODEV;
+		goto out;
+	}
+
+	err = scsi_execute(sdev, cmd, DMA_TO_DEVICE, fw_data->buffer, ioctl_data->buf_size, sense, 10000, 1,
+						REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT | REQ_FAILFAST_DRIVER, NULL);
+	if (err) {
+		dev_err(hba->dev, "%s: Failed write buffer %d\n", __func__, err);
+		goto out;
+	}
+
+	if (scsi_normalize_sense(sense, SCSI_SENSE_BUFFERSIZE, &sshdr)) {
+		dev_err(hba->dev, "%s: print sense hdr\n", __func__);
+		scsi_print_sense_hdr(sdev, "ffu", &sshdr);
+	}
+
+out:
+	if (sdev) {
+		scsi_device_put(sdev);
+	}
+
+	if (shost) {
+		scsi_host_put(shost);
+	}
+
+	if (fw_data) {
+		kfree(fw_data);
+	}
+
+	if (ioctl_data) {
+		kfree(ioctl_data);
+	}
+	return err;
+}
+
 /**
  * ufshcd_ioctl - ufs ioctl callback registered in scsi_host
  * @dev: scsi device required for per LUN queries
@@ -7789,18 +7922,33 @@ static int ufshcd_ioctl(struct scsi_device *dev, int cmd, void __user *buffer)
 {
 	struct ufs_hba *hba = shost_priv(dev->host);
 	int err = 0;
+	struct task_struct *tsk = current;
 
 	BUG_ON(!hba);
 	if (!buffer) {
-		dev_err(hba->dev, "%s: User buffer is NULL!\n", __func__);
+		dev_err(hba->dev, "%s: User buffer is NULL! (cmd:0x%08x)\n",
+			__func__, cmd);
+		if (tsk && tsk->pid) {
+			dev_err(hba->dev, " pid=%d comm=%s", tsk->pid, tsk->comm);
+
+			if (tsk->parent && tsk->parent->pid) {
+				dev_err(hba->dev, " ppid=%d pcomm=%s",
+					tsk->parent->pid, tsk->parent->comm);
+			}
+		}
 		return -EINVAL;
 	}
 
 	switch (cmd) {
 	case UFS_IOCTL_QUERY:
 		pm_runtime_get_sync(hba->dev);
-		err = ufshcd_query_ioctl(hba, ufshcd_scsi_to_upiu_lun(dev->lun),
+		err = ufshcd_query_ioctl(dev, ufshcd_scsi_to_upiu_lun(dev->lun),
 				buffer);
+		pm_runtime_put_sync(hba->dev);
+		break;
+	case UFS_IOCTL_WRITE_BUFFER:
+		pm_runtime_get_sync(hba->dev);
+		err = ufshcd_write_buffer(hba, buffer);
 		pm_runtime_put_sync(hba->dev);
 		break;
 	default:

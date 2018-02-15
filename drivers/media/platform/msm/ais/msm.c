@@ -391,9 +391,6 @@ static void msm_add_sd_in_position(struct msm_sd_subdev *msm_subdev,
 	struct msm_sd_subdev *temp_sd;
 
 	list_for_each_entry(temp_sd, sd_list, list) {
-		if (temp_sd == msm_subdev) {
-			return;
-		}
 		if (msm_subdev->close_seq < temp_sd->close_seq) {
 			list_add_tail(&msm_subdev->list, &temp_sd->list);
 			return;
@@ -727,9 +724,6 @@ static long msm_private_ioctl(struct file *file, void *fh,
 		is_daemon_status = false;
 		return 0;
 	}
-
-	if (!event_data)
-		return -EINVAL;
 
 	memset(&event, 0, sizeof(struct v4l2_event));
 	session_id = event_data->session_id;

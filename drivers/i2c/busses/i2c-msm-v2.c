@@ -11,6 +11,11 @@
  *
  */
 /*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
+/*
  * I2C controller driver for Qualcomm Technologies Inc platforms
  */
 
@@ -409,6 +414,7 @@ struct i2c_msm_clk_div_fld {
  */
 static struct i2c_msm_clk_div_fld i2c_msm_clk_div_map[] = {
 	{KHz(100), 124, 62},
+	{KHz(355),  32, 16},
 	{KHz(400),  28, 14},
 	{KHz(1000),  8,  5},
 };
@@ -2232,7 +2238,18 @@ static int i2c_msm_pm_clk_enable(struct i2c_msm_ctrl *ctrl)
 static int i2c_msm_pm_xfer_start(struct i2c_msm_ctrl *ctrl)
 {
 	int ret;
+	struct i2c_msm_xfer *xfer = &ctrl->xfer;
 	mutex_lock(&ctrl->xfer.mtx);
+
+	/* if system is suspended just bail out */
+	if (ctrl->pwr_state == I2C_MSM_PM_SYS_SUSPENDED) {
+		struct i2c_msg *msgs = xfer->msgs + xfer->cur_buf.msg_idx;
+		dev_err(ctrl->dev,
+				"slave:0x%x is calling xfer when system is suspended\n",
+				msgs->addr);
+		mutex_unlock(&ctrl->xfer.mtx);
+		return -EIO;
+	}
 
 	i2c_msm_pm_pinctrl_state(ctrl, true);
 	pm_runtime_get_sync(ctrl->dev);
@@ -2317,14 +2334,6 @@ i2c_msm_frmwrk_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	if (IS_ERR_OR_NULL(msgs)) {
 		dev_err(ctrl->dev, " error on msgs Accessing invalid  pointer location\n");
 		return PTR_ERR(msgs);
-	}
-
-	/* if system is suspended just bail out */
-	if (ctrl->pwr_state == I2C_MSM_PM_SYS_SUSPENDED) {
-		dev_err(ctrl->dev,
-				"slave:0x%x is calling xfer when system is suspended\n",
-				msgs->addr);
-		return -EIO;
 	}
 
 	ret = i2c_msm_pm_xfer_start(ctrl);

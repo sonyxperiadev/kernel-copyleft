@@ -667,36 +667,6 @@ ath10k_mac_get_any_chandef_iter(struct ieee80211_hw *hw,
 	*def = &conf->def;
 }
 
-static int ath10k_peer_delete(struct ath10k *ar, u32 vdev_id, const u8 *addr)
-{
-	int ret;
-	unsigned long time_left;
-
-	lockdep_assert_held(&ar->conf_mutex);
-
-	ret = ath10k_wmi_peer_delete(ar, vdev_id, addr);
-	if (ret)
-		return ret;
-
-	ret = ath10k_wait_for_peer_deleted(ar, vdev_id, addr);
-	if (ret)
-		return ret;
-
-	if (QCA_REV_WCN3990(ar)) {
-		time_left = wait_for_completion_timeout(&ar->peer_delete_done,
-							50 * HZ);
-
-		if (time_left == 0) {
-			ath10k_warn(ar, "Timeout in receiving peer delete response\n");
-			return -ETIMEDOUT;
-		}
-	}
-
-	ar->num_peers--;
-
-	return 0;
-}
-
 static int ath10k_peer_create(struct ath10k *ar,
 			      struct ieee80211_vif *vif,
 			      struct ieee80211_sta *sta,
@@ -741,7 +711,7 @@ static int ath10k_peer_create(struct ath10k *ar,
 		spin_unlock_bh(&ar->data_lock);
 		ath10k_warn(ar, "failed to find peer %pM on vdev %i after creation\n",
 			    addr, vdev_id);
-		ath10k_peer_delete(ar, vdev_id, addr);
+		ath10k_wmi_peer_delete(ar, vdev_id, addr);
 		return -ENOENT;
 	}
 
@@ -807,6 +777,36 @@ static int ath10k_mac_set_rts(struct ath10k_vif *arvif, u32 value)
 
 	vdev_param = ar->wmi.vdev_param->rts_threshold;
 	return ath10k_wmi_vdev_set_param(ar, arvif->vdev_id, vdev_param, value);
+}
+
+static int ath10k_peer_delete(struct ath10k *ar, u32 vdev_id, const u8 *addr)
+{
+	int ret;
+	unsigned long time_left;
+
+	lockdep_assert_held(&ar->conf_mutex);
+
+	ret = ath10k_wmi_peer_delete(ar, vdev_id, addr);
+	if (ret)
+		return ret;
+
+	ret = ath10k_wait_for_peer_deleted(ar, vdev_id, addr);
+	if (ret)
+		return ret;
+
+	if (QCA_REV_WCN3990(ar)) {
+		time_left = wait_for_completion_timeout(&ar->peer_delete_done,
+							50 * HZ);
+
+		if (time_left == 0) {
+			ath10k_warn(ar, "Timeout in receiving peer delete response\n");
+			return -ETIMEDOUT;
+		}
+	}
+
+	ar->num_peers--;
+
+	return 0;
 }
 
 static void ath10k_peer_cleanup(struct ath10k *ar, u32 vdev_id)
@@ -5094,7 +5094,7 @@ static int ath10k_add_interface(struct ieee80211_hw *hw,
 err_peer_delete:
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP ||
 	    arvif->vdev_type == WMI_VDEV_TYPE_IBSS)
-		ath10k_peer_delete(ar, arvif->vdev_id, vif->addr);
+		ath10k_wmi_peer_delete(ar, arvif->vdev_id, vif->addr);
 
 err_vdev_delete:
 	ath10k_wmi_vdev_delete(ar, arvif->vdev_id);
@@ -5150,8 +5150,8 @@ static void ath10k_remove_interface(struct ieee80211_hw *hw,
 
 	if (arvif->vdev_type == WMI_VDEV_TYPE_AP ||
 	    arvif->vdev_type == WMI_VDEV_TYPE_IBSS) {
-		ret = ath10k_peer_delete(arvif->ar, arvif->vdev_id,
-					 vif->addr);
+		ret = ath10k_wmi_peer_delete(arvif->ar, arvif->vdev_id,
+					     vif->addr);
 		if (ret)
 			ath10k_warn(ar, "failed to submit AP/IBSS self-peer removal on vdev %i: %d\n",
 				    arvif->vdev_id, ret);
@@ -7168,25 +7168,12 @@ ath10k_mac_update_vif_chan(struct ath10k *ar,
 
 		if (WARN_ON(!arvif->is_up))
 			continue;
-		if (QCA_REV_WCN3990(ar)) {
-			/* In the case of wcn3990 WLAN module we send
-			 * vdev restart only, no need to send vdev down.
-			 */
 
-			ret = ath10k_vdev_restart(arvif, &vifs[i].new_ctx->def);
-			if (ret) {
-				ath10k_warn(ar,
-					    "failed to restart vdev %d: %d\n",
-					    arvif->vdev_id, ret);
-				continue;
-			}
-		} else {
-			ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
-			if (ret) {
-				ath10k_warn(ar, "failed to down vdev %d: %d\n",
-					    arvif->vdev_id, ret);
-				continue;
-			}
+		ret = ath10k_wmi_vdev_down(ar, arvif->vdev_id);
+		if (ret) {
+			ath10k_warn(ar, "failed to down vdev %d: %d\n",
+				    arvif->vdev_id, ret);
+			continue;
 		}
 	}
 
@@ -7217,17 +7204,11 @@ ath10k_mac_update_vif_chan(struct ath10k *ar,
 			ath10k_warn(ar, "failed to update prb tmpl during csa: %d\n",
 				    ret);
 
-		if (!QCA_REV_WCN3990(ar)) {
-			/* In case of other than wcn3990 WLAN module we
-			 * send vdev down and vdev restart to the firmware.
-			 */
-
-			ret = ath10k_vdev_restart(arvif, &vifs[i].new_ctx->def);
-			if (ret) {
-				ath10k_warn(ar, "failed to restart vdev %d: %d\n",
-					    arvif->vdev_id, ret);
-				continue;
-			}
+		ret = ath10k_vdev_restart(arvif, &vifs[i].new_ctx->def);
+		if (ret) {
+			ath10k_warn(ar, "failed to restart vdev %d: %d\n",
+				    arvif->vdev_id, ret);
+			continue;
 		}
 
 		ret = ath10k_wmi_vdev_up(arvif->ar, arvif->vdev_id, arvif->aid,
@@ -7822,6 +7803,10 @@ static const struct ieee80211_iface_limit ath10k_wcn3990_if_limit[] = {
 			 BIT(NL80211_IFTYPE_P2P_CLIENT) |
 			 BIT(NL80211_IFTYPE_P2P_GO),
 	},
+	{
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_P2P_DEVICE),
+	},
 };
 
 static const struct ieee80211_iface_limit ath10k_wcn3990_qcs_if_limit[] = {
@@ -7840,6 +7825,10 @@ static const struct ieee80211_iface_limit ath10k_wcn3990_qcs_if_limit[] = {
 			 BIT(NL80211_IFTYPE_MESH_POINT) |
 #endif
 			 BIT(NL80211_IFTYPE_P2P_GO),
+	},
+	{
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_P2P_DEVICE),
 	},
 };
 
@@ -8013,10 +8002,6 @@ int ath10k_mac_register(struct ath10k *ar)
 			BIT(NL80211_IFTYPE_P2P_DEVICE) |
 			BIT(NL80211_IFTYPE_P2P_CLIENT) |
 			BIT(NL80211_IFTYPE_P2P_GO);
-
-	if (QCA_REV_WCN3990(ar))
-		ar->hw->wiphy->interface_modes &=
-			~BIT(NL80211_IFTYPE_P2P_DEVICE);
 
 	ieee80211_hw_set(ar->hw, SIGNAL_DBM);
 	ieee80211_hw_set(ar->hw, SUPPORTS_PS);

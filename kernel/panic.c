@@ -3,6 +3,11 @@
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  * This function is used through-out the kernel (including mm and fs)
@@ -24,6 +29,7 @@
 #include <linux/init.h>
 #include <linux/nmi.h>
 #include <linux/console.h>
+#include <linux/crash_notes.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/exception.h>
@@ -126,6 +132,9 @@ void panic(const char *fmt, ...)
 	if (!crash_kexec_post_notifiers)
 		crash_kexec(NULL);
 
+	/* Store crash context for all other no panic cpus */
+	crash_notes_save_cpus();
+
 	/*
 	 * Note smp_send_stop is the usual smp shutdown function, which
 	 * unfortunately means it may not be hardened to work in a panic
@@ -172,7 +181,7 @@ void panic(const char *fmt, ...)
 		 * Delay timeout seconds before rebooting the machine.
 		 * We can't use the "normal" timers since we just panicked.
 		 */
-		pr_emerg("Rebooting in %d seconds..\n", panic_timeout);
+		pr_emerg("Rebooting in %d seconds..", panic_timeout);
 
 		for (i = 0; i < panic_timeout * 1000; i += PANIC_TIMER_STEP) {
 			touch_nmi_watchdog();

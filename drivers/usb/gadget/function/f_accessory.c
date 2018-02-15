@@ -14,6 +14,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /* #define DEBUG */
 /* #define VERBOSE_DEBUG */
@@ -346,7 +351,6 @@ static void acc_complete_set_string(struct usb_ep *ep, struct usb_request *req)
 	struct acc_dev	*dev = ep->driver_data;
 	char *string_dest = NULL;
 	int length = req->actual;
-	unsigned long flags;
 
 	if (req->status != 0) {
 		pr_err("acc_complete_set_string, err %d\n", req->status);
@@ -372,26 +376,22 @@ static void acc_complete_set_string(struct usb_ep *ep, struct usb_request *req)
 	case ACCESSORY_STRING_SERIAL:
 		string_dest = dev->serial;
 		break;
-	default:
+	}
+	if ((string_dest) && (length != 0)) {
+		unsigned long flags;
+
+		if (length >= ACC_STRING_SIZE)
+			length = ACC_STRING_SIZE - 1;
+
+		spin_lock_irqsave(&dev->lock, flags);
+		memcpy(string_dest, req->buf, length);
+		/* ensure zero termination */
+		string_dest[length] = 0;
+		spin_unlock_irqrestore(&dev->lock, flags);
+	} else {
 		pr_err("unknown accessory string index %d\n",
-					dev->string_index);
-		return;
+			dev->string_index);
 	}
-
-	if (!length) {
-		pr_debug("zero length for accessory string index %d\n",
-						dev->string_index);
-		return;
-	}
-
-	if (length >= ACC_STRING_SIZE)
-		length = ACC_STRING_SIZE - 1;
-
-	spin_lock_irqsave(&dev->lock, flags);
-	memcpy(string_dest, req->buf, length);
-	/* ensure zero termination */
-	string_dest[length] = 0;
-	spin_unlock_irqrestore(&dev->lock, flags);
 }
 
 static void acc_complete_set_hid_report_desc(struct usb_ep *ep,
@@ -699,6 +699,7 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 	ssize_t r = count;
 	unsigned xfer;
 	int ret;
+	int sendZLP = 0;
 
 	pr_debug("acc_write(%zu)\n", count);
 
@@ -707,7 +708,14 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 		return -ENODEV;
 	}
 
-	while (count > 0) {
+	if ((count & (dev->ep_in->maxpacket - 1)) == 0)
+		sendZLP = 1;
+
+	while ((count > 0) || (sendZLP == 1)) {
+		/* exit after sending ZLP */
+		if (count == 0)
+			sendZLP = 0;
+
 		if (!dev->online) {
 			pr_debug("acc_write dev->error\n");
 			r = -EIO;
@@ -732,8 +740,9 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 			/*
 			 * If the data length is a multple of the
 			 * maxpacket size then send a zero length packet(ZLP).
+			 *
+			 * req->zero = ((xfer % dev->ep_in->maxpacket) == 0);
 			 */
-			req->zero = ((xfer % dev->ep_in->maxpacket) == 0);
 		}
 		if (copy_from_user(req->buf, buf, xfer)) {
 			r = -EFAULT;

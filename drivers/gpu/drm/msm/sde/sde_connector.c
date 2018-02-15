@@ -83,55 +83,11 @@ int sde_connector_pre_kickoff(struct drm_connector *connector)
 	if (!c_conn->ops.pre_kickoff)
 		return 0;
 
-	params.hdr_ctrl = &c_state->hdr_ctrl;
+	params.hdr_metadata = &c_state->hdr_meta;
 
 	rc = c_conn->ops.pre_kickoff(connector, c_conn->display, &params);
 
 	return rc;
-}
-
-enum sde_csc_type sde_connector_get_csc_type(struct drm_connector *conn)
-{
-	struct sde_connector *c_conn;
-
-	if (!conn) {
-		SDE_ERROR("invalid argument\n");
-		return -EINVAL;
-	}
-
-	c_conn = to_sde_connector(conn);
-
-	if (!c_conn->display) {
-		SDE_ERROR("invalid argument\n");
-		return -EINVAL;
-	}
-
-	if (!c_conn->ops.get_csc_type)
-		return SDE_CSC_RGB2YUV_601L;
-
-	return c_conn->ops.get_csc_type(conn, c_conn->display);
-}
-
-bool sde_connector_mode_needs_full_range(struct drm_connector *connector)
-{
-	struct sde_connector *c_conn;
-
-	if (!connector) {
-		SDE_ERROR("invalid argument\n");
-		return false;
-	}
-
-	c_conn = to_sde_connector(connector);
-
-	if (!c_conn->display) {
-		SDE_ERROR("invalid argument\n");
-		return false;
-	}
-
-	if (!c_conn->ops.mode_needs_full_range)
-		return false;
-
-	return c_conn->ops.mode_needs_full_range(c_conn->display);
 }
 
 static void sde_connector_destroy(struct drm_connector *connector)
@@ -291,7 +247,6 @@ static int _sde_connector_set_hdr_info(
 	void *usr_ptr)
 {
 	struct drm_connector *connector;
-	struct drm_msm_ext_panel_hdr_ctrl *hdr_ctrl;
 	struct drm_msm_ext_panel_hdr_metadata *hdr_meta;
 	int i;
 
@@ -307,26 +262,21 @@ static int _sde_connector_set_hdr_info(
 		return -ENOTSUPP;
 	}
 
-	memset(&c_state->hdr_ctrl, 0, sizeof(c_state->hdr_ctrl));
+	memset(&c_state->hdr_meta, 0, sizeof(c_state->hdr_meta));
 
 	if (!usr_ptr) {
-		SDE_DEBUG_CONN(c_conn, "hdr control cleared\n");
+		SDE_DEBUG_CONN(c_conn, "hdr metadata cleared\n");
 		return 0;
 	}
 
-	if (copy_from_user(&c_state->hdr_ctrl,
+	if (copy_from_user(&c_state->hdr_meta,
 		(void __user *)usr_ptr,
-			sizeof(*hdr_ctrl))) {
-		SDE_ERROR_CONN(c_conn, "failed to copy hdr control\n");
+			sizeof(*hdr_meta))) {
+		SDE_ERROR_CONN(c_conn, "failed to copy hdr metadata\n");
 		return -EFAULT;
 	}
 
-	hdr_ctrl = &c_state->hdr_ctrl;
-
-	SDE_DEBUG_CONN(c_conn, "hdr_supported %d\n",
-				   hdr_ctrl->hdr_state);
-
-	hdr_meta = &hdr_ctrl->hdr_meta;
+	hdr_meta = &c_state->hdr_meta;
 
 	SDE_DEBUG_CONN(c_conn, "hdr_supported %d\n",
 				   hdr_meta->hdr_supported);
@@ -412,7 +362,7 @@ static int sde_connector_atomic_set_property(struct drm_connector *connector,
 			SDE_ERROR("invalid topology_control: 0x%llX\n", val);
 	}
 
-	if (idx == CONNECTOR_PROP_HDR_CONTROL) {
+	if (idx == CONNECTOR_PROP_HDR_METADATA) {
 		rc = _sde_connector_set_hdr_info(c_conn, c_state, (void *)val);
 		if (rc)
 			SDE_ERROR_CONN(c_conn, "cannot set hdr info %d\n", rc);
@@ -648,7 +598,6 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 	struct sde_kms *sde_kms;
 	struct sde_kms_info *info;
 	struct sde_connector *c_conn = NULL;
-	struct sde_splash_info *sinfo;
 	int rc;
 
 	if (!dev || !dev->dev_private || !encoder) {
@@ -769,8 +718,8 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 	}
 
 	msm_property_install_volatile_range(&c_conn->property_info,
-		"hdr_control", 0x0, 0, ~0, 0,
-		CONNECTOR_PROP_HDR_CONTROL);
+		"hdr_metadata", 0x0, 0, ~0, 0,
+		CONNECTOR_PROP_HDR_METADATA);
 
 	msm_property_install_range(&c_conn->property_info, "RETIRE_FENCE",
 			0x0, 0, INR_OPEN_MAX, 0, CONNECTOR_PROP_RETIRE_FENCE);
@@ -801,10 +750,6 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 
 	SDE_DEBUG("connector %d attach encoder %d\n",
 			c_conn->base.base.id, encoder->base.id);
-
-	sinfo = &sde_kms->splash_info;
-	if (sinfo && sinfo->handoff)
-		sde_splash_setup_connector_count(sinfo, connector_type);
 
 	priv->connectors[priv->num_connectors++] = &c_conn->base;
 

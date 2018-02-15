@@ -161,7 +161,6 @@ struct fd_ctx {
 	struct msm_fd_mem_pool mem_pool;
 	struct msm_fd_stats *stats;
 	struct msm_fd_buf_handle work_buf;
-	struct mutex lock;
 };
 
 /*

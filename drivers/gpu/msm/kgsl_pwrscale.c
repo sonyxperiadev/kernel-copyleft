@@ -522,8 +522,7 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 	struct kgsl_device *device = dev_get_drvdata(dev);
 	struct kgsl_pwrctrl *pwr;
 	struct kgsl_pwrlevel *pwr_level;
-	int level;
-	unsigned int i;
+	int level, i;
 	unsigned long cur_freq;
 
 	if (device == NULL)
@@ -552,11 +551,10 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 	if (*freq != cur_freq) {
 		level = pwr->max_pwrlevel;
 		/*
-		 * Array index of pwrlevels[] should be within the permitted
-		 * power levels, i.e., from max_pwrlevel to min_pwrlevel.
+		 * To avoid infinite loop issue type cast max_pwrlevel to
+		 * signed integer type
 		 */
-		for (i = pwr->min_pwrlevel; (i >= pwr->max_pwrlevel
-					&& i <= pwr->min_pwrlevel); i--)
+		for (i = pwr->min_pwrlevel; i >= (int)pwr->max_pwrlevel; i--)
 			if (*freq <= pwr->pwrlevels[i].gpu_freq) {
 				if (pwr->thermal_cycle == CYCLE_ACTIVE)
 					level = _thermal_adjust(pwr, i);
@@ -591,7 +589,7 @@ int kgsl_devfreq_get_dev_status(struct device *dev,
 	struct kgsl_device *device = dev_get_drvdata(dev);
 	struct kgsl_pwrctrl *pwrctrl;
 	struct kgsl_pwrscale *pwrscale;
-	ktime_t tmp1, tmp2;
+	ktime_t tmp;
 
 	if (device == NULL)
 		return -ENODEV;
@@ -602,8 +600,6 @@ int kgsl_devfreq_get_dev_status(struct device *dev,
 	pwrctrl = &device->pwrctrl;
 
 	mutex_lock(&device->mutex);
-
-	tmp1 = ktime_get();
 	/*
 	 * If the GPU clock is on grab the latest power counter
 	 * values.  Otherwise the most recent ACTIVE values will
@@ -611,9 +607,9 @@ int kgsl_devfreq_get_dev_status(struct device *dev,
 	 */
 	kgsl_pwrscale_update_stats(device);
 
-	tmp2 = ktime_get();
-	stat->total_time = ktime_us_delta(tmp2, pwrscale->time);
-	pwrscale->time = tmp1;
+	tmp = ktime_get();
+	stat->total_time = ktime_us_delta(tmp, pwrscale->time);
+	pwrscale->time = tmp;
 
 	stat->busy_time = pwrscale->accum_stats.busy_time;
 

@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/bitops.h>
 #include <linux/delay.h>
@@ -272,6 +277,20 @@ static void hdmi_tx_cable_notify_work(struct work_struct *work)
 	mutex_unlock(&hdmi_ctrl->tx_lock);
 } /* hdmi_tx_cable_notify_work */
 
+static bool hdmi_tx_is_cea_format(int mode)
+{
+	bool cea_fmt;
+
+	if ((mode > 0) && (mode <= HDMI_EVFRMT_END))
+		cea_fmt = true;
+	else
+		cea_fmt = false;
+
+	DEV_DBG("%s: %s\n", __func__, cea_fmt ? "Yes" : "No");
+
+	return cea_fmt;
+}
+
 static inline bool hdmi_tx_is_hdcp_enabled(struct hdmi_tx_ctrl *hdmi_ctrl)
 {
 	return hdmi_ctrl->hdcp_feature_on &&
@@ -361,11 +380,12 @@ static void hdmi_tx_audio_setup(struct hdmi_tx_ctrl *hdmi_ctrl)
 	}
 }
 
-static inline u32 hdmi_tx_is_dvi_mode(struct hdmi_tx_ctrl *hdmi_ctrl)
+static inline bool hdmi_tx_is_dvi_mode(struct hdmi_tx_ctrl *hdmi_ctrl)
 {
 	void *data = hdmi_tx_get_fd(HDMI_TX_FEAT_EDID);
 
-	return hdmi_edid_is_dvi_mode(data);
+	return (hdmi_edid_get_sink_mode(data,
+		hdmi_ctrl->vic) == SINK_MODE_DVI);
 } /* hdmi_tx_is_dvi_mode */
 
 static inline u32 hdmi_tx_is_in_splash(struct hdmi_tx_ctrl *hdmi_ctrl)
@@ -836,7 +856,9 @@ static ssize_t hdmi_tx_sysfs_wta_hpd(struct device *dev,
 
 	mutex_lock(&hdmi_ctrl->tx_lock);
 
-	rc = kstrtoint(buf, 10, &hpd);
+	/* Force HPD to be low */
+	/*rc = kstrtoint(buf, 10, &hpd);*/
+	rc = kstrtoint("0", 10, &hpd);
 	if (rc) {
 		DEV_ERR("%s: kstrtoint failed. rc=%d\n", __func__, rc);
 		goto end;
@@ -2467,7 +2489,8 @@ static void hdmi_tx_set_mode(struct hdmi_tx_ctrl *hdmi_ctrl, u32 power_on)
 			hdmi_ctrl_reg |= BIT(2);
 
 		/* Set transmission mode to DVI based in EDID info */
-		if (hdmi_edid_is_dvi_mode(data))
+		if (hdmi_edid_get_sink_mode(data,
+			hdmi_ctrl->vic) == SINK_MODE_DVI)
 			hdmi_ctrl_reg &= ~BIT(1); /* DVI mode */
 
 		/*
@@ -2926,7 +2949,6 @@ static int hdmi_tx_audio_info_setup(struct platform_device *pdev,
 {
 	int rc = 0;
 	struct hdmi_tx_ctrl *hdmi_ctrl = platform_get_drvdata(pdev);
-	u32 is_mode_dvi;
 
 	if (!hdmi_ctrl || !params) {
 		DEV_ERR("%s: invalid input\n", __func__);
@@ -2935,9 +2957,8 @@ static int hdmi_tx_audio_info_setup(struct platform_device *pdev,
 
 	mutex_lock(&hdmi_ctrl->tx_lock);
 
-	is_mode_dvi = hdmi_tx_is_dvi_mode(hdmi_ctrl);
-
-	if (!is_mode_dvi && hdmi_tx_is_panel_on(hdmi_ctrl)) {
+	if (!hdmi_tx_is_dvi_mode(hdmi_ctrl) &&
+		hdmi_tx_is_panel_on(hdmi_ctrl)) {
 		memcpy(&hdmi_ctrl->audio_params, params,
 			sizeof(struct msm_ext_disp_audio_setup_params));
 
@@ -3178,7 +3199,9 @@ static int hdmi_tx_power_on(struct hdmi_tx_ctrl *hdmi_ctrl)
 	}
 
 	hdmi_ctrl->panel.vic = hdmi_ctrl->vic;
-	if (!hdmi_tx_is_dvi_mode(hdmi_ctrl))
+
+	if (!hdmi_tx_is_dvi_mode(hdmi_ctrl) &&
+	    hdmi_tx_is_cea_format(hdmi_ctrl->vic))
 		hdmi_ctrl->panel.infoframe = true;
 	else
 		hdmi_ctrl->panel.infoframe = false;

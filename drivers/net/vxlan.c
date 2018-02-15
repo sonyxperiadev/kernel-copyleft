@@ -2240,7 +2240,7 @@ static void vxlan_cleanup(unsigned long arg)
 				= container_of(p, struct vxlan_fdb, hlist);
 			unsigned long timeout;
 
-			if (f->state & (NUD_PERMANENT | NUD_NOARP))
+			if (f->state & NUD_PERMANENT)
 				continue;
 
 			timeout = f->used + vxlan->cfg.age_interval * HZ;

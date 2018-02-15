@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <asm/dma-iommu.h>
 #include <asm/memory.h>
@@ -1574,7 +1579,6 @@ static int __scale_clocks(struct venus_hfi_device *device,
 
 	return rc;
 }
-
 static int venus_hfi_scale_clocks(void *dev, int load,
 					struct vidc_clk_scale_data *data,
 					unsigned long instant_bitrate)
@@ -1599,41 +1603,6 @@ static int venus_hfi_scale_clocks(void *dev, int load,
 exit:
 	mutex_unlock(&device->lock);
 	return rc;
-}
-
-static void __save_clock_rate(struct venus_hfi_device *device, bool reset)
-{
-	struct clock_info *cl;
-
-	venus_hfi_for_each_clock(device, cl) {
-		if (cl->has_scaling) {
-			cl->rate_on_enable =
-				reset ? 0 : clk_get_rate(cl->clk);
-			dprintk(VIDC_PROF, "Saved clock %s rate %lu\n",
-					cl->name, cl->rate_on_enable);
-		}
-	}
-}
-
-static void __restore_clock_rate(struct venus_hfi_device *device)
-{
-	struct clock_info *cl;
-
-	venus_hfi_for_each_clock(device, cl) {
-		if (cl->has_scaling && cl->rate_on_enable) {
-			int rc;
-
-			rc = __set_clk_rate(device, cl, cl->rate_on_enable);
-			if (rc)
-				dprintk(VIDC_ERR,
-				"Failed to restore clock %s rate %lu\n",
-					cl->name, cl->rate_on_enable);
-			else
-				dprintk(VIDC_DBG,
-					"Restored clock %s rate %lu\n",
-					cl->name, cl->rate_on_enable);
-		}
-	}
 }
 
 /* Writes into cmdq without raising an interrupt */
@@ -3283,6 +3252,8 @@ static void venus_hfi_pm_handler(struct work_struct *work)
 	const int max_tries = 5;
 	struct venus_hfi_device *device = list_first_entry(
 			&hal_ctxt.dev_head, struct venus_hfi_device, list);
+	char msg[SUBSYS_CRASH_REASON_LEN];
+
 	if (!device) {
 		dprintk(VIDC_ERR, "%s: NULL device\n", __func__);
 		return;
@@ -3296,6 +3267,9 @@ static void venus_hfi_pm_handler(struct work_struct *work)
 		dprintk(VIDC_WARN, "Failed to PC for %d times\n",
 				device->skip_pc_count);
 		device->skip_pc_count = 0;
+		snprintf(msg, sizeof(msg),
+			"Failed to prepare for PC, rc : %d\n", rc);
+		subsystem_crash_reason("venus", msg);
 		__process_fatal_error(device);
 		return;
 	}
@@ -3374,6 +3348,15 @@ exit:
 	return;
 }
 
+static void venus_hfi_crash_reason(struct hfi_sfr_struct *vsfr)
+{
+	char msg[SUBSYS_CRASH_REASON_LEN];
+
+	snprintf(msg, sizeof(msg), "SFR Message from FW : %s",
+						vsfr->rg_data);
+	subsystem_crash_reason("venus", msg);
+}
+
 static void __process_sys_error(struct venus_hfi_device *device)
 {
 	struct hfi_sfr_struct *vsfr = NULL;
@@ -3398,6 +3381,7 @@ static void __process_sys_error(struct venus_hfi_device *device)
 
 		dprintk(VIDC_ERR, "SFR Message from FW: %s\n",
 				vsfr->rg_data);
+		venus_hfi_crash_reason(vsfr);
 	}
 }
 
@@ -3495,9 +3479,11 @@ static int __response_handler(struct venus_hfi_device *device)
 			}
 		};
 
-		if (vsfr)
+		if (vsfr) {
 			dprintk(VIDC_ERR, "SFR Message from FW: %s\n",
 					vsfr->rg_data);
+			venus_hfi_crash_reason(vsfr);
+		}
 
 		dprintk(VIDC_ERR, "Received watchdog timeout\n");
 		packets[packet_count++] = info;
@@ -4352,7 +4338,6 @@ static inline int __suspend(struct venus_hfi_device *device)
 		goto err_tzbsp_suspend;
 	}
 
-	__save_clock_rate(device, false);
 	__venus_power_off(device, true);
 	dprintk(VIDC_PROF, "Venus power collapsed\n");
 	return rc;
@@ -4382,7 +4367,6 @@ static inline int __resume(struct venus_hfi_device *device)
 		dprintk(VIDC_ERR, "Failed to power on venus\n");
 		goto err_venus_power_on;
 	}
-	__restore_clock_rate(device);
 
 	/* Reboot the firmware */
 	rc = __tzbsp_set_video_state(TZBSP_VIDEO_STATE_RESUME);
@@ -4420,7 +4404,6 @@ exit:
 err_reset_core:
 	__tzbsp_set_video_state(TZBSP_VIDEO_STATE_SUSPEND);
 err_set_video_state:
-	__save_clock_rate(device, true);
 	__venus_power_off(device, true);
 err_venus_power_on:
 	dprintk(VIDC_ERR, "Failed to resume from power collapse\n");
@@ -4479,7 +4462,6 @@ fail_protect_mem:
 		subsystem_put(device->resources.fw.cookie);
 	device->resources.fw.cookie = NULL;
 fail_load_fw:
-	__save_clock_rate(device, true);
 	__venus_power_off(device, true);
 fail_venus_power_on:
 fail_init_pkt:
@@ -4501,7 +4483,6 @@ static void __unload_fw(struct venus_hfi_device *device)
 	__vote_buses(device, NULL, 0);
 	subsystem_put(device->resources.fw.cookie);
 	__interface_queues_release(device);
-	__save_clock_rate(device, true);
 	__venus_power_off(device, false);
 	device->resources.fw.cookie = NULL;
 	__deinit_resources(device);

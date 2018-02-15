@@ -2882,7 +2882,7 @@ end:
 	return rc;
 }
 
-static int msm_cpp_validate_ioctl_input(unsigned int cmd, void *arg,
+static int msm_cpp_validate_input(unsigned int cmd, void *arg,
 	struct msm_camera_v4l2_ioctl_t **ioctl_ptr)
 {
 	switch (cmd) {
@@ -2922,14 +2922,6 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 		pr_err("sd %pK\n", sd);
 		return -EINVAL;
 	}
-
-
-	rc = msm_cpp_validate_ioctl_input(cmd, arg, &ioctl_ptr);
-	if (rc != 0) {
-		pr_err("input validation failed\n");
-		return rc;
-	}
-
 	cpp_dev = v4l2_get_subdevdata(sd);
 	if (cpp_dev == NULL) {
 		pr_err("cpp_dev is null\n");
@@ -2941,6 +2933,11 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 		return -EINVAL;
 	}
 
+	rc = msm_cpp_validate_input(cmd, arg, &ioctl_ptr);
+	if (rc != 0) {
+		pr_err("input validation failed\n");
+		return rc;
+	}
 	mutex_lock(&cpp_dev->mutex);
 
 	CPP_DBG("E cmd: 0x%x\n", cmd);
@@ -3440,7 +3437,6 @@ STREAM_BUFF_END:
 		} else {
 			pr_err("%s:%d IOMMMU attach triggered in invalid state\n",
 				__func__, __LINE__);
-			rc = -EINVAL;
 		}
 		break;
 	}
@@ -4065,8 +4061,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 	default:
 		pr_err_ratelimited("%s: unsupported compat type :%x LOAD %lu\n",
 				__func__, cmd, VIDIOC_MSM_CPP_LOAD_FIRMWARE);
-		mutex_unlock(&cpp_dev->mutex);
-		return -EINVAL;
+		break;
 	}
 
 	mutex_unlock(&cpp_dev->mutex);
@@ -4097,7 +4092,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 	default:
 		pr_err_ratelimited("%s: unsupported compat type :%d\n",
 				__func__, cmd);
-		return -EINVAL;
+		break;
 	}
 
 	if (is_copytouser_req) {

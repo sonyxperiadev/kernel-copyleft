@@ -4,6 +4,11 @@
  *  This work is licensed under the terms of the GNU GPL, version 2. See
  *  the COPYING file in the top-level directory.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -1363,11 +1368,8 @@ int do_huge_pmd_numa_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	 */
 	if (unlikely(pmd_trans_migrating(*pmdp))) {
 		page = pmd_page(*pmdp);
-		if (!get_page_unless_zero(page))
-			goto out_unlock;
 		spin_unlock(ptl);
 		wait_on_page_locked(page);
-		put_page(page);
 		goto out;
 	}
 
@@ -1399,11 +1401,8 @@ int do_huge_pmd_numa_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	/* Migration could have started since the pmd_trans_migrating check */
 	if (!page_locked) {
-		if (!get_page_unless_zero(page))
-			goto out_unlock;
 		spin_unlock(ptl);
 		wait_on_page_locked(page);
-		put_page(page);
 		page_nid = -1;
 		goto out;
 	}

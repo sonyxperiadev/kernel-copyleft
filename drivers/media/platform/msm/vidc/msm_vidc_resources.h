@@ -106,7 +106,6 @@ struct clock_info {
 	u32 count;
 	bool has_scaling;
 	bool has_mem_retention;
-	unsigned long rate_on_enable;
 };
 
 struct clock_set {

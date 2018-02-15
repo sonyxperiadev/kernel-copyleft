@@ -23,7 +23,6 @@
 
 enum {
 	A5XX_ZAP_SHADER_LOADED = 1,
-	A5XX_HWCG_ENABLED = 2,
 };
 
 struct a5xx_gpu {
@@ -70,8 +69,6 @@ struct a5xx_gpu {
  * PREEMPT_NONE - no preemption in progress.  Next state START.
  * PREEMPT_START - The trigger is evaulating if preemption is possible. Next
  * states: TRIGGERED, NONE
- * PREEMPT_ABORT - An intermediate state before moving back to NONE. Next
- * state: NONE.
  * PREEMPT_TRIGGERED: A preemption has been executed on the hardware. Next
  * states: FAULTED, PENDING
  * PREEMPT_FAULTED: A preemption timed out (never completed). This will trigger
@@ -83,7 +80,6 @@ struct a5xx_gpu {
 enum preempt_state {
 	PREEMPT_NONE = 0,
 	PREEMPT_START,
-	PREEMPT_ABORT,
 	PREEMPT_TRIGGERED,
 	PREEMPT_FAULTED,
 	PREEMPT_PENDING,
@@ -187,10 +183,7 @@ int a5xx_snapshot(struct msm_gpu *gpu, struct msm_snapshot *snapshot);
 /* Return true if we are in a preempt state */
 static inline bool a5xx_in_preempt(struct a5xx_gpu *a5xx_gpu)
 {
-	int preempt_state = atomic_read(&a5xx_gpu->preempt_state);
-
-	return !(preempt_state == PREEMPT_NONE ||
-			preempt_state == PREEMPT_ABORT);
+	return !(atomic_read(&a5xx_gpu->preempt_state) == PREEMPT_NONE);
 }
 
 int a5xx_counters_init(struct adreno_gpu *adreno_gpu);

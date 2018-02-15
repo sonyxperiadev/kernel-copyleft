@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
 #include <asm/div64.h>
@@ -776,6 +781,40 @@ void msm_isp_check_for_output_error(struct vfe_device *vfe_dev,
 	}
 }
 
+static int msm_isp_check_sync_time(struct msm_vfe_src_info *src_info,
+			struct msm_isp_timestamp *ts,
+			struct master_slave_resource_info *ms_res)
+{
+	int i;
+	struct msm_vfe_src_info *master_src_info = NULL;
+	uint32_t master_time = 0, current_time;
+
+	if (!ms_res->src_sof_mask)
+		return 0;
+
+	for (i = 0; i < MAX_VFE * VFE_SRC_MAX; i++) {
+		if (ms_res->src_info[i] == NULL)
+			continue;
+		if (src_info == ms_res->src_info[i] ||
+			ms_res->src_info[i]->active == 0)
+			continue;
+		if (ms_res->src_sof_mask &
+			(1 << ms_res->src_info[i]->dual_hw_ms_info.index)) {
+			master_src_info = ms_res->src_info[i];
+			break;
+		}
+	}
+	if (!master_src_info)
+		return 0;
+	master_time = master_src_info->
+		dual_hw_ms_info.sof_info.mono_timestamp_ms;
+	current_time = ts->buf_time.tv_sec * 1000 +
+		ts->buf_time.tv_usec / 1000;
+	if ((current_time - master_time) > ms_res->sof_delta_threshold)
+		return 1;
+	return 0;
+}
+
 static void msm_isp_sync_dual_cam_frame_id(
 		struct vfe_device *vfe_dev,
 		struct master_slave_resource_info *ms_res,
@@ -790,11 +829,24 @@ static void msm_isp_sync_dual_cam_frame_id(
 
 	if (src_info->dual_hw_ms_info.sync_state ==
 		ms_res->dual_sync_mode) {
-		(frame_src == VFE_PIX_0) ? src_info->frame_id +=
+		if (msm_isp_check_sync_time(src_info, ts, ms_res) == 0) {
+			(frame_src == VFE_PIX_0) ? src_info->frame_id +=
 				vfe_dev->axi_data.src_info[frame_src].
 				sof_counter_step :
 			src_info->frame_id++;
-		return;
+			return;
+		}
+		ms_res->src_sof_mask = 0;
+		ms_res->active_src_mask = 0;
+		for (i = 0; i < MAX_VFE * VFE_SRC_MAX; i++) {
+			if (ms_res->src_info[i] == NULL)
+				continue;
+			if (ms_res->src_info[i]->active == 0)
+				continue;
+			ms_res->src_info[i]->dual_hw_ms_info.
+				sync_state =
+				MSM_ISP_DUAL_CAM_ASYNC;
+		}
 	}
 
 	/* find highest frame id */
@@ -2569,7 +2621,6 @@ int msm_isp_axi_reset(struct vfe_device *vfe_dev,
 	struct msm_vfe_axi_shared_data *axi_data = &vfe_dev->axi_data;
 	uint32_t bufq_handle = 0, bufq_id = 0;
 	struct msm_isp_timestamp timestamp;
-	struct msm_vfe_frame_request_queue *queue_req;
 	unsigned long flags;
 	int vfe_idx;
 
@@ -2606,18 +2657,8 @@ int msm_isp_axi_reset(struct vfe_device *vfe_dev,
 					VFE_PING_FLAG);
 		msm_isp_cfg_stream_scratch(stream_info,
 					VFE_PONG_FLAG);
-		stream_info->undelivered_request_cnt = 0;
 		spin_unlock_irqrestore(&stream_info->lock,
 					flags);
-		while (!list_empty(&stream_info->request_q)) {
-			queue_req = list_first_entry_or_null(
-				&stream_info->request_q,
-				struct msm_vfe_frame_request_queue, list);
-			if (queue_req) {
-				queue_req->cmd_used = 0;
-				list_del(&queue_req->list);
-			}
-		}
 		for (bufq_id = 0; bufq_id < VFE_BUF_QUEUE_MAX;
 			bufq_id++) {
 			bufq_handle = stream_info->bufq_handle[bufq_id];
@@ -3257,6 +3298,10 @@ int msm_isp_cfg_axi_stream(struct vfe_device *vfe_dev, void *arg)
 
 		rc = msm_isp_start_axi_stream(
 			vfe_dev, stream_cfg_cmd);
+#if defined(CONFIG_SONY_CAM_V4L2)
+		pr_info("%s: msm_isp_start_axi_stream: rc %d\n",
+			__func__, rc);
+#endif
 	} else {
 		rc = msm_isp_stop_axi_stream(
 			vfe_dev, stream_cfg_cmd);
@@ -3279,8 +3324,13 @@ int msm_isp_cfg_axi_stream(struct vfe_device *vfe_dev, void *arg)
 	}
 
 	if (rc < 0)
+#if defined(CONFIG_SONY_CAM_V4L2)
+		pr_err("%s: start/stop %d stream failed: rc %d\n", __func__,
+			stream_cfg_cmd->cmd, rc);
+#else
 		pr_err("%s: start/stop %d stream failed\n", __func__,
 			stream_cfg_cmd->cmd);
+#endif
 	return rc;
 }
 

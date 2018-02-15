@@ -849,13 +849,8 @@ cifs_query_dir_first(const unsigned int xid, struct cifs_tcon *tcon,
 		     struct cifs_fid *fid, __u16 search_flags,
 		     struct cifs_search_info *srch_inf)
 {
-	int rc;
-
-	rc = CIFSFindFirst(xid, tcon, path, cifs_sb,
-			   &fid->netfid, search_flags, srch_inf, true);
-	if (rc)
-		cifs_dbg(FYI, "find first failed=%d\n", rc);
-	return rc;
+	return CIFSFindFirst(xid, tcon, path, cifs_sb,
+			     &fid->netfid, search_flags, srch_inf, true);
 }
 
 static int

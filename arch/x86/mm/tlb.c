@@ -134,6 +134,8 @@ void native_flush_tlb_others(const struct cpumask *cpumask,
 {
 	struct flush_tlb_info info;
 
+	if (end == 0)
+		end = start + PAGE_SIZE;
 	info.flush_mm = mm;
 	info.flush_start = start;
 	info.flush_end = end;
@@ -262,7 +264,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long start)
 	}
 
 	if (cpumask_any_but(mm_cpumask(mm), smp_processor_id()) < nr_cpu_ids)
-		flush_tlb_others(mm_cpumask(mm), mm, start, start + PAGE_SIZE);
+		flush_tlb_others(mm_cpumask(mm), mm, start, 0UL);
 
 	preempt_enable();
 }

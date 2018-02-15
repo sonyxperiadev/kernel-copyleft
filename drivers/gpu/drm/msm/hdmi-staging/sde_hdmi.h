@@ -33,9 +33,6 @@
 #include "sde_hdmi_util.h"
 #include "sde_hdcp.h"
 
-#ifndef MIN
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
-#endif
 #ifdef HDMI_DEBUG_ENABLE
 #define SDE_HDMI_DEBUG(fmt, args...)   SDE_ERROR(fmt, ##args)
 #else
@@ -113,8 +110,6 @@ enum hdmi_tx_feature_type {
  * @client_notify_pending: If there is client notification pending.
  * @irq_domain:       IRQ domain structure.
  * @pll_update_enable: if it's allowed to update HDMI PLL ppm.
- * @dc_enable:        If deep color is enabled. Only DC_30 so far.
- * @dc_feature_supported: If deep color feature is supported.
  * @notifier:         CEC notifider to convey physical address information.
  * @root:             Debug fs root entry.
  */
@@ -147,7 +142,6 @@ struct sde_hdmi {
 	u32 hdcp22_present;
 	u8 hdcp_status;
 	u32 enc_lvl;
-	u8 curr_hdr_state;
 	bool auth_state;
 	bool sink_hdcp22_support;
 	bool src_hdcp22_support;
@@ -167,9 +161,6 @@ struct sde_hdmi {
 	struct irq_domain *irq_domain;
 	struct cec_notifier *notifier;
 	bool pll_update_enable;
-	bool dc_enable;
-	bool dc_feature_supported;
-	bool bt2020_colorimetry;
 
 	struct delayed_work hdcp_cb_work;
 	struct dss_io_data io[HDMI_TX_MAX_IO];
@@ -197,19 +188,6 @@ enum hdmi_tx_scdc_access_type {
 
 #define HDMI_KHZ_TO_HZ 1000
 #define HDMI_MHZ_TO_HZ 1000000
-#define HDMI_YUV420_24BPP_PCLK_TMDS_CH_RATE_RATIO 2
-#define HDMI_RGB_24BPP_PCLK_TMDS_CH_RATE_RATIO 1
-
-#define HDMI_GEN_PKT_CTRL_CLR_MASK 0x7
-
-/* for AVI program */
-#define HDMI_AVI_INFOFRAME_BUFFER_SIZE \
-	(HDMI_INFOFRAME_HEADER_SIZE + HDMI_AVI_INFOFRAME_SIZE)
-#define HDMI_VS_INFOFRAME_BUFFER_SIZE (HDMI_INFOFRAME_HEADER_SIZE + 6)
-
-#define LEFT_SHIFT_BYTE(x) ((x) << 8)
-#define LEFT_SHIFT_WORD(x) ((x) << 16)
-#define LEFT_SHIFT_24BITS(x) ((x) << 24)
 
 /* Maximum pixel clock rates for hdmi tx */
 #define HDMI_DEFAULT_MAX_PCLK_RATE	148500
@@ -367,13 +345,6 @@ int sde_hdmi_set_property(struct drm_connector *connector,
 			int property_index,
 			uint64_t value,
 			void *display);
-/**
- * sde_hdmi_bridge_power_on -- A wrapper of _sde_hdmi_bridge_power_on.
- * @bridge:          Handle to the drm bridge.
- *
- * Return: void.
- */
-void sde_hdmi_bridge_power_on(struct drm_bridge *bridge);
 
 /**
  * sde_hdmi_get_property() - get the connector properties
@@ -492,23 +463,6 @@ int sde_hdmi_pre_kickoff(struct drm_connector *connector,
 		void *display,
 		struct msm_display_kickoff_params *params);
 
-/*
- * sde_hdmi_mode_needs_full_range - does mode need full range
- * quantization
- * @display: Pointer to private display structure
- * Returns: true or false based on mode
- */
-bool sde_hdmi_mode_needs_full_range(void *display);
-
-/*
- * sde_hdmi_get_csc_type - returns the CSC type to be
- * used based on state of HDR playback
- * @conn: Pointer to DRM connector
- * @display: Pointer to private display structure
- * Returns: true or false based on mode
- */
-enum sde_csc_type sde_hdmi_get_csc_type(struct drm_connector *conn,
-	void *display);
 #else /*#ifdef CONFIG_DRM_SDE_HDMI*/
 
 static inline u32 sde_hdmi_get_num_of_displays(void)
@@ -619,17 +573,6 @@ static inline int sde_hdmi_set_property(struct drm_connector *connector,
 			int property_index,
 			uint64_t value,
 			void *display)
-{
-	return 0;
-}
-
-static inline bool sde_hdmi_mode_needs_full_range(void *display)
-{
-	return false;
-}
-
-enum sde_csc_type sde_hdmi_get_csc_type(struct drm_connector *conn,
-	void *display)
 {
 	return 0;
 }

@@ -13,6 +13,11 @@
  *  Per cpu hot/cold page lists, bulk allocation, Martin J. Bligh, Sept 2002
  *          (lots of bits borrowed from Ingo Molnar & Andrew Morton)
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/stddef.h>
 #include <linux/mm.h>
@@ -223,20 +228,6 @@ static char * const zone_names[MAX_NR_ZONES] = {
 };
 
 static void free_compound_page(struct page *page);
-
-char * const migratetype_names[MIGRATE_TYPES] = {
-	"Unmovable",
-	"Movable",
-	"Reclaimable",
-#ifdef CONFIG_CMA
-	"CMA",
-#endif
-	"HighAtomic",
-#ifdef CONFIG_MEMORY_ISOLATION
-	"Isolate",
-#endif
-};
-
 compound_page_dtor * const compound_page_dtors[] = {
 	NULL,
 	free_compound_page,
@@ -473,7 +464,6 @@ static void bad_page(struct page *page, const char *reason,
 	printk(KERN_ALERT "BUG: Bad page state in process %s  pfn:%05lx\n",
 		current->comm, page_to_pfn(page));
 	dump_page_badflags(page, reason, bad_flags);
-	dump_page_owner(page);
 
 	print_modules();
 	dump_stack();
@@ -584,9 +574,6 @@ static inline void set_page_guard(struct zone *zone, struct page *page,
 		return;
 
 	page_ext = lookup_page_ext(page);
-	if (unlikely(!page_ext))
-		return;
-
 	__set_bit(PAGE_EXT_DEBUG_GUARD, &page_ext->flags);
 
 	INIT_LIST_HEAD(&page->lru);
@@ -604,9 +591,6 @@ static inline void clear_page_guard(struct zone *zone, struct page *page,
 		return;
 
 	page_ext = lookup_page_ext(page);
-	if (unlikely(!page_ext))
-		return;
-
 	__clear_bit(PAGE_EXT_DEBUG_GUARD, &page_ext->flags);
 
 	set_page_private(page, 0);
@@ -1443,21 +1427,8 @@ static inline bool free_pages_prezeroed(void)
 		page_poisoning_enabled();
 }
 
-inline void post_alloc_hook(struct page *page, unsigned int order,
-				gfp_t gfp_flags)
-{
-	set_page_private(page, 0);
-	set_page_refcounted(page);
-
-	kasan_alloc_pages(page, order);
-	arch_alloc_page(page, order);
-	kernel_map_pages(page, 1 << order, 1);
-	kernel_poison_pages(page, 1 << order, 1);
-	set_page_owner(page, order, gfp_flags);
-}
-
 static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
-                                                               int alloc_flags)
+								int alloc_flags)
 {
 	int i;
 
@@ -1467,7 +1438,13 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
 			return 1;
 	}
 
-	post_alloc_hook(page, order, gfp_flags);
+	set_page_private(page, 0);
+	set_page_refcounted(page);
+
+	kasan_alloc_pages(page, order);
+	arch_alloc_page(page, order);
+	kernel_map_pages(page, 1 << order, 1);
+	kernel_poison_pages(page, 1 << order, 1);
 
 	if (!free_pages_prezeroed() && (gfp_flags & __GFP_ZERO))
 		for (i = 0; i < (1 << order); i++)
@@ -1475,6 +1452,8 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
 
 	if (order && (gfp_flags & __GFP_COMP))
 		prep_compound_page(page, order);
+
+	set_page_owner(page, order, gfp_flags);
 
 	/*
 	 * page is set pfmemalloc when ALLOC_NO_WATERMARKS was necessary to
@@ -2243,6 +2222,7 @@ void free_hot_cold_page_list(struct list_head *list, bool cold)
 void split_page(struct page *page, unsigned int order)
 {
 	int i;
+	gfp_t gfp_mask;
 
 	VM_BUG_ON_PAGE(PageCompound(page), page);
 	VM_BUG_ON_PAGE(!page_count(page), page);
@@ -2256,9 +2236,12 @@ void split_page(struct page *page, unsigned int order)
 		split_page(virt_to_page(page[0].shadow), order);
 #endif
 
-	for (i = 1; i < (1 << order); i++)
+	gfp_mask = get_page_owner_gfp(page);
+	set_page_owner(page, 0, gfp_mask);
+	for (i = 1; i < (1 << order); i++) {
 		set_page_refcounted(page + i);
-	split_page_owner(page, order);
+		set_page_owner(page + i, 0, gfp_mask);
+	}
 }
 EXPORT_SYMBOL_GPL(split_page);
 
@@ -2288,6 +2271,8 @@ int __isolate_free_page(struct page *page, unsigned int order)
 	zone->free_area[order].nr_free--;
 	rmv_page_order(page);
 
+	set_page_owner(page, order, __GFP_MOVABLE);
+
 	/* Set the pageblock if the isolated page is at least a pageblock */
 	if (order >= pageblock_order - 1) {
 		struct page *endpage = page + (1 << order) - 1;
@@ -2302,6 +2287,33 @@ int __isolate_free_page(struct page *page, unsigned int order)
 
 
 	return 1UL << order;
+}
+
+/*
+ * Similar to split_page except the page is already free. As this is only
+ * being used for migration, the migratetype of the block also changes.
+ * As this is called with interrupts disabled, the caller is responsible
+ * for calling arch_alloc_page() and kernel_map_page() after interrupts
+ * are enabled.
+ *
+ * Note: this is probably too low level an operation for use in drivers.
+ * Please consult with lkml before using this in your driver.
+ */
+int split_free_page(struct page *page)
+{
+	unsigned int order;
+	int nr_pages;
+
+	order = page_order(page);
+
+	nr_pages = __isolate_free_page(page, order);
+	if (!nr_pages)
+		return 0;
+
+	/* Split into individual pages */
+	set_page_refcounted(page);
+	split_page(page, order);
+	return nr_pages;
 }
 
 /*
@@ -2818,6 +2830,7 @@ void warn_alloc_failed(gfp_t gfp_mask, unsigned int order, const char *fmt, ...)
 	pr_warn("%s: page allocation failure: order:%u, mode:0x%x\n",
 		current->comm, order, gfp_mask);
 
+	trace_mm_page_alloc_fail(order);
 	dump_stack();
 	if (!should_suppress_show_mem())
 		show_mem(filter);
@@ -3383,6 +3396,9 @@ retry_cpuset:
 		kmemcheck_pagealloc_alloc(page, order, gfp_mask);
 
 	trace_mm_page_alloc(page, order, alloc_mask, ac.migratetype);
+	if (order > 1)
+		trace_mm_page_alloc_highorder(page, order,
+					      alloc_mask, ac.migratetype);
 
 out:
 	/*

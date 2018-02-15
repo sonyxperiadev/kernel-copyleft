@@ -556,13 +556,13 @@ static const struct file_operations sde_hdmi_hdcp_state_fops = {
 	.read = _sde_hdmi_hdcp_state_read,
 };
 
-static u64 _sde_hdmi_clip_valid_pclk(struct hdmi *hdmi, u64 pclk_in)
+static u64 _sde_hdmi_clip_valid_pclk(struct drm_display_mode *mode, u64 pclk_in)
 {
 	u32 pclk_delta, pclk;
 	u64 pclk_clip = pclk_in;
 
 	/* as per standard, 0.5% of deviation is allowed */
-	pclk = hdmi->pixclock;
+	pclk = mode->clock * HDMI_KHZ_TO_HZ;
 	pclk_delta = pclk * 5 / 1000;
 
 	if (pclk_in < (pclk - pclk_delta))
@@ -700,6 +700,7 @@ static void sde_hdmi_tx_hdcp_cb_work(struct work_struct *work)
 static int _sde_hdmi_update_pll_delta(struct sde_hdmi *display, s32 ppm)
 {
 	struct hdmi *hdmi = display->ctrl.ctrl;
+	struct drm_display_mode *current_mode = &display->mode;
 	u64 cur_pclk, dst_pclk;
 	u64 clip_pclk;
 	int rc = 0;
@@ -724,7 +725,7 @@ static int _sde_hdmi_update_pll_delta(struct sde_hdmi *display, s32 ppm)
 	dst_pclk = cur_pclk * (1000000000 + ppm);
 	do_div(dst_pclk, 1000000000);
 
-	clip_pclk = _sde_hdmi_clip_valid_pclk(hdmi, dst_pclk);
+	clip_pclk = _sde_hdmi_clip_valid_pclk(current_mode, dst_pclk);
 
 	/* update pclk */
 	if (clip_pclk != cur_pclk) {
@@ -1253,13 +1254,6 @@ static int _sde_hdmi_hpd_enable(struct sde_hdmi *sde_hdmi)
 	uint32_t hpd_ctrl;
 	int i, ret;
 	unsigned long flags;
-	struct drm_connector *connector;
-	struct msm_drm_private *priv;
-	struct sde_kms *sde_kms;
-
-	connector = hdmi->connector;
-	priv = connector->dev->dev_private;
-	sde_kms = to_sde_kms(priv->kms);
 
 	for (i = 0; i < config->hpd_reg_cnt; i++) {
 		ret = regulator_enable(hdmi->hpd_regs[i]);
@@ -1299,11 +1293,9 @@ static int _sde_hdmi_hpd_enable(struct sde_hdmi *sde_hdmi)
 		}
 	}
 
-	if (!sde_kms->splash_info.handoff) {
-		sde_hdmi_set_mode(hdmi, false);
-		_sde_hdmi_phy_reset(hdmi);
-		sde_hdmi_set_mode(hdmi, true);
-	}
+	sde_hdmi_set_mode(hdmi, false);
+	_sde_hdmi_phy_reset(hdmi);
+	sde_hdmi_set_mode(hdmi, true);
 
 	hdmi_write(hdmi, REG_HDMI_USEC_REFTIMER, 0x0001001b);
 
@@ -1901,6 +1893,11 @@ struct drm_msm_ext_panel_hdr_metadata *hdr_meta)
 		return;
 	}
 
+	if (!connector->hdr_supported) {
+		SDE_ERROR("Sink does not support HDR\n");
+		return;
+	}
+
 	/* Setup Packet header and payload */
 	packet_header = type_code | (version << 8) | (length << 16);
 	hdmi_write(hdmi, HDMI_GENERIC0_HDR, packet_header);
@@ -1967,147 +1964,6 @@ enable_packet_control:
 	 */
 	packet_control = hdmi_read(hdmi, HDMI_GEN_PKT_CTRL);
 	packet_control |= BIT(0) | BIT(1) | BIT(2) | BIT(16);
-	hdmi_write(hdmi, HDMI_GEN_PKT_CTRL, packet_control);
-}
-
-static void sde_hdmi_update_colorimetry(struct sde_hdmi *display,
-	bool use_bt2020)
-{
-	struct hdmi *hdmi;
-	struct drm_connector *connector;
-	bool mode_is_yuv = false;
-	struct drm_display_mode *mode;
-	u32 mode_fmt_flags = 0;
-	u8 checksum;
-	u32 avi_info0 = 0;
-	u32 avi_info1 = 0;
-	u8 avi_iframe[HDMI_AVI_INFOFRAME_BUFFER_SIZE] = {0};
-	u8 *avi_frame = &avi_iframe[HDMI_INFOFRAME_HEADER_SIZE];
-	struct hdmi_avi_infoframe info;
-
-	if (!display) {
-		SDE_ERROR("invalid input\n");
-		return;
-	}
-
-	hdmi = display->ctrl.ctrl;
-
-	if (!hdmi) {
-		SDE_ERROR("invalid input\n");
-		return;
-	}
-
-	connector = display->ctrl.ctrl->connector;
-
-	if (!connector) {
-		SDE_ERROR("invalid input\n");
-		return;
-	}
-
-	if (!connector->hdr_supported) {
-		SDE_DEBUG("HDR is not supported\n");
-		return;
-	}
-
-	/* If sink doesn't support BT2020, just return */
-	if (!(connector->color_enc_fmt & DRM_EDID_COLORIMETRY_BT2020_YCC) ||
-	    !(connector->color_enc_fmt & DRM_EDID_COLORIMETRY_BT2020_RGB)) {
-		SDE_DEBUG("BT2020 colorimetry is not supported\n");
-		return;
-	}
-
-	/* If there is no change in colorimetry, just return */
-	if (use_bt2020 && display->bt2020_colorimetry)
-		return;
-	else if (!use_bt2020 && !display->bt2020_colorimetry)
-		return;
-
-	mode = &display->mode;
-	/* Cache the format flags before clearing */
-	mode_fmt_flags = mode->flags;
-	/**
-	 * Clear the RGB/YUV format flags before calling upstream API
-	 * as the API also compares the flags and then returns a mode
-	 */
-	mode->flags &= ~SDE_DRM_MODE_FLAG_FMT_MASK;
-	drm_hdmi_avi_infoframe_from_display_mode(&info, mode);
-	/* Restore the format flags */
-	mode->flags = mode_fmt_flags;
-
-	/* Mode should only support YUV and not both to set the flag */
-	if ((mode->private_flags & MSM_MODE_FLAG_COLOR_FORMAT_YCBCR420)
-	    && !(mode->private_flags & MSM_MODE_FLAG_COLOR_FORMAT_RGB444)) {
-		mode_is_yuv = true;
-	}
-
-
-	if (!display->bt2020_colorimetry && use_bt2020) {
-		/**
-		 * 1. Update colorimetry to use extended
-		 * 2. Change extended to use BT2020
-		 * 3. Change colorspace based on mode
-		 * 4. Use limited as BT2020 is always limited
-		 */
-		info.colorimetry = SDE_HDMI_USE_EXTENDED_COLORIMETRY;
-		info.extended_colorimetry = SDE_HDMI_BT2020_COLORIMETRY;
-		if (mode_is_yuv)
-			info.colorspace = HDMI_COLORSPACE_YUV420;
-		if (connector->yuv_qs)
-			info.ycc_quantization_range =
-				HDMI_YCC_QUANTIZATION_RANGE_LIMITED;
-	} else if (display->bt2020_colorimetry && !use_bt2020) {
-		/**
-		 * 1. Update colorimetry to non-extended
-		 * 2. Change colorspace based on mode
-		 * 3. Restore quantization to full if QS
-		 *	  is enabled
-		 */
-		info.colorimetry = SDE_HDMI_DEFAULT_COLORIMETRY;
-		if (mode_is_yuv)
-			info.colorspace = HDMI_COLORSPACE_YUV420;
-		if (connector->yuv_qs)
-			info.ycc_quantization_range =
-				HDMI_YCC_QUANTIZATION_RANGE_FULL;
-	}
-
-	hdmi_avi_infoframe_pack(&info, avi_iframe, sizeof(avi_iframe));
-	checksum = avi_iframe[HDMI_INFOFRAME_HEADER_SIZE - 1];
-	avi_info0 = checksum |
-		LEFT_SHIFT_BYTE(avi_frame[0]) |
-		LEFT_SHIFT_WORD(avi_frame[1]) |
-		LEFT_SHIFT_24BITS(avi_frame[2]);
-
-	avi_info1 = avi_frame[3] |
-		LEFT_SHIFT_BYTE(avi_frame[4]) |
-		LEFT_SHIFT_WORD(avi_frame[5]) |
-		LEFT_SHIFT_24BITS(avi_frame[6]);
-
-	hdmi_write(hdmi, REG_HDMI_AVI_INFO(0), avi_info0);
-	hdmi_write(hdmi, REG_HDMI_AVI_INFO(1), avi_info1);
-	display->bt2020_colorimetry = use_bt2020;
-}
-
-static void sde_hdmi_clear_hdr_infoframe(struct sde_hdmi *display)
-{
-	struct hdmi *hdmi;
-	struct drm_connector *connector;
-	u32 packet_control = 0;
-
-	if (!display) {
-		SDE_ERROR("invalid input\n");
-		return;
-	}
-
-	hdmi = display->ctrl.ctrl;
-	connector = display->ctrl.ctrl->connector;
-
-	if (!hdmi || !connector) {
-		SDE_ERROR("invalid input\n");
-		return;
-	}
-
-	packet_control = hdmi_read(hdmi, HDMI_GEN_PKT_CTRL);
-	packet_control &= ~HDMI_GEN_PKT_CTRL_CLR_MASK;
 	hdmi_write(hdmi, HDMI_GEN_PKT_CTRL, packet_control);
 }
 
@@ -2275,13 +2131,9 @@ static int sde_hdmi_tx_check_capability(struct sde_hdmi *sde_hdmi)
 		}
 	}
 
-	if (sde_hdmi->hdmi_tx_major_version >= HDMI_TX_VERSION_4)
-		sde_hdmi->dc_feature_supported = true;
-
-	SDE_DEBUG("%s: Features <HDMI:%s, HDCP:%s, Deep Color:%s>\n", __func__,
+	SDE_DEBUG("%s: Features <HDMI:%s, HDCP:%s>\n", __func__,
 			hdmi_disabled ? "OFF" : "ON",
-			hdcp_disabled ? "OFF" : "ON",
-			sde_hdmi->dc_feature_supported ? "ON" : "OFF");
+			hdcp_disabled ? "OFF" : "ON");
 
 	if (hdmi_disabled) {
 		DEV_ERR("%s: HDMI disabled\n", __func__);
@@ -2455,108 +2307,11 @@ int sde_hdmi_pre_kickoff(struct drm_connector *connector,
 	void *display,
 	struct msm_display_kickoff_params *params)
 {
-	struct sde_hdmi *hdmi_display = (struct sde_hdmi *)display;
-	struct drm_msm_ext_panel_hdr_ctrl *hdr_ctrl;
-	struct drm_msm_ext_panel_hdr_metadata *hdr_meta;
-	u8 hdr_op;
 
-	if (!connector || !display || !params ||
-		!params->hdr_ctrl) {
-		pr_err("Invalid params\n");
-		return -EINVAL;
-	}
-
-	hdr_ctrl = params->hdr_ctrl;
-	hdr_meta = &hdr_ctrl->hdr_meta;
-
-	if (!hdr_meta) {
-		SDE_ERROR("Invalid params\n");
-		return -EINVAL;
-	}
-
-	hdr_op = sde_hdmi_hdr_get_ops(hdmi_display->curr_hdr_state,
-		hdr_ctrl->hdr_state);
-
-	if (hdr_op == HDR_SEND_INFO) {
-		if (connector->hdr_supported)
-			sde_hdmi_panel_set_hdr_infoframe(display,
-				&hdr_ctrl->hdr_meta);
-		if (hdr_meta->eotf)
-			sde_hdmi_update_colorimetry(hdmi_display,
-				true);
-		else
-			sde_hdmi_update_colorimetry(hdmi_display,
-				false);
-	} else if (hdr_op == HDR_CLEAR_INFO)
-		sde_hdmi_clear_hdr_infoframe(display);
-
-	hdmi_display->curr_hdr_state = hdr_ctrl->hdr_state;
+	sde_hdmi_panel_set_hdr_infoframe(display,
+		params->hdr_metadata);
 
 	return 0;
-}
-
-bool sde_hdmi_mode_needs_full_range(void *display)
-{
-	struct sde_hdmi *hdmi_display = (struct sde_hdmi *)display;
-	struct drm_display_mode *mode;
-	u32 mode_fmt_flags = 0;
-	u32 cea_mode;
-
-	if (!hdmi_display) {
-		SDE_ERROR("invalid input\n");
-		return false;
-	}
-
-	mode = &hdmi_display->mode;
-	/* Cache the format flags before clearing */
-	mode_fmt_flags = mode->flags;
-	/**
-	 * Clear the RGB/YUV format flags before calling upstream API
-	 * as the API also compares the flags and then returns a mode
-	 */
-	mode->flags &= ~SDE_DRM_MODE_FLAG_FMT_MASK;
-	cea_mode = drm_match_cea_mode(mode);
-	/* Restore the format flags */
-	mode->flags = mode_fmt_flags;
-
-	if (cea_mode > SDE_HDMI_VIC_640x480)
-		return false;
-
-	return true;
-}
-
-enum sde_csc_type sde_hdmi_get_csc_type(struct drm_connector *conn,
-	void *display)
-{
-	struct sde_hdmi *hdmi_display = (struct sde_hdmi *)display;
-	struct sde_connector_state *c_state;
-	struct drm_msm_ext_panel_hdr_ctrl *hdr_ctrl;
-	struct drm_msm_ext_panel_hdr_metadata *hdr_meta;
-
-	if (!hdmi_display || !conn) {
-		SDE_ERROR("invalid input\n");
-		goto error;
-	}
-
-	c_state = to_sde_connector_state(conn->state);
-
-	if (!c_state) {
-		SDE_ERROR("invalid input\n");
-		goto error;
-	}
-
-	hdr_ctrl = &c_state->hdr_ctrl;
-	hdr_meta = &hdr_ctrl->hdr_meta;
-
-	if ((hdr_ctrl->hdr_state == HDR_ENABLE)
-		&& (hdr_meta->eotf != 0))
-		return SDE_CSC_RGB2YUV_2020L;
-	else if (sde_hdmi_mode_needs_full_range(hdmi_display)
-		|| conn->yuv_qs)
-		return SDE_CSC_RGB2YUV_601FR;
-
-error:
-	return SDE_CSC_RGB2YUV_601L;
 }
 
 int sde_hdmi_connector_get_modes(struct drm_connector *connector, void *display)
@@ -3067,7 +2822,6 @@ int sde_hdmi_drm_init(struct sde_hdmi *display, struct drm_encoder *enc)
 	struct msm_drm_private *priv = NULL;
 	struct hdmi *hdmi;
 	struct platform_device *pdev;
-	struct sde_kms *sde_kms;
 
 	DBG("");
 	if (!display || !display->drm_dev || !enc) {
@@ -3125,19 +2879,6 @@ int sde_hdmi_drm_init(struct sde_hdmi *display, struct drm_encoder *enc)
 
 	enc->bridge = hdmi->bridge;
 	priv->bridges[priv->num_bridges++] = hdmi->bridge;
-
-	/*
-	 * After initialising HDMI bridge, we need to check
-	 * whether the early display is enabled for HDMI.
-	 * If yes, we need to increase refcount of hdmi power
-	 * clocks. This can skip the clock disabling operation in
-	 * clock_late_init when finding clk.count == 1.
-	 */
-	sde_kms = to_sde_kms(priv->kms);
-	if (sde_kms->splash_info.handoff) {
-		sde_hdmi_bridge_power_on(hdmi->bridge);
-		hdmi->power_on = true;
-	}
 
 	mutex_unlock(&display->display_lock);
 	return 0;

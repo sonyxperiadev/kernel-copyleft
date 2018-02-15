@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef MDSS_H
 #define MDSS_H
@@ -37,6 +42,10 @@
 
 #define MDSS_PINCTRL_STATE_DEFAULT "mdss_default"
 #define MDSS_PINCTRL_STATE_SLEEP  "mdss_sleep"
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+#define MDSS_PINCTRL_STATE_TOUCH_ACTIVE "mdss_touch_active"
+#define MDSS_PINCTRL_STATE_TOUCH_SUSPEND  "mdss_touch_suspend"
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 enum mdss_mdp_clk_type {
 	MDSS_CLK_AHB,
@@ -547,7 +556,6 @@ struct mdss_data_type {
 	u32 sec_session_cnt;
 	wait_queue_head_t secure_waitq;
 	struct cx_ipeak_client *mdss_cx_ipeak;
-	struct mult_factor bus_throughput_factor;
 };
 
 extern struct mdss_data_type *mdss_res;

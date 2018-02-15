@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -51,6 +56,9 @@
 
 #define QUSB2PHY_PORT_TUNE1		0x23c
 #define QUSB2PHY_TEST1			0x24C
+#define QUSB2PHY_PORT_TUNE2		0x240
+#define QUSB2PHY_PORT_TUNE3		0x244
+#define QUSB2PHY_PORT_TUNE4		0x248
 
 #define QUSB2PHY_1P2_VOL_MIN           1200000 /* uV */
 #define QUSB2PHY_1P2_VOL_MAX           1200000 /* uV */
@@ -70,9 +78,39 @@
 #define QUSB2PHY_PLL_ANALOG_CONTROLS_ONE	0x0
 #define QUSB2PHY_PLL_ANALOG_CONTROLS_TWO	0x4
 
+#define USB_PHY_HSTX_TRIM		0xF0	/* TUNE1 7:4 */
+#define USB_PHY_HSTX_SR			0x0C	/* TUNE1 3:2 */
+#define USB_PHY_HSTX_SR_BIAS		0x03	/* TUNE1 1:0 */
+#define USB_PHY_SEL_EMPH_HALF_WIDTH	0x10	/* TUNE2   4 */
+#define USB_PHY_EN_EMPHASIS		0x0C	/* TUNE2 3:2 */
+#define USB_PHY_HS_DISCON_TRIM		0x03	/* TUNE2 1:0 */
+#define USB_PHY_CDR_WIDE		0x80	/* TUNE3   7 */
+#define USB_PHY_CDR_PULSE_SMPL		0x40	/* TUNE3   6 */
+#define USB_PHY_TX2RX_DLY		0x3F	/* TUNE3 5:0 */
+#define USB_PHY_HANDOFF_PHSEL		0xE0	/* TUNE4 7:5 */
+#define USB_PHY_FORCE_HSRX_ALWAYS_ON	0x10	/* TUNE4   4 */
+#define USB_PHY_SQ_FILTER_DIS		0x08	/* TUNE4   3 */
+#define USB_PHY_SQ_LEVEL		0x07	/* TUNE4 2:0 */
+
 unsigned int phy_tune1;
+unsigned int phy_tune2;
+unsigned int phy_tune3;
+unsigned int phy_tune4;
+unsigned int phy_host_tune1;
+unsigned int phy_host_tune2;
 module_param(phy_tune1, uint, S_IRUGO | S_IWUSR);
+module_param(phy_tune2, uint, S_IRUGO | S_IWUSR);
+module_param(phy_tune3, uint, S_IRUGO | S_IWUSR);
+module_param(phy_tune4, uint, S_IRUGO | S_IWUSR);
+module_param(phy_host_tune1, uint, S_IRUGO | S_IWUSR);
+module_param(phy_host_tune2, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(phy_tune1, "QUSB PHY v2 TUNE1");
+MODULE_PARM_DESC(phy_tune2, "QUSB PHY v2 TUNE2");
+MODULE_PARM_DESC(phy_tune3, "QUSB PHY v2 TUNE3");
+MODULE_PARM_DESC(phy_tune4, "QUSB PHY v2 TUNE4");
+MODULE_PARM_DESC(phy_host_tune1, "QUSB PHY HOST v2 TUNE1");
+MODULE_PARM_DESC(phy_host_tune2, "QUSB PHY HOST v2 TUNE2");
+
 
 struct qusb_phy {
 	struct usb_phy		phy;
@@ -98,8 +136,10 @@ struct qusb_phy {
 	int			*qusb_phy_host_init_seq;
 
 	u32			tune_val;
+	u32			host_tune_val;
 	int			efuse_bit_pos;
 	int			efuse_num_of_bits;
+	u32			efuse_offset;
 
 	int			power_enabled_ref;
 	bool			clocks_enabled;
@@ -380,14 +420,16 @@ static int qusb_phy_update_dpdm(struct usb_phy *phy, int value)
 	return ret;
 }
 
-static void qusb_phy_get_tune1_param(struct qusb_phy *qphy)
+static u32 qusb_phy_get_tune1_param(struct qusb_phy *qphy)
 {
 	u8 reg;
 	u32 bit_mask = 1;
+	u32 tune_val;
 
-	pr_debug("%s(): num_of_bits:%d bit_pos:%d\n", __func__,
+	pr_debug("%s(): num_of_bits:%d bit_pos:%d offset:%d\n", __func__,
 				qphy->efuse_num_of_bits,
-				qphy->efuse_bit_pos);
+				qphy->efuse_bit_pos,
+				qphy->efuse_offset);
 
 	/* get bit mask based on number of bits to use with efuse reg */
 	bit_mask = (bit_mask << qphy->efuse_num_of_bits) - 1;
@@ -396,18 +438,22 @@ static void qusb_phy_get_tune1_param(struct qusb_phy *qphy)
 	 * if efuse reg is updated (i.e non-zero) then use it to program
 	 * tune parameters
 	 */
-	qphy->tune_val = readl_relaxed(qphy->efuse_reg);
+	tune_val = readl_relaxed(qphy->efuse_reg);
 	pr_debug("%s(): bit_mask:%d efuse based tune1 value:%d\n",
-				__func__, bit_mask, qphy->tune_val);
+				__func__, bit_mask, tune_val);
 
-	qphy->tune_val = TUNE_VAL_MASK(qphy->tune_val,
-				qphy->efuse_bit_pos, bit_mask);
+	tune_val = TUNE_VAL_MASK(tune_val, qphy->efuse_bit_pos, bit_mask);
 	reg = readb_relaxed(qphy->base + QUSB2PHY_PORT_TUNE1);
-	if (qphy->tune_val) {
+	if (tune_val) {
+		tune_val += qphy->efuse_offset;
+		if ((s32)tune_val < 0)
+			tune_val = 0x00;
+		else if ((s32)tune_val > 0x0f)
+			tune_val = 0x0f;
 		reg = reg & 0x0f;
-		reg |= (qphy->tune_val << 4);
+		reg |= (tune_val << 4);
 	}
-	qphy->tune_val = reg;
+	return reg;
 }
 
 static void qusb_phy_write_seq(void __iomem *base, u32 *seq, int cnt,
@@ -422,6 +468,75 @@ static void qusb_phy_write_seq(void __iomem *base, u32 *seq, int cnt,
 		if (delay)
 			usleep_range(delay, (delay + 2000));
 	}
+}
+
+static inline u32 msm_usb_read_reg_field(void *base, u32 offset, const u32 mask)
+{
+	u32 shift = find_first_bit((void *)&mask, 32);
+	u32 val = readb_relaxed(base + offset);
+	val &= mask;		/* clear other bits */
+	val >>= shift;
+	return val;
+}
+
+static void msm_qphy_param_output(struct usb_phy *phy)
+{
+	struct qusb_phy *qphy = container_of(phy, struct qusb_phy, phy);
+
+	/* PORT_TUNE1 */
+	dev_dbg(phy->dev, "PORT_TUNE1:0x%02x\n",
+		readb_relaxed(qphy->base + QUSB2PHY_PORT_TUNE1));
+	dev_dbg(phy->dev, "  :HSTX_TRIM     \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE1, USB_PHY_HSTX_TRIM));
+	dev_dbg(phy->dev, "  :HSTX_SR      \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE1, USB_PHY_HSTX_SR));
+	dev_dbg(phy->dev, "  :HSTX_SR_BIAS      \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE1, USB_PHY_HSTX_SR_BIAS));
+
+	/* PORT_TUNE2 */
+	dev_dbg(phy->dev, "PORT_TUNE2:0x%02x\n",
+		readb_relaxed(qphy->base + QUSB2PHY_PORT_TUNE2));
+	dev_dbg(phy->dev, "  :SEL_EMPH_HALF_WIDTH    \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE2, USB_PHY_SEL_EMPH_HALF_WIDTH));
+	dev_dbg(phy->dev, "  :EN_EMPHASIS       \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE2, USB_PHY_EN_EMPHASIS));
+	dev_dbg(phy->dev, "  :HS_DISCON_TRIM      \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE2, USB_PHY_HS_DISCON_TRIM));
+
+	/* PORT_TUNE3 */
+	dev_dbg(phy->dev, "PORT_TUNE3:0x%02x\n",
+		readb_relaxed(qphy->base + QUSB2PHY_PORT_TUNE3));
+	dev_dbg(phy->dev, "  :CDR_WIDE            \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE3, USB_PHY_CDR_WIDE));
+	dev_dbg(phy->dev, "  :CDR_PULSE_SMPL            \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE3, USB_PHY_CDR_PULSE_SMPL));
+	dev_dbg(phy->dev, "  :TX2RX_DLY            \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE3, USB_PHY_TX2RX_DLY));
+
+	/* PORT_TUNE4 */
+	dev_dbg(phy->dev, "PORT_TUNE4:0x%02x\n",
+		readb_relaxed(qphy->base + QUSB2PHY_PORT_TUNE4));
+	dev_dbg(phy->dev, "  :HANDOFF_PHSEL      \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE4, USB_PHY_HANDOFF_PHSEL));
+	dev_dbg(phy->dev, "  :FORCE_HSRX_ALWAYS_ON    \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE4, USB_PHY_FORCE_HSRX_ALWAYS_ON));
+	dev_dbg(phy->dev, "  :SQ_FILTER_DIS     \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE4, USB_PHY_SQ_FILTER_DIS));
+	dev_dbg(phy->dev, "  :SQ_LEVEL       \t0x%02x\n",
+		msm_usb_read_reg_field(qphy->base,
+			QUSB2PHY_PORT_TUNE4, USB_PHY_SQ_LEVEL));
 }
 
 static void qusb_phy_host_init(struct usb_phy *phy)
@@ -443,6 +558,32 @@ static void qusb_phy_host_init(struct usb_phy *phy)
 
 	qusb_phy_write_seq(qphy->base, qphy->qusb_phy_host_init_seq,
 			qphy->host_init_seq_len, 0);
+
+	if (qphy->efuse_reg) {
+		if (!qphy->host_tune_val)
+			qphy->host_tune_val = qusb_phy_get_tune1_param(qphy);
+
+		pr_debug("%s(): Programming host TUNE1 parameter as:%x\n",
+				__func__, qphy->host_tune_val);
+		writel_relaxed(qphy->host_tune_val,
+				qphy->base + QUSB2PHY_PORT_TUNE1);
+	}
+
+	/* If phy_tune1 modparam set, override tune1 value */
+	if (phy_host_tune1) {
+		pr_debug("%s(): (modparam) HOST_TUNE1 val:0x%02x\n",
+						__func__, phy_host_tune1);
+		writel_relaxed(phy_host_tune1,
+				qphy->base + QUSB2PHY_PORT_TUNE1);
+	}
+	/* If phy_tune2 modparam set, override tune2 value */
+	if (phy_host_tune2) {
+		pr_debug("%s(): (modparam) HOST TUNE2 val:0x%02x\n",
+						__func__, phy_host_tune2);
+		writel_relaxed(phy_host_tune2,
+				qphy->base + QUSB2PHY_PORT_TUNE2);
+	}
+	msm_qphy_param_output(phy);
 
 	/* Ensure above write is completed before turning ON ref clk */
 	wmb();
@@ -520,7 +661,7 @@ static int qusb_phy_init(struct usb_phy *phy)
 				qphy->init_seq_len, 0);
 	if (qphy->efuse_reg) {
 		if (!qphy->tune_val)
-			qusb_phy_get_tune1_param(qphy);
+			qphy->tune_val = qusb_phy_get_tune1_param(qphy);
 
 		pr_debug("%s(): Programming TUNE1 parameter as:%x\n", __func__,
 				qphy->tune_val);
@@ -535,6 +676,28 @@ static int qusb_phy_init(struct usb_phy *phy)
 		writel_relaxed(phy_tune1,
 				qphy->base + QUSB2PHY_PORT_TUNE1);
 	}
+	/* If phy_tune2 modparam set, override tune2 value */
+	if (phy_tune2) {
+		pr_debug("%s(): (modparam) TUNE2 val:0x%02x\n",
+						__func__, phy_tune2);
+		writel_relaxed(phy_tune2,
+				qphy->base + QUSB2PHY_PORT_TUNE2);
+	}
+	/* If phy_tune3 modparam set, override tune3 value */
+	if (phy_tune3) {
+		pr_debug("%s(): (modparam) TUNE3 val:0x%02x\n",
+						__func__, phy_tune3);
+		writel_relaxed(phy_tune3,
+				qphy->base + QUSB2PHY_PORT_TUNE3);
+	}
+	/* If phy_tune4 modparam set, override tune4 value */
+	if (phy_tune4) {
+		pr_debug("%s(): (modparam) TUNE4 val:0x%02x\n",
+						__func__, phy_tune4);
+		writel_relaxed(phy_tune4,
+				qphy->base + QUSB2PHY_PORT_TUNE4);
+	}
+	msm_qphy_param_output(phy);
 
 	/* ensure above writes are completed before re-enabling PHY */
 	wmb();
@@ -652,16 +815,13 @@ static int qusb_phy_set_suspend(struct usb_phy *phy, int suspend)
 			writel_relaxed(intr_mask,
 				qphy->base + QUSB2PHY_INTR_CTRL);
 
-			if (linestate & (LINESTATE_DP | LINESTATE_DM)) {
-
-				/* enable phy auto-resume */
-				writel_relaxed(0x91,
+			/* enable phy auto-resume */
+			writel_relaxed(0x91,
 					qphy->base + QUSB2PHY_TEST1);
-				/* flush the previous write before next write */
-				wmb();
-				writel_relaxed(0x90,
-					qphy->base + QUSB2PHY_TEST1);
-			}
+			/* flush the previous write before next write */
+			wmb();
+			writel_relaxed(0x90,
+				qphy->base + QUSB2PHY_TEST1);
 
 			dev_dbg(phy->dev, "%s: intr_mask = %x\n",
 			__func__, intr_mask);
@@ -884,6 +1044,12 @@ static int qusb_phy_probe(struct platform_device *pdev)
 				ret = of_property_read_u32(dev->of_node,
 						"qcom,efuse-num-bits",
 						&qphy->efuse_num_of_bits);
+			}
+
+			if (!ret) {
+				ret = of_property_read_u32(dev->of_node,
+						"qcom,efuse-offset",
+						&qphy->efuse_offset);
 			}
 
 			if (ret) {

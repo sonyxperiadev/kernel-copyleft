@@ -42,13 +42,6 @@
 			reg = <0x1 0x0 0 0x10000000>;
 			label = "ion_system_mem";
 		};
-		qseecom_mem: qseecom_region {
-			compatible = "shared-dma-pool";
-			alloc-ranges = <0 0x00000000 0 0xffffffff>;
-			reusable;
-			alignment = <0 0x400000>;
-			size = <0 0x1400000>;
-		};
 		ion_audio: ion_audio_region {
 			reg = <0 0xc8000000 0 0x00400000>;
 			label = "ion_audio_mem";
@@ -85,10 +78,6 @@
 			<&afe_proxy_rx>, <&afe_proxy_tx>,
 			<&incall_record_rx>, <&incall_record_tx>,
 			<&incall_music_rx>, <&incall_music2_rx>,
-			<&dai_pri_tdm_tx_0>, <&dai_pri_tdm_tx_1>,
-			<&dai_pri_tdm_tx_2>, <&dai_pri_tdm_tx_3>,
-			<&dai_pri_tdm_rx_0>, <&dai_pri_tdm_rx_1>,
-			<&dai_pri_tdm_rx_2>, <&dai_pri_tdm_rx_3>,
 			<&dai_sec_tdm_tx_0>, <&dai_sec_tdm_tx_1>,
 			<&dai_sec_tdm_tx_2>, <&dai_sec_tdm_tx_3>,
 			<&dai_tert_tdm_rx_0>, <&dai_tert_tdm_rx_1>,
@@ -107,10 +96,6 @@
 			"msm-dai-q6-dev.241", "msm-dai-q6-dev.240",
 			"msm-dai-q6-dev.32771", "msm-dai-q6-dev.32772",
 			"msm-dai-q6-dev.32773", "msm-dai-q6-dev.32770",
-			"msm-dai-q6-tdm.36865", "msm-dai-q6-tdm.36867",
-			"msm-dai-q6-tdm.36869", "msm-dai-q6-tdm.36871",
-			"msm-dai-q6-tdm.36864", "msm-dai-q6-tdm.36866",
-			"msm-dai-q6-tdm.36868", "msm-dai-q6-tdm.36870",
 			"msm-dai-q6-tdm.36881", "msm-dai-q6-tdm.36883",
 			"msm-dai-q6-tdm.36885", "msm-dai-q6-tdm.36887",
 			"msm-dai-q6-tdm.36896", "msm-dai-q6-tdm.36898",
@@ -490,22 +475,6 @@
 			qcom,msm-cpudai-tdm-dev-id = <36919>;
 			qcom,msm-cpudai-tdm-data-align = <0>;
 		};
-	};
-
-	qcom_seecom: qseecom@86600000 {
-		compatible = "qcom,qseecom";
-		reg = <0x86600000 0x2200000>;
-		reg-names = "secapp-region";
-		qcom,hlos-num-ce-hw-instances = <1>;
-		qcom,hlos-ce-hw-instance = <0>;
-		qcom,qsee-ce-hw-instance = <0>;
-		qcom,disk-encrypt-pipe-pair = <2>;
-		qcom,no-clock-support;
-		qcom,msm-bus,name = "qseecom-noc";
-		qcom,msm-bus,num-cases = <4>;
-		qcom,msm-bus,num-paths = <1>;
-		qcom,ce-opp-freq = <171430000>;
-		qcom,qsee-reentrancy-support = <2>;
 	};
 
 	hostless: qcom,msm-pcm-hostless {

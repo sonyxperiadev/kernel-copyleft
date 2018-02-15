@@ -2676,7 +2676,7 @@ static bool shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 		if (!populated_zone(zone))
 			continue;
 
-		classzone_idx = gfp_zone(sc->gfp_mask);
+		classzone_idx = requested_highidx;
 		while (!populated_zone(zone->zone_pgdat->node_zones +
 							classzone_idx))
 			classzone_idx--;

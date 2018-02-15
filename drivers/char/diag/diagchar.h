@@ -642,7 +642,6 @@ struct diagchar_dev {
 #endif
 	int time_sync_enabled;
 	uint8_t uses_time_api;
-	struct platform_device *pdev;
 };
 
 extern struct diagchar_dev *driver;

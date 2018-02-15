@@ -975,31 +975,29 @@ static int __validate_layer_reconfig(struct mdp_input_layer *layer,
 	struct mdss_mdp_pipe *pipe)
 {
 	int status = 0;
-	struct mdss_mdp_format_params *layer_src_fmt;
+	struct mdss_mdp_format_params *src_fmt;
 	struct mdss_data_type *mdata = mfd_to_mdata(pipe->mfd);
-	bool is_csc_db = (mdata->mdp_rev < MDSS_MDP_HW_REV_300) ? false : true;
-
-	layer_src_fmt = mdss_mdp_get_format_params(layer->buffer.format);
-	if (!layer_src_fmt) {
-		pr_err("Invalid layer format %d\n", layer->buffer.format);
-		status = -EINVAL;
-		goto err_exit;
-	}
 
 	/*
-	 * HW earlier to sdm 3.x.x does not support double buffer CSC.
-	 * Invalidate any reconfig of CSC block on staged pipe.
+	 * csc registers are not double buffered earlier to sdm 3.x.x.
+	 * It is not permitted to change them on staged pipe
+	 * with YUV layer.
 	 */
-	if (!is_csc_db &&
-		((!!pipe->src_fmt->is_yuv != !!layer_src_fmt->is_yuv) ||
-		(pipe->src_fmt->is_yuv && layer_src_fmt->is_yuv &&
-		pipe->csc_coeff_set != layer->color_space))) {
-		pr_err("CSC reconfig not allowed on staged pipe\n");
-		status = -EINVAL;
-		goto err_exit;
+	if (mdata->mdp_rev < MDSS_MDP_HW_REV_300 &&
+		pipe->csc_coeff_set != layer->color_space) {
+		src_fmt = mdss_mdp_get_format_params(layer->buffer.format);
+		if (!src_fmt) {
+			pr_err("Invalid layer format %d\n",
+						layer->buffer.format);
+			status = -EINVAL;
+		} else {
+			if (pipe->src_fmt->is_yuv && src_fmt &&
+							src_fmt->is_yuv) {
+				status = -EPERM;
+				pr_err("csc change is not permitted on used pipe\n");
+			}
+		}
 	}
-
-err_exit:
 	return status;
 }
 
@@ -3136,14 +3134,6 @@ int mdss_mdp_layer_pre_commit_wfd(struct msm_fb_data_type *mfd,
 		sync_pt_data = &mfd->mdp_sync_pt_data;
 		mutex_lock(&sync_pt_data->sync_mutex);
 		count = sync_pt_data->acq_fen_cnt;
-
-		if (count >= MDP_MAX_FENCE_FD) {
-			pr_err("Reached maximum possible value for fence count\n");
-			mutex_unlock(&sync_pt_data->sync_mutex);
-			rc = -EINVAL;
-			goto input_layer_err;
-		}
-
 		sync_pt_data->acq_fen[count] = fence;
 		sync_pt_data->acq_fen_cnt++;
 		mutex_unlock(&sync_pt_data->sync_mutex);
