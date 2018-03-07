@@ -2618,6 +2618,7 @@ static int module_sig_check(struct load_info *info, int flags)
 	const unsigned long markerlen = sizeof(MODULE_SIG_STRING) - 1;
 	const void *mod = info->hdr;
 
+	pr_err("insmod debug5, module_sig_check enabled: flags=%i\n", flags);//debug
 	/*
 	 * Require flags == 0, as a module with version information
 	 * removed is no longer the module that was signed
@@ -2632,8 +2633,11 @@ static int module_sig_check(struct load_info *info, int flags)
 
 	if (!err) {
 		info->sig_ok = true;
+		pr_err("insmod debug6, module_sig_check: sig_ok is true\n");//debug
 		return 0;
 	}
+
+	pr_err("insmod debug6-2, module_sig_check: sig_ok is %d\n", info->sig_ok);//debug
 
 	/* Not having a signature is only an error if we're strict. */
 	if (err == -ENOKEY && !sig_enforce)
@@ -2644,6 +2648,7 @@ static int module_sig_check(struct load_info *info, int flags)
 #else /* !CONFIG_MODULE_SIG */
 static int module_sig_check(struct load_info *info, int flags)
 {
+	pr_err("insmod debug7, module_sig_check disabled: flags=%i sig_ok is %d\n", flags, info->sig_ok);//debug
 	return 0;
 }
 #endif /* !CONFIG_MODULE_SIG */
@@ -3246,11 +3251,16 @@ static noinline int do_init_module(struct module *mod)
 	int ret = 0;
 	struct mod_initfree *freeinit;
 
+	pr_err("insmod debug13, do_init_module, module:%s\n", mod->name);//debug
+
 	freeinit = kmalloc(sizeof(*freeinit), GFP_KERNEL);
 	if (!freeinit) {
 		ret = -ENOMEM;
 		goto fail;
 	}
+
+	pr_err("insmod debug14, do_init_module \n");//debug
+
 	freeinit->module_init = mod->module_init;
 
 	/*
@@ -3455,6 +3465,8 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	long err;
 	char *after_dashes;
 
+	pr_err("insmod debug4, load_module: flags=%i\n", flags);//debug
+
 	err = module_sig_check(info, flags);
 	if (err)
 		goto free_copy;
@@ -3463,6 +3475,8 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	if (err)
 		goto free_copy;
 
+	pr_err("insmod debug8, load_module: flags=%i\n", flags);//debug
+
 	/* Figure out module layout, and allocate all the memory. */
 	mod = layout_and_allocate(info, flags);
 	if (IS_ERR(mod)) {
@@ -3470,14 +3484,20 @@ static int load_module(struct load_info *info, const char __user *uargs,
 		goto free_copy;
 	}
 
+	pr_err("insmod debug9, load_module: flags=%i\n", flags);//debug
+
 	/* Reserve our place in the list. */
 	err = add_unformed_module(mod);
 	if (err)
 		goto free_module;
 
+	pr_err("insmod debug10, load_module:%s flags=%i info->sig_ok=%d\n", mod->name, flags, info->sig_ok);//debug
+
 #ifdef CONFIG_MODULE_SIG
 	mod->sig_ok = info->sig_ok;
+	pr_err("insmod debug10-2, load_module:%s flags=%i mod->sig_ok=%d\n", mod->name, flags, mod->sig_ok);//debug
 	if (!mod->sig_ok) {
+		pr_err("insmod debug11, load_module:%s verification failure, flags=%i\n", mod->name, flags);//debug
 		pr_notice_once("%s: module verification failed: signature "
 			       "and/or required key missing - tainting "
 			       "kernel\n", mod->name);
@@ -3565,6 +3585,8 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	/* Done! */
 	trace_module_load(mod);
 
+	pr_err("insmod debug12, load_module: flags=%i\n", flags);//debug
+
 	return do_init_module(mod);
 
  bug_cleanup:
@@ -3640,10 +3662,13 @@ SYSCALL_DEFINE3(finit_module, int, fd, const char __user *, uargs, int, flags)
 	int err;
 	struct load_info info = { };
 
+	pr_err("insmod debug1, finit_module: fd=%d, uargs=%p, flags=%i\n", fd, uargs, flags);//debug
+
 	err = may_init_module();
 	if (err)
 		return err;
 
+	pr_err("insmod debug2, finit_module: fd=%d, uargs=%p, flags=%i\n", fd, uargs, flags);//debug
 	pr_debug("finit_module: fd=%d, uargs=%p, flags=%i\n", fd, uargs, flags);
 
 	if (flags & ~(MODULE_INIT_IGNORE_MODVERSIONS
@@ -3653,6 +3678,8 @@ SYSCALL_DEFINE3(finit_module, int, fd, const char __user *, uargs, int, flags)
 	err = copy_module_from_fd(fd, &info);
 	if (err)
 		return err;
+
+	pr_err("insmod debug3, finit_module: fd=%d, uargs=%p, flags=%i\n", fd, uargs, flags);//debug
 
 	return load_module(&info, uargs, flags);
 }

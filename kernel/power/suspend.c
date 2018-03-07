@@ -32,7 +32,17 @@
 #include <linux/moduleparam.h>
 #include <linux/wakeup_reason.h>
 
+#include <linux/module.h>
 #include "power.h"
+
+#include <linux/gpio.h>
+#include <linux/proc_fs.h>
+static int suspend_dump_flag = 1;
+int suspend_dump_state = 0;
+
+module_param_named(suspend_dump_flag,
+		suspend_dump_flag, int,
+		S_IRUGO | S_IWUSR | S_IWGRP);
 
 const char *pm_labels[] = { "mem", "standby", "freeze", NULL };
 const char *pm_states[PM_SUSPEND_MAX];
@@ -371,11 +381,20 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 		goto Enable_cpus;
 	}
 
+	if (suspend_dump_flag)
+		cei_save_suspend_gpio_pmic_info();
 	arch_suspend_disable_irqs();
 	BUG_ON(!irqs_disabled());
 
+#ifdef CONFIG_PM_WAKEUP_TIMES
+   dpm_log_wakeup_stats(PMSG_SUSPEND);
+#endif
 	error = syscore_suspend();
 	if (!error) {
+		suspend_dump_state = 1;
+		//if (suspend_dump_flag)
+			//cei_save_suspend_gpio_pmic_info();
+
 		*wakeup = pm_wakeup_pending();
 		if (!(suspend_test(TEST_CORE) || *wakeup)) {
 			trace_suspend_resume(TPS("machine_suspend"),
@@ -393,6 +412,9 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 		syscore_resume();
 	}
 
+#ifdef CONFIG_PM_WAKEUP_TIMES
+   dpm_log_start_time(PMSG_RESUME);
+#endif
 	arch_suspend_enable_irqs();
 	BUG_ON(irqs_disabled());
 
@@ -432,6 +454,9 @@ int suspend_devices_and_enter(suspend_state_t state)
 
 	suspend_console();
 	suspend_test_start();
+#ifdef CONFIG_PM_WAKEUP_TIMES
+   dpm_log_start_time(PMSG_SUSPEND);
+#endif
 	error = dpm_suspend_start(PMSG_SUSPEND);
 	if (error) {
 		pr_err("PM: Some devices failed to suspend, or early wake event detected\n");
@@ -449,6 +474,9 @@ int suspend_devices_and_enter(suspend_state_t state)
  Resume_devices:
 	suspend_test_start();
 	dpm_resume_end(PMSG_RESUME);
+#ifdef CONFIG_PM_WAKEUP_TIMES
+   dpm_log_wakeup_stats(PMSG_RESUME);
+#endif
 	suspend_test_finish("resume devices");
 	trace_suspend_resume(TPS("resume_console"), state, true);
 	resume_console();
@@ -508,9 +536,9 @@ static int enter_state(suspend_state_t state)
 
 #ifndef CONFIG_SUSPEND_SKIP_SYNC
 	trace_suspend_resume(TPS("sync_filesystems"), 0, true);
-	printk(KERN_INFO "PM: Syncing filesystems ... ");
+	printk(KERN_INFO "PM: Syncing filesystems ...\n");
 	sys_sync();
-	printk("done.\n");
+	printk(KERN_INFO "PM: Syncing filesystems ... done.\n");
 	trace_suspend_resume(TPS("sync_filesystems"), 0, false);
 #endif
 

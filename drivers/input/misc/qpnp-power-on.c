@@ -32,6 +32,7 @@
 #include <linux/regulator/of_regulator.h>
 #include <linux/input/qpnp-power-on.h>
 #include <linux/power_supply.h>
+#include <linux/cei_hw_id.h>
 
 #define PMIC_VER_8941           0x01
 #define PMIC_VERSION_REG        0x0105
@@ -137,6 +138,8 @@
 #define QPNP_PON_UVLO_DLOAD_EN			BIT(7)
 #define QPNP_PON_SMPL_EN			BIT(7)
 
+#define QPNP_PON_DVDD_HARD_RESET_SET       0x08
+
 /* Ranges */
 #define QPNP_PON_S1_TIMER_MAX			10256
 #define QPNP_PON_S2_TIMER_MAX			2000
@@ -229,6 +232,7 @@ module_param_named(
 );
 
 static struct qpnp_pon *sys_reset_dev;
+static struct qpnp_pon *sys_reset_dev_2;
 static DEFINE_SPINLOCK(spon_list_slock);
 static LIST_HEAD(spon_dev_list);
 
@@ -1803,6 +1807,138 @@ static struct kernel_param_ops smpl_en_ops = {
 
 module_param_cb(smpl_en, &smpl_en_ops, &smpl_en, 0644);
 
+static bool resin_n_reset;
+
+static int qpnp_pon_debugfs_resin_n_get(char *buf,
+                   const struct kernel_param *kp)
+{
+   struct qpnp_pon *pon = sys_reset_dev;
+   int rc = 0;
+   uint reg;
+
+   if (!pon)
+       return -ENODEV;
+
+   rc = regmap_read(pon->regmap,QPNP_PON_RESIN_S2_CNTL(pon), &reg);
+   if (rc) {
+       dev_err(&pon->pdev->dev,
+           "Unable to read addr=%x, rc(%d)\n",
+           QPNP_PON_RESIN_S2_CNTL(pon), rc);
+       return rc;
+   }
+   pr_debug("ctrl:%p add:%x sid:%u reg:0x%02x\n",
+        to_spmi_device(pon->pdev->dev.parent)->ctrl, QPNP_PON_RESIN_S2_CNTL(pon),
+        to_spmi_device(pon->pdev->dev.parent)->usid, reg);
+
+   return snprintf(buf, PAGE_SIZE, "Address 0x846:0x%02x", reg);
+}
+
+static int qpnp_pon_debugfs_resin_n_set(const char *val,
+                   const struct kernel_param *kp)
+{
+   struct qpnp_pon *pon = sys_reset_dev;
+   int rc = 0;
+   u8 reg = PON_POWER_OFF_WARM_RESET;
+
+   if (!pon)
+       return -ENODEV;
+
+   rc = param_set_bool(val, kp);
+   if (rc) {
+       pr_err("Unable to set bms_reset: %d\n", rc);
+       return rc;
+   }
+
+   if (!*(bool *)kp->arg)
+       reg = QPNP_PON_DVDD_HARD_RESET_SET;
+
+   rc = regmap_write(pon->regmap,QPNP_PON_RESIN_S2_CNTL(pon), reg);
+   if (rc) {
+       dev_err(&pon->pdev->dev,
+           "Unable to write to addr=%hx, rc(%d)\n",
+           QPNP_PON_RESIN_S2_CNTL(pon), rc);
+       return rc;
+   }
+
+   return 0;
+}
+
+static struct kernel_param_ops resin_n_ops = {
+   .set = qpnp_pon_debugfs_resin_n_set,
+   .get = qpnp_pon_debugfs_resin_n_get,
+};
+
+module_param_cb(resin_n_reset, &resin_n_ops, &resin_n_reset, 0644);
+
+static bool s3_timer;
+
+static int qpnp_pon_debugfs_s3_timer_get(char *buf,
+                   const struct kernel_param *kp)
+{
+   struct qpnp_pon *pon = sys_reset_dev;
+   int rc = 0;
+   uint reg;
+
+   if (!pon)
+       return -ENODEV;
+
+   rc = regmap_read(pon->regmap, QPNP_PON_S3_DBC_CTL(pon), &reg);
+   if (rc) {
+       dev_err(&pon->pdev->dev,
+           "Unable to read addr=%x, rc(%d)\n",
+           QPNP_PON_S3_DBC_CTL(pon), rc);
+       return rc;
+   }
+   pr_debug("ctrl:%p add:%x sid:%u reg:0x%02x\n",
+        to_spmi_device(pon->pdev->dev.parent)->ctrl, QPNP_PON_S3_DBC_CTL(pon),
+        to_spmi_device(pon->pdev->dev.parent)->usid, reg);
+
+   return snprintf(buf, PAGE_SIZE, "Address 0x875:0x%02x", reg);
+}
+
+static int qpnp_pon_debugfs_s3_timer_set(const char *val,
+                   const struct kernel_param *kp)
+{
+   struct qpnp_pon *pon = sys_reset_dev;
+   int rc = 0;
+
+   if (!pon)
+       return -ENODEV;
+
+   rc = param_set_byte(val, kp);
+
+   if (rc) {
+       pr_err("Unable to set bms_reset: %d\n", rc);
+       return rc;
+   }
+
+   /* s3 debounce is SEC_ACCESS register */
+   rc = qpnp_pon_masked_write(pon, QPNP_PON_SEC_ACCESS(pon),
+               0xFF, QPNP_PON_SEC_UNLOCK);
+   if (rc) {
+       dev_err(&pon->pdev->dev, "Unable to do SEC_ACCESS rc:%d\n",
+           rc);
+       return rc;
+   }
+
+   rc = qpnp_pon_masked_write(pon, QPNP_PON_S3_DBC_CTL(pon),
+           QPNP_PON_S3_DBC_DELAY_MASK, *(unsigned char *)kp->arg);
+   if (rc) {
+       dev_err(&pon->pdev->dev, "Unable to set S3 debounce rc:%d\n",
+           rc);
+       return rc;
+   }
+
+   return 0;
+}
+
+static struct kernel_param_ops s3_timer_ops = {
+   .set = qpnp_pon_debugfs_s3_timer_set,
+   .get = qpnp_pon_debugfs_s3_timer_get,
+};
+
+module_param_cb(s3_timer, &s3_timer_ops, &s3_timer, 0644);
+
 static bool dload_on_uvlo;
 
 static int qpnp_pon_debugfs_uvlo_dload_get(char *buf,
@@ -2001,6 +2137,32 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 	u8 s3_src_reg;
 	unsigned long flags;
 	uint temp = 0;
+	char *phase;
+
+	phase = get_cei_phase_id();
+	index = get_phase_name_index(phase);
+
+	switch (index)
+	{
+		case PDP:
+			if (of_device_is_compatible(pdev->dev.of_node, "qcom,qpnp-power-on-dp")) {
+				printk("At PDP phase, do not use [qcom,qpnp-power-on-dp] deviceinfo");
+				return -EINVAL;
+			}
+			break;
+		case DP:
+		case SP:
+		case AP:
+		case TP:
+		case PQ:
+		case MP:
+		default:
+			if (of_device_is_compatible(pdev->dev.of_node, "qcom,qpnp-power-on")) {
+				printk("Not at PDP phase, do not use [qcom,qpnp-power-on] deviceinfo");
+				return -EINVAL;
+			}
+			break;
+	}
 
 	pon = devm_kzalloc(&pdev->dev, sizeof(struct qpnp_pon), GFP_KERNEL);
 	if (!pon)
@@ -2133,6 +2295,8 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 			"PMIC@SID%d Power-on reason: Unknown and '%s' boot\n",
 			to_spmi_device(pon->pdev->dev.parent)->usid,
 			 cold_boot ? "cold" : "warm");
+		if (to_spmi_device(pon->pdev->dev.parent)->usid == 2)
+			sys_reset_dev_2 = pon;
 	} else {
 		pon->pon_trigger_reason = index;
 		dev_info(&pon->pdev->dev,
@@ -2140,6 +2304,8 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 			to_spmi_device(pon->pdev->dev.parent)->usid,
 			 qpnp_pon_reason[index],
 			cold_boot ? "cold" : "warm");
+		if (to_spmi_device(pon->pdev->dev.parent)->usid == 2)
+			sys_reset_dev_2 = pon;
 	}
 
 	/* POFF reason */
@@ -2385,6 +2551,7 @@ static int qpnp_pon_remove(struct platform_device *pdev)
 
 static const struct of_device_id spmi_match_table[] = {
 	{ .compatible = "qcom,qpnp-power-on", },
+	{ .compatible = "qcom,qpnp-power-on-dp", },
 	{}
 };
 

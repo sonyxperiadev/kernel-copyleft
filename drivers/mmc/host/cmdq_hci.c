@@ -823,7 +823,7 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	if (err) {
 		pr_err("%s: %s: failed to setup tx desc: %d\n",
 		       mmc_hostname(mmc), __func__, err);
-		goto out;
+		goto desc_err;
 	}
 
 	cq_host->mrq_slot[tag] = mrq;
@@ -843,7 +843,19 @@ ring_doorbell:
 	/* Commit the doorbell write immediately */
 	wmb();
 
+	return err;
+
+desc_err:
+	if (cq_host->ops->crypto_cfg_end) {
+	  err = cq_host->ops->crypto_cfg_end(mmc, mrq);
+	  if (err) {
+	    pr_err("%s: failed to end ice config: err %d tag %d\n",
+	    mmc_hostname(mmc), err, tag);
+	  }
+	}
 out:
+	if (err)
+	  cmdq_runtime_pm_put(cq_host);
 	return err;
 }
 

@@ -1048,6 +1048,8 @@ static int mmc_blk_ioctl_rpmb_cmd(struct block_device *bdev,
 		goto idata_free;
 	}
 
+	mutex_lock(&card->host->rpmb_req_mutex);
+	atomic_set(&card->host->rpmb_req_pending, 1);
 	mmc_get_card(card);
 
 	if (mmc_card_doing_bkops(card)) {
@@ -1163,6 +1165,9 @@ static int mmc_blk_ioctl_rpmb_cmd(struct block_device *bdev,
 
 cmd_rel_host:
 	mmc_put_card(card);
+	atomic_set(&card->host->rpmb_req_pending, 0);
+	mutex_unlock(&card->host->rpmb_req_mutex);
+
 
 idata_free:
 	for (i = 0; i < MMC_IOC_MAX_RPMB_CMD; i++) {
@@ -1511,12 +1516,19 @@ static int get_card_status(struct mmc_card *card, u32 *status, int retries)
 	return err;
 }
 
+#define EXE_ERRORS \
+	(R1_OUT_OF_RANGE |   /* Command argument out of range */ \
+	 R1_ADDRESS_ERROR |   /* Misaligned address */ \
+	 R1_WP_VIOLATION |    /* Tried to write to protected block */ \
+	 R1_CARD_ECC_FAILED | /* ECC error */ \
+	 R1_ERROR)            /* General/unknown error */
+
 static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 		bool hw_busy_detect, struct request *req, int *gen_err)
 {
 	unsigned long timeout = jiffies + msecs_to_jiffies(timeout_ms);
 	int err = 0;
-	u32 status;
+	u32 status, first_status = 0;
 
 	do {
 		err = get_card_status(card, &status, 5);
@@ -1525,6 +1537,9 @@ static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 			       req->rq_disk->disk_name, err);
 			return err;
 		}
+
+		if (!first_status)
+			first_status = status;
 
 		if (status & R1_ERROR) {
 			pr_err("%s: %s: error sending status cmd, status %#x\n",
@@ -1555,6 +1570,14 @@ static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 		 */
 	} while (!(status & R1_READY_FOR_DATA) ||
 		 (R1_CURRENT_STATE(status) == R1_STATE_PRG));
+
+	/* Check for errors during cmd execution. In this case
+	 * the execution was terminated. */
+	if (first_status & EXE_ERRORS) {
+		pr_err("%s: error during r/w command, err status %#x, status %#x\n",
+		       req->rq_disk->disk_name, first_status, status);
+		return MMC_BLK_ABORT;
+	}
 
 	return err;
 }
@@ -2238,12 +2261,25 @@ static int mmc_blk_err_check(struct mmc_card *card,
 		return MMC_BLK_ABORT;
 	}
 
+	/* Check execution mode errors. If stop cmd was sent, these
+	 * errors would be reported in response to it. In this case
+	 * the execution is retried using single-block read. */
+	if (brq->stop.resp[0] & EXE_ERRORS) {
+		pr_err("%s: error during r/w command, stop response %#x\n",
+		       req->rq_disk->disk_name, brq->stop.resp[0]);
+		return MMC_BLK_RETRY_SINGLE;
+	}
+
 	/*
 	 * Everything else is either success, or a data error of some
 	 * kind.  If it was a write, we may have transitioned to
 	 * program mode, which we have to wait for it to complete.
+	 * If pre defined block count (CMD23) was used, no stop
+	 * cmd was sent and we need to read status to check
+	 * for errors during cmd execution.
 	 */
-	if (!mmc_host_is_spi(card->host) && rq_data_dir(req) != READ) {
+	if (!mmc_host_is_spi(card->host) &&
+	    (rq_data_dir(req) != READ || brq->sbc.opcode == MMC_SET_BLOCK_COUNT)) {
 		int err;
 
 		/* Check stop command response */
@@ -3170,6 +3206,16 @@ static struct mmc_cmdq_req *mmc_blk_cmdq_rw_prep(
 	return &mqrq->cmdq_req;
 }
 
+static void mmc_blk_cmdq_requeue_rw_rq(struct mmc_queue *mq,
+				struct request *req)
+{
+	struct mmc_card *card = mq->card;
+	struct mmc_host *host = card->host;
+
+	blk_requeue_request(req->q, req);
+	mmc_put_card(host->card);
+}
+
 static int mmc_blk_cmdq_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 {
 	struct mmc_queue_req *active_mqrq;
@@ -3216,6 +3262,15 @@ static int mmc_blk_cmdq_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 	if (!ret && (host->clk_scaling.state == MMC_LOAD_LOW))
 		wait_event_interruptible(ctx->queue_empty_wq,
 					(!ctx->active_reqs));
+
+	if (ret) {
+		/* clear pending request */
+		WARN_ON(!test_and_clear_bit(req->tag,
+				&host->cmdq_ctx.data_active_reqs));
+		WARN_ON(!test_and_clear_bit(req->tag,
+				&host->cmdq_ctx.active_reqs));
+		mmc_cmdq_clk_scaling_stop_busy(host, true, false);
+	}
 
 	return ret;
 }
@@ -3805,6 +3860,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 				break;
 			goto cmd_abort;
 		}
+		case MMC_BLK_RETRY_SINGLE:
 		case MMC_BLK_ECC_ERR:
 			if (brq->data.blocks > 1) {
 				/* Redo read one sector at a time */
@@ -4000,6 +4056,13 @@ static int mmc_blk_cmdq_issue_rq(struct mmc_queue *mq, struct request *req)
 			ret = mmc_blk_cmdq_issue_flush_rq(mq, req);
 		} else {
 			ret = mmc_blk_cmdq_issue_rw_rq(mq, req);
+			/*
+			 * If issuing of the request fails with eitehr EBUSY or
+			 * EAGAIN error, re-queue the request.
+			 * This case would occur with ICE calls.
+			 */
+			if (ret == -EBUSY || ret == -EAGAIN)
+				mmc_blk_cmdq_requeue_rw_rq(mq, req);
 		}
 	}
 
@@ -4512,7 +4575,8 @@ static const struct mmc_fixup blk_fixups[] =
 		  MMC_QUIRK_BLK_NO_CMD23),
 	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_TOSHIBA, CID_OEMID_ANY,
 		  add_quirk_mmc, MMC_QUIRK_CMDQ_EMPTY_BEFORE_DCMD),
-
+  MMC_FIXUP(CID_NAME_ANY, CID_MANFID_MICRON, CID_OEMID_ANY, 
+      add_quirk_mmc, MMC_QUIRK_CMDQ_EMPTY_BEFORE_DCMD), 
 	/*
 	 * Some MMC cards need longer data read timeout than indicated in CSD.
 	 */
@@ -4636,7 +4700,13 @@ static int mmc_blk_probe(struct mmc_card *card)
 	}
 
 	pm_runtime_use_autosuspend(&card->dev);
-	pm_runtime_set_autosuspend_delay(&card->dev, MMC_AUTOSUSPEND_DELAY_MS);
+
+	if (mmc_card_sd(card))
+		pm_runtime_set_autosuspend_delay(&card->dev,
+			MMC_SDCARD_AUTOSUSPEND_DELAY_MS);
+	else
+		pm_runtime_set_autosuspend_delay(&card->dev, MMC_AUTOSUSPEND_DELAY_MS);
+
 	pm_runtime_use_autosuspend(&card->dev);
 
 	/*

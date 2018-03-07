@@ -13,10 +13,15 @@
 #include "sdm660-pinctrl.dtsi"
 #include "sdm630-camera-sensor-mtp.dtsi"
 / {
-	mtp_batterydata: qcom,battery-data {
+	mtp_batterydata_sm12: qcom,battery-data-sm12 {
 		qcom,batt-id-range-pct = <15>;
-		#include "fg-gen3-batterydata-itech-3000mah.dtsi"
-		#include "fg-gen3-batterydata-ascent-3450mah.dtsi"
+		#include "sm12-batterydata-tdk-3200mah.dtsi"
+		#include "sm12-batterydata-somc-3200mah.dtsi"
+	};
+
+	mtp_batterydata_sm22: qcom,battery-data-sm22 {
+		qcom,batt-id-range-pct = <15>;
+		#include "sm22-batterydata-3450mah.dtsi"
 	};
 };
 
@@ -84,18 +89,47 @@
 	qcom,peripheral-size = <0x500000>;
 };
 
-&pm660l_wled {
-	qcom,led-strings-list = [01 02];
-};
-
 &soc {
+	somc_pinctrl: somc_pinctrl {
+		compatible = "somc-pinctrl";
+		pinctrl-names = "platform_common_default",
+						"product_common_default",
+						"variant_default";
+		pinctrl-0 = <>;
+
+		/* If product common default setting is needed,
+			fill pinctrl-1 value in <product>_common.dtsi */
+		pinctrl-1 = <>;
+
+		/* If variant specific default setting is needed,
+			fill pinctrl-2 value in <variant>.dtsi */
+		pinctrl-2 = <>;
+	};
+
 	qcom,msm-ssc-sensors {
 		compatible = "qcom,msm-ssc-sensors";
 	};
+
+        //start:CEI_ANDROID
+        hall {
+               compatible = "hall-switch";
+               interrupt-parent = <&tlmm>;
+               interrupts = <75 0x3>;
+               //vddio-supply = <&pm660l_l14>;
+               linux,gpio-int = <&tlmm 75 0x1>;
+               linux,wakeup;
+               linux,min-uv = <1700000>;
+               linux,max-uv = <1900000>;
+              };
+        //end:CEI_ANDROID
+
 };
 
 &pm660_fg {
-	qcom,battery-data = <&mtp_batterydata>;
+	qcom,battery-data-sm12 = <&mtp_batterydata_sm12>;
+	qcom,battery-data-sm22 = <&mtp_batterydata_sm22>;
+	qcom,fg-jeita-thresholds = <5 10 45 55>;
+	qcom,battery-thermal-coefficients = [c7 50 ff];
 };
 
 &sdhc_1 {
@@ -156,7 +190,7 @@
 };
 
 &mdss_dsi0 {
-	qcom,dsi-pref-prim-pan = <&dsi_nt35695b_truly_fhd_video>;
+	qcom,dsi-pref-prim-pan = <&dsi_td4322_truly_fhd_cmd>;
 	pinctrl-names = "mdss_default", "mdss_sleep";
 	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
 	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
@@ -173,22 +207,52 @@
 	qcom,usbplug-cc-gpio = <&tlmm 58 0>;
 };
 
-&pm660l_wled {
-	qcom,led-strings-list = [01 02];
-};
-
-&dsi_nt35695b_truly_fhd_video {
+&dsi_td4322_innolux_fhd_cmd {
 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 	qcom,mdss-dsi-bl-min-level = <1>;
 	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_innolux>;
 };
 
-&dsi_nt35695b_truly_fhd_cmd {
+&dsi_td4322_truly_fhd_cmd {
 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 	qcom,mdss-dsi-bl-min-level = <1>;
 	qcom,mdss-dsi-bl-max-level = <4095>;
-	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_truly>;
+};
+
+&dsi_td4322_csot_fhd_cmd {
+	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+	qcom,mdss-dsi-bl-min-level = <1>;
+	qcom,mdss-dsi-bl-max-level = <4095>;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_csot>;
+};
+
+&i2c_1 {
+	status = "okay";
+	synaptics@70 {
+		compatible = "synaptics,dsx-i2c";
+		reg = <0x70>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <45 0x2008>;
+		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
+		pinctrl-0 = <&ts_int_active &ts_lcd_id_active>;
+		pinctrl-1 = <&ts_int_suspend &ts_lcd_id_suspend>;
+		synaptics,pwr-reg-name = "avdd";
+		synaptics,bus-reg-name = "vdd";
+		synaptics,ub-i2c-addr = <0x20>;
+		synaptics,irq-gpio = <&tlmm 45 0x2008>; /* IRQF_ONESHOT | IRQF_TRIGGER_LOW */
+		synaptics,irq-on-state = <0>;
+		synaptics,power-delay-ms = <200>;
+		synaptics,reset-delay-ms = <200>;
+		synaptics,reset-on-state = <0>;
+		synaptics,reset-active-ms = <20>;
+		/* uncomment and update line below as appropriate if there are 0D buttons */
+		/* synaptics,cap-button-codes = <102 158>; */
+		/* uncomment and update lines below as appropriate if there are virtual buttons */
+		/* synaptics,vir-button-codes = <102 100 900 100 60 158 300 900 100 60>; */
+		/* synaptics,max-y-for-2d = <800>; */
+	};
 };
 
 &i2c_2 {

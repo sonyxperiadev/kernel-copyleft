@@ -524,6 +524,9 @@ slhc_uncompress(struct slcompress *comp, unsigned char *icp, int isize)
 	thp = &cs->cs_tcp;
 	ip = &cs->cs_ip;
 
+	if (ip->ihl < 5)
+		goto bad;
+
 	thp->check = *(__sum16 *)cp;
 	cp += 2;
 

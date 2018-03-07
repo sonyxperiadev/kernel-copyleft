@@ -159,7 +159,7 @@ Charger specific properties:
   Usage:      optional
   Value type: <u32>
   Definition: Specifies the maximum charger buck/boost switching frequency in
-		 KHz. It overrides the max frequency defined for the charger.
+              KHz. It overrides the max frequency defined for the charger.
 
 - qcom,otg-deglitch-time-ms
   Usage:      optional
@@ -178,10 +178,6 @@ Charger specific properties:
   Definition: WD bark-timeout in seconds. The possible values are
 		16, 32, 64, 128. If not defined it defaults to 64.
 
-- qcom,sw-jeita-enable
-  Usage:      optional
-  Value type: bool
-  Definition: Boolean flag which when present enables sw compensation for jeita
 
 =============================================
 Second Level Nodes - SMB2 Charger Peripherals

@@ -22,6 +22,66 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/gpio.h>
 
+#include "linux/proc_fs.h"
+//#include <linux/mfd/pm8xxx/pm8921.h>
+#include <linux/io.h>
+#include <linux/regulator/driver.h>
+#include <linux/regulator/consumer.h>
+#include <linux/qpnp/pin.h>
+#include <linux/spmi.h>
+
+#include <linux/gpio.h>
+#include <linux/proc_fs.h>
+#include <linux/regulator/machine.h>
+
+#define MSM_TLMM_BASE 0x03100000
+#define MSM_TLMM_SIZE 0x850000
+#define MSM_TLMM_REG_SIZE 0x1000
+static int  suspend_settings_gpio = 0xffff;
+int suspend_settings_test = 0xffffffff;
+
+static int suspend_gpio_pull;
+static int suspend_gpio_func;
+static int suspend_drv_strn;
+static int suspend_gpio_oe;
+//static void __iomem *cfg_reg;
+static unsigned char __iomem *cfg_reg;
+
+struct pmic_gpio_struct{
+	int pmic_data[100];
+	const char *pmic_chip_name;
+};
+
+module_param_named(suspend_settings_gpio,
+				suspend_settings_gpio,
+				int, S_IRUGO | S_IWUSR | S_IWGRP);
+module_param_named(suspend_gpio_pull,
+				suspend_gpio_pull,
+				int, S_IRUGO | S_IWUSR | S_IWGRP);
+module_param_named(suspend_gpio_func,
+				suspend_gpio_func,
+				int, S_IRUGO | S_IWUSR | S_IWGRP);
+module_param_named(suspend_drv_strn,
+				suspend_drv_strn,
+				int, S_IRUGO | S_IWUSR | S_IWGRP);
+module_param_named(suspend_gpio_oe,
+				suspend_gpio_oe,
+				int, S_IRUGO | S_IWUSR | S_IWGRP);
+
+#define NR_MSM_GPIOS 114
+
+uint32_t cei_suspend_settings[NR_MSM_GPIOS];
+uint32_t cei_suspend_dir[NR_MSM_GPIOS];
+uint cei_save_suspend_gpio_info_done;
+uint cei_save_suspend_pmic_info_done;
+uint cei_save_suspend_regulator_info_done;
+
+static int cei_suspend_reg_en[100];
+static int cei_suspend_reg_vol[100];
+static unsigned cei_suspend_reg_mode[100];
+
+static struct pmic_gpio_struct pmic_chip[10];
+
 /* Implementation infrastructure for GPIO interfaces.
  *
  * The GPIO programming interface allows for inlining speed-critical
@@ -48,6 +108,8 @@
  */
 DEFINE_SPINLOCK(gpio_lock);
 
+static struct gpio_desc gpio_desc[ARCH_NR_GPIOS];
+
 static DEFINE_MUTEX(gpio_lookup_lock);
 static LIST_HEAD(gpio_lookup_list);
 LIST_HEAD(gpio_chips);
@@ -56,6 +118,21 @@ LIST_HEAD(gpio_chips);
 static void gpiochip_free_hogs(struct gpio_chip *chip);
 static void gpiochip_irqchip_remove(struct gpio_chip *gpiochip);
 
+struct qpnp_pin_debugfs_args dfs_args[] = {
+	{ Q_PIN_CFG_MODE, "mode" },
+	{ Q_PIN_CFG_OUTPUT_TYPE, "output_type" },
+	{ Q_PIN_CFG_INVERT, "invert" },
+	{ Q_PIN_CFG_PULL, "pull" },
+	{ Q_PIN_CFG_VIN_SEL, "vin_sel" },
+	{ Q_PIN_CFG_OUT_STRENGTH, "out_strength" },
+	{ Q_PIN_CFG_SRC_SEL, "src_sel" },
+	{ Q_PIN_CFG_MASTER_EN, "master_en" },
+	{ Q_PIN_CFG_AOUT_REF, "aout_ref" },
+	{ Q_PIN_CFG_AIN_ROUTE, "ain_route" },
+	{ Q_PIN_CFG_CS_OUT, "cs_out" },
+	{ Q_PIN_CFG_APASS_SEL, "apass_sel" },
+	{ Q_PIN_CFG_DTEST_SEL, "dtest_sel" },
+};
 
 static inline void desc_set_label(struct gpio_desc *d, const char *label)
 {
@@ -354,6 +431,8 @@ int gpiochip_add(struct gpio_chip *chip)
 	status = gpiochip_set_desc_names(chip);
 	if (status)
 		goto err_remove_from_list;
+
+	pr_debug("FUNC[%s] : lable = %s\n", __func__, chip->label);
 
 	status = of_gpiochip_add(chip);
 	if (status)
@@ -2537,3 +2616,700 @@ static int __init gpiolib_debugfs_init(void)
 subsys_initcall(gpiolib_debugfs_init);
 
 #endif	/* DEBUG_FS */
+
+void cei_save_suspend_gpio_pmic_info(void)
+{
+	unsigned int j, i;
+	unsigned int rc, ret;
+	unsigned int k = 0;
+	int count, count_1, tlmm_base;
+	static struct regulator_dev *rdev;
+	static struct regulator *reg_tmp;
+	static struct qpnp_pin_chip *q_chip;
+	static struct qpnp_pin_spec *q_spec, *tmp_q_spec;
+	unsigned char __iomem *cfg_reg_org;
+
+	struct gpio_desc *desc;
+
+	for (i = 0; i < qpnp_get_pmic_chip_number(); i++) {
+		count = 1;
+		q_chip = qpnp_pin_chip_dev_get(i);
+		if (dev_name(q_chip->gpio_chip.dev) == NULL)
+			break;
+
+		pmic_chip[i].pmic_chip_name = q_chip->gpio_chip.label;
+
+		tmp_q_spec = q_chip->chip_gpios[0];
+
+		for (k = 0; k < Q_NUM_PARAMS; k++) {
+			rc = check_pin_config(dfs_args[k].type, tmp_q_spec, 0);
+			if (rc == -ENXIO)
+				continue;
+			count++;
+		}
+
+		for (j = 0; j < q_chip->gpio_chip.ngpio; j++) {
+			count_1 = 0;
+			if (j > q_chip->gpio_chip.ngpio)
+				pr_debug("[CEI] : Larger than qpio_chip.ngpio\n");
+
+			q_spec = q_chip->chip_gpios[j];
+
+			pmic_chip[i].pmic_data[j*count] = q_spec->pmic_pin;
+
+			for (k = 0; k < Q_NUM_PARAMS; k++) {
+				rc = check_pin_config(dfs_args[k].type
+						, q_spec, 0);
+				if (rc == -ENXIO)
+					continue;
+
+				count_1++;
+				rc = qpnp_pin_info_get(dfs_args[k].type
+							, q_spec, &ret);
+				if (rc)
+					pr_debug("[CEI] : can't get qpnp_pin_info\n");
+
+				pmic_chip[i].pmic_data[j*count+count_1] = ret;
+			}
+		}
+	}
+
+	cei_save_suspend_pmic_info_done = 1;
+
+	cfg_reg = ioremap(MSM_TLMM_BASE, MSM_TLMM_SIZE);
+	cfg_reg_org = cfg_reg;
+	/* save msm-gpio info, when suspend */
+	for (j = 0; j < NR_MSM_GPIOS; j++) {
+		desc = &gpio_desc[j];
+		cfg_reg = cfg_reg_org;
+
+		switch (j) {
+		case 8 ... 11:
+			continue;
+		case 12 ... 15:
+			tlmm_base = 3;
+			break;
+		case 16 ... 19:
+			tlmm_base = 2;
+			break;
+		case 22 ... 23:
+			tlmm_base = 2;
+			break;
+		case 24 ... 27:
+			tlmm_base = 3;
+			break;
+		case 28 ... 31:
+			tlmm_base = 2;
+			break;
+		case 53 ... 54:
+			tlmm_base = 3;
+			break;
+		case 59 ... 63:
+			tlmm_base = 3;
+			break;
+		case 66 ... 78:
+			tlmm_base = 3;
+			break;
+		case 81 ... 82:
+			tlmm_base = 2;
+			break;
+		default:
+			tlmm_base = 1;
+		}
+		if (tlmm_base == 2)
+			cfg_reg += 0x0400000;
+		else if (tlmm_base == 3)
+			cfg_reg += 0x0800000;
+		cfg_reg += (j * MSM_TLMM_REG_SIZE);
+
+		cei_suspend_settings[j] = readl_relaxed(cfg_reg + 0x0);
+		cei_suspend_dir[j] = readl_relaxed(cfg_reg + 0x4);
+	}
+	iounmap(cfg_reg);
+
+	cei_save_suspend_gpio_info_done = 1;
+
+	/* save regulator info when suspend */
+	for (i = 0; i <= regulator_number(); i++) {
+		rdev = regulator_dev_get(i);
+		if (rdev->constraints->name == NULL)
+			continue;
+		reg_tmp = regulator_get(NULL, rdev->constraints->name);
+		cei_suspend_reg_en[i] = regulator_is_enabled(reg_tmp);
+		cei_suspend_reg_vol[i] = regulator_get_voltage(reg_tmp);
+		cei_suspend_reg_mode[i] = regulator_get_mode(reg_tmp);
+	}
+
+	cei_save_suspend_regulator_info_done = 1;
+
+}
+EXPORT_SYMBOL_GPL(cei_save_suspend_gpio_pmic_info);
+
+
+
+static int cei_dump_current_pmic_info(struct seq_file *s, void *unused)
+{
+	int i, j, k, rc;
+	uint32_t ret;
+	static struct qpnp_pin_chip *q_chip;
+	static struct qpnp_pin_spec *q_spec, *tmp_q_spec;
+
+	for (i = 0; i < qpnp_get_pmic_chip_number(); i++) {
+		q_chip = qpnp_pin_chip_dev_get(i);
+		if (dev_name(q_chip->gpio_chip.dev) == NULL)
+			continue;
+		seq_puts(s, "\n============================================");
+		seq_puts(s, "==============================================");
+		seq_puts(s, "==============================\n");
+
+		seq_printf(s, "%12s", q_chip->gpio_chip.label);
+
+		tmp_q_spec = q_chip->chip_gpios[0];
+		for (k = 0; k < Q_NUM_PARAMS; k++) {
+			rc = check_pin_config(dfs_args[k].type, tmp_q_spec, 0);
+			if (rc == -ENXIO)
+				continue;
+			seq_printf(s, "%10s", dfs_args[k].filename);
+		}
+
+		seq_puts(s, "\n============================================");
+		seq_puts(s, "==============================================");
+		seq_puts(s, "==============================\n");
+
+		for (j = 0; j < q_chip->gpio_chip.ngpio; j++) {
+			if (j > q_chip->gpio_chip.ngpio)
+				pr_err("[CEI] : Larger than qpio_chip.ngpio\n");
+
+			q_spec = q_chip->chip_gpios[j];
+			seq_printf(s, "\n%12d", q_spec->pmic_pin);
+			for (k = 0; k < Q_NUM_PARAMS; k++) {
+				rc = check_pin_config(dfs_args[k].type
+						, q_spec, 0);
+				if (rc == -ENXIO)
+					continue;
+
+				rc = qpnp_pin_info_get(dfs_args[k].type
+						, q_spec, &ret);
+				if (rc)
+					pr_debug("[CEI] : can't get qpnp_pin_info\n");
+				seq_printf(s, "%13d", (int)ret);
+			}
+		}
+	}
+	seq_puts(s, "\n");
+
+	return 0;
+}
+
+static int cei_current_pmic_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, cei_dump_current_pmic_info, NULL);
+}
+
+static const struct file_operations cei_current_pmic_info_ops = {
+	.open           = cei_current_pmic_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static int cei_dump_suspend_pmic_info(struct seq_file *s, void *unused)
+{
+	int i, j, k, val, index, rc;
+	uint32_t ret;
+	static struct qpnp_pin_chip *q_chip;
+	static struct qpnp_pin_spec *q_spec, *tmp_q_spec;
+	unsigned int cn, cn_1;
+
+	if (cei_save_suspend_pmic_info_done == 1) {
+		for (i = 0; i < qpnp_get_pmic_chip_number(); i++) {
+			cn = 1;
+			q_chip = qpnp_pin_chip_dev_get(i);
+			if (dev_name(q_chip->gpio_chip.dev) == NULL)
+				break;
+
+			seq_puts(s, "\n===========================================");
+			seq_puts(s, "=============================================");
+			seq_puts(s, "================================\n");
+			seq_printf(s, "%12s", pmic_chip[i].pmic_chip_name);
+
+			tmp_q_spec = q_chip->chip_gpios[0];
+			for (k = 0; k < Q_NUM_PARAMS; k++) {
+				rc = check_pin_config(dfs_args[k].type
+						, tmp_q_spec, 0);
+				if (rc == -ENXIO)
+					continue;
+
+				seq_printf(s, "%10s", dfs_args[k].filename);
+				cn++;
+			}
+
+			seq_puts(s, "\n===========================================");
+			seq_puts(s, "=============================================");
+			seq_puts(s, "================================\n");
+
+			for (j = 0; j < q_chip->gpio_chip.ngpio; j++) {
+				cn_1 = 0;
+				if (j > q_chip->gpio_chip.ngpio)
+					pr_debug("[CEI] : Larger than qpio_chip.ngpio\n");
+
+				q_spec = q_chip->chip_gpios[j];
+				index = j*cn;
+
+				val = pmic_chip[i].pmic_data[index];
+				seq_printf(s, "\n%12d", val);
+
+				for (k = 0; k < Q_NUM_PARAMS; k++) {
+					rc = check_pin_config(dfs_args[k].type
+							, q_spec, 0);
+					if (rc == -ENXIO)
+						continue;
+
+					cn_1++;
+					rc = qpnp_pin_info_get(dfs_args[k].type
+							, q_spec, &ret);
+					if (rc)
+						pr_debug("[CEI] : can't get qpnp_pin_info\n");
+
+					index = j*cn + cn_1;
+					val = pmic_chip[i].pmic_data[index];
+					seq_printf(s, "%10d", val);
+				}
+			}
+		}
+		seq_puts(s, "\n");
+	} else {
+		seq_puts(s, "Don't suspend before, PMIC Data not ready\n");
+	}
+	seq_puts(s, "Finish dump suspend pmic\n");
+
+	return 0;
+}
+
+static int cei_suspend_pmic_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, cei_dump_suspend_pmic_info, NULL);
+}
+
+
+
+static const struct file_operations cei_suspend_pmic_info_ops = {
+	.open           = cei_suspend_pmic_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+void cei_dump_gpio_info(struct seq_file *s, int suspend_mode)
+{
+	int i, value = 0;
+	struct gpio_desc *desc;
+	unsigned char __iomem *cfg_reg_org;
+
+	seq_puts(s, "GPIO    I/O     Output_H/L   Read_Value");
+	seq_puts(s, "   Function   Driver	PullType\n");
+	seq_puts(s, "=======================================");
+	seq_puts(s, "=================================\n");
+
+	cfg_reg = ioremap(MSM_TLMM_BASE, MSM_TLMM_SIZE);
+	cfg_reg_org = cfg_reg;
+	for (i = 0; i < NR_MSM_GPIOS; i++) {
+		uint32_t gpio_oe = 0, drv_strn = 0;
+		uint32_t gpio_func = 0, gpio_pull = 0, out = 0;
+		char out_pull[10];
+		char out_drv[10];
+		char outval[5];
+		char inval[5];
+		char oe[10];
+		int tlmm_base;
+
+		desc = &gpio_desc[i];
+		cfg_reg = cfg_reg_org;
+
+		/*check if is suspend mode or not, if not dump current config */
+		if (suspend_mode == 1) {
+			if (i > 7 && i < 12)
+				continue;
+			gpio_pull = cei_suspend_settings[i] & 0x3;
+			gpio_func = (cei_suspend_settings[i] >> 2) & 0xf;
+			drv_strn = (cei_suspend_settings[i] >> 6) & 0x7;
+			gpio_oe = (cei_suspend_settings[i] >> 9) & 0x1;
+
+			if (gpio_oe)
+				out = (cei_suspend_dir[i] >> 1) & 0x1;
+			else
+				value = cei_suspend_dir[i] & 0x1;
+		} else {
+			uint32_t cei_current_settings;
+			uint32_t cei_current_dir;
+
+			switch (i) {
+			case 8 ... 11:
+				continue;
+			case 12 ... 15:
+				tlmm_base = 3;
+				break;
+			case 16 ... 19:
+				tlmm_base = 2;
+				break;
+			case 22 ... 23:
+				tlmm_base = 2;
+				break;
+			case 24 ... 27:
+				tlmm_base = 3;
+				break;
+			case 28 ... 31:
+				tlmm_base = 2;
+				break;
+			case 53 ... 54:
+				tlmm_base = 3;
+				break;
+			case 59 ... 63:
+				tlmm_base = 3;
+				break;
+			case 66 ... 78:
+				tlmm_base = 3;
+				break;
+			case 81 ... 82:
+				tlmm_base = 2;
+				break;
+			default:
+				tlmm_base = 1;
+			}
+			if (tlmm_base == 2)
+				cfg_reg += 0x0400000;
+			else if (tlmm_base == 3)
+				cfg_reg += 0x0800000;
+
+			cfg_reg += (i * MSM_TLMM_REG_SIZE);
+
+			cei_current_settings = readl_relaxed(cfg_reg + 0x0);
+			cei_current_dir = readl_relaxed(cfg_reg + 0x4);
+
+			gpio_pull = cei_current_settings & 0x3;
+			gpio_func = (cei_current_settings >> 2) & 0xf;
+			drv_strn = (cei_current_settings >> 6) & 0x7;
+
+			gpio_oe = (cei_current_settings >> 9) & 0x1;
+			if (gpio_oe)
+				out = (cei_current_dir >> 1) & 0x1;
+			else
+				value = cei_current_dir & 0x1;
+		}
+		switch (gpio_pull) {
+		case 0:
+			snprintf(out_pull, sizeof(out_pull), "NoPull");
+			break;
+		case 1:
+			snprintf(out_pull, sizeof(out_pull), "PullDown");
+			break;
+		case 2:
+			snprintf(out_pull, sizeof(out_pull), "Keeper");
+			break;
+		case 3:
+			snprintf(out_pull, sizeof(out_pull), "PullHigh");
+			break;
+		default:
+			snprintf(out_pull, sizeof(out_pull), "unknown");
+		}
+
+		switch (drv_strn) {
+		case 0:
+			snprintf(out_drv, sizeof(out_drv), "2mA");
+			break;
+		case 1:
+			snprintf(out_drv, sizeof(out_drv), "4mA");
+			break;
+		case 2:
+			snprintf(out_drv, sizeof(out_drv), "6mA");
+			break;
+		case 3:
+			snprintf(out_drv, sizeof(out_drv), "8mA");
+			break;
+		case 4:
+			snprintf(out_drv, sizeof(out_drv), "10mA");
+			break;
+		case 5:
+			snprintf(out_drv, sizeof(out_drv), "12mA");
+			break;
+		case 6:
+			snprintf(out_drv, sizeof(out_drv), "14mA");
+			break;
+		case 7:
+			snprintf(out_drv, sizeof(out_drv), "16mA");
+			break;
+		default:
+			snprintf(out_drv, sizeof(out_drv), "NA");
+		}
+
+		switch (value) {
+		case 0:
+			snprintf(inval, sizeof(inval), "Low");
+			break;
+		case 1:
+			snprintf(inval, sizeof(inval), "High");
+			break;
+		}
+
+		switch (out) {
+		case 0:
+			snprintf(outval, sizeof(outval), "Low");
+			break;
+		case 1:
+			snprintf(outval, sizeof(outval), "High");
+			break;
+		}
+
+		switch (gpio_oe) {
+		case 0:
+			snprintf(oe, sizeof(oe), "Input");
+			break;
+		case 1:
+			snprintf(oe, sizeof(oe), "Output");
+			break;
+		}
+
+		if (gpio_oe) {/* output */
+			seq_printf(s, "%4d  %4s      %4s", i, oe, outval);
+			seq_printf(s, "         %4s", "NA");
+			seq_printf(s, "        %4d", gpio_func);
+			seq_printf(s, "    %8s   %8s\n", out_drv, out_pull);
+		} else {/* input */
+			seq_printf(s, "%4d   %4s      %4s", i, oe, "NA");
+			seq_printf(s, "         %4s", inval);
+			seq_printf(s, "        %4d", gpio_func);
+			seq_printf(s, "    %8s   %8s\n", out_drv, out_pull);
+		}
+	}
+	iounmap(cfg_reg);
+}
+
+static int cei_dump_current_gpio_info(struct seq_file *s, void *unused)
+{
+	/* dump suspend use 1, current use 0*/
+	cei_dump_gpio_info(s, 0);
+
+	return 0;
+}
+
+
+static int cei_current_gpio_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, cei_dump_current_gpio_info, NULL);
+}
+
+static const struct file_operations cei_current_gpio_info_ops = {
+	.open           = cei_current_gpio_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static int cei_dump_suspend_gpio_info(struct seq_file *s, void *unused)
+{
+	if (cei_save_suspend_gpio_info_done <= 0) {
+		seq_puts(s, "Don't suspend before, MSM-GPIO Data not ready\n");
+		return 0;
+	}
+
+	cei_dump_gpio_info(s, 1);
+
+	return 0;
+}
+
+static int cei_suspend_gpio_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, cei_dump_suspend_gpio_info, NULL);
+}
+
+static const struct file_operations cei_suspend_gpio_info_ops = {
+	.open           = cei_suspend_gpio_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+/* suspend_regulator */
+static int cei_dump_suspend_regulator_info(struct seq_file *s, void *unused)
+{
+	int i;
+	char tmp_str[10];
+	static struct regulator_dev *rdev;
+
+	if (cei_save_suspend_regulator_info_done == 0) {
+		seq_puts(s, "Don't suspend before, Regulator Data not ready\n");
+		return 0;
+	}
+
+	seq_puts(s, "Device-Supply                   EN  Voltage     Mode\n");
+	seq_puts(s, "====================================================\n");
+
+	for (i = 0; i <= regulator_number(); i++) {
+		rdev = regulator_dev_get(i);
+		if (rdev->constraints->name == NULL)
+			continue;
+
+		seq_printf(s, "%-32s", rdev->constraints->name);
+		seq_printf(s, " %c",    cei_suspend_reg_en[i] ? 'Y' : 'N');
+
+		if (cei_suspend_reg_vol[i] == -EINVAL)
+			seq_puts(s, "       NA");
+		else
+			seq_printf(s, " %8d", cei_suspend_reg_vol[i]);
+
+		switch (cei_suspend_reg_mode[i]) {
+		case REGULATOR_MODE_FAST:
+			snprintf(tmp_str, sizeof(tmp_str), "Fast");
+			break;
+		case REGULATOR_MODE_NORMAL:
+			snprintf(tmp_str, sizeof(tmp_str), "Normal");
+			break;
+		case REGULATOR_MODE_IDLE:
+			snprintf(tmp_str, sizeof(tmp_str), "Idle");
+			break;
+		case REGULATOR_MODE_STANDBY:
+			snprintf(tmp_str, sizeof(tmp_str), "Standby");
+			break;
+		default:
+			snprintf(tmp_str, sizeof(tmp_str), "NA");
+			break;
+		}
+
+		seq_printf(s, " %8s", tmp_str);
+		seq_puts(s, "\n");
+	}
+
+	return 0;
+}
+
+static int cei_suspend_regulator_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, cei_dump_suspend_regulator_info, NULL);
+}
+
+static const struct file_operations cei_suspend_regulator_info_ops = {
+	.open           = cei_suspend_regulator_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+/* current_regulator */
+static int cei_dump_current_regulator_info(struct seq_file *s, void *unused)
+{
+	int i;
+	static struct regulator *reg_tmp;
+	static struct regulator_dev *rdev;
+	char tmp_str[10];
+
+	seq_puts(s, "Device-Supply                   EN  Voltage     Mode\n");
+	seq_puts(s, "====================================================\n");
+
+	for (i = 0; i <= regulator_number(); i++) {
+		rdev = regulator_dev_get(i);
+		if (rdev->constraints->name == NULL)
+			continue;
+
+		reg_tmp = regulator_get(NULL, rdev->constraints->name);
+		seq_printf(s, "%-32s", rdev->constraints->name);
+		seq_printf(s, " %c", regulator_is_enabled(reg_tmp) ? 'Y' : 'N');
+
+		if (regulator_get_voltage(reg_tmp) == -EINVAL)
+			seq_puts(s, "       NA");
+		else
+			seq_printf(s, " %8d", regulator_get_voltage(reg_tmp));
+
+		switch (regulator_get_mode(reg_tmp)) {
+		case REGULATOR_MODE_FAST:
+			snprintf(tmp_str, sizeof(tmp_str), "Fast");
+			break;
+		case REGULATOR_MODE_NORMAL:
+			snprintf(tmp_str, sizeof(tmp_str), "Normal");
+			break;
+		case REGULATOR_MODE_IDLE:
+			snprintf(tmp_str, sizeof(tmp_str), "Idle");
+			break;
+		case REGULATOR_MODE_STANDBY:
+			snprintf(tmp_str, sizeof(tmp_str), "Standby");
+			break;
+		default:
+			snprintf(tmp_str, sizeof(tmp_str), "NA");
+			break;
+		}
+
+		seq_printf(s, " %8s", tmp_str);
+		seq_puts(s, "\n");
+	}
+
+	return 0;
+}
+
+static int cei_current_regulator_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, cei_dump_current_regulator_info, NULL);
+}
+
+static const struct file_operations cei_current_regulator_info_ops = {
+	.open           = cei_current_regulator_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static int __init cei_gpio_pmic_debug_init(void)
+{
+	struct proc_dir_entry *suspend_pmic_debug_entry = NULL;
+	struct proc_dir_entry *current_pmic_debug_entry = NULL;
+	struct proc_dir_entry *suspend_entry = NULL;
+	struct proc_dir_entry *current_entry = NULL;
+	struct proc_dir_entry *current_pmregu_debug_entry = NULL;
+	struct proc_dir_entry *suspend_pmregu_debug_entry = NULL;
+
+	/* For pmic */
+	suspend_pmic_debug_entry = proc_create("cei_suspend_pmic_info",
+			S_IRUSR | S_IRGRP | S_IROTH, NULL,
+			&cei_suspend_pmic_info_ops);
+
+	if (suspend_pmic_debug_entry)
+		cei_save_suspend_pmic_info_done = 0;
+
+	current_pmic_debug_entry = proc_create("cei_current_pmic_info",
+			S_IRUSR | S_IRGRP | S_IROTH, NULL,
+			&cei_current_pmic_info_ops);
+
+	if (current_pmic_debug_entry)
+		/* TODO */
+
+	/* For msm-gpio */
+	suspend_entry = proc_create("cei_suspend_gpio_info",
+			S_IRUSR | S_IRGRP | S_IROTH, NULL,
+			&cei_suspend_gpio_info_ops);
+
+	if (suspend_entry)
+		cei_save_suspend_gpio_info_done = 0;
+
+	current_entry = proc_create("cei_current_gpio_info",
+			S_IRUSR | S_IRGRP | S_IROTH, NULL,
+			&cei_current_gpio_info_ops);
+
+	if (current_entry)
+		/* TODO */
+
+	/* For pmic regulator */
+	suspend_pmregu_debug_entry = proc_create("cei_suspend_regulator_info",
+			S_IRUSR | S_IRGRP | S_IROTH, NULL,
+			&cei_suspend_regulator_info_ops);
+
+	if (suspend_pmregu_debug_entry)
+		/* TODO */
+
+	current_pmregu_debug_entry = proc_create("cei_current_regulator_info",
+			S_IRUSR | S_IRGRP | S_IROTH, NULL,
+			&cei_current_regulator_info_ops);
+
+	if (current_pmregu_debug_entry)
+		cei_save_suspend_regulator_info_done = 0;
+
+	return 0;
+}
+subsys_initcall(cei_gpio_pmic_debug_init);

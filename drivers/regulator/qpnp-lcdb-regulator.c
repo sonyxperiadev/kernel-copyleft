@@ -606,6 +606,13 @@ static int qpnp_lcdb_enable_wa(struct qpnp_lcdb *lcdb)
 		return rc;
 	}
 
+	pr_debug("%s: LCDB_PWRUP_PWRDN_CTL_REG!!\n", __func__);
+	rc = qpnp_lcdb_secure_write(lcdb, lcdb->base + LCDB_PWRUP_PWRDN_CTL_REG, 0xF);
+	if (rc < 0) {
+		pr_err("Failed to set PWRUP_PWRDN_CTL rc=%d\n", rc);
+		return rc;
+	}
+
 	/* execute the below for rev1.1 */
 	if (lcdb->pmic_rev_id->rev3 == PM660L_V1P1_REV3 &&
 		lcdb->pmic_rev_id->rev4 == PM660L_V1P1_REV4) {
@@ -645,6 +652,8 @@ static int qpnp_lcdb_enable(struct qpnp_lcdb *lcdb)
 	int rc = 0, timeout, delay;
 	u8 val = 0;
 
+	pr_debug("%s: lcdb_enabled=%d lcdb_sc_disable=%d\n",
+             __func__, lcdb->lcdb_enabled, lcdb->lcdb_sc_disable);
 	if (lcdb->lcdb_enabled || lcdb->lcdb_sc_disable) {
 		pr_debug("lcdb_enabled=%d lcdb_sc_disable=%d\n",
 			lcdb->lcdb_enabled, lcdb->lcdb_sc_disable);
@@ -665,6 +674,7 @@ static int qpnp_lcdb_enable(struct qpnp_lcdb *lcdb)
 		return rc;
 	}
 
+	pr_debug("%s: qpnp_lcdb_write MODULE_EN_BIT\n", __func__);
 	val = MODULE_EN_BIT;
 	rc = qpnp_lcdb_write(lcdb, lcdb->base + LCDB_ENABLE_CTL1_REG,
 							&val, 1);

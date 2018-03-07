@@ -309,7 +309,7 @@
 					dev = "/dev/block/platform/soc/c0c4000.sdhci/by-name/vendor";
 					type = "ext4";
 					mnt_flags = "ro,barrier=1,discard";
-					fsmgr_flags = "wait,slotselect";
+					fsmgr_flags = "wait,slotselect,verify";
 					status = "ok";
 				};
 			};
@@ -320,6 +320,19 @@
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
+
+		debug_region: debug_region@ffb00000 {
+			compatible = "removed-dma-pool", "qcom,debug_memory";
+			no-map;
+			reg = <0 0xffb00000 0 0x100000>;
+			label = "debug_mem";
+		};
+
+		pstore_reserve_mem: pstore_reserve_mem_region_region@ffc00000 {
+			compatible = "removed-dma-pool";
+			no-map;
+			reg = <0 0xffc00000 0 0x00100000>;
+		};
 
 		wlan_msa_guard: wlan_msa_guard@85600000 {
 			compatible = "removed-dma-pool";
@@ -452,6 +465,16 @@
 		#redistributor-regions = <1>;
 		redistributor-stride = <0x0 0x20000>;
 		interrupts = <1 9 4>;
+	};
+
+	ramoops {
+		compatible = "ramoops";
+		memory-region = <&pstore_reserve_mem>;
+		record-size = <0x0 0x1000>;
+		console-size = <0x0 0x40000>;
+		ftrace-size = <0x0 0x0>;
+		pmsg-size = <0x0 0x0>;
+		ecc-size = <0x0 0x0>;
 	};
 
 	timer {
@@ -725,6 +748,41 @@
 			qcom,sensor-type = "llm";
 			qcom,sensor-name = "limits_sensor-01";
 		};
+		sensor_information20: qcom,sensor-information-20 { /* msm_therm */
+			qcom,sensor-type =  "adc";
+			qcom,sensor-name = "msm_therm";
+			qcom,scaling-factor = <10>;
+		};
+		sensor_information21: qcom,sensor-information-21 { /* quiet_therm */
+			qcom,sensor-type =  "adc";
+			qcom,sensor-name = "quiet_therm";
+			qcom,alias-name = "bl_therm";
+			qcom,scaling-factor = <10>;
+		};
+		sensor_information22: qcom,sensor-information-22 { /* ufs_therm */
+			qcom,sensor-type = "adc";
+			qcom,sensor-name = "ufs_therm";
+			qcom,scaling-factor = <10>;
+		};
+		sensor_information23: qcom,sensor-information-23 { /* flash_therm */
+			qcom,sensor-type = "adc";
+			qcom,sensor-name = "flash_therm";
+			qcom,scaling-factor = <10>;
+		};
+		sensor_information24: qcom,sensor-information-24 { /* xo_therm */
+			qcom,sensor-type = "adc";
+			qcom,sensor-name = "xo_therm";
+		};
+		sensor_information25: qcom,sensor-information-25 { /* pa_therm2 */
+			qcom,sensor-type = "adc";
+			qcom,sensor-name = "pa_therm2";
+		};
+		sensor_information26: qcom,sensor-information-26 { /* bms */
+			qcom,sensor-type = "adc";
+			qcom,sensor-name = "bms";
+			qcom,alias-name = "batt_therm";
+			qcom,scaling-factor = <1000>;
+		};
 	};
 
 	mitigation_profile0: qcom,limit_info-0 {
@@ -859,7 +917,7 @@
 		reg = <0x17817000 0x1000>;
 		reg-names = "wdt-base";
 		interrupts = <0 3 0>, <0 4 0>;
-		qcom,bark-time = <11000>;
+		qcom,bark-time = <12000>;
 		qcom,pet-time = <10000>;
 		qcom,ipi-ping;
 		qcom,wakeup-enable;
@@ -2033,6 +2091,7 @@
 		qcom,disk-encrypt-pipe-pair = <2>;
 		qcom,support-fde;
 		qcom,fde-key-size;
+		qcom,commonlib64-loaded-by-uefi;
 		qcom,no-clock-support;
 		qcom,msm-bus,name = "qseecom-noc";
 		qcom,msm-bus,num-cases = <4>;
@@ -2250,6 +2309,11 @@
 };
 
 &soc {
+	ceihwid {
+		compatible = "ceihwid";
+		ceihwid_vcc-supply = <&pm660l_l6>;
+	};
+
 	gpio_keys {
 		status = "okay";
 		compatible = "gpio-keys";
@@ -2284,8 +2348,123 @@
 		};
 	};
 
+	gpio_keys_dp_sm12 {
+		status = "okay";
+		compatible = "gpio-keys-dp-sm12";
+		input-name = "gpio-keys";
+		pinctrl-names = "tlmm_gpio_key_active","tlmm_gpio_key_suspend";
+		pinctrl-0 = <&gpio_key_active>;
+		pinctrl-1 = <&gpio_key_suspend>;
+
+		camera_focus {
+			label = "camera_focus";
+			gpios = <&tlmm 113 0x1>;
+			linux,input-type = <1>;
+			linux,code = <0x210>;
+			debounce-interval = <15>;
+		};
+
+		camera_snapshot {
+			label = "camera_snapshot";
+			gpios = <&tlmm 64 0x1>;
+			linux,input-type = <1>;
+			linux,code = <0x2fe>;
+			debounce-interval = <15>;
+		};
+
+		vol_down {
+			label = "volume_down";
+			gpios = <&pm660l_gpios 7 0x1>;
+			linux,input-type = <1>;
+			linux,code = <114>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+	};
+
+	gpio_keys_dp {
+		status = "okay";
+		compatible = "gpio-keys-dp";
+		input-name = "gpio-keys";
+		pinctrl-names = "tlmm_gpio_key_active","tlmm_gpio_key_suspend";
+		pinctrl-0 = <&gpio_key_active>;
+		pinctrl-1 = <&gpio_key_suspend>;
+
+		camera_focus {
+			label = "camera_focus";
+			gpios = <&tlmm 64 0x1>;
+			linux,input-type = <1>;
+			linux,code = <0x210>;
+			debounce-interval = <15>;
+		};
+
+		camera_snapshot {
+			label = "camera_snapshot";
+			gpios = <&tlmm 113 0x1>;
+			linux,input-type = <1>;
+			linux,code = <0x2fe>;
+			debounce-interval = <15>;
+		};
+
+		vol_down {
+			label = "volume_down";
+			gpios = <&pm660l_gpios 7 0x1>;
+			linux,input-type = <1>;
+			linux,code = <114>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+	};
+
 	devfreq_spdm_cpu {
 		qcom,bw-dwnstep = <6750>;
 		qcom,max-vote = <6750>;
+	};
+
+	egistec {
+		compatible = "etspi,et510";
+		spi-max-frequency = <1000000>;
+		et516_vcc-supply = <&pm660l_l6>;
+		input-device-name = "et510";
+		interrupt-parent = <&tlmm>;
+		interrupts = <72 0x0>;
+		egis,reset-gpio    = <&tlmm 20 0>;
+		egis,irq-gpio      = <&tlmm 72 0>;
+    };
+
+	fpc1020 {
+		status = "ok";
+		compatible = "fpc,fpc1020";
+		interrupt-parent = <&tlmm>;
+		interrupts = <72 0x0>;
+        fpc,gpio_rst    = <&tlmm 20 0x0>;
+        fpc,gpio_irq    = <&tlmm 72 0x0>;
+		vdd_ana-supply = <&pm660l_l6>;
+        fpc,enable-on-boot;
+        fpc,enable-wakeup;
+
+        pinctrl-names = "fpc1020_reset_reset",
+            "fpc1020_reset_active",
+            "fpc1020_irq_active";
+
+        pinctrl-0 = <&msm_gpio_20>;
+        pinctrl-1 = <&msm_gpio_20_output_high>;
+        pinctrl-2 = <&msm_gpio_72>;
+    };
+
+	sim_detect {
+		compatible = "sim-detect";
+
+		sim1_det {
+			label = "sim-detection";
+			gpios = <&tlmm 90 0x1>;
+			debounce-interval = <10>;
+		};
+
+		sim2_det {
+			label = "sim2-detection";
+			gpios = <&tlmm 86 0x1>;
+			debounce-interval = <10>;
+		};
 	};
 };

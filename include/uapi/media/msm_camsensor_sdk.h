@@ -173,6 +173,7 @@ enum msm_actuator_write_type {
 enum msm_actuator_i2c_operation {
 	MSM_ACT_WRITE = 0,
 	MSM_ACT_POLL,
+	MSM_ACT_DL,
 };
 
 enum actuator_type {
@@ -414,7 +415,7 @@ struct region_params_t {
 struct reg_settings_t {
 	unsigned short reg_addr;
 	enum msm_camera_i2c_reg_addr_type addr_type;
-	unsigned short reg_data;
+	unsigned int reg_data;
 	enum msm_camera_i2c_data_type data_type;
 	enum msm_actuator_i2c_operation i2c_operation;
 	unsigned int delay;

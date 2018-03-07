@@ -15,6 +15,8 @@
 
 #include <linux/mutex.h>
 
+#define NUM_MAX_CLIENTS 16//CEI comment, RID001102 Battery Care ver 1.0 for DD
+
 struct votable;
 
 enum votable_type {
@@ -46,5 +48,6 @@ struct votable *create_votable(const char *name,
 void destroy_votable(struct votable *votable);
 void lock_votable(struct votable *votable);
 void unlock_votable(struct votable *votable);
+int somc_chg_get_vote_clients(struct votable *votable, char *clients[]); //CEI comment, RID001102 Battery Care ver 1.0 for DD
 
 #endif /* __PMIC_VOTER_H */

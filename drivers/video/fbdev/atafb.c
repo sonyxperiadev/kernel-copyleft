@@ -1055,13 +1055,13 @@ static int falcon_decode_var(struct fb_var_screeninfo *var,
 	/* single or double pixel width */
 	xstretch = (xres < 640) ? 2 : 1;
 
-#if 0 /* SM124 supports only 640x400, this is rejected above */
+#if 0 /**/
 	if (mon_type == F_MON_SM) {
 		if (xres != 640 && yres != 400)
 			return -EINVAL;
 		plen = 1;
 		pclock = &f32;
-		/* SM124-mode is special */
+		/**/
 		par->hw.falcon.ste_mode = 1;
 		par->hw.falcon.f_shift = 0x000;
 		par->hw.falcon.st_shift = 0x200;
@@ -1734,7 +1734,7 @@ static int falcon_blank(int blank_mode)
 	 */
 	int vdb, vss, hbe, hss;
 
-	if (mon_type == F_MON_SM)	/* this doesn't work on SM124 */
+	if (mon_type == F_MON_SM)	/**/
 		return 1;
 
 	vdb = current_par.VDB;

@@ -436,10 +436,14 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			}
 
 			for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) {
+				pr_debug("%s: Set RESET pin to %d\n", __func__, pdata->panel_info.rst_seq[i]);
 				gpio_set_value((ctrl_pdata->rst_gpio),
 					pdata->panel_info.rst_seq[i]);
-				if (pdata->panel_info.rst_seq[++i])
+				if (pdata->panel_info.rst_seq[++i]) {
+					pr_debug("%s: usleep_range %d\n", __func__, pdata->panel_info.rst_seq[i] * 1000);
 					usleep_range(pinfo->rst_seq[i] * 1000, pinfo->rst_seq[i] * 1000);
+					pr_debug("%s: End sleep\n", __func__);
+				}
 			}
 
 			if (gpio_is_valid(ctrl_pdata->avdd_en_gpio)) {
@@ -865,7 +869,7 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	 * for the backlight brightness. If the brightness is less
 	 * than it, the controller can malfunction.
 	 */
-	pr_debug("%s: bl_level:%d\n", __func__, bl_level);
+	pr_err("%s: bl_level:%d\n", __func__, bl_level);
 
 	/* do not allow backlight to change when panel in disable mode */
 	if (pdata->panel_disable_mode && (bl_level != 0))
@@ -2546,7 +2550,12 @@ static int mdss_dsi_panel_timing_from_dt(struct device_node *np,
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-v-bottom-border", &tmp);
 	pt->timing.border_bottom = !rc ? tmp : 0;
 
+#ifdef CEI_FACTORY
+	pr_err(" ****************** CEI_FACTORY use mdss-dsi-panel-framerate-f ******************\n");
+	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-framerate-f", &tmp);
+#else
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-framerate", &tmp);
+#endif
 	pt->timing.frame_rate = !rc ? tmp : DEFAULT_FRAME_RATE;
 	rc = of_property_read_u64(np, "qcom,mdss-dsi-panel-clockrate", &tmp64);
 	if (rc == -EOVERFLOW) {
@@ -2603,9 +2612,16 @@ static int  mdss_dsi_panel_config_res_properties(struct device_node *np,
 
 	mdss_dsi_parse_roi_alignment(np, pt);
 
+#ifdef CEI_FACTORY
+	pr_err(" ****************** CEI_FACTORY use mdss-dsi-on-command-f ******************\n");
+	mdss_dsi_parse_dcs_cmds(np, &pt->on_cmds,
+		"qcom,mdss-dsi-on-command-f",
+		"qcom,mdss-dsi-on-command-state");
+#else
 	mdss_dsi_parse_dcs_cmds(np, &pt->on_cmds,
 		"qcom,mdss-dsi-on-command",
 		"qcom,mdss-dsi-on-command-state");
+#endif
 
 	mdss_dsi_parse_dcs_cmds(np, &pt->post_panel_on_cmds,
 		"qcom,mdss-dsi-post-panel-on-command", NULL);

@@ -238,6 +238,7 @@ enum mmc_blk_status {
 	MMC_BLK_ECC_ERR,
 	MMC_BLK_NOMEDIUM,
 	MMC_BLK_NEW_REQUEST,
+	MMC_BLK_RETRY_SINGLE,
 };
 
 enum mmc_packed_stop_reasons {
@@ -342,6 +343,25 @@ enum mmc_pon_type {
 
 #define MMC_QUIRK_CMDQ_DELAY_BEFORE_DCMD 6 /* microseconds */
 
+#ifdef CONFIG_MMC_CMD_DEBUG
+#define CMD_QUEUE_SIZE CONFIG_MMC_CMD_QUEUE_SIZE
+#endif
+
+#ifdef CONFIG_MMC_CMD_DEBUG
+struct mmc_cmdq {
+	u32		opcode;
+	u32		arg;
+	u32		flags;
+	u64		timestamp;
+};
+
+struct mmc_cmd_stats {
+	u32 next_idx;
+	u32 wrapped;
+	struct mmc_cmdq cmdq[CMD_QUEUE_SIZE];
+};
+#endif
+
 /*
  * MMC device
  */
@@ -436,6 +456,9 @@ struct mmc_card {
 	struct notifier_block        reboot_notify;
 	enum mmc_pon_type pon_type;
 	bool cmdq_init;
+#ifdef CONFIG_MMC_CMD_DEBUG
+	struct mmc_cmd_stats cmd_stats;
+#endif
 	struct mmc_bkops_info bkops;
 	bool err_in_sdr104;
 	bool sdr104_blocked;

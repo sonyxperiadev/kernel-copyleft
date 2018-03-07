@@ -294,6 +294,10 @@ static void msm_restart_prepare(const char *cmd)
 				(cmd != NULL && cmd[0] != '\0'));
 	}
 
+	if (in_panic)
+		need_warm_reset = true;
+
+
 	/* Hard reset the PMIC unless memory contents must be maintained. */
 	if (need_warm_reset) {
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
@@ -301,43 +305,102 @@ static void msm_restart_prepare(const char *cmd)
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
 	}
 
-	if (cmd != NULL) {
+	if (in_panic) {
+		u32 prev_reason;
+
+		prev_reason = __raw_readl(restart_reason);
+		if (prev_reason != 0xABADF00D) {
+			__raw_writel(0xC0DEDEAD, restart_reason);
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_KERNEL_PANIC);
+		}
+	} else if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
+			pr_err("Next boot mode: bootloader= %d\n",
+				PON_RESTART_REASON_BOOTLOADER);
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_BOOTLOADER);
 			__raw_writel(0x77665500, restart_reason);
-		} else if (!strncmp(cmd, "recovery", 8)) {
+		} else if (!strncmp(cmd, "recovery", 8) || !strncmp(cmd, "reboot, recovery", 17)) {
+			pr_err("Next boot mode: recovery= %d\n",
+				PON_RESTART_REASON_RECOVERY);
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_RECOVERY);
 			__raw_writel(0x77665502, restart_reason);
 		} else if (!strcmp(cmd, "rtc")) {
+			pr_err("Next boot mode: rtc= %d\n",
+				PON_RESTART_REASON_RTC);
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_RTC);
 			__raw_writel(0x77665503, restart_reason);
+		} else if (!strcmp(cmd, "cei_t1")) {
+			pr_err("Next boot mode: cei_t1= %d\n",
+				PON_RESTART_REASON_CEI_T1);
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_CEI_T1);
+			__raw_writel(0x77665504, restart_reason);
+		} else if (!strcmp(cmd, "cei_t2")) {
+			pr_err("Next boot mode: cei_t2= %d\n",
+				PON_RESTART_REASON_CEI_T2);
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_CEI_T2);
+			__raw_writel(0x77665505, restart_reason);
 		} else if (!strcmp(cmd, "dm-verity device corrupted")) {
+			pr_err("Next boot mode: dm-verity device corrupted= %d\n",
+				PON_RESTART_REASON_DMVERITY_CORRUPTED);
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_DMVERITY_CORRUPTED);
 			__raw_writel(0x77665508, restart_reason);
 		} else if (!strcmp(cmd, "dm-verity enforcing")) {
+			pr_err("Next boot mode: dm-verity enforcing= %d\n",
+				PON_RESTART_REASON_DMVERITY_ENFORCE);
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_DMVERITY_ENFORCE);
 			__raw_writel(0x77665509, restart_reason);
 		} else if (!strcmp(cmd, "keys clear")) {
+			pr_err("Next boot mode: keys clean= %d\n",
+				PON_RESTART_REASON_KEYS_CLEAR);
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_KEYS_CLEAR);
 			__raw_writel(0x7766550a, restart_reason);
+
+		} else if (!strcmp(cmd, "oem-N")) {
+			pr_err("Next boot mode: oem-N\n");
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_SYSTEM);
+			__raw_writel(0x6f656d4E, restart_reason);
+
+		} else if (!strcmp(cmd, "oem-S") || !strcmp(cmd, "cei_xfl")) {
+			pr_err("Next boot mode: oem-S\n");
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_XFL);
+			__raw_writel(0x6f656d53, restart_reason);
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned long code;
 			int ret;
 			ret = kstrtoul(cmd + 4, 16, &code);
-			if (!ret)
+			if (!ret) {
+				if ((code & 0xff) == 'N') {
+					qpnp_pon_set_restart_reason(
+						PON_RESTART_REASON_SYSTEM);
+				} else if ((code & 0xff) == 'S') {
+					qpnp_pon_set_restart_reason(
+						PON_RESTART_REASON_XFL);
+				} else if ((code & 0xff) == 'P') {
+					qpnp_pon_set_restart_reason(
+						PON_RESTART_REASON_OEM_P);
+				}
 				__raw_writel(0x6f656d00 | (code & 0xff),
 					     restart_reason);
+			}
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
 		} else {
 			__raw_writel(0x77665501, restart_reason);
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
 		}
+	} else {
+		__raw_writel(0x77665501, restart_reason);
+		qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
 	}
 
 	flush_cache_all();
@@ -403,6 +466,7 @@ static void do_msm_poweroff(void)
 	set_dload_mode(0);
 	scm_disable_sdi();
 	qpnp_pon_system_pwr_off(PON_POWER_OFF_SHUTDOWN);
+	qpnp_pon_set_restart_reason(PON_RESTART_REASON_NONE);
 
 	halt_spmi_pmic_arbiter();
 	deassert_ps_hold();

@@ -43,6 +43,7 @@
 #include "sdhci-msm.h"
 #include "sdhci-msm-ice.h"
 #include "cmdq_hci.h"
+#include <linux/cei_hw_id.h>
 
 #define QOS_REMOVE_DELAY_MS	10
 #define CORE_POWER		0x0
@@ -353,6 +354,8 @@ enum vdd_io_level {
 	 */
 	VDD_IO_SET_LEVEL,
 };
+
+unsigned int   dct_gpio;
 
 /* MSM platform specific tuning */
 static inline int msm_dll_poll_ck_out_en(struct sdhci_host *host,
@@ -1833,6 +1836,7 @@ struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev,
 	u32 *ice_clk_table = NULL;
 	enum of_gpio_flags flags = OF_GPIO_ACTIVE_LOW;
 	const char *lower_bus_speed = NULL;
+	char *mb_id = get_cei_mb_id();
 
 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
@@ -1841,8 +1845,13 @@ struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev,
 	}
 
 	pdata->status_gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
+	if (!memcmp(mb_id, "SM22", 4))
+		flags = 0x0;
+
 	if (gpio_is_valid(pdata->status_gpio) && !(flags & OF_GPIO_ACTIVE_LOW))
 		pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+
+	dct_gpio = pdata->status_gpio;
 
 	of_property_read_u32(np, "qcom,bus-width", &bus_width);
 	if (bus_width == 8)
@@ -2685,6 +2694,12 @@ static irqreturn_t sdhci_msm_pwr_irq(int irq, void *data)
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	return IRQ_HANDLED;
+}
+
+static ssize_t
+show_dct_pin(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", gpio_get_value(dct_gpio));
 }
 
 static ssize_t
@@ -4538,6 +4553,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	 * 1. Card detection is handled using separate GPIO.
 	 * 2. Bus power control is handled by interacting with PMIC.
 	 */
+	host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
 	host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
 	host->quirks |= SDHCI_QUIRK_SINGLE_POWER_WRITE;
 	host->quirks |= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
@@ -4718,6 +4734,15 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 			&msm_host->msm_bus_vote.max_bus_bw);
 	if (ret)
 		goto remove_host;
+
+	msm_host->dct_pin.show = show_dct_pin;
+	sysfs_attr_init(&msm_host->dct_pin.attr);
+	msm_host->dct_pin.attr.name = "dct_pin";
+	msm_host->dct_pin.attr.mode = S_IRUGO;
+	ret = device_create_file(&pdev->dev, &msm_host->dct_pin);
+	if (ret)
+		dev_err(&pdev->dev, "%s device_create_file fail (%d)\n",
+			__func__, ret);
 
 	if (!gpio_is_valid(msm_host->pdata->status_gpio)) {
 		msm_host->polling.show = show_polling;

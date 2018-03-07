@@ -45,6 +45,11 @@
     doing the mount will be allowed to access the filesystem */
 #define FUSE_ALLOW_OTHER         (1 << 1)
 
+/** If the FUSE_ALLOW_UTIME_GRP flag is given, then call to utime() is
+    allowed for the current process if it's in the same group as the
+    file and if the file's group is writeable */
+#define FUSE_ALLOW_UTIME_GRP     (1 << 2)
+
 /** Number of page pointers embedded in fuse_req */
 #define FUSE_REQ_INLINE_PAGES 1
 

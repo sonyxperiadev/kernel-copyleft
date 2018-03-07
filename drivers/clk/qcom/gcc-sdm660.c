@@ -906,6 +906,7 @@ static struct clk_rcg2 sdcc1_ice_core_clk_src = {
 
 static const struct freq_tbl ftbl_sdcc2_apps_clk_src[] = {
 	F(144000, P_XO, 16, 3, 25),
+	F(384000, P_XO, 10, 1, 5),
 	F(400000, P_XO, 12, 1, 4),
 	F(20000000, P_PLL0_EARLY_DIV_CLK_SRC, 5, 1, 3),
 	F(25000000, P_PLL0_EARLY_DIV_CLK_SRC, 6, 1, 2),

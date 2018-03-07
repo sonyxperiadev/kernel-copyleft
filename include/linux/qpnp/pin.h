@@ -121,6 +121,33 @@
 #define QPNP_PIN_CS_OUT_35MA			6
 #define QPNP_PIN_CS_OUT_40MA			7
 
+enum qpnp_pin_param_type {
+	Q_PIN_CFG_MODE,
+	Q_PIN_CFG_OUTPUT_TYPE,
+	Q_PIN_CFG_INVERT,
+	Q_PIN_CFG_PULL,
+	Q_PIN_CFG_VIN_SEL,
+	Q_PIN_CFG_OUT_STRENGTH,
+	Q_PIN_CFG_SRC_SEL,
+	Q_PIN_CFG_MASTER_EN,
+	Q_PIN_CFG_AOUT_REF,
+	Q_PIN_CFG_AIN_ROUTE,
+	Q_PIN_CFG_CS_OUT,
+	Q_PIN_CFG_APASS_SEL,
+	Q_PIN_CFG_DTEST_SEL,
+	Q_PIN_CFG_INVALID,
+};
+
+#define Q_NUM_CTL_REGS            0xD
+#define Q_NUM_PARAMS          Q_PIN_CFG_INVALID
+
+struct qpnp_pin_debugfs_args {
+	enum qpnp_pin_param_type type;
+	const char *filename;
+};
+
+extern struct qpnp_pin_debugfs_args dfs_args[];
+
 /* ANALOG PASS SEL (GPIO LV/MV) */
 #define QPNP_PIN_APASS_SEL_ATEST1		0
 #define QPNP_PIN_APASS_SEL_ATEST2		1
@@ -202,6 +229,36 @@ struct qpnp_pin_cfg {
 	int dtest_sel;
 };
 
+struct qpnp_pin_spec {
+	uint8_t slave;          /* 0-15 */
+	uint16_t offset;        /* 0-255 */
+	uint32_t gpio_chip_idx;     /* offset from gpio_chip base */
+	uint32_t pmic_pin;      /* PMIC pin number */
+	int irq;            /* logical IRQ number */
+	u8 regs[Q_NUM_CTL_REGS];    /* Control regs */
+	u8 num_ctl_regs;        /* usable number on this pin */
+	u8 type;            /* peripheral type */
+	u8 subtype;         /* peripheral subtype */
+	u8 dig_major_rev;
+	struct device_node *node;
+	enum qpnp_pin_param_type params[Q_NUM_PARAMS];
+	struct qpnp_pin_chip *q_chip;
+};
+
+struct qpnp_pin_chip {
+	struct gpio_chip    gpio_chip;
+	struct platform_device  *pdev;
+	struct regmap           *regmap;
+	struct qpnp_pin_spec    **pmic_pins;
+	struct qpnp_pin_spec    **chip_gpios;
+	uint32_t        pmic_pin_lowest;
+	uint32_t        pmic_pin_highest;
+	struct device_node  *int_ctrl;
+	struct list_head    chip_list;
+	struct dentry       *dfs_dir;
+	bool            chip_registered;
+};
+
 /**
  * qpnp_pin_config - Apply pin configuration for Linux gpio
  * @gpio: Linux gpio number to configure.
@@ -224,3 +281,16 @@ int qpnp_pin_config(int gpio, struct qpnp_pin_cfg *param);
  * For such cases, use of_get_gpio() or friends instead.
  */
 int qpnp_pin_map(const char *name, uint32_t pmic_pin);
+
+int qpnp_get_pmic_chip_number(void);
+
+/**
+ * qpnp_pin_chip_dev_get - Obtain struct qpnp_pin_chip device information
+ * @count: index to get point of struct qpnp_pin_chip.
+ *
+ */
+struct qpnp_pin_chip  *qpnp_pin_chip_dev_get(int count);
+int check_pin_config(enum qpnp_pin_param_type idx,
+				struct qpnp_pin_spec *q_spec, uint32_t val);
+int qpnp_pin_info_get(enum qpnp_pin_param_type idx,
+				struct qpnp_pin_spec *q_spec, int *val);

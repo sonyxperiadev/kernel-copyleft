@@ -182,7 +182,11 @@ static void *usbpd_ipc_log;
 #define PS_HARD_RESET_TIME	25
 #define PS_SOURCE_ON		400
 #define PS_SOURCE_OFF		750
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define FIRST_SOURCE_CAP_TIME	50
+#else
 #define FIRST_SOURCE_CAP_TIME	200
+#endif
 #define VDM_BUSY_TIME		50
 #define VCONN_ON_TIME		100
 
@@ -1451,7 +1455,6 @@ static void dr_swap(struct usbpd *pd)
 	}
 
 	pd_phy_update_roles(pd->current_dr, pd->current_pr);
-	dual_role_instance_changed(pd->dual_role);
 }
 
 
@@ -1636,6 +1639,12 @@ static void usbpd_sm(struct work_struct *w)
 		else
 			/* Set CC back to DRP toggle */
 			val.intval = POWER_SUPPLY_TYPEC_PR_DUAL;
+
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		/* special prop with delay in case of SINK via syscall */
+		if (val.intval == POWER_SUPPLY_TYPEC_PR_SINK)
+			val.intval = POWER_SUPPLY_TYPEC_PR_SINK_DELAY;
+#endif
 
 		power_supply_set_property(pd->usb_psy,
 				POWER_SUPPLY_PROP_TYPEC_POWER_ROLE, &val);
@@ -2608,6 +2617,12 @@ static int usbpd_dr_set_property(struct dual_role_phy_instance *dual_role,
 			msleep(20);
 
 		if (!wait_count) {
+			union power_supply_propval resetval = {0};
+			pd->forced_pr = POWER_SUPPLY_TYPEC_PR_NONE;
+			resetval.intval = POWER_SUPPLY_TYPEC_PR_DUAL;
+			power_supply_set_property(pd->usb_psy,
+				POWER_SUPPLY_PROP_TYPEC_POWER_ROLE, &resetval);
+
 			usbpd_err(&pd->dev, "setting mode timed out\n");
 			return -ETIMEDOUT;
 		}
@@ -2734,17 +2749,13 @@ static int usbpd_dr_set_property(struct dual_role_phy_instance *dual_role,
 static int usbpd_dr_prop_writeable(struct dual_role_phy_instance *dual_role,
 		enum dual_role_property prop)
 {
-	struct usbpd *pd = dual_role_get_drvdata(dual_role);
 
 	switch (prop) {
 	case DUAL_ROLE_PROP_MODE:
 		return 1;
 	case DUAL_ROLE_PROP_DR:
 	case DUAL_ROLE_PROP_PR:
-		if (pd)
-			return pd->current_state == PE_SNK_READY ||
-				pd->current_state == PE_SRC_READY;
-		break;
+		return 0;
 	default:
 		break;
 	}

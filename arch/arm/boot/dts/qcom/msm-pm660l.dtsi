@@ -214,10 +214,11 @@
 				qcom,default-state = "off";
 				linux,name = "red";
 				qcom,start-idx = <0>;
-				qcom,idx-len = <22>;
+				qcom,idx-len = <2>;
 				qcom,duty-pcts =
-					[01 0a 14 1e 28 32 3c 46 50 5a 64
-					64 5a 50 46 3c 32 28 1e 14 0a 01];
+					[00 0F];
+				qcom,lut-flags = <25>;
+				qcom,ramp-step-ms = <100>;
 				qcom,use-blink;
 			};
 
@@ -230,6 +231,13 @@
 				qcom,max-current = <12>;
 				qcom,default-state = "off";
 				linux,name = "green";
+				qcom,start-idx = <2>;
+				qcom,idx-len = <2>;
+				qcom,duty-pcts =
+					[00 64];
+				qcom,lut-flags = <25>;
+				qcom,ramp-step-ms = <100>;
+				qcom,use-blink;
 			};
 
 			blue_led: qcom,rgb_2 {
@@ -241,6 +249,13 @@
 				qcom,max-current = <12>;
 				qcom,default-state = "off";
 				linux,name = "blue";
+				qcom,start-idx = <4>;
+				qcom,idx-len = <2>;
+				qcom,duty-pcts =
+					[00 31];
+				qcom,lut-flags = <25>;
+				qcom,ramp-step-ms = <100>;
+				qcom,use-blink;
 			};
 		};
 
@@ -264,9 +279,10 @@
 			qcom,dim-mode = "hybrid";
 			qcom,hyb-thres = <625>;
 			qcom,sync-dly-us = <800>;
-			qcom,fs-curr-ua = <25000>;
+			qcom,fs-curr-ua = <17500>;
 			qcom,cons-sync-write-delay-us = <1000>;
-			qcom,led-strings-list = [00 01 02];
+			qcom,led-strings-list = [00 01];
+			/*qcom,en-ext-pfet-sc-pro; Mike, removed in qcom pre-ES5*/
 			qcom,loop-auto-gm-en;
 			qcom,pmic-revid = <&pm660l_revid>;
 			qcom,auto-calibration-enable;
@@ -337,7 +353,7 @@
 				qcom,max-current = <500>;
 				qcom,default-led-trigger = "torch0_trigger";
 				qcom,id = <0>;
-				qcom,current-ma = <300>;
+				qcom,current-ma = <100>;
 				qcom,ires-ua = <12500>;
 				qcom,hdrm-voltage-mv = <325>;
 				qcom,hdrm-vol-hi-lo-win-mv = <100>;
@@ -349,7 +365,7 @@
 				qcom,max-current = <500>;
 				qcom,default-led-trigger = "torch1_trigger";
 				qcom,id = <1>;
-				qcom,current-ma = <300>;
+				qcom,current-ma = <100>;
 				qcom,ires-ua = <12500>;
 				qcom,hdrm-voltage-mv = <325>;
 				qcom,hdrm-vol-hi-lo-win-mv = <100>;
@@ -361,7 +377,7 @@
 				qcom,max-current = <500>;
 				qcom,default-led-trigger = "torch2_trigger";
 				qcom,id = <2>;
-				qcom,current-ma = <300>;
+				qcom,current-ma = <100>;
 				qcom,ires-ua = <12500>;
 				qcom,hdrm-voltage-mv = <325>;
 				qcom,hdrm-vol-hi-lo-win-mv = <100>;
@@ -370,14 +386,14 @@
 			pm660l_switch0: qcom,led_switch_0 {
 				label = "switch";
 				qcom,led-name = "led:switch_0";
-				qcom,led-mask = <3>;
+				qcom,led-mask = <1>;
 				qcom,default-led-trigger = "switch0_trigger";
 			};
 
 			pm660l_switch1: qcom,led_switch_1 {
 				label = "switch";
 				qcom,led-name = "led:switch_1";
-				qcom,led-mask = <4>;
+				qcom,led-mask = <2>;
 				qcom,default-led-trigger = "switch1_trigger";
 			};
 		};

@@ -1384,6 +1384,7 @@ static int qpnp_pwm_config(struct pwm_chip *pwm_chip,
 	unsigned long flags;
 	struct qpnp_pwm_chip *chip = qpnp_pwm_from_pwm_chip(pwm_chip);
 	int prev_period_us = chip->pwm_config.pwm_period;
+	bool pwm_mode = get_cei_pwm_mode();
 
 	if ((unsigned int)period_ns < PM_PWM_PERIOD_MIN * NSEC_PER_USEC) {
 		pr_err("Invalid pwm handle or parameters\n");
@@ -1394,7 +1395,7 @@ static int qpnp_pwm_config(struct pwm_chip *pwm_chip,
 
 	chip->pwm_config.update_period = false;
 	if (prev_period_us > INT_MAX / NSEC_PER_USEC ||
-			prev_period_us * NSEC_PER_USEC != period_ns) {
+			prev_period_us * NSEC_PER_USEC != period_ns || pwm_mode) {
 		qpnp_lpg_calc_period(LVL_NSEC, period_ns, chip);
 		qpnp_lpg_save_period(chip);
 		pwm->period = period_ns;
@@ -1475,7 +1476,7 @@ static void qpnp_pwm_disable(struct pwm_chip *pwm_chip,
  */
 int pwm_change_mode(struct pwm_device *pwm, enum pm_pwm_mode mode)
 {
-	int rc;
+	int rc = 0;
 	unsigned long flags;
 	struct qpnp_pwm_chip *chip;
 

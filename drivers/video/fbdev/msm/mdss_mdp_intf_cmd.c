@@ -2156,7 +2156,7 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 		reinit_completion(&pdata->te_done);
 		rc = wait_for_completion_timeout(&pdata->te_done, KOFF_TIMEOUT);
 
-		if (!rc) {
+		/*if (!rc) {
 			MDSS_XLOG(0xbac);
 			mdss_fb_report_panel_dead(ctl->mfd);
 		} else if (ctx->pp_timeout_report_cnt == 0) {
@@ -2172,7 +2172,7 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 				"dbg_bus", "vbif_dbg_bus",
 				"dsi_dbg_bus", "panic");
 			mdss_fb_report_panel_dead(ctl->mfd);
-		}
+		}*/
 
 		/* disable te irq */
 		disable_irq_nosync(te_irq);

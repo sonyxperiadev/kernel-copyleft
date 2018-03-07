@@ -53,6 +53,7 @@
 	pr_debug("%s: " fmt, rdev_get_name(rdev), ##__VA_ARGS__)
 
 static DEFINE_MUTEX(regulator_list_mutex);
+static LIST_HEAD(regulator_list);
 static LIST_HEAD(regulator_map_list);
 static LIST_HEAD(regulator_ena_gpio_list);
 static LIST_HEAD(regulator_supply_alias_list);
@@ -61,6 +62,8 @@ static bool has_full_constraints;
 static struct dentry *debugfs_root;
 
 static struct class regulator_class;
+
+static int num_of_regulator;
 
 /*
  * struct regulator_map
@@ -4354,6 +4357,7 @@ regulator_register(const struct regulator_desc *regulator_desc,
 	rdev->dev.parent = dev;
 	dev_set_name(&rdev->dev, "regulator.%lu",
 		    (unsigned long) atomic_inc_return(&regulator_no));
+	num_of_regulator = atomic_read(&regulator_no);
 	ret = device_register(&rdev->dev);
 	if (ret != 0) {
 		put_device(&rdev->dev);
@@ -4398,7 +4402,7 @@ regulator_register(const struct regulator_desc *regulator_desc,
 			}
 		}
 	}
-
+	list_add(&rdev->list, &regulator_list);
 	mutex_unlock(&regulator_list_mutex);
 	rdev_init_debugfs(rdev);
 	rdev->proxy_consumer = regulator_proxy_consumer_register(dev,
@@ -4609,6 +4613,45 @@ void *regulator_get_init_drvdata(struct regulator_init_data *reg_init_data)
 	return reg_init_data->driver_data;
 }
 EXPORT_SYMBOL_GPL(regulator_get_init_drvdata);
+
+struct regulator_dev  *regulator_dev_get(int count)
+{
+	struct regulator_dev *rdev;
+	int index;
+
+	if (!suspend_dump_state)
+		mutex_lock(&regulator_list_mutex);
+
+	for (rdev = list_entry((&regulator_list)->next
+		, typeof(*rdev), list), index = 0
+		; (&rdev->list != (&regulator_list) && (index < count))
+		; rdev = list_entry(rdev->list.next, typeof(*rdev), list)
+		, index++)
+		; {
+
+		if (!suspend_dump_state)
+			mutex_lock(&rdev->mutex);
+
+		if (!count)
+			pr_debug("regulator_name = %s\n",
+						rdev->constraints->name);
+
+		if (!suspend_dump_state)
+			mutex_unlock(&rdev->mutex);
+	}
+
+	if (!suspend_dump_state)
+		mutex_unlock(&regulator_list_mutex);
+
+	return rdev;
+}
+EXPORT_SYMBOL_GPL(regulator_dev_get);
+
+int regulator_number(void)
+{
+	return num_of_regulator;
+}
+EXPORT_SYMBOL_GPL(regulator_number);
 
 #ifdef CONFIG_DEBUG_FS
 static ssize_t supply_map_read_file(struct file *file, char __user *user_buf,

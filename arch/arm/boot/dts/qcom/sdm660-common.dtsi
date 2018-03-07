@@ -192,12 +192,12 @@
 			reg = <0x0a800000 0xc8d0>;
 			interrupt-parent = <&intc>;
 			interrupts = <0 131 0>;
+			maximum-speed = "high-speed";
 			usb-phy = <&qusb_phy0>, <&ssphy>;
 			tx-fifo-resize;
 			snps,usb3-u1u2-disable;
 			snps,nominal-elastic-buffer;
 			snps,disable-clk-gating;
-			snps,has-lpm-erratum;
 			snps,is-utmi-l1-suspend;
 			snps,hird-threshold = /bits/ 8 <0x0>;
 		};
@@ -285,6 +285,26 @@
 					0xb3 0x84
 					0x83 0x88
 					0xc0 0x8c
+					0x30 0x08
+					0x79 0x0c
+					0x21 0x10
+					0x14 0x9c
+					0x9f 0x1c
+					0x00 0x18>;
+		qcom,qusb-phy-init-seq-sm12 = <0xa7 0x80
+					0x33 0x84
+					0x83 0x88
+					0x07 0x8c
+					0x30 0x08
+					0x79 0x0c
+					0x21 0x10
+					0x14 0x9c
+					0x9f 0x1c
+					0x00 0x18>;
+		qcom,qusb-phy-init-seq-sm22 = <0xa7 0x80
+					0x33 0x84
+					0x83 0x88
+					0xc7 0x8c
 					0x30 0x08
 					0x79 0x0c
 					0x21 0x10
@@ -670,7 +690,7 @@
 			<&clock_gcc GCC_SDCC2_APPS_CLK>;
 		clock-names = "iface_clk", "core_clk";
 
-		qcom,clk-rates = <400000 20000000 25000000 50000000 100000000
+		qcom,clk-rates = <384000 400000 20000000 25000000 50000000 100000000
 								200000000>;
 		qcom,bus-speed-mode = "SDR12", "SDR25", "SDR50", "DDR50",
 								"SDR104";

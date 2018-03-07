@@ -30,8 +30,105 @@ DEFINE_MSM_MUTEX(msm_ois_mutex);
 static struct v4l2_file_operations msm_ois_v4l2_subdev_fops;
 static int32_t msm_ois_power_up(struct msm_ois_ctrl_t *o_ctrl);
 static int32_t msm_ois_power_down(struct msm_ois_ctrl_t *o_ctrl);
+static int32_t msm_ois_write_settings(struct msm_ois_ctrl_t *o_ctrl,
+	uint16_t size, struct reg_settings_ois_t *settings);
 
 static struct i2c_driver msm_ois_i2c_driver;
+
+static struct class *ois_class;
+//static bool isOpened = 0;
+static bool ois_status = 0;
+
+static ssize_t msm_ois_switch_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	ssize_t ret = 0;
+	sprintf(buf, "OIS_Switch = %d\n", ois_status);
+	ret = strlen(buf) + 1;
+
+	return ret;
+}
+
+static ssize_t msm_ois_switch_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	int32_t rc = 0;
+	unsigned short setting_size = 4;
+	struct reg_settings_ois_t settings[setting_size];
+	struct msm_ois_ctrl_t *o_ctrl = dev_get_drvdata(dev);
+	enum msm_camera_i2c_reg_addr_type save_addr_type;
+
+	switch(o_ctrl->ois_state) {
+	case OIS_OPS_ACTIVE: {
+		save_addr_type = o_ctrl->i2c_client.addr_type;
+		o_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
+
+		CDBG("Current OIS status:%d\n", ois_status);
+
+		if(!strncmp(buf,"1", 1)) {//set OIS ON from OIS OFF
+			ois_status = 1;
+
+			settings[0].reg_addr = 0x6020, settings[0].addr_type = MSM_CAMERA_I2C_WORD_ADDR, settings[0].reg_data = 0x01, settings[0].data_type = MSM_CAMERA_I2C_BYTE_DATA, settings[0].i2c_operation = MSM_OIS_WRITE, settings[0].delay = 0;
+			settings[1].reg_addr = 0x6021, settings[1].addr_type = MSM_CAMERA_I2C_WORD_ADDR, settings[1].reg_data = 0x03, settings[1].data_type = MSM_CAMERA_I2C_BYTE_DATA, settings[1].i2c_operation = MSM_OIS_WRITE, settings[1].delay = 0;
+			settings[2].reg_addr = 0x6024, settings[2].addr_type = MSM_CAMERA_I2C_WORD_ADDR, settings[2].reg_data = 0x01, settings[2].data_type = MSM_CAMERA_I2C_BYTE_DATA, settings[2].i2c_operation = MSM_OIS_POLL , settings[2].delay = 100;
+			settings[3].reg_addr = 0x6020, settings[3].addr_type = MSM_CAMERA_I2C_WORD_ADDR, settings[3].reg_data = 0x02, settings[3].data_type = MSM_CAMERA_I2C_BYTE_DATA, settings[3].i2c_operation = MSM_OIS_WRITE, settings[3].delay = 10;
+
+			rc = msm_ois_write_settings(o_ctrl, setting_size, settings);
+			if (rc < 0) {
+				pr_err("Fail to set OIS On\n");
+			}
+
+			CDBG("msm_ois_switch_store Switch = %d\n", ois_status);
+		} else if (!strncmp(buf,"0", 1)) {//set OIS OFF from OIS ON
+			ois_status = 0;
+
+			settings[0].reg_addr = 0x6020, settings[0].addr_type = MSM_CAMERA_I2C_WORD_ADDR, settings[0].reg_data = 0x01, settings[0].data_type = MSM_CAMERA_I2C_BYTE_DATA, settings[0].i2c_operation = MSM_OIS_WRITE, settings[0].delay = 0;
+
+			rc = msm_ois_write_settings(o_ctrl, setting_size, settings);
+			if (rc < 0) {
+				pr_err("Fail to set OIS On\n");
+			}
+
+			CDBG("msm_ois_switch_store Switch = %d\n", ois_status);
+		} else {
+			pr_err("You send neither 1 nor 0, buf:%s\n", buf);
+		}
+		o_ctrl->i2c_client.addr_type = save_addr_type;
+	}
+		break;
+	case OIS_DISABLE_STATE:
+		pr_err("OIS doesn't work now...\n");
+		break;
+	default:
+		pr_err("OIS is in other state(%d)\n", o_ctrl->ois_state);
+		break;
+	}
+
+	return size;
+}
+static DEVICE_ATTR(OIS_Switch, 0644, msm_ois_switch_show, msm_ois_switch_store);
+
+static int32_t msm_ois_register_switch_device(struct msm_ois_ctrl_t *o_ctrl)
+{
+	struct device *ois_device = NULL;
+
+	CDBG("Enter\n");
+	ois_class = class_create(THIS_MODULE, "actuatordrv_sub_af");
+	if (IS_ERR(ois_class)) {
+		int ret = PTR_ERR(ois_class);
+
+		CDBG("Unable to create class, err = %d\n", ret);
+		return ret;
+	}
+
+	ois_device = device_create(ois_class, NULL, 0, (void *)o_ctrl, "SUBAF");
+
+	if (NULL == ois_device)
+		return -EIO;
+
+	device_create_file(ois_device, &dev_attr_OIS_Switch);
+
+	CDBG("Exit\n");
+	return 0;
+}
 
 static int32_t data_type_to_num_bytes(
 	enum msm_camera_i2c_data_type data_type)
@@ -412,7 +509,7 @@ static int32_t msm_ois_control(struct msm_ois_ctrl_t *o_ctrl,
 	struct msm_ois_set_info_t *set_info)
 {
 	struct reg_settings_ois_t *settings = NULL;
-	int32_t rc = 0, i = 0;
+	int32_t rc = 0;
 	struct msm_camera_cci_client *cci_client = NULL;
 	CDBG("Enter\n");
 
@@ -454,17 +551,10 @@ static int32_t msm_ois_control(struct msm_ois_ctrl_t *o_ctrl,
 		rc = msm_ois_write_settings(o_ctrl,
 			set_info->ois_params.setting_size,
 			settings);
-
-		for (i = 0; i < set_info->ois_params.setting_size; i++) {
-			if (set_info->ois_params.settings[i].i2c_operation
-				== MSM_OIS_READ) {
-				set_info->ois_params.settings[i].reg_data =
-					settings[i].reg_data;
-				CDBG("ois_data at addr 0x%x is 0x%x",
-				set_info->ois_params.settings[i].reg_addr,
-				set_info->ois_params.settings[i].reg_data);
-			}
-		}
+		if (set_info->ois_params.setting_size <= 1)//set disable OIS setting
+			ois_status = 0;
+		else //set OIS mode setting
+			ois_status = 1;
 
 		kfree(settings);
 		if (rc < 0) {
@@ -661,6 +751,7 @@ static int msm_ois_close(struct v4l2_subdev *sd,
 			pr_err("cci_init failed\n");
 	}
 	o_ctrl->ois_state = OIS_DISABLE_STATE;
+	ois_status = 0;
 	mutex_unlock(o_ctrl->ois_mutex);
 	CDBG("Exit\n");
 	return rc;
@@ -968,7 +1059,7 @@ static int32_t msm_ois_platform_probe(struct platform_device *pdev)
 
 	rc = msm_sensor_driver_get_gpio_data(&(msm_ois_t->gconf),
 		(&pdev->dev)->of_node);
-	if (rc < 0) {
+	if (rc <= 0) {
 		pr_err("%s: No/Error OIS GPIO\n", __func__);
 	} else {
 		msm_ois_t->cam_pinctrl_status = 1;
@@ -1020,6 +1111,9 @@ static int32_t msm_ois_platform_probe(struct platform_device *pdev)
 #endif
 	msm_ois_t->msm_sd.sd.devnode->fops =
 		&msm_ois_v4l2_subdev_fops;
+
+	if (pdev->id == 1)
+		msm_ois_register_switch_device(msm_ois_t);
 
 	CDBG("Exit\n");
 	return rc;

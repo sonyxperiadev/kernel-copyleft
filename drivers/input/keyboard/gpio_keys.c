@@ -34,6 +34,7 @@
 #include <linux/spinlock.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/syscore_ops.h>
+#include <linux/cei_hw_id.h>
 
 struct gpio_button_data {
 	const struct gpio_keys_button *button;
@@ -652,10 +653,50 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 	int error;
 	int nbuttons;
 	int i;
+	int index;
+	char *phase;
+	char *mainboard;
 
 	node = dev->of_node;
 	if (!node)
 		return ERR_PTR(-ENODEV);
+
+	phase = get_cei_phase_id();
+	index = get_phase_name_index(phase);
+	mainboard = get_cei_mb_id();
+	switch (index)
+	{
+		case PDP:
+			if (of_device_is_compatible(node, "gpio-keys-dp") || of_device_is_compatible(node, "gpio-keys-dp-sm12")) {
+				printk("PDP phase: compatible name is not gpio-keys-dp or gpio-keys-dp-sm12");
+				return ERR_PTR(-ENODEV);
+			}
+			break;
+		case DP:
+			if (!strcmp(mainboard, "SM12")) { 
+				if (of_device_is_compatible(node, "gpio-keys-dp") || of_device_is_compatible(node, "gpio-keys")) {
+					printk("[SM12][DP]: compatible name is not gpio-keys-dp or gpio-keys");
+					return ERR_PTR(-ENODEV);
+				}
+			} else {
+				if (of_device_is_compatible(node, "gpio-keys-dp-sm12") || of_device_is_compatible(node, "gpio-keys")) {
+					printk("[SM22][DP]: compatible name is not gpio-keys-dp-sm12 or gpio-keys");
+					return ERR_PTR(-ENODEV);
+				}
+			}
+			break;
+		case SP:
+		case AP:
+		case TP:
+		case PQ:
+		case MP:
+		default:
+			if (of_device_is_compatible(node, "gpio-keys") || of_device_is_compatible(node, "gpio-keys-dp-sm12")) {
+				printk("Not PDP phase: compatible name is not gpio-keys");
+				return ERR_PTR(-ENODEV);
+			}
+			break;
+	}
 
 	nbuttons = of_get_child_count(node);
 	if (nbuttons == 0)
@@ -731,6 +772,8 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 
 static const struct of_device_id gpio_keys_of_match[] = {
 	{ .compatible = "gpio-keys", },
+	{ .compatible = "gpio-keys-dp", },
+	{ .compatible = "gpio-keys-dp-sm12", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, gpio_keys_of_match);

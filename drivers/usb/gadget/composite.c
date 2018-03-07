@@ -1650,10 +1650,6 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				if (gadget->speed >= USB_SPEED_SUPER) {
 					cdev->desc.bcdUSB = cpu_to_le16(0x0310);
 					cdev->desc.bMaxPacketSize0 = 9;
-				} else if (!disable_l1_for_hs) {
-					cdev->desc.bcdUSB = cpu_to_le16(0x0210);
-					DBG(cdev,
-					"Config HS device with LPM(L1)\n");
 				}
 			}
 
@@ -1691,9 +1687,9 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				value = min(w_length, (u16) value);
 			break;
 		case USB_DT_BOS:
-			if ((gadget_is_superspeed(gadget) &&
-				(gadget->speed >= USB_SPEED_SUPER))
-				 || !disable_l1_for_hs) {
+			if (gadget_is_superspeed(gadget) &&
+				((gadget->speed >= USB_SPEED_SUPER)
+				 || !disable_l1_for_hs)) {
 				value = bos_desc(cdev);
 				value = min(w_length, (u16) value);
 			}

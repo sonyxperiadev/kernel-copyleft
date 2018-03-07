@@ -28,6 +28,7 @@
 #include <linux/usb/phy.h>
 #include <linux/usb/msm_hsusb.h>
 #include <linux/reset.h>
+#include <linux/cei_hw_id.h>
 
 #define QUSB2PHY_PLL_STATUS	0x38
 #define QUSB2PHY_PLL_LOCK	BIT(5)
@@ -118,6 +119,9 @@ MODULE_PARM_DESC(tune4, "QUSB PHY TUNE4");
 unsigned int tune5;
 module_param(tune5, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(tune5, "QUSB PHY TUNE5");
+
+char cei_mainb_sm12[] = "SM12";
+char cei_mainb_sm22[] = "SM22";
 
 
 struct qusb_phy {
@@ -1075,25 +1079,71 @@ static int qusb_phy_probe(struct platform_device *pdev)
 	}
 
 	size = 0;
-	of_get_property(dev->of_node, "qcom,qusb-phy-init-seq", &size);
-	if (size) {
-		qphy->qusb_phy_init_seq = devm_kzalloc(dev,
-						size, GFP_KERNEL);
-		if (qphy->qusb_phy_init_seq) {
-			qphy->init_seq_len =
-				(size / sizeof(*qphy->qusb_phy_init_seq));
-			if (qphy->init_seq_len % 2) {
-				dev_err(dev, "invalid init_seq_len\n");
-				return -EINVAL;
-			}
+	if( strcmp(get_cei_mb_id(), cei_mainb_sm12) == 0) {
+		of_get_property(dev->of_node, "qcom,qusb-phy-init-seq-sm12", &size);
+		if (size) {
+			qphy->qusb_phy_init_seq = devm_kzalloc(dev,
+							size, GFP_KERNEL);
+			if (qphy->qusb_phy_init_seq) {
+				qphy->init_seq_len =
+					(size / sizeof(*qphy->qusb_phy_init_seq));
+				if (qphy->init_seq_len % 2) {
+					dev_err(dev, "invalid init_seq_len\n");
+					return -EINVAL;
+				}
 
-			of_property_read_u32_array(dev->of_node,
-				"qcom,qusb-phy-init-seq",
-				qphy->qusb_phy_init_seq,
-				qphy->init_seq_len);
-		} else {
-			dev_err(dev, "error allocating memory for phy_init_seq\n");
+				of_property_read_u32_array(dev->of_node,
+					"qcom,qusb-phy-init-seq-sm12",
+					qphy->qusb_phy_init_seq,
+					qphy->init_seq_len);
+			} else {
+				dev_err(dev, "error allocating memory for phy_init_seq\n");
+			}
 		}
+	} else if (strcmp(get_cei_mb_id(), cei_mainb_sm22) == 0) {
+		of_get_property(dev->of_node, "qcom,qusb-phy-init-seq-sm22", &size);
+		if (size) {
+			qphy->qusb_phy_init_seq = devm_kzalloc(dev,
+							size, GFP_KERNEL);
+			if (qphy->qusb_phy_init_seq) {
+				qphy->init_seq_len =
+					(size / sizeof(*qphy->qusb_phy_init_seq));
+				if (qphy->init_seq_len % 2) {
+					dev_err(dev, "invalid init_seq_len\n");
+					return -EINVAL;
+				}
+
+				of_property_read_u32_array(dev->of_node,
+					"qcom,qusb-phy-init-seq-sm22",
+					qphy->qusb_phy_init_seq,
+					qphy->init_seq_len);
+			} else {
+				dev_err(dev, "error allocating memory for phy_init_seq\n");
+			}
+		}
+	} else {
+		/*load default eye setting*/
+		of_get_property(dev->of_node, "qcom,qusb-phy-init-seq", &size);
+		if (size) {
+			qphy->qusb_phy_init_seq = devm_kzalloc(dev,
+							size, GFP_KERNEL);
+			if (qphy->qusb_phy_init_seq) {
+				qphy->init_seq_len =
+					(size / sizeof(*qphy->qusb_phy_init_seq));
+				if (qphy->init_seq_len % 2) {
+					dev_err(dev, "invalid init_seq_len\n");
+					return -EINVAL;
+				}
+
+				of_property_read_u32_array(dev->of_node,
+					"qcom,qusb-phy-init-seq",
+					qphy->qusb_phy_init_seq,
+					qphy->init_seq_len);
+			} else {
+				dev_err(dev, "error allocating memory for phy_init_seq\n");
+			}
+		}
+
 	}
 
 	qphy->ulpi_mode = false;

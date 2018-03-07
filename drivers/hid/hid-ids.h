@@ -1055,4 +1055,5 @@
 #define USB_DEVICE_ID_RAPHNET_2NES2SNES	0x0002
 #define USB_DEVICE_ID_RAPHNET_4NES4SNES	0x0003
 
+extern int hid_state;
 #endif

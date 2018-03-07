@@ -13,6 +13,8 @@
 #define pr_fmt(fmt) "%s:%d " fmt, __func__, __LINE__
 
 #include <linux/module.h>
+#include <linux/firmware.h>
+#include <linux/cei_hw_id.h>
 #include "msm_sd.h"
 #include "msm_actuator.h"
 #include "msm_cci.h"
@@ -31,6 +33,11 @@ DEFINE_MSM_MUTEX(msm_actuator_mutex);
 #define PARK_LENS_SMALL_STEP 3
 #define MAX_QVALUE 4096
 
+#define OIS_7B 1
+#define OIS_5B 2
+
+static int OIS_FW_FLAG = 0;
+
 static struct v4l2_file_operations msm_actuator_v4l2_subdev_fops;
 static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl);
 static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl);
@@ -47,6 +54,391 @@ static struct msm_actuator *actuators[] = {
 	&msm_hvcm_actuator_table,
 	&msm_bivcm_actuator_table,
 };
+
+static struct class *hall_class;
+
+static ssize_t msm_actuator_hall_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	uint16_t curdet = 0, hall = 0, curpos = 0;
+	int32_t rc = 0;
+	enum msm_camera_i2c_reg_addr_type save_addr_type;
+	struct msm_actuator_ctrl_t *o_ctrl = dev_get_drvdata(dev);
+
+	if (o_ctrl->step_position_table != NULL)
+	{
+		save_addr_type = o_ctrl->i2c_client.addr_type;
+		o_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
+		rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_read(
+			&o_ctrl->i2c_client,
+			0x843B,
+			&curdet,
+			MSM_CAMERA_I2C_WORD_DATA);
+		if (rc != 0)
+		{
+			CDBG("curdet read error! rc = %d\n",rc);
+		}
+		rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_read(
+			&o_ctrl->i2c_client,
+			0x842C,
+			&hall,
+			MSM_CAMERA_I2C_WORD_DATA);
+		if (rc != 0)
+		{
+			CDBG("hall read error! rc = %d\n",rc);
+		}
+		curpos = o_ctrl->step_position_table[o_ctrl->curr_step_pos];
+		o_ctrl->i2c_client.addr_type = save_addr_type;
+	}
+
+	//return sprintf(buf, "%d(0x%x) %d(0x%x) %d\n", hall, hall, curdet, curdet, curpos);
+	return sprintf(buf, "%d(0x%x) %d\n", hall, hall, curpos);
+}
+
+static ssize_t msm_actuator_hall_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	return size;
+}
+static DEVICE_ATTR(hall, 0644, msm_actuator_hall_show, msm_actuator_hall_store);
+
+static int32_t msm_actuator_register_hall_device(struct msm_actuator_ctrl_t *o_ctrl)
+{
+	struct device *hall_device = NULL;
+
+	CDBG("Enter\n");
+	hall_class = class_create(THIS_MODULE, "HALL");
+	if (IS_ERR(hall_class)) {
+		int ret = PTR_ERR(hall_class);
+
+		CDBG("Unable to create class, err = %d\n", ret);
+		return ret;
+	}
+
+	hall_device = device_create(hall_class, NULL, 0, (void *)o_ctrl, "MAIN_HALL");
+
+	if (NULL == hall_device)
+		return -EIO;
+
+	device_create_file(hall_device, &dev_attr_hall);
+
+	CDBG("Exit\n");
+	return 0;
+}
+
+static int32_t msm_actuator_download(struct msm_actuator_ctrl_t *o_ctrl)
+{
+	uint16_t bytes_in_tx = 0;
+	uint16_t total_bytes = 0;
+	uint16_t fw_tx_size = 0;
+	uint16_t reg_data = 0;
+	uint8_t *ptr = NULL;
+	int32_t rc = 0;
+	const struct firmware *fw = NULL;
+	const char *fw_name_prog = NULL;
+	const char *fw_name_coeff = NULL;
+	char name_prog[MAX_SENSOR_NAME] = {0};
+	char name_coeff[MAX_SENSOR_NAME] = {0};
+	struct device *dev = &(o_ctrl->pdev->dev);
+	enum msm_camera_i2c_reg_addr_type save_addr_type;
+
+	CDBG("Enter\n");
+
+	save_addr_type = o_ctrl->i2c_client.addr_type;
+	o_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_BYTE_ADDR;
+	fw_tx_size = o_ctrl->oboard_info->fw_tx_size;
+
+	o_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
+	rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_read(
+		&o_ctrl->i2c_client,
+		0x825F,
+		&reg_data,
+		MSM_CAMERA_I2C_WORD_DATA);
+	if (rc == 0)
+	{
+		CDBG("   IC_Version:%4X\n",reg_data);
+	}
+	o_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_BYTE_ADDR;
+	rc = 0;
+
+	snprintf(name_coeff, MAX_SENSOR_NAME, "%s.coeff",
+		o_ctrl->oboard_info->actuator_name);
+
+	snprintf(name_prog, MAX_SENSOR_NAME, "%s.prog",
+		o_ctrl->oboard_info->actuator_name);
+
+	/* cast pointer as const pointer*/
+	fw_name_prog = name_prog;
+	fw_name_coeff = name_coeff;
+
+	/* Load FW */
+	rc = request_firmware(&fw, fw_name_prog, dev);
+	if (rc) {
+		dev_err(dev, "Failed to locate %s\n", fw_name_prog);
+		o_ctrl->i2c_client.addr_type = save_addr_type;
+		return rc;
+	}
+	CDBG("rc = %d FW size = %zu\n", rc, fw->size);
+	ptr = (uint8_t *)fw->data;
+	total_bytes = fw->size;
+	for (ptr = (uint8_t *)fw->data; total_bytes;
+		total_bytes -= bytes_in_tx, ptr += bytes_in_tx) {
+		bytes_in_tx = (total_bytes > fw_tx_size) ? fw_tx_size : total_bytes;
+		rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_write_seq(
+			&o_ctrl->i2c_client, o_ctrl->oboard_info->opcode.prog,
+			 ptr, bytes_in_tx);
+		if (rc < 0) {
+			pr_err("Failed:remaining bytes to be downloaded:%d\n",
+				bytes_in_tx);
+			/* abort download fw and return error*/
+			goto release_firmware;
+		}
+	}
+	release_firmware(fw);
+	o_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
+	rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_read(
+		&o_ctrl->i2c_client,
+		0x84F7,
+		&reg_data,
+		MSM_CAMERA_I2C_WORD_DATA);
+	if (rc == 0)
+	{
+		if ( ( reg_data&0x0004 ) == 0x0004 )
+		{
+			reg_data = 0;
+			rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_read(
+				&o_ctrl->i2c_client,
+				0x84F6,
+				&reg_data,
+				MSM_CAMERA_I2C_WORD_DATA);
+			if (rc == 0)
+			{
+				CDBG("@@@ FirmwareDownload _OK_ @@@ \n");
+				CDBG("@@@ Firm Ver :       %.4d @@@ \n", reg_data);
+			}
+		}
+		else
+		{
+			CDBG("XXX DOWNLOAD  NG NG NG NG XXX \n" );
+		}
+	}
+	o_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_BYTE_ADDR;
+	rc = 0;
+
+	rc = request_firmware(&fw, fw_name_coeff, dev);
+	if (rc) {
+		dev_err(dev, "Failed to locate %s\n", fw_name_coeff);
+		o_ctrl->i2c_client.addr_type = save_addr_type;
+		return rc;
+	}
+	CDBG("rc = %d FW size = %zu\n", rc, fw->size);
+	ptr = (uint8_t *)fw->data;
+	total_bytes = fw->size;
+	for (ptr = (uint8_t *)fw->data; total_bytes;
+		total_bytes -= bytes_in_tx, ptr += bytes_in_tx) {
+		bytes_in_tx = (total_bytes > fw_tx_size) ? fw_tx_size : total_bytes;
+		rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_write_seq(
+			&o_ctrl->i2c_client, o_ctrl->oboard_info->opcode.coeff,
+			ptr, bytes_in_tx);
+		if (rc < 0) {
+			pr_err("Failed:remaining bytes to be downloaded:%d\n",
+				total_bytes);
+			/* abort download fw*/
+			break;
+		}
+	}
+release_firmware:
+	release_firmware(fw);
+	o_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
+	reg_data = 0;
+	rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_read(
+		&o_ctrl->i2c_client,
+		0x84CD,
+		&reg_data,
+		MSM_CAMERA_I2C_WORD_DATA);
+	if (rc == 0)
+	{
+		CDBG("@@@ CoefDownload   _DONE_ @@@ \n");
+		CDBG("@@@ Coef Ver :     %d @@@ \n", reg_data);
+	}
+
+	o_ctrl->i2c_client.addr_type = save_addr_type;
+	return rc;
+}
+
+static int32_t msm_actuator_get_eeprom_data(struct msm_actuator_ctrl_t *o_ctrl, uint8_t *data){
+	unsigned short eeprom_addr = 0xA2;
+	unsigned short save_addr = 0;
+	uint32_t moduleVer_reg = 0x010;
+	uint32_t oisCali_reg = 0xC98;
+	uint16_t moduleVer_data = 0;
+	uint8_t oisCali_data[44];
+	int32_t rc = 0;
+
+	CDBG("Enter\n");
+
+	save_addr = o_ctrl->i2c_client.cci_client->sid;
+	o_ctrl->i2c_client.cci_client->sid = eeprom_addr >> 1;
+
+	rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_read(
+			&o_ctrl->i2c_client, moduleVer_reg, &moduleVer_data, MSM_CAMERA_I2C_WORD_DATA);
+	if (rc < 0) {
+		pr_err("Read module version failed, rc:%d\n", rc);
+	}
+
+	CDBG("moduleVer_data: 0x%x\n", moduleVer_data);
+	if(((moduleVer_data & 0xFF00) >> 8) >= 16 && (moduleVer_data & 0xFF) >= 4) {
+		OIS_FW_FLAG = OIS_7B;
+	}
+	else {
+		OIS_FW_FLAG = OIS_5B;
+	}
+
+	/* read OIS calibration data */
+	rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_read_seq(
+			&o_ctrl->i2c_client, oisCali_reg, oisCali_data, 44);
+	if (rc < 0) {
+		pr_err("Read module version failed, rc:%d\n", rc);
+	}
+
+	data = oisCali_data;
+
+	/* restore ois i2c addr and addr type */
+	o_ctrl->i2c_client.cci_client->sid = save_addr;
+
+	CDBG("Exit\n");
+
+	return rc;
+}
+
+static int32_t msm_actuator_ois_download(struct msm_actuator_ctrl_t *o_ctrl)
+{
+	uint16_t bytes_in_tx = 0;
+	uint16_t total_bytes = 0;
+	uint16_t fw_tx_size = 0;
+	uint16_t ois_cali_reg = 0x1DC0;
+	uint8_t *ptr = NULL;
+	uint8_t checksum[4];
+	uint8_t ois_cali_data[44];
+	int32_t rc, i = 0;
+	const struct firmware *fw = NULL;
+	const char *fw_name_prog = NULL;
+	const char *fw_name_coeff = NULL;
+	char name_prog[MAX_SENSOR_NAME] = {0};
+	char name_coeff[MAX_SENSOR_NAME] = {0};
+	struct device *dev = &(o_ctrl->pdev->dev);
+	enum msm_camera_i2c_reg_addr_type save_addr_type;
+
+	CDBG("Enter\n");
+
+	save_addr_type = o_ctrl->i2c_client.addr_type;
+	o_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
+	fw_tx_size = o_ctrl->oboard_info->fw_tx_size;
+
+	rc = msm_actuator_get_eeprom_data(o_ctrl, ois_cali_data);
+	if (rc < 0) return rc;
+
+	rc = 0;
+	if (OIS_FW_FLAG == OIS_7B) {
+		snprintf(name_coeff, MAX_SENSOR_NAME, "%s_fw2.bin",
+			o_ctrl->oboard_info->actuator_name);
+
+		snprintf(name_prog, MAX_SENSOR_NAME, "%s_fw1.bin",
+			o_ctrl->oboard_info->actuator_name);
+	} else {
+		pr_err("FW doesn't support this version(%d)", OIS_FW_FLAG);
+	}
+
+	/* cast pointer as const pointer*/
+	fw_name_prog = name_prog;
+	fw_name_coeff = name_coeff;
+
+	/* Load FW */
+	rc = request_firmware(&fw, fw_name_prog, dev);
+	if (rc) {
+		dev_err(dev, "Failed to locate %s\n", fw_name_prog);
+		o_ctrl->i2c_client.addr_type = save_addr_type;
+		return rc;
+	}
+	CDBG("rc = %d FW size = %zu\n", rc, fw->size);
+	total_bytes = fw->size;
+	for (ptr = (uint8_t *)fw->data; total_bytes;
+		total_bytes -= bytes_in_tx, ptr += bytes_in_tx) {
+		bytes_in_tx = (total_bytes > fw_tx_size) ? fw_tx_size : total_bytes;
+		rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_write_seq(
+			&o_ctrl->i2c_client, o_ctrl->oboard_info->opcode.prog,
+			 ptr, bytes_in_tx);
+		if (rc < 0) {
+			pr_err("Failed:remaining bytes to be downloaded:%d\n",
+				bytes_in_tx);
+			/* abort download fw and return error*/
+			goto release_firmware;
+		}
+		o_ctrl->oboard_info->opcode.prog += bytes_in_tx;
+	}
+	release_firmware(fw);
+	mdelay(1);
+
+	rc = request_firmware(&fw, fw_name_coeff, dev);
+	if (rc) {
+		dev_err(dev, "Failed to locate %s\n", fw_name_coeff);
+		o_ctrl->i2c_client.addr_type = save_addr_type;
+		return rc;
+	}
+	CDBG("rc = %d FW size = %zu\n", rc, fw->size);
+	total_bytes = fw->size;
+	for (ptr = (uint8_t *)fw->data; total_bytes;
+		total_bytes -= bytes_in_tx, ptr += bytes_in_tx) {
+		bytes_in_tx = (total_bytes > fw_tx_size) ? fw_tx_size : total_bytes;
+		rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_write_seq(
+			&o_ctrl->i2c_client, o_ctrl->oboard_info->opcode.coeff,
+			ptr, bytes_in_tx);
+		if (rc < 0) {
+			pr_err("Failed:remaining bytes to be downloaded:%d\n",
+				total_bytes);
+			/* abort download fw*/
+			break;
+		}
+		o_ctrl->oboard_info->opcode.coeff += bytes_in_tx;
+	}
+
+release_firmware:
+	release_firmware(fw);
+
+	mdelay(1);
+	/* Read the checksum to check FW download is correct or not */
+	rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_read_seq(
+		&o_ctrl->i2c_client, 0xF008, checksum, 4);
+
+	if (rc < 0) {
+		pr_err("Read checkSum failed:%d\n", rc);
+		return rc;
+	}
+	for (i = 0; i < 4; i++) {
+		CDBG("checksum = 0x%x\n", checksum[i]);
+	}
+
+	/* Download OIS calibration data */
+	total_bytes = 44;
+	for (ptr = ois_cali_data; total_bytes;
+		total_bytes -= bytes_in_tx, ptr += bytes_in_tx) {
+		bytes_in_tx = (total_bytes > fw_tx_size) ? fw_tx_size : total_bytes;
+		rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_write_seq(
+			&o_ctrl->i2c_client, ois_cali_reg,
+			ptr, bytes_in_tx);
+		if (rc < 0) {
+			pr_err("OIS Cali Data DL Failed:remaining bytes to be downloaded:%d\n",
+				total_bytes);
+			/* abort download fw*/
+			break;
+		}
+		ois_cali_reg += bytes_in_tx;
+	}
+
+	o_ctrl->i2c_client.addr_type = save_addr_type;
+
+	CDBG("Exit\n");
+
+	return rc;
+}
 
 static int32_t msm_actuator_piezo_set_default_focus(
 	struct msm_actuator_ctrl_t *a_ctrl,
@@ -358,6 +750,7 @@ static int32_t msm_actuator_init_focus(struct msm_actuator_ctrl_t *a_ctrl,
 {
 	int32_t rc = -EFAULT;
 	int32_t i = 0;
+	struct msm_camera_i2c_seq_reg_array *reg_setting;
 	enum msm_camera_i2c_reg_addr_type save_addr_type;
 	CDBG("Enter\n");
 
@@ -378,17 +771,59 @@ static int32_t msm_actuator_init_focus(struct msm_actuator_ctrl_t *a_ctrl,
 		}
 
 		switch (settings[i].i2c_operation) {
-		case MSM_ACT_WRITE:
-			rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write(
-				&a_ctrl->i2c_client,
-				settings[i].reg_addr,
-				settings[i].reg_data,
-				settings[i].data_type);
+		case MSM_ACT_WRITE: {
+			switch (settings[i].data_type) {
+			case MSM_CAMERA_I2C_BYTE_DATA:
+			case MSM_CAMERA_I2C_WORD_DATA:
+				rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write(
+					&a_ctrl->i2c_client,
+					settings[i].reg_addr,
+					settings[i].reg_data,
+					settings[i].data_type);
+				break;
+			case MSM_CAMERA_I2C_DWORD_DATA:
+				reg_setting =
+				kzalloc(sizeof(struct msm_camera_i2c_seq_reg_array),
+					GFP_KERNEL);
+				if (!reg_setting)
+					return -ENOMEM;
+
+				reg_setting->reg_addr = settings[i].reg_addr;
+				reg_setting->reg_data[0] = (uint8_t)
+					((settings[i].reg_data &
+					0xFF000000) >> 24);
+				reg_setting->reg_data[1] = (uint8_t)
+					((settings[i].reg_data &
+					0x00FF0000) >> 16);
+				reg_setting->reg_data[2] = (uint8_t)
+					((settings[i].reg_data &
+					0x0000FF00) >> 8);
+				reg_setting->reg_data[3] = (uint8_t)
+					(settings[i].reg_data & 0x000000FF);
+				reg_setting->reg_data_size = 4;
+				rc = a_ctrl->i2c_client.i2c_func_tbl->
+					i2c_write_seq(&a_ctrl->i2c_client,
+					reg_setting->reg_addr,
+					reg_setting->reg_data,
+					reg_setting->reg_data_size);
+				kfree(reg_setting);
+				reg_setting = NULL;
+				if (rc < 0)
+					return rc;
+				break;
+
+			default:
+				pr_err("Unsupport data type: %d\n",
+					settings[i].data_type);
+				break;
+			}
+
 			if (settings[i].delay > 20)
 				msleep(settings[i].delay);
 			else if (0 != settings[i].delay)
 				usleep_range(settings[i].delay * 1000,
 					(settings[i].delay * 1000) + 1000);
+		}
 			break;
 		case MSM_ACT_POLL:
 			rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_poll(
@@ -397,6 +832,18 @@ static int32_t msm_actuator_init_focus(struct msm_actuator_ctrl_t *a_ctrl,
 				settings[i].reg_data,
 				settings[i].data_type,
 				settings[i].delay);
+			break;
+		case MSM_ACT_DL:
+			if (!strcmp(a_ctrl->oboard_info->actuator_name, "bu64747gwz")) {
+				rc = msm_actuator_download(a_ctrl);
+			} else if (!strcmp(a_ctrl->oboard_info->actuator_name, "bu24228gwl")) {
+				rc = msm_actuator_ois_download(a_ctrl);
+			}
+			if (settings[i].delay > 20)
+				msleep(settings[i].delay);
+			else if (0 != settings[i].delay)
+				usleep_range(settings[i].delay * 1000,
+					(settings[i].delay * 1000) + 1000);
 			break;
 		default:
 			pr_err("Unsupport i2c_operation: %d\n",
@@ -1050,8 +1497,10 @@ static int32_t msm_actuator_set_default_focus(
 static int32_t msm_actuator_vreg_control(struct msm_actuator_ctrl_t *a_ctrl,
 							int config)
 {
-	int rc = 0, i, cnt;
+	int rc = 0, i, cnt, cei_type = 0;
 	struct msm_actuator_vreg *vreg_cfg;
+	const char *vreg_name = NULL;
+	char *cei_phase_id = NULL;
 
 	vreg_cfg = &a_ctrl->vreg_cfg;
 	cnt = vreg_cfg->num_vreg;
@@ -1065,6 +1514,18 @@ static int32_t msm_actuator_vreg_control(struct msm_actuator_ctrl_t *a_ctrl,
 
 	for (i = 0; i < cnt; i++) {
 		if (a_ctrl->act_device_type == MSM_CAMERA_PLATFORM_DEVICE) {
+			cei_phase_id = get_cei_phase_id();
+			if (strncmp(cei_phase_id, "PDP", 3) == 0)
+				cei_type = 1;
+			else
+				cei_type = 2;
+
+			vreg_name = vreg_cfg->cam_vreg[i].reg_name;
+			if ((cei_type == 1 && strncmp(vreg_name, "cam_vaf", 7) == 0)		//BY12/BY22 PDP use L8B(cam_vafbk)
+				|| (cei_type == 2 && strncmp(vreg_name, "cam_vafbk", 9) == 0))  //BY12/BY22 DP/SP... use L3B(cam_vaf)
+				continue;
+			CDBG("%s build, cei_type:%d, use %s\n", cei_phase_id, cei_type, vreg_name);
+
 			rc = msm_camera_config_single_vreg(&(a_ctrl->pdev->dev),
 				&vreg_cfg->cam_vreg[i],
 				(struct regulator **)&vreg_cfg->data[i],
@@ -1297,6 +1758,7 @@ static int32_t msm_actuator_set_param(struct msm_actuator_ctrl_t *a_ctrl,
 		a_ctrl->i2c_client.client->addr =
 			set_info->actuator_params.i2c_addr;
 	}
+	CDBG("i2c_freq_mode: %d\n", a_ctrl->i2c_client.cci_client->i2c_freq_mode);
 
 	a_ctrl->i2c_data_type = set_info->actuator_params.i2c_data_type;
 	a_ctrl->i2c_client.addr_type = set_info->actuator_params.i2c_addr_type;
@@ -1308,6 +1770,15 @@ static int32_t msm_actuator_set_param(struct msm_actuator_ctrl_t *a_ctrl,
 		pr_err("MAX_ACTUATOR_REG_TBL_SIZE is exceeded.\n");
 		return -EFAULT;
 	}
+
+	if (strlcpy(a_ctrl->oboard_info->actuator_name, set_info->actuator_params.board_info.actuator_name,
+		sizeof(a_ctrl->oboard_info->actuator_name)) < 0) {
+		pr_err("failed: copy_from_user\n");
+		return -EFAULT;
+	}
+	memcpy(&(a_ctrl->oboard_info->opcode), &(set_info->actuator_params.board_info.opcode),
+		sizeof(struct msm_actuator_opcode));
+	a_ctrl->oboard_info->fw_tx_size = set_info->actuator_params.board_info.fw_tx_size;
 
 	if ((a_ctrl->actuator_state == ACT_OPS_ACTIVE) &&
 		(a_ctrl->i2c_reg_tbl != NULL)) {
@@ -1506,6 +1977,7 @@ static struct msm_camera_i2c_fn_t msm_sensor_cci_func_tbl = {
 	.i2c_read_seq = msm_camera_cci_i2c_read_seq,
 	.i2c_write = msm_camera_cci_i2c_write,
 	.i2c_write_table = msm_camera_cci_i2c_write_table,
+	.i2c_write_seq = msm_camera_cci_i2c_write_seq,
 	.i2c_write_seq_table = msm_camera_cci_i2c_write_seq_table,
 	.i2c_write_table_w_microdelay =
 		msm_camera_cci_i2c_write_table_w_microdelay,
@@ -1671,6 +2143,9 @@ static long msm_actuator_subdev_do_ioctl(
 
 			actuator_data.cfg.set_info.actuator_params.park_lens =
 				u32->cfg.set_info.actuator_params.park_lens;
+
+			actuator_data.cfg.set_info.actuator_params.board_info=
+				u32->cfg.set_info.actuator_params.board_info;
 
 			parg = &actuator_data;
 			break;
@@ -1912,6 +2387,13 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 		pr_err("%s:%d failed no memory\n", __func__, __LINE__);
 		return -ENOMEM;
 	}
+	msm_actuator_t->oboard_info = kzalloc(sizeof(
+		struct msm_actuator_board_info), GFP_KERNEL);
+	if (!msm_actuator_t->oboard_info) {
+		kfree(msm_actuator_t);
+		pr_err("%s:%d failed no memory\n", __func__, __LINE__);
+		return -ENOMEM;
+	}
 	rc = of_property_read_u32((&pdev->dev)->of_node, "cell-index",
 		&pdev->id);
 	CDBG("cell-index %d, rc %d\n", pdev->id, rc);
@@ -1997,6 +2479,9 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 #endif
 	msm_actuator_t->msm_sd.sd.devnode->fops =
 		&msm_actuator_v4l2_subdev_fops;
+
+	if (pdev->id == 0)
+		msm_actuator_register_hall_device(msm_actuator_t);
 
 	CDBG("Exit\n");
 	return rc;

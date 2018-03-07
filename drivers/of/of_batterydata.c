@@ -356,6 +356,12 @@ struct device_node *of_batterydata_get_best_profile(
 				delta = abs(batt_ids.kohm[i] - batt_id_kohm);
 				limit = (batt_ids.kohm[i] * id_range_pct) / 100;
 				in_range = (delta <= limit);
+				/*fix battery ID check for 0 kohm resistance S*/
+				if (batt_ids.kohm[i] == 0) {
+					in_range = (delta <= limit) || (delta <= 1);
+					pr_err("batt_id_kohm %d, in_range %d\n", batt_id_kohm, in_range);
+				}
+				/*fix battery ID check for 0 kohm resistance E*/
 				/*
 				 * Check if the delta is the lowest one
 				 * and also if the limits are in range

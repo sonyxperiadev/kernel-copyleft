@@ -3329,7 +3329,9 @@ static int msm_compr_query_audio_effect_put(struct snd_kcontrol *kcontrol,
 	cstream = pdata->cstream[fe_id];
 	audio_effects = pdata->audio_effects[fe_id];
 	if (!cstream || !audio_effects) {
+#ifndef CEI_FACTORY
 		pr_err("%s: stream or effects inactive\n", __func__);
+#endif
 		return -EINVAL;
 	}
 	prtd = cstream->runtime->private_data;

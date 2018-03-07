@@ -52,6 +52,7 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/almk.h>
+#include <trace/events/lmk.h>
 
 #ifdef CONFIG_HIGHMEM
 #define _ZONE ZONE_HIGHMEM
@@ -420,8 +421,10 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 	int other_free;
 	int other_file;
 
-	if (!mutex_trylock(&scan_mutex))
+	if (!mutex_trylock(&scan_mutex)){
+		trace_lmk_remain_scan(0, sc->nr_to_scan, sc->gfp_mask);
 		return 0;
+	};
 
 	other_free = global_page_state(NR_FREE_PAGES);
 
@@ -458,6 +461,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		trace_almk_shrink(0, ret, other_free, other_file, 0);
 		lowmem_print(5, "lowmem_scan %lu, %x, return 0\n",
 			     sc->nr_to_scan, sc->gfp_mask);
+		trace_lmk_remain_scan(0, sc->nr_to_scan, sc->gfp_mask);
 		mutex_unlock(&scan_mutex);
 		return 0;
 	}
@@ -476,10 +480,16 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		if (test_task_flag(tsk, TIF_MM_RELEASED))
 			continue;
 
+		/* Ignore task if coredump in progress */
+		if (tsk->mm && tsk->mm->core_state)
+			continue;
+
 		if (time_before_eq(jiffies, lowmem_deathpending_timeout)) {
 			if (test_task_flag(tsk, TIF_MEMDIE)) {
 				rcu_read_unlock();
 				mutex_unlock(&scan_mutex);
+				trace_lmk_remain_scan(0, sc->nr_to_scan,
+						      sc->gfp_mask);
 				return 0;
 			}
 		}
@@ -572,6 +582,9 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		lowmem_deathpending_timeout = jiffies + HZ;
 		rem += selected_tasksize;
 		rcu_read_unlock();
+		trace_lmk_sigkill(selected->pid, selected->comm,
+				 selected_oom_score_adj, selected_tasksize,
+				 sc->gfp_mask);
 		/* give the system time to free up the memory */
 		msleep_interruptible(20);
 		trace_almk_shrink(selected_tasksize, ret,
@@ -585,6 +598,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 	lowmem_print(4, "lowmem_scan %lu, %x, return %lu\n",
 		     sc->nr_to_scan, sc->gfp_mask, rem);
 	mutex_unlock(&scan_mutex);
+	trace_lmk_remain_scan(rem, sc->nr_to_scan, sc->gfp_mask);
 	return rem;
 }
 
