@@ -326,6 +326,15 @@ config VIRT_TO_BUS
 config MMU_NOTIFIER
 	bool
 
+config OOM_SCORE_NOTIFIER
+	bool "OOM score notifier"
+	default n
+	help
+	  This creates a notifier for process oom_score_adj status.
+	  It create events for new, updated or freed tasks and
+	  are used to build a mirrored task list in
+	  lowmemorykiller.
+
 config KSM
 	bool "Enable KSM for page merging"
 	depends on MMU
@@ -533,6 +542,16 @@ config CMA_AREAS
 
 	  If unsure, leave the default value "7".
 
+config SWAP_CONSIDER_CMA_FREE
+	bool "swap consider cma free size"
+	depends on CMA
+	help
+	  When swap is enable, CMA page is also swapped out.
+	  But CMA page is not used for movable pages.
+	  So in some cases many CMA page remains free.
+	  This help to avoid this situation
+	  by introducing a threshold allowing CMA page reclaim.
+
 config MEM_SOFT_DIRTY
 	bool "Track memory changes"
 	depends on CHECKPOINT_RESTORE && HAVE_ARCH_SOFT_DIRTY && PROC_FS
@@ -573,7 +592,7 @@ config ZPOOL
 	  zsmalloc.
 
 config ZBUD
-	tristate "Low density storage for compressed pages"
+	tristate "Low (Up to 2x) density storage for compressed pages"
 	default n
 	help
 	  A special purpose allocator for storing compressed pages.
@@ -581,6 +600,16 @@ config ZBUD
 	  page.  While this design limits storage density, it has simple and
 	  deterministic reclaim properties that make it preferable to a higher
 	  density approach when reclaim will be used.
+
+config Z3FOLD
+	tristate "Up to 3x density storage for compressed pages"
+	depends on ZPOOL
+	default n
+	help
+	  A special purpose allocator for storing compressed pages.
+	  It is designed to store up to three compressed pages per physical
+	  page. It is a ZBUD derivative so the simplicity and determinism are
+	  still there.
 
 config ZSMALLOC
 	tristate "Memory allocator for compressed pages"

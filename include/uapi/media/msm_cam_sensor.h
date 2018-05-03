@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __UAPI_LINUX_MSM_CAM_SENSOR_H
 #define __UAPI_LINUX_MSM_CAM_SENSOR_H
 
@@ -302,7 +307,7 @@ struct msm_eeprom_cfg_data {
 	enum eeprom_cfg_type_t cfgtype;
 	uint8_t is_supported;
 	union {
-		char eeprom_name[MAX_SENSOR_NAME];
+		char eeprom_name[MAX_EEPROM_NAME];
 		struct eeprom_get_t get_data;
 		struct eeprom_read_t read_data;
 		struct eeprom_write_t write_data;
@@ -558,6 +563,16 @@ struct sensor_init_cfg_data {
 		void *setting;
 	} cfg;
 };
+
+/* extension begin */
+#define SENSOR_EVENT_BASE           (V4L2_EVENT_PRIVATE_START)
+#define SENSOR_EVENT_SOF            (SENSOR_EVENT_BASE + 0)
+
+struct msm_sensor_event_data {
+	uint32_t sof_count;
+	struct timeval mono_timestamp;
+};
+/* extension end */
 
 #define VIDIOC_MSM_SENSOR_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 1, struct sensorb_cfg_data)

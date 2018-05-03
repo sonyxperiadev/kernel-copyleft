@@ -450,15 +450,18 @@ static void fiq_debugger_help(struct fiq_debugger_state *state)
 			" reset         Hard reset\n"
 			" irqs          Interrupt status\n");
 	}
+
 	fiq_debugger_printf(&state->output,
 			" sleep         Allow sleep while in FIQ\n"
 			" nosleep       Disable sleep while in FIQ\n"
 			" console       Switch terminal to console\n"
 			" ps            Process list\n");
+
 #ifdef CONFIG_KGDB
 	if (fiq_kgdb_enable) {
 		fiq_debugger_printf(&state->output,
 			" kgdb          Enter kernel debugger\n");
+
 #endif
 }
 
@@ -544,6 +547,7 @@ static bool fiq_debugger_fiq_exec(struct fiq_debugger_state *state,
 			fiq_debugger_printf(&state->output, "invalid cpu\n");
 		fiq_debugger_printf(&state->output, "cpu %d\n",
 				    state->current_cpu);
+
 	} else {
 		if (state->debug_busy) {
 			fiq_debugger_printf(&state->output,

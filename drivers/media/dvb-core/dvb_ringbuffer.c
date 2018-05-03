@@ -25,6 +25,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 
 
@@ -217,7 +222,7 @@ ssize_t dvb_ringbuffer_write_user(struct dvb_ringbuffer *rbuf,
 {
 	size_t todo = len;
 	size_t split;
-	ssize_t oldpwrite = rbuf->pwrite;
+	int status;
 
 	split = (rbuf->pwrite + len > rbuf->size) ?
 			rbuf->size - rbuf->pwrite :
