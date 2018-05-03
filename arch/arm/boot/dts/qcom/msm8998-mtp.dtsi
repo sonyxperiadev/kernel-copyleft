@@ -9,9 +9,14 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <dt-bindings/interrupt-controller/irq.h>
-#include "msm8998-camera-sensor-mtp.dtsi"
+/* #include "msm8998-camera-sensor-mtp.dtsi" */
 &vendor {
 	bluetooth: bt_wcn3990 {
 		compatible = "qca,wcn3990";
@@ -240,6 +245,7 @@
 	};
 };
 
+/*
 &mdss_hdmi_tx {
 	pinctrl-names = "hdmi_hpd_active", "hdmi_ddc_active", "hdmi_cec_active",
 				"hdmi_active", "hdmi_sleep";
@@ -254,6 +260,7 @@
 	pinctrl-4 = <&mdss_hdmi_5v_suspend &mdss_hdmi_hpd_suspend
 			&mdss_hdmi_ddc_suspend &mdss_hdmi_cec_suspend>;
 };
+*/
 
 &mdss_dp_ctrl {
 	pinctrl-names = "mdss_dp_active", "mdss_dp_sleep";
@@ -597,6 +604,7 @@
 	};
 };
 
+/*
 &vendor {
 	mtp_batterydata: qcom,battery-data {
 		qcom,batt-id-range-pct = <15>;
@@ -609,3 +617,4 @@
 &pmi8998_fg {
 	qcom,battery-data = <&mtp_batterydata>;
 };
+*/

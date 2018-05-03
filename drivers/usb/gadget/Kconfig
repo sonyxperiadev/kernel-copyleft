@@ -573,6 +573,13 @@ config USB_CONFIGFS_F_CCID
 	  USB CCID function driver creats transport layer between the
 	  userspace CCID component and the Windows Host.
 
+config USB_ANDROID_PRODUCTION
+	boolean "Production capable Android gadget"
+	depends on USB_CONFIGFS
+	default n
+	help
+	  Provides an Android gadget where iSerialNumber is set to 0.
+
 source "drivers/usb/gadget/legacy/Kconfig"
 
 endchoice

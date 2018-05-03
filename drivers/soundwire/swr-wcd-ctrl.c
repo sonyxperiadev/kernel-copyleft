@@ -1713,8 +1713,10 @@ int swrm_wcd_notify(struct platform_device *pdev, u32 id, void *data)
 		mutex_lock(&swrm->reslock);
 		if ((swrm->state == SWR_MSTR_RESUME) ||
 		    (swrm->state == SWR_MSTR_UP)) {
-			dev_dbg(swrm->dev, "%s: SWR master is already UP: %d\n",
-				__func__, swrm->state);
+			dev_dbg(swrm->dev, "%s: SWR master is already UP: %d. Do slave reset\n",
+						__func__, swrm->state);
+			list_for_each_entry(swr_dev, &mstr->devices, dev_list)
+				ret = swr_reset_device(swr_dev);
 		} else {
 			pm_runtime_mark_last_busy(&pdev->dev);
 			mutex_unlock(&swrm->reslock);

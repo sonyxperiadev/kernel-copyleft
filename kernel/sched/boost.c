@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "sched.h"
 #include <linux/of.h>
@@ -40,6 +45,7 @@ static void boost_kick_cpus(void)
 {
 	int i;
 	struct cpumask kick_mask;
+	u32 nr_running;
 
 	if (boost_policy != SCHED_BOOST_ON_BIG)
 		return;
@@ -47,8 +53,20 @@ static void boost_kick_cpus(void)
 	cpumask_andnot(&kick_mask, cpu_online_mask, cpu_isolated_mask);
 
 	for_each_cpu(i, &kick_mask) {
-		if (cpu_capacity(i) != max_capacity)
-			boost_kick(i);
+		/*
+		 * kick only "small" cluster
+		 */
+		if (cpu_capacity(i) != max_capacity) {
+			nr_running = ACCESS_ONCE(cpu_rq(i)->nr_running);
+
+			/*
+			 * make sense to interrupt CPU if its run-queue
+			 * has something running in order to check for
+			 * migration afterwards, otherwise skip it.
+			 */
+			if (nr_running)
+				boost_kick(i);
+		}
 	}
 }
 

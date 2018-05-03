@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -74,6 +79,7 @@ struct swr_port {
 };
 
 enum {
+	WSA881X_DEV_RESET,
 	WSA881X_DEV_DOWN,
 	WSA881X_DEV_UP,
 };
@@ -968,6 +974,8 @@ static void wsa881x_init(struct snd_soc_codec *codec)
 
 	wsa881x->version = snd_soc_read(codec, WSA881X_CHIP_ID1);
 	wsa881x_regmap_defaults(wsa881x->regmap, wsa881x->version);
+	/* Enable software reset output from soundwire slave */
+	snd_soc_update_bits(codec, WSA881X_SWR_RESET_EN, 0x07, 0x07);
 	/* Bring out of analog reset */
 	snd_soc_update_bits(codec, WSA881X_CDC_RST_CTL, 0x02, 0x02);
 	/* Bring out of digital reset */
@@ -991,7 +999,7 @@ static void wsa881x_init(struct snd_soc_codec *codec)
 			    0x03, 0x00);
 	if (snd_soc_read(codec, WSA881X_OTP_REG_0))
 		snd_soc_update_bits(codec, WSA881X_BOOST_PRESET_OUT1,
-				    0xF0, 0x70);
+				    0xFF, 0x7F);
 	snd_soc_update_bits(codec, WSA881X_BOOST_PRESET_OUT2,
 			    0xF0, 0x30);
 	snd_soc_update_bits(codec, WSA881X_SPKR_DRV_EN, 0x08, 0x08);
@@ -1359,6 +1367,10 @@ static int wsa881x_swr_reset(struct swr_device *pdev)
 		dev_err(&pdev->dev, "%s: wsa881x is NULL\n", __func__);
 		return -EINVAL;
 	}
+	if (wsa881x->state == WSA881X_DEV_RESET) {
+		dev_err(&pdev->dev, "Device is already reset");
+		return 0;
+	}
 	wsa881x->bg_cnt = 0;
 	wsa881x->clk_cnt = 0;
 	while (swr_get_logical_dev_num(pdev, pdev->addr, &devnum) && retry--) {
@@ -1368,6 +1380,7 @@ static int wsa881x_swr_reset(struct swr_device *pdev)
 	pdev->dev_num = devnum;
 	regcache_mark_dirty(wsa881x->regmap);
 	regcache_sync(wsa881x->regmap);
+	wsa881x->state = WSA881X_DEV_RESET;
 	return 0;
 }
 
