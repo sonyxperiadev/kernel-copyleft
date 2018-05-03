@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014,2016 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/export.h>
@@ -841,18 +846,9 @@ int msm_ion_heap_alloc_pages_mem(struct pages_mem *pages_mem)
 
 	pages_mem->free_fn = kfree;
 	page_tbl_size = sizeof(struct page *) * (pages_mem->size >> PAGE_SHIFT);
-	if (page_tbl_size > SZ_8K) {
-		/*
-		 * Do fallback to ensure we have a balance between
-		 * performance and availability.
-		 */
-		pages = kmalloc(page_tbl_size,
-				__GFP_COMP | __GFP_NORETRY |
-				__GFP_NO_KSWAPD | __GFP_NOWARN);
-		if (!pages) {
-			pages = vmalloc(page_tbl_size);
-			pages_mem->free_fn = vfree;
-		}
+	if (page_tbl_size > PAGE_SIZE) {
+		pages = vmalloc(page_tbl_size);
+		pages_mem->free_fn = vfree;
 	} else {
 		pages = kmalloc(page_tbl_size, GFP_KERNEL);
 	}

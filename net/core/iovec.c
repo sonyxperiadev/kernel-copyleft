@@ -15,6 +15,11 @@
  *		Alexey Kuznetsov:	2.1 optimisations
  *		Andi Kleen	:	Fix csum*fromiovecend for IPv6.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/errno.h>
 #include <linux/module.h>
@@ -146,6 +151,10 @@ int csum_partial_copy_fromiovecend(unsigned char *kdata, struct iovec *iov,
 {
 	__wsum csum = *csump;
 	int partial_cnt = 0, err = 0;
+
+	/* No data? Done! */
+	if (len == 0)
+		return 0;
 
 	/* Skip over the finished iovecs */
 	while (offset >= iov->iov_len) {

@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -81,6 +86,7 @@ struct swr_port {
 };
 
 enum {
+	WSA881X_DEV_RESET,
 	WSA881X_DEV_DOWN,
 	WSA881X_DEV_UP,
 };
@@ -984,7 +990,7 @@ static void wsa881x_init(struct snd_soc_codec *codec)
 		snd_soc_update_bits(codec, WSA881X_SPKR_PA_INT, 0x0F, 0x0E);
 		snd_soc_update_bits(codec, WSA881X_BOOST_PS_CTL, 0x80, 0x00);
 		snd_soc_update_bits(codec, WSA881X_BOOST_PRESET_OUT1,
-				    0xF0, 0xB0);
+				    0xF0, 0x30);
 		snd_soc_update_bits(codec, WSA881X_BOOST_PRESET_OUT2,
 				    0xF0, 0x30);
 		snd_soc_update_bits(codec, WSA881X_SPKR_DRV_EN, 0x0F, 0x0C);
@@ -1361,6 +1367,10 @@ static int wsa881x_swr_reset(struct swr_device *pdev)
 		dev_err(&pdev->dev, "%s: wsa881x is NULL\n", __func__);
 		return -EINVAL;
 	}
+	if (wsa881x->state == WSA881X_DEV_RESET) {
+		dev_err(&pdev->dev, "Device is already reset");
+		return 0;
+	}
 	wsa881x->bg_cnt = 0;
 	wsa881x->clk_cnt = 0;
 	while (swr_get_logical_dev_num(pdev, pdev->addr, &devnum) && retry--) {
@@ -1369,6 +1379,7 @@ static int wsa881x_swr_reset(struct swr_device *pdev)
 	}
 	regcache_mark_dirty(wsa881x->regmap);
 	regcache_sync(wsa881x->regmap);
+	wsa881x->state = WSA881X_DEV_RESET;
 	return 0;
 }
 

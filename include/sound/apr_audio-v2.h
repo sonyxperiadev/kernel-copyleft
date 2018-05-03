@@ -9,6 +9,11 @@
 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 * GNU General Public License for more details.
 */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 
 #ifndef _APR_AUDIO_V2_H_
@@ -441,6 +446,29 @@ struct audproc_softvolume_params {
 	u32 rampingcurve;
 } __packed;
 
+/*
+ * ID of the Media Format Converter (MFC) module.
+ * This module supports the following parameter IDs:
+ * #AUDPROC_PARAM_ID_MFC_OUTPUT_MEDIA_FORMAT
+ * #AUDPROC_CHMIXER_PARAM_ID_COEFF
+ */
+#define AUDPROC_MODULE_ID_MFC                               0x00010912
+
+/* ID of the Output Media Format parameters used by AUDPROC_MODULE_ID_MFC.
+ *
+ */
+#define AUDPROC_PARAM_ID_MFC_OUTPUT_MEDIA_FORMAT            0x00010913
+
+
+struct audproc_mfc_output_media_fmt {
+	struct adm_cmd_set_pp_params_v5 params;
+	struct adm_param_data_v5 data;
+	uint32_t sampling_rate;
+	uint16_t bits_per_sample;
+	uint16_t num_channels;
+	uint16_t channel_type[8];
+} __packed;
+
 struct audproc_volume_ctrl_master_gain {
 	struct adm_cmd_set_pp_params_v5 params;
 	struct adm_param_data_v5 data;
@@ -617,6 +645,7 @@ struct adm_session_copp_gain_v5 {
 
 /*  Payload of the #ADM_CMD_MATRIX_MUTE_V5 command*/
 struct adm_cmd_matrix_mute_v5 {
+	struct apr_hdr	hdr;
 	u32                  matrix_id;
 /* Specifies whether the matrix ID is Audio Rx (0) or Audio Tx (1).
  * Use the ADM_MATRIX_ID_AUDIO_RX or  ADM_MATRIX_ID_AUDIOX
@@ -2534,6 +2563,8 @@ struct afe_lpass_core_shared_clk_config_command {
 #define VPM_TX_DM_RFECNS_COPP_TOPOLOGY			0x00010F86
 #define ADM_CMD_COPP_OPEN_TOPOLOGY_ID_DTS_HPX		0x10015002
 #define ADM_CMD_COPP_OPEN_TOPOLOGY_ID_AUDIOSPHERE	0x10028000
+#define VOICE_TOPOLOGY_LVVEFQ_TX_SM			0x1000BFF0
+#define VOICE_TOPOLOGY_LVVEFQ_TX_DM			0x1000BFF1
 
 /* Memory map regions command payload used by the
  * #ASM_CMD_SHARED_MEM_MAP_REGIONS ,#ADM_CMD_SHARED_MEM_MAP_REGIONS
@@ -2812,6 +2843,8 @@ struct asm_softvolume_params {
 
 #define ASM_MEDIA_FMT_MULTI_CHANNEL_PCM_V2 0x00010DA5
 
+#define ASM_MEDIA_FMT_MULTI_CHANNEL_PCM_V3 0x00010DDC
+
 #define ASM_MEDIA_FMT_EVRCB_FS 0x00010BEF
 
 #define ASM_MEDIA_FMT_EVRCWB_FS 0x00010BF0
@@ -2879,6 +2912,51 @@ struct asm_multi_channel_pcm_fmt_blk_v2 {
  */
 } __packed;
 
+struct asm_multi_channel_pcm_fmt_blk_v3 {
+	uint16_t                num_channels;
+/*
+ * Number of channels
+ * Supported values: 1 to 8
+ */
+
+	uint16_t                bits_per_sample;
+/*
+ * Number of bits per sample per channel
+ * Supported values: 16, 24
+ */
+
+	uint32_t                sample_rate;
+/*
+ * Number of samples per second
+ * Supported values: 2000 to 48000, 96000,192000 Hz
+ */
+
+	uint16_t                is_signed;
+/* Flag that indicates that PCM samples are signed (1) */
+
+	uint16_t                sample_word_size;
+/*
+ * Size in bits of the word that holds a sample of a channel.
+ * Supported values: 12,24,32
+ */
+
+	uint8_t                 channel_mapping[8];
+/*
+ * Each element, i, in the array describes channel i inside the buffer where
+ * 0 <= i < num_channels. Unused channels are set to 0.
+ */
+} __packed;
+
+/*
+ * Payload of the multichannel PCM configuration parameters in
+ * the ASM_MEDIA_FMT_MULTI_CHANNEL_PCM_V3 media format.
+ */
+struct asm_multi_channel_pcm_fmt_blk_param_v3 {
+	struct apr_hdr hdr;
+	struct asm_data_cmd_media_fmt_update_v2 fmt_blk;
+	struct asm_multi_channel_pcm_fmt_blk_v3 param;
+} __packed;
+
 struct asm_stream_cmd_set_encdec_param {
 	u32                  param_id;
 	/* ID of the parameter. */
@@ -2913,6 +2991,66 @@ struct asm_dec_ddp_endp_param_v2 {
 	struct asm_stream_cmd_set_encdec_param  encdec;
 	int endp_param_value;
 } __packed;
+
+
+/*
+ * Payload of the multichannel PCM encoder configuration parameters in
+ * the ASM_MEDIA_FMT_MULTI_CHANNEL_PCM_V3 media format.
+ */
+
+struct asm_multi_channel_pcm_enc_cfg_v3 {
+	struct apr_hdr hdr;
+	struct asm_stream_cmd_set_encdec_param encdec;
+	struct asm_enc_cfg_blk_param_v2 encblk;
+	uint16_t num_channels;
+	/*
+	 * Number of PCM channels.
+	 * @values
+	 * - 0 -- Native mode
+	 * - 1 -- 8 channels
+	 * Native mode indicates that encoding must be performed with the number
+	 * of channels at the input.
+	 */
+	uint16_t  bits_per_sample;
+	/*
+	 * Number of bits per sample per channel.
+	 * @values 16, 24
+	 */
+	uint32_t  sample_rate;
+	/*
+	 * Number of samples per second.
+	 * @values 0, 8000 to 48000 Hz
+	 * A value of 0 indicates the native sampling rate. Encoding is
+	 * performed at the input sampling rate.
+	 */
+	uint16_t  is_signed;
+	/*
+	 * Flag that indicates the PCM samples are signed (1). Currently, only
+	 * signed PCM samples are supported.
+	 */
+	uint16_t    sample_word_size;
+	/*
+	 * The size in bits of the word that holds a sample of a channel.
+	 * @values 16, 24, 32
+	 * 16-bit samples are always placed in 16-bit words:
+	 * sample_word_size = 1.
+	 * 24-bit samples can be placed in 32-bit words or in consecutive
+	 * 24-bit words.
+	 * - If sample_word_size = 32, 24-bit samples are placed in the
+	 * most significant 24 bits of a 32-bit word.
+	 * - If sample_word_size = 24, 24-bit samples are placed in
+	 * 24-bit words. @tablebulletend
+	 */
+	uint8_t   channel_mapping[8];
+	/*
+	 * Channel mapping array expected at the encoder output.
+	 *  Channel[i] mapping describes channel i inside the buffer, where
+	 *  0 @le i < num_channels. All valid used channels must be present at
+	 *  the beginning of the array.
+	 * If Native mode is set for the channels, this field is ignored.
+	 * @values See Section @xref{dox:PcmChannelDefs}
+	 */
+};
 
 /* @brief Multichannel PCM encoder configuration structure used
  * in the #ASM_STREAM_CMD_OPEN_READ_V2(for AVS2.6 image) OR
@@ -4370,7 +4508,76 @@ struct asm_stream_cmd_open_write_v3 {
  */
 } __packed;
 
-#define ASM_STREAM_CMD_OPEN_READ_V2                 0x00010D8C
+#define ASM_STREAM_CMD_OPEN_PULL_MODE_WRITE    0x00010DD9
+
+/* Bitmask for the stream_perf_mode subfield. */
+#define ASM_BIT_MASK_STREAM_PERF_FLAG_PULL_MODE_WRITE 0xE0000000UL
+
+/* Bitmask for the stream_perf_mode subfield. */
+#define ASM_SHIFT_STREAM_PERF_FLAG_PULL_MODE_WRITE 29
+
+#define ASM_STREAM_CMD_OPEN_PUSH_MODE_READ  0x00010DDA
+
+#define ASM_BIT_MASK_STREAM_PERF_FLAG_PUSH_MODE_READ 0xE0000000UL
+
+#define ASM_SHIFT_STREAM_PERF_FLAG_PUSH_MODE_READ 29
+
+#define ASM_DATA_EVENT_WATERMARK 0x00010DDB
+
+struct asm_shared_position_buffer {
+	volatile uint32_t               frame_counter;
+/* Counter used to handle interprocessor synchronization issues.
+ * When frame_counter is 0: read_index, wall_clock_us_lsw, and
+ * wall_clock_us_msw are invalid.
+ * Supported values: >= 0.
+ */
+
+	volatile uint32_t               index;
+/* Index in bytes from where the aDSP is reading/writing.
+ * Supported values: 0 to circular buffer size - 1
+ */
+
+	volatile uint32_t               wall_clock_us_lsw;
+/* Lower 32 bits of the 64-bit wall clock time in microseconds when the
+ * read index was updated.
+ * Supported values: >= 0
+ */
+
+	volatile uint32_t               wall_clock_us_msw;
+/* Upper 32 bits of the 64 bit wall clock time in microseconds when the
+ * read index was updated
+ * Supported values: >= 0
+ */
+} __packed;
+
+struct asm_shared_watermark_level {
+	uint32_t                watermark_level_bytes;
+} __packed;
+
+struct asm_stream_cmd_open_shared_io {
+	struct apr_hdr          hdr;
+	uint32_t                mode_flags;
+	uint16_t                endpoint_type;
+	uint16_t                topo_bits_per_sample;
+	uint32_t                topo_id;
+	uint32_t                fmt_id;
+	uint32_t                shared_pos_buf_phy_addr_lsw;
+	uint32_t                shared_pos_buf_phy_addr_msw;
+	uint16_t                shared_pos_buf_mem_pool_id;
+	uint16_t                shared_pos_buf_num_regions;
+	uint32_t                shared_pos_buf_property_flag;
+	uint32_t                shared_circ_buf_start_phy_addr_lsw;
+	uint32_t                shared_circ_buf_start_phy_addr_msw;
+	uint32_t                shared_circ_buf_size;
+	uint16_t                shared_circ_buf_mem_pool_id;
+	uint16_t                shared_circ_buf_num_regions;
+	uint32_t                shared_circ_buf_property_flag;
+	uint32_t                num_watermark_levels;
+	struct asm_multi_channel_pcm_fmt_blk_v3         fmt;
+	struct avs_shared_map_region_payload            map_region_pos_buf;
+	struct avs_shared_map_region_payload            map_region_circ_buf;
+	struct asm_shared_watermark_level watermark[0];
+} __packed;
 
 #define ASM_STREAM_CMD_OPEN_READ_V3                 0x00010DB4
 
@@ -5231,10 +5438,12 @@ struct asm_stream_cmd_open_read_compressed {
 								0x0001070E
 #define ADM_CMD_COPP_OPENOPOLOGY_ID_SPEAKER_STEREO_IIR_AUDIO_COPP_MBDRCV2\
 								0x0001070F
-#define ADM_CMD_COPP_OPENOPOLOGY_ID_SPEAKER_STEREO_AUDIO_COPP_MBDRC_V3 \
-								0x11000000
 #define ADM_CMD_COPP_OPENOPOLOGY_ID_SPEAKER_MCH_PEAK_VOL \
 								0x0001031B
+#define ADM_CMD_COPP_OPENOPOLOGY_ID_SPEAKER_RX_MCH_IIR_COPP_MBDRC_V3 \
+								0x11000004
+#define ADM_CMD_COPP_OPENOPOLOGY_ID_SPEAKER_STEREO_AUDIO_COPP_SOMC_HP \
+								0x11000006
 #define ADM_CMD_COPP_OPENOPOLOGY_ID_MIC_MONO_AUDIO_COPP  0x00010315
 #define ADM_CMD_COPP_OPENOPOLOGY_ID_MIC_STEREO_AUDIO_COPP 0x00010316
 #define AUDPROC_COPPOPOLOGY_ID_MCHAN_IIR_AUDIO           0x00010715
@@ -7405,6 +7614,45 @@ struct afe_param_id_clip_bank_sel {
 	uint32_t bank_map[AFE_CLIP_MAX_BANKS];
 } __packed;
 
+/* SOMC effect start */
+/* Module/Parameter IDs */
+#define ASM_MODULE_ID_SONYBUNDLE            0x10002010
+
+#define PARAM_ID_SB_COMMON_USER_PARAM       0x10002011
+#define PARAM_ID_SB_DYNAMICNORMALIZER_USER_PARAM 0x10002012
+#define PARAM_ID_SB_SFORCE_USER_PARAM       0x10002013
+#define PARAM_ID_SB_VPT20_USER_PARAM        0x10002014
+#define PARAM_ID_SB_CLEARPHASE_HP_USER_PARAM 0x10002015
+#define PARAM_ID_SB_CLEARAUDIO_USER_PARAM   0x10002016
+#define PARAM_ID_SB_CLEARAUDIO_VOLUME_PARAM 0x10002017
+#define PARAM_ID_SB_CLEARPHASE_SP_USER_PARAM 0x10002018
+#define PARAM_ID_SB_XLOUD_USER_PARAM        0x10002019
+
+#define PARAM_ID_SB_CLEARPHASE_HP_TUNING    0x1000201A
+#define PARAM_ID_SB_SFORCE_TUNING           0x1000201B
+#define PARAM_ID_SB_CLEARPHASE_SP_TUNING    0x1000201C
+#define PARAM_ID_SB_XLOUD_TUNING            0x1000201D
+
+#define ASM_STREAM_POSTPROC_TOPO_ID_SONY    0x10002101
+
+struct clearphase_hp_tuning_params {
+	unsigned char coefs[2064];
+} __packed;
+
+struct s_force_tuning_params {
+	unsigned char coefs[1016];
+} __packed;
+
+struct clearphase_sp_tuning_params {
+	unsigned char coefs[2360];
+} __packed;
+
+struct xloud_tuning_params {
+	unsigned int level;
+	unsigned char coefs[512];
+} __packed;
+/* SOMC effect end */
+
 /* ERROR CODES */
 /* Success. The operation completed with no errors. */
 #define ADSP_EOK          0x00000000
@@ -8116,7 +8364,6 @@ struct asm_mtmx_strtr_params {
 } __packed;
 
 
-
 /* Command for Matrix or Stream Router */
 #define ASM_SESSION_CMD_SET_MTMX_STRTR_PARAMS_V2    0x00010DCE
 /* Module for AVSYNC */
@@ -8256,7 +8503,6 @@ struct asm_mtmx_strtr_get_params_cmdrsp {
 	struct asm_stream_param_data_v2 param_info;
 	union asm_session_mtmx_strtr_data_type param_data;
 } __packed;
-
 
 
 #define AUDPROC_MODULE_ID_RESAMPLER 0x00010719

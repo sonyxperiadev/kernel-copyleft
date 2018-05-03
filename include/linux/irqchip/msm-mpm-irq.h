@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __MSM_MPM_IRQ_H
 #define __MSM_MPM_IRQ_H
@@ -98,7 +103,7 @@ bool msm_mpm_gpio_irqs_detectable(bool from_idle);
  * Low power management code calls into this API to configure the MPM to
  * monitor the active irqs before going to sleep.
  */
-void msm_mpm_enter_sleep(uint32_t sclk_count, bool from_idle,
+void msm_mpm_enter_sleep(uint64_t sclk_count, bool from_idle,
 		const struct cpumask *cpumask);
 /**
  * msm_mpm_exit_sleep() -Called from PM code after resuming from low power mode

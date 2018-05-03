@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/jiffies.h>
 #include <linux/sched.h>
@@ -1317,6 +1322,7 @@ static void handle_sys_error(enum command_response cmd, void *data)
 
 	dprintk(VIDC_WARN, "SYS_ERROR %d received for core %pK\n", cmd, core);
 	msm_comm_clean_notify_client(core);
+
 	hdev = core->device;
 	mutex_lock(&core->lock);
 	if (core->state == VIDC_CORE_INVALID) {
@@ -2036,6 +2042,7 @@ static int msm_comm_session_abort(struct msm_vidc_inst *inst)
 {
 	int rc = 0, abort_completion = 0;
 	struct hfi_device *hdev;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
 
 	if (!inst || !inst->core || !inst->core->device) {
 		dprintk(VIDC_ERR, "%s invalid params\n", __func__);
@@ -2058,6 +2065,10 @@ static int msm_comm_session_abort(struct msm_vidc_inst *inst)
 		dprintk(VIDC_ERR,
 				"%s: Wait interrupted or timed out [%pK]: %d\n",
 				__func__, inst, abort_completion);
+		snprintf(crash_reason, sizeof(crash_reason),
+			  "%s: Wait interrupted or timed out [%p]: %d",
+			  __func__, inst, abort_completion);
+		subsystem_crash_reason("venus", crash_reason);
 		rc = -EBUSY;
 	} else {
 		rc = 0;

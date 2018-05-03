@@ -41,6 +41,8 @@ struct address_space swapper_spaces[MAX_SWAPFILES] = {
 		.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC|__GFP_NOWARN),
 		.a_ops		= &swap_aops,
 		.backing_dev_info = &swap_backing_dev_info,
+		/* swap cache doesn't use writeback related tags */
+		.flags		= 1 << AS_NO_WRITEBACK_TAGS,
 	}
 };
 
