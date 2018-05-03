@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef IPA_QMI_SERVICE_H
 #define IPA_QMI_SERVICE_H
@@ -175,6 +180,9 @@ int rmnet_ipa_set_tether_client_pipe(struct wan_ioctl_set_tether_client_pipe
 
 int rmnet_ipa_query_tethering_stats(struct wan_ioctl_query_tether_stats *data,
 	bool reset);
+
+int rmnet_ipa_query_tethering_stats_all(
+	struct wan_ioctl_query_tether_stats_all *data);
 
 int ipa_qmi_get_data_stats(struct ipa_get_data_stats_req_msg_v01 *req,
 	struct ipa_get_data_stats_resp_msg_v01 *resp);

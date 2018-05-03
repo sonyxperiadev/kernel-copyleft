@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "subsys-restart: %s(): " fmt, __func__
 
@@ -28,7 +33,10 @@
 #include <linux/spinlock.h>
 #include <linux/device.h>
 #include <linux/idr.h>
+#include <linux/debugfs.h>
 #include <linux/interrupt.h>
+#include <linux/poll.h>
+#include <linux/wait.h>
 #include <linux/of_gpio.h>
 #include <linux/cdev.h>
 #include <linux/platform_device.h>
@@ -173,6 +181,10 @@ struct subsys_device {
 	bool keep_alive;
 	int crash_count;
 	struct subsys_soc_restart_order *restart_order;
+	struct dentry *reason_dentry;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
+	int data_ready;
+	wait_queue_head_t subsys_debug_q;
 	bool do_ramdump_on_put;
 	struct cdev char_dev;
 	dev_t dev_no;
@@ -181,6 +193,8 @@ struct subsys_device {
 	int notif_state;
 	struct list_head list;
 };
+
+static void subsys_notify_crash_reason(struct subsys_device *subsys);
 
 static struct subsys_device *to_subsys(struct device *d)
 {
@@ -684,8 +698,14 @@ static int subsystem_powerup(struct subsys_device *dev, void *data)
 
 	ret = dev->desc->powerup(dev->desc);
 	if (ret < 0) {
-		notify_each_subsys_device(&dev, 1, SUBSYS_POWERUP_FAILURE,
-								NULL);
+		if ((system_state == SYSTEM_POWER_OFF) ||
+			(system_state == SYSTEM_RESTART)) {
+			pr_err("[%p]: Powerup error: %s!", current, name);
+			return ret;
+		} else {
+			notify_each_subsys_device(&dev, 1, SUBSYS_POWERUP_FAILURE,
+									NULL);	
+		}
 		if (!dev->desc->ignore_ssr_failure)
 			panic("[%s:%d]: Powerup error: %s!",
 				current->comm, current->pid, name);
@@ -1008,7 +1028,7 @@ static void subsystem_restart_wq_func(struct work_struct *work)
 	spin_lock_irqsave(&track->s_lock, flags);
 	track->p_state = SUBSYS_RESTARTING;
 	spin_unlock_irqrestore(&track->s_lock, flags);
-
+	subsys_notify_crash_reason(dev);
 	/* Collect ram dumps for all subsystems in order here */
 	for_each_subsys_device(list, count, NULL, subsystem_ramdump);
 
@@ -1108,7 +1128,7 @@ int subsystem_restart_dev(struct subsys_device *dev)
 		return -EBUSY;
 	}
 
-	pr_info("Restart sequence requested for %s, restart_level = %s.\n",
+	pr_err("Restart sequence requested for %s, restart_level = %s.\n",
 		name, restart_levels[dev->restart_level]);
 
 	if (disable_restart_work == DISABLE_SSR) {
@@ -1150,6 +1170,19 @@ int subsystem_restart(const char *name)
 	return ret;
 }
 EXPORT_SYMBOL(subsystem_restart);
+
+int subsystem_crash_reason(const char *name, char *msg)
+{
+	struct subsys_device *dev = find_subsys(name);
+
+	if (!dev)
+		return -ENODEV;
+	update_crash_reason(dev, msg, SUBSYS_CRASH_REASON_LEN);
+	subsys_notify_crash_reason(dev);
+
+	return 0;
+}
+EXPORT_SYMBOL(subsystem_crash_reason);
 
 int subsystem_crashed(const char *name)
 {
@@ -1224,6 +1257,146 @@ void notify_proxy_unvote(struct device *device)
 	if (dev)
 		notify_each_subsys_device(&dev, 1, SUBSYS_PROXY_UNVOTE, NULL);
 }
+
+#ifdef CONFIG_DEBUG_FS
+static ssize_t subsys_debugfs_read(struct file *filp, char __user *ubuf,
+		size_t cnt, loff_t *ppos)
+{
+	int r;
+	char buf[40];
+	struct subsys_device *subsys = filp->private_data;
+
+	r = snprintf(buf, sizeof(buf), "%d\n", subsys->count);
+	return simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+}
+
+static ssize_t subsys_debugfs_write(struct file *filp,
+		const char __user *ubuf, size_t cnt, loff_t *ppos)
+{
+	struct subsys_device *subsys = filp->private_data;
+	char buf[10];
+	char *cmp;
+
+	cnt = min(cnt, sizeof(buf) - 1);
+	if (copy_from_user(&buf, ubuf, cnt))
+		return -EFAULT;
+	buf[cnt] = '\0';
+	cmp = strstrip(buf);
+
+	if (!strcmp(cmp, "restart")) {
+		if (subsystem_restart_dev(subsys))
+			return -EIO;
+	} else if (!strcmp(cmp, "get")) {
+		if (subsystem_get(subsys->desc->name))
+			return -EIO;
+	} else if (!strcmp(cmp, "put")) {
+		subsystem_put(subsys);
+	} else {
+		return -EINVAL;
+	}
+
+	return cnt;
+}
+
+static const struct file_operations subsys_debugfs_fops = {
+	.open	= simple_open,
+	.read	= subsys_debugfs_read,
+	.write	= subsys_debugfs_write,
+};
+
+void update_crash_reason(struct subsys_device *subsys,
+				char *smem_reason, int size)
+{
+	memcpy(subsys->crash_reason, smem_reason, size);
+	subsys->data_ready = 1;
+}
+
+static void subsys_notify_crash_reason(struct subsys_device *subsys)
+{
+	if (subsys->data_ready && subsys->restart_level != RESET_SOC)
+		wake_up(&subsys->subsys_debug_q);
+}
+
+static ssize_t subsys_debugfs_reason_read(struct file *filp, char __user *ubuf,
+		size_t cnt, loff_t *ppos)
+{
+	int r;
+	char buf[SUBSYS_CRASH_REASON_LEN];
+	ssize_t size;
+	struct subsys_device *subsys = filp->private_data;
+
+	r = snprintf(buf, sizeof(buf), "%s", subsys->crash_reason);
+	size = simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+	if (*ppos == r) {
+		memset(subsys->crash_reason, 0, sizeof(subsys->crash_reason));
+		subsys->data_ready = 0;
+	}
+
+	return size;
+}
+
+static unsigned int subsys_debugfs_reason_poll(struct file *filp,
+					struct poll_table_struct *wait)
+{
+	struct subsys_device *subsys = filp->private_data;
+	unsigned int mask = 0;
+
+	if (subsys->data_ready)
+		mask |= (POLLIN | POLLRDNORM);
+
+	poll_wait(filp, &subsys->subsys_debug_q, wait);
+	return mask;
+}
+
+static const struct file_operations subsys_debugfs_reason_fops = {
+	.open   = simple_open,
+	.read   = subsys_debugfs_reason_read,
+	.poll   = subsys_debugfs_reason_poll,
+	.llseek = default_llseek,
+};
+
+static struct dentry *subsys_base_dir;
+static struct dentry *subsys_reason_dir;
+
+static int __init subsys_debugfs_init(void)
+{
+	subsys_base_dir = debugfs_create_dir("msm_subsys", NULL);
+	if (subsys_base_dir)
+		subsys_reason_dir = debugfs_create_dir("crash_reason",
+							subsys_base_dir);
+	return !subsys_base_dir ? -ENOMEM : 0;
+}
+
+static void subsys_debugfs_exit(void)
+{
+	if (subsys_reason_dir)
+		debugfs_remove_recursive(subsys_reason_dir);
+	debugfs_remove_recursive(subsys_base_dir);
+}
+
+static int subsys_debugfs_add(struct subsys_device *subsys)
+{
+	if (!subsys_base_dir)
+		return -ENOMEM;
+
+	if (subsys_reason_dir)
+		subsys->reason_dentry = debugfs_create_file(subsys->desc->name,
+				S_IRUGO | S_IWUSR, subsys_reason_dir,
+				subsys, &subsys_debugfs_reason_fops);
+	return !subsys->reason_dentry ? -ENOMEM : 0;
+}
+
+static void subsys_debugfs_remove(struct subsys_device *subsys)
+{
+	debugfs_remove(subsys->reason_dentry);
+}
+#else
+static int __init subsys_debugfs_init(void) { return 0; };
+static void subsys_debugfs_exit(void) { }
+static int subsys_debugfs_add(struct subsys_device *subsys) { return 0; }
+static void subsys_debugfs_remove(struct subsys_device *subsys) { }
+static void subsys_notify_crash_reason(struct subsys_device *subsys) { }
+#endif
 
 static int subsys_device_open(struct inode *inode, struct file *file)
 {
@@ -1664,6 +1837,15 @@ struct subsys_device *subsys_register(struct subsys_desc *desc)
 
 	mutex_init(&subsys->track.lock);
 
+	ret = subsys_debugfs_add(subsys);
+	if (ret) {
+		ida_simple_remove(&subsys_ida, subsys->id);
+		wakeup_source_trash(&subsys->ssr_wlock);
+		kfree(subsys);
+		return ERR_PTR(ret);
+	}
+
+	init_waitqueue_head(&subsys->subsys_debug_q);
 	ret = device_register(&subsys->dev);
 	if (ret) {
 		put_device(&subsys->dev);
@@ -1727,6 +1909,7 @@ err_setup_irqs:
 	if (ofnode)
 		subsys_remove_restart_order(ofnode);
 err_register:
+	subsys_debugfs_remove(subsys);
 	device_unregister(&subsys->dev);
 	return ERR_PTR(ret);
 }
@@ -1800,6 +1983,9 @@ static int __init subsys_restart_init(void)
 	ret = bus_register(&subsys_bus_type);
 	if (ret)
 		goto err_bus;
+	ret = subsys_debugfs_init();
+	if (ret)
+		goto err_debugfs;
 
 	char_class = class_create(THIS_MODULE, "subsys");
 	if (IS_ERR(char_class)) {
@@ -1818,6 +2004,8 @@ static int __init subsys_restart_init(void)
 err_soc:
 	class_destroy(char_class);
 err_class:
+	subsys_debugfs_exit();
+err_debugfs:
 	bus_unregister(&subsys_bus_type);
 err_bus:
 	destroy_workqueue(ssr_wq);
