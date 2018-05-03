@@ -1428,6 +1428,12 @@ static int mtp_ctrlrequest(struct usb_composite_dev *cdev,
 			total = sizeof(*head) + (sizeof(*func) * func_num);
 
 			/* header section */
+			if (w_length < total &&
+				w_length >= (sizeof(*head) + sizeof(*func))) {
+				total = w_length;
+				func_num = (total - sizeof(*head)) /
+					sizeof(*func);
+			}
 			head->dwLength = total;
 			head->bcdVersion = cpu_to_le16(0x0100);
 			head->wIndex = cpu_to_le16(4);
