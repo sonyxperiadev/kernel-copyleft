@@ -15,6 +15,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/device.h>
 #include <linux/ion.h>
@@ -394,7 +399,7 @@ static unsigned long ion_secure_cma_shrinker(struct shrinker *shrinker,
 	 * would cause a deadlock in several places so don't shrink if that
 	 * happens.
 	 */
-	if (!mutex_trylock(&sheap->chunk_lock))
+	if (!mutex_trylock_spin(&sheap->chunk_lock))
 		return -1;
 
 	__ion_secure_cma_shrink_pool(sheap, nr_to_scan);

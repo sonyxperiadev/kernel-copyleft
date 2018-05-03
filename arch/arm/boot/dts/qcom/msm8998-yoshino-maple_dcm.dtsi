@@ -1,0 +1,288 @@
+/* arch/arm64/boot/dts/qcom/msm8998-maple_dcm.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2016 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+#include "msm8998-yoshino-maple_common.dtsi"
+
+&soc {
+	/* I2C: BLSP7 */
+	i2c@c1b5000 { /* BLSP2 QUP1 */
+		felica_ldo@1e {
+			compatible = "rohm,bd7602";
+			reg = <0x1e>;
+		};
+		felica@29 {
+			compatible = "sony,cxd224x";
+			reg = <0x29>;
+			interrupt-parent = <&tlmm>;
+			interrupts = <92 0x2002>;
+			cxd224x,irq_gpio = <&tlmm 92 0>;
+			cxd224x,wake_gpio = <&tlmm 93 0>;
+
+			pinctrl-names = "felica_active","felica_suspend";
+			pinctrl-0 = <&msm_gpio_92>;
+			pinctrl-1 = <&msm_gpio_92>;
+
+			/* Defined in Clock Distribution */
+			clocks = <&clock_gcc clk_ln_bb_clk3_pin>;
+			clock-names = "felica_clk";
+		};
+	};
+
+	felica,pm-ops {
+		compatible = "sony,cxd224x-pm-ops";
+	};
+
+	somc_pinctrl: somc_pinctrl {
+		/*If variant specific default setting is needed,
+		  fill pinctrl-2 value in <variant>.dtsi */
+		pinctrl-2 = <&msm_gpio_12 &msm_gpio_49 &msm_gpio_50 &msm_gpio_51 &msm_gpio_52
+			     &msm_gpio_90 &msm_gpio_91 &msm_gpio_92>;
+	};
+
+	/* SPI: BLSP9 */
+	spi@c1b7000 { /* BLSP2 QUP3 */
+		pinctrl-0 = <&spi_9_active &spi_9_miso_active>;
+		pinctrl-1 = <&spi_9_sleep &spi_9_miso_sleep>;
+		qcom,clk-freq-out = <30000000>;
+		qcom,infinite-mode = <0>;
+		qcom,gpio-clk  = <&tlmm 52 0>;
+		qcom,gpio-cs0  = <&tlmm 51 0>;
+		qcom,gpio-mosi = <&tlmm 49 0>;
+		qcom,gpio-miso = <&tlmm 50 0>;
+		qcom,rt-priority;
+		status = "okay";
+
+		tmm3spi@0 {
+			compatible = "socionext,mn553-spi";
+			reg = <0>;
+			spi-max-frequency = <30000000>;
+			spi-mode = <0>;
+		};
+	};
+
+	dtv_tuner: mn88553 {
+		compatible = "socionext,mn88553";
+		interrupt-parent = <&tlmm>;
+		interrupts = <91 0>;
+		gpios = <&pm8998_gpios 20 0>,  /* DTV_ACTIVE  */
+			<&tlmm 90 0>,  /* DTV_RESET_N */
+			<&tlmm 91 0>;  /* DTV_INT     */
+	};
+
+	tlmm: pinctrl@03400000 {
+		spi_9 {
+			spi_9_active: spi_9_active {
+				qcom,pin-func = <1>;
+				mux {
+					pins = "gpio49", "gpio51", "gpio52";
+					function = "blsp_spi9";
+				};
+
+				config {
+					pins = "gpio49", "gpio51", "gpio52";
+					drive-strength = <2>;
+					bias-disable;
+				};
+			};
+
+			spi_9_sleep: spi_9_sleep {
+				qcom,pin-func = <1>;
+				mux {
+					pins = "gpio49", "gpio51", "gpio52";
+					function = "blsp_spi9";
+				};
+
+				config {
+					pins = "gpio49", "gpio51", "gpio52";
+					drive-strength = <2>;
+					bias-disable;
+				};
+			};
+		};
+
+		spi_9_miso {
+			spi_9_miso_active: spi_9_miso_active {
+				qcom,pin-func = <1>;
+				mux {
+					pins = "gpio50";
+					function = "blsp_spi9";
+				};
+
+				config {
+					pins = "gpio50";
+					drive-strength = <2>;
+					bias-pull-down;
+				};
+			};
+
+			spi_9_miso_sleep: spi_9_miso_sleep {
+				qcom,pin-func = <1>;
+				mux {
+					pins = "gpio50";
+					function = "blsp_spi9";
+				};
+
+				config {
+					pins = "gpio50";
+					drive-strength = <2>;
+					bias-pull-down;
+				};
+			};
+		};
+	};
+};
+
+&pm8998_gpios {
+	/* GPIO_20: DTV_PWR_EN */
+	gpio@d300 {
+		qcom,src-sel = <0>;             /* GPIO */
+		qcom,mode = <1>;                /* Out */
+		qcom,output-type = <0>;         /* CMOS */
+		qcom,vin-sel = <1>;             /* 1.8V */
+		qcom,out-strength = <1>;        /* Low */
+		qcom,invert = <0>;              /* Low */
+		qcom,master-en = <1>;           /* Enable */
+		status = "okay";
+	};
+};
+
+&tlmm {
+	/* GPIO_12 : NC */
+	msm_gpio_12: msm_gpio_12{
+		mux {
+			pins = "gpio12";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio12";
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+	/* GPIO_49 : DTV_SPI_MOSI */
+	msm_gpio_49: msm_gpio_49 {
+		mux {
+			pins = "gpio49";
+			function = "blsp_spi9";
+		};
+
+		config {
+			pins = "gpio49";
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_50 : DTV_SPI_MISO */
+	msm_gpio_50: msm_gpio_50{
+		mux {
+			pins = "gpio50";
+			function = "blsp_spi9";
+		};
+
+		config {
+			pins = "gpio50";
+			drive-strength = <2>;
+			/delete-property/ bias-disable;
+			bias-pull-down;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_51 : DTV_SPI_CS_N */
+	msm_gpio_51: msm_gpio_51{
+		mux {
+			pins = "gpio51";
+			function = "blsp_spi9";
+		};
+
+		config {
+			pins = "gpio51";
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_52 : DTV_SPI_CLK */
+	msm_gpio_52: msm_gpio_52{
+		mux {
+			pins = "gpio52";
+			function = "blsp_spi9";
+		};
+
+		config {
+			pins = "gpio52";
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_90 : DTV_RST_N */
+	msm_gpio_90: msm_gpio_90 {
+		mux {
+			pins="gpio90";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio90";
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+	/* GPIO_91 : DTV_INT */
+	msm_gpio_91: msm_gpio_91 {
+		mux {
+			pins = "gpio91";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio91";
+			drive-strength = <2>;
+			/delete-property/ bias-disable;
+			bias-pull-down;
+			/delete-property/ output-low;
+			input-enable;
+		};
+	};
+
+	/* GPIO_92 : NFC_IRQ/FELICA_INT_N */
+	msm_gpio_92: msm_gpio_92 {
+		mux {
+			pins="gpio92";
+			function = "gpio";
+		};
+
+		config {
+			drive-strength = <2>;
+			/delete-property/ bias-pull-down;
+			bias-disable;
+			input-enable;
+		};
+	};
+};

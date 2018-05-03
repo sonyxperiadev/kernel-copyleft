@@ -12,6 +12,11 @@
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/random.h>
@@ -109,12 +114,14 @@ static void __inet_put_port(struct sock *sk)
 	struct inet_bind_bucket *tb;
 
 	spin_lock(&head->lock);
-	tb = inet_csk(sk)->icsk_bind_hash;
-	__sk_del_bind_node(sk);
-	tb->num_owners--;
-	inet_csk(sk)->icsk_bind_hash = NULL;
-	inet_sk(sk)->inet_num = 0;
-	inet_bind_bucket_destroy(hashinfo->bind_bucket_cachep, tb);
+	if (inet_csk(sk)->icsk_bind_hash) {
+		tb = inet_csk(sk)->icsk_bind_hash;
+		__sk_del_bind_node(sk);
+		tb->num_owners--;
+		inet_csk(sk)->icsk_bind_hash = NULL;
+		inet_sk(sk)->inet_num = 0;
+		inet_bind_bucket_destroy(hashinfo->bind_bucket_cachep, tb);
+	}
 	spin_unlock(&head->lock);
 }
 

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __Q6_ADM_V2_H__
 #define __Q6_ADM_V2_H__
 
@@ -87,6 +92,9 @@ struct msm_pcm_channel_mixer {
 	int channel_weight[ADM_MAX_CHANNELS][ADM_MAX_CHANNELS];
 };
 
+int adm_matrix_mute(int port_id, int session_id, uint32_t ramp_duration,
+		uint32_t mute_flag_ch1, uint32_t mute_flag_ch2);
+
 int srs_trumedia_open(int port_id, int copp_idx, __s32 srs_tech_id,
 		      void *srs_params);
 
@@ -106,6 +114,9 @@ int adm_send_params_v5(int port_id, int copp_idx, char *params,
 
 int adm_dolby_dap_send_params(int port_id, int copp_idx, char *params,
 			      uint32_t params_length);
+
+int adm_ahc_send_params(int port_id, int copp_idx, char *params,
+			uint32_t params_length);
 
 int adm_open(int port, int path, int rate, int mode, int topology,
 			   int perf_mode, uint16_t bits_per_sample,
