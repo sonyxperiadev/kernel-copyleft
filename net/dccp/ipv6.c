@@ -552,6 +552,9 @@ static struct sock *dccp_v6_request_recv_sock(struct sock *sk,
 	newnp->ipv6_ac_list = NULL;
 	newnp->ipv6_fl_list = NULL;
 
+	newnp->ipv6_mc_list = NULL;
+	newnp->ipv6_ac_list = NULL;
+	newnp->ipv6_fl_list = NULL;
 	/* Clone pktoptions received with SYN */
 	newnp->pktoptions = NULL;
 	if (ireq->pktopts != NULL) {

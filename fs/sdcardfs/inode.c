@@ -17,6 +17,11 @@
  * under the terms of the Apache 2.0 License OR version 2 of the GNU
  * General Public License.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "sdcardfs.h"
 #include <linux/fs_struct.h>
@@ -768,9 +773,13 @@ static int sdcardfs_setattr(struct vfsmount *mnt, struct dentry *dentry, struct 
 	 * afterwards in the other cases: we fsstack_copy_inode_size from
 	 * the lower level.
 	 */
+	if (current->mm)
+		down_write(&current->mm->mmap_sem);
 	if (ia->ia_valid & ATTR_SIZE) {
 		err = inode_newsize_ok(&tmp, ia->ia_size);
 		if (err) {
+			if (current->mm)
+				up_write(&current->mm->mmap_sem);
 			goto out;
 		}
 		truncate_setsize(inode, ia->ia_size);
@@ -793,6 +802,8 @@ static int sdcardfs_setattr(struct vfsmount *mnt, struct dentry *dentry, struct 
 	err = notify_change2(lower_mnt, lower_dentry, &lower_ia, /* note: lower_ia */
 			NULL);
 	mutex_unlock(&lower_dentry->d_inode->i_mutex);
+	if (current->mm)
+		up_write(&current->mm->mmap_sem);
 	if (err)
 		goto out;
 
@@ -858,6 +869,8 @@ static int sdcardfs_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	if (err)
 		goto out;
 	sdcardfs_copy_and_fix_attrs(dentry->d_inode,
+			      lower_path.dentry->d_inode);
+	fsstack_copy_inode_size(dentry->d_inode,
 			      lower_path.dentry->d_inode);
 	err = sdcardfs_fillattr(mnt, dentry->d_inode, stat);
 	stat->blocks = lower_stat.blocks;

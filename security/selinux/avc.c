@@ -13,6 +13,11 @@
  *	it under the terms of the GNU General Public License version 2,
  *	as published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/types.h>
 #include <linux/stddef.h>
 #include <linux/kernel.h>
@@ -33,6 +38,10 @@
 #include "avc.h"
 #include "avc_ss.h"
 #include "classmap.h"
+#ifdef CONFIG_SECURITY_SELINUX_TRAP
+#include "trap.h"
+const int secclass_map_size = ARRAY_SIZE(secclass_map);
+#endif
 
 #define AVC_CACHE_SLOTS			512
 #define AVC_DEF_CACHE_THRESHOLD		512
@@ -718,6 +727,35 @@ static void avc_audit_pre_callback(struct audit_buffer *ab, void *a)
 }
 
 /**
+ * avc_dump_extra_info - add extra info about task and audit result
+ * @ab: the audit buffer
+ * @ad: audit_data
+ */
+#ifdef CONFIG_SECURITY_SELINUX_AVC_EXTRA_INFO
+static void avc_dump_extra_info(struct audit_buffer *ab,
+		struct common_audit_data *ad)
+{
+	struct task_struct *tsk = current;
+
+	if (tsk && tsk->pid) {
+		audit_log_format(ab, " ppid=%d pcomm=", tsk->parent->pid);
+		audit_log_untrustedstring(ab, tsk->parent->comm);
+
+		if (tsk->group_leader->pid != tsk->pid) {
+			audit_log_format(ab, " pgid=%d pgcomm=",
+					tsk->group_leader->pid);
+			audit_log_untrustedstring(ab,
+					tsk->group_leader->comm);
+		} else if (tsk->parent->group_leader->pid) {
+			audit_log_format(ab, " pgid=%d pgcomm=",
+					tsk->parent->group_leader->pid);
+			audit_log_untrustedstring(ab,
+					tsk->parent->group_leader->comm);
+		}
+	}
+}
+#endif
+/**
  * avc_audit_post_callback - SELinux specific information
  * will be called by generic audit code
  * @ab: the audit buffer
@@ -734,6 +772,14 @@ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
 		audit_log_format(ab, " permissive=%u",
 				 ad->selinux_audit_data->result ? 0 : 1);
 	}
+
+#ifdef CONFIG_SECURITY_SELINUX_AVC_EXTRA_INFO
+	avc_dump_extra_info(ab, ad);
+#endif
+#ifdef CONFIG_SECURITY_SELINUX_TRAP
+	if (ad->selinux_audit_data->denied && ad->selinux_audit_data->result)
+		trap_selinux_error(ad);
+#endif
 }
 
 /* This is the slow part of avc audit with big stack footprint */

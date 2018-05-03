@@ -114,6 +114,26 @@ config HBTP_INPUT_SECURE_TOUCH
 	  Say Y to enable this functionality.
 	  If unsure, say N.
 
+config INPUT_BU520X1NVX
+	tristate "BU520X1NVX driver support"
+	default n
+	help
+	  Say Y here
+	  if you want to
+	  support BU520X1NVX
+	  as bipolar detection device.
+
+config INPUT_HBTP_INPUT
+	tristate "HBTP input driver support"
+	help
+	  This option enables an input driver for the host based touch
+	  processing.
+
+	  Say Y to enable HBTP input driver.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called hbtp_input.
+
 config INPUT_PCSPKR
 	tristate "PC Speaker support"
 	depends on PCSPKR_PLATFORM
@@ -779,4 +799,9 @@ config INPUT_DRV2667_HAPTICS
 
 source "drivers/input/misc/ots_pat9125/Kconfig"
 
+config FPC1145_PLATFORM
+	tristate "Platform FPC1145 finger print driver"
+	default n
+	help
+	  Select this module to enable FPC1145 tee finger print driver
 endif

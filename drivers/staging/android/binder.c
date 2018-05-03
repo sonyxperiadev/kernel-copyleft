@@ -14,6 +14,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  * Locking overview
@@ -2302,7 +2307,6 @@ static void binder_transaction_buffer_release(struct binder_proc *proc,
 			struct flat_binder_object *fp;
 			struct binder_ref_data rdata;
 			int ret;
-
 			fp = to_flat_binder_object(hdr);
 			ret = binder_dec_ref_for_handle(proc, fp->handle,
 				hdr->type == BINDER_TYPE_HANDLE, &rdata);

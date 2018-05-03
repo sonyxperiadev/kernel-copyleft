@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
@@ -22,6 +27,10 @@
 #include <linux/msm-bus.h>
 #include <linux/msm-bus-board.h>
 #include "mdss_mdp_pp_cache_config.h"
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+#include "mdss_dsi_panel_driver.h"
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 struct mdp_csc_cfg mdp_csc_8bit_convert[MDSS_MDP_MAX_CSC] = {
 	[MDSS_MDP_CSC_YUV2RGB_601L] = {
@@ -3581,9 +3590,15 @@ static void pp_update_pcc_regs(char __iomem *addr,
 	writel_relaxed(cfg_ptr->b.rgb_1, addr + 8);
 }
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+int mdss_mdp_pcc_config(struct msm_fb_data_type *mfd,
+				struct mdp_pcc_cfg_data *config,
+				u32 *copyback, u32 copy_from_kernel)
+#else
 int mdss_mdp_pcc_config(struct msm_fb_data_type *mfd,
 				struct mdp_pcc_cfg_data *config,
 				u32 *copyback)
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 {
 	int ret = 0;
 	u32 disp_num, dspp_num = 0;
@@ -3631,8 +3646,14 @@ int mdss_mdp_pcc_config(struct msm_fb_data_type *mfd,
 				goto pcc_clk_off;
 			}
 			addr += mdata->pp_block_off.dspp_pcc_off;
-			ret = pp_ops[PCC].pp_get_config(addr, config,
-					DSPP, disp_num);
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			if (copy_from_kernel)
+				ret = __pp_pcc_get_config(addr, config,
+							  DSPP, disp_num);
+			else
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+				ret = pp_ops[PCC].pp_get_config(addr, config,
+								DSPP, disp_num);
 			if (ret)
 				pr_err("pcc get config failed %d\n", ret);
 			goto pcc_clk_off;
@@ -3650,7 +3671,12 @@ pcc_clk_off:
 			res_cache.block = DSPP;
 			res_cache.mdss_pp_res = mdss_pp_res;
 			res_cache.pipe_res = NULL;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			ret = pp_pcc_cache_params(config, &res_cache, copy_from_kernel);
+#else
 			ret = pp_pcc_cache_params(config, &res_cache);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+
 			if (ret) {
 				pr_err("pcc config failed version %d ret %d\n",
 					config->version, ret);
@@ -7010,6 +7036,9 @@ int mdss_mdp_pp_sspp_config(struct mdss_mdp_pipe *pipe)
 	struct mdp_pp_cache_res cache_res;
 	u32 len = 0;
 	int ret = 0;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	u32 copy_from_kernel = 0;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	if (!pipe) {
 		pr_err("invalid params, pipe %pK\n", pipe);
@@ -7110,8 +7139,13 @@ int mdss_mdp_pp_sspp_config(struct mdss_mdp_pipe *pipe)
 	}
 	if (pipe->pp_cfg.config_ops & MDP_OVERLAY_PP_PCC_CFG
 	    && pp_ops[PCC].pp_set_config) {
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		ret = pp_pcc_cache_params(&pipe->pp_cfg.pcc_cfg_data,
+					  &cache_res, copy_from_kernel);
+#else
 		ret = pp_pcc_cache_params(&pipe->pp_cfg.pcc_cfg_data,
 					  &cache_res);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 		if (ret) {
 			pr_err("failed to cache the pcc params ret %d\n", ret);
 			goto exit_fail;
