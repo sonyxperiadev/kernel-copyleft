@@ -5,6 +5,11 @@
  * Copyright 2013-2014  Intel Mobile Communications GmbH
  * Copyright 2015	Intel Deutschland GmbH
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/if.h>
 #include <linux/module.h>
@@ -4019,11 +4024,9 @@ static bool nl80211_put_sta_rate(struct sk_buff *msg, struct rate_info *info,
 	bitrate = cfg80211_calculate_bitrate(info);
 	/* report 16-bit bitrate only if we can */
 	bitrate_compat = bitrate < (1UL << 16) ? bitrate : 0;
-	if (bitrate > 0 &&
-	    nla_put_u32(msg, NL80211_RATE_INFO_BITRATE32, bitrate))
+	if (nla_put_u32(msg, NL80211_RATE_INFO_BITRATE32, bitrate))
 		return false;
-	if (bitrate_compat > 0 &&
-	    nla_put_u16(msg, NL80211_RATE_INFO_BITRATE, bitrate_compat))
+	if (nla_put_u16(msg, NL80211_RATE_INFO_BITRATE, bitrate_compat))
 		return false;
 
 	switch (info->bw) {

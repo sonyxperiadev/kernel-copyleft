@@ -7,6 +7,11 @@
  *
  *  Host driver specific definitions.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_HOST_H
 #define LINUX_MMC_HOST_H
 
@@ -24,7 +29,10 @@
 #include <linux/mmc/pm.h>
 #include <linux/mmc/ring_buffer.h>
 
+/* Default idle timeout for MMC devices: 3 seconds. */
 #define MMC_AUTOSUSPEND_DELAY_MS	3000
+/* Default idle timeout for SD cards: 5 minutes. */
+#define MMC_SDCARD_AUTOSUSPEND_DELAY_MS 30000
 
 struct mmc_ios {
 	unsigned int	clock;			/* clock rate */

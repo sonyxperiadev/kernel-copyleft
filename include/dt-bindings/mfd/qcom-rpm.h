@@ -1,6 +1,11 @@
 /*
  * This header provides constants for the Qualcomm RPM bindings.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _DT_BINDINGS_MFD_QCOM_RPM_H
 #define _DT_BINDINGS_MFD_QCOM_RPM_H

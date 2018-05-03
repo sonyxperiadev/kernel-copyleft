@@ -31,6 +31,11 @@
  *   in normal mode for loads > 10mA and in IDLE mode for load <= 10mA.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __LINUX_REGULATOR_CONSUMER_H_
 #define __LINUX_REGULATOR_CONSUMER_H_
@@ -163,6 +168,18 @@ struct regulator_bulk_data {
 	int ret;
 };
 
+/**
+ * struct regulator_ocp_notification: event notification structure
+ * @notify: pointer to client function to call when ocp event is detected.
+ *          notify function runs in interrupt context.
+ * @ctxt: client-specific context pointer
+ *
+ */
+struct regulator_ocp_notification {
+	void (*notify)(void *);
+	void *ctxt;
+};
+
 #if defined(CONFIG_REGULATOR)
 
 /* regulator get and put */
@@ -259,6 +276,9 @@ int regulator_get_hardware_vsel_register(struct regulator *regulator,
 					 unsigned *vsel_mask);
 int regulator_list_hardware_vsel(struct regulator *regulator,
 				 unsigned selector);
+/* regulator register ocp notification */
+int regulator_register_ocp_notification(struct regulator *regulator,
+			struct regulator_ocp_notification *ocp_notification);
 
 /* regulator notifier block */
 int regulator_register_notifier(struct regulator *regulator,
@@ -521,6 +541,13 @@ static inline int regulator_list_hardware_vsel(struct regulator *regulator,
 					       unsigned selector)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline int regulator_register_ocp_notification(
+			struct regulator *regulator,
+			struct regulator_ocp_notification *ocp_notification)
+{
+	return 0;
 }
 
 static inline int regulator_register_notifier(struct regulator *regulator,
