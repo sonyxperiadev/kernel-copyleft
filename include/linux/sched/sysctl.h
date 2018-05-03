@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _SCHED_SYSCTL_H
 #define _SCHED_SYSCTL_H
 
@@ -61,8 +66,6 @@ extern unsigned int sysctl_sched_upmigrate_pct;
 extern unsigned int sysctl_sched_downmigrate_pct;
 extern int sysctl_sched_upmigrate_min_nice;
 extern unsigned int sysctl_sched_boost;
-extern unsigned int sysctl_sched_small_wakee_task_load_pct;
-extern unsigned int sysctl_sched_big_waker_task_load_pct;
 extern unsigned int sysctl_sched_prefer_sync_wakee_to_waker;
 
 #ifdef CONFIG_SCHED_QHMP

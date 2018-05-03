@@ -13,6 +13,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __ASM_CACHE_H
 #define __ASM_CACHE_H
 
@@ -31,6 +36,8 @@
 #define ARCH_DMA_MINALIGN	(128)
 
 #ifndef __ASSEMBLY__
+
+#define __read_mostly __attribute__((__section__(".data..read_mostly")))
 
 static inline int cache_line_size(void)
 {

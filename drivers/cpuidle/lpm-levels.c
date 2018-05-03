@@ -134,13 +134,13 @@ s32 msm_cpuidle_get_deep_idle_latency(void)
 void lpm_suspend_wake_time(uint64_t wakeup_time)
 {
 	if (wakeup_time <= 0) {
-		suspend_wake_time = msm_pm_sleep_time_override;
+		suspend_wake_time = msm_pm_sleep_time_override * MSEC_PER_SEC;
 		return;
 	}
 
 	if (msm_pm_sleep_time_override &&
 		(msm_pm_sleep_time_override < wakeup_time))
-		suspend_wake_time = msm_pm_sleep_time_override;
+		suspend_wake_time = msm_pm_sleep_time_override * MSEC_PER_SEC;
 	else
 		suspend_wake_time = wakeup_time;
 }
@@ -525,7 +525,7 @@ static uint64_t get_cluster_sleep_time(struct lpm_cluster *cluster,
 		if (!suspend_wake_time)
 			return ~0ULL;
 		else
-			return USEC_PER_SEC * suspend_wake_time;
+			return USEC_PER_MSEC * suspend_wake_time;
 	}
 
 	cpumask_and(&online_cpus_in_cluster,

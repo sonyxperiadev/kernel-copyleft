@@ -1383,7 +1383,8 @@ static int __cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 	}
 	up_write(&policy->rwsem);
 
-	kobject_uevent(&policy->kobj, KOBJ_ADD);
+/*	kobject_uevent(&policy->kobj, KOBJ_ADD); */
+	kobject_uevent(&dev->kobj, KOBJ_CHANGE);
 
 	up_read(&cpufreq_rwsem);
 

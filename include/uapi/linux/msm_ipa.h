@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _UAPI_MSM_IPA_H_
 #define _UAPI_MSM_IPA_H_
 
@@ -460,8 +465,18 @@ enum ipa_vlan_l2tp_event {
 	IPA_VLAN_L2TP_EVENT_MAX,
 };
 
-#define IPA_EVENT_MAX_NUM (IPA_VLAN_L2TP_EVENT_MAX)
-#define IPA_EVENT_MAX ((int)IPA_EVENT_MAX_NUM)
+enum ipa_quota_event {
+	IPA_QUOTA_REACH = IPA_VLAN_L2TP_EVENT_MAX,
+	IPA_QUOTA_EVENT_MAX,
+};
+
+enum ipa_ssr_event {
+	IPA_SSR_BEFORE_SHUTDOWN = IPA_QUOTA_EVENT_MAX,
+	IPA_SSR_AFTER_POWERUP,
+	IPA_SSR_EVENT_MAX,
+};
+
+#define IPA_EVENT_MAX_NUM (IPA_SSR_EVENT_MAX)
 
 /**
  * enum ipa_rm_resource_name - IPA RM clients identification names

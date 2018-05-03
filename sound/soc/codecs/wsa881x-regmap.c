@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/regmap.h>
 #include <linux/device.h>
@@ -174,7 +179,7 @@ static struct reg_default wsa881x_rev_2_0[] = {
 	{WSA881X_SPKR_BIAS_INT, 0x5F},
 	{WSA881X_SPKR_BIAS_PSRR, 0x44},
 	{WSA881X_BOOST_PS_CTL, 0xA0},
-	{WSA881X_BOOST_PRESET_OUT1, 0xB7},
+	{WSA881X_BOOST_PRESET_OUT1, 0x37},
 	{WSA881X_BOOST_LOOP_STABILITY, 0x8D},
 	{WSA881X_SPKR_PROT_ATEST2, 0x02},
 	{WSA881X_BONGO_RESRV_REG1, 0x5E},
