@@ -41,6 +41,9 @@
 
 #include "gadget_chips.h"
 
+/* Wait time (ms) before sending CONFIGURED uevent */
+#define WAIT_TIME_BEFORE_SENDING_CONFIGURED		(50)
+
 #include "f_fs.c"
 #ifdef CONFIG_SND_PCM
 #include "f_audio_source.c"
