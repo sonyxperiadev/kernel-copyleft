@@ -5,6 +5,7 @@
 ** Copyright (C) 2008 Google, Inc.
 **
 ** Robert Love <rlove@google.com>
+** Copyright (C) 2014 Foxconn International Holdings, Ltd. All rights reserved.
 **
 ** This software is licensed under the terms of the GNU General Public
 ** License version 2, as published by the Free Software Foundation, and
@@ -365,8 +366,14 @@ static int ashmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	if (!sc->nr_to_scan)
 		return lru_count;
 
-	if (!mutex_trylock(&ashmem_mutex))
+	/* CORE-HC-Avoid_Deadlock-01+[ */
+	if ((&ashmem_mutex)->owner == current)
+	{
+		pr_err("Skip locking ashmem_mutex to avoid deadlock\n");
 		return -1;
+	}
+	mutex_lock(&ashmem_mutex);
+	/* CORE-HC-Avoid_Deadlock-01+] */
 
 	list_for_each_entry_safe(range, next, &ashmem_lru_list, lru) {
 		struct inode *inode = range->asma->file->f_dentry->d_inode;

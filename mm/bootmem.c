@@ -1,6 +1,7 @@
 /*
  *  bootmem - A boot-time physical memory allocator and configurator
  *
+ *  Copyright(C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *  Copyright (C) 1999 Ingo Molnar
  *                1999 Kanoj Sarcar, SGI
  *                2008 Johannes Weiner
@@ -434,6 +435,9 @@ int __init reserve_bootmem(unsigned long addr, unsigned long size,
 
 	start = PFN_DOWN(addr);
 	end = PFN_UP(addr + size);
+    /* FIH-CORE-TH-DebugToolPorting-00*[ */
+	printk(KERN_INFO "Memory reserve start 0x%08X size 0x%08X flag %d", (int)addr, (int)size, flags);
+    /* FIH-CORE-TH-DebugToolPorting-00*] */
 
 	return mark_bootmem(start, end, 1, flags);
 }

@@ -36,6 +36,7 @@ enum {
 	MEMTYPE_SMI,
 	MEMTYPE_EBI0,
 	MEMTYPE_EBI1,
+	MEMTYPE_EBI1_FIH,   // BSP-LC-Reserve_Mem-00 +
 	MEMTYPE_MAX,
 };
 

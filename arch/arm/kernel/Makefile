@@ -85,3 +85,6 @@ obj-$(CONFIG_DEBUG_LL)	+= debug.o
 obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 
 extra-y := $(head-y) init_task.o vmlinux.lds
+
+# FIH-CORE-TH-POC-00+
+obj-y	+= fih_sw_info.o

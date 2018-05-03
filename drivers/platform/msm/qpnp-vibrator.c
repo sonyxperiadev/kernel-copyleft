@@ -164,6 +164,8 @@ static void qpnp_vib_enable(struct timed_output_dev *dev, int value)
 	mutex_lock(&vib->lock);
 	hrtimer_cancel(&vib->vib_timer);
 
+	pr_info("qpnp_vib_enable level: %d, value: %d.\n", vib->vtg_level, value);
+	
 	if (value == 0)
 		vib->state = 0;
 	else {

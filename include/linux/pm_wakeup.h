@@ -3,6 +3,7 @@
  *
  *  Copyright (C) 2008 Alan Stern
  *  Copyright (C) 2010 Rafael J. Wysocki, Novell Inc.
+ *  Copyright (C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -78,6 +79,20 @@ static inline bool device_may_wakeup(struct device *dev)
 {
 	return dev->power.can_wakeup && !!dev->power.wakeup;
 }
+
+//CORE-BH-PMSWakelockInfo-01*[
+#ifdef CONFIG_FIH_DUMP_WAKELOCK
+struct pms_wake_lock {
+	struct list_head	link;
+	char				*pid;
+	char				*tag;
+	ktime_t				acquire_time; //CORE-BH-PMSWakelockInfo-02+
+};
+
+ void add_pms_wakelock_info(char *pid, char * tag);
+ void remove_pms_wakelock_info(char *pid, char * tag); //CORE-BH-PMSWakelockInfo-02*
+ #endif
+//CORE-BH-PMSWakelockInfo-01*]
 
 /* drivers/base/power/wakeup.c */
 extern void wakeup_source_prepare(struct wakeup_source *ws, const char *name);

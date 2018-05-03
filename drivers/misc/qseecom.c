@@ -1508,6 +1508,17 @@ static int qseecom_send_modfd_cmd(struct qseecom_dev_handle *data,
 		pr_err("response buffer address not within shared bufffer\n");
 		return -EINVAL;
 	}
+	/*[All][Main][security][DMS05827422][WI41991][CR636633][oliverchen]Security Vulnerabilities
+
+-80-N4130-13_A  start*/
+		if (req.cmd_req_len == 0 || req.cmd_req_len > data->client.sb_length ||
+					req.resp_len > data->client.sb_length) {
+							pr_err("cmd or response buffer length not valid\n");
+									return -EINVAL;
+										}
+	/*[All][Main][security][DMS05827422][WI41991][CR636633][oliverchen]Security Vulnerabilities
+
+-80-N4130-13_A  end*/				
 	send_cmd_req.cmd_req_buf = req.cmd_req_buf;
 	send_cmd_req.cmd_req_len = req.cmd_req_len;
 	send_cmd_req.resp_buf = req.resp_buf;

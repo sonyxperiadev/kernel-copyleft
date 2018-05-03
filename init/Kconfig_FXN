@@ -1,0 +1,362 @@
+menuconfig FIH_CONFIG_GROUP
+    bool "FIH Configurations Group"
+    default y
+    help
+        Turn on this group to enable FIH's configurations menu
+ 
+if FIH_CONFIG_GROUP
+    comment "FIH Project Flags for FIH_CONFIG_GROUP"
+
+    choice
+        prompt "Select a project name"
+        default FIH_PROJECT_SEAGULL_LTE
+
+        config FIH_PROJECT_SEAGULL_LTE
+            bool "01. FIH_PROJECT_SEAGULL_LTE"
+            help
+                Enable the support for FIH_PROJECT_SEAGULL_LTE flag
+
+        config FIH_PROJECT_SEAGULL_3G
+            bool "01. FIH_PROJECT_SEAGULL_3G"
+            help
+                Enable the support for FIH_PROJECT_SEAGULL_3G flag
+
+    endchoice
+
+    # --- FIH_PROJECT_SEAGULL_LTE{-------------------------------------------------- START
+    # ***********************************************************    
+    # Project configurations for FIH_PROJECT_SEAGULL_LTE
+    # ***********************************************************
+    menu "Configurations for FIH_PROJECT_SEAGULL_LTE"
+        depends on FIH_PROJECT_SEAGULL_LTE
+        config FIH_FTM
+            bool "FIH_FTM"
+            default n
+            help
+                Enable/Disable the build flag FIH_FTM.
+
+        config FIH_MACH_I4
+            bool "FIH_MACH_I4"
+            depends on FIH_PROJECT_SEAGULL_LTE
+            default y
+            help
+                Enable/Disable the build flag FIH_MACH_I4.
+                
+        config FIH_SEMC_S1
+            bool "FIH_SEMC_S1"
+            depends on FIH_PROJECT_SEAGULL_LTE
+            default n
+            help
+                Enable/Disable SEMC S1 boot.
+
+        config FIH_USER_DEBUG
+            bool "FIH_USER_DEBUG"
+            depends on FIH_PROJECT_SEAGULL_LTE
+            default n
+            help
+                set if build variant is user_debug
+				
+	config PN544_I2C_NFC
+		tristate "PN544 NFC driver"
+		depends on I2C
+		select CRC_CCITT
+		default n
+		---help---
+	 	Say yes if you want PN544 Near Field Communication driver.
+		This is for i2c connected version. If unsure, say N here.
+		To compile this driver as a module, choose m here. The module will
+		be called pn544.
+		
+    # PERI-AC-SENSOR-00+[
+        config SENSORS_BMA2X2
+        	tristate "BMA255/BMA250E/BMA222E/BMA280 acceleration sensor support"
+        	depends on I2C=y
+          default y
+        	help
+        	  If you say yes here you get support for Bosch Sensortec's 
+        	  acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
+        	  
+        config SENSORS_BMM050
+        	tristate "BMM050 Magnetic Sensor Driver"
+        	depends on I2C
+          default y
+        	help
+        	 BMM050 Magnetic Sensor Driver implemented by Bosch-Sensortec.
+        	 
+        config SENSORS_BMG160
+        	tristate "BMG160 Gyroscope Driver"
+        	depends on I2C
+          default y
+        	help
+        	 BMG160 Gyroscope Driver implemented by Bosch-Sensortec.
+
+       config SENSORS_ALS_PRX_STK3X1X
+        	tristate "SensorTek stk3x1x"
+        	depends on I2C
+          default y
+        	help
+        	 Support for stk3x1x	
+    # PERI-AC-SENSOR-00+] 
+    # MM-SL-BringUpCameraSensorIMX134-00+[        
+        config IMX134
+            bool "Sensor IMX134 (BAYER 8M)"
+	          depends on MSMB_CAMERA
+	          default n
+	          help
+		            This driver supports IMX134 cameras from Sony.
+    # MM-SL-BringUpCameraSensorIMX134-00+]                
+
+    # MM-SL-BringUpCameraSensorIMX188-00+[        
+        config IMX188
+            bool "Sensor IMX188 (BAYER 1M)"
+	          depends on MSMB_CAMERA
+	          default n
+	          help
+		            This driver supports IMX188 front cameras from Sony.
+    # MM-SL-BringUpCameraSensorIMX188-00+]   
+
+    # PERI-AH-LED-00+[
+        config FIH_PWM_LED
+            bool "FIH PWM LED"
+            default y
+            help
+             Support for PWM LED of FIH.
+    # PERI-AH-LED-00+]
+    
+        # /*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+[ */
+        config FIH_SUSPEND_RESUME_LOG
+            bool "FIH LOG about SUSPEND/RESUME"
+            depends on FIH_CONFIG_GROUP
+            default n
+            help
+                Enable suspend and resume log support
+				
+        #CORE-EL-sleep-func-00+[
+        config FIH_HR_MSLEEP
+            bool "FIH_HR_MSLEEP"
+            depends on FIH_CONFIG_GROUP
+            default y
+            help
+                Provide more efficient sleep function.
+        #CORE-EL-sleep-func-00+]
+
+        #/*CORE-SC-PMSWakelockInfo-00+[*/
+        config FIH_DUMP_WAKELOCK
+            bool "FIH DUMP WAKELOCK"
+            depends on FIH_CONFIG_GROUP
+            default n
+            help
+                Enable to dump wakelock if it active.  
+        #/*CORE-SC-PMSWakelockInfo-00+]*/
+
+        # FIH-KERNEL-HC-dynamically_disable_UART-00+[
+        config FIH_REMOVE_SERIAL_DYNAMICALLY
+            bool "turn off serial port dynamically"
+            default n
+            help
+                turn off serial port dynamically
+        # FIH-KERNEL-HC-dynamically_disable_UART-00+]
+
+        # FIH-KERNEL-HC-Force_Trigger_Panic-00+[
+        config FIH_FORCE_TRIGGER_PANIC
+            bool "Force trigger panic"
+            default n
+            help
+                Say Y here if you want to trigger panic 
+                by pressing power key more than 15s.
+        # FIH-KERNEL-HC-Force_Trigger_Panic-00+]
+
+        # FIH-SW3-KERNEL-TH-add_last_alog-00+[
+        config FEATURE_FIH_SW3_LAST_ALOG
+            bool "RAM console for last alog"
+            depends on FIH_CONFIG_GROUP
+            default n
+            help
+                Enable RAM console for last alog
+        # FIH-SW3-KERNEL-TH-add_last_alog-00+]
+		# FIH-SW3-KERNEL-TH-buildtype_bebug-00+]
+		config FEATURE_FIH_SW3_BUILDTYPE_DEBUG
+            bool "enable debug mode for printk"
+            default n
+            help
+                if build debug, printk will not lost log when resume
+		# FIH-SW3-KERNEL-TH-buildtype_bebug-00+]
+    	# CORE-BH-RPMStatsLog-00+[
+        config FIH_FEATURE_RPM_STATS_LOG
+            bool "FIH RPM STATS LOG"
+            default n
+            help
+             Support RPM Stats log.
+    	# CORE-BH-RPMStatsLog-00+]
+    endmenu
+    # --- FIH_PROJECT_SEAGULL_LTE}-------------------------------------------------- END
+
+
+    # --- FIH_PROJECT_SEAGULL_3G{-------------------------------------------------- START
+    # ***********************************************************    
+    # Project configurations for FIH_PROJECT_SEAGULL_3G
+    # ***********************************************************
+    menu "Configurations for FIH_PROJECT_SEAGULL_3G"
+        depends on FIH_PROJECT_SEAGULL_3G
+        config FIH_FTM
+            bool "FIH_FTM"
+            default n
+            help
+                Enable/Disable the build flag FIH_FTM.
+
+        config FIH_MACH_I4_3G
+            bool "FIH_MACH_I4_3G"
+            depends on FIH_PROJECT_SEAGULL_3G
+            default y
+            help
+                Enable/Disable the build flag FIH_MACH_I4_3G.
+                
+        config FIH_SEMC_S1
+            bool "FIH_SEMC_S1"
+            depends on FIH_PROJECT_SEAGULL_3G
+            default n
+            help
+                Enable/Disable SEMC S1 boot.
+
+        config FIH_USER_DEBUG
+            bool "FIH_USER_DEBUG"
+            depends on FIH_PROJECT_SEAGULL_3G
+            default n
+            help
+                set if build variant is user_debug
+				
+       config PN544_I2C_NFC
+               tristate "PN544 NFC driver"
+               depends on I2C
+               select CRC_CCITT
+               default n
+               ---help---
+               Say yes if you want PN544 Near Field Communication driver.
+               This is for i2c connected version. If unsure, say N here.
+               To compile this driver as a module, choose m here. The module will
+               be called pn544.
+               
+    # PERI-AC-SENSOR-00+[
+        config SENSORS_BMA2X2
+               tristate "BMA255/BMA250E/BMA222E/BMA280 acceleration sensor support"
+               depends on I2C=y
+          default y
+               help
+                 If you say yes here you get support for Bosch Sensortec's 
+                 acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
+                 
+        config SENSORS_BMM050
+               tristate "BMM050 Magnetic Sensor Driver"
+               depends on I2C
+          default y
+               help
+                BMM050 Magnetic Sensor Driver implemented by Bosch-Sensortec.
+                
+        config SENSORS_BMG160
+               tristate "BMG160 Gyroscope Driver"
+               depends on I2C
+          default y
+               help
+                BMG160 Gyroscope Driver implemented by Bosch-Sensortec.
+
+       config SENSORS_ALS_PRX_STK3X1X
+               tristate "SensorTek stk3x1x"
+               depends on I2C
+          default y
+               help
+                Support for stk3x1x    
+    # PERI-AC-SENSOR-00+] 
+    # MM-SL-BringUpCameraSensorIMX134-00+[        
+        config IMX134
+            bool "Sensor IMX134 (BAYER 8M)"
+                 depends on MSMB_CAMERA
+                 default n
+                 help
+                           This driver supports IMX134 cameras from Sony.
+    # MM-SL-BringUpCameraSensorIMX134-00+]                
+
+    # MM-SL-BringUpCameraSensorIMX188-00+[        
+        config IMX188
+            bool "Sensor IMX188 (BAYER 1M)"
+                 depends on MSMB_CAMERA
+                 default n
+                 help
+                           This driver supports IMX188 front cameras from Sony.
+    # MM-SL-BringUpCameraSensorIMX188-00+]   
+
+    # PERI-AH-LED-00+[
+        config FIH_PWM_LED
+            bool "FIH PWM LED"
+            default y
+            help
+             Support for PWM LED of FIH.
+    # PERI-AH-LED-00+]
+    
+        # /*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+[ */
+        config FIH_SUSPEND_RESUME_LOG
+            bool "FIH LOG about SUSPEND/RESUME"
+            depends on FIH_CONFIG_GROUP
+            default n
+            help
+                Enable suspend and resume log support
+
+        #CORE-EL-sleep-func-00+[
+        config FIH_HR_MSLEEP
+            bool "FIH_HR_MSLEEP"
+            depends on FIH_CONFIG_GROUP
+            default y
+            help
+                Provide more efficient sleep function.
+        #CORE-EL-sleep-func-00+]
+				
+        #/*CORE-SC-PMSWakelockInfo-00+[*/
+        config FIH_DUMP_WAKELOCK
+            bool "FIH DUMP WAKELOCK"
+            depends on FIH_CONFIG_GROUP
+            default n
+            help
+                Enable to dump wakelock if it active.  
+        #/*CORE-SC-PMSWakelockInfo-00+]*/
+
+        # FIH-KERNEL-HC-dynamically_disable_UART-00+[
+        config FIH_REMOVE_SERIAL_DYNAMICALLY
+            bool "turn off serial port dynamically"
+            default n
+            help
+                turn off serial port dynamically
+        # FIH-KERNEL-HC-dynamically_disable_UART-00+]
+
+        # FIH-KERNEL-HC-Force_Trigger_Panic-00+[
+        config FIH_FORCE_TRIGGER_PANIC
+            bool "Force trigger panic"
+            default n
+            help
+                Say Y here if you want to trigger panic 
+                by pressing power key more than 15s.
+        # FIH-KERNEL-HC-Force_Trigger_Panic-00+]
+
+        # FIH-SW3-KERNEL-TH-add_last_alog-00+[
+        config FEATURE_FIH_SW3_LAST_ALOG
+            bool "RAM console for last alog"
+            depends on FIH_CONFIG_GROUP
+            default n
+            help
+                Enable RAM console for last alog
+        # FIH-SW3-KERNEL-TH-add_last_alog-00+]
+               # FIH-SW3-KERNEL-TH-buildtype_bebug-00+]
+               config FEATURE_FIH_SW3_BUILDTYPE_DEBUG
+            bool "enable debug mode for printk"
+            default n
+            help
+                if build debug, printk will not lost log when resume
+               # FIH-SW3-KERNEL-TH-buildtype_bebug-00+]
+       # CORE-BH-RPMStatsLog-00+[
+        config FIH_FEATURE_RPM_STATS_LOG
+            bool "FIH RPM STATS LOG"
+            default n
+            help
+             Support RPM Stats log.
+       # CORE-BH-RPMStatsLog-00+]
+    endmenu
+    # --- FIH_PROJECT_SEAGULL_3G}-------------------------------------------------- END
+endif

@@ -890,7 +890,13 @@ static int usbhid_output_raw_report(struct hid_device *hid, __u8 *buf, size_t co
 	struct usb_host_interface *interface = intf->cur_altsetting;
 	int ret;
 
+#ifndef CONFIG_HID_SONY_PS3_CTRL_BT
 	if (usbhid->urbout && report_type != HID_FEATURE_REPORT) {
+#else
+	if (usbhid->urbout && report_type != HID_FEATURE_REPORT &&
+			report_type != HID_FEATREP_SKIPREPID &&
+			report_type != HID_OUTREP_SKIPREPID) {
+#endif
 		int actual_length;
 		int skipped_report_id = 0;
 
@@ -919,6 +925,25 @@ static int usbhid_output_raw_report(struct hid_device *hid, __u8 *buf, size_t co
 			count--;
 			skipped_report_id = 1;
 		}
+#ifdef CONFIG_HID_SONY_PS3_CTRL_BT
+		if (report_type == HID_FEATREP_SKIPREPID ||
+			report_type == HID_OUTREP_SKIPREPID) {
+
+			buf++;
+			count--;
+			skipped_report_id = 1;
+
+			switch (report_type) {
+			case HID_FEATREP_SKIPREPID:
+				report_type = HID_FEATURE_REPORT;
+				break;
+			case HID_OUTREP_SKIPREPID:
+				report_type = HID_OUTPUT_REPORT;
+			default:
+				break;
+			}
+		}
+#endif
 		ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			HID_REQ_SET_REPORT,
 			USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,

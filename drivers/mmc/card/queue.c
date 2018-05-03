@@ -357,7 +357,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 		blk_queue_max_segment_size(mq->queue, host->max_seg_size);
 retry:
 		blk_queue_max_segments(mq->queue, host->max_segs);
-
+		
 		mqrq_cur->sg = mmc_alloc_sg(host->max_segs, &ret);
 		if (ret == -ENOMEM)
 			goto cur_sg_alloc_failed;
@@ -378,13 +378,15 @@ prev_sg_alloc_failed:
 cur_sg_alloc_failed:
 		host->max_segs /= 2;
 		if (host->max_segs) {
+			pr_warning("%s: Retry max_seg allocation (size : %d)", __func__,host->max_segs);/*BSP-ELUO-OOM-LOG*/
 			goto retry;
 		} else {
 			host->max_segs = max_segs;
+			pr_warning("%s: Retry max_seg allocation fail. Go to cleanup queue", __func__);/*BSP-ELUO-OOM-LOG*/
 			goto cleanup_queue;
 		}
 	}
-
+	
 success:
 	sema_init(&mq->thread_sem, 1);
 

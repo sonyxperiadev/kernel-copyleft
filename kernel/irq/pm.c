@@ -1,6 +1,7 @@
 /*
  * linux/kernel/irq/pm.c
  *
+ * Copyright (C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  * Copyright (C) 2009 Rafael J. Wysocki <rjw@sisk.pl>, Novell Inc.
  *
  * This file contains power management functions related to interrupts.
@@ -104,6 +105,16 @@ int check_wakeup_irqs(void)
 
 	for_each_irq_desc(irq, desc) {
 		if (irqd_is_wakeup_set(&desc->irq_data)) {
+
+			/*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+[ */
+			#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+			pr_info("IRQ %d %s set wake, status(%x)\n",
+				irq,
+				(desc->action && desc->action->name ? desc->action->name : ""),
+				desc->status_use_accessors);
+			#endif /*CONFIG_FIH_SUSPEND_RESUME_LOG*/
+			/*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+] */
+			  
 			if (desc->istate & IRQS_PENDING) {
 				pr_info("Wakeup IRQ %d %s pending, suspend aborted\n",
 					irq,

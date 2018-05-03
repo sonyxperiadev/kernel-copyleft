@@ -1,0 +1,12 @@
+#
+# Sensor driver configuration
+#
+menuconfig INPUT_SENSOR
+	bool "Sensors"
+	default y
+	help
+	  Say Y here, and a list of supported input sensors will be displayed.
+	  This option doesn't affect the kernel.
+
+	  If unsure, say Y.
+

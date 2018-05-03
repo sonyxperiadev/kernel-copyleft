@@ -210,7 +210,7 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 	kgsl_event_func func, void *priv, void *owner)
 {
 	struct kgsl_event *event;
-	unsigned int queued, cur_ts;
+	unsigned int queued = 0, cur_ts;
 	struct kgsl_context *context = NULL;
 
 	BUG_ON(!mutex_is_locked(&device->mutex));
@@ -224,11 +224,21 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 			return -EINVAL;
 	}
 
-	queued = kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_QUEUED);
+	/*
+	 * If the caller is creating their own timestamps, let them schedule
+	 * events in the future. Otherwise only allow timestamps that have been
+	 * queued.
+	 */
+	if (context == NULL ||
+		((context->flags & KGSL_CONTEXT_USER_GENERATED_TS) == 0)) {
 
-	if (timestamp_cmp(ts, queued) > 0) {
-		kgsl_context_put(context);
-		return -EINVAL;
+		queued = kgsl_readtimestamp(device, context,
+						KGSL_TIMESTAMP_QUEUED);
+
+		if (timestamp_cmp(ts, queued) > 0) {
+			kgsl_context_put(context);
+			return -EINVAL;
+		}
 	}
 
 	cur_ts = kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_RETIRED);
@@ -399,7 +409,7 @@ void kgsl_process_events(struct work_struct *work)
 	struct kgsl_context *context, *tmp;
 	uint32_t timestamp;
 
-	mutex_lock(&device->mutex);
+	kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 
 	timestamp = kgsl_readtimestamp(device, NULL, KGSL_TIMESTAMP_RETIRED);
 	_retire_events(device, &device->events, timestamp);
@@ -426,6 +436,6 @@ void kgsl_process_events(struct work_struct *work)
 		}
 	}
 
-	mutex_unlock(&device->mutex);
+	kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 }
 EXPORT_SYMBOL(kgsl_process_events);

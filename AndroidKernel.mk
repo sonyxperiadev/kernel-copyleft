@@ -91,5 +91,11 @@ kernelconfig: $(KERNEL_OUT) $(KERNEL_CONFIG)
 	env KCONFIG_NOTIMESTAMP=true \
 	     $(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- savedefconfig
 	cp $(KERNEL_OUT)/defconfig kernel/arch/arm/configs/$(KERNEL_DEFCONFIG)
-
+#/* FIH-MTD-SI-JS-BuildEnv-00{ */
+fih_gen_kernelconfig: $(KERNEL_OUT) $(KERNEL_CONFIG)
+	@echo "========================================={"
+	@echo "Genetate the .config only in $(KERNEL_OUT)"
+	@echo "$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- $(KERNEL_DEFCONFIG)"
+	@echo "=========================================}"
+#/* FIH-MTD-SI-JS-BuildEnv-00} */
 endif

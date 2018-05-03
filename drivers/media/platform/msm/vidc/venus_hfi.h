@@ -124,6 +124,12 @@ enum bus_index {
 	BUS_IDX_MAX
 };
 
+enum clock_state {
+	DISABLED_UNPREPARED,
+	ENABLED_PREPARED,
+	DISABLED_PREPARED
+};
+
 struct vidc_mem_addr {
 	u8 *align_device_addr;
 	u8 *align_virtual_addr;
@@ -177,6 +183,11 @@ struct venus_resources {
 	struct on_chip_mem ocmem;
 };
 
+enum venus_hfi_state {
+	VENUS_STATE_DEINIT = 1,
+	VENUS_STATE_INIT,
+};
+
 struct venus_hfi_device {
 	struct list_head list;
 	struct list_head sess_head;
@@ -184,8 +195,9 @@ struct venus_hfi_device {
 	u32 device_id;
 	u32 clk_load;
 	u32 bus_load[MSM_VIDC_MAX_DEVICES];
-	u32 clocks_enabled;
-	u32 power_enabled;
+	unsigned long ocmem_size;
+	enum clock_state clk_state;
+	bool power_enabled;
 	enum vidc_clocks clk_gating_level;
 	struct mutex read_lock;
 	struct mutex write_lock;
@@ -212,6 +224,7 @@ struct venus_hfi_device {
 	struct venus_resources resources;
 	struct msm_vidc_platform_resources *res;
 	struct regulator *gdsc;
+	enum venus_hfi_state state;
 };
 
 void venus_hfi_delete_device(void *device);

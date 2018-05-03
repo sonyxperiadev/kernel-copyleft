@@ -1,6 +1,7 @@
 /*
  * drivers/base/power/main.c - Where the driver meets power management.
  *
+ * Copyright (c) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  * Copyright (c) 2003 Patrick Mochel
  * Copyright (c) 2003 Open Source Development Lab
  *
@@ -32,6 +33,24 @@
 
 #include "../base.h"
 #include "power.h"
+
+/* CORE-EL-DBG_RESUME-00+[ */	
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+
+/* When enabled, we show driver resume time */
+enum {
+	DEBUG_ALL_DRIVER = 1U << 0, /* when enable this, print all */
+	DEBUG_BY_DRIVER_NAME = 1U << 1,
+	DEBUG_BY_FUNCTION_NAME = 1U << 2,
+	DEBUG_BY_RESUME_TIME = 1U << 3,
+};
+
+/* the file node will be /sys/module/main/parameters/debug_mask */
+static uint __read_mostly debug_mask;
+module_param(debug_mask, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(debug_mask, "mask for debugging resume time");
+/* CORE-EL-DBG_RESUME-00+] */	
 
 typedef int (*pm_callback_t)(struct device *);
 
@@ -571,6 +590,12 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 	pm_callback_t callback = NULL;
 	char *info = NULL;
 	int error = 0;
+/* CORE-EL-DBG_RESUME-00+[ */	
+	ktime_t starttime;
+
+	if (debug_mask)
+		starttime = ktime_get();
+/* CORE-EL-DBG_RESUME-00+] */
 
 	TRACE_DEVICE(dev);
 	TRACE_RESUME(0);
@@ -632,6 +657,26 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 
  End:
 	error = dpm_run_callback(callback, dev, state, info);
+
+/* CORE-EL-DBG_RESUME-00+[ */
+	if (debug_mask & DEBUG_ALL_DRIVER) {
+		u64 usecs64;
+		int usecs;
+		char symbol_buf[KSYM_SYMBOL_LEN];
+		ktime_t endtime = ktime_get();
+		
+		sprint_symbol(symbol_buf, (unsigned long)callback);
+		
+		usecs64 = ktime_to_ns(ktime_sub(endtime, starttime));
+		
+		do_div(usecs64, NSEC_PER_USEC);
+		usecs = usecs64;
+
+		printk("[PM]pm resume: %s: %s costs %ld.%03ld ms\n",
+			symbol_buf, (dev->kobj.name) ? dev->kobj.name : "", 
+			usecs / USEC_PER_MSEC , usecs % USEC_PER_MSEC);
+	}
+/* CORE-EL-DBG_RESUME-00+] */	
 	dev->power.is_suspended = false;
 
  Unlock:
@@ -1114,6 +1159,12 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 			goto Run;
 		} else if (dev->class->suspend) {
 			pm_dev_dbg(dev, state, "legacy class ");
+
+            /*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+[ */
+            #ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+            print_symbol("[PM]class suspend: %s\n", (unsigned long)dev->class->suspend);
+            #endif
+            /*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+] */
 			error = legacy_suspend(dev, state, dev->class->suspend);
 			goto End;
 		}

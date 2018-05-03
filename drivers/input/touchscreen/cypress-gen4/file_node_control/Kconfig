@@ -1,0 +1,9 @@
+
+config FIH_FILE_NODE_CONTROL
+        tristate "FIH file node control"
+        default n
+        depends on TOUCHSCREEN_CYPRESS_CYTTSP4_I2C
+        select FIH_DEVELOPMENT_TOOL
+	select FIH_UNITED_FILE_NODE
+        help
+          This is touch tool.

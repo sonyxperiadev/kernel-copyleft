@@ -6,6 +6,7 @@
  *  This code was moved from linux/kernel/timer.c.
  *  Please see that file for copyright and history logs.
  *
+ * Copyright (C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -268,6 +269,32 @@ ktime_t ktime_get(void)
 	return ktime_add_ns(ktime_set(secs, 0), nsecs);
 }
 EXPORT_SYMBOL_GPL(ktime_get);
+
+//CORE-BH-SuspendLog-00+[
+ktime_t ktime_get_in_suspend(void)
+{
+   unsigned int seq;
+   s64 secs, nsecs;
+
+   do {
+       seq = read_seqbegin(&timekeeper.lock);
+       secs = timekeeper.xtime.tv_sec +
+                       timekeeper.wall_to_monotonic.tv_sec;
+       nsecs = timekeeper.xtime.tv_nsec +
+                       timekeeper.wall_to_monotonic.tv_nsec;
+       nsecs += timekeeping_get_ns();
+       /* If arch requires, add in gettimeoffset() */
+       nsecs += arch_gettimeoffset();
+
+   } while (read_seqretry(&timekeeper.lock, seq));
+   /*
+    * Use ktime_set/ktime_add_ns to create a proper ktime on
+    * 32-bit architectures without CONFIG_KTIME_SCALAR.
+    */
+   return ktime_add_ns(ktime_set(secs, 0), nsecs);
+}
+EXPORT_SYMBOL_GPL(ktime_get_in_suspend);
+//CORE-BH-SuspendLog-00+]
 
 /**
  * ktime_get_ts - get the monotonic clock in timespec format

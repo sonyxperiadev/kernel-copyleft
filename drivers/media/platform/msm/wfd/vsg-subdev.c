@@ -26,12 +26,6 @@
 #define TICKS_PER_TIMEOUT 2
 
 
-static void vsg_reset_timer(struct hrtimer *timer, ktime_t time)
-{
-	hrtimer_forward_now(timer, time);
-	hrtimer_restart(timer);
-}
-
 static int vsg_release_input_buffer(struct vsg_context *context,
 		struct vsg_buf_info *buf)
 {
@@ -343,6 +337,7 @@ static int vsg_close(struct v4l2_subdev *sd)
 static int vsg_start(struct v4l2_subdev *sd)
 {
 	struct vsg_context *context = NULL;
+	int rc = 0;
 
 	if (!sd) {
 		WFD_MSG_ERR("ERROR, invalid arguments into %s\n", __func__);
@@ -351,18 +346,24 @@ static int vsg_start(struct v4l2_subdev *sd)
 
 	context = (struct vsg_context *)sd->dev_priv;
 
+	mutex_lock(&context->mutex);
 	if (context->state == VSG_STATE_STARTED) {
 		WFD_MSG_ERR("VSG not stopped, start not allowed\n");
-		return -EINPROGRESS;
+		rc = -EINPROGRESS;
+		goto err_bad_state;
 	} else if (context->state == VSG_STATE_ERROR) {
 		WFD_MSG_ERR("VSG in error state, not allowed to restart\n");
-		return -ENOTRECOVERABLE;
+		rc = -ENOTRECOVERABLE;
+		goto err_bad_state;
 	}
 
 	context->state = VSG_STATE_STARTED;
 	hrtimer_start(&context->threshold_timer, ns_to_ktime(context->
 			max_frame_interval), HRTIMER_MODE_REL);
-	return 0;
+
+err_bad_state:
+	mutex_unlock(&context->mutex);
+	return rc;
 }
 
 static int vsg_stop(struct v4l2_subdev *sd)
@@ -467,7 +468,7 @@ static long vsg_queue_buffer(struct v4l2_subdev *sd, void *arg)
 			 * otherwise, diff between two consecutive frames might
 			 * be less than max_frame_interval (for just one sample)
 			 */
-			vsg_reset_timer(&context->threshold_timer,
+			hrtimer_forward_now(&context->threshold_timer,
 				ns_to_ktime(context->max_frame_interval));
 		}
 	}

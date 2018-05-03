@@ -15,10 +15,18 @@
 #define MDSS_DEBUG_H
 
 #include "mdss.h"
+#include "mdss_mdp_trace.h"
 
 #define MISR_POLL_SLEEP		2000
 #define MISR_POLL_TIMEOUT	32000
 #define MISR_CRC_BATCH_CFG	0x101
+
+#define ATRACE_END(name) trace_tracing_mark_write(current->tgid, name, 0)
+#define ATRACE_BEGIN(name) trace_tracing_mark_write(current->tgid, name, 1)
+#define ATRACE_FUNC() ATRACE_BEGIN(__func__)
+
+#define ATRACE_INT(name, value) \
+	trace_mdp_trace_counter(current->tgid, name, value)
 
 #ifdef CONFIG_DEBUG_FS
 int mdss_debugfs_init(struct mdss_data_type *mdata);

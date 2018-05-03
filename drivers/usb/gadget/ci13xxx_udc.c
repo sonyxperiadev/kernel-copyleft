@@ -70,6 +70,11 @@
 #include <mach/usb_trace.h>
 #include "ci13xxx_udc.h"
 
+#undef pr_debug
+#define pr_debug pr_info
+#undef dev_dbg
+#define dev_dbg dev_info
+
 /******************************************************************************
  * DEFINE
  *****************************************************************************/

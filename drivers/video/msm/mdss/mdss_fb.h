@@ -1,4 +1,5 @@
-/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
+ * Copyright(C) 2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -43,6 +44,47 @@
 #define  MIN(x, y) (((x) < (y)) ? (x) : (y))
 #endif
 
+/* MM-KW-Display-01+{ */
+#define INIT_IMAGE_FILE "/logo.rle"
+#define SPLASH_RLE_TO_RGBA_IMAGE_HEIGHT 1280
+#define SPLASH_RLE_TO_RGBA_IMAGE_WIDTH	720
+#define SPLASH_RLE_TO_RGBA_IMAGE_BPP 4
+
+typedef enum {
+	BATTERY_EMPTY = 0,
+	BATTERY_LEVEL_01,
+	BATTERY_LEVEL_02,
+	BATTERY_LEVEL_03,
+	BATTERY_LEVEL_04,
+	BATTERY_LEVEL_05,
+	BATTERY_FULL,
+	BATTERY_DISP_ON,
+	BATTERY_DISP_OFF,
+	DISP_LOGO,
+	BATTERY_INVALID_ENUM
+} BATT_ICON_TYPE;
+
+typedef enum
+{
+   RESET= 0,
+   RESET_01,
+   RESET_02,
+   RESET_03,
+   RESET_04,
+   RESET_05,
+   RESET_06,
+   RESET_07,
+   RESET_DISP_ON,
+   RESET_DISP_OFF,
+   RESET_DISP_BACKLIGHT,
+   RESET_INVALID_ENUM
+}RST_ICON_TYPE;
+
+int fih_load_rle_image(const char *filename);
+int fih_dump_framebuffer(char *filename);
+int mdss_load_rle565_image(const char *filename,int clean);
+
+/* MM-KW-Display-01-} */
 /**
  * enum mdp_notify_event - Different frame events to indicate frame update state
  *
@@ -134,6 +176,7 @@ struct msm_mdp_interface {
 	int (*splash_fnc) (struct msm_fb_data_type *mfd, int *index, int req);
 	struct msm_sync_pt_data *(*get_sync_fnc)(struct msm_fb_data_type *mfd,
 				const struct mdp_buf_sync *buf_sync);
+	void (*check_dsi_status)(struct work_struct *work, uint32_t interval);
 	void *private1;
 };
 
@@ -168,6 +211,9 @@ struct msm_fb_data_type {
 
 	u32 dest;
 	struct fb_info *fbi;
+
+	int idle_time;
+	struct delayed_work idle_notify_work;
 
 	int op_enable;
 	u32 fb_imgType;

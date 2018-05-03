@@ -1,4 +1,6 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 Sony Mobile Communications AB.
+ * Copyright (c) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,7 +20,7 @@
 	interrupt-parent = <&intc>;
 
 	aliases {
-		spi0 = &spi_0;
+//		spi0 = &spi_0;/* Core-PK-Remove_SPI_settings-00 */
 		sdhc1 = &sdhc_1; /* SDC1 eMMC slot */
 		sdhc2 = &sdhc_2; /* SDC2 SD card slot */
 		sdhc3 = &sdhc_3; /* SDC3 SDIO slot */
@@ -230,6 +232,26 @@
 		compatible = "qcom,msm-imem";
 		reg = <0xfe805000 0x1000>; /* Address and size of IMEM */
 	};
+
+/* CORE-TH-New_Ram_Console-00+[ */
+	qcom,ram_console {
+		compatible = "qcom,ram_console";
+		reg = <0x20000000 0x20000>;
+	};
+
+	qcom,alog_ram_console {
+		compatible = "qcom,alog_ram_console";
+		reg = <0x20020000 0x20000>,
+			<0x20040000 0x20000>,
+			<0x20060000 0x20000>,
+			<0x20080000 0x20000>;
+		reg-names = "alog_main_buffer",
+			"alog_radio_buffer",
+			"alog_events_buffer",
+			"alog_system_buffer";
+	};
+
+/* CORE-TH-New_Ram_Console-00+] */
 
 	qcom,sps@f9984000 {
 		compatible = "qcom,msm_sps";
@@ -759,6 +781,7 @@
 
 		qcom,bus-width = <8>;
 
+		qcom,cpu-dma-latency-us = <701>;
 		qcom,msm-bus,name = "sdcc1";
 		qcom,msm-bus,num-cases = <8>;
 		qcom,msm-bus,num-paths = <1>;
@@ -786,6 +809,7 @@
 
 		qcom,bus-width = <8>;
 
+		qcom,cpu-dma-latency-us = <701>;
 		qcom,msm-bus,name = "sdhc1";
 		qcom,msm-bus,num-cases = <8>;
 		qcom,msm-bus,num-paths = <1>;
@@ -816,6 +840,7 @@
 
 		qcom,bus-width = <4>;
 
+		qcom,cpu-dma-latency-us = <701>;
 		qcom,msm-bus,name = "sdcc2";
 		qcom,msm-bus,num-cases = <8>;
 		qcom,msm-bus,num-paths = <1>;
@@ -843,6 +868,7 @@
 
 		qcom,bus-width = <4>;
 
+		qcom,cpu-dma-latency-us = <701>;
 		qcom,msm-bus,name = "sdhc2";
 		qcom,msm-bus,num-cases = <8>;
 		qcom,msm-bus,num-paths = <1>;
@@ -869,6 +895,7 @@
 		reg-names = "core_mem", "dml_mem", "bam_mem";
 
 		qcom,bus-width = <4>;
+		qcom,cpu-dma-latency-us = <701>;
 		gpios = <&msmgpio 44 0>, /* CLK */
 			<&msmgpio 43 0>, /* CMD */
 			<&msmgpio 42 0>, /* DATA0 */
@@ -912,6 +939,7 @@
 		reg-names = "hc_mem", "core_mem";
 
 		qcom,bus-width = <4>;
+		qcom,cpu-dma-latency-us = <701>;
 		gpios = <&msmgpio 44 0>, /* CLK */
 			<&msmgpio 43 0>, /* CMD */
 			<&msmgpio 42 0>, /* DATA0 */
@@ -963,8 +991,23 @@
 		qcom,pmic-arb-channel = <0>;
 	};
 
+//	i2c@f9924000 { /* BLSP-1 QUP-2 */
+//		cell-index = <2>;
+//		compatible = "qcom,i2c-qup";
+//		reg = <0xf9924000 0x1000>;
+//		#address-cells = <1>;
+//		#size-cells = <0>;
+//		reg-names = "qup_phys_addr";
+//		interrupts = <0 96 0>;
+//		interrupt-names = "qup_err_intr";
+//		qcom,i2c-bus-freq = <400000>;
+//		qcom,i2c-src-freq = <19200000>;
+//		qcom,scl-gpio = <&msmgpio 7 0>;
+//		qcom,sda-gpio = <&msmgpio 6 0>;
+//	};
+
 	i2c@f9925000 { /* BLSP-1 QUP-3 */
-		cell-index = <2>;
+		cell-index = <3>;
 		compatible = "qcom,i2c-qup";
 		reg = <0xf9925000 0x1000>;
 		#address-cells = <1>;
@@ -974,21 +1017,19 @@
 		interrupt-names = "qup_err_intr";
 		qcom,i2c-bus-freq = <400000>;
 		qcom,i2c-src-freq = <19200000>;
-		qcom,sda-gpio = <&msmgpio 10 0>;
-		qcom,scl-gpio = <&msmgpio 11 0>;
-		qcom,master-id = <86>;
 	};
-	i2c@f9926000 { /* BLSP-1 QUP-4 */
-		cell-index = <0>;
-		compatible = "qcom,i2c-qup";
-		reg = <0xf9926000 0x1000>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg-names = "qup_phys_addr";
-		interrupts = <0 98 0>;
-		interrupt-names = "qup_err_intr";
-		qcom,i2c-bus-freq = <100000>;
-	};
+
+//	i2c@f9926000 { /* BLSP-1 QUP-4 */
+//		cell-index = <0>;
+//		compatible = "qcom,i2c-qup";
+//		reg = <0xf9926000 0x1000>;
+//		#address-cells = <1>;
+//		#size-cells = <0>;
+//		reg-names = "qup_phys_addr";
+//		interrupts = <0 98 0>;
+//		interrupt-names = "qup_err_intr";
+//		qcom,i2c-bus-freq = <100000>;
+//	};
 
 	i2c@f9927000 { /* BLSP1 QUP5 */
 		cell-index = <5>;
@@ -1036,7 +1077,7 @@
 			<  300000 1525 >,
 			<  384000 1525 >,
 			<  600000 1525 >,
-			<  787200 3051 >,
+			<  787200 1525 >,
 			<  998400 4066 >,
 			< 1094400 4066 >,
 			< 1190400 4066 >,
@@ -1204,29 +1245,31 @@
 		};
 	};
 
-	spi_0: spi@f9923000 { /* BLSP1 QUP1 */
-		compatible = "qcom,spi-qup-v2";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg-names = "spi_physical", "spi_bam_physical";
-		reg = <0xf9923000 0x1000>,
-		      <0xf9904000 0xF000>;
-		interrupt-names = "spi_irq", "spi_bam_irq";
-		interrupts = <0 95 0>, <0 238 0>;
-		spi-max-frequency = <19200000>;
-
-		qcom,gpio-mosi = <&msmgpio 0 0>;
-		qcom,gpio-miso = <&msmgpio 1 0>;
-		qcom,gpio-clk  = <&msmgpio 3 0>;
-		qcom,gpio-cs0  = <&msmgpio 22 0>;
-
-		qcom,infinite-mode = <0>;
-		qcom,use-bam;
-		qcom,ver-reg-exists;
-		qcom,bam-consumer-pipe-index = <12>;
-		qcom,bam-producer-pipe-index = <13>;
-		qcom,master-id = <86>;
-	};
+/* Core-PK-Remove_SPI_settings-00+[ */
+//	spi_0: spi@f9923000 { /* BLSP1 QUP1 */
+//		compatible = "qcom,spi-qup-v2";
+//		#address-cells = <1>;
+//		#size-cells = <0>;
+//		reg-names = "spi_physical", "spi_bam_physical";
+//		reg = <0xf9923000 0x1000>,
+//		      <0xf9904000 0xF000>;
+//		interrupt-names = "spi_irq", "spi_bam_irq";
+//		interrupts = <0 95 0>, <0 238 0>;
+//		spi-max-frequency = <19200000>;
+//
+//		qcom,gpio-mosi = <&msmgpio 0 0>;
+//		qcom,gpio-miso = <&msmgpio 1 0>;
+//		qcom,gpio-clk  = <&msmgpio 3 0>;
+//		qcom,gpio-cs0  = <&msmgpio 22 0>;
+//
+//		qcom,infinite-mode = <0>;
+//		qcom,use-bam;
+//		qcom,ver-reg-exists;
+//		qcom,bam-consumer-pipe-index = <12>;
+//		qcom,bam-producer-pipe-index = <13>;
+//		qcom,master-id = <86>;
+//	};
+/* Core-PK-Remove_SPI_settings-00+] */
 
 	qcom,bam_dmux@fc834000 {
 		compatible = "qcom,bam_dmux";
@@ -1356,6 +1399,14 @@
 		compatible = "arm,cortex-a7-pmu";
 		qcom,irq-is-percpu;
 		interrupts = <1 7 0xf00>;
+	};
+
+	sony,ric_info {
+		compatible = "sony_ric";
+		sony,num-partition = <4>;
+		sony,partition-names = "system", "userdata", "cache", "apps_log";
+		sony,mount_paths = "/system", "/data", "/cache", "/mnt/idd";
+		sony,mount-flags = <0x1 0x6 0x6 0xE>;
 	};
 };
 
@@ -1542,19 +1593,6 @@
 		qcom,hw-settle-time = <2>;
 		qcom,fast-avg-setup = <0>;
 		qcom,btm-channel-number = <0x78>;
-		qcom,thermal-node;
-	};
-
-	chan@17 {
-		label = "pa_therm1";
-		reg = <0x17>;
-		qcom,decimation = <0>;
-		qcom,pre-div-channel-scaling = <0>;
-		qcom,calibration-type = "ratiometric";
-		qcom,scale-function = <2>;
-		qcom,hw-settle-time = <2>;
-		qcom,fast-avg-setup = <0>;
-		qcom,btm-channel-number = <0x80>;
 		qcom,thermal-node;
 	};
 };

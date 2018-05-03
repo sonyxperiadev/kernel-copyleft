@@ -1,4 +1,5 @@
 /* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,6 +38,7 @@
 #include "msm_watchdog.h"
 #include "timer.h"
 #include "wdog_debug.h"
+#include <linux/fih_sw_info.h> /* MTD-CORE-EL-power_on_cause-00+ */
 
 #define WDT0_RST	0x38
 #define WDT0_EN		0x40
@@ -59,6 +61,14 @@
 #else
 #define use_restart_v2()	0
 #endif
+
+/* MTD-EL-FOTA-00 +[ */
+#define CONFIG_WARMBOOT_FOTA 0x6F656D46
+#define CONFIG_WARMBOOT_S1   0x6F656D53
+/* MTD-EL-FOTA-00 +] */
+
+extern unsigned int debug_ramdump_to_sdcard_enable; /* MTD-CORE-EL-power_on_cause-00+ */
+
 
 static int restart_mode;
 void *restart_reason;
@@ -160,8 +170,30 @@ static bool get_dload_mode(void)
 void msm_set_restart_mode(int mode)
 {
 	restart_mode = mode;
+
+	/* CORE-HC-Reboot_Fail-01*[ */
+	if (restart_mode == RESTART_DLOAD)
+	{
+		pr_err("msm_set_restart_mode: RESTART_DLOAD\n");
+		dump_stack();
+	}
+	/* CORE-HC-Reboot_Fail-01*] */
 }
 EXPORT_SYMBOL(msm_set_restart_mode);
+
+//CORE-EL-AdbWriteRestartReason-00 +[
+static int lights_on;
+u32 reboot_reason;
+void msm_write_restart_reason(u32 reason)
+{
+	reboot_reason = reason;
+	lights_on = 1;
+
+	pr_err("ADB write 0x%08x into restart_reason\n", reboot_reason);
+	__raw_writel(reboot_reason, restart_reason);
+}
+EXPORT_SYMBOL(msm_write_restart_reason);
+//CORE-EL-AdbWriteRestartReason-00 +]
 
 static bool scm_pmic_arbiter_disable_supported;
 /*
@@ -248,19 +280,28 @@ static irqreturn_t resout_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+extern void * get_hw_wd_virt_addr(void);	/* MTD-CORE-EL-power_on_cause-00+ */
+
 static void msm_restart_prepare(const char *cmd)
 {
+	unsigned int *fih_hw_wd_ptr;			/* MTD-CORE-EL-power_on_cause-00+ */
+
 #ifdef CONFIG_MSM_DLOAD_MODE
 
 	/* This looks like a normal reboot at this point. */
 	set_dload_mode(0);
 
 	/* Write download mode flags if we're panic'ing */
-	set_dload_mode(in_panic);
+	/* set_dload_mode(in_panic); */   /* CORE-HC-Reboot_Fail-00- */
 
 	/* Write download mode flags if restart_mode says so */
+	/* CORE-HC-Reboot_Fail-01*[ */
 	if (restart_mode == RESTART_DLOAD)
+	{
 		set_dload_mode(1);
+		pr_err("restart_mode == RESTART_DLOAD\n");
+	}
+	/* CORE-HC-Reboot_Fail-01*] */
 
 	/* Kill download mode if master-kill switch is set */
 	if (!download_mode)
@@ -270,7 +311,9 @@ static void msm_restart_prepare(const char *cmd)
 	pm8xxx_reset_pwr_off(1);
 
 	/* Hard reset the PMIC unless memory contents must be maintained. */
-	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0'))
+//CORE-EL-adb_reboot_fail-00*
+	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0' && 
+			strncmp(cmd, "hwreset", 7) && strncmp(cmd, "recovery", 8)))
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 	else
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
@@ -286,12 +329,51 @@ static void msm_restart_prepare(const char *cmd)
 			unsigned long code;
 			code = simple_strtoul(cmd + 4, NULL, 16) & 0xff;
 			__raw_writel(0x6f656d00 | code, restart_reason);
+/* MTD-EL-FOTA-00 +[ */
+		} else if (!strncmp(cmd, "oemS", 4)) {
+			__raw_writel(CONFIG_WARMBOOT_S1, restart_reason);
+		} else if (!strncmp(cmd, "oemF", 4)) {
+			__raw_writel(CONFIG_WARMBOOT_FOTA , restart_reason);
+/* MTD-EL-FOTA-00 +] */
+/* MTD-CORE-EL-power_on_cause-00+[ */
+	/* ADB Reboot also handled*/
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}
+	} else {
+		__raw_writel(0x77665501, restart_reason);
 	}
+
+//CORE-EL-AdbWriteRestartReason-00 +[
+	if (lights_on == 1)
+		__raw_writel(reboot_reason, restart_reason);
+//CORE-EL-AdbWriteRestartReason-00 +]
+	if ((in_panic == 1) && (debug_ramdump_to_sdcard_enable == 1)) {
+		/* Write restart_reason as REBOOT_CRASHDUMP_PANIC */
+		__raw_writel(0xC0DEDEAD, restart_reason);
+	}
+
+	fih_hw_wd_ptr = (unsigned int*) get_hw_wd_virt_addr();
+
+	/* CORE-EL-HWWD-00*[ */
+	if (fih_hw_wd_ptr != NULL) {
+		do {
+			if (cmd != NULL) {
+				if (!strncmp(cmd, "hwwd", 5)) {
+					/* if reset command is "hwwd", don't clean hw wd signature */
+					break;
+				}
+			}
+
+			/* normal path: drop here and clean hw wd signature */
+			*fih_hw_wd_ptr = 0;
+		} while(0);
+	}
+	/* CORE-EL-HWWD-00*] */
+	
+/* MTD-CORE-EL-power_on_cause-00+] */
 
 	flush_cache_all();
 	outer_flush_all();
@@ -358,7 +440,7 @@ static int __init msm_restart_init(void)
 	dload_mode_addr = MSM_IMEM_BASE + DLOAD_MODE_ADDR;
 	emergency_dload_mode_addr = MSM_IMEM_BASE +
 		EMERGENCY_DLOAD_MODE_ADDR;
-	set_dload_mode(download_mode);
+	/* set_dload_mode(download_mode); */   /* CORE-HC-Reboot_Fail-01- */
 #endif
 	msm_tmr0_base = msm_timer_get_timer0_base();
 	restart_reason = MSM_IMEM_BASE + RESTART_REASON_ADDR;

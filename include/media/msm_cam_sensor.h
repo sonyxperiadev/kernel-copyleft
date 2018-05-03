@@ -40,14 +40,26 @@
 #define MAX_ACTUATOR_REGION 5
 #define MAX_ACTUATOR_INIT_SET 12
 #define MAX_ACTUATOR_REG_TBL_SIZE 8
+#define MAX_ACTUATOR_AF_TOTAL_STEPS 1024
 
 #define MOVE_NEAR 0
 #define MOVE_FAR  1
+
+#define MSM_ACTUATOR_MOVE_SIGNED_FAR -1
+#define MSM_ACTUATOR_MOVE_SIGNED_NEAR  1
 
 #define MAX_EEPROM_NAME 32
 
 #define MAX_AF_ITERATIONS 3
 #define MAX_NUMBER_OF_STEPS 47
+
+/*MM-YW-IMX134 LSC setting-00+{*/
+#define SONY_IMX134_LSC_DATA_LENGTH 280
+#define SONY_EEPROM_LSC_INDEX 0x404
+#define SONY_LSC_REG_SETTING_INDEX 0x4800
+#define SONY_EEPROM_LSC_CHECKNUM 5
+/*MM-YW-IMX134 LSC setting-00+}*/
+
 
 enum flash_type {
 	LED_FLASH = 1,
@@ -86,9 +98,15 @@ enum msm_sensor_clk_type_t {
 	SENSOR_CAM_CLK_MAX,
 };
 
+/*MM-SL-BringUpCameraSensorIMX188-00*{ */
+/*MM-SL-BringUpCameraSensorIMX134-00*{ */
 enum msm_sensor_power_seq_gpio_t {
 	SENSOR_GPIO_RESET,
 	SENSOR_GPIO_STANDBY,
+	SENSOR_GPIO_CAM_VAA_V2P8,  
+	SENSOR_GPIO_CAM_VDDAF_V2P8,
+	SENSOR_GPIO_CAM_VDDIO_V1P8,
+	SENSOR_GPIO_RESET1,
 	SENSOR_GPIO_AF_PWDM,
 	SENSOR_GPIO_VIO,
 	SENSOR_GPIO_VANA,
@@ -96,6 +114,8 @@ enum msm_sensor_power_seq_gpio_t {
 	SENSOR_GPIO_VAF,
 	SENSOR_GPIO_MAX,
 };
+/*MM-SL-BringUpCameraSensorIMX134-00*} */
+/*MM-SL-BringUpCameraSensorIMX188-00*} */
 
 enum msm_camera_vreg_name_t {
 	CAM_VDIG,
@@ -320,6 +340,7 @@ struct csi_lane_params_t {
 
 struct msm_sensor_info_t {
 	char sensor_name[MAX_SENSOR_NAME];
+    char module_name[MAX_SENSOR_NAME];/* MM-MC-AddCameraSwitchMechanismForSecondSource+ */
 	int32_t    session_id;
 	int32_t     subdev_id[SUB_MODULE_MAX];
 };
@@ -535,6 +556,8 @@ enum af_camera_name {
 	ACTUATOR_MAIN_CAM_3,
 	ACTUATOR_MAIN_CAM_4,
 	ACTUATOR_MAIN_CAM_5,
+	ACTUATOR_MAIN_CAM_6, /*MM-SL-AddAFHeaderFile-00+ */
+	ACTUATOR_MAIN_CAM_7, /* MM-MC-AddCameraSwitchMechanismForSecondSource-02+ */
 	ACTUATOR_WEB_CAM_0,
 	ACTUATOR_WEB_CAM_1,
 	ACTUATOR_WEB_CAM_2,

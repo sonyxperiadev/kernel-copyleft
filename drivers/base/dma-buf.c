@@ -39,8 +39,12 @@ static int dma_buf_release(struct inode *inode, struct file *file)
 
 	dmabuf = file->private_data;
 
-	dmabuf->ops->release(dmabuf);
-	kfree(dmabuf);
+	if(dmabuf != NULL){
+		dmabuf->ops->release(dmabuf);
+		kfree(dmabuf);
+	}else{
+		pr_err("%s: error: dmabuf == NULL", __func__);
+	}
 	return 0;
 }
 

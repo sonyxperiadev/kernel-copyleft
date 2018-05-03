@@ -5,6 +5,7 @@
  * Copyright (C) 2009 Samsung Electronics
  *                    Author: Michal Nazarewicz <mina86@mina86.com>
  * All rights reserved.
+ * Copyright (C) 2012 Sony Mobile Communications AB.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -315,6 +316,33 @@ static int write_error_after_csw_sent;
 static int csw_hack_sent;
 #endif
 /*-------------------------------------------------------------------------*/
+/*CONN-JY-PCCOMPANION-00+{*/
+#define F_CDROM  1
+
+#ifdef F_CDROM
+/* Storage mode */
+#define STORAGE_MODE_NONE	0
+#define STORAGE_MODE_MSC	1
+#define STORAGE_MODE_CDROM	2
+
+/* Length of inquiry string. Vendor (8 chars), product (16 chars),
+ * release (4 hexadecimal digits) and NUL byte
+ */
+#define INQUIRY_STRING_LEN	(8 + 16 + 4 + 1)
+
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
+
+/*CONN-EH-SCSI-00+{*/
+/*
+ * Max length of Serial number = Max allocation length (255 bytes) - Peripheral
+ * qualifier (1 byte) - page code (1 byte) - reserved (1 byte) - page length
+ * (1 byte) - NUL byte(1byte) = 250 bytes
+ */
+#define USB_SERIAL_NUMBER_MAX_LEN	250
+/*CONN-EH-SCSI-00+}*/
+
+/*-------------------------------------------------------------------------*/
 
 struct fsg_dev;
 struct fsg_common;
@@ -345,6 +373,14 @@ struct fsg_operations {
 			  struct fsg_lun *lun, int num);
 };
 
+/*CONN-EH-SCSI-00+{*/
+/* EUI-64 identifier format for Device Identification VPD page */
+struct eui64_id {
+	u8 ieee_company_id[3];
+	u8 vendor_specific_ext_field[5];
+} __packed;
+/*CONN-EH-SCSI-00+}*/
+
 /* Data shared by all the FSG instances. */
 struct fsg_common {
 	struct usb_gadget	*gadget;
@@ -374,6 +410,14 @@ struct fsg_common {
 	struct fsg_lun		*luns;
 	struct fsg_lun		*curlun;
 
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	int			storage_mode;
+	struct fsg_lun		*luns_all;
+	unsigned int		msc_nluns;
+	unsigned int		cdrom_nluns;
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 	unsigned int		bulk_out_maxpacket;
 	enum fsg_state		state;		/* For exception handling */
 	unsigned int		exception_req_tag;
@@ -405,13 +449,30 @@ struct fsg_common {
 	 * Vendor (8 chars), product (16 chars), release (4
 	 * hexadecimal digits) and NUL byte
 	 */
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+        char inquiry_string[INQUIRY_STRING_LEN];
+	char cdrom_inquiry_string[INQUIRY_STRING_LEN];
+#else
 	char inquiry_string[8 + 16 + 4 + 1];
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 
+        /*CONN-EH-SCSI-00+{*/
+        /* inquiry */
+	char			serial_number[USB_SERIAL_NUMBER_MAX_LEN + 1];
+	struct eui64_id		eui64_id;
+        /*CONN-EH-SCSI-00+}*/
 	struct kref		ref;
 };
 
 struct fsg_config {
 	unsigned nluns;
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	unsigned cdrom_nluns;
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 	struct fsg_lun_config {
 		const char *filename;
 		char ro;
@@ -431,9 +492,16 @@ struct fsg_config {
 	const char *vendor_name;		/*  8 characters or less */
 	const char *product_name;		/* 16 characters or less */
 	u16 release;
-
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	const char *cdrom_vendor_name;	/*  8 characters or less */
+	const char *cdrom_product_name;	/* 16 characters or less */
+	u16 cdrom_release;
+#endif
+/*CONN-JY-PCCOMPANION-00+{*/
 	char			can_stall;
 };
+#define TOC_FORMAT2_SIZE		(11 * 3 + 4)
 
 struct fsg_dev {
 	struct usb_function	function;
@@ -1277,6 +1345,11 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 {
 	struct fsg_lun *curlun = common->curlun;
 	u8	*buf = (u8 *) bh->buf;
+        /*CONN-EH-SCSI-00+{*/
+	u8	evpd;
+	u8	page_code;
+	u16	len;
+        /*CONN-EH-SCSI-00+}*/
 
 	if (!curlun) {		/* Unsupported LUNs are okay */
 		common->bad_lun_okay = 1;
@@ -1285,16 +1358,106 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 		buf[4] = 31;		/* Additional length */
 		return 36;
 	}
+        /*CONN-EH-SCSI-00+{*/
+	evpd = common->cmnd[1] & 0x1;
+	page_code = common->cmnd[2];
+	if (evpd == 0 && page_code) {
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		return -EINVAL;
+	}
+
+	if (evpd == 1) {
+		buf[0] = curlun->cdrom ? TYPE_ROM : TYPE_DISK;
+		switch (page_code) {
+		case VPD_SUPPORTED_VPD_PAGES:
+			buf[1] = 0; /* page code */
+			buf[2] = 0; /* Reserved */
+			buf[3] = 3; /* PAGE LENGTH */
+			/* Supported VPD page list */
+			buf[4] = VPD_SUPPORTED_VPD_PAGES;
+			buf[5] = VPD_UNIT_SERIAL_NUMBER;
+			buf[6] = VPD_DEVICE_IDENTIFICATION;
+			return 7;
+
+		case VPD_UNIT_SERIAL_NUMBER:
+			buf[1] = VPD_UNIT_SERIAL_NUMBER; /* page code */
+			buf[2] = 0; /* Reserved */
+
+			/* PAGE LENGTH */
+			len = strnlen(common->serial_number,
+					USB_SERIAL_NUMBER_MAX_LEN) + 1;
+			if (len > common->data_size_from_cmnd - 4)
+				len = common->data_size_from_cmnd - 4;
+			buf[3] = len;
+
+			/* PRODUCT SERIAL NUMBER */
+			strlcpy(&buf[4], common->serial_number, len);
+			len += 4;
+
+			/* Adjustment data size which send to IN buffer */
+			if (len < common->data_size_from_cmnd) {
+				common->data_size_from_cmnd = len;
+				common->residue = len;
+			}
+
+			return len;
+
+		case VPD_DEVICE_IDENTIFICATION:
+			buf[1] = VPD_DEVICE_IDENTIFICATION; /* page code */
+			buf[2] = 0;  /* PAGE LENGTH (MSB) */
+			buf[3] = 12; /* PAGE LENGTH (LSB) */
+
+			/* Identification descriptor list */
+			buf[4] = 1;  /* CODE SET */
+			buf[5] = 2;  /* IDENTIFIER TYPE */
+			buf[6] = 0;  /* Reserved */
+			buf[7] = 8;  /* IDENTIFIER LENGTH (n-3) */
+
+			/* IEEE COMPANY_ID */
+			memcpy(&buf[8], common->eui64_id.ieee_company_id,
+				sizeof(common->eui64_id.ieee_company_id));
+
+			/* VENDOR SPECIFIC EXTENSION IDENTIFIER */
+			memcpy(&buf[11],
+				common->eui64_id.vendor_specific_ext_field,
+				sizeof(common->eui64_id.
+					vendor_specific_ext_field));
+
+			/* Adjustment data size which send to IN buffer */
+			len = 16;
+			if (len < common->data_size_from_cmnd) {
+				common->data_size_from_cmnd = len;
+				common->residue = len;
+			}
+			return len;
+		}
+	}
+        /*CONN-EH-SCSI-00+}*/
 
 	buf[0] = curlun->cdrom ? TYPE_ROM : TYPE_DISK;
 	buf[1] = curlun->removable ? 0x80 : 0;
-	buf[2] = 2;		/* ANSI SCSI level 2 */
+	///*CONN-EH-SCSI-00-*/buf[2] = 2;		/* ANSI SCSI level 2 */
+        buf[2] = 4;		/* ANSI SCSI SPC-2 *//*CONN-EH-SCSI-00+*/
 	buf[3] = 2;		/* SCSI-2 INQUIRY data format */
 	buf[4] = 31;		/* Additional length */
 	buf[5] = 0;		/* No special options */
 	buf[6] = 0;
 	buf[7] = 0;
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	if (curlun->cdrom) {
+		memcpy(buf + 8,
+			common->cdrom_inquiry_string,
+			sizeof common->cdrom_inquiry_string);
+	} else {
+		memcpy(buf + 8,
+			common->inquiry_string,
+			sizeof common->inquiry_string);
+		}
+#else
 	memcpy(buf + 8, common->inquiry_string, sizeof common->inquiry_string);
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 	return 36;
 }
 
@@ -1369,6 +1532,29 @@ static int do_read_capacity(struct fsg_common *common, struct fsg_buffhd *bh)
 	put_unaligned_be32(curlun->blksize, &buf[4]);/* Block length */
 	return 8;
 }
+/*CONN-EH-SCSI-00+{*/
+static int do_read_capacity16(struct fsg_common *common, struct fsg_buffhd *bh)
+{
+	struct fsg_lun	*curlun = common->curlun;
+	u64		lba = get_unaligned_be64(&common->cmnd[2]);
+	int		pmi = common->cmnd[14];
+	u8		*buf = (u8 *) bh->buf;
+
+	/* Check the PMI and LBA fields */
+	if (pmi > 1 || (pmi == 0 && lba != (u64) 0)) {
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		return -EINVAL;
+	}
+
+	put_unaligned_be64(curlun->num_sectors - 1, &buf[0]);
+						/* Max logical block */
+	put_unaligned_be32(curlun->blksize, &buf[8]);
+						/* Set block length */
+	memset(&buf[12], 0, 20);
+
+	return 32;
+}
+/*CONN-EH-SCSI-00+}*/
 
 static int do_read_header(struct fsg_common *common, struct fsg_buffhd *bh)
 {
@@ -1398,6 +1584,8 @@ static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
 	int		msf = common->cmnd[1] & 0x02;
 	int		start_track = common->cmnd[6];
 	u8		*buf = (u8 *)bh->buf;
+	u8		format;
+	int		offset;
 
 	if ((common->cmnd[1] & ~0x02) != 0 ||	/* Mask away MSF */
 			start_track > 1) {
@@ -1405,18 +1593,55 @@ static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
 		return -EINVAL;
 	}
 
-	memset(buf, 0, 20);
-	buf[1] = (20-2);		/* TOC data length */
-	buf[2] = 1;			/* First track number */
-	buf[3] = 1;			/* Last track number */
-	buf[5] = 0x16;			/* Data track, copying allowed */
-	buf[6] = 0x01;			/* Only track is number 1 */
-	store_cdrom_address(&buf[8], msf, 0);
+	format = common->cmnd[2] & 0x07;
+	/* SFF-8020i: When Format in Byte 2 is zero, then Byte 9 is used. */
+	if (format == 0)
+		format = (common->cmnd[9] >> 6) & 0x03;
 
-	buf[13] = 0x16;			/* Lead-out track is data */
-	buf[14] = 0xAA;			/* Lead-out track number */
-	store_cdrom_address(&buf[16], msf, curlun->num_sectors);
-	return 20;
+	if (format == 0) {
+		memset(buf, 0, 20);
+		buf[1] = (20-2);	/* TOC data length */
+		buf[2] = 1;		/* First track number */
+		buf[3] = 1;		/* Last track number */
+		buf[5] = 0x16;		/* Data track, copying allowed */
+		buf[6] = 0x01;		/* Only track is number 1 */
+		store_cdrom_address(&buf[8], msf, 0);
+
+		buf[13] = 0x16;		/* Lead-out track is data */
+		buf[14] = 0xAA;		/* Lead-out track number */
+		store_cdrom_address(&buf[16], msf, curlun->num_sectors);
+		return 20;
+	} else if (format == 0x02) {
+		memset(buf, 0, TOC_FORMAT2_SIZE);
+		buf[1] = (TOC_FORMAT2_SIZE-2);	/* TOC data length */
+		buf[2] = 1;			/* First Session Number */
+		buf[3] = 1;			/* Last Session Number */
+		offset = 4;
+
+		buf[offset] = 1;	/* Session Number */
+		buf[offset + 1] = 0x16;	/* Data track, copying allowed */
+		buf[offset + 2] = 0;	/* TNO */
+		buf[offset + 3] = 0xA0;	/* Point */
+		buf[offset + 8] = 1;	/* First track number */
+		buf[offset + 9] = 0;	/* Disc Type */
+		offset += 11;
+
+		buf[offset] = 1;	/* Session Number */
+		buf[offset + 1] = 0x16;	/* Data track, copying allowed */
+		buf[offset + 2] = 0;	/* TNO */
+		buf[offset + 3] = 0xA1;	/* Point */
+		buf[offset + 8] = 1;	/* Last track number */
+		offset += 11;
+
+		buf[offset] = 1;	/* Session Number */
+		buf[offset + 1] = 0x16;	/* Data track, copying allowed */
+		buf[offset + 2] = 0;	/* TNO */
+		buf[offset + 3] = 0xA2;	/* Point */
+		store_cdrom_address(&buf[offset + 7], msf, curlun->num_sectors);
+		return TOC_FORMAT2_SIZE;
+	}
+	curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+	return -EINVAL;
 }
 
 static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
@@ -1427,7 +1652,7 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	u8		*buf0 = buf;
 	int		pc, page_code;
 	int		changeable_values, all_pages;
-	int		valid_page = 0;
+	///*CONN-EH-SCSI-00-*/int		valid_page = 0;
 	int		len, limit;
 
 	if ((common->cmnd[1] & ~0x08) != 0) {	/* Mask away DBD */
@@ -1467,7 +1692,7 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	 * is the Caching page.
 	 */
 	if (page_code == 0x08 || all_pages) {
-		valid_page = 1;
+		///*CONN-EH-SCSI-00-*/valid_page = 1;
 		buf[0] = 0x08;		/* Page code */
 		buf[1] = 10;		/* Page length */
 		memset(buf+2, 0, 10);	/* None of the fields are changeable */
@@ -1492,7 +1717,7 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	 * isn't too long.
 	 */
 	len = buf - buf0;
-	if (!valid_page || len > limit) {
+	/*CONN-EH-SCSI-00**/if (len > limit) {
 		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
 		return -EINVAL;
 	}
@@ -1502,6 +1727,14 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 		buf0[0] = len - 1;
 	else
 		put_unaligned_be16(len - 2, buf0);
+
+        /*CONN-EH-SCSI-00+{*/
+	if (len < common->data_size_from_cmnd) {
+		common->data_size_from_cmnd = len;
+		common->residue = len;
+	}
+        /*CONN-EH-SCSI-00+}*/
+
 	return len;
 }
 
@@ -1509,6 +1742,7 @@ static int do_start_stop(struct fsg_common *common)
 {
 	struct fsg_lun	*curlun = common->curlun;
 	int		loej, start;
+	int		rc;/*CONN-EH-SCSI-00+*/
 
 	if (!curlun) {
 		return -EINVAL;
@@ -1529,11 +1763,35 @@ static int do_start_stop(struct fsg_common *common)
 	 * available for use as soon as it is loaded.
 	 */
 	if (start) {
+                /*CONN-EH-SCSI-00+{*/
+                #if 0
 		if (!fsg_lun_is_open(curlun)) {
 			curlun->sense_data = SS_MEDIUM_NOT_PRESENT;
 			return -EINVAL;
 		}
+                #endif
+                if (loej && !fsg_lun_is_open(curlun)) {
+			if (curlun->lun_filename) {
+				up_read(&common->filesem);
+				down_write(&common->filesem);
+				rc = fsg_lun_open(curlun, curlun->lun_filename);
+				up_write(&common->filesem);
+				down_read(&common->filesem);
+				if (!rc) {
+					curlun->unit_attention_data =
+					SS_NOT_READY_TO_READY_TRANSITION;
+				} else {
+					curlun->sense_data =
+						SS_MEDIUM_NOT_PRESENT;
+					return -EINVAL;
+				}
+			} else {
+				curlun->sense_data = SS_MEDIUM_NOT_PRESENT;
+				return -EINVAL;
+			}
+                /*CONN-EH-SCSI-00+}*/
 		return 0;
+	}
 	}
 
 	/* Are we allowed to unload the media? */
@@ -1547,6 +1805,7 @@ static int do_start_stop(struct fsg_common *common)
 		return 0;
 
 	/* Simulate an unload/eject */
+	if (fsg_lun_is_open(curlun)) {/*CONN-EH-SCSI-00+*/
 	if (common->ops && common->ops->pre_eject) {
 		int r = common->ops->pre_eject(common, curlun,
 					       curlun - common->luns);
@@ -1561,6 +1820,7 @@ static int do_start_stop(struct fsg_common *common)
 	fsg_lun_close(curlun);
 	up_write(&common->filesem);
 	down_read(&common->filesem);
+	}/*CONN-EH-SCSI-00+*/
 
 	return common->ops && common->ops->post_eject
 		? min(0, common->ops->post_eject(common, curlun,
@@ -1933,7 +2193,7 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 		 * we are allowed.
 		 */
 		common->data_size_from_cmnd = common->data_size;
-		common->phase_error = 1;
+		///*CONN-EH-SCSI-00-*/common->phase_error = 1;
 	}
 	common->residue = common->data_size;
 	common->usb_amount_left = common->data_size;
@@ -2074,7 +2334,7 @@ static int do_scsi_command(struct fsg_common *common)
 	case INQUIRY:
 		common->data_size_from_cmnd = common->cmnd[4];
 		reply = check_command(common, 6, DATA_DIR_TO_HOST,
-				      (1<<4), 0,
+				      (1<<1) | (1<<2) | (3<<3), 0,/*CONN-EH-SCSI-00**/
 				      "INQUIRY");
 		if (reply == 0)
 			reply = do_inquiry(common, bh);
@@ -2168,6 +2428,16 @@ static int do_scsi_command(struct fsg_common *common)
 		if (reply == 0)
 			reply = do_read_capacity(common, bh);
 		break;
+        /*CONN-EH-SCSI-00+{*/
+	case READ_CAPACITY_16:
+		common->data_size_from_cmnd = 32;
+		reply = check_command(common, 16, DATA_DIR_TO_HOST,
+				(0xff << 2) | (0xf << 10) | (1 << 14), 1,
+				"READ CAPACITY 16");
+		if (reply == 0)
+			reply = do_read_capacity16(common, bh);
+		break;
+        /*CONN-EH-SCSI-00+}*/
 
 	case READ_HEADER:
 		if (!common->curlun || !common->curlun->cdrom)
@@ -2187,7 +2457,7 @@ static int do_scsi_command(struct fsg_common *common)
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
 		reply = check_command(common, 10, DATA_DIR_TO_HOST,
-				      (7<<6) | (1<<1), 1,
+				      (0x0f<<6) | (1<<1), 1,
 				      "READ TOC");
 		if (reply == 0)
 			reply = do_read_toc(common, bh);
@@ -2869,7 +3139,21 @@ static inline void fsg_common_put(struct fsg_common *common)
 {
 	kref_put(&common->ref, fsg_common_release);
 }
-
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+static void fsg_common_setup_luns(struct fsg_common *common)
+{
+	if (common->storage_mode == STORAGE_MODE_MSC ||
+		common->cdrom_nluns < 1) {
+		common->nluns = common->msc_nluns;
+		common->luns = common->luns_all;
+	} else {
+		common->nluns = common->cdrom_nluns;
+		common->luns = &common->luns_all[common->msc_nluns];
+	}
+}
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 static struct fsg_common *fsg_common_init(struct fsg_common *common,
 					  struct usb_composite_dev *cdev,
 					  struct fsg_config *cfg)
@@ -2886,7 +3170,13 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		return ERR_PTR(rc);
 
 	/* Find out how many LUNs there should be */
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	nluns = cfg->nluns + cfg->cdrom_nluns;
+#else
 	nluns = cfg->nluns;
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 	if (nluns < 1 || nluns > FSG_MAX_LUNS) {
 		dev_err(&gadget->dev, "invalid number of LUNs: %u\n", nluns);
 		return ERR_PTR(-EINVAL);
@@ -2928,7 +3218,17 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		rc = -ENOMEM;
 		goto error_release;
 	}
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	common->luns_all = curlun;
 	common->luns = curlun;
+	common->msc_nluns = cfg->nluns;
+	common->cdrom_nluns = cfg->cdrom_nluns;
+	common->storage_mode = STORAGE_MODE_MSC;
+#else
+	common->luns = curlun;
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 
 	init_rwsem(&common->filesem);
 
@@ -3012,6 +3312,21 @@ buffhds_first_it:
 			i = 0x0399;
 		}
 	}
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	snprintf(common->inquiry_string, sizeof common->inquiry_string,
+		 "%-8s%-16s%04x", cfg->vendor_name ?: "Linux",
+		 /* Assume product name dependent on the first LUN */
+		 cfg->product_name ?: "File-Stor Gadget",
+		 i);
+	snprintf(common->cdrom_inquiry_string,
+		 sizeof common->cdrom_inquiry_string,
+		 "%-8s%-16s%04x",
+		 cfg->cdrom_vendor_name ?: "Linux   ",
+		 /* Assume product name dependent on the first LUN */
+		 cfg->cdrom_product_name ?: "File-CD Gadget  ",
+		 i);
+#else
 	snprintf(common->inquiry_string, sizeof common->inquiry_string,
 		 "%-8s%-16s%04x", cfg->vendor_name ?: "Linux",
 		 /* Assume product name dependent on the first LUN */
@@ -3019,6 +3334,10 @@ buffhds_first_it:
 				     ? "File-Stor Gadget"
 				     : "File-CD Gadget"),
 		 i);
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
+        strlcpy(common->serial_number, " ", sizeof(common->serial_number));/*MTD-CONN-EH-SCSI-00+*/
+
 
 	/*
 	 * Some peripheral controllers are known not to be able to
@@ -3067,7 +3386,11 @@ buffhds_first_it:
 		      p);
 	}
 	kfree(pathbuf);
-
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	fsg_common_setup_luns(common);
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 	DBG(common, "I/O thread pid: %d\n", task_pid_nr(common->thread_task));
 
 	wake_up_process(common->thread_task);
@@ -3092,11 +3415,17 @@ static void fsg_common_release(struct kref *ref)
 		raise_exception(common, FSG_STATE_EXIT);
 		wait_for_completion(&common->thread_notifier);
 	}
-
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	if (likely(common->luns_all)) {
+		struct fsg_lun *lun = common->luns_all;
+		unsigned i = common->msc_nluns + common->cdrom_nluns;
+#else
 	if (likely(common->luns)) {
 		struct fsg_lun *lun = common->luns;
 		unsigned i = common->nluns;
-
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 		/* In error recovery common->nluns may be zero. */
 		for (; i; --i, ++lun) {
 #ifdef CONFIG_USB_MSC_PROFILING
@@ -3106,10 +3435,17 @@ static void fsg_common_release(struct kref *ref)
 			device_remove_file(&lun->dev, &dev_attr_ro);
 			device_remove_file(&lun->dev, &dev_attr_file);
 			fsg_lun_close(lun);
+			kfree(lun->lun_filename);/*CONN-EH-SCSI-00+*/
+			lun->lun_filename = NULL;/*CONN-EH-SCSI-00+*/
 			device_unregister(&lun->dev);
 		}
-
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+		kfree(common->luns_all);
+#else
 		kfree(common->luns);
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 	}
 
 	{
@@ -3132,6 +3468,11 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct fsg_dev		*fsg = fsg_from_func(f);
 	struct fsg_common	*common = fsg->common;
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	int i;
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 
 	DBG(fsg, "unbind\n");
 	if (fsg->common->fsg == fsg) {
@@ -3140,7 +3481,15 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 		/* FIXME: make interruptible or killable somehow? */
 		wait_event(common->fsg_wait, common->fsg != fsg);
 	}
-
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	down_write(&common->filesem);
+	for (i = 0; i < common->nluns; i++)
+		if (fsg_lun_is_open(&common->luns[i]))
+			fsg_lun_close(&common->luns[i]);
+	up_write(&common->filesem);
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 	fsg_common_put(common);
 	usb_free_descriptors(fsg->function.descriptors);
 	usb_free_descriptors(fsg->function.hs_descriptors);

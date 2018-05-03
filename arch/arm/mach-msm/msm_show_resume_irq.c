@@ -1,4 +1,5 @@
 /* Copyright (c) 2011, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,7 +16,13 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
+//CORE-BH-SuspendLog-00+[
+#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+int msm_show_resume_irq_mask=1;
+#else
 int msm_show_resume_irq_mask;
+#endif
+//CORE-BH-SuspendLog-00+]
 
 module_param_named(
 	debug_mask, msm_show_resume_irq_mask, int, S_IRUGO | S_IWUSR | S_IWGRP

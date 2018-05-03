@@ -205,6 +205,7 @@ extern struct page *__page_cache_alloc(gfp_t gfp);
 #else
 static inline struct page *__page_cache_alloc(gfp_t gfp)
 {
+/*BSP-ELuo-SD_FUSE_Page_Alloc-00+[*/
 	struct page *page;
 
 	page = alloc_pages(gfp, 0);
@@ -215,6 +216,7 @@ static inline struct page *__page_cache_alloc(gfp_t gfp)
 	}
 
 	return page;
+/*BSP-ELuo-SD_FUSE_Page_Alloc-00]+*/	
 }
 #endif
 

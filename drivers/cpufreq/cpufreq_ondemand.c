@@ -5,6 +5,7 @@
  *            (C)  2003 Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>.
  *                      Jun Nakajima <jun.nakajima@intel.com>
  *            (c)  2013 The Linux Foundation. All rights reserved.
+ *  Copyright (C)  2014 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -396,6 +397,7 @@ static ssize_t store_sampling_rate(struct kobject *a, struct attribute *b,
 	ret = sscanf(buf, "%u", &input);
 	if (ret != 1)
 		return -EINVAL;
+	pr_info("[ondemand] %s set sampling_rate to %d\n", current->comm, input);
 	update_sampling_rate(input);
 	return count;
 }
@@ -408,6 +410,7 @@ static ssize_t store_input_boost(struct kobject *a, struct attribute *b,
 	ret = sscanf(buf, "%u", &input);
 	if (ret != 1)
 		return -EINVAL;
+	pr_info("[ondemand] %s set input_boost to %d\n", current->comm, input);
 	dbs_tuners_ins.input_boost = input;
 	return count;
 }
@@ -421,6 +424,7 @@ static ssize_t store_sync_freq(struct kobject *a, struct attribute *b,
 	ret = sscanf(buf, "%u", &input);
 	if (ret != 1)
 		return -EINVAL;
+	pr_info("[ondemand] %s set sync_freq to %d\n", current->comm, input);
 	dbs_tuners_ins.sync_freq = input;
 	return count;
 }
@@ -434,6 +438,7 @@ static ssize_t store_io_is_busy(struct kobject *a, struct attribute *b,
 	ret = sscanf(buf, "%u", &input);
 	if (ret != 1)
 		return -EINVAL;
+	pr_info("[ondemand] %s set io_is_busy to %d\n", current->comm, input);
 	dbs_tuners_ins.io_is_busy = !!input;
 	return count;
 }
@@ -447,6 +452,7 @@ static ssize_t store_down_differential_multi_core(struct kobject *a,
 	ret = sscanf(buf, "%u", &input);
 	if (ret != 1)
 		return -EINVAL;
+	pr_info("[ondemand] %s set down_differential_multi_core to %d\n", current->comm, input);
 	dbs_tuners_ins.down_differential_multi_core = input;
 	return count;
 }
@@ -461,6 +467,7 @@ static ssize_t store_optimal_freq(struct kobject *a, struct attribute *b,
 	ret = sscanf(buf, "%u", &input);
 	if (ret != 1)
 		return -EINVAL;
+	pr_info("[ondemand] %s set optimal_freq to %d\n", current->comm, input);
 	dbs_tuners_ins.optimal_freq = input;
 	return count;
 }
@@ -476,6 +483,7 @@ static ssize_t store_up_threshold(struct kobject *a, struct attribute *b,
 			input < MIN_FREQUENCY_UP_THRESHOLD) {
 		return -EINVAL;
 	}
+	pr_info("[ondemand] %s set up_threshold to %d\n", current->comm, input);
 	dbs_tuners_ins.up_threshold = input;
 	return count;
 }
@@ -491,6 +499,7 @@ static ssize_t store_up_threshold_multi_core(struct kobject *a,
 			input < MIN_FREQUENCY_UP_THRESHOLD) {
 		return -EINVAL;
 	}
+	pr_info("[ondemand] %s set up_threshold_multi_core to %d\n", current->comm, input);
 	dbs_tuners_ins.up_threshold_multi_core = input;
 	return count;
 }
@@ -506,6 +515,7 @@ static ssize_t store_up_threshold_any_cpu_load(struct kobject *a,
 			input < MIN_FREQUENCY_UP_THRESHOLD) {
 		return -EINVAL;
 	}
+	pr_info("[ondemand] %s set up_threshold_any_cpu_load to %d\n", current->comm, input);
 	dbs_tuners_ins.up_threshold_any_cpu_load = input;
 	return count;
 }
@@ -521,7 +531,7 @@ static ssize_t store_down_differential(struct kobject *a, struct attribute *b,
 			input < MIN_FREQUENCY_DOWN_DIFFERENTIAL) {
 		return -EINVAL;
 	}
-
+	pr_info("[ondemand] %s set down_differential to %d\n", current->comm, input);
 	dbs_tuners_ins.down_differential = input;
 
 	return count;
@@ -536,6 +546,7 @@ static ssize_t store_sampling_down_factor(struct kobject *a,
 
 	if (ret != 1 || input > MAX_SAMPLING_DOWN_FACTOR || input < 1)
 		return -EINVAL;
+	pr_info("[ondemand] %s set sampling_down_factor to %d\n", current->comm, input);
 	dbs_tuners_ins.sampling_down_factor = input;
 
 	/* Reset down sampling multiplier in case it was active */
@@ -565,6 +576,8 @@ static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
 	if (input == dbs_tuners_ins.ignore_nice) { /* nothing to do */
 		return count;
 	}
+
+	pr_info("[ondemand] %s set ignore_nice_load to %d\n", current->comm, input);
 	dbs_tuners_ins.ignore_nice = input;
 
 	/* we need to re-evaluate prev_cpu_idle */
@@ -613,7 +626,7 @@ static ssize_t store_powersave_bias(struct kobject *a, struct attribute *b,
 				POWERSAVE_BIAS_MAXLEVEL) ||
 				(dbs_tuners_ins.powersave_bias ==
 				POWERSAVE_BIAS_MINLEVEL));
-
+	pr_info("[ondemand] %s set powersave_bias to %d\n", current->comm, input);
 	dbs_tuners_ins.powersave_bias = input;
 
 	get_online_cpus();

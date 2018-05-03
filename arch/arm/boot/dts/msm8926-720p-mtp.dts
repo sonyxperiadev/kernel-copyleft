@@ -14,7 +14,11 @@
 /dts-v1/;
 /include/ "msm8926.dtsi"
 /include/ "msm8226-720p-mtp.dtsi"
-/include/ "msm8226-camera-sensor-mtp.dtsi"
+/include/ "dsi-panel-nt35521-720p-video-truly.dtsi"
+/include/ "dsi-panel-nt35521-720p-video-jdi.dtsi"
+/include/ "msm8226-camera-sensor-fih.dtsi"
+/include/ "msm8226-flash.dtsi"
+
 
 / {
 	model = "Qualcomm MSM 8926 MTP";

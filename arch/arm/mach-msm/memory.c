@@ -148,6 +148,11 @@ static void __init adjust_reserve_sizes(void)
 
 	mt = &reserve_info->memtype_reserve_table[0];
 	for (i = 0; i < MEMTYPE_MAX; i++, mt++) {
+		// BSP-LC-Reserve_Mem-00 +[
+		if (i == MEMTYPE_EBI1_FIH) {
+			continue;
+		}
+		// BSP-LC-Reserve_Mem-00 +]
 		if (mt->flags & MEMTYPE_FLAGS_1M_ALIGN)
 			mt->size = (mt->size + SECTION_SIZE - 1) & SECTION_MASK;
 		if (mt->size > mt->limit) {
@@ -162,12 +167,19 @@ static void __init reserve_memory_for_mempools(void)
 {
 	int memtype;
 	struct memtype_reserve *mt;
+	int ret;	// BSP-LC-Reserve_Mem-00 +
 	phys_addr_t alignment;
 
 	mt = &reserve_info->memtype_reserve_table[0];
 	for (memtype = 0; memtype < MEMTYPE_MAX; memtype++, mt++) {
+		// BSP-LC-Reserve_Mem-00 *[
 		if (mt->flags & MEMTYPE_FLAGS_FIXED || !mt->size)
+		{
+			ret = memblock_remove(mt->start, mt->size);
+			BUG_ON(ret);
 			continue;
+		}
+		// BSP-LC-Reserve_Mem-00 *]
 		alignment = (mt->flags & MEMTYPE_FLAGS_1M_ALIGN) ?
 			SZ_1M : PAGE_SIZE;
 		mt->start = arm_memblock_steal(mt->size, alignment);
@@ -255,6 +267,7 @@ static char * const memtype_names[] = {
 	[MEMTYPE_SMI]	= "SMI",
 	[MEMTYPE_EBI0] = "EBI0",
 	[MEMTYPE_EBI1] = "EBI1",
+	[MEMTYPE_EBI1_FIH] = "EBI1_FIH",    // BSP-LC-Reserve_Mem-00 +
 };
 
 int msm_get_memory_type_from_name(const char *memtype_name)

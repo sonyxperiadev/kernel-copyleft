@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ *  Copyright(C) 2013 Foxconn International Holdings, Ltd. All rights reserved
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,9 +17,11 @@
 #include "msm_cci.h"
 #include "msm_camera_io_util.h"
 #include "msm_camera_i2c_mux.h"
+#include "../../../../../gpio/gpio-msm-common.h"/* MM-MC-AddCameraSwitchMechanismForSecondSource+ */
 #include <mach/rpm-regulator.h>
 #include <mach/rpm-regulator-smd.h>
 #include <linux/regulator/consumer.h>
+
 
 #undef CDBG
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
@@ -26,6 +29,23 @@
 #else
 #define CDBG(fmt, args...) do { } while (0)
 #endif
+
+/* MM-MC-AddCameraSwitchMechanismForSecondSource+{ */
+#define FRONT_CAM_MODULE_PIN 114 //GPIO_114
+#define MAIN_CAM_NAME "imx134"
+#define FRONT_CAM_NAME "imx188"
+#define GPIO_HIGH 1
+#define SONY_IU134FB 0x0C
+#define SONY_IU134F3 0x02
+#define OMP_IMX134 0x0A/* MM-MC-AddCameraSwitchMechanismForSecondSource-01* */
+extern int g_MainCamModuleId;
+/* MM-MC-AddCameraSwitchMechanismForSecondSource+} */
+
+/*MM-YW-IMX134 LSC setting-00+{*/
+extern uint8_t *g_SonyImx134_LSC_ptr;
+extern int SonyImx134LSC_Module;
+/*MM-YW-IMX134 LSC setting-00+}*/
+
 
 static int32_t msm_sensor_enable_i2c_mux(struct msm_camera_i2c_conf *i2c_conf)
 {
@@ -553,6 +573,25 @@ int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_RESET]);
 	}
 
+	/*MM-SL-BringUpCameraSensorIMX188-00+{ */
+	if (of_property_read_bool(of_node, "qcom,gpio-reset1") == true) {
+		rc = of_property_read_u32(of_node, "qcom,gpio-reset1", &val);
+		if (rc < 0) {
+			pr_err("%s:%d read qcom,gpio-reset1 failed rc %d\n",
+				__func__, __LINE__, rc);
+			goto ERROR;
+		} else if (val >= gpio_array_size) {
+			pr_err("%s:%d qcom,gpio-reset1 invalid %d\n",
+				__func__, __LINE__, val);
+			goto ERROR;
+		}
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_RESET1] =
+			gpio_array[val];
+		CDBG("%s qcom,gpio-reset1 %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_RESET1]);
+	}	
+	/*MM-SL-BringUpCameraSensorIMX188-00+} */
+
 	if (of_property_read_bool(of_node, "qcom,gpio-standby") == true) {
 		rc = of_property_read_u32(of_node, "qcom,gpio-standby", &val);
 		if (rc < 0) {
@@ -566,9 +605,60 @@ int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 		}
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY] =
 			gpio_array[val];
-		CDBG("%s qcom,gpio-reset %d\n", __func__,
+		CDBG("%s qcom,gpio-standby %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY]);
 	}
+
+	/*MM-SL-BringUpCameraSensorIMX134-00+{ */
+	if (of_property_read_bool(of_node, "qcom,gpio-cam-vaa-v2p8") == true) {
+		rc = of_property_read_u32(of_node, "qcom,gpio-cam-vaa-v2p8", &val);
+		if (rc < 0) {
+			pr_err("%s:%d read qcom,gpio-cam-vaa-v2p8 failed rc %d\n",
+				__func__, __LINE__, rc);
+			goto ERROR;
+		} else if (val >= gpio_array_size) {
+			pr_err("%s:%d qcom,gpio-cam-vaa-v2p8 invalid %d\n",
+				__func__, __LINE__, val);
+			goto ERROR;
+		}
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_CAM_VAA_V2P8] =
+			gpio_array[val];
+		CDBG("%s qcom,gpio-cam-vaa-v2p8 %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_CAM_VAA_V2P8]);
+	}
+	if (of_property_read_bool(of_node, "qcom,gpio-cam-vddaf-v2p8") == true) {
+		rc = of_property_read_u32(of_node, "qcom,gpio-cam-vddaf-v2p8", &val);
+		if (rc < 0) {
+			pr_err("%s:%d read qcom,gpio-cam-vddaf-v2p8 failed rc %d\n",
+				__func__, __LINE__, rc);
+			goto ERROR;
+		} else if (val >= gpio_array_size) {
+			pr_err("%s:%d qcom,gpio-cam-vddaf-v2p8 invalid %d\n",
+				__func__, __LINE__, val);
+			goto ERROR;
+		}
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_CAM_VDDAF_V2P8] =
+			gpio_array[val];
+		CDBG("%s qcom,gpio-cam-vddaf-v2p8 %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_CAM_VDDAF_V2P8]);
+	}
+	if (of_property_read_bool(of_node, "qcom,gpio-cam-vddio-v1p8") == true) {
+		rc = of_property_read_u32(of_node, "qcom,gpio-cam-vddio-v1p8", &val);
+		if (rc < 0) {
+			pr_err("%s:%d read qcom,gpio-cam-vddio-v1p8 failed rc %d\n",
+				__func__, __LINE__, rc);
+			goto ERROR;
+		} else if (val >= gpio_array_size) {
+			pr_err("%s:%d qcom,gpio-cam-vddio-v1p8 invalid %d\n",
+				__func__, __LINE__, val);
+			goto ERROR;
+		}
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_CAM_VDDIO_V1P8] =
+			gpio_array[val];
+		CDBG("%s qcom,gpio-cam-vddio-v1p8 %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_CAM_VDDIO_V1P8]);
+	}
+	/*MM-SL-BringUpCameraSensorIMX134-00+} */
 
 	rc = of_property_read_u32(of_node, "qcom,gpio-vio", &val);
 	if (!rc) {
@@ -957,7 +1047,7 @@ static struct msm_cam_clk_info cam_8610_clk_info[] = {
 };
 
 static struct msm_cam_clk_info cam_8974_clk_info[] = {
-	[SENSOR_CAM_MCLK] = {"cam_src_clk", 24000000},
+	[SENSOR_CAM_MCLK] = {"cam_src_clk", 24000000}, /*MM-SL-BringUpCameraSensorIMX134-00* */
 	[SENSOR_CAM_CLK] = {"cam_clk", 0},
 };
 
@@ -1212,7 +1302,9 @@ int32_t msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 	msm_camera_request_gpio_table(
 		data->gpio_conf->cam_gpio_req_tbl,
 		data->gpio_conf->cam_gpio_req_tbl_size, 0);
-	CDBG("%s exit\n", __func__);
+	//Delay 20ms to avoid next poll up sequence abnormal while power down
+	msleep(20);
+	CDBG("%s exit\n", __func__);	
 	return 0;
 }
 
@@ -1236,6 +1328,45 @@ int32_t msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("msm_sensor_match_id chip id doesnot match\n");
 		return -ENODEV;
 	}
+
+    /* MM-MC-AddCameraSwitchMechanismForSecondSource+{ */
+    s_ctrl->sensordata->module_name = "Unknown";
+    if (strcmp(FRONT_CAM_NAME, s_ctrl->sensordata->sensor_name) == 0)
+    {
+        if (__msm_gpio_get_inout(FRONT_CAM_MODULE_PIN) != GPIO_HIGH)
+            s_ctrl->sensordata->module_name = "Front-LiteOn";
+        else
+            s_ctrl->sensordata->module_name = "Front-OMP";
+        
+        printk("%s: Front sensor_name = %s, module_name = %s.\n", __func__
+                                                                , s_ctrl->sensordata->sensor_name
+                                                                , s_ctrl->sensordata->module_name);
+    }
+    else if (strcmp(MAIN_CAM_NAME, s_ctrl->sensordata->sensor_name) == 0)
+    {
+        if ((g_MainCamModuleId == SONY_IU134FB) || (g_MainCamModuleId == SONY_IU134F3))
+        {
+			/*MM-YW-IMX134 LSC setting-00+{*/
+			if(!SonyImx134LSC_Module)
+				s_ctrl->sensordata->module_name = "Main-Sony";
+			else
+				s_ctrl->sensordata->module_name = "Main-SonyLSC";
+			/*MM-YW-IMX134 LSC setting-00+}*/
+        }
+
+        if (g_MainCamModuleId == OMP_IMX134)
+            s_ctrl->sensordata->module_name = "Main-OMP";
+        
+        printk("%s: Main sensor_name = %s, module_name = %s, g_MainCamModuleId = 0x%x.\n"
+                                                                      , __func__
+                                                                      , s_ctrl->sensordata->sensor_name
+                                                                      , s_ctrl->sensordata->module_name
+                                                                      , g_MainCamModuleId);
+    }
+    else
+        pr_err("%s: Unknown sensor_name = %s.\n", __func__, s_ctrl->sensordata->sensor_name);
+    /* MM-MC-AddCameraSwitchMechanismForSecondSource+} */
+
 	return rc;
 }
 
@@ -1302,6 +1433,12 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 		s_ctrl->sensordata->sensor_name, cdata->cfgtype);
 	switch (cdata->cfgtype) {
 	case CFG_GET_SENSOR_INFO:
+        /* MM-MC-AddCameraSwitchMechanismForSecondSource+{ */
+		memcpy(cdata->cfg.sensor_info.module_name,
+			s_ctrl->sensordata->module_name,
+			sizeof(cdata->cfg.sensor_info.module_name));
+        printk("%s: module_name = %s.\n", __func__, cdata->cfg.sensor_info.module_name);
+        /* MM-MC-AddCameraSwitchMechanismForSecondSource+} */
 		memcpy(cdata->cfg.sensor_info.sensor_name,
 			s_ctrl->sensordata->sensor_name,
 			sizeof(cdata->cfg.sensor_info.sensor_name));
@@ -1317,7 +1454,6 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 		for (i = 0; i < SUB_MODULE_MAX; i++)
 			CDBG("%s:%d subdev_id[%d] %d\n", __func__, __LINE__, i,
 				cdata->cfg.sensor_info.subdev_id[i]);
-
 		break;
 	case CFG_GET_SENSOR_INIT_PARAMS:
 		cdata->cfg.sensor_init_params =
@@ -1442,13 +1578,77 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 			rc = -EFAULT;
 			break;
 		}
-
+			 
 		conf_array.reg_setting = reg_setting;
 		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write_table(
 			s_ctrl->sensor_i2c_client, &conf_array);
 		kfree(reg_setting);
 		break;
 	}
+	/*MM-YW-IMX134 LSC setting-00+{*/
+	case CFG_SET_INIT_SETTING:{
+		struct msm_camera_i2c_reg_setting conf_array;
+		struct msm_camera_i2c_reg_array *sonyLSC_data_array = NULL;
+		uint8_t *ptr = NULL;
+
+		if (s_ctrl->sensor_state != MSM_SENSOR_POWER_UP) {
+			pr_err("%s:%d failed: invalid state %d\n", __func__,
+				__LINE__, s_ctrl->sensor_state);
+			rc = -EFAULT;
+			break;
+		}	
+		if(SonyImx134LSC_Module)
+		{
+			sonyLSC_data_array = kzalloc( (SONY_IMX134_LSC_DATA_LENGTH + 3) *
+				(sizeof(struct msm_camera_i2c_reg_array)), GFP_KERNEL );
+
+			if(!sonyLSC_data_array){
+				pr_err("%s:%d failed\n", __func__, __LINE__);
+				rc = -ENOMEM;
+				break;
+			}
+
+			ptr = g_SonyImx134_LSC_ptr;
+			for (i = 0; i < SONY_IMX134_LSC_DATA_LENGTH; i++,ptr++)
+			{
+				sonyLSC_data_array[i].delay = 0;
+				sonyLSC_data_array[i].reg_addr = SONY_LSC_REG_SETTING_INDEX + i;
+				sonyLSC_data_array[i].reg_data = *ptr;
+				CDBG("%s: sonyLSC_data_array[0x%X] = 0x%X\n", __func__,
+					sonyLSC_data_array[i].reg_addr, sonyLSC_data_array[i].reg_data);
+			}
+			//EN_LSC reg setting
+			sonyLSC_data_array[i].delay = 0;
+			sonyLSC_data_array[i].reg_addr = 0x4500;
+			sonyLSC_data_array[i].reg_data = 0x1f;
+			i++;
+			//EN_LSC reg setting
+			sonyLSC_data_array[i].delay = 0;
+			sonyLSC_data_array[i].reg_addr = 0x0700;
+			sonyLSC_data_array[i].reg_data = 0x01;
+			i++;
+			//EN LSC Parameters setting
+			sonyLSC_data_array[i].delay = 0;
+			sonyLSC_data_array[i].reg_addr = 0x3a63;
+			sonyLSC_data_array[i].reg_data = 0x01;
+
+			conf_array.reg_setting = sonyLSC_data_array;
+			conf_array.size = SONY_IMX134_LSC_DATA_LENGTH+3;
+			conf_array.addr_type = MSM_CAMERA_I2C_WORD_ADDR,
+			conf_array.data_type = MSM_CAMERA_I2C_BYTE_DATA,
+			conf_array.delay = 0,
+
+			rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write_table(
+				s_ctrl->sensor_i2c_client, &conf_array);
+
+			if(rc <0)
+				pr_err("%s:%d failed\n", __func__, __LINE__);
+
+			kfree(sonyLSC_data_array);
+		}
+		break;
+	}
+	/*MM-YW-IMX134 LSC setting-00+}*/
 	case CFG_SLAVE_READ_I2C: {
 		struct msm_camera_i2c_read_config read_config;
 		uint16_t local_data = 0;
@@ -1504,7 +1704,6 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 		struct msm_camera_i2c_reg_array *reg_setting = NULL;
 		uint16_t write_slave_addr = 0;
 		uint16_t orig_slave_addr = 0;
-
 		if (copy_from_user(&write_config,
 			(void *)cdata->cfg.setting,
 			sizeof(struct msm_camera_i2c_array_write_config))) {

@@ -187,6 +187,20 @@ config KEYBOARD_GPIO
 	  To compile this driver as a module, choose M here: the
 	  module will be called gpio_keys.
 
+config FIH_KEYBOARD_GPIO
+	tristate "FIH GPIO Buttons"
+	depends on GENERIC_GPIO
+	select FIH_DEVELOPMENT_TOOL
+	help
+      FIH GPIO button driver.
+
+config FIH_HALL_SENSOR
+	tristate "FIH HALL SENSOR"
+	depends on GENERIC_GPIO
+	select FIH_DEVELOPMENT_TOOL
+	help
+      FIH Hall sensor driver.      
+
 config KEYBOARD_GPIO_POLLED
 	tristate "Polled GPIO buttons"
 	depends on GENERIC_GPIO

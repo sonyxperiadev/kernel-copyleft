@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -121,7 +122,7 @@
 #define WCD9XXX_V_CS_HS_MAX 500
 #define WCD9XXX_V_CS_NO_MIC 5
 #define WCD9XXX_MB_MEAS_DELTA_MAX_MV 80
-#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 12
+#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 100//12  /* MM-NC-DeltaValue-00 */
 
 static int impedance_detect_en;
 module_param(impedance_detect_en, int,
@@ -184,7 +185,7 @@ static void wcd9xxx_mbhc_calc_thres(struct wcd9xxx_mbhc *mbhc);
 
 static bool wcd9xxx_mbhc_polling(struct wcd9xxx_mbhc *mbhc)
 {
-	return mbhc->polling_active;
+	return snd_soc_read(mbhc->codec, WCD9XXX_A_CDC_MBHC_EN_CTL) & 0x1;
 }
 
 static void wcd9xxx_turn_onoff_override(struct wcd9xxx_mbhc *mbhc, bool on)
@@ -538,13 +539,13 @@ static void wcd9xxx_codec_switch_cfilt_mode(struct wcd9xxx_mbhc *mbhc,
 
 	if (cfilt_mode.cur_mode_val
 			!= cfilt_mode.reg_mode_val) {
-		if (mbhc->polling_active)
+		if (mbhc->polling_active && wcd9xxx_mbhc_polling(mbhc))
 			wcd9xxx_pause_hs_polling(mbhc);
 		snd_soc_update_bits(codec,
 				    mbhc->mbhc_bias_regs.cfilt_ctl,
 					cfilt_mode.reg_mask,
 					cfilt_mode.reg_mode_val);
-		if (mbhc->polling_active)
+		if (mbhc->polling_active && wcd9xxx_mbhc_polling(mbhc))
 			wcd9xxx_start_hs_polling(mbhc);
 		pr_debug("%s: CFILT mode change (%x to %x)\n", __func__,
 			cfilt_mode.cur_mode_val,
@@ -1361,7 +1362,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		} else
 			d->_type = PLUG_TYPE_HEADSET;
 
-		pr_debug("%s: DCE #%d, %04x, V %04d(%04d), HPHL %d TYPE %d\n",
+		pr_info("%s: DCE #%d, %04x, V %04d(%04d), HPHL %d TYPE %d\n",
 			 __func__, i, d->dce, vdce, d->_vdces,
 			 d->hphl_status & 0x01,
 			 d->_type);
@@ -1379,7 +1380,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		    (d->mic_bias &&
 		    (d->_vdces >= WCD9XXX_MEAS_INVALD_RANGE_LOW_MV &&
 		     d->_vdces <= WCD9XXX_MEAS_INVALD_RANGE_HIGH_MV))) {
-			pr_debug("%s: within invalid range\n", __func__);
+			pr_warn("%s: within invalid range\n", __func__);
 			type = PLUG_TYPE_INVALID;
 			goto exit;
 		}
@@ -1392,7 +1393,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 	for (i = 0, d = dt; i < sz; i++, d++) {
 		if ((i > 0) && !d->mic_bias && !d->swap_gnd &&
 		    (d->_type != dprev->_type)) {
-			pr_debug("%s: Invalid, inconsistent types\n", __func__);
+			pr_warn("%s: Invalid, inconsistent types\n", __func__);
 			type = PLUG_TYPE_INVALID;
 			goto exit;
 		}
@@ -1400,7 +1401,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		if (!d->swap_gnd && !d->mic_bias &&
 		    (abs(minv - d->_vdces) > delta_thr ||
 		     abs(maxv - d->_vdces) > delta_thr)) {
-			pr_debug("%s: Invalid, delta %dmv, %dmv and %dmv\n",
+			pr_warn("%s: Invalid, delta %dmv, %dmv and %dmv\n",
 				 __func__, d->_vdces, minv, maxv);
 			type = PLUG_TYPE_INVALID;
 			goto exit;
@@ -1415,7 +1416,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 	}
 	if (dgnd && dt->_type != PLUG_TYPE_HEADSET &&
 	    dt->_type != dgnd->_type) {
-		pr_debug("%s: Invalid, inconsistent types\n", __func__);
+		pr_warn("%s: Invalid, inconsistent types\n", __func__);
 		type = PLUG_TYPE_INVALID;
 		goto exit;
 	}
@@ -1447,7 +1448,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 			 */
 			goto exit;
 		} else if (dgnd->_type != PLUG_TYPE_HEADSET && !dmicbias) {
-			pr_debug("%s: Invalid, inconsistent types\n", __func__);
+			pr_warn("%s: Invalid, inconsistent types\n", __func__);
 			type = PLUG_TYPE_INVALID;
 		}
 	}
@@ -1455,7 +1456,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 	if (event_state & (1 << MBHC_EVENT_PA_HPHL)) {
 		pr_debug("%s: HPHL PA was ON\n", __func__);
 	} else if (ch != sz && ch > 0) {
-		pr_debug("%s: Invalid, inconsistent HPHL..\n", __func__);
+		pr_warn("%s: Invalid, inconsistent HPHL..\n", __func__);
 		type = PLUG_TYPE_INVALID;
 		goto exit;
 	}
@@ -1463,7 +1464,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 	if (!(event_state & (1UL << MBHC_EVENT_PA_HPHL))) {
 		if (((type == PLUG_TYPE_HEADSET ||
 		      type == PLUG_TYPE_HEADPHONE) && ch != sz)) {
-			pr_debug("%s: Invalid, not fully inserted, TYPE %d\n",
+			pr_warn("%s: Invalid, not fully inserted, TYPE %d\n",
 				 __func__, type);
 			type = PLUG_TYPE_INVALID;
 		}
@@ -1475,7 +1476,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		mbhc->micbias_enable = true;
 
 exit:
-	pr_debug("%s: Plug type %d detected\n", __func__, type);
+	pr_info("%s: Plug type %d detected\n", __func__, type);
 	return type;
 }
 
@@ -1511,13 +1512,16 @@ wcd9xxx_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 			d->_vdces = scale_v_micb_vddio(mbhc, vdce, false);
 		else
 			d->_vdces = vdce;
-
-		if (d->_vdces >= no_mic && d->_vdces < hs_max)
+		/*SW-MM-CL-MBHC-00*[*/
+		if (d->_vdces >= 750 && d->_vdces < hs_max)
 			d->_type = PLUG_TYPE_HEADSET;
+		else if (d->_vdces >= no_mic && d->_vdces < 750)
+			d->_type = PLUG_TYPE_NOT_SUPPORT;
 		else if (d->_vdces < no_mic)
 			d->_type = PLUG_TYPE_HEADPHONE;
 		else
 			d->_type = PLUG_TYPE_HIGH_HPH;
+		/*SW-MM-CL-MBHC-00*]*/
 
 		ch += d->hphl_status & 0x01;
 		if (!d->swap_gnd && !d->hwvalue && !d->vddio) {
@@ -1561,11 +1565,15 @@ wcd9xxx_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 			continue;
 		}
 
-		if ((i > 0) && (d->_type != dprev->_type)) {
-			pr_debug("%s: Invalid, inconsistent types\n", __func__);
-			type = PLUG_TYPE_INVALID;
-			goto exit;
+		/* MM-AY-Coverity92210-00-[+ */
+		if (dprev != NULL) {
+			if ((i > 0) && (d->_type != dprev->_type)) {
+				pr_debug("%s: Invalid, inconsistent types\n", __func__);
+				type = PLUG_TYPE_INVALID;
+				goto exit;
+			}
 		}
+		/* MM-AY-Coverity92210-00-]- */
 
 		if (!d->swap_gnd && !d->hwvalue &&
 		    (abs(minv - d->_vdces) > WCD9XXX_MEAS_DELTA_MAX_MV ||
@@ -2073,6 +2081,12 @@ static void wcd9xxx_find_plug_and_report(struct wcd9xxx_mbhc *mbhc,
 							  MBHC_USE_HPHL_TRIGGER,
 						 false);
 		}
+/*SW-MM-CL-MBHC-00*[*/
+	} else if (plug_type == PLUG_TYPE_NOT_SUPPORT) {
+		wcd9xxx_report_plug(mbhc, 1, SND_JACK_UNSUPPORTED);
+		msleep(100);
+		wcd9xxx_cleanup_hs_polling(mbhc);
+/*SW-MM-CL-MBHC-00*]*/
 	} else {
 		WARN(1, "Unexpected current plug_type %d, plug_type %d\n",
 		     mbhc->current_plug, plug_type);
@@ -3160,7 +3174,8 @@ void wcd9xxx_update_z(struct wcd9xxx_mbhc *mbhc)
  * wcd9xxx_update_rel_threshold : update mbhc release upper bound threshold
  *				  to ceilmv + buffer
  */
-static int wcd9xxx_update_rel_threshold(struct wcd9xxx_mbhc *mbhc, int ceilmv)
+static int wcd9xxx_update_rel_threshold(struct wcd9xxx_mbhc *mbhc, int ceilmv,
+					bool vddio)
 {
 	u16 v_brh, v_b1_hu;
 	int mv;
@@ -3170,6 +3185,8 @@ static int wcd9xxx_update_rel_threshold(struct wcd9xxx_mbhc *mbhc, int ceilmv)
 
 	btn_det = WCD9XXX_MBHC_CAL_BTN_DET_PTR(calibration);
 	mv = ceilmv + btn_det->v_btn_press_delta_cic;
+	if (vddio)
+		mv = scale_v_micb_vddio(mbhc, mv, true);
 	pr_debug("%s: reprogram vb1hu/vbrh to %dmv\n", __func__, mv);
 
 	if (mbhc->mbhc_state != MBHC_STATE_POTENTIAL_RECOVERY) {
@@ -3212,7 +3229,7 @@ irqreturn_t wcd9xxx_dce_handler(int irq, void *data)
 	int n_btn_meas = d->n_btn_meas;
 	void *calibration = mbhc->mbhc_cfg->calibration;
 
-	pr_debug("%s: enter\n", __func__);
+	pr_info("%s: enter\n", __func__);
 
 	WCD9XXX_BCL_LOCK(mbhc->resmgr);
 	mbhc_status = snd_soc_read(codec, WCD9XXX_A_CDC_MBHC_B1_STATUS) & 0x3E;
@@ -3320,7 +3337,7 @@ irqreturn_t wcd9xxx_dce_handler(int irq, void *data)
 					  mbhc->mbhc_data.micb_mv);
 	mv_s[0] = vddio ? scale_v_micb_vddio(mbhc, mv[0], false) : mv[0];
 	btnmeas[0] = wcd9xxx_determine_button(mbhc, mv_s[0]);
-	pr_debug("%s: Meas HW - DCE 0x%x,%d,%d button %d\n", __func__,
+	pr_info("%s: Meas HW - DCE 0x%x,%d,%d button %d\n", __func__,
 		 dce[0] & 0xFFFF, mv[0], mv_s[0], btnmeas[0]);
 	if (n_btn_meas == 0)
 		btn = btnmeas[0];
@@ -3331,7 +3348,7 @@ irqreturn_t wcd9xxx_dce_handler(int irq, void *data)
 		mv_s[meas] = vddio ? scale_v_micb_vddio(mbhc, mv[meas], false) :
 				     mv[meas];
 		btnmeas[meas] = wcd9xxx_determine_button(mbhc, mv_s[meas]);
-		pr_debug("%s: Meas %d - DCE 0x%x,%d,%d button %d\n",
+		pr_info("%s: Meas %d - DCE 0x%x,%d,%d button %d\n",
 			 __func__, meas, dce[meas] & 0xFFFF, mv[meas],
 			 mv_s[meas], btnmeas[meas]);
 		/*
@@ -3370,7 +3387,7 @@ irqreturn_t wcd9xxx_dce_handler(int irq, void *data)
 						       MBHC_BTN_DET_V_BTN_HIGH);
 		WARN_ON(btn >= btn_det->num_btn);
 		/* reprogram release threshold to catch voltage ramp up early */
-		wcd9xxx_update_rel_threshold(mbhc, v_btn_high[btn]);
+		wcd9xxx_update_rel_threshold(mbhc, v_btn_high[btn], vddio);
 
 		mask = wcd9xxx_get_button_mask(btn);
 		mbhc->buttons_pressed |= mask;

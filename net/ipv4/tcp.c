@@ -3,6 +3,8 @@
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
  *
+ * Copyright(C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
+ *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
  * Authors:	Ross Biro
@@ -3451,7 +3453,7 @@ restart:
 			bh_unlock_sock(sk);
 			local_bh_enable();
 			sock_put(sk);
-
+			
 			goto restart;
 		}
 		spin_unlock_bh(lock);

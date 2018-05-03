@@ -1032,4 +1032,6 @@ config TOUCHSCREEN_GT9XX
 
 source "drivers/input/touchscreen/gt9xx/Kconfig"
 
+source "drivers/input/touchscreen/cypress-gen4/Kconfig"
+
 endif

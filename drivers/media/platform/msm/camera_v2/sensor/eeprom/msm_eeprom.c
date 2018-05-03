@@ -24,6 +24,17 @@
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
 
+/* MM-MC-AddCameraSwitchMechanismForSecondSource+{ */
+int g_MainCamModuleId;
+#define MODULE_INDEX 0x46
+/* MM-MC-AddCameraSwitchMechanismForSecondSource+} */
+
+/*MM-YW-IMX134 LSC setting-00+{*/
+uint8_t *g_SonyImx134_LSC_ptr;
+int SonyImx134LSC_Module;
+/*MM-YW-IMX134 LSC setting-00+}*/
+
+
 DEFINE_MSM_MUTEX(msm_eeprom_mutex);
 
 int32_t msm_eeprom_config(struct msm_eeprom_ctrl_t *e_ctrl,
@@ -155,6 +166,7 @@ static const struct v4l2_subdev_internal_ops msm_eeprom_internal_ops = {
 	.close = msm_eeprom_close,
 };
 
+uint16_t eeprom_saddr[8] = {0xa0, 0xa2, 0xa4, 0xa6, 0xa8, 0xaa, 0xac, 0xae}; /*MM-MC-AddIMX134EEProme-01+ */
 int32_t read_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl)
 {
 	int rc = 0;
@@ -172,6 +184,13 @@ int32_t read_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl)
 	emap = eb_info->eeprom_map;
 
 	for (j = 0; j < eb_info->num_blocks; j++) {
+
+        e_ctrl->eboard_info->i2c_slaveaddr = eeprom_saddr[j];/* MM-MC-AddIMX134EEProme-01+ */
+        e_ctrl->i2c_client.cci_client->sid = eeprom_saddr[j] >> 1;  /*MM-SL-AddIMX134EEProme-00+ */
+        #if 0/* Enable for debuging */
+        pr_err("%s: i2c_slaveaddr = %x, j = %d\n", __func__, e_ctrl->eboard_info->i2c_slaveaddr, j);
+		pr_err("%s: e_ctrl->i2c_client.cci_client->sid = %x, j = %d\n", __func__, e_ctrl->i2c_client.cci_client->sid, j);
+        #endif
 		if (emap[j].page.valid_size) {
 			e_ctrl->i2c_client.addr_type = emap[j].page.addr_t;
 			rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_write(
@@ -215,6 +234,14 @@ int32_t read_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl)
 				pr_err("%s: read failed\n", __func__);
 				return rc;
 			}
+            
+            #if 0/* Enable for debuging */
+            {
+                int i = 0;
+                for (i = 0; i < 5; i++)
+                    pr_err("memptr[%d] = 0x%X\n", j, memptr[i]);
+            }
+            #endif
 			memptr += emap[j].mem.valid_size;
 		}
 		if (emap[j].pageen.valid_size) {
@@ -389,7 +416,7 @@ static struct msm_cam_clk_info cam_8960_clk_info[] = {
 };
 
 static struct msm_cam_clk_info cam_8974_clk_info[] = {
-	[SENSOR_CAM_MCLK] = {"cam_src_clk", 19200000},
+	[SENSOR_CAM_MCLK] = {"cam_src_clk", 24000000}, /*MM-SL-AddIMX134EEProme-00* */
 	[SENSOR_CAM_CLK] = {"cam_clk", 0},
 };
 
@@ -624,7 +651,7 @@ static int msm_eeprom_spi_setup(struct spi_device *spi)
 	client = &e_ctrl->i2c_client;
 	e_ctrl->is_supported = 0;
 
-	spi_client = kzalloc(sizeof(spi_client), GFP_KERNEL);
+	spi_client = kzalloc(sizeof(struct msm_camera_spi_client), GFP_KERNEL);/* MM-CL-coverity94504-01**/
 	if (!spi_client) {
 		pr_err("%s:%d kzalloc failed\n", __func__, __LINE__);
 		kfree(e_ctrl);
@@ -645,7 +672,7 @@ static int msm_eeprom_spi_setup(struct spi_device *spi)
 	client->i2c_func_tbl = &msm_eeprom_spi_func_tbl;
 	client->addr_type = MSM_CAMERA_I2C_3B_ADDR;
 
-	eb_info = kzalloc(sizeof(eb_info), GFP_KERNEL);
+	eb_info = kzalloc(sizeof(struct msm_eeprom_board_info), GFP_KERNEL);/* MM-CL-coverity94504-00**/
 	if (!eb_info)
 		goto spi_free;
 	e_ctrl->eboard_info = eb_info;
@@ -907,12 +934,35 @@ static int32_t msm_eeprom_platform_probe(struct platform_device *pdev)
 	for (j = 0; j < e_ctrl->num_bytes; j++)
 		CDBG("memory_data[%d] = 0x%X\n", j, e_ctrl->memory_data[j]);
 
+    /* MM-MC-AddCameraSwitchMechanismForSecondSource+{ */
+    g_MainCamModuleId = e_ctrl->memory_data[MODULE_INDEX];
+    printk("g_MainCamModuleId = 0x%x\n", g_MainCamModuleId);
+    /* MM-MC-AddCameraSwitchMechanismForSecondSource+} */
+
+	/*MM-YW-IMX134 LSC setting-00+{*/
+	j = 0;
+	while(e_ctrl->memory_data[SONY_EEPROM_LSC_INDEX + j] != 0xFF && j < SONY_EEPROM_LSC_CHECKNUM)
+	{
+		CDBG("%s memory_data[%d] = %x\n", __func__,SONY_EEPROM_LSC_INDEX + j, e_ctrl->memory_data[SONY_EEPROM_LSC_INDEX + j]);
+		j++;
+	}
+	if(j == SONY_EEPROM_LSC_CHECKNUM)
+	{
+		g_SonyImx134_LSC_ptr = &e_ctrl->memory_data[SONY_EEPROM_LSC_INDEX];
+		SonyImx134LSC_Module = 1;
+		CDBG("%s Sony EEPROM_LSC module is recognized", __func__);
+	}
+	/*MM-YW-IMX134 LSC setting-00+}*/
+
 	rc = msm_camera_power_down(power_info, e_ctrl->eeprom_device_type,
 		&e_ctrl->i2c_client);
 	if (rc) {
 		pr_err("failed rc %d\n", rc);
 		goto memdata_free;
-	}
+	}	
+	//Delay 20ms to avoid next poll up sequence abnormal while power down
+	msleep(20);
+	
 	v4l2_subdev_init(&e_ctrl->msm_sd.sd,
 		e_ctrl->eeprom_v4l2_subdev_ops);
 	v4l2_set_subdevdata(&e_ctrl->msm_sd.sd, e_ctrl);
@@ -1015,6 +1065,11 @@ static int __init msm_eeprom_init_module(void)
 {
 	int32_t rc = 0;
 	CDBG("%s E\n", __func__);
+
+	g_MainCamModuleId = 0;/* MM-MC-AddCameraSwitchMechanismForSecondSource+ */
+	g_SonyImx134_LSC_ptr = NULL;/*MM-YW-IMX134 LSC setting-00*/
+	SonyImx134LSC_Module = 0;/*MM-YW-IMX134 LSC setting-00*/
+
 	rc = platform_driver_probe(&msm_eeprom_platform_driver,
 		msm_eeprom_platform_probe);
 	CDBG("%s:%d platform rc %d\n", __func__, __LINE__, rc);

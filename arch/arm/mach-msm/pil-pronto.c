@@ -36,6 +36,11 @@
 #include "peripheral-loader.h"
 #include "scm-pas.h"
 
+/* MTD-CORE-EL-power_on_cause-01+[ */
+#include <linux/fih_sw_info.h>
+extern void write_pwron_cause (int pwron_cause); 
+/* MTD-CORE-EL-power_on_cause-01+] */
+
 #define PRONTO_PMU_COMMON_GDSCR				0x24
 #define PRONTO_PMU_COMMON_GDSCR_SW_COLLAPSE		BIT(0)
 #define CLK_DIS_WAIT					12
@@ -285,18 +290,24 @@ static void log_wcnss_sfr(void)
 	smem_reset_reason = smem_get_entry(SMEM_SSR_REASON_WCNSS0,
 					   &smem_reset_size);
 
+	/* MTD-CORE-EL-AddInitStringForMtbf-01*[ */
 	if (!smem_reset_reason || !smem_reset_size) {
 		pr_err("wcnss subsystem failure reason:\n"
 		       "(unknown, smem_get_entry failed)");
+		log_ss_failure_reason("wcnss", 0,  "unknown, smem_get_entry failed");
 	} else if (!smem_reset_reason[0]) {
 		pr_err("wcnss subsystem failure reason:\n"
 		       "(unknown, init string found)");
+		log_ss_failure_reason("wcnss", 0,  "unknown, init string found");
 	} else {
 		pr_err("wcnss subsystem failure reason: %.81s\n",
 				smem_reset_reason);
+		log_ss_failure_reason("wcnss", smem_reset_size,  smem_reset_reason);
 		memset(smem_reset_reason, 0, smem_reset_size);
 		wmb();
 	}
+	/* MTD-CORE-EL-AddInitStringForMtbf-01*] */
+	
 }
 
 static void restart_wcnss(struct pronto_data *drv)
@@ -316,6 +327,12 @@ static irqreturn_t wcnss_err_fatal_intr_handler(int irq, void *dev_id)
 		pr_err("wcnss: Ignoring error fatal, restart in progress\n");
 		return IRQ_HANDLED;
 	}
+
+	/* MTD-CORE-EL-power_on_cause-01+[ */
+	pr_err("WCNSS Fatal Error. Let's note!\n");
+	write_pwron_cause(MODEM_FATAL_ERR);
+	/* MTD-CORE-EL-power_on_cause-01+] */
+	
 
 	drv->restart_inprogress = true;
 	restart_wcnss(drv);
@@ -345,6 +362,13 @@ static irqreturn_t wcnss_wdog_bite_irq_hdlr(int irq, void *dev_id)
 		pr_err("Ignoring wcnss bite irq, restart in progress\n");
 		return IRQ_HANDLED;
 	}
+
+	/* MTD-CORE-EL-power_on_cause-01+[ */	
+	pr_err("WCNSS WDOG timeout. Let's note! %d\n", irq);
+	write_pwron_cause(MODEM_SW_WDOG_EXPIRED);
+	/* MTD-CORE-EL-power_on_cause-01+] */	
+	
+	wcnss_log_debug_regs_on_bite();
 
 	drv->restart_inprogress = true;
 	schedule_work(&drv->wcnss_wdog_bite_work);

@@ -1589,8 +1589,16 @@ static unsigned interleave_nodes(struct mempolicy *policy)
  * task can change it's policy.  The system default policy requires no
  * such protection.
  */
-unsigned slab_node(struct mempolicy *policy)
+/* CORE-HC-Memory_Corruption-00+[ */
+unsigned slab_node(void)
 {
+	struct mempolicy *policy;
+
+	if (in_interrupt())
+		return numa_node_id();
+
+	policy = current->mempolicy;
+	/* CORE-HC-Memory_Corruption-00+] */
 	if (!policy || policy->flags & MPOL_F_LOCAL)
 		return numa_node_id();
 

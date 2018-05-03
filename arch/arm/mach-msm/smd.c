@@ -55,6 +55,8 @@
 #include "modem_notifier.h"
 #include "smem_private.h"
 
+#include <linux/fih_sw_info.h> //BSP-REXER-SMEM-00+
+
 #define SMD_VERSION 0x00020000
 #define SMSM_SNAPSHOT_CNT 64
 #define SMSM_SNAPSHOT_SIZE ((SMSM_NUM_ENTRIES + 1) * 4 + sizeof(uint64_t))
@@ -1035,12 +1037,19 @@ static unsigned ch_read_buffer(struct smd_channel *ch, void **ptr)
 {
 	unsigned head = ch->half_ch->get_head(ch->recv);
 	unsigned tail = ch->half_ch->get_tail(ch->recv);
-	*ptr = (void *) (ch->recv_data + tail);
+	unsigned fifo_size = ch->fifo_size;
 
+	BUG_ON(fifo_size >= SZ_1M);
+	BUG_ON(head >= fifo_size);
+	BUG_ON(tail >= fifo_size);
+	BUG_ON(OVERFLOW_ADD_UNSIGNED(uintptr_t, (uintptr_t)ch->recv_data,
+								 tail));
+
+	*ptr = (void *) (ch->recv_data + tail);
 	if (tail <= head)
 		return head - tail;
 	else
-		return ch->fifo_size - tail;
+		return fifo_size - tail;
 }
 
 static int read_intr_blocked(struct smd_channel *ch)
@@ -1140,16 +1149,23 @@ static unsigned ch_write_buffer(struct smd_channel *ch, void **ptr)
 {
 	unsigned head = ch->half_ch->get_head(ch->send);
 	unsigned tail = ch->half_ch->get_tail(ch->send);
-	*ptr = (void *) (ch->send_data + head);
+	unsigned fifo_size = ch->fifo_size;
 
+	BUG_ON(fifo_size >= SZ_1M);
+	BUG_ON(head >= fifo_size);
+	BUG_ON(tail >= fifo_size);
+	BUG_ON(OVERFLOW_ADD_UNSIGNED(uintptr_t, (uintptr_t)ch->send_data,
+								head));
+
+	*ptr = (void *) (ch->send_data + head);
 	if (head < tail) {
 		return tail - head - SMD_FIFO_FULL_RESERVE;
 	} else {
 		if (tail < SMD_FIFO_FULL_RESERVE)
-			return ch->fifo_size + tail - head
+			return fifo_size + tail - head
 					- SMD_FIFO_FULL_RESERVE;
 		else
-			return ch->fifo_size - head;
+			return fifo_size - head;
 	}
 }
 
@@ -3299,6 +3315,64 @@ void smd_cfg_smsm_intr(uint32_t proc, uint32_t mask, void *ptr)
 	private_intr_config[proc].smsm.out_base = ptr;
 	private_intr_config[proc].smsm.out_offset = 0;
 }
+
+//BSP-REXER-SMEM-00+[
+static char fih_nonHLOS_version[30] = {0};
+static char fih_nonHLOS_git_head[64] = {0};
+
+void fih_set_oem_info(void)
+{
+  unsigned int hwid = 0;
+  struct smem_oem_info *fih_smem_info = smem_alloc2(SMEM_ID_VENDOR0, sizeof(*fih_smem_info));
+
+  if (fih_smem_info==NULL)
+  {
+    pr_err("FIH set oem info : fih_smem_info is NULL\r\n");
+    return;
+  }
+  
+  hwid |= fih_get_product_id()&0xff;
+  hwid |= (fih_get_product_phase()&0xff) << PHASE_ID_SHIFT_MASK;
+  hwid |= (fih_get_band_id()&0xff) << BAND_ID_SHIFT_MASK;
+  hwid |= (fih_get_sim_id()&0x03) << SIM_ID_SHIFT_MASK;
+  fih_smem_info->hwid = hwid;
+  
+  pr_info("=======================================================");
+  pr_info("FIH set hwid 0x%08X to smem\r\n",fih_smem_info->hwid);
+  pr_info("=======================================================");
+}
+EXPORT_SYMBOL(fih_set_oem_info);
+
+void fih_get_nonHLOS_info(void)
+{
+  struct smem_oem_info *fih_smem_info = smem_alloc(SMEM_ID_VENDOR0, sizeof(*fih_smem_info));
+
+  if (fih_smem_info==NULL)
+  {
+    pr_err("FIH get nonHLOS info : fih_smem_info is NULL\r\n");
+    return;
+  }
+  
+  snprintf(fih_nonHLOS_git_head,sizeof(fih_nonHLOS_git_head),fih_smem_info->nonHLOS_git_head);
+  snprintf(fih_nonHLOS_version, sizeof(fih_nonHLOS_version),fih_smem_info->nonHLOS_version);
+
+  pr_info("=======================================================");
+  pr_info("FIH nonHLOS git head = %s \r\n",fih_nonHLOS_git_head);
+  pr_info("FIH non-HLOS version = %s \r\n",fih_nonHLOS_version);
+  pr_info("=======================================================");
+}
+char *fih_get_nonHLOS_version(void)
+{
+  return fih_nonHLOS_version;
+}
+EXPORT_SYMBOL(fih_get_nonHLOS_info);
+
+char *fih_get_nonHLOS_git_head(void)
+{
+  return fih_nonHLOS_git_head;
+}
+EXPORT_SYMBOL(fih_get_nonHLOS_git_head);
+//BSP-REXER-SMEM-00+]
 
 static __init int modem_restart_late_init(void)
 {

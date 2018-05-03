@@ -1060,11 +1060,13 @@ static int msm_isp_update_stream_bandwidth(struct vfe_device *vfe_dev)
 			}
 		}
 	}
+    /* MM-MC-PortingQctPatchForBugFix-00*{ */
 	if (num_pix_streams > 0)
 		total_pix_bandwidth = total_pix_bandwidth /
 			num_pix_streams * (num_pix_streams - 1) +
-			axi_data->src_info[VFE_PIX_0].pixel_clock *
+			((unsigned long)axi_data->src_info[VFE_PIX_0].pixel_clock) *
 			ISP_DEFAULT_FORMAT_FACTOR / ISP_Q2;
+    /* MM-MC-PortingQctPatchForBugFix-00*} */
 	total_bandwidth = total_pix_bandwidth + total_rdi_bandwidth;
 
 	rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
@@ -1376,10 +1378,7 @@ int msm_isp_update_axi_stream(struct vfe_device *vfe_dev, void *arg)
 			return -EINVAL;
 		}
 		if (stream_info->state == ACTIVE &&
-			stream_info->stream_type == BURST_STREAM &&
-			(1 != update_cmd->num_streams ||
-				UPDATE_STREAM_FRAMEDROP_PATTERN !=
-					update_cmd->update_type)) {
+			stream_info->stream_type == BURST_STREAM) {
 			pr_err("%s: Cannot update active burst stream\n",
 				__func__);
 			return -EINVAL;
@@ -1406,10 +1405,7 @@ int msm_isp_update_axi_stream(struct vfe_device *vfe_dev, void *arg)
 				msm_isp_get_framedrop_period(
 				   update_info->skip_pattern);
 			stream_info->runtime_init_frame_drop = 0;
-			if (update_info->skip_pattern == SKIP_ALL)
-				stream_info->framedrop_pattern = 0x0;
-			else
-				stream_info->framedrop_pattern = 0x1;
+			stream_info->framedrop_pattern = 0x1;
 			stream_info->framedrop_period = framedrop_period - 1;
 			vfe_dev->hw_info->vfe_ops.axi_ops.
 				cfg_framedrop(vfe_dev, stream_info);

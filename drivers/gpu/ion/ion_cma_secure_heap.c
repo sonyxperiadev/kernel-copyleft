@@ -4,6 +4,7 @@
  * Copyright (C) Linaro 2012
  * Author: <benjamin.gaignard@linaro.org> for ST-Ericsson.
  * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -444,6 +445,7 @@ static struct ion_secure_cma_buffer_info *__ion_secure_cma_allocate(
 	ret = ion_secure_cma_alloc_from_pool(sheap, &info->phys, len);
 
 	if (ret) {
+retry:
 		ret = ion_secure_cma_add_to_pool(sheap, len);
 		if (ret) {
 			mutex_unlock(&sheap->alloc_lock);
@@ -453,10 +455,9 @@ static struct ion_secure_cma_buffer_info *__ion_secure_cma_allocate(
 		ret = ion_secure_cma_alloc_from_pool(sheap, &info->phys, len);
 		if (ret) {
 			/*
-			 * We just added memory to the pool, we shouldn't be
-			 * failing to get memory
+			 * Lost the race with the shrinker, try again
 			 */
-			BUG();
+			goto retry;
 		}
 	}
 	mutex_unlock(&sheap->alloc_lock);

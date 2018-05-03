@@ -81,6 +81,7 @@ static void send_reset(struct sk_buff *oldskb, int hook)
 	niph->saddr	= oiph->daddr;
 	niph->daddr	= oiph->saddr;
 
+	skb_reset_transport_header(nskb);
 	tcph = (struct tcphdr *)skb_put(nskb, sizeof(struct tcphdr));
 	memset(tcph, 0, sizeof(*tcph));
 	tcph->source	= oth->dest;
@@ -110,6 +111,7 @@ static void send_reset(struct sk_buff *oldskb, int hook)
 	if (ip_route_me_harder(nskb, RTN_UNSPEC))
 		goto free_nskb;
 
+	niph = (struct iphdr *)skb_network_header(nskb);  //CONN-EC-NET-MemoryCorruption-01+
 	niph->ttl	= ip4_dst_hoplimit(skb_dst(nskb));
 
 	/* "Never happens" */

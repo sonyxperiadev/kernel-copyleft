@@ -70,6 +70,7 @@ struct v4l2_subdev_info {
 
 struct msm_camera_sensor_board_info {
 	const char *sensor_name;
+	const char *module_name;/* MM-MC-AddCameraSwitchMechanismForSecondSource+ */
 	struct msm_camera_slave_info *slave_info;
 	struct msm_camera_csi_lane_params *csi_lane_params;
 	struct camera_vreg_t *cam_vreg;

@@ -1,6 +1,7 @@
 /*
  *  linux/arch/arm/kernel/process.c
  *
+ *  Copyright(C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *  Copyright (C) 1996-2000 Russell King - Converted to ARM.
  *  Original Copyright (C) 1995  Linus Torvalds
  *
@@ -16,6 +17,11 @@
 #include <linux/mm.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
+/* FIH-CORE-TH-DebugToolPorting-00+[ */
+#ifdef CONFIG_FEATURE_FIH_SW3_PANIC_FILE
+#include <linux/slab.h>	
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00+] */
 #include <linux/user.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
@@ -45,6 +51,13 @@
 unsigned long __stack_chk_guard __read_mostly;
 EXPORT_SYMBOL(__stack_chk_guard);
 #endif
+
+/* FIH-CORE-TH-DebugToolPorting-00+[ */ 
+#include <linux/fs.h>
+#include <linux/file.h> 
+#include <linux/fih_sw_info.h>
+int send_mtbf = 1;	/* determine if send mtbf report */
+/* FIH-CORE-TH-DebugToolPorting-00-] */ 
 
 static const char *processor_modes[] = {
   "USER_26", "FIQ_26" , "IRQ_26" , "SVC_26" , "UK4_26" , "UK5_26" , "UK6_26" , "UK7_26" ,
@@ -414,6 +427,207 @@ static void show_extra_register_data(struct pt_regs *regs, int nbytes)
 	set_fs(fs);
 }
 
+/* FIH-CORE-TH-DebugToolPorting-00+[ */ 
+/*====================================
+ * write kernel panic data into txt
+ *===================================*/ 
+#ifdef CONFIG_FEATURE_FIH_SW3_PANIC_FILE 
+#define KSYM_NAME_LEN_FIH 128
+
+void __print_symbol_fih(char *buffer_panic, int buffer_size, unsigned long address) /*FIH-KERNEL-SC-fix_coverity-issues-03**/
+{
+	int strlen_char = 0;
+	
+	memset(buffer_panic, 0, buffer_size); /*FIH-KERNEL-SC-fix_coverity-issues-03**/
+	sprint_symbol(buffer_panic, address);
+	strlen_char = strlen(buffer_panic);
+	strlcpy((buffer_panic + strlen_char), "\n", buffer_size);/*FIH-KERNEL-SC-fix_coverity-issues-03**/
+}
+
+void print_symbol_fih(unsigned long addr, char *buffer_panic, int buffer_size) /*FIH-KERNEL-SC-fix_coverity-issues-03**/
+{
+	__print_symbol_fih( buffer_panic, buffer_size, (unsigned long) __builtin_extract_return_addr((void *)addr));/*FIH-KERNEL-SC-fix_coverity-issues-03**/
+}
+
+/* MTD-CORE-EL-power_on_cause-00+[ */
+void * get_hw_wd_virt_addr(void)
+{
+	static void *hw_wd_virt_addr = 0;
+
+	if (unlikely(hw_wd_virt_addr == 0)){
+		hw_wd_virt_addr = ioremap(FIH_HW_WD_ADDR, FIH_HW_WD_LEN);
+		if (hw_wd_virt_addr == NULL)
+			printk(KERN_ERR "hw_wd_virt_addr iormap failed\n");
+	}
+
+	return hw_wd_virt_addr;
+}
+
+EXPORT_SYMBOL(get_hw_wd_virt_addr);
+
+void * get_pwron_cause_virt_addr(void)
+{
+	static void *pwron_cause_virt_addr = 0;
+
+	if (unlikely(pwron_cause_virt_addr == 0)){
+		pwron_cause_virt_addr = ioremap(FIH_PWRON_CAUSE_ADDR, FIH_PWRON_CAUSE_LEN);
+		if (pwron_cause_virt_addr == NULL)
+			printk(KERN_ERR "pwron_cause_virt_addr iormap failed\n");
+	}
+
+	return pwron_cause_virt_addr;
+}
+
+EXPORT_SYMBOL(get_pwron_cause_virt_addr);
+
+/* MTD-CORE-EL-handle_SSR-00+[ */
+void clear_all_modem_pwron_cause (void) {
+	unsigned int *pwron_cause_ptr;
+
+	pwron_cause_ptr = (unsigned int*) get_pwron_cause_virt_addr();
+	if (pwron_cause_ptr == NULL)
+		return;
+
+	*pwron_cause_ptr &= ~MTD_PWR_ON_EVENT_MODEM_FATAL_ERROR;
+	*pwron_cause_ptr &= ~MTD_PWR_ON_EVENT_MODEM_SW_WD_RESET;
+	*pwron_cause_ptr &= ~MTD_PWR_ON_EVENT_MODEM_FW_WD_RESET;
+
+	printk(KERN_ERR "%s called\n ", __func__);
+}
+
+EXPORT_SYMBOL(clear_all_modem_pwron_cause);
+/* MTD-CORE-EL-handle_SSR-00+] */
+
+/* MTD-CORE-EL-handle_SSR-00*[ */
+unsigned int latest_modem_err = 0; 
+
+void write_pwron_cause (int pwron_cause)
+{
+	unsigned int *pwron_cause_ptr;
+
+	pwron_cause_ptr = (unsigned int*) get_pwron_cause_virt_addr();
+	if (pwron_cause_ptr == NULL)
+		return;
+
+	switch (pwron_cause) {
+	case HOST_KERNEL_PANIC:
+		*pwron_cause_ptr |= MTD_PWR_ON_EVENT_KERNEL_PANIC;
+		break;
+	case MODEM_FATAL_ERR:
+		*pwron_cause_ptr |= MTD_PWR_ON_EVENT_MODEM_FATAL_ERROR;
+		/* MTD-CORE-EL-handle_SSR-00+ */
+		latest_modem_err = MTD_PWR_ON_EVENT_MODEM_FATAL_ERROR;
+		break;
+	case MODEM_SW_WDOG_EXPIRED:
+		*pwron_cause_ptr |= MTD_PWR_ON_EVENT_MODEM_SW_WD_RESET;
+		/* MTD-CORE-EL-handle_SSR-00+ */
+		latest_modem_err = MTD_PWR_ON_EVENT_MODEM_SW_WD_RESET;
+		break;
+	case MODEM_FW_WDOG_EXPIRED:
+		*pwron_cause_ptr |= MTD_PWR_ON_EVENT_MODEM_FW_WD_RESET;
+		/* MTD-CORE-EL-handle_SSR-00+ */
+		latest_modem_err = MTD_PWR_ON_EVENT_MODEM_FW_WD_RESET;
+		break;
+	case SOFTWARE_RESET:
+		if (*pwron_cause_ptr & MTD_PWR_ON_EVENT_PWR_OFF_CHG_REBOOT)
+			printk("PWR_OFF_CHG_REBOOT is detected. Keep POC as it is.\n");
+		else
+			*pwron_cause_ptr |= MTD_PWR_ON_EVENT_SOFTWARE_RESET;
+		break;
+	case PWR_OFF_CHG_REBOOT:
+		*pwron_cause_ptr |= MTD_PWR_ON_EVENT_PWR_OFF_CHG_REBOOT;
+		break;
+	default:
+		printk(KERN_ERR "%d Unknown reboot_reason!\n", pwron_cause);
+	}
+}
+
+/* MTD-CORE-EL-handle_SSR-00*] */
+
+
+EXPORT_SYMBOL(write_pwron_cause);
+/* MTD-CORE-EL-power_on_cause-00+] */
+
+void * get_alog_buffer_virt_addr(void){
+	static void *alog_buffer_virt_addr = 0;
+
+	if (unlikely(alog_buffer_virt_addr == 0)){
+		alog_buffer_virt_addr = ioremap(PANIC_RAM_DATA_BEGIN, PANIC_RAM_DATA_SIZE);
+	}
+
+	return alog_buffer_virt_addr;
+}
+
+EXPORT_SYMBOL(get_alog_buffer_virt_addr);
+
+void * get_timestamp_buffer_virt_addr(void){
+	static void *buffer_virt_addr = 0;
+
+	if (unlikely(buffer_virt_addr == 0)){
+		buffer_virt_addr = ioremap(CRASH_TIME_RAMDUMP_ADDR, CRASH_TIME_RAMDUMP_LEN);
+	}
+	return buffer_virt_addr;
+}
+
+EXPORT_SYMBOL(get_timestamp_buffer_virt_addr);
+
+static void fih_write_panic_into_buffer(struct pt_regs *regs)
+{
+	int strlen_char = 0;
+	char *panic_string = NULL;
+	char pointer_data[300] = {0};
+	char buffer_panic[128] = {0};
+	int panic_string_len = PANIC_RAM_DATA_SIZE - sizeof(struct fih_panic_ram_data);/*FIH-KERNEL-SC-fix_coverity-issues-03*/
+
+	struct fih_panic_ram_data *fih_panic_ram_data_ptr = 
+		(struct fih_panic_ram_data *) get_alog_buffer_virt_addr();
+        
+	/* Lookup function in PC */
+	if (fih_panic_ram_data_ptr == NULL) {
+		printk("ioremap PANIC_RAM_DATA_BEGIN fail\n");
+		return;
+	}
+
+	panic_string = fih_panic_ram_data_ptr->data;
+
+	strlcpy(panic_string, "PC is at ", panic_string_len);
+	strlen_char= strlen(panic_string);
+	print_symbol_fih(instruction_pointer(regs), buffer_panic, sizeof(buffer_panic));
+	strlcpy(panic_string + strlen_char, buffer_panic, panic_string_len);
+	strlen_char= strlen(panic_string);
+
+	/* Lookup function in LR */
+	strlcpy(panic_string + strlen_char, "LR is at ", panic_string_len);
+	strlen_char= strlen(panic_string);
+	print_symbol_fih(regs->ARM_lr, buffer_panic, sizeof(buffer_panic));
+	strlcpy(panic_string + strlen_char, buffer_panic, panic_string_len);
+	strlen_char= strlen(panic_string);
+	
+	/* Get pointer value: pc, lr, psr, sp, ip, fp */        
+    memset(pointer_data, 0, sizeof(pointer_data));
+	snprintf(pointer_data, sizeof(pointer_data), "pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
+		"sp : %08lx  ip : %08lx  fp : %08lx\n", regs->ARM_pc, regs->ARM_lr, regs->ARM_cpsr,
+		regs->ARM_sp, regs->ARM_ip, regs->ARM_fp);
+	strlcpy(panic_string + strlen_char, pointer_data, panic_string_len);
+	strlen_char= strlen(panic_string);
+    
+	/* Get r0 -r10 value */  
+    memset(pointer_data, 0, sizeof(pointer_data));
+	snprintf(pointer_data, sizeof(pointer_data), "r10: %08lx  r9 : %08lx  r8 : %08lx\n"
+		"r7 : %08lx  r6 : %08lx  r5 : %08lx  r4 : %08lx\n"
+		"r3 : %08lx  r2 : %08lx  r1 : %08lx  r0 : %08lx\n", 
+		regs->ARM_r10, regs->ARM_r9,regs->ARM_r8,
+		regs->ARM_r7, regs->ARM_r6,regs->ARM_r5, regs->ARM_r4,
+		regs->ARM_r3, regs->ARM_r2,regs->ARM_r1, regs->ARM_r0);
+	strlcpy(panic_string + strlen_char, pointer_data, panic_string_len);
+	strlen_char= strlen(panic_string);
+
+	fih_panic_ram_data_ptr->length = strlen_char;
+	fih_panic_ram_data_ptr->signature = PANIC_RAM_SIGNATURE;	
+}
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00-] */ 
+
 void __show_regs(struct pt_regs *regs)
 {
 	unsigned long flags;
@@ -475,6 +689,14 @@ void __show_regs(struct pt_regs *regs)
 #endif
 
 	show_extra_register_data(regs, 128);
+
+/* FIH-CORE-TH-DebugToolPorting-00+[ */ 
+#ifdef CONFIG_FEATURE_FIH_SW3_PANIC_FILE    
+	/* determine if send mtbf report */
+	if (send_mtbf == 1)	
+		fih_write_panic_into_buffer(regs);
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00-] */ 
 }
 
 void show_regs(struct pt_regs * regs)

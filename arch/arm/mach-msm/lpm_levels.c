@@ -340,7 +340,7 @@ static void lpm_system_prepare(struct lpm_system_state *system_state,
 	int dbg_mask;
 	int ret;
 	const struct cpumask *nextcpu;
-
+ 	
 	spin_lock(&system_state->sync_lock);
 	if (index < 0 ||
 			num_powered_cores != system_state->num_cores_in_sync) {
@@ -527,7 +527,7 @@ static noinline int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 		if (latency_us < pwr->latency_us)
 			continue;
 
-		if (next_event_us)
+		if (next_event_us) {
 			if (next_event_us < pwr->latency_us)
 				continue;
 
@@ -536,6 +536,7 @@ static noinline int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 				next_wakeup_us = next_event_us
 					- pwr->latency_us;
 			}
+		}
 
 		if (next_wakeup_us <= pwr->time_overhead_us)
 			continue;
@@ -723,7 +724,6 @@ static void lpm_enter_low_power(struct lpm_system_state *system_state,
 	int idx;
 	struct lpm_cpu_level *cpu_level = &system_state->cpu_level[cpu_index];
 
-	cpu_level = &system_state->cpu_level[cpu_index];
 
 	lpm_cpu_prepare(system_state, cpu_index, from_idle);
 
@@ -982,9 +982,8 @@ static int lpm_system_probe(struct platform_device *pdev)
 			goto fail;
 		}
 
-		if (l->l2_mode == MSM_SPM_L2_MODE_GDHS ||
-				l->l2_mode == MSM_SPM_L2_MODE_POWER_COLLAPSE)
-			l->notify_rpm = true;
+		key = "qcom,send-rpm-sleep-set";
+		l->notify_rpm = of_property_read_bool(node, key);
 
 		if (l->l2_mode >= MSM_SPM_L2_MODE_GDHS)
 			l->sync = true;

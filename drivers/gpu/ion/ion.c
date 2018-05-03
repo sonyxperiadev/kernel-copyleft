@@ -343,8 +343,14 @@ static void ion_handle_destroy(struct kref *kref)
 	struct ion_buffer *buffer = handle->buffer;
 
 	mutex_lock(&buffer->lock);
-	while (handle->kmap_cnt)
-		ion_handle_kmap_put(handle);
+	while ((handle->kmap_cnt)){
+		if(handle->kmap_cnt > 0){
+			ion_handle_kmap_put(handle);
+		}else{
+			pr_err("%s: Illegal kmap_cnt decrement.", __func__);
+			break;
+		}
+	}
 	mutex_unlock(&buffer->lock);
 
 	idr_remove(&client->idr, handle->id);
@@ -653,6 +659,7 @@ static void ion_handle_kmap_put(struct ion_handle *handle)
 {
 	struct ion_buffer *buffer = handle->buffer;
 
+	BUG_ON(!handle->kmap_cnt);
 	handle->kmap_cnt--;
 	if (!handle->kmap_cnt)
 		ion_buffer_kmap_put(buffer);

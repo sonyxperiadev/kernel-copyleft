@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,7 +13,7 @@
 #include <linux/module.h>
 #include <mach/iommu.h>
 #include <linux/ratelimit.h>
-
+#include <asm/div64.h>/* 0001-msm-Camera-some-camera-change-for-tasklet-overflow+ */
 #include "msm_isp40.h"
 #include "msm_isp_util.h"
 #include "msm_isp_axi_util.h"
@@ -36,8 +36,8 @@
 #define VFE40_8x26_VERSION 0x20000013
 #define VFE40_8x26V2_VERSION 0x20010014
 
-#define VFE40_BURST_LEN 3
-#define VFE40_STATS_BURST_LEN 2
+#define VFE40_BURST_LEN 1/* 0001-msm-Camera-some-camera-change-for-tasklet-overflow+ */
+#define VFE40_STATS_BURST_LEN 1/* 0001-msm-Camera-some-camera-change-for-tasklet-overflow+ */
 #define VFE40_UB_SIZE 1536
 #define VFE40_EQUAL_SLICE_UB 228
 #define VFE40_WM_BASE(idx) (0x6C + 0x24 * idx)
@@ -551,6 +551,7 @@ static void msm_vfe40_process_reg_update(struct vfe_device *vfe_dev,
 	uint32_t irq_status0, uint32_t irq_status1,
 	struct msm_isp_timestamp *ts)
 {
+	uint32_t rdi_status; /*MM-SL-AddVHDRSetting-01+ */
 	if (!(irq_status0 & 0xF0))
 		return;
 
@@ -562,6 +563,21 @@ static void msm_vfe40_process_reg_update(struct vfe_device *vfe_dev,
 		msm_isp_sof_notify(vfe_dev, VFE_RAW_1, ts);
 	if (irq_status0 & BIT(7))
 		msm_isp_sof_notify(vfe_dev, VFE_RAW_2, ts);
+
+	/*MM-SL-AddVHDRSetting-01+{ */
+	if (vfe_dev->axi_data.stream_update) {
+		rdi_status = msm_camera_io_r(vfe_dev->vfe_base +
+						VFE40_XBAR_BASE(0));
+		rdi_status |= msm_camera_io_r(vfe_dev->vfe_base +
+						VFE40_XBAR_BASE(4));
+
+		if (((rdi_status & BIT(7)) || (rdi_status & BIT(7)) ||
+			(rdi_status & BIT(7)) || (rdi_status & BIT(7))) &&
+			(!(irq_status0 & 0x20)))
+			return;
+	}
+	/*MM-SL-AddVHDRSetting-01+} */
+
 
 	if (vfe_dev->axi_data.stream_update)
 		msm_isp_axi_stream_update(vfe_dev);
@@ -1064,8 +1080,8 @@ static void msm_vfe40_axi_clear_wm_xbar_reg(
 		vfe_dev->vfe_base + VFE40_XBAR_BASE(wm));
 }
 
-#define MSM_ISP40_TOTAL_WM_UB 819
-
+#define MSM_ISP40_TOTAL_WM_UB 1140 /* codeaurora: 7710e02ae722e513fe38a3d6ab47d82ad9ef5bac */
+/* 0001-msm-Camera-some-camera-change-for-tasklet-overflow*{ */
 static void msm_vfe40_cfg_axi_ub_equal_default(
 	struct vfe_device *vfe_dev)
 {
@@ -1077,7 +1093,6 @@ static void msm_vfe40_cfg_axi_ub_equal_default(
 	uint8_t num_used_wms = 0;
 	uint32_t prop_size = 0;
 	uint32_t wm_ub_size;
-	uint32_t delta;
 
 	for (i = 0; i < axi_data->hw_info->num_wm; i++) {
 		if (axi_data->free_wm[i] > 0) {
@@ -1089,18 +1104,22 @@ static void msm_vfe40_cfg_axi_ub_equal_default(
 		axi_data->hw_info->min_wm_ub * num_used_wms;
 	for (i = 0; i < axi_data->hw_info->num_wm; i++) {
 		if (axi_data->free_wm[i]) {
-			delta =
-				(axi_data->wm_image_size[i] *
-					prop_size)/total_image_size;
+            uint64_t delta = 0;
+            uint64_t temp = (uint64_t)axi_data->wm_image_size[i]*prop_size;
+            do_div(temp, total_image_size);
+            delta = temp;
+ 
 			wm_ub_size = axi_data->hw_info->min_wm_ub + delta;
 			msm_camera_io_w(ub_offset << 16 | (wm_ub_size - 1),
 				vfe_dev->vfe_base + VFE40_WM_BASE(i) + 0x10);
+            pr_err("%s: ub_offset=%d, wm_ub_size=%d\n", __func__, ub_offset, wm_ub_size);
 			ub_offset += wm_ub_size;
 		} else
 			msm_camera_io_w(0,
 				vfe_dev->vfe_base + VFE40_WM_BASE(i) + 0x10);
 	}
 }
+/* 0001-msm-Camera-some-camera-change-for-tasklet-overflow*} */
 
 static void msm_vfe40_cfg_axi_ub_equal_slicing(
 	struct vfe_device *vfe_dev)
@@ -1118,7 +1137,7 @@ static void msm_vfe40_cfg_axi_ub_equal_slicing(
 static void msm_vfe40_cfg_axi_ub(struct vfe_device *vfe_dev)
 {
 	struct msm_vfe_axi_shared_data *axi_data = &vfe_dev->axi_data;
-	axi_data->wm_ub_cfg_policy = MSM_WM_UB_EQUAL_SLICING;
+	axi_data->wm_ub_cfg_policy = MSM_WM_UB_CFG_DEFAULT;/* 0001-msm-Camera-some-camera-change-for-tasklet-overflow* */
 	if (axi_data->wm_ub_cfg_policy == MSM_WM_UB_EQUAL_SLICING)
 		msm_vfe40_cfg_axi_ub_equal_slicing(vfe_dev);
 	else

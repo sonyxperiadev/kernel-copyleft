@@ -27,6 +27,10 @@ config IRQ_WORK
 	bool
 	depends on HAVE_IRQ_WORK
 
+#MTD-SI-JS-AddConfig-00[
+source init/Kconfig_FXN
+#MTD-SI-JS-AddConfig-00]
+
 menu "General setup"
 
 config EXPERIMENTAL

@@ -138,6 +138,7 @@ int freeze_processes(void)
 {
 	int error;
 
+	printk(KERN_INFO "PM: __usermodehelper_disable\n");
 	error = __usermodehelper_disable(UMH_FREEZING);
 	if (error)
 		return error;

@@ -99,12 +99,15 @@ static int suspend_prepare(void)
 	if (!suspend_ops || !suspend_ops->enter)
 		return -EPERM;
 
+	printk(KERN_INFO "PM: pm_prepare_console\n");
 	pm_prepare_console();
 
+	printk(KERN_INFO "PM: pm_notifier_call_chain\n");
 	error = pm_notifier_call_chain(PM_SUSPEND_PREPARE);
 	if (error)
 		goto Finish;
 
+	printk(KERN_INFO "PM: suspend_freeze_processes\n");
 	error = suspend_freeze_processes();
 	if (!error)
 		return 0;

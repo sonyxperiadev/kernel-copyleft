@@ -70,3 +70,6 @@ obj-$(CONFIG_QSEECOM) += qseecom.o
 obj-$(CONFIG_QFP_FUSE) += qfp_fuse.o
 obj-$(CONFIG_TI_DRV2667) += ti_drv2667.o
 obj-$(CONFIG_QPNP_MISC) += qpnp-misc.o
+#MTD-SW3-PERIPHERAL-CH-NFC_Porting-00+{
+obj-$(CONFIG_PN544_I2C_NFC) += pn544.o
+#MTD-SW3-PERIPHERAL-CH-NFC_Porting-00+}

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2014 Foxconn International Holdings, Ltd. All rights reserved.
  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -33,10 +34,16 @@
 #include <mach/ramdump.h>
 #include <mach/msm_smem.h>
 
+
 #include "peripheral-loader.h"
 #include "pil-q6v5.h"
 #include "pil-msa.h"
 #include "sysmon.h"
+
+/* MTD-CORE-EL-power_on_cause-01*[ */
+#include <linux/fih_sw_info.h> 
+extern void write_pwron_cause (int pwron_cause); 
+/* MTD-CORE-EL-power_on_cause-01*] */
 
 #define MAX_VDD_MSS_UV		1150000
 #define PROXY_TIMEOUT_MS	10000
@@ -63,6 +70,14 @@ static void log_modem_sfr(void)
 	char *smem_reason, reason[MAX_SSR_REASON_LEN];
 
 	smem_reason = smem_get_entry_no_rlock(SMEM_SSR_REASON_MSS0, &size);
+
+	/* MTD-CORE-EL-AddInitStringForMtbf-01+[ */
+	if (!smem_reason || !size)
+		log_ss_failure_reason("modem", 0, "unknown, smem_get_entry_no_rlock failed");
+	else if (!smem_reason[0]) 
+		log_ss_failure_reason("modem", 0, "unknown, empty string found");
+	/* MTD-CORE-EL-AddInitStringForMtbf-01+] */
+	
 	if (!smem_reason || !size) {
 		pr_err("modem subsystem failure reason: (unknown, smem_get_entry_no_rlock failed).\n");
 		return;
@@ -73,6 +88,10 @@ static void log_modem_sfr(void)
 	}
 
 	strlcpy(reason, smem_reason, min(size, sizeof(reason)));
+
+	/* MTD-CORE-EL-AddInitStringForMtbf-01* */
+	log_ss_failure_reason("modem", size, smem_reason);
+	
 	pr_err("modem subsystem failure reason: %s.\n", reason);
 
 	smem_reason[0] = '\0';
@@ -93,6 +112,11 @@ static irqreturn_t modem_err_fatal_intr_handler(int irq, void *dev_id)
 	/* Ignore if we're the one that set the force stop GPIO */
 	if (drv->crash_shutdown)
 		return IRQ_HANDLED;
+
+/* MTD-CORE-EL-power_on_cause-00+[ */
+	pr_err("Modem Fatal Error. Let's note!\n");
+	write_pwron_cause(MODEM_FATAL_ERR);
+/* MTD-CORE-EL-power_on_cause-00+] */
 
 	pr_err("Fatal error on the modem.\n");
 	subsys_set_crash_status(drv->subsys, true);
@@ -200,8 +224,15 @@ static struct notifier_block adsp_state_notifier_block = {
 static irqreturn_t modem_wdog_bite_intr_handler(int irq, void *dev_id)
 {
 	struct modem_data *drv = subsys_to_drv(dev_id);
+	
 	if (drv->ignore_errors)
 		return IRQ_HANDLED;
+
+	/* MTD-CORE-EL-power_on_cause-01*[ */	
+	pr_err("Modem WDOG timeout. Let's note! %d\n", irq);
+	write_pwron_cause(MODEM_SW_WDOG_EXPIRED);
+	/* MTD-CORE-EL-power_on_cause-01*] */	
+	
 	pr_err("Watchdog bite received from modem software!\n");
 	subsys_set_crash_status(drv->subsys, true);
 	restart_modem(drv);

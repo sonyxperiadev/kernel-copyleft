@@ -2,6 +2,7 @@
  * The input core
  *
  * Copyright (c) 1999-2002 Vojtech Pavlik
+ * Copyright(C) 2013 Foxconn International Holdings, Ltd. All rights reserved.
  */
 
 /*
@@ -46,6 +47,21 @@ static LIST_HEAD(input_handler_list);
 static DEFINE_MUTEX(input_mutex);
 
 static struct input_handler *input_table[8];
+
+
+static int is_sensor_input(const char *dev_name)
+{
+	if (strcmp(dev_name, "bma2x2") == 0 || strcmp(dev_name, "proximity") == 0 ||\
+		strcmp(dev_name, "bmm050") == 0 || strcmp(dev_name, "bmg160") == 0 ||\
+		strcmp(dev_name, "lightsensor-level") == 0)
+	{
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
+}
 
 static inline int is_event_supported(unsigned int code,
 				     unsigned long *bm, unsigned int max)
@@ -97,7 +113,13 @@ static void input_pass_event(struct input_dev *dev,
 				if (filtered)
 					break;
 
-				handler->event(handle, type, code, value);
+				if (is_sensor_input(dev->name) && strcmp(handler->name, "cpufreq_ond")==0)
+				{
+					//Do not call cpufreq_ondemand to change cpu freq to max.
+					//printk(KERN_INFO "[INPUT]Do not call cpufreq_ondemand.c(%s)\n", dev->name);
+				}
+				else
+					handler->event(handle, type, code, value);
 
 			} else if (handler->filter(handle, type, code, value))
 				filtered = true;
@@ -596,6 +618,7 @@ static void input_dev_release_keys(struct input_dev *dev)
 			if (is_event_supported(code, dev->keybit, KEY_MAX) &&
 			    __test_and_clear_bit(code, dev->key)) {
 				input_pass_event(dev, EV_KEY, code, 0);
+				pr_info("%s %d\n", __func__, code);
 			}
 		}
 		input_pass_event(dev, EV_SYN, SYN_REPORT, 1);

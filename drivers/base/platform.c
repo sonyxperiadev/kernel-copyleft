@@ -1,6 +1,7 @@
 /*
  * platform.c - platform 'pseudo' bus for legacy devices
  *
+ * Copyright (c) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  * Copyright (c) 2002-3 Patrick Mochel
  * Copyright (c) 2002-3 Open Source Development Labs
  *
@@ -21,6 +22,11 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 
+/*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+[ */
+#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+#include <linux/kallsyms.h>
+#endif
+/*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+] */
 #include "base.h"
 
 #define to_platform_driver(drv)	(container_of((drv), struct platform_driver, \
@@ -683,7 +689,14 @@ static int platform_legacy_suspend(struct device *dev, pm_message_t mesg)
 	int ret = 0;
 
 	if (dev->driver && pdrv->suspend)
+/*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+[ */
+	{
 		ret = pdrv->suspend(pdev, mesg);
+        #ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+		print_symbol("[PM]platform_legacy_suspend: %s\n", (unsigned long)pdrv->suspend);
+        #endif
+	}
+/*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+] */
 
 	return ret;
 }
@@ -695,7 +708,14 @@ static int platform_legacy_resume(struct device *dev)
 	int ret = 0;
 
 	if (dev->driver && pdrv->resume)
+/*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+[ */
+	{
 		ret = pdrv->resume(pdev);
+        #ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+		print_symbol("[PM]platform_legacy_resume: %s\n", (unsigned long)pdrv->resume);
+        #endif
+	}
+/*KERNEL-SC-SUSPEND_RESUME_WAKELOCK_LOG-01+] */
 
 	return ret;
 }

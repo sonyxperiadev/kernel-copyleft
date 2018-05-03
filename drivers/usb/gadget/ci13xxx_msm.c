@@ -260,6 +260,7 @@ static int ci13xxx_msm_probe(struct platform_device *pdev)
 	bool is_l1_supported = false;
 
 	dev_dbg(&pdev->dev, "ci13xxx_msm_probe\n");
+	printk(KERN_INFO "USB: ci13xxx_msm_probe\n");/*MTD-CONN-JY-USBPORTING-00+*/
 
 	if (pdata) {
 		/* Acceptable values for nz_itc are: 0,1,2,4,8,16,32,64 */
@@ -380,3 +381,6 @@ static void __exit ci13xxx_msm_exit(void)
 module_exit(ci13xxx_msm_exit);
 
 MODULE_LICENSE("GPL v2");
+
+#undef pr_debug
+#undef dev_dbg

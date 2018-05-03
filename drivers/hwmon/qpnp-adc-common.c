@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,6 +30,7 @@
 #include <linux/completion.h>
 #include <linux/qpnp/qpnp-adc.h>
 #include <linux/platform_device.h>
+#include <linux/fih_hw_info.h> //CORE-DL-AddFxnAdcTable-00
 
 /* Min ADC code represets 0V */
 #define QPNP_VADC_MIN_ADC_CODE			0x6000
@@ -129,6 +131,226 @@ static const struct qpnp_vadc_map_pt adcmap_btm_threshold[] = {
 	{780,	208},
 	{790,	203}
 };
+
+//CORE-DL-AddFxnAdcTable-00 +[
+static const struct qpnp_vadc_map_pt adcmap_fxn_btm_threshold[] = {
+	{-250,	1711},
+	{-240,	1705},
+	{-230,	1700},
+	{-220,	1694},
+	{-210,	1688},
+	{-200,	1681},
+	{-190,	1674},
+	{-180,	1667},
+	{-170,	1660},
+	{-160,	1652},
+	{-150,	1644},
+	{-140,	1636},
+	{-130,	1627},
+	{-120,	1618},
+	{-110,	1609},
+	{-100,	1599},
+	{-90,	1589},
+	{-80,	1578},
+	{-70,	1567},
+	{-60,	1556},
+	{-50,	1544},
+	{-40,	1532},
+	{-30,	1520},
+	{-20,	1507},
+	{-10,	1494},
+	{0,	1480},
+	{10,	1466},
+	{20,	1452},
+	{30,	1437},
+	{40,	1422},
+	{50,	1407},
+	{60,	1391},
+	{70,	1375},
+	{80,	1358},
+	{90,	1342},
+	{100,	1325},
+	{110,	1307},
+	{120,	1290},
+	{130,	1272},
+	{140,	1253},
+	{150,	1235},
+	{160,	1216},
+	{170,	1198},
+	{180,	1179},
+	{190,	1159},
+	{200,	1140},
+	{210,	1121},
+	{220,	1101},
+	{230,	1082},
+	{240,	1062},
+	{250,	1042},
+	{260,	1022},
+	{270,	1003},
+	{280,	983},
+	{290,	963},
+	{300,	943},
+	{310,	924},
+	{320,	904},
+	{330,	885},
+	{340,	865},
+	{350,	846},
+	{360,	827},
+	{370,	808},
+	{380,	790},
+	{390,	771},
+	{400,	753},
+	{410,	735},
+	{420,	717},
+	{430,	700},
+	{440,	682},
+	{450,	665},
+	{460,	649},
+	{470,	632},
+	{480,	616},
+	{490,	600},
+	{500,	584},
+	{510,	569},
+	{520,	554},
+	{530,	539},
+	{540,	525},
+	{550,	511},
+	{560,	497},
+	{570,	483},
+	{580,	470},
+	{590,	457},
+	{600,	445},
+	{610,	432},
+	{620,	420},
+	{630,	408},
+	{640,	397},
+	{650,	386},
+	{660,	375},
+	{670,	364},
+	{680,	354},
+	{690,	344},
+	{700,	334},
+	{710,	325},
+	{720,	316},
+	{730,	307},
+	{740,	298},
+	{750,	289},
+	{760,	281},
+	{770,	273},
+	{780,	265},
+	{790,	258},
+	{800,	250},
+};
+
+static const struct qpnp_vadc_map_pt adcmap_fxn_btm_threshold_v2[] = {
+	{-250,	1627},
+	{-240,	1618},
+	{-230,	1608},
+	{-220,	1598},
+	{-210,	1587},
+	{-200,	1577},
+	{-190,	1565},
+	{-180,	1554},
+	{-170,	1542},
+	{-160,	1530},
+	{-150,	1517},
+	{-140,	1504},
+	{-130,	1491},
+	{-120,	1477},
+	{-110,	1463},
+	{-100,	1449},
+	{-90,	1435},
+	{-80,	1420},
+	{-70,	1405},
+	{-60,	1390},
+	{-50,	1375},
+	{-40,	1359},
+	{-30,	1344},
+	{-20,	1328},
+	{-10,	1312},
+	{0,	1296},
+	{10,	1280},
+	{20,	1263},
+	{30,	1247},
+	{40,	1231},
+	{50,	1215},
+	{60,	1198},
+	{70,	1182},
+	{80,	1166},
+	{90,	1150},
+	{100,	1134},
+	{110,	1118},
+	{120,	1103},
+	{130,	1087},
+	{140,	1072},
+	{150,	1057},
+	{160,	1042},
+	{170,	1027},
+	{180,	1012},
+	{190,	998},
+	{200,	984},
+	{210,	970},
+	{220,	956},
+	{230,	943},
+	{240,	930},
+	{250,	917},
+	{260,	905},
+	{270,	893},
+	{280,	881},
+	{290,	869},
+	{300,	858},
+	{310,	847},
+	{320,	836},
+	{330,	826},
+	{340,	815},
+	{350,	805},
+	{360,	796},
+	{370,	786},
+	{380,	777},
+	{390,	769},
+	{400,	760},
+	{410,	752},
+	{420,	744},
+	{430,	736},
+	{440,	728},
+	{450,	721},
+	{460,	714},
+	{470,	707},
+	{480,	700},
+	{490,	694},
+	{500,	688},
+	{510,	682},
+	{520,	676},
+	{530,	670},
+	{540,	665},
+	{550,	660},
+	{560,	655},
+	{570,	650},
+	{580,	645},
+	{590,	640},
+	{600,	636},
+	{610,	632},
+	{620,	628},
+	{630,	624},
+	{640,	620},
+	{650,	616},
+	{660,	613},
+	{670,	609},
+	{680,	606},
+	{690,	603},
+	{700,	600},
+	{710,	597},
+	{720,	594},
+	{730,	591},
+	{740,	588},
+	{750,	586},
+	{760,	583},
+	{770,	581},
+	{780,	578},
+	{790,	576},
+	{800,	574},
+};
+//CORE-DL-AddFxnAdcTable-00 +]
 
 static const struct qpnp_vadc_map_pt adcmap_qrd_btm_threshold[] = {
 	{-200,	1540},
@@ -617,15 +839,35 @@ int32_t qpnp_adc_scale_batt_therm(struct qpnp_vadc_chip *chip,
 		struct qpnp_vadc_result *adc_chan_result)
 {
 	int64_t bat_voltage = 0;
+	unsigned product_phase = fih_get_product_phase(); //CORE-DL-AddFxnAdcTable-00
+	unsigned band_id = fih_get_band_id(); //CORE-DL-ModifyFxnAdcForRitaSp-00
 
 	bat_voltage = qpnp_adc_scale_ratiometric_calib(adc_code,
 			adc_properties, chan_properties);
 
-	return qpnp_adc_map_temp_voltage(
-			adcmap_btm_threshold,
-			ARRAY_SIZE(adcmap_btm_threshold),
-			bat_voltage,
-			&adc_chan_result->physical);
+	//CORE-DL-AddFxnAdcTable-00 +[
+	if (product_phase >= PHASE_SP2) {
+		return qpnp_adc_map_temp_voltage(
+				adcmap_fxn_btm_threshold_v2,
+				ARRAY_SIZE(adcmap_fxn_btm_threshold_v2),
+				bat_voltage,
+				&adc_chan_result->physical);
+	//CORE-DL-ModifyFxnAdcForRitaSp-00 +[
+	} else if (band_id == BAND_1258 && product_phase >= PHASE_SP) {
+		return qpnp_adc_map_temp_voltage(
+				adcmap_fxn_btm_threshold_v2,
+				ARRAY_SIZE(adcmap_fxn_btm_threshold_v2),
+				bat_voltage,
+				&adc_chan_result->physical);
+	//CORE-DL-ModifyFxnAdcForRitaSp-00 +[
+	} else {
+		return qpnp_adc_map_temp_voltage(
+				adcmap_fxn_btm_threshold,
+				ARRAY_SIZE(adcmap_fxn_btm_threshold),
+				bat_voltage,
+				&adc_chan_result->physical);
+	}
+	//CORE-DL-AddFxnAdcTable-00 +]
 }
 EXPORT_SYMBOL(qpnp_adc_scale_batt_therm);
 
@@ -814,17 +1056,22 @@ int32_t qpnp_adc_scale_default(struct qpnp_vadc_chip *vadc,
 		return -EINVAL;
 
 	scale_voltage = (adc_code -
-		chan_properties->adc_graph[CALIB_ABSOLUTE].adc_gnd)
-		* chan_properties->adc_graph[CALIB_ABSOLUTE].dx;
+		chan_properties->adc_graph[chan_properties->calib_type].adc_gnd)
+		* chan_properties->adc_graph[chan_properties->calib_type].dx;
 	if (scale_voltage < 0) {
 		negative_offset = 1;
 		scale_voltage = -scale_voltage;
 	}
 	do_div(scale_voltage,
-		chan_properties->adc_graph[CALIB_ABSOLUTE].dy);
+		chan_properties->adc_graph[chan_properties->calib_type].dy);
 	if (negative_offset)
 		scale_voltage = -scale_voltage;
-	scale_voltage += chan_properties->adc_graph[CALIB_ABSOLUTE].dx;
+
+	if (chan_properties->calib_type == CALIB_ABSOLUTE)
+		scale_voltage +=
+		chan_properties->adc_graph[chan_properties->calib_type].dx;
+	else
+		scale_voltage *= 1000;
 
 	if (scale_voltage < 0) {
 		if (adc_properties->bipolar) {
@@ -929,16 +1176,36 @@ int32_t qpnp_adc_btm_scaler(struct qpnp_vadc_chip *chip,
 	struct qpnp_vadc_linear_graph btm_param;
 	int64_t low_output = 0, high_output = 0;
 	int rc = 0;
+	unsigned product_phase = fih_get_product_phase(); //CORE-DL-AddFxnAdcTable-00
+	unsigned band_id = fih_get_band_id(); //CORE-DL-ModifyFxnAdcForRitaSp-00
 
 	qpnp_get_vadc_gain_and_offset(chip, &btm_param, CALIB_RATIOMETRIC);
 
 	pr_debug("warm_temp:%d and cool_temp:%d\n", param->high_temp,
 				param->low_temp);
-	rc = qpnp_adc_map_voltage_temp(
-		adcmap_btm_threshold,
-		ARRAY_SIZE(adcmap_btm_threshold),
-		(param->low_temp),
-		&low_output);
+	//CORE-DL-AddFxnAdcTable-00 +[
+	if (product_phase >= PHASE_SP2) {
+		rc = qpnp_adc_map_voltage_temp(
+			adcmap_fxn_btm_threshold_v2,
+			ARRAY_SIZE(adcmap_fxn_btm_threshold_v2),
+			(param->low_temp),
+			&low_output);
+	//CORE-DL-ModifyFxnAdcForRitaSp-00 +[
+	} else if (band_id == BAND_1258 && product_phase >= PHASE_SP) {
+		rc = qpnp_adc_map_voltage_temp(
+			adcmap_fxn_btm_threshold_v2,
+			ARRAY_SIZE(adcmap_fxn_btm_threshold_v2),
+			(param->low_temp),
+			&low_output);
+	//CORE-DL-ModifyFxnAdcForRitaSp-00 +]
+	} else {
+		rc = qpnp_adc_map_voltage_temp(
+			adcmap_fxn_btm_threshold,
+			ARRAY_SIZE(adcmap_fxn_btm_threshold),
+			(param->low_temp),
+			&low_output);
+	}
+	//CORE-DL-AddFxnAdcTable-00 +]
 	if (rc) {
 		pr_debug("low_temp mapping failed with %d\n", rc);
 		return rc;
@@ -949,11 +1216,29 @@ int32_t qpnp_adc_btm_scaler(struct qpnp_vadc_chip *chip,
 	do_div(low_output, btm_param.adc_vref);
 	low_output += btm_param.adc_gnd;
 
-	rc = qpnp_adc_map_voltage_temp(
-		adcmap_btm_threshold,
-		ARRAY_SIZE(adcmap_btm_threshold),
-		(param->high_temp),
-		&high_output);
+	//CORE-DL-AddFxnAdcTable-00 +[
+	if (product_phase >= PHASE_SP2) {
+		rc = qpnp_adc_map_voltage_temp(
+			adcmap_fxn_btm_threshold_v2,
+			ARRAY_SIZE(adcmap_fxn_btm_threshold_v2),
+			(param->high_temp),
+			&high_output);
+	//CORE-DL-ModifyFxnAdcForRitaSp-00 +[
+	} else if (band_id == BAND_1258 && product_phase >= PHASE_SP) {
+		rc = qpnp_adc_map_voltage_temp(
+			adcmap_fxn_btm_threshold_v2,
+			ARRAY_SIZE(adcmap_fxn_btm_threshold_v2),
+			(param->high_temp),
+			&high_output);
+	//CORE-DL-ModifyFxnAdcForRitaSp-00 +]
+	} else {
+		rc = qpnp_adc_map_voltage_temp(
+			adcmap_fxn_btm_threshold,
+			ARRAY_SIZE(adcmap_fxn_btm_threshold),
+			(param->high_temp),
+			&high_output);
+	}
+	//CORE-DL-AddFxnAdcTable-00 +]
 	if (rc) {
 		pr_debug("high temp mapping failed with %d\n", rc);
 		return rc;
@@ -1190,6 +1475,7 @@ int32_t qpnp_adc_get_devicetree_data(struct spmi_device *spmi,
 		adc_channel_list[i].adc_scale_fn = post_scaling;
 		adc_channel_list[i].hw_settle_time = hw_settle_time;
 		adc_channel_list[i].fast_avg_setup = fast_avg_setup;
+		adc_channel_list[i].calib_type = calib_type;
 		i++;
 	}
 

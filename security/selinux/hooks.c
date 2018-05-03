@@ -8,6 +8,7 @@
  *	      Wayne Salamon, <wsalamon@nai.com>
  *	      James Morris <jmorris@redhat.com>
  *
+ * Copyright(C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *  Copyright (C) 2001,2002 Networks Associates Technology, Inc.
  *  Copyright (C) 2003-2008 Red Hat, Inc., James Morris <jmorris@redhat.com>
  *					   Eric Paris <eparis@redhat.com>
@@ -217,6 +218,16 @@ static int inode_alloc_security(struct inode *inode)
 	return 0;
 }
 
+/*BSP-LC-SELinux_PATCH-00 +[ */
+static void inode_free_rcu(struct rcu_head *head)
+{
+       struct inode_security_struct *isec;
+
+       isec = container_of(head, struct inode_security_struct, rcu);
+       kmem_cache_free(sel_inode_cache, isec);
+}
+/*BSP-LC-SELinux_PATCH-00 +] */
+
 static void inode_free_security(struct inode *inode)
 {
 	struct inode_security_struct *isec = inode->i_security;
@@ -227,8 +238,22 @@ static void inode_free_security(struct inode *inode)
 		list_del_init(&isec->list);
 	spin_unlock(&sbsec->isec_lock);
 
+/*BSP-LC-SELinux_PATCH-00 *[*/
+	/*
 	inode->i_security = NULL;
 	kmem_cache_free(sel_inode_cache, isec);
+	*/
+    /*
+     * The inode may still be referenced in a path walk and
+     * a call to selinux_inode_permission() can be made
+     * after inode_free_security() is called. Ideally, the VFS
+     * wouldn't do this, but fixing that is a much harder
+     * job. For now, simply free the i_security via RCU, and
+     * leave the current inode->i_security pointer intact.
+     * The inode will be freed after the RCU grace period too.
+     */
+    call_rcu(&isec->rcu, inode_free_rcu);
+/*BSP-KC-SELinux_PATCH-00 *]*/
 }
 
 static int file_alloc_security(struct file *file)
@@ -3816,10 +3841,12 @@ static int sock_has_perm(struct task_struct *task, struct sock *sk, u32 perms)
 	struct lsm_network_audit net = {0,};
 	u32 tsid = task_sid(task);
 
-	if (unlikely(!sksec)) {
-		pr_warn("SELinux: sksec is NULL, socket is already freed\n");
-		return -EINVAL;
+	/* CORE-TH-OEM_MISC_Workaround-00+[ */
+	if (unlikely(!sksec)){
+			printk(KERN_CRIT "[SELinux] sksec is NULL, socket is already freed. \n");
+			return -EINVAL;
 	}
+	/* CORE-TH-OEM_MISC_Workaround-00-[ */
 
 	if (sksec->sid == SECINITSID_KERNEL)
 		return 0;

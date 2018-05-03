@@ -78,6 +78,7 @@ enum wcd9xxx_mbhc_plug_type {
 	PLUG_TYPE_HEADPHONE,
 	PLUG_TYPE_HIGH_HPH,
 	PLUG_TYPE_GND_MIC_SWAP,
+	PLUG_TYPE_NOT_SUPPORT,	/*SW-MM-CL-MBHC-00+ */
 };
 
 enum wcd9xxx_micbias_num {

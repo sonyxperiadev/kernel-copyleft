@@ -52,6 +52,7 @@
 #include <mach/msm_memtypes.h>
 
 #include "mdss_fb.h"
+#include "mdss_dsi.h"
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
@@ -69,6 +70,9 @@ static u32 mdss_fb_pseudo_palette[16] = {
 	0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
 	0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
 };
+
+static int SplashScreenState = 2;
+static int backlight_early_init=0;
 
 static struct msm_mdp_interface *mdp_instance;
 
@@ -167,15 +171,12 @@ static int mdss_fb_splash_thread(void *data)
 	}
 
 	fbi = mfd->fbi;
-
+	printk("[DSIPLAY]%s:+\n",__func__);
 	ret = mdss_fb_open(fbi, current->tgid);
 	if (ret) {
 		pr_err("fb_open failed\n");
 		goto end;
 	}
-
-	mfd->bl_updated = true;
-	mdss_fb_set_backlight(mfd, mfd->panel_info->bl_max >> 1);
 
 	ret = mfd->mdp.splash_fnc(mfd, ov_index, MDP_CREATE_SPLASH_OV);
 	if (ret) {
@@ -183,11 +184,16 @@ static int mdss_fb_splash_thread(void *data)
 		goto splash_err;
 	}
 
+	mfd->bl_updated = true;
+	mdss_fb_set_backlight(mfd, mfd->panel_info->bl_max >> 1);
+
+
 	do {
 		schedule_timeout_interruptible(SPLASH_THREAD_WAIT_TIMEOUT * HZ);
 	} while (!kthread_should_stop());
 
 	mfd->mdp.splash_fnc(mfd, ov_index, MDP_REMOVE_SPLASH_OV);
+	printk("[DSIPLAY]%s:-\n",__func__);
 
 splash_err:
 	mdss_fb_release(fbi, current->tgid);
@@ -196,12 +202,51 @@ end:
 }
 
 static int lcd_backlight_registered;
+/* MM-KW-Display-00+{ */
+//static int unset_bl_level = 0;
+//static int bl_level_old = 0;
+/* MM-KW-Display-00-} */
+/*PERI-AC-Backlight_Level-00+{*/
+#define MAX_BACKLIGHT_BRIGHTNESS 255
+/*PERI-AC-Backlight_Level-00+}*/
 
 static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 				      enum led_brightness value)
 {
 	struct msm_fb_data_type *mfd = dev_get_drvdata(led_cdev->dev->parent);
 	int bl_lvl;
+       /*PERI-AC-Backlight_Level-00+{*/
+       char bkl_lut[MAX_BACKLIGHT_BRIGHTNESS + 1] = {
+               0x00, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+               0x07, 0x08, 0x0A, 0x0C, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13,
+               0x13, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14,
+               0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14, 0x14,
+               0x14, 0x14, 0x14, 0x14, 0x14, 0x15, 0x15, 0x15, 0x15, 0x15,
+               0x15, 0x15, 0x15, 0x15, 0x15, 0x15, 0x15, 0x16, 0x16, 0x16,
+               0x16, 0x16, 0x16, 0x16, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17,
+               0x18, 0x18, 0x18, 0x18, 0x18, 0x19, 0x19, 0x19, 0x19, 0x1A,
+               0x1A, 0x1A, 0x1A, 0x1B, 0x1B, 0x1B, 0x1C, 0x1C, 0x1C, 0x1D,
+               0x1D, 0x1D, 0x1E, 0x1E, 0x1E, 0x1F, 0x1F, 0x20, 0x20, 0x20,
+               0x21, 0x21, 0x22, 0x22, 0x23, 0x23, 0x24, 0x24, 0x25, 0x25,
+               0x26, 0x26, 0x27, 0x27, 0x28, 0x28, 0x29, 0x2A, 0x2A, 0x2B,
+               0x2B, 0x2C, 0x2D, 0x2D, 0x2E, 0x2F, 0x2F, 0x30, 0x31, 0x32,
+               0x32, 0x33, 0x34, 0x35, 0x35, 0x36, 0x37, 0x38, 0x39, 0x39,
+               0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x41, 0x42, 0x43,
+               0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D,
+               0x4E, 0x4F, 0x50, 0x51, 0x53, 0x54, 0x55, 0x56, 0x57, 0x59,
+               0x5A, 0x5B, 0x5C, 0x5E, 0x5F, 0x60, 0x62, 0x63, 0x64, 0x66,
+               0x67, 0x69, 0x6A, 0x6C, 0x6D, 0x6E, 0x70, 0x71, 0x73, 0x74,
+               0x76, 0x78, 0x79, 0x7B, 0x7C, 0x7E, 0x80, 0x81, 0x83, 0x85,
+               0x86, 0x88, 0x8A, 0x8C, 0x8D, 0x8F, 0x91, 0x93, 0x95, 0x97,
+               0x98, 0x9A, 0x9C, 0x9E, 0xA0, 0xA2, 0xA4, 0xA6, 0xA8, 0xAA,
+               0xAC, 0xAE, 0xB0, 0xB2, 0xB4, 0xB7, 0xB9, 0xBB, 0xBD, 0xBF,
+               0xC1, 0xC4, 0xC6, 0xC8, 0xCB, 0xCD, 0xCF, 0xD2, 0xD4, 0xD6,
+               0xD9, 0xDB, 0xDE, 0xE0, 0xE2, 0xE5, 0xE7, 0xEA, 0xED, 0xEF,
+               0xF2, 0xF4, 0xF7, 0xFA, 0xFC, 0xFF,
+       };
+
+       /*PERI-AC-Backlight_Level-00+}*/
+
 
 	if (value > mfd->panel_info->brightness_max)
 		value = mfd->panel_info->brightness_max;
@@ -211,12 +256,19 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
 				mfd->panel_info->brightness_max);
 
+       /*PERI-AC-Backlight_Level-00+{*/
+       /*Base on display backlight propert, setup the mapping table
+       and ignore default driver algorithms*/
+       bl_lvl = bkl_lut[value];
+       /*PERI-AC-Backlight_Level-00+}*/
+
 	if (!bl_lvl && value)
 		bl_lvl = 1;
 
 	if (!IS_CALIB_MODE_BL(mfd) && (!mfd->ext_bl_ctrl || !value ||
 							!mfd->bl_level)) {
 		mutex_lock(&mfd->bl_lock);
+
 		mdss_fb_set_backlight(mfd, bl_lvl);
 		mutex_unlock(&mfd->bl_lock);
 	}
@@ -270,25 +322,38 @@ static ssize_t mdss_fb_get_type(struct device *dev,
 
 static void mdss_fb_parse_dt(struct msm_fb_data_type *mfd)
 {
-	u32 data[2];
+	u32 data[2] = {0};
+	u32 panel_xres;
 	struct platform_device *pdev = mfd->pdev;
 
 	mfd->splash_logo_enabled = of_property_read_bool(pdev->dev.of_node,
 				"qcom,mdss-fb-splash-logo-enabled");
 
-	if (of_property_read_u32_array(pdev->dev.of_node, "qcom,mdss-fb-split",
-				       data, 2))
-		return;
-	if (data[0] && data[1] &&
-	    (mfd->panel_info->xres == (data[0] + data[1]))) {
-		mfd->split_fb_left = data[0];
-		mfd->split_fb_right = data[1];
-		pr_info("split framebuffer left=%d right=%d\n",
-			mfd->split_fb_left, mfd->split_fb_right);
-	} else {
-		mfd->split_fb_left = 0;
-		mfd->split_fb_right = 0;
+	printk("[DISPLAY]%s: splash_logo_enabled (%d)+\n", __func__,mfd->splash_logo_enabled);
+	if(!mdss_display_splash_LK())
+	{
+		mfd->splash_logo_enabled =1;
 	}
+	of_property_read_u32_array(pdev->dev.of_node,
+		"qcom,mdss-fb-split", data, 2);
+
+	panel_xres = mfd->panel_info->xres;
+	if (data[0] && data[1]) {
+		if (mfd->split_display)
+			panel_xres *= 2;
+
+		if (panel_xres == data[0] + data[1]) {
+			mfd->split_fb_left = data[0];
+			mfd->split_fb_right = data[1];
+		}
+	} else {
+		if (mfd->split_display)
+			mfd->split_fb_left = mfd->split_fb_right = panel_xres;
+		else
+			mfd->split_fb_left = mfd->split_fb_right = 0;
+	}
+	pr_info("split framebuffer left=%d right=%d\n",
+		mfd->split_fb_left, mfd->split_fb_right);
 }
 
 static ssize_t mdss_fb_get_split(struct device *dev,
@@ -316,14 +381,75 @@ static ssize_t mdss_mdp_show_blank_event(struct device *dev,
 	return ret;
 }
 
+static void __mdss_fb_idle_notify_work(struct work_struct *work)
+{
+	struct delayed_work *dw = to_delayed_work(work);
+	struct msm_fb_data_type *mfd = container_of(dw, struct msm_fb_data_type,
+		idle_notify_work);
+
+	/* Notify idle-ness here */
+	pr_debug("Idle timeout %dms expired!\n", mfd->idle_time);
+	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "idle_notify");
+}
+
+static ssize_t mdss_fb_get_idle_time(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = fbi->par;
+	int ret;
+
+	ret = scnprintf(buf, PAGE_SIZE, "%d", mfd->idle_time);
+
+	return ret;
+}
+
+static ssize_t mdss_fb_set_idle_time(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = fbi->par;
+	int rc = 0;
+	int idle_time = 0;
+
+	rc = kstrtoint(buf, 10, &idle_time);
+	if (rc) {
+		pr_err("kstrtoint failed. rc=%d\n", rc);
+		return rc;
+	}
+
+	pr_debug("Idle time = %d\n", idle_time);
+	mfd->idle_time = idle_time;
+
+	return count;
+}
+
+static ssize_t mdss_fb_get_idle_notify(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = fbi->par;
+	int ret;
+
+	ret = scnprintf(buf, PAGE_SIZE, "%s",
+		work_busy(&mfd->idle_notify_work.work) ? "no" : "yes");
+
+	return ret;
+}
+
 static DEVICE_ATTR(msm_fb_type, S_IRUGO, mdss_fb_get_type, NULL);
 static DEVICE_ATTR(msm_fb_split, S_IRUGO, mdss_fb_get_split, NULL);
 static DEVICE_ATTR(show_blank_event, S_IRUGO, mdss_mdp_show_blank_event, NULL);
+static DEVICE_ATTR(idle_time, S_IRUGO | S_IWUSR | S_IWGRP,
+	mdss_fb_get_idle_time, mdss_fb_set_idle_time);
+static DEVICE_ATTR(idle_notify, S_IRUGO, mdss_fb_get_idle_notify, NULL);
 
 static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_msm_fb_type.attr,
 	&dev_attr_msm_fb_split.attr,
 	&dev_attr_show_blank_event.attr,
+	&dev_attr_idle_time.attr,
+	&dev_attr_idle_notify.attr,
 	NULL,
 };
 
@@ -391,8 +517,14 @@ static int mdss_fb_probe(struct platform_device *pdev)
 
 	mfd->ext_ad_ctrl = -1;
 	mfd->bl_level = 0;
+	/* MM-KW-Display-00+{ */
+	if (mfd->index == 0) {
+		mfd->bl_level = pdata->panel_info.bl_max;
+		mfd->unset_bl_level = mfd->bl_level;
+	}
+	/* MM-KW-Display-00-} */
 	mfd->bl_scale = 1024;
-	mfd->bl_min_lvl = 30;
+	mfd->bl_min_lvl = 7;/*PERI-AC-Backlight_Level-00*/
 	mfd->fb_imgType = MDP_RGBA_8888;
 
 	mfd->pdev = pdev;
@@ -470,14 +602,19 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	}
 
 	if (mfd->splash_logo_enabled) {
-		mfd->splash_thread = kthread_run(mdss_fb_splash_thread, mfd,
-				"mdss_fb_splash");
-		if (IS_ERR(mfd->splash_thread)) {
-			pr_err("unable to start splash thread %d\n",
-				mfd->index);
-			mfd->splash_thread = NULL;
+		if (mfd->index == 0) {
+
+			mfd->splash_thread = kthread_run(mdss_fb_splash_thread, mfd,
+					"mdss_fb_splash");
+			if (IS_ERR(mfd->splash_thread)) {
+				pr_err("unable to start splash thread %d\n",
+					mfd->index);
+				mfd->splash_thread = NULL;
+			}
 		}
 	}
+
+	INIT_DELAYED_WORK(&mfd->idle_notify_work, __mdss_fb_idle_notify_work);
 
 	return rc;
 }
@@ -793,6 +930,16 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 			mfd->update.type = NOTIFY_TYPE_UPDATE;
 			mfd->update.is_suspend = 0;
 			mutex_unlock(&mfd->update.lock);
+
+			/* Start the work thread to signal idle time */
+			if (mfd->idle_time)
+				schedule_delayed_work(&mfd->idle_notify_work,
+					msecs_to_jiffies(mfd->idle_time));
+			if(backlight_early_init)
+			{
+				mdss_fb_set_backlight(mfd, mfd->bl_level);
+				backlight_early_init = 0;
+			}
 		}
 		break;
 
@@ -803,7 +950,7 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 	default:
 		if (mfd->panel_power_on && mfd->mdp.off_fnc) {
 			int curr_pwr_state;
-
+			printk("FB_BLANK_POWERDOWN: Power down unblank");
 			mutex_lock(&mfd->update.lock);
 			mfd->update.type = NOTIFY_TYPE_SUSPEND;
 			mfd->update.is_suspend = 1;
@@ -986,6 +1133,186 @@ static int mdss_fb_alloc_fbmem(struct msm_fb_data_type *mfd)
 		return -ENOMEM;
 	}
 }
+/* MM-KW-Display-00+{ */
+static int mdss_fb_show_logo(char* path, struct fb_info *fbi)
+{
+	if(mdss_display_splash_LK())
+		fih_load_rle_image(path);
+	else
+		mdss_load_rle565_image(path,0);
+	return mdss_fb_pan_display(&fbi->var, fbi);
+}
+
+static int draw_pic = 0;
+static int DisplayHandle=0;
+extern int mdss_mdp_overlay_start_splash(struct msm_fb_data_type *mfd);
+
+static ssize_t mdss_fb_show_battery(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct fb_info *info = registered_fb[0];
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
+	int last_bl_level = 0;
+	int battery_state = 0;
+	char rlefile[50];
+	long data = 0;
+	int error = strict_strtol(buf, 10, &data);
+	struct mdss_panel_data *pdata = NULL;
+
+	if (error) {
+		printk(KERN_ERR "[DISPLAY]%s: failure, buf <%s>, data <%ld>, err <%d>\n",
+				__func__, buf, data, error);
+	}
+	pdata = dev_get_platdata(&mfd->pdev->dev);
+
+	if(!DisplayHandle && mdss_display_splash_LK())
+	{
+		DisplayHandle++;
+		mdss_fb_open(info, current->tgid);
+		mfd->panel_power_on = 0;
+		mdss_mdp_overlay_start_splash(mfd);
+		memset(info->screen_base, 0x0,
+						((736*info->var.yres*info->var.bits_per_pixel)>>3));
+
+	}
+
+	battery_state = (int)data;
+	draw_pic = battery_state;
+	snprintf(rlefile, 50, "/res/images/charger/ca0%d.rle", battery_state+1); //CORE-DL-ShowBattery-00
+
+	printk(KERN_INFO "[DISPLAY]%s state=%d\n", __func__, battery_state);
+	switch (battery_state) {
+		case BATTERY_EMPTY:
+		case BATTERY_LEVEL_01:
+		case BATTERY_LEVEL_02:
+		case BATTERY_LEVEL_03:
+		case BATTERY_LEVEL_04:
+		case BATTERY_LEVEL_05:
+		case BATTERY_FULL:
+			mdss_fb_show_logo(rlefile, info);
+			break;
+		case BATTERY_DISP_ON:
+			mdss_fb_blank_sub(FB_BLANK_UNBLANK, info, mfd->op_enable);
+			mutex_lock(&mfd->bl_lock);
+			mdss_fb_set_backlight(mfd, pdata->panel_info.bl_max);
+			mutex_unlock(&mfd->bl_lock);
+			break;
+		case BATTERY_DISP_OFF:
+			last_bl_level = mfd->bl_level;
+			mfd->bl_level = 0;
+			mdss_fb_set_backlight(mfd, LED_OFF);
+			mfd->bl_level = last_bl_level;
+			snprintf(rlefile, 50, "/res/images/charger/ca0%d.rle", draw_pic+1);
+//			mdss_load_rle565_image(rlefile,1);
+			memset(info->screen_base, 0x0,
+							((736*info->var.yres*info->var.bits_per_pixel)>>3));
+
+			mdss_fb_blank_sub(FB_BLANK_POWERDOWN, info, mfd->op_enable);
+			break;
+		case DISP_LOGO:
+			mdss_fb_show_logo(INIT_IMAGE_FILE, info);
+			break;
+		default:
+			printk(KERN_ERR "[DISPLAY]%s Invalid battery state\n", __func__);
+			break;
+	}
+
+	return size;
+}
+static DEVICE_ATTR(display_battery, 0644, NULL, mdss_fb_show_battery);
+/* MM-KW-Display-00-} */
+
+/* PERI-AC-Display-00+{ */
+static ssize_t mdss_manufactory_id_show(struct device *dev,
+               struct device_attribute *attr, char *buf)
+{
+       unsigned char manufactoryID = mdss_manufacture_id_read();
+
+       return snprintf(buf, PAGE_SIZE, "%x\n", manufactoryID);
+}
+
+static DEVICE_ATTR(manufactory_id, 0644, mdss_manufactory_id_show, NULL);
+/* PERI-AC-Display-00-} */
+
+
+/* PERI-AC-Display-00-{ */
+static ssize_t mdss_fb_store_factoryreset(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct fb_info *info = registered_fb[0];
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
+	int last_bl_level = 0;
+	int reset_state = 0;
+	char rlefile[50];
+	long data = 0;
+	int error = strict_strtol(buf, 10, &data);
+	struct mdss_panel_data *pdata = NULL;
+
+	SplashScreenState = 2;
+	if (error) {
+		printk(KERN_ERR "[DISPLAY]%s: failure, buf <%s>, data <%ld>, err <%d>\n",
+				__func__, buf, data, error);
+	}
+	pdata = dev_get_platdata(&mfd->pdev->dev);
+
+	if(!DisplayHandle && mdss_display_splash_LK())
+	{
+		DisplayHandle++;
+		mfd->panel_power_on = 1;
+		mdss_fb_open(info, current->tgid);
+		mdss_mdp_overlay_start_splash(mfd);
+		memset(info->screen_base, 0x0,
+						(736*info->var.yres*info->var.bits_per_pixel)>>3);
+
+	}
+
+	reset_state = (int)data;
+	draw_pic = reset_state;
+	snprintf(rlefile, 50, "/res/images/reset/rst0%d.rle", reset_state); 
+
+	printk(KERN_INFO "[DISPLAY]%s state=%d\n", __func__, reset_state);
+	switch (reset_state) {
+		case RESET:
+		case RESET_01:
+		case RESET_02:
+		case RESET_03:
+		case RESET_04:
+		case RESET_05:
+		case RESET_06:
+		case RESET_07:
+			mdss_fb_show_logo(rlefile, info);
+			break;
+		case RESET_DISP_ON:
+			mdss_fb_blank_sub(FB_BLANK_UNBLANK, info, mfd->op_enable);
+			mutex_lock(&mfd->bl_lock);
+			mdss_fb_set_backlight(mfd, pdata->panel_info.bl_max);
+			mutex_unlock(&mfd->bl_lock);
+			break;
+		case RESET_DISP_OFF:
+			last_bl_level = mfd->bl_level;
+			mfd->bl_level = 0;
+			mdss_fb_set_backlight(mfd, LED_OFF);
+			mfd->bl_level = last_bl_level;
+			snprintf(rlefile, 50, "/res/images/reset/rst0%d.rle", draw_pic);
+//			mdss_load_rle565_image(rlefile,1);
+			memset(info->screen_base, 0x0,
+							((736*info->var.yres*info->var.bits_per_pixel)>>3));
+
+			mdss_fb_blank_sub(FB_BLANK_POWERDOWN, info, mfd->op_enable);
+			break;
+		case RESET_DISP_BACKLIGHT:
+			backlight_early_init = 1;
+			break;
+		default:
+			printk(KERN_ERR "[DISPLAY]%s Invalid battery state\n", __func__);
+			break;
+	}
+
+	return size;
+}
+static DEVICE_ATTR(frst, 0644, NULL, mdss_fb_store_factoryreset);
+/* PERI-AC-Display-00-} */
+
 
 static int mdss_fb_register(struct msm_fb_data_type *mfd)
 {
@@ -1010,16 +1337,16 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 	fix->mmio_len = 0;	/* No MMIO Address */
 	fix->accel = FB_ACCEL_NONE;/* FB_ACCEL_MSM needes to be added in fb.h */
 
-	var->xoffset = 0,	/* Offset from virtual to visible */
-	var->yoffset = 0,	/* resolution */
-	var->grayscale = 0,	/* No graylevels */
-	var->nonstd = 0,	/* standard pixel format */
-	var->activate = FB_ACTIVATE_VBL,	/* activate it at vsync */
-	var->height = -1,	/* height of picture in mm */
-	var->width = -1,	/* width of picture in mm */
-	var->accel_flags = 0,	/* acceleration flags */
-	var->sync = 0,	/* see FB_SYNC_* */
-	var->rotate = 0,	/* angle we rotate counter clockwise */
+	var->xoffset = 0;	/* Offset from virtual to visible */
+	var->yoffset = 0;	/* resolution */
+	var->grayscale = 0;	/* No graylevels */
+	var->nonstd = 0;	/* standard pixel format */
+	var->activate = FB_ACTIVATE_VBL;	/* activate it at vsync */
+	var->height = -1;	/* height of picture in mm */
+	var->width = -1;	/* width of picture in mm */
+	var->accel_flags = 0;	/* acceleration flags */
+	var->sync = 0;	/* see FB_SYNC_* */
+	var->rotate = 0;	/* angle we rotate counter clockwise */
 	mfd->op_enable = false;
 
 	switch (mfd->fb_imgType) {
@@ -1207,10 +1534,39 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 		     mfd->index, fbi->var.xres, fbi->var.yres,
 		     fbi->fix.smem_len);
 
-	return 0;
+	/* MM-KW-Display-01+{ */
+	if (mfd->index == 0) {
+		/* File node: /sys/class/graphics/fb?/display_battery */
+		ret = device_create_file(fbi->dev, &dev_attr_display_battery);
+		if (ret) {
+			printk(KERN_ERR "[DISPLAY]%s: create dev_attr_display_battery failed, ret <%d>\n",
+					__func__, ret);
+		}
+		/* PERI-AC-Display-00-{ */
+		ret = device_create_file(fbi->dev, &dev_attr_manufactory_id);
+		if (ret) {
+		       printk(KERN_ERR "[DISPLAY]%s: create dev_attr_manufactory_id failed, ret <%d>\n",
+		                       __func__, ret);
+		}
+		/* PERI-AC-Display-00-} */
+		/* PERI-AC-Display-00-{ */
+		ret = device_create_file(fbi->dev, &dev_attr_frst);
+		if (ret) {
+		       printk(KERN_ERR "[DISPLAY]%s: create dev_attr_frst failed, ret <%d>\n",
+		                       __func__, ret);
+		}
+		/* PERI-AC-Display-00-} */
+
+	}
+	/* MM-KW-Display-01-} */
+
+	ret = 0;
+
+	return ret;
 }
 
-static int mdss_fb_open(struct fb_info *info, int user)
+/* MM-KW-Display-00+{ */
+static int mdss_fb_open_sub(struct fb_info *info, int user)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct mdss_fb_proc_info *pinfo = NULL;
@@ -1291,6 +1647,43 @@ thread_error:
 pm_error:
 	return result;
 }
+
+static int mdss_fb_open(struct fb_info *info, int user)
+{
+	struct msm_fb_data_type *mfd = NULL;
+	struct mdss_panel_data *pdata = NULL;
+
+	if (info->node == 0) {
+		if(SplashScreenState == 2){
+			mdss_fb_open_sub(info,user);
+		}else if(SplashScreenState == 1){
+			mfd = (struct msm_fb_data_type *)info->par;
+			pdata = dev_get_platdata(&mfd->pdev->dev);
+
+			mutex_lock(&mfd->bl_lock);
+			mdss_fb_set_backlight(mfd, LED_OFF);
+			mutex_unlock(&mfd->bl_lock);
+
+			memset(info->screen_base, 0x0,
+				(info->var.xres*info->var.yres*info->var.bits_per_pixel)>>3);
+			mdss_fb_release(info, user);
+			mdss_fb_open_sub(info,user);
+
+			mutex_lock(&mfd->bl_lock);
+			mdss_fb_set_backlight(mfd, pdata->panel_info.bl_max);
+			mutex_unlock(&mfd->bl_lock);
+
+			SplashScreenState = 2;
+		}else{
+			mdss_fb_open_sub(info,user);
+			SplashScreenState = 1;
+		}
+	} else {
+		mdss_fb_open_sub(info,user);
+	}
+	return 0;
+}
+/* MM-KW-Display-00-} */
 
 static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 {
@@ -1520,10 +1913,20 @@ static int __mdss_fb_sync_buf_done_callback(struct notifier_block *p,
 		unsigned long event, void *data)
 {
 	struct msm_sync_pt_data *sync_pt_data;
+	struct msm_fb_data_type *mfd;
 
 	sync_pt_data = container_of(p, struct msm_sync_pt_data, notifier);
+	mfd = container_of(sync_pt_data, struct msm_fb_data_type,
+		mdp_sync_pt_data);
 
 	switch (event) {
+	case MDP_NOTIFY_FRAME_BEGIN:
+		if (mfd->idle_time) {
+			cancel_delayed_work_sync(&mfd->idle_notify_work);
+			schedule_delayed_work(&mfd->idle_notify_work,
+				msecs_to_jiffies(mfd->idle_time));
+		}
+		break;
 	case MDP_NOTIFY_FRAME_READY:
 		if (sync_pt_data->async_wait_fences)
 			mdss_fb_wait_for_fence(sync_pt_data);

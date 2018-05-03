@@ -578,6 +578,32 @@ static int tapan_pa_gain_put(struct snd_kcontrol *kcontrol,
 	return rc;
 }
 
+/*SW-MM-CL-GetHsType-00+[*/
+static int tapan_hs_type_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+
+	int insert;
+
+	if(snd_soc_read(codec,WCD9XXX_A_MBHC_INSERT_DET_STATUS) & (1 << 2))
+		insert = 0;
+	else
+		insert = 1;
+	ucontrol->value.integer.value[0] = insert+1;
+
+	dev_dbg(codec->dev, "%s: hs_type = 0x%ld\n", __func__, ucontrol->value.integer.value[0]);
+
+	return 0;
+}
+
+static int tapan_hs_type_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	return 0;
+}
+/*SW-MM-CL-GetHsType-00+]*/
+
 static int tapan_get_iir_enable_audio_mixer(
 					struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
@@ -1049,6 +1075,13 @@ static const char *const tapan_anc_func_text[] = {"OFF", "ON"};
 static const struct soc_enum tapan_anc_func_enum =
 		SOC_ENUM_SINGLE_EXT(2, tapan_anc_func_text);
 
+/*SW-MM-CL-GetHsType-00+[*/
+static const char * const tapan_hs_type_text[] = {"not insert", "insert"};
+static const struct soc_enum tapan_hs_type_enum[] = {
+		SOC_ENUM_SINGLE_EXT(2, tapan_hs_type_text),
+};
+/*SW-MM-CL-GetHsType-00+]*/
+
 /*cut of frequency for high pass filter*/
 static const char * const cf_text[] = {
 	"MIN_3DB_4Hz", "MIN_3DB_75Hz", "MIN_3DB_150Hz"
@@ -1111,6 +1144,11 @@ static const struct snd_kcontrol_new tapan_common_snd_controls[] = {
 
 	SOC_ENUM_EXT("EAR PA Gain", tapan_ear_pa_gain_enum[0],
 		tapan_pa_gain_get, tapan_pa_gain_put),
+
+	/*SW-MM-CL-GetHsType-00+[*/
+	SOC_ENUM_EXT("HS TYPE", tapan_hs_type_enum[0],
+		tapan_hs_type_get, tapan_hs_type_put),
+	/*SW-MM-CL-GetHsType-00+]*/
 
 	SOC_SINGLE_TLV("HPHL Volume", TAPAN_A_RX_HPH_L_GAIN, 0, 14, 1,
 		line_gain),
@@ -1344,6 +1382,9 @@ static const struct soc_enum rx3_mix1_inp1_chain_enum =
 static const struct soc_enum rx3_mix1_inp2_chain_enum =
 	SOC_ENUM_SINGLE(TAPAN_A_CDC_CONN_RX3_B1_CTL, 4, 13, rx_3_4_mix1_text);
 
+static const struct soc_enum rx3_mix1_inp3_chain_enum =
+	SOC_ENUM_SINGLE(TAPAN_A_CDC_CONN_RX3_B2_CTL, 0, 13, rx_3_4_mix1_text);
+
 static const struct soc_enum rx4_mix1_inp1_chain_enum =
 	SOC_ENUM_SINGLE(TAPAN_A_CDC_CONN_RX4_B1_CTL, 0, 13, rx_3_4_mix1_text);
 
@@ -1441,6 +1482,9 @@ static const struct snd_kcontrol_new rx3_mix1_inp1_mux =
 
 static const struct snd_kcontrol_new rx3_mix1_inp2_mux =
 	SOC_DAPM_ENUM("RX3 MIX1 INP2 Mux", rx3_mix1_inp2_chain_enum);
+
+static const struct snd_kcontrol_new rx3_mix1_inp3_mux =
+	SOC_DAPM_ENUM("RX3 MIX1 INP3 Mux", rx3_mix1_inp3_chain_enum);
 
 static const struct snd_kcontrol_new rx4_mix1_inp1_mux =
 	SOC_DAPM_ENUM("RX4 MIX1 INP1 Mux", rx4_mix1_inp1_chain_enum);
@@ -4136,7 +4180,7 @@ static int tapan_codec_enable_slimtx(struct snd_soc_dapm_widget *w,
 	struct wcd9xxx *core;
 	struct snd_soc_codec *codec = w->codec;
 	struct tapan_priv *tapan_p = snd_soc_codec_get_drvdata(codec);
-	u32  ret = 0;
+	int  ret = 0; /* MM-AY-Coverity93379-00-- */
 	struct wcd9xxx_codec_dai_data *dai;
 
 	core = dev_get_drvdata(codec->dev->parent);
@@ -4481,7 +4525,7 @@ static const struct snd_soc_dapm_widget tapan_common_dapm_widgets[] = {
 	SND_SOC_DAPM_MUX("RX3 MIX1 INP2", SND_SOC_NOPM, 0, 0,
 		&rx3_mix1_inp2_mux),
 	SND_SOC_DAPM_MUX("RX3 MIX1 INP3", SND_SOC_NOPM, 0, 0,
-		&rx3_mix1_inp2_mux),
+		&rx3_mix1_inp3_mux),
 
 	/* RX1 MIX2 mux inputs */
 	SND_SOC_DAPM_MUX("RX1 MIX2 INP1", SND_SOC_NOPM, 0, 0,
@@ -4819,20 +4863,28 @@ static int tapan_handle_pdata(struct tapan_priv *tapan)
 	struct snd_soc_codec *codec = tapan->codec;
 	struct wcd9xxx_pdata *pdata = tapan->resmgr.pdata;
 	int k1, k2, k3, rc = 0;
-	u8 txfe_bypass = pdata->amic_settings.txfe_enable;
-	u8 txfe_buff = pdata->amic_settings.txfe_buff;
-	u8 flag = pdata->amic_settings.use_pdata;
+	/* MM-AY-Coverity94376-00-[+ */
+	u8 txfe_bypass = 0;
+	u8 txfe_buff = 0;
+	u8 flag = 0;
+	/* MM-AY-Coverity94376-00-]- */
 	u8 i = 0, j = 0;
 	u8 val_txfe = 0, value = 0;
 	u8 dmic_sample_rate_value = 0;
 	u8 dmic_b1_ctl_value = 0;
 	u8 anc_ctl_value = 0;
 
-	if (!pdata) {
+	if (pdata == NULL) { /* MM-AY-Coverity94376-00-- */
 		dev_err(codec->dev, "%s: NULL pdata\n", __func__);
 		rc = -ENODEV;
 		goto done;
 	}
+
+	/* MM-AY-Coverity94376-00-[+ */
+	txfe_bypass = pdata->amic_settings.txfe_enable;
+	txfe_buff = pdata->amic_settings.txfe_buff;
+	flag = pdata->amic_settings.use_pdata;
+	/* MM-AY-Coverity94376-00-]- */
 
 	/* Make sure settings are correct */
 	if ((pdata->micbias.ldoh_v > WCD9XXX_LDOH_3P0_V) ||
@@ -5346,6 +5398,7 @@ static void wcd9xxx_prepare_hph_pa(struct wcd9xxx_mbhc *mbhc,
 	int i;
 	struct snd_soc_codec *codec = mbhc->codec;
 	u32 delay;
+	int ret = 0; /* MM-AY-Coverity91439-00-- */
 
 	const struct wcd9xxx_reg_mask_val reg_set_paon[] = {
 		{WCD9XXX_A_CDC_CLSH_B1_CTL, 0x0F, 0x00},
@@ -5411,10 +5464,15 @@ static void wcd9xxx_prepare_hph_pa(struct wcd9xxx_mbhc *mbhc,
 			delay = 1000;
 		else
 			delay = 0;
-		wcd9xxx_soc_update_bits_push(codec, lh,
+		/* MM-AY-Coverity91439-00-[+ */
+		ret = wcd9xxx_soc_update_bits_push(codec, lh,
 					     reg_set_paon[i].reg,
 					     reg_set_paon[i].mask,
 					     reg_set_paon[i].val, delay);
+		if (ret < 0)
+			pr_debug("%s: wcd9xxx_soc_update_bits_push has error.\n", __func__);
+		/* MM-AY-Coverity91439-00-]- */
+
 	}
 	pr_debug("%s: PAs are prepared\n", __func__);
 	return;

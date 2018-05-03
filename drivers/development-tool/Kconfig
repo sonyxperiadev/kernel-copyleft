@@ -1,0 +1,20 @@
+#
+# Vibrator device configuration
+#
+
+menu "FIH development tool"
+
+config FIH_DEVELOPMENT_TOOL
+	bool "use FIH development tool"
+	help
+	  FIH development tool.
+
+config FIH_UNITED_FILE_NODE
+        tristate "FIH united file node"
+        default n
+        depends on FIH_DEVELOPMENT_TOOL
+        help
+          This is united file node.
+
+endmenu
+

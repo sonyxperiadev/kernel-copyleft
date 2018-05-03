@@ -4,6 +4,7 @@
  * Copyright (C) 2008 Google, Inc.
  * Author: Mike Lockwood <lockwood@android.com>
  *         Benoit Goby <benoit@android.com>
+ * Copyright (C) 2011-2012 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -69,7 +70,7 @@
 #include "u_ctrl_hsuart.c"
 #include "u_data_hsuart.c"
 #include "f_serial.c"
-#include "f_acm.c"
+//#include "f_acm.c"/*MTD-CONN-JY-USBPORTING-00-*/
 #include "f_adb.c"
 #include "f_ccid.c"
 #include "f_mtp.c"
@@ -92,6 +93,8 @@
 #include "f_uac1.c"
 #endif
 #include "f_ncm.c"
+
+#define F_CDROM  1/*CONN-JY-PCCOMPANION-00+*/
 
 MODULE_AUTHOR("Mike Lockwood");
 MODULE_DESCRIPTION("Android Composite USB Driver");
@@ -327,6 +330,14 @@ static void android_work(struct work_struct *data)
 	static enum android_device_state last_uevent, next_state;
 	unsigned long flags;
 	int pm_qos_vote = -1;
+	/*CONN-JY-mtpRandump-00+{*/
+	int testcase=0;
+
+	printk(KERN_INFO"usb:%s: in state : %d config %p\n", __func__,next_state,cdev->config);
+	printk(KERN_INFO"usb:%s: sw_suspend : %d sw_connect : %d \n", __func__,dev->sw_suspended,dev->sw_connected);
+	printk(KERN_INFO"usb:%s:      suspend : %d      connect : %d \n", __func__,dev->suspended,dev->connected);
+	if (strncmp(dev->pm_qos, "low", 3))printk(KERN_INFO"usb:%s: pm_qos high\n", __func__);
+	/*CONN-JY-mtpRandump-00+}*/
 
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (dev->suspended != dev->sw_suspended && cdev->config) {
@@ -334,9 +345,11 @@ static void android_work(struct work_struct *data)
 			pm_qos_vote = dev->suspended ? 0 : 1;
 		next_state = dev->suspended ? USB_SUSPENDED : USB_RESUMED;
 		uevent_envp = dev->suspended ? suspended : resumed;
+		testcase=1;/*CONN-JY-mtpRandump-00+*/
 	} else if (cdev->config) {
 		uevent_envp = configured;
 		next_state = USB_CONFIGURED;
+		testcase=2;/*CONN-JY-mtpRandump-00+*/
 	} else if (dev->connected != dev->sw_connected) {
 		uevent_envp = dev->connected ? connected : disconnected;
 		next_state = dev->connected ? USB_CONNECTED : USB_DISCONNECTED;
@@ -344,13 +357,19 @@ static void android_work(struct work_struct *data)
 			pm_qos_vote = 1;
 		else if (!dev->connected || !strncmp(dev->pm_qos, "low", 3))
 			pm_qos_vote = 0;
+		testcase=3;/*CONN-JY-mtpRandump-00+*/
 	}
 	dev->sw_connected = dev->connected;
 	dev->sw_suspended = dev->suspended;
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
-	if (pm_qos_vote != -1)
+	/*CONN-JY-mtpRandump-00+{*/
+	printk(KERN_INFO"usb:%s: out case %d next_state : %d \n", __func__,testcase,next_state);
+	if (pm_qos_vote != -1){
 		android_pm_qos_update_latency(dev, pm_qos_vote);
+		printk(KERN_INFO"usb:%s:  pm_qos_vote : %d \n", __func__,pm_qos_vote);
+		}
+	/*CONN-JY-mtpRandump-00+}*/
 
 	if (uevent_envp) {
 		/*
@@ -545,7 +564,7 @@ static void adb_closed_callback(void)
 
 /*-------------------------------------------------------------------------*/
 /* Supported functions initialization */
-
+#if 0/*MTD-CONN-JY-USBPORTING-00-{*/
 /* ACM */
 static char acm_transports[32];	/*enabled ACM ports - "tty[,sdio]"*/
 static ssize_t acm_transports_store(
@@ -621,7 +640,7 @@ static struct android_usb_function acm_function = {
 	.bind_config	= acm_function_bind_config,
 	.attributes	= acm_function_attributes,
 };
-
+#endif/*MTD-CONN-JY-USBPORTING-00-}*/
 /* RMNET_SMD */
 static int rmnet_smd_function_bind_config(struct android_usb_function *f,
 					  struct usb_configuration *c)
@@ -1771,7 +1790,11 @@ static int mass_storage_function_init(struct android_usb_function *f,
 	int err;
 	int i;
 	const char *name[3];
-
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	int nluns;
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 	config = kzalloc(sizeof(struct mass_storage_function_config),
 								GFP_KERNEL);
 	if (!config)
@@ -1793,8 +1816,46 @@ static int mass_storage_function_init(struct android_usb_function *f,
 		name[config->fsg.nluns] = "lun1";
 		config->fsg.nluns++;
 	}
+        /*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	if (config->fsg.nluns > FSG_MAX_LUNS)
+		config->fsg.nluns = FSG_MAX_LUNS;
 
+	config->fsg.cdrom_nluns = 1;
+	if (config->fsg.cdrom_nluns > FSG_MAX_LUNS - config->fsg.nluns)
+		config->fsg.cdrom_nluns = FSG_MAX_LUNS - config->fsg.nluns;
+
+	nluns = config->fsg.nluns + config->fsg.cdrom_nluns;
+	if (nluns <= 0) {
+		kfree(config);
+		return -EINVAL;
+	}
+	for (i = 0; i < nluns; i++) {
+		config->fsg.luns[i].removable = 1;
+		if (i < config->fsg.nluns) {
+			/* Mass storage lun */
+			config->fsg.luns[i].ro = 0;
+			config->fsg.luns[i].cdrom = 0;
+		} else {
+			/* CD-ROM lun */
+			config->fsg.luns[i].ro = 1;
+			config->fsg.luns[i].cdrom = 1;
+		}
+	}
+
+	if (dev->pdata && dev->pdata->can_stall) {
+		config->fsg.can_stall = dev->pdata->can_stall;
+	}
+
+	config->fsg.vendor_name = "SONY";
+	config->fsg.product_name = "Mass storage";
+#else
 	config->fsg.luns[0].removable = 1;
+
+	config->fsg.vendor_name = "SONY";
+	config->fsg.product_name = "Mass storage";
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 
 	common = fsg_common_init(NULL, cdev, &config->fsg);
 	if (IS_ERR(common)) {
@@ -1832,6 +1893,22 @@ static int mass_storage_function_bind_config(struct android_usb_function *f,
 						struct usb_configuration *c)
 {
 	struct mass_storage_function_config *config = f->config;
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	int err;
+	//printk(KERN_INFO "USB:mass_storage_function_bind_config");
+
+	config->common->storage_mode = STORAGE_MODE_MSC;
+	fsg_common_setup_luns(config->common);
+	sysfs_remove_link(&f->dev->kobj, "lun");
+
+	err = sysfs_create_link(&f->dev->kobj,
+				&config->common->luns[0].dev.kobj,
+				"lun");
+	if (err)
+		return err;
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 	return fsg_bind_config(c->cdev, c, config->common);
 }
 
@@ -1850,19 +1927,111 @@ static ssize_t mass_storage_inquiry_store(struct device *dev,
 	struct mass_storage_function_config *config = f->config;
 	if (size >= sizeof(config->common->inquiry_string))
 		return -EINVAL;
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+        return snprintf(config->common->inquiry_string,
+			sizeof(config->common->inquiry_string),
+			"%28s",
+			buf);
+#else
 	if (sscanf(buf, "%28s", config->common->inquiry_string) != 1)
 		return -EINVAL;
 	return size;
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 }
 
 static DEVICE_ATTR(inquiry_string, S_IRUGO | S_IWUSR,
 					mass_storage_inquiry_show,
 					mass_storage_inquiry_store);
 
+/*CONN-EH-SCSI-00+{*/
+static ssize_t mass_storage_serial_number_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	return snprintf(buf, PAGE_SIZE, "%s\n", config->common->serial_number);
+}
+
+static ssize_t mass_storage_serial_number_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	if (size >= sizeof(config->common->serial_number))
+		return -EINVAL;
+	return snprintf(config->common->serial_number,
+			sizeof(config->common->serial_number),
+			"%s",
+			buf);
+}
+
+static DEVICE_ATTR(serial_number, S_IRUGO | S_IWUSR,
+					mass_storage_serial_number_show,
+					mass_storage_serial_number_store);
+
+static ssize_t mass_storage_eui64_id_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	return snprintf(buf, PAGE_SIZE, "%02x%02x%02x%02x%02x%02x%02x%02x\n",
+			config->common->eui64_id.ieee_company_id[0],
+			config->common->eui64_id.ieee_company_id[1],
+			config->common->eui64_id.ieee_company_id[2],
+			config->common->eui64_id.vendor_specific_ext_field[0],
+			config->common->eui64_id.vendor_specific_ext_field[1],
+			config->common->eui64_id.vendor_specific_ext_field[2],
+			config->common->eui64_id.vendor_specific_ext_field[3],
+			config->common->eui64_id.vendor_specific_ext_field[4]);
+}
+
+static ssize_t mass_storage_eui64_id_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	int ret;
+	char tmp[3];
+	u8 val;
+	int i;
+	int offset = 0;
+
+	if (size < sizeof(config->common->eui64_id) * 2)
+		return -EINVAL;
+	tmp[2] = '\0';
+	for (i = 0; i < sizeof(config->common->eui64_id.ieee_company_id); i++) {
+		memcpy(tmp, &buf[i * 2], 2);
+		ret = kstrtou8((const char *)tmp, 16, &val);
+		if (ret)
+			return ret;
+		config->common->eui64_id.ieee_company_id[i] = val;
+		offset += 2;
+	}
+	for (i = 0; i < sizeof(
+		config->common->eui64_id.vendor_specific_ext_field); i++) {
+		memcpy(tmp, &buf[offset + i * 2], 2);
+		ret = kstrtou8((const char *)tmp, 16, &val);
+		if (ret)
+			return ret;
+		config->common->eui64_id.vendor_specific_ext_field[i] = val;
+	}
+
+	return sizeof(config->common->eui64_id);
+}
+
+static DEVICE_ATTR(eui64_id, S_IRUGO | S_IWUSR,
+					mass_storage_eui64_id_show,
+					mass_storage_eui64_id_store);
+
 static struct device_attribute *mass_storage_function_attributes[] = {
 	&dev_attr_inquiry_string,
+	&dev_attr_serial_number,
+	&dev_attr_eui64_id,
 	NULL
 };
+/*CONN-EH-SCSI-00+}*/
 
 static struct android_usb_function mass_storage_function = {
 	.name		= "mass_storage",
@@ -1871,7 +2040,73 @@ static struct android_usb_function mass_storage_function = {
 	.bind_config	= mass_storage_function_bind_config,
 	.attributes	= mass_storage_function_attributes,
 };
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+static int cdrom_function_init(struct android_usb_function *f,
+				struct usb_composite_dev *cdev)
+{
+	//printk(KERN_INFO "USB:cdrom_function_init");
+	f->config = mass_storage_function.config;
+	return 0;
+}
 
+static int cdrom_function_bind_config(struct android_usb_function *f,
+					struct usb_configuration *c)
+{
+	struct mass_storage_function_config *config = f->config;
+	int err;
+
+	//printk(KERN_INFO "USB:cdrom_function_bind_config");
+	config->common->storage_mode = STORAGE_MODE_CDROM;
+	fsg_common_setup_luns(config->common);
+	sysfs_remove_link(&mass_storage_function.dev->kobj, "lun");
+	err = sysfs_create_link(&mass_storage_function.dev->kobj,
+				&config->common->luns[0].dev.kobj,
+				"lun");
+	if (err)
+		return err;
+	return fsg_bind_config(c->cdev, c, config->common);
+}
+
+static ssize_t cdrom_inquiry_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	return snprintf(buf, PAGE_SIZE, "%s\n",
+			config->common->cdrom_inquiry_string);
+}
+
+static ssize_t cdrom_inquiry_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	if (size >= sizeof(config->common->cdrom_inquiry_string))
+		return -EINVAL;
+	return snprintf(config->common->cdrom_inquiry_string,
+			sizeof(config->common->inquiry_string),
+			"%28s",
+			buf);
+}
+
+static DEVICE_ATTR(cdrom_inquiry_string, S_IRUGO | S_IWUSR,
+					cdrom_inquiry_show,
+					cdrom_inquiry_store);
+
+static struct device_attribute *cdrom_function_attributes[] = {
+	&dev_attr_cdrom_inquiry_string,
+	NULL
+};
+
+static struct android_usb_function cdrom_function = {
+	.name		= "cdrom",
+	.init		= cdrom_function_init,
+	.bind_config	= cdrom_function_bind_config,
+	.attributes	= cdrom_function_attributes,
+};
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 
 static int accessory_function_init(struct android_usb_function *f,
 					struct usb_composite_dev *cdev)
@@ -2031,7 +2266,7 @@ static struct android_usb_function *supported_functions[] = {
 	&serial_function,
 	&adb_function,
 	&ccid_function,
-	&acm_function,
+//	&acm_function,  /*MTD-CONN-JY-USBPORTING-00-*/
 	&mtp_function,
 	&ptp_function,
 	&rndis_function,
@@ -2039,6 +2274,11 @@ static struct android_usb_function *supported_functions[] = {
 	&ecm_function,
 	&ncm_function,
 	&mass_storage_function,
+/*CONN-JY-PCCOMPANION-00+{*/
+#ifdef F_CDROM
+	&cdrom_function,
+#endif
+/*CONN-JY-PCCOMPANION-00+}*/
 	&accessory_function,
 #ifdef CONFIG_SND_PCM
 	&audio_source_function,
@@ -2709,6 +2949,7 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	struct android_configuration	*conf;
 	int value = -EOPNOTSUPP;
 	unsigned long flags;
+	int testcase=0;/*CONN-JY-mtpRandump-00+*/
 
 	req->zero = 0;
 	req->complete = composite_setup_complete;
@@ -2738,13 +2979,16 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (!dev->connected) {
-		dev->connected = 1;
+		 testcase=1;
+		 dev->connected = 1;
 		schedule_work(&dev->work);
 	} else if (c->bRequest == USB_REQ_SET_CONFIGURATION &&
 						cdev->config) {
 		schedule_work(&dev->work);
+		testcase=2;
 	}
 	spin_unlock_irqrestore(&cdev->lock, flags);
+	printk(KERN_INFO"usb:%s case= %d\n", __func__,testcase);/*CONN-JY-mtpRandump-00+*/
 
 	return value;
 }
@@ -2755,6 +2999,7 @@ static void android_disconnect(struct usb_gadget *gadget)
 	struct android_dev *dev = cdev_to_android_dev(cdev);
 	unsigned long flags;
 
+	printk(KERN_INFO"usb:%s\n", __func__);/*MTD-CONN-JY-USBPORTING-00+*/
 	composite_disconnect(gadget);
 	/* accessory HID support can be active while the
 	   accessory function is not actually enabled,
@@ -2764,6 +3009,7 @@ static void android_disconnect(struct usb_gadget *gadget)
 
 	spin_lock_irqsave(&cdev->lock, flags);
 	dev->connected = 0;
+	printk(KERN_INFO"usb:%s:  set dev->connected=0\n", __func__);/*MTD-CONN-JY-USBPORTING-00+*/
 	schedule_work(&dev->work);
 	spin_unlock_irqrestore(&cdev->lock, flags);
 }

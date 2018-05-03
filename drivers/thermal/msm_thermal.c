@@ -1,4 +1,6 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2014 Foxconn International Holdings, Ltd. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -887,6 +889,8 @@ static int __ref update_offline_cores(int val)
 			continue;
 		if (!cpu_online(cpu))
 			continue;
+	/* CORE-EL-show_cpu_offline_msg-00+ */
+		pr_info("%s: Set Offline: CPU%d\n",	KBUILD_MODNAME, cpu);
 		ret = cpu_down(cpu);
 		if (ret)
 			pr_err("%s: Unable to offline cpu%d\n",

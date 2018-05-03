@@ -1,5 +1,6 @@
 /* drivers/android/ram_console.c
  *
+ * Copyright(C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  * Copyright (C) 2007-2008 Google, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
@@ -74,12 +75,22 @@ static int __devinit ram_console_probe(struct platform_device *pdev)
 	return 0;
 }
 
+/* CORE-TH-New_RAM_Console-00*[ */
+static struct of_device_id ram_console_dt_match[] = {
+	{
+		.compatible = "qcom,ram_console",
+	},
+	{}
+};
+
 static struct platform_driver ram_console_driver = {
 	.driver		= {
-		.name	= "ram_console",
+		.name	= "qcom,ram_console",
+		.of_match_table = ram_console_dt_match,
 	},
 	.probe = ram_console_probe,
 };
+/* CORE-TH-New_RAM_Console-00*] */
 
 static int __init ram_console_module_init(void)
 {

@@ -30,6 +30,12 @@
 #include <linux/of_gpio.h>
 #include <linux/spinlock.h>
 
+#ifdef CONFIG_FIH_HALL_SENSOR
+#include <linux/fb.h> /* PERI-AH-Porting Hall Sensor-00++ */
+#endif
+
+#include <linux/wakelock.h> /* PERI-AH-Add wake lock-00++ */
+
 struct gpio_button_data {
 	const struct gpio_keys_button *button;
 	struct input_dev *input;
@@ -50,6 +56,70 @@ struct gpio_keys_drvdata {
 	void (*disable)(struct device *dev);
 	struct gpio_button_data data[0];
 };
+
+struct wake_lock gkey_wakelock; /* PERI-AH-Add wake lock-00++ */
+
+/* PERI-AH-Porting Hall Sensor-00++[ */
+#ifdef CONFIG_FIH_HALL_SENSOR
+
+#define HALL_SENSOR_GPIO 66
+
+/* These file nodes for service menu used */ 
+static int service_menu=0;
+module_param(  service_menu, int, S_IWUSR | S_IRUGO); /* sys/module/gpio_keys/parameters/service_menu */
+static int hall_state=0;
+module_param(  hall_state, int, S_IRUGO); /* sys/module/gpio_keys/parameters/hall_state */
+
+bool screen_on;
+struct notifier_block fb_notif; 
+static int fb_notifier_callback(struct notifier_block *self, 
+							 unsigned long event, void *data);
+
+static int fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank;
+
+	/* If we aren't interested in this event, skip it immediately ... */
+	if (event != FB_EVENT_BLANK && event != FB_EVENT_CONBLANK)
+	{
+		pr_info("GKEY fb_notifier_callback skip event\n");
+		return 0;
+	}
+
+    if (evdata && evdata->data && event == FB_EVENT_BLANK) {
+		blank = evdata->data;
+		if (*blank == FB_BLANK_UNBLANK)
+		{
+			pr_info("GKEY fb_notifier_callback SCREEN ON\n");
+			screen_on = true;
+		}
+		else if (*blank == FB_BLANK_POWERDOWN)
+		{
+			pr_info("GKEY fb_notifier_callback SCREEN OFF\n");
+			screen_on = false;
+		}
+	}
+    return 0;
+}
+
+static void gpio_keys_register_fb(void)
+{
+	int retval = 0;
+
+	memset(&fb_notif, 0, sizeof(fb_notif));
+	fb_notif.notifier_call = fb_notifier_callback;
+
+	retval = fb_register_client(&fb_notif);
+	if (retval)
+		pr_err("GKEY Unable to register fb_notifier: %d\n", retval);
+	
+	return;
+}
+#endif
+/* PERI-AH-Porting Hall Sensor-00++] */
+
 
 /*
  * SYSFS interface for enabling/disabling keys and switches:
@@ -331,6 +401,24 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
 
+	pr_info( "GKEY %s %s\n", button->desc, (state?"down":"up")); 
+
+	/* PERI-AH-Porting Hall Sensor-00++[ */
+	#ifdef CONFIG_FIH_HALL_SENSOR
+	if (button->gpio == HALL_SENSOR_GPIO)
+	{
+		hall_state = gpio_get_value_cansleep(button->gpio);
+		pr_info("GKEY screen_on:%d hall_state:%d \n", screen_on, hall_state);
+		
+		if (service_menu)
+		{
+			pr_info("GKEY skip hall sensor report input event when Service Menu running. \n");
+			return;
+		}
+	}
+	#endif
+	/* PERI-AH-Porting Hall Sensor-00++] */
+	
 	if (type == EV_ABS) {
 		if (state)
 			input_event(input, type, button->code, button->value);
@@ -360,6 +448,11 @@ static irqreturn_t gpio_keys_gpio_isr(int irq, void *dev_id)
 	struct gpio_button_data *bdata = dev_id;
 
 	BUG_ON(irq != bdata->irq);
+
+	/* PERI-AH-Add wake lock-00++[ */
+	wake_lock_timeout( &gkey_wakelock, (bdata->timer_debounce + 5) * HZ / 1000 ); 
+	pr_info( "GKEY wake_lock_timeout(gkey_wakelock)"); 
+	/* PERI-AH-Add wake lock-00++] */
 
 	if (bdata->timer_debounce)
 		mod_timer(&bdata->timer,
@@ -495,6 +588,9 @@ static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
 		irqflags = 0;
 	}
 
+	/* PERI-AH-Set gpio-keys input device which don't send dummy release event when system resumes-00++ */
+	__set_bit(INPUT_PROP_NO_DUMMY_RELEASE, input->propbit);
+	
 	input_set_capability(input, button->type ?: EV_KEY, button->code);
 
 	/*
@@ -732,6 +828,14 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 
 	device_init_wakeup(&pdev->dev, wakeup);
 
+	wake_lock_init( &gkey_wakelock, WAKE_LOCK_SUSPEND, "gpio_keys" ); /* PERI-AH-Add wake lock-00++ */
+	
+	/* PERI-AH-Porting Hall Sensor-00++[ */
+	#ifdef CONFIG_FIH_HALL_SENSOR
+	gpio_keys_register_fb();
+	#endif
+	/* PERI-AH-Porting Hall Sensor-00++] */
+
 	return 0;
 
  fail3:
@@ -766,6 +870,8 @@ static int __devexit gpio_keys_remove(struct platform_device *pdev)
 
 	input_unregister_device(input);
 
+	wake_lock_destroy(&gkey_wakelock); /* PERI-AH-Add wake lock-00++ */
+	
 	/*
 	 * If we had no platform_data, we allocated buttons dynamically, and
 	 * must free them here. ddata->data[0].button is the pointer to the
@@ -806,8 +912,18 @@ static int gpio_keys_resume(struct device *dev)
 		if (bdata->button->wakeup && device_may_wakeup(dev))
 			disable_irq_wake(bdata->irq);
 
+		/* PERI-AH-Skip hall sensor report UP event-00++ */
+		#ifdef CONFIG_FIH_HALL_SENSOR
+		if (bdata->button->gpio == HALL_SENSOR_GPIO)
+		{
+			pr_info("GKEY Skip hall sensor report UP event\n");
+			continue;
+		}
+		#endif
+
 		if (gpio_is_valid(bdata->button->gpio))
 			gpio_keys_gpio_report_event(bdata);
+
 	}
 	input_sync(ddata->input);
 

@@ -10,6 +10,8 @@
  *
  *	Copyright (c) 2010 Dmitry Torokhov
  *	Input handler conversion
+ *
+ *  Copyright(C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -44,6 +46,8 @@
 
 #include <asm/ptrace.h>
 #include <asm/irq_regs.h>
+
+#include <linux/fih_sw_info.h>	 /*CORE-TH-manual_crash-00+*/
 
 /* Whether we react on sysrq keys or just ignore them */
 static int __read_mostly sysrq_enabled = SYSRQ_DEFAULT_ENABLE;
@@ -123,10 +127,23 @@ static struct sysrq_key_op sysrq_unraw_op = {
 #define sysrq_unraw_op (*(struct sysrq_key_op *)NULL)
 #endif /* CONFIG_VT */
 
+void * get_pwron_cause_virt_addr(void);
+
+/* if send mtbf report */
+extern int send_mtbf; /* MTD-CORE-EL-IgnoreSysrqTriggerForMtbf-00+ */
 static void sysrq_handle_crash(int key)
 {
 	char *killer = NULL;
+	unsigned int *pwron_cause_ptr; 	/*CORE-TH-manual_crash-00+*/
 
+	/*CORE-TH-manual_crash-00+*/
+	pwron_cause_ptr = (unsigned int*) get_pwron_cause_virt_addr();
+	if (pwron_cause_ptr != NULL){
+		*pwron_cause_ptr |= MTD_PWR_ON_EVENT_FORCE_TRIGGER_PANIC;
+	}
+	/*CORE-TH-manual_crash-00-*/
+
+	send_mtbf = 0; /* MTD-CORE-EL-IgnoreSysrqTriggerForMtbf-00+ */
 	panic_on_oops = 1;	/* force panic */
 	wmb();
 	*killer = 1;

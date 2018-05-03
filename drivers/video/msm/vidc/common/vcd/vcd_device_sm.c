@@ -338,6 +338,7 @@ void vcd_handle_device_err_fatal(struct vcd_dev_ctxt *dev_ctxt,
 	struct vcd_clnt_ctxt *cctxt = dev_ctxt->cctxt_list_head;
 	struct vcd_clnt_ctxt *tmp_clnt = NULL;
 	VCD_MSG_LOW("vcd_handle_device_err_fatal:");
+
 	while (cctxt) {
 		tmp_clnt = cctxt;
 		cctxt = cctxt->next;

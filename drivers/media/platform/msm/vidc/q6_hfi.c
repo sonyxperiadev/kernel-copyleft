@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -146,8 +146,8 @@ static int q6_hfi_iface_eventq_read(struct q6_hfi_device *device, void *pkt)
 	struct q6_iface_q_info *q_info;
 	unsigned long flags = 0;
 
-	if (!pkt) {
-		dprintk(VIDC_ERR, "Invalid Params");
+	if (!device || !pkt) {
+		dprintk(VIDC_ERR, "Invalid Params\n");
 		return -EINVAL;
 	}
 
@@ -554,6 +554,10 @@ static void *q6_hfi_session_init(void *device, u32 session_id,
 
 	new_session = (struct hal_session *)
 		kzalloc(sizeof(struct hal_session), GFP_KERNEL);
+	if (!new_session) {
+		dprintk(VIDC_ERR, "new session fail: Out of memory\n");
+		return NULL;
+	}
 	new_session->session_id = (u32) session_id;
 	if (session_type == 1)
 		new_session->is_decoder = 0;
@@ -1314,6 +1318,24 @@ fail_subsystem_get:
 	return rc;
 }
 
+int q6_hfi_capability_check(u32 fourcc, u32 width,
+				u32 *max_width, u32 *max_height)
+{
+	int rc = 0;
+	if (!max_width || !max_height) {
+		dprintk(VIDC_ERR, "%s - invalid parameter\n", __func__);
+		return -EINVAL;
+	}
+
+	if (width > *max_width) {
+		dprintk(VIDC_ERR,
+			"Unsupported width = %u supported max width = %u\n",
+			width, *max_width);
+		rc = -ENOTSUPP;
+	}
+	return rc;
+}
+
 static void q6_hfi_unload_fw(void *hfi_device_data)
 {
 	struct q6_hfi_device *device = hfi_device_data;
@@ -1368,6 +1390,7 @@ static void q6_init_hfi_callbacks(struct hfi_device *hdev)
 	hdev->unset_ocmem = q6_hfi_unset_ocmem;
 	hdev->iommu_get_domain_partition = q6_hfi_iommu_get_domain_partition;
 	hdev->load_fw = q6_hfi_load_fw;
+	hdev->capability_check = q6_hfi_capability_check;
 	hdev->unload_fw = q6_hfi_unload_fw;
 	hdev->get_stride_scanline = q6_hfi_get_stride_scanline;
 }

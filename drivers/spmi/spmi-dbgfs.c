@@ -1,4 +1,6 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2014 Foxconn International Holdings, Ltd. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -129,6 +131,12 @@ static struct spmi_dbgfs dbgfs_data = {
 "SPMI bus.\n\n",
 	},
 };
+
+// CORE-EL-dbg_power_on_reason-00+[
+#ifdef CONFIG_FIH_USER_DEBUG
+int spmi_dfs_readdata(u32 cnt, u32 addr);
+#endif
+// CORE-EL-dbg_power_on_reason-00+]
 
 static int spmi_dfs_open(struct spmi_ctrl_data *ctrl_data, struct file *file)
 {
@@ -627,6 +635,87 @@ struct dentry *spmi_dfs_get_root(void)
 	return dbgfs_data.root;
 }
 
+// CORE-EL-dbg_power_on_reason-00+[
+#ifdef CONFIG_FIH_USER_DEBUG
+static struct spmi_ctrl_data *zero_ctrl_data;
+
+static ssize_t spmi_dfs_reg_read2(struct spmi_trans *trans)
+{
+	struct spmi_log_buffer *log = trans->log;
+	size_t len;
+	size_t i;
+
+	/* Is the the log buffer empty */
+	if (log->rpos >= log->wpos) {
+		if (get_log_data(trans) <= 0) {
+			printk(KERN_ERR "%d get_log_data fail\n", __LINE__);
+			return 0;
+		}
+	}
+
+	len = log->wpos - log->rpos;
+
+	printk(KERN_ERR "dump spmi-0 start from %x\n", trans->addr);
+	for (i = 0; i < log->wpos - log->rpos; i ++) {
+		printk("%c", log->data[log->rpos+i]);
+	}
+
+	return len;
+}
+
+int spmi_dfs_readdata(u32 cnt, u32 addr)
+{
+	struct spmi_log_buffer *log;
+	struct spmi_trans *trans;
+
+	size_t logbufsize = SZ_4K;
+
+	if (!zero_ctrl_data) {
+		pr_err("zero_ctrl_data is null\n");
+		return -EINVAL;
+	}
+
+	zero_ctrl_data->cnt = cnt;
+	zero_ctrl_data->addr = addr;
+
+	/* Per file "transaction" data */
+	trans = kzalloc(sizeof(*trans), GFP_KERNEL);
+
+	if (!trans) {
+		pr_err("Unable to allocate memory for transaction data\n");
+		return -ENOMEM;
+	}
+
+	/* Allocate log buffer */
+	log = kzalloc(logbufsize, GFP_KERNEL);
+
+	if (!log) {
+		kfree(trans);
+		pr_err("Unable to allocate memory for log buffer\n");
+		return -ENOMEM;
+	}
+
+	log->rpos = 0;
+	log->wpos = 0;
+	log->len = logbufsize - sizeof(*log);
+
+	trans->log = log;
+	trans->cnt = zero_ctrl_data->cnt;
+	trans->addr = zero_ctrl_data->addr;
+	trans->ctrl = zero_ctrl_data->ctrl;
+	trans->offset = trans->addr;
+
+	spmi_dfs_reg_read2(trans);
+
+	/* Free trans buff, we don't want it any more. */
+	kfree(trans->log);
+	kfree(trans);
+	
+	return 0;
+}
+#endif
+// CORE-EL-dbg_power_on_reason-00+]
+
 /*
  * spmi_dfs_add_controller: adds new spmi controller entry
  * @return zero on success
@@ -647,6 +736,15 @@ int spmi_dfs_add_controller(struct spmi_controller *ctrl)
 	ctrl_data = kzalloc(sizeof(*ctrl_data), GFP_KERNEL);
 	if (!ctrl_data)
 		return -ENOMEM;
+	
+// CORE-EL-dbg_power_on_reason-00+[
+#ifdef CONFIG_FIH_USER_DEBUG
+	if (ctrl->nr == 0) {
+		zero_ctrl_data = ctrl_data;
+		printk(KERN_ERR "backup spmi-0 ctrl address %p %p\n", ctrl, zero_ctrl_data);
+	}
+#endif	
+// CORE-EL-dbg_power_on_reason-00+]	
 
 	dir = debugfs_create_dir(ctrl->dev.kobj.name, root);
 	if (!dir) {

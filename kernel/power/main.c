@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2003 Patrick Mochel
  * Copyright (c) 2003 Open Source Development Lab
+ * Copyright (C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This file is released under the GPLv2
  *
@@ -35,6 +36,30 @@ static DECLARE_WORK(touch_event_struct, touch_event_fn);
 static struct hrtimer tc_ev_timer;
 static int tc_ev_processed;
 static ktime_t touch_evt_timer_val;
+
+//CORE-SC-PMSWakelockInfo-00+[
+#ifdef CONFIG_FIH_DUMP_WAKELOCK
+static void getPMSWakeLockInfo(char* name, char **pid, char **tag)
+{
+	// parse wakelock name field
+	while (*name && *name!='^')
+		name++;
+	if (*name) *name++='\0';
+	
+	// parse pid field
+	*pid=name;
+	while (*name && *name!='^')
+		name++;
+	if (*name) *name++='\0';
+
+	// parse tag field
+	*tag=name;
+	while (*name && *name!='^')
+		name++;
+	if (*name) *name++='\0';
+}
+#endif
+//CORE-SC-PMSWakelockInfo-00*]
 
 int register_pm_notifier(struct notifier_block *nb)
 {
@@ -533,7 +558,29 @@ static ssize_t wake_lock_store(struct kobject *kobj,
 			       struct kobj_attribute *attr,
 			       const char *buf, size_t n)
 {
-	int error = pm_wake_lock(buf);
+	//CORE-SC-PMSWakelockInfo-00+[
+	int error = 0;
+
+	#ifdef CONFIG_FIH_DUMP_WAKELOCK
+	char *pid = NULL;
+	char *tag = NULL;
+
+	if (!strncmp(buf,"PMS^",4))
+	{
+		#ifdef CONFIG_FIH_DUMP_WAKELOCK	
+		//CORE-BH-PMSWakelockInfo-01*[
+		getPMSWakeLockInfo((char *)buf,&pid,&tag);
+		add_pms_wakelock_info(pid, tag);
+		//CORE-BH-PMSWakelockInfo-01*]
+		#endif		
+		return n;
+	}
+	#endif
+
+	error = pm_wake_lock(buf);
+	
+//CORE-SC-PMSWakelockInfo-00+]
+
 	return error ? error : n;
 }
 
@@ -550,7 +597,28 @@ static ssize_t wake_unlock_store(struct kobject *kobj,
 				 struct kobj_attribute *attr,
 				 const char *buf, size_t n)
 {
-	int error = pm_wake_unlock(buf);
+	//CORE-BH-PMSWakelockInfo-01*[
+	int error = 0;
+	//CORE-BH-PMSWakelockInfo-02+[
+	#ifdef CONFIG_FIH_DUMP_WAKELOCK
+	char *pid = NULL;
+	char *tag = NULL;
+	#endif
+	//CORE-BH-PMSWakelockInfo-02+]
+	
+	if (!strncmp(buf,"PMS^",4))
+	{
+		#ifdef CONFIG_FIH_DUMP_WAKELOCK
+		getPMSWakeLockInfo((char *)buf,&pid,&tag); //CORE-BH-PMSWakelockInfo-02+
+		remove_pms_wakelock_info(pid, tag); //CORE-BH-PMSWakelockInfo-02*
+		#endif
+		return n;
+	}
+
+	error = pm_wake_unlock(buf);
+	
+	//CORE-BH-PMSWakelockInfo-01*]
+
 	return error ? error : n;
 }
 

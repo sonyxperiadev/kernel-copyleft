@@ -841,7 +841,8 @@ static int __init spmi_init(void)
 
 	return retval;
 }
-postcore_initcall(spmi_init);
+//postcore_initcall(spmi_init);
+core_initcall(spmi_init); //BSP-REXER-HWID-00*
 module_exit(spmi_exit);
 
 MODULE_LICENSE("GPL v2");

@@ -5,6 +5,7 @@
  *  Copyright (C) 2008 Zhang Rui <rui.zhang@intel.com>
  *  Copyright (C) 2008 Sujith Thomas <sujith.thomas@intel.com>
  *  Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  *  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
@@ -449,6 +450,7 @@ type_show(struct device *dev, struct device_attribute *attr, char *buf)
 	return sprintf(buf, "%s\n", tz->type);
 }
 
+int notify_thermal_zone3_temp(int temp); //CORE-DL-MonitorTz3Temp-00
 static ssize_t
 temp_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -463,6 +465,13 @@ temp_show(struct device *dev, struct device_attribute *attr, char *buf)
 
 	if (ret)
 		return ret;
+
+	//CORE-DL-MonitorTz3Temp-00 +[
+	if (tz->id == 3) {
+		notify_thermal_zone3_temp(temperature);
+		pr_info("[TzMonitor] thermal_zone%d: temp=%ld\n", tz->id, temperature);
+	}
+	//CORE-DL-MonitorTz3Temp-00 +]
 
 	return sprintf(buf, "%ld\n", temperature);
 }

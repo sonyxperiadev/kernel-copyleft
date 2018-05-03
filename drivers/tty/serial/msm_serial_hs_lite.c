@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Copyright(C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -54,6 +55,12 @@
 #include <mach/msm_bus.h>
 #include <asm/mach-types.h>
 #include "msm_serial_hs_hwreg.h"
+
+/* FIH-CORE-TH-DebugToolPorting-00+[ */
+#if defined(CONFIG_FIH_REMOVE_SERIAL_DYNAMICALLY) && defined(CONFIG_FIH_SEMC_S1)
+extern unsigned int debug_uartmsg_enable;
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00+] */
 
 /*
  * There are 3 different kind of UART Core available on MSM.
@@ -1960,6 +1967,16 @@ static int __init msm_serial_hsl_init(void)
 {
 	int ret;
 
+/* FIH-CORE-TH-DebugToolPorting-00+[ */
+#if defined(CONFIG_FIH_REMOVE_SERIAL_DYNAMICALLY) && defined(CONFIG_FIH_SEMC_S1)
+	if( !debug_uartmsg_enable )
+	{
+		pr_info("%s(): Disable UART console\n", __func__);
+		return 0;
+	}
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00+] */
+
 	ret = uart_register_driver(&msm_hsl_uart_driver);
 	if (unlikely(ret))
 		return ret;
@@ -1979,6 +1996,16 @@ static int __init msm_serial_hsl_init(void)
 
 static void __exit msm_serial_hsl_exit(void)
 {
+
+/* FIH-CORE-TH-DebugToolPorting-00+[ */
+#if defined(CONFIG_FIH_REMOVE_SERIAL_DYNAMICALLY) && defined(CONFIG_FIH_SEMC_S1)
+	if( !debug_uartmsg_enable )
+	{
+        return;
+    }
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00+] */
+
 	debugfs_remove_recursive(debug_base);
 #ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
 	unregister_console(&msm_hsl_console);

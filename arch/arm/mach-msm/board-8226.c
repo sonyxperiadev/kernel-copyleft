@@ -1,4 +1,5 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright(C) 2012-2013 Foxconn International Holdings, Ltd. All rights reserved. 
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -46,12 +47,38 @@
 #include <mach/rpm-regulator-smd.h>
 #include <mach/msm_smem.h>
 #include <linux/msm_thermal.h>
+#include <linux/fih_sw_info.h>	// CORE-TH-Reserve_Mem-00 +
 #include "board-dt.h"
 #include "clock.h"
 #include "platsmp.h"
 #include "spm.h"
 #include "pm.h"
 #include "modem_notifier.h"
+#include <linux/fih_hw_info.h> //BSP-REXER-HWID-00+
+#include <linux/version_host.h> //BSP-REXER-SMEM-00+
+
+/* CORE-TH-New_RAM_Console-00+[ */
+#include <linux/persistent_ram.h>
+#include <linux/fih_sw_info.h>
+
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+static struct persistent_ram_descriptor pr_descriptor = {
+	.name = "20000000.qcom,ram_console",
+	.size = RAM_CONSOLE_SIZE
+};
+static struct persistent_ram ram_console_pram = {
+	.ecc_block_size = 0,
+	.ecc_size = 0,
+	.ecc_symsize = 0,
+	.ecc_poly = 0,
+	.num_descs = 1,
+	.descs = &pr_descriptor,
+	.start = RAM_CONSOLE_PHYS,
+	.size = RAM_CONSOLE_SIZE
+};
+
+#endif /* end of #ifdef CONFIG_ANDROID_RAM_CONSOLE */
+/* CORE-TH-New_RAM_Console-00+] */
 
 static struct memtype_reserve msm8226_reserve_table[] __initdata = {
 	[MEMTYPE_SMI] = {
@@ -62,6 +89,13 @@ static struct memtype_reserve msm8226_reserve_table[] __initdata = {
 	[MEMTYPE_EBI1] = {
 		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
 	},
+	// BSP-LC-Reserve_Mem-00 +[
+	[MEMTYPE_EBI1_FIH] = {
+		.start	=	MTD_MEMORY_RESERVE_BASE,
+		.size	=	MTD_MEMORY_RESERVE_SIZE,
+		.flags	=	MEMTYPE_FLAGS_FIXED,
+	},
+	// BSP-LC-Reserve_Mem-00 +]
 };
 
 static int msm8226_paddr_to_memtype(unsigned int paddr)
@@ -91,6 +125,23 @@ static struct reserve_info msm8226_reserve_info __initdata = {
 	.memtype_reserve_table = msm8226_reserve_table,
 	.paddr_to_memtype = msm8226_paddr_to_memtype,
 };
+
+//BSP-REXER-SMEM-00+[
+void fih_get_HLOS_info(void)
+{
+    char   fih_host_version[30];
+    snprintf(fih_host_version, sizeof(fih_host_version), "%s.%s.%s.%s",
+               VER_HOST_BSP_VERSION,
+               VER_HOST_PLATFORM_NUMBER,
+               VER_HOST_BRANCH_NUMBER, 
+               VER_HOST_BUILD_NUMBER);
+    
+    pr_info("FIH HLOS version = %s \r\n",fih_host_version);
+    pr_info("FIH HLOS git head = %s \r\n",VER_HOST_GIT_COMMIT);
+    pr_info("================================\r\n");
+}
+//BSP-REXER-SMEM-00+]
+
 
 static void __init msm8226_early_memory(void)
 {
@@ -133,12 +184,37 @@ void __init msm8226_init(void)
 {
 	struct of_dev_auxdata *adata = msm8226_auxdata_lookup;
 
+/* CORE-TH-New_RAM_Console-00+[ */
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+	unsigned int ret = 0;
+
+	INIT_LIST_HEAD(&ram_console_pram.node);
+	ret = persistent_ram_early_init(&ram_console_pram);
+	if (ret) {
+		pr_err("Init of persistent RAM for ram_console failed: %d\n",
+			ret);
+	} else {
+		pr_info("ram_console memory reserved: %#x@%#08x\n",
+			(unsigned int)ram_console_pram.size,
+			(unsigned int)ram_console_pram.start);
+	}
+#endif
+/* CORE-TH-New_RAM_Console-00+] */
+	
 	if (socinfo_init() < 0)
 		pr_err("%s: socinfo_init() failed\n", __func__);
 
-	msm8226_init_gpiomux();
-	board_dt_populate(adata);
-	msm8226_add_drivers();
+    //BSP-REXER-HWID-00*[
+    board_dt_populate(adata);
+    fih_hwid_get();
+    fih_get_HLOS_info();
+    msm8226_init_gpiomux();
+    msm8226_add_drivers();
+    //BSP-REXER-HWID-00*]
+    //BSP-REXER-SMEM-00+[
+    fih_info_init();
+    fih_set_oem_info();
+    //BSP-REXER-SMEM-00+]
 }
 
 static const char *msm8226_dt_match[] __initconst = {

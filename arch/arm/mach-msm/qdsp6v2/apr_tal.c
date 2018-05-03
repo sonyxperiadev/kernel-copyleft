@@ -29,6 +29,8 @@
 #include <mach/msm_smd.h>
 #include <mach/qdsp6v2/apr_tal.h>
 
+#include <linux/fih_hw_info.h> //BSP-REXER-SMEM-00+
+
 static char *svc_names[APR_DEST_MAX][APR_CLIENT_MAX] = {
 	{
 		"apr_audio_svc",
@@ -235,6 +237,7 @@ static int apr_smd_probe(struct platform_device *pdev)
 		clnt = APR_CLIENT_VOICE;
 		apr_svc_ch[APR_DL_SMD][dest][clnt].dest_state = 1;
 		wake_up(&apr_svc_ch[APR_DL_SMD][dest][clnt].dest);
+		fih_get_nonHLOS_info(); //BSP-REXER-SMEM-00+
 	} else if (pdev->id == APR_DEST_QDSP6) {
 		pr_info("apr_tal:Q6 Is Up\n");
 		dest = APR_DEST_QDSP6;

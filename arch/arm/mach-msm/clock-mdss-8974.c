@@ -1273,6 +1273,7 @@ static int dsi_pll_enable_seq_8974(void)
 		udelay(100);
 		DSS_REG_W(mdss_dsi_base, DSI_0_PHY_PLL_UNIPHY_PLL_LKDET_CFG2,
 			0x0d);
+		udelay(500);
 		/* poll for PLL ready status */
 		max_reads = 5;
 		timeout_us = 100;

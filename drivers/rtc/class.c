@@ -1,6 +1,7 @@
 /*
  * RTC subsystem, base class
- *
+ * 
+ * Copyright(C) 2011-2013 Foxconn International Holdings, Ltd. All rights reserved.
  * Copyright (C) 2005 Tower Technologies
  * Author: Alessandro Zummo <a.zummo@towertech.it>
  *
@@ -20,6 +21,11 @@
 
 #include "rtc-core.h"
 
+/* FIH-CORE-TH-DebugToolPorting-00+[ */
+#ifdef CONFIG_FIH_LAST_ALOG
+#include "mach/alog_ram_console.h"
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00-] */
 
 static DEFINE_IDA(rtc_ida);
 struct class *rtc_class;
@@ -46,6 +52,17 @@ static int rtc_suspend(struct device *dev, pm_message_t mesg)
 	struct rtc_device	*rtc = to_rtc_device(dev);
 	struct rtc_time		tm;
 	struct timespec		delta, delta_delta;
+
+/* FIH-CORE-TH-DebugToolPorting-00+[ */
+#ifdef CONFIG_FIH_LAST_ALOG
+	alog_ram_console_sync_time(LOG_TYPE_ALL, SYNC_BEFORE);
+#endif	
+
+#ifdef CONFIG_FIH_SUSPEND_RESUME_LOG
+    printk(KERN_INFO "[PM]rtc_suspend(): %s, dev_name = %s\n", rtc->name, dev_name(&rtc->dev));
+#endif
+/* FIH-CORE-TH-DebugToolPorting-00-] */
+
 	if (strcmp(dev_name(&rtc->dev), CONFIG_RTC_HCTOSYS_DEVICE) != 0)
 		return 0;
 
@@ -117,6 +134,12 @@ static int rtc_resume(struct device *dev)
 
 	if (sleep_time.tv_sec >= 0)
 		timekeeping_inject_sleeptime(&sleep_time);
+
+/* FIH-CORE-TH-DebugToolPorting-00+[ */
+#ifdef CONFIG_FIH_LAST_ALOG
+	alog_ram_console_sync_time(LOG_TYPE_ALL, SYNC_AFTER);
+#endif	
+/* FIH-CORE-TH-DebugToolPorting-00-] */
 	return 0;
 }
 
