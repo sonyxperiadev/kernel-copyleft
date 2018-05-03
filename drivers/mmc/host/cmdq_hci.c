@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/highmem.h>
@@ -373,9 +378,6 @@ static int cmdq_enable(struct mmc_host *mmc)
 
 	if (cq_host->ops->clear_set_dumpregs)
 		cq_host->ops->clear_set_dumpregs(mmc, 1);
-
-	if (cq_host->ops->enhanced_strobe_mask)
-		cq_host->ops->enhanced_strobe_mask(mmc, true);
 out:
 	return err;
 }
@@ -391,9 +393,6 @@ static void cmdq_disable(struct mmc_host *mmc, bool soft)
 	}
 
 	mmc_host_set_cq_disable(mmc);
-	if (cq_host->ops->enhanced_strobe_mask)
-		cq_host->ops->enhanced_strobe_mask(mmc, false);
-
 	cq_host->enabled = false;
 }
 
@@ -772,6 +771,12 @@ skip_cqterri:
 		 */
 		if (ret)
 			cmdq_disable(mmc, true);
+
+		/* Temporary fix to avoid Null Pointer access */
+		if (!mrq || !mrq->cmdq_req) {
+			pr_err("%s: mrq is not initialized\n", __func__);
+			goto out;
+		}
 
 		/*
 		 * CQE detected a reponse error from device

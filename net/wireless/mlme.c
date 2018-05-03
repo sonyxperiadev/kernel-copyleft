@@ -3,6 +3,11 @@
  *
  * Copyright (c) 2009, Jouni Malinen <j@w1.fi>
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -597,7 +602,7 @@ int cfg80211_mlme_register_mgmt(struct wireless_dev *wdev, u32 snd_portid,
 		if (frame_type != le16_to_cpu(reg->frame_type))
 			continue;
 
-		if (memcmp(reg->match, match_data, mlen) == 0) {
+		if (mlen != 0 && memcmp(reg->match, match_data, mlen) == 0) {
 			err = -EALREADY;
 			break;
 		}

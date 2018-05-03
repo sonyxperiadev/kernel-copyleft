@@ -3,6 +3,7 @@ config ARM
 	default y
 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+	select ARCH_HAS_CRASH_NOTES if CRASH_NOTES
 	select ARCH_HAVE_CUSTOM_GPIO_H
 	select ARCH_SUPPORTS_ATOMIC_RMW
 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
@@ -2195,6 +2196,18 @@ config CRASH_DUMP
 	  memory address not used by the main kernel
 
 	  For more details see Documentation/kdump/kdump.txt
+
+config ARCH_HAS_CRASH_NOTES
+	bool
+
+config CRASH_NOTES
+	bool "Support storing crash notes at panic"
+	depends on !KEXEC
+	help
+	  Generate kdump style crash notes like per-cpu reigsters, pid
+	  process info etc.. at the time of a panic and fill it with the
+	  crashed context to support analysis of the memory dump with
+	  tools like Redhat CRASH.
 
 config AUTO_ZRELADDR
 	bool "Auto calculation of the decompressed kernel image address"

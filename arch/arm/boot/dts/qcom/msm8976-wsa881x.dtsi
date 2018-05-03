@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 &slim_msm {
 	tasha_codec {
@@ -27,7 +32,7 @@
 			wsa881x@20170212 {
 				compatible = "qcom,wsa881x";
 				reg = <0x00 0x20170212>;
-				qcom,spkr-sd-n-gpio = <&msm_gpio 132 0>;
+				qcom,spkr-sd-n-gpio = <&msm_gpio 101 0>;
 
 			};
 

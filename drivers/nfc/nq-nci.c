@@ -187,8 +187,8 @@ static ssize_t nfc_read(struct file *filp, char __user *buf,
 				ret = wait_event_interruptible(nqx_dev->read_wq,
 					!nqx_dev->irq_enabled);
 			}
-			if (ret)
-				goto err;
+		if (ret)
+			goto err;
 			nqx_disable_irq(nqx_dev);
 
 			if (gpio_get_value(nqx_dev->irq_gpio))
@@ -478,6 +478,7 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 			dev_dbg(&nqx_dev->client->dev, "ese_gpio invalid, set en_gpio to low\n");
 			gpio_set_value(nqx_dev->en_gpio, 0);
 		}
+
 		r = nqx_clock_deselect(nqx_dev);
 		if (r < 0)
 			dev_err(&nqx_dev->client->dev, "unable to disable clock\n");
@@ -1019,6 +1020,7 @@ static int nqx_probe(struct i2c_client *client,
 	nqx_dev->en_gpio = platform_data->en_gpio;
 	nqx_dev->irq_gpio = platform_data->irq_gpio;
 	nqx_dev->firm_gpio  = platform_data->firm_gpio;
+	nqx_dev->ese_gpio = platform_data->ese_gpio;
 	nqx_dev->clkreq_gpio = platform_data->clkreq_gpio;
 	nqx_dev->pdata = platform_data;
 
@@ -1080,6 +1082,14 @@ static int nqx_probe(struct i2c_client *client,
 		goto err_clock_en_failed;
 	}
 	gpio_set_value(platform_data->en_gpio, 1);
+#endif
+#ifdef NFC_KERNEL_BU
+	r = nqx_clock_select(nqx_dev);
+	if (r < 0) {
+		dev_err(&client->dev,
+			"%s: nqx_clock_select failed\n", __func__);
+		goto err_clock_en_failed;
+	}
 #endif
 	device_init_wakeup(&client->dev, true);
 	device_set_wakeup_capable(&client->dev, true);

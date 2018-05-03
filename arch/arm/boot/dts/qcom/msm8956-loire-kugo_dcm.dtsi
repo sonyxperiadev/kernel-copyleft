@@ -1,0 +1,170 @@
+/* arch/arm/boot/dts/qcom/msm8956-loire-kugo_dcm.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2016 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+/{
+	aliases {
+		spi7 = &spi_7;
+	};
+};
+
+&soc {
+	/* SPI : BLSP7 */
+	spi_7: spi@0x7af7000 { /* BLSP2 QUP2 */
+		compatible = "qcom,spi-qup-v2";
+		reg-names = "spi_physical", "spi_bam_physical";
+		reg = <0x7af7000 0x600>,
+		      <0x7ac4000 0x1f000>;
+		interrupt-names = "spi_irq", "spi_bam_irq";
+		interrupts = <0 301 0>, <0 239 0>;
+		spi-max-frequency = <19200000>;
+		pinctrl-names = "spi_default", "spi_sleep";
+		pinctrl-0 = <&msm_gpio_108_def &msm_gpio_109_def &msm_gpio_110_def &msm_gpio_111_def>;
+		pinctrl-1 = <&msm_gpio_108_def &msm_gpio_109_def &msm_gpio_110_def &msm_gpio_111_def>;
+		clocks = <&clock_gcc clk_gcc_blsp2_ahb_clk>,
+			 <&clock_gcc clk_gcc_blsp2_qup3_spi_apps_clk>;
+		clock-names = "iface_clk", "core_clk";
+		qcom,infinite-mode = <0>;
+		qcom,use-bam;
+		qcom,use-pinctrl;
+		qcom,ver-reg-exists;
+		qcom,bam-consumer-pipe-index = <8>;
+		qcom,bam-producer-pipe-index = <9>;
+		qcom,master-id = <84>;
+		status = "okay";
+	};
+
+	oneseg_tuner: vj190 {
+		compatible = "sony,vj190";
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <67 0>;
+		gpios = <&msm_gpio 66 0>,  /* DTV_ACTIVE  */
+			<&msm_gpio 62 0>,  /* DTV_RESET   */
+			<&msm_gpio 67 0>;  /* DTV_INT     */
+	};
+
+	/*I2C : BLSP2 */
+	i2c@7af6000 {
+		felica_ldo@1e {
+			compatible = "rohm,bd7602";
+			reg = <0x1e>;
+		};
+		felica@29 {
+			compatible = "sony,cxd224x";
+			reg = <0x29>;
+			interrupt-parent = <&msm_gpio>;
+			interrupts = <33 0x2002>;
+			cxd224x,irq_gpio = <&msm_gpio 33 0>;
+			cxd224x,wake_gpio = <&msm_gpio 16 0>;
+
+			pinctrl-names = "felica_active","felica_suspend";
+			pinctrl-0 = <&msm_gpio_33_felica_act>;
+			pinctrl-1 = <&msm_gpio_33_felica_sus>;
+
+			clocks = <&clock_gcc clk_bb_clk2_pin>;
+			clock-names = "felica_clk";
+		};
+	};
+
+	somc_pinctrl: somc_pinctrl {
+		/* If variant specific default setting is needed,
+		   fill pinctrl-3 value in <variant>.dtsi */
+		pinctrl-3 = <&msm_gpio_66_def &msm_gpio_67_def &msm_gpio_108_def
+			&msm_gpio_109_def &msm_gpio_110_def &msm_gpio_111_def>;
+	};
+};
+
+&tlmm_pinmux {
+	/* GPIO_33: NFC_IRQ FELICA_INT */
+	msm_gpio_33 {
+		qcom,pin-func = <0>;
+		msm_gpio_33_felica_act: felica_active {
+			drive-strength = <2>;
+			bias-disable;
+			input-enable;
+		};
+
+		msm_gpio_33_felica_sus: felica_suspend {
+			drive-strength = <2>;
+			bias-disable;
+			input-enable;
+		};
+	};
+
+	/* GPIO_66: DTV_LDO_EN */
+	msm_gpio_66 {
+		qcom,pin-func = <0>;
+		msm_gpio_66_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+	/* GPIO_67: DTV_INT */
+	msm_gpio_67 {
+		qcom,pin-func = <0>;
+		msm_gpio_67_def: default {
+			drive-strength = <2>;
+			/delete-property/ bias-disable;
+			/delete-property/ output-low;
+			bias-pull-down;
+			input-enable;
+		};
+	};
+
+	/* GPIO_108: DTV_SPI_MOSI */
+	msm_gpio_108 {
+		qcom,pin-func = <2>;
+		msm_gpio_108_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_109: DTV_SPI_MISO */
+	msm_gpio_109 {
+		qcom,pin-func = <2>;
+		msm_gpio_109_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_110: DTV_SPI_CS_N */
+	msm_gpio_110 {
+		qcom,pin-func = <1>;
+		msm_gpio_110_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_111: DTV_SPI_CLK(FORCE_MSA_AUTH_EN) */
+	msm_gpio_111 {
+		qcom,pin-func = <1>;
+		msm_gpio_111_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+};

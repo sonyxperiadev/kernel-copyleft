@@ -9,6 +9,11 @@
  *
  *  You may use this code as per GPL version 2
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __LINUX_POWER_SUPPLY_H__
 #define __LINUX_POWER_SUPPLY_H__
@@ -205,6 +210,27 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_MAX_PULSE_ALLOWED,
 	POWER_SUPPLY_PROP_ENABLE_AICL,
 	POWER_SUPPLY_PROP_SOC_REPORTING_READY,
+	POWER_SUPPLY_PROP_USBIN_DET,
+	POWER_SUPPLY_PROP_SUB_TYPE,
+	POWER_SUPPLY_PROP_ENABLE_SHUTDOWN_AT_LOW_BATTERY,
+	POWER_SUPPLY_PROP_FV_CFG,
+	POWER_SUPPLY_PROP_FV_CMP_CFG,
+	POWER_SUPPLY_PROP_LRC_ENABLE,
+	POWER_SUPPLY_PROP_LRC_SOCMAX,
+	POWER_SUPPLY_PROP_LRC_SOCMIN,
+	POWER_SUPPLY_PROP_LRC_NOT_STARTUP,
+	POWER_SUPPLY_PROP_MAX_CHARGE_CURRENT,
+	POWER_SUPPLY_PROP_INT_CLD,
+	POWER_SUPPLY_PROP_BATT_AGING,
+	POWER_SUPPLY_PROP_SMART_CHARGING_ACTIVATION,
+	POWER_SUPPLY_PROP_SMART_CHARGING_INTERRUPTION,
+	POWER_SUPPLY_PROP_SMART_CHARGING_STATUS,
+	POWER_SUPPLY_PROP_CURRENT_CAPABILITY,
+	POWER_SUPPLY_PROP_TYPEC_MODE,
+	POWER_SUPPLY_PROP_INPUT_CURRENT_STATE,
+	POWER_SUPPLY_PROP_CHARGE_FULL_RAW,
+	POWER_SUPPLY_PROP_TIME_TO_CAP_LEARNING,
+	POWER_SUPPLY_PROP_CHGERR_STS,
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT,
 	/* Properties of type `const char *' */
@@ -212,6 +238,7 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_MANUFACTURER,
 	POWER_SUPPLY_PROP_SERIAL_NUMBER,
 	POWER_SUPPLY_PROP_BATTERY_TYPE,
+	POWER_SUPPLY_PROP_CHARGER_TYPE,
 };
 
 enum power_supply_type {
@@ -229,6 +256,18 @@ enum power_supply_type {
 	POWER_SUPPLY_TYPE_BMS,		/* Battery Monitor System */
 	POWER_SUPPLY_TYPE_USB_PARALLEL,		/* USB Parallel Path */
 	POWER_SUPPLY_TYPE_WIPOWER,		/* Wipower */
+	POWER_SUPPLY_TYPE_TYPEC,	/*Type-C */
+	POWER_SUPPLY_TYPE_UFP,		/* Type-C UFP */
+	POWER_SUPPLY_TYPE_DFP,		/* TYpe-C DFP */
+	POWER_SUPPLY_TYPE_RETRY_DET,	/* Retry charger detection */
+};
+
+enum power_supply_sub_type {
+	POWER_SUPPLY_SUB_TYPE_UNKNOWN = 0,
+	POWER_SUPPLY_SUB_TYPE_PROPRIETARY,
+	POWER_SUPPLY_SUB_TYPE_PROPRIETARY_1000MA,
+	POWER_SUPPLY_SUB_TYPE_PROPRIETARY_500MA,
+	POWER_SUPPLY_SUB_TYPE_INVALID,
 };
 
 enum power_supply_notifier_events {
@@ -255,7 +294,12 @@ struct power_supply {
 #ifdef CONFIG_OF
 	struct device_node *of_node;
 #endif
-
+	/*
+	 * Functions for drivers implementing power supply class.
+	 * These shouldn't be called directly by other drivers for accessing
+	 * this power supply. Instead use power_supply_*() functions (for
+	 * example power_supply_get_property()).
+	 */
 	int (*get_property)(struct power_supply *psy,
 			    enum power_supply_property psp,
 			    union power_supply_propval *val);
@@ -275,6 +319,7 @@ struct power_supply {
 	struct work_struct changed_work;
 	spinlock_t changed_lock;
 	bool changed;
+	atomic_t use_cnt;
 #ifdef CONFIG_THERMAL
 	struct thermal_zone_device *tzd;
 	struct thermal_cooling_device *tcd;
@@ -321,6 +366,15 @@ extern struct power_supply *power_supply_get_by_name(const char *name);
 extern void power_supply_changed(struct power_supply *psy);
 extern int power_supply_am_i_supplied(struct power_supply *psy);
 extern int power_supply_set_battery_charged(struct power_supply *psy);
+extern int power_supply_get_property(struct power_supply *psy,
+			    enum power_supply_property psp,
+			    union power_supply_propval *val);
+extern int power_supply_set_property(struct power_supply *psy,
+			    enum power_supply_property psp,
+			    const union power_supply_propval *val);
+extern int power_supply_property_is_writeable(struct power_supply *psy,
+					enum power_supply_property psp);
+extern void power_supply_external_power_changed(struct power_supply *psy);
 extern int power_supply_set_current_limit(struct power_supply *psy, int limit);
 extern int power_supply_set_voltage_limit(struct power_supply *psy, int limit);
 extern int power_supply_set_online(struct power_supply *psy, bool enable);
