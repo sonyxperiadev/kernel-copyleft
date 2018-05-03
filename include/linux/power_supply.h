@@ -272,6 +272,7 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_CHARGE_FULL_RAW,
 	POWER_SUPPLY_PROP_TIME_TO_CAP_LEARNING,
 	POWER_SUPPLY_PROP_INT_CLD,
+	POWER_SUPPLY_PROP_MONOTONIC_SOC,
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT,
 	/* Properties of type `const char *' */

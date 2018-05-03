@@ -4068,6 +4068,9 @@ irqreturn_t smblib_handle_usb_plugin(int irq, void *data)
 	struct smb_charger *chg = irq_data->parent_data;
 
 	mutex_lock(&chg->lock);
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	smblib_somc_ctrl_inhibit(chg, false);
+#endif
 #if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (chg->pd_hard_reset)
 		smblib_usb_plugin_hard_reset_locked(chg);
@@ -6167,6 +6170,90 @@ void smblib_somc_set_low_batt_suspend_en(struct smb_charger *chg)
 	rc = vote(chg->dc_suspend_votable, LOW_BATT_EN_VOTER, true, 0);
 	if (rc < 0)
 		dev_err(chg->dev, "Couldn't set dc suspend rc %d\n", rc);
+}
+
+#define INHIBIT_HOLD_MSOC 100
+void smblib_somc_ctrl_inhibit(struct smb_charger *chg, bool en)
+{
+	int rc;
+	int msoc;
+	u8 stat;
+	bool fv_decreased;
+	union power_supply_propval val = {0, };
+
+	if (!chg->bms_psy) {
+		smblib_err(chg, "Couldn't get bms_psy\n");
+		return;
+	}
+
+	rc = power_supply_get_property(chg->bms_psy,
+				POWER_SUPPLY_PROP_MONOTONIC_SOC, &val);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't get prop msoc rc=%d\n", rc);
+		return;
+	}
+	msoc = val.intval;
+
+	if (chg->batt_profile_fv_uv < chg->last_batt_profile_fv_uv)
+		fv_decreased = true;
+	else
+		fv_decreased = false;
+
+	rc = smblib_somc_get_battery_charger_status(chg, &stat);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't get battery charge sts rc=%d\n", rc);
+		return;
+	}
+
+	smblib_dbg(chg, PR_MISC, "msoc:%d, FV:%d->%d, status:%d\n",
+				msoc, chg->last_batt_profile_fv_uv,
+				chg->batt_profile_fv_uv, stat);
+
+	if (en) {
+		if (fv_decreased && (msoc == INHIBIT_HOLD_MSOC)) {
+			smblib_dbg(chg, PR_SOMC, "Enable inhibit for RB WA\n");
+			rc = smblib_masked_write(chg, CHGR_CFG2_REG,
+							CHARGER_INHIBIT_BIT,
+							CHARGER_INHIBIT_BIT);
+			if (rc < 0) {
+				dev_err(chg->dev,
+					"Couldn't set inhibit rc=%d\n", rc);
+				return;
+			}
+		} else {
+			smblib_dbg(chg, PR_MISC, "Don't enable inhibit\n");
+		}
+	} else {
+		if (msoc < INHIBIT_HOLD_MSOC) {
+			smblib_dbg(chg, PR_SOMC, "Disable inhibit for RB WA\n");
+			rc = smblib_masked_write(chg, CHGR_CFG2_REG,
+							CHARGER_INHIBIT_BIT, 0);
+			if (rc < 0) {
+				dev_err(chg->dev,
+					"Couldn't set inhibit rc=%d\n", rc);
+				return;
+			}
+		} else {
+			smblib_dbg(chg, PR_MISC, "Don't disable inhibit\n");
+		}
+	}
+	chg->last_batt_profile_fv_uv = chg->batt_profile_fv_uv;
+}
+
+int smblib_somc_get_battery_charger_status(struct smb_charger *chg, u8 *val)
+{
+	int rc;
+	u8 stat;
+
+	rc = smblib_read(chg, BATTERY_CHARGER_STATUS_1_REG, &stat);
+	if (rc < 0) {
+		smblib_err(chg,
+			  "Couldn't read BATTERY_CHARGER_STATUS_1 rc=%d\n", rc);
+		return rc;
+	}
+
+	*val = stat & BATTERY_CHARGER_STATUS_MASK;
+	return rc;
 }
 
 #define FULL_CAPACITY		100

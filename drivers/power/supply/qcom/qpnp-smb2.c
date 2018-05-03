@@ -387,6 +387,7 @@ static int smb2_parse_dt(struct smb2 *chip)
 	chip->dt.hvdcp_disable = of_property_read_bool(node,
 						"qcom,hvdcp-disable");
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	of_property_read_u32(node, "qcom,chg-inhibit-threshold-mv",
 				&chip->dt.chg_inhibit_thr_mv);
 	if ((chip->dt.chg_inhibit_thr_mv < 0 ||
@@ -394,6 +395,7 @@ static int smb2_parse_dt(struct smb2 *chip)
 		pr_err("qcom,chg-inhibit-threshold-mv is incorrect\n");
 		return -EINVAL;
 	}
+#endif
 
 	chip->dt.auto_recharge_soc = of_property_read_bool(node,
 						"qcom,auto-recharge-soc");
@@ -1306,6 +1308,9 @@ static int smb2_batt_set_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 		chg->batt_profile_fv_uv = val->intval;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		smblib_somc_ctrl_inhibit(chg, true);
+#endif
 		vote(chg->fv_votable, BATT_PROFILE_VOTER, true, val->intval);
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_QNOVO_ENABLE:
@@ -2124,6 +2129,7 @@ static int smb2_init_hw(struct smb2 *chip)
 		return rc;
 	}
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	switch (chip->dt.chg_inhibit_thr_mv) {
 	case 50:
 		rc = smblib_masked_write(chg, CHARGE_INHIBIT_THRESHOLD_CFG_REG,
@@ -2157,7 +2163,28 @@ static int smb2_init_hw(struct smb2 *chip)
 			rc);
 		return rc;
 	}
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	rc = smblib_masked_write(chg, CHARGE_INHIBIT_THRESHOLD_CFG_REG,
+			CHARGE_INHIBIT_THRESHOLD_MASK,
+			CHARGE_INHIBIT_THRESHOLD_50MV);
 
+	if (rc < 0) {
+		dev_err(chg->dev,
+			"Couldn't configure charge inhibit cfg rc=%d\n",
+			rc);
+		return rc;
+	}
+
+	rc = smblib_masked_write(chg, CHGR_CFG2_REG,
+			CHARGER_INHIBIT_BIT, 0);
+	if (rc < 0) {
+		dev_err(chg->dev,
+			"Couldn't configure charge inhibit threshold rc=%d\n",
+			rc);
+		return rc;
+	}
+#endif
 	if (chip->dt.auto_recharge_soc) {
 		rc = smblib_masked_write(chg, FG_UPDATE_CFG_2_SEL_REG,
 				SOC_LT_CHG_RECHARGE_THRESH_SEL_BIT |
@@ -2707,6 +2734,7 @@ enum smb2_somc_sysfs {
 	ATTR_JEITA_AUX_THRESH_WARM,
 	ATTR_USBIN_ADAPTER_ALLOW_CFG,
 	ATTR_FAKED_STATUS,
+	ATTR_BATTERY_CHARGER_STATUS,
 };
 
 static ssize_t smb2_somc_param_show(struct device *dev,
@@ -2767,6 +2795,7 @@ static struct device_attribute smb2_somc_attrs[] = {
 				smb2_somc_param_show, smb2_somc_param_store),
 	__ATTR(usbin_adapter_allow_cfg, S_IRUGO, smb2_somc_param_show, NULL),
 	__ATTR(faked_status, S_IRUGO, smb2_somc_param_show, NULL),
+	__ATTR(battery_charger_status, S_IRUGO, smb2_somc_param_show, NULL),
 };
 
 static ssize_t smb2_somc_param_show(struct device *dev,
@@ -3119,6 +3148,14 @@ static ssize_t smb2_somc_param_show(struct device *dev,
 		break;
 	case ATTR_FAKED_STATUS:
 		size = scnprintf(buf, PAGE_SIZE, "%d\n", chg->faked_status);
+		break;
+	case ATTR_BATTERY_CHARGER_STATUS:
+		ret = smblib_somc_get_battery_charger_status(chg, &reg);
+		if (ret)
+			dev_err(dev, "Can't read battery charger status: %d\n",
+									ret);
+		else
+			size = scnprintf(buf, PAGE_SIZE, "%d\n", reg);
 		break;
 	default:
 		size = 0;

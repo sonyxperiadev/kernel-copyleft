@@ -320,6 +320,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(charge_full_raw),
 	POWER_SUPPLY_ATTR(time_to_cap_learning),
 	POWER_SUPPLY_ATTR(int_cld),
+	POWER_SUPPLY_ATTR(monotonic_soc),
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_ATTR(charge_counter_ext),
 	/* Properties of type `const char *' */

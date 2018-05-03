@@ -424,6 +424,9 @@ struct smb_charger {
 	/* battery profile */
 	int			batt_profile_fcc_ua;
 	int			batt_profile_fv_uv;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int			last_batt_profile_fv_uv;
+#endif
 
 	/* qnovo */
 	int			usb_icl_delta_ua;
@@ -676,6 +679,8 @@ int smblib_set_prop_pr_swap_in_progress(struct smb_charger *chg,
 void smblib_somc_thermal_fcc_change(struct smb_charger *chg);
 void smblib_somc_thermal_icl_change(struct smb_charger *chg);
 void smblib_somc_set_low_batt_suspend_en(struct smb_charger *chg);
+void smblib_somc_ctrl_inhibit(struct smb_charger *chg, bool en);
+int smblib_somc_get_battery_charger_status(struct smb_charger *chg, u8 *val);
 int smblib_somc_smart_set_suspend(struct smb_charger *chg);
 int smblib_somc_lrc_get_capacity(struct smb_charger *chg,
 			int capacity);
