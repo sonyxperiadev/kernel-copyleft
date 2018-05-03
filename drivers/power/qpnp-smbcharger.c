@@ -4808,8 +4808,13 @@ static int smbchg_change_usb_supply_type(struct smbchg_chip *chip,
 		goto out;
 	}
 
-	if (!chip->skip_usb_notification)
+	if (!chip->skip_usb_notification) {
+#ifdef CONFIG_QPNP_SMBCHARGER_DELAY_UPDATE
+		if (type == POWER_SUPPLY_TYPE_USB_DCP)
+			msleep(100);
+#endif
 		power_supply_set_supply_type(chip->usb_psy, type);
+	}
 #ifdef CONFIG_QPNP_SMBCHARGER_EXTENSION
 	if (chip->typec_psy)
 		power_supply_set_supply_type(chip->typec_psy, type);
