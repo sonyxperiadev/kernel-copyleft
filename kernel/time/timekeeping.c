@@ -7,11 +7,6 @@
  *  Please see that file for copyright and history logs.
  *
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/timekeeper_internal.h>
 #include <linux/module.h>

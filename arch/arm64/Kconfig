@@ -246,6 +246,24 @@ config ARCH_SONY_LOIRE
       If you enable this config,
       please use SONY Mobile device tree.
 
+config MACH_SONY_CDB
+    bool "Sony Mobile CDB"
+    depends on ARCH_SONY_LOIRE
+    help
+      Support for the SONY Mobile CDB board
+      which is based on SONY Loire platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_CDB_R2
+    bool "Sony Mobile Loire CDB R2"
+    depends on ARCH_SONY_LOIRE
+    help
+      Support for the SONY Mobile Loire CDB R2 board
+      which is based on SONY Loire platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
 config MACH_SONY_SUZU
     bool "Sony Mobile SUZU"
     depends on ARCH_SONY_LOIRE
@@ -260,6 +278,24 @@ config MACH_SONY_KUGO
     depends on ARCH_SONY_LOIRE
     help
       Support for the SONY Mobile Kugo device
+      which is based on SONY Loire platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_KUGO_DCM
+    bool "Sony Mobile KUGO Docomo"
+    depends on ARCH_SONY_LOIRE
+    help
+      Support for the SONY Mobile Kugo Docomo device
+      which is based on SONY Loire platform.
+      If you enable this config,
+      please use SONY Mobile device tree.
+
+config MACH_SONY_OAK
+    bool "Sony Mobile OAK"
+    depends on ARCH_SONY_LOIRE
+    help
+      Support for the SONY Mobile Oak device
       which is based on SONY Loire platform.
       If you enable this config,
       please use SONY Mobile device tree.

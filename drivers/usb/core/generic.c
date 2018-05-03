@@ -16,11 +16,6 @@
  *	(C) Copyright Greg Kroah-Hartman 2002-2003
  *
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>

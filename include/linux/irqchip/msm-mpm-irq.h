@@ -10,11 +10,6 @@
  * GNU General Public License for more details.
  *
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef __MSM_MPM_IRQ_H
 #define __MSM_MPM_IRQ_H

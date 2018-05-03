@@ -27,13 +27,6 @@
  *  2009-Aug-10  Motorola        Changed "add_timer" to "mod_timer" to solve
  *                               race when flurry of queued work comes in.
  */
-/*
- * Copyright (C) 2015 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
- */
 
 #define pr_fmt(fmt)	"Bluetooth: %s: " fmt, __func__
 

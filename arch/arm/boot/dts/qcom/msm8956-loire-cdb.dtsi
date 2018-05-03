@@ -1,0 +1,265 @@
+/* arch/arm/boot/dts/qcom/msm8956-loire-cdb.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	/*I2C : BLSP2 */
+	i2c@7af6000 {
+		nfc@28 {
+			compatible = "nxp,pn547";
+			reg = <0x28>;
+			interrupt-parent = <&msm_gpio>;
+			interrupts = <33 0x1>;
+			nxp,irq_gpio = <&msm_gpio 33 0x00>;
+			nxp,dwld_en = <&msm_gpio 16 0x00>;
+			nxp,ven = <&msm_gpio 34 0x01>;
+			qcom,clk-src = "BBCLK2";
+			qcom,clk-gpio = <&pm8950_gpios 5 0x00>;
+			clocks = <&clock_gcc clk_bb_clk2_pin>;
+			clock-names = "nfc_clk";
+			pinctrl-names = "pn547-active", "pn547-inactive";
+			pinctrl-0 = <&msm_gpio_33_def &msm_gpio_16_def>;
+			pinctrl-1 = <&msm_gpio_33_def &msm_gpio_16_def>;
+		};
+	};
+
+	/* I2C : BLSP4 */
+	i2c@78b8000 {
+		synaptics_clearpad@2c {
+			chip_id = <0x38>;
+		};
+	};
+
+	/* SPI : BLSP7 */
+	spi_7: spi@0x7af7000 { /* BLSP2 QUP2 */
+		compatible = "qcom,spi-qup-v2";
+		reg-names = "spi_physical", "spi_bam_physical";
+		reg = <0x7af7000 0x600>,
+		      <0x7884000 0x1f000>;
+		interrupt-names = "spi_irq", "spi_bam_irq";
+		interrupts = <0 301 0>, <0 238 0>;
+		spi-max-frequency = <19200000>;
+		pinctrl-names = "spi_default", "spi_sleep";
+		pinctrl-0 = <&msm_gpio_108_def &msm_gpio_109_def &msm_gpio_110_def &msm_gpio_111_def>;
+		pinctrl-1 = <&msm_gpio_108_def &msm_gpio_109_def &msm_gpio_110_def &msm_gpio_111_def>;
+		clocks = <&clock_gcc clk_gcc_blsp2_ahb_clk>,
+			 <&clock_gcc clk_gcc_blsp2_qup3_spi_apps_clk>;
+		clock-names = "iface_clk", "core_clk";
+		qcom,infinite-mode = <0>;
+		qcom,use-bam;
+		qcom,use-pinctrl;
+		qcom,ver-reg-exists;
+		qcom,bam-consumer-pipe-index = <8>;
+		qcom,bam-producer-pipe-index = <9>;
+		qcom,master-id = <84>;
+		status = "okay";
+	};
+
+	somc_pinctrl: somc_pinctrl {
+		/* If variant specific default setting is needed,
+		   fill pinctrl-2 value in <variant>.dtsi */
+		pinctrl-2 = <&msm_gpio_27_def &msm_gpio_36_def &msm_gpio_62_def
+					&msm_gpio_63_def &msm_gpio_66_def &msm_gpio_67_def
+					&msm_gpio_107_def &msm_gpio_108_def &msm_gpio_109_def
+					&msm_gpio_110_def &msm_gpio_111_def &msm_gpio_116_def
+					&msm_gpio_131_def &msm_gpio_144_def>;
+	};
+
+};
+
+/{
+	aliases {
+		spi7 = &spi_7;
+	};
+
+	loire_cdb_batterydata: qcom,battery-data {
+		#include "batterydata-loire-suzu-send.dtsi"
+		#include "batterydata-loire-suzu-atl.dtsi"
+	};
+};
+
+&pmi8950_fg {
+	qcom,battery-data = <&loire_cdb_batterydata>;
+	qcom,cold-hot-jeita-hysteresis = <20 20>;
+	somc,cool-warm-jeita-hysteresis = <20 20>;
+};
+
+&pmi8950_charger {
+	qcom,charging-disabled;
+	qcom,fastchg-current-ma = <1850>;
+	somc,usb-9v-current-max = <1500>;
+	qcom,float-voltage-comp = <0x08>;
+	somc,fastchg-warm-current-ma = <1200>;
+	somc,fastchg-cool-current-ma = <700>;
+	somc,thermal-engine-fastchg-current = <1850 1850 1850 1100 900 700 500 300 300 300 300 300 300 0 0>;
+	somc,thermal-mitigation-usb-9v = <1500 1400 1200 1000 1000 1000 1000 1000 1200 900 700 500 300 0 0>;
+	somc,thermal-mitigation-usb-5v = <1500 1500 1500 1500 1500 1500 1500 1500 1200 900 700 500 300 0 0>;
+	somc,limit-usb-5v-level = <8>;
+};
+
+&tlmm_pinmux {
+	/* GPIO_27: CAM1_MCLK */
+	msm_gpio_27 {
+		qcom,pin-func = <1>;
+		msm_gpio_27_def: default {
+			drive-strength = <6>;
+			/delete-property/ output-low;
+			bias-disable;
+		};
+	};
+
+	/* GPIO_36: CAM1_RESET_N */
+	msm_gpio_36 {
+		qcom,pin-func = <0>;
+		msm_gpio_36_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+	/* GPIO_62: DTV_RST_N */
+	msm_gpio_62 {
+		qcom,pin-func = <0>;
+		msm_gpio_62_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+	/* GPIO_63: NC(LCD_VDDIO_EN) */
+	msm_gpio_63 {
+		qcom,pin-func = <0>;
+		msm_gpio_63_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+	/* GPIO_66: DTV_LDO_EN */
+	msm_gpio_66 {
+		qcom,pin-func = <0>;
+		msm_gpio_66_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+	/* GPIO_67: DTV_INT */
+	msm_gpio_67 {
+		qcom,pin-func = <0>;
+		msm_gpio_67_def: default {
+			drive-strength = <2>;
+			/delete-property/ bias-disable;
+			/delete-property/ output-low;
+			bias-pull-down;
+			input-enable;
+		};
+	};
+
+	/* GPIO_107: USB_CABLE_DET_N */
+	msm_gpio_107 {
+		qcom,pin-func = <0>;
+		msm_gpio_107_def: default {
+			drive-strength = <2>;
+			/delete-property/ bias-disable;
+			/delete-property/ output-low;
+			bias-pull-down;
+			input-enable;
+		};
+	};
+
+	/* GPIO_108: DTV_SPI_MOSI */
+	msm_gpio_108 {
+		qcom,pin-func = <1>;
+		msm_gpio_108_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_109: DTV_SPI_MISO */
+	msm_gpio_109 {
+		qcom,pin-func = <1>;
+		msm_gpio_109_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_110: DTV_SPI_CS_N */
+	msm_gpio_110 {
+		qcom,pin-func = <1>;
+		msm_gpio_110_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_111: FORCE_MSA_AUTH_EN */
+	msm_gpio_111 {
+		qcom,pin-func = <1>;
+		msm_gpio_111_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			/delete-property/ output-low;
+		};
+	};
+
+	/* GPIO_116: USB_CABLE_SENSE_EN */
+	msm_gpio_116 {
+		qcom,pin-func = <0>;
+		msm_gpio_116_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+	/* GPIO_131: USBPD_INT */
+	msm_gpio_131 {
+		qcom,pin-func = <0>;
+		msm_gpio_131_def: default {
+			drive-strength = <2>;
+			/delete-property/ bias-disable;
+			/delete-property/ output-low;
+			bias-pull-up;
+			input-enable;
+		};
+	};
+
+	/* GPIO_144: PROX_DET */
+	msm_gpio_144 {
+		qcom,pin-func = <0>;
+		msm_gpio_144_def: default {
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+};
+
+&spmi_bus {
+	qcom,pmi8950@3 {
+		qcom,leds@d800 {
+			somc,init-br-ua = <10000>;
+			somc-s1,br-power-save-ua = <800>;
+			qcom,led-strings-list = [00 01 02];
+			qcom,ilim-ma = <660>;
+		};
+	};
+};

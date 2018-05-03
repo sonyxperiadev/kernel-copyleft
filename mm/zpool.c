@@ -6,11 +6,6 @@
  * This is a common frontend for memory storage pool implementations.
  * Typically, this is used to store compressed memory.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 

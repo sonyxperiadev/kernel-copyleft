@@ -29,11 +29,6 @@
  * always be lost. RTS will be asserted even while the UART is off in this mode
  * of operation. See msm_serial_hs_platform_data.rx_wakeup_irq.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/module.h>
 

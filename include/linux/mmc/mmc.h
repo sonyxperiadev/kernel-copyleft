@@ -20,11 +20,6 @@
  * Author:  Andrew Christian
  *          15 May 2002
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef LINUX_MMC_MMC_H
 #define LINUX_MMC_MMC_H

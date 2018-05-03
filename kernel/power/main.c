@@ -7,11 +7,6 @@
  * This file is released under the GPLv2
  *
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/export.h>
 #include <linux/kobject.h>

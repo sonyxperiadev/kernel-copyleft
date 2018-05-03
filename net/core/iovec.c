@@ -15,11 +15,6 @@
  *		Alexey Kuznetsov:	2.1 optimisations
  *		Andi Kleen	:	Fix csum*fromiovecend for IPv6.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/errno.h>
 #include <linux/module.h>

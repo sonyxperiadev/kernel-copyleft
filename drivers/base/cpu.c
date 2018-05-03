@@ -1,11 +1,6 @@
 /*
  * CPU subsystem support
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/kernel.h>
 #include <linux/module.h>

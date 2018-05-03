@@ -317,6 +317,14 @@ dtb-$(CONFIG_ARCH_MSM8992) += msm8992-sim.dtb \
 	msm8992-pmi8994-pm8004-mtp.dtb
 dtb-$(CONFIG_ARCH_MDMFERMIUM) += mdmfermium-rumi.dtb
 else
+dtb-$(CONFIG_MACH_SONY_CDB) += msm8956-loire-cdb.dtb \
+	msm8976-loire-cdb.dtb \
+	msm8956-v1.1-loire-cdb.dtb \
+	msm8976-v1.1-loire-cdb.dtb
+dtb-$(CONFIG_MACH_SONY_CDB_R2) += msm8956-loire-cdb-r2.dtb \
+	msm8976-loire-cdb-r2.dtb \
+	msm8956-v1.1-loire-cdb-r2.dtb \
+	msm8976-v1.1-loire-cdb-r2.dtb
 dtb-$(CONFIG_MACH_SONY_SUZU) += msm8956-loire-suzu_generic.dtb \
 	msm8976-loire-suzu_generic.dtb \
 	msm8956-v1.1-loire-suzu_generic.dtb \
@@ -325,6 +333,12 @@ dtb-$(CONFIG_MACH_SONY_KUGO) += msm8956-loire-kugo_generic.dtb \
 	msm8976-loire-kugo_generic.dtb \
 	msm8956-v1.1-loire-kugo_generic.dtb \
 	msm8976-v1.1-loire-kugo_generic.dtb
+dtb-$(CONFIG_MACH_SONY_KUGO_DCM) += msm8956-loire-kugo_dcm.dtb \
+	msm8976-loire-kugo_dcm.dtb \
+	msm8956-v1.1-loire-kugo_dcm.dtb \
+	msm8976-v1.1-loire-kugo_dcm.dtb
+dtb-$(CONFIG_MACH_SONY_OAK) += msm8956-loire-oak_generic.dtb \
+	msm8956-v1.1-loire-oak_generic.dtb
 endif
 
 DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES))

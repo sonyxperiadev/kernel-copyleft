@@ -7,11 +7,6 @@
  *
  *  Card driver specific definitions.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 #ifndef LINUX_MMC_CARD_H
 #define LINUX_MMC_CARD_H
 

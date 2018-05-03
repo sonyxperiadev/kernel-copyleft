@@ -5,11 +5,6 @@
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef _FS_FUSE_I_H
 #define _FS_FUSE_I_H

@@ -5,11 +5,6 @@
  * This file contains the spinlock/rwlock implementations for
  * DEBUG_SPINLOCK.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/spinlock.h>
 #include <linux/nmi.h>

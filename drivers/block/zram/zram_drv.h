@@ -11,11 +11,6 @@
  * Released under the terms of GNU General Public License Version 2.0
  *
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef _ZRAM_DRV_H_
 #define _ZRAM_DRV_H_

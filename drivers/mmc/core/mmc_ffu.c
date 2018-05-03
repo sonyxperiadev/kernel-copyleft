@@ -17,11 +17,6 @@
  * http://www.gnu.org/licenses/,
  * or http://www.opensource.org/licenses/gpl-2.0.php
 */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/bug.h>
 #include <linux/errno.h>

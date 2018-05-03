@@ -3,11 +3,6 @@
  * to be __user pointers not __kernel pointers.  To limit the sparse
  * noise, turn off sparse checking for this file.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 #ifdef __CHECKER__
 #undef __CHECKER__
 #warning "Sparse checking disabled for this file"

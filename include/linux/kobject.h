@@ -12,11 +12,6 @@
  * interface, ESPECIALLY the parts about reference counts and object
  * destructors.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef _KOBJECT_H_
 #define _KOBJECT_H_

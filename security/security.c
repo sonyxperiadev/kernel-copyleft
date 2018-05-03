@@ -10,11 +10,6 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #include <linux/capability.h>
 #include <linux/module.h>

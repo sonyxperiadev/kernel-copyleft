@@ -10,11 +10,6 @@
  * Changed:
  * 10-Mar-94: Arno Griffioen: Conversion for vt100 emulator port from PC LINUX
  */
-/*
- * NOTE: This file has been modified by Sony Mobile Communications Inc.
- * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
- * and licensed under the license of the file.
- */
 
 #ifndef _LINUX_CONSOLE_H_
 #define _LINUX_CONSOLE_H_ 1
