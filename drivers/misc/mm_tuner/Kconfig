@@ -1,0 +1,16 @@
+config MMTUNER_MN8855x
+	tristate "Socionext mm_tuner driver support"
+	---help---
+	  This module adds support for wireless adapters based on
+	  Socionext MN8855x chipset.
+
+	  If you choose to build a module, it'll be called mm_tuner. Say Y if
+	  unsure.
+
+config MMTUNER_DEBUG
+        bool "Socionext MN8855x Debug message mode"
+	depends on MMTUNER_MN8855x
+	default n
+	---help---
+	  MN8855x driver debug message mode. Say Y when you want to debug.
+

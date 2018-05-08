@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/device.h>
 #include <linux/platform_device.h>
@@ -662,9 +667,10 @@ static int cam_cpas_util_get_ahb_level(struct cam_hw_info *cpas_hw,
 
 	opp = dev_pm_opp_find_freq_ceil(dev, &corner_freq);
 	if (IS_ERR(opp)) {
-		CAM_ERR(CAM_CPAS, "Error on OPP freq :%ld, %pK",
+		CAM_DBG(CAM_CPAS, "OPP Ceil not available for freq :%ld, %pK",
 			corner_freq, opp);
-		return -EINVAL;
+		*req_level = CAM_TURBO_VOTE;
+		return 0;
 	}
 
 	corner = dev_pm_opp_get_voltage(opp);

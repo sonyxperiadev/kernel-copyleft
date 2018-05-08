@@ -20,6 +20,13 @@
  * has large external dependencies) by  implementing it's own
  * number output and print routines, and using __builtin_strlen()
  */
+/*
+ * Copyright (C) 2014 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
 
 #include <sys/sysinfo.h>
 #include <unistd.h>

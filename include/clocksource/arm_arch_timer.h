@@ -13,6 +13,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __CLKSOURCE_ARM_ARCH_TIMER_H
 #define __CLKSOURCE_ARM_ARCH_TIMER_H
 
@@ -59,7 +64,7 @@ struct arch_timer_kvm_info {
 extern u32 arch_timer_get_rate(void);
 extern u64 (*arch_timer_read_counter)(void);
 extern struct arch_timer_kvm_info *arch_timer_get_kvm_info(void);
-
+extern void arch_timer_mem_get_cval(u32 *lo, u32 *hi);
 #else
 
 static inline u32 arch_timer_get_rate(void)
@@ -72,6 +77,10 @@ static inline u64 arch_timer_read_counter(void)
 	return 0;
 }
 
+static void arch_timer_mem_get_cval(u32 *lo, u32 *hi)
+{
+	*lo = *hi = ~0U;
+}
 #endif
 
 #endif

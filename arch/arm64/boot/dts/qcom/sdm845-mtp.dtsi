@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <dt-bindings/gpio/gpio.h>
 #include "sdm845-pmic-overlay.dtsi"
@@ -196,7 +201,6 @@
 
 &pmi8998_haptics {
 	qcom,vmax-mv = <2400>;
-	qcom,lra-auto-mode;
 	status = "okay";
 };
 
@@ -270,13 +274,14 @@
 };
 
 &vendor {
+/*
 	mtp_batterydata: qcom,battery-data {
 		qcom,batt-id-range-pct = <15>;
 		#include "fg-gen3-batterydata-itech-3000mah.dtsi"
 		#include "fg-gen3-batterydata-ascent-3450mah.dtsi"
 		#include "fg-gen3-batterydata-demo-6000mah.dtsi"
 	};
-
+*/
 	extcon_usb1: extcon_usb1 {
 		compatible = "linux,extcon-usb-gpio";
 		vbus-gpio = <&pmi8998_gpios 8 GPIO_ACTIVE_HIGH>;
@@ -285,11 +290,11 @@
 		pinctrl-0 = <&usb2_vbus_det_default>;
 	};
 };
-
+/*
 &pmi8998_fg {
 	qcom,battery-data = <&mtp_batterydata>;
 };
-
+*/
 &smb1355_charger_0 {
 	status = "ok";
 	qcom,disable-ctm;

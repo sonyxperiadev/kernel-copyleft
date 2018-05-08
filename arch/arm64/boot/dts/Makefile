@@ -16,6 +16,7 @@ dts-dirs += qcom
 dts-dirs += renesas
 dts-dirs += rockchip
 dts-dirs += socionext
+dts-dirs += somc
 dts-dirs += sprd
 dts-dirs += xilinx
 dts-dirs += lg

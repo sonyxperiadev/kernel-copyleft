@@ -567,6 +567,13 @@ config MSM_PIL_SSR_GENERIC
          or a fatal error. Subsystems include LPASS, Venus, VPU, WCNSS and
          BCSS.
 
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on QCOM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
+
 config MSM_PIL_MSS_QDSP6V5
        tristate "MSS QDSP6v5 (Hexagon) Boot Support"
        depends on MSM_PIL && MSM_SUBSYSTEM_RESTART
@@ -738,6 +745,29 @@ config QMP_DEBUGFS_CLIENT
 	  This options enables a driver which allows clients to send messages
 	  to Alway On processor using QMP transport.
 
+config SUBSYS_LAST_ERR_LOG
+	bool "support last error log for subsystems"
+	help
+	  When a fatal error is encountered, few subsystems export the
+	  error log into SMEM. This driver supports the mechanism to read
+	  these logs and exports them to user via procfs.
+	  If unsure, say N
+
+config LAST_LOGS
+	bool "support last logs for system"
+	depends on DEBUG_FS
+	select SECURITY_STATUS
+	help
+	  When a fatal error is encountered on system, system reboots and
+	  saves the logs in last logs memory. This driver supports the mechanism
+	  to read these logs and exports them via debugfs.
+
+config SECURITY_STATUS
+	bool "Get security_status"
+	help
+	  Gets security status by checking oemandroidboot.securityflags
+	  parameter.
+
 source "drivers/soc/qcom/memshare/Kconfig"
 
 config MSM_REMOTEQDSS
@@ -774,3 +804,26 @@ config QCOM_QDSS_BRIDGE
 	  The driver will help route diag traffic from modem side over the QDSS
 	  sub-system to USB on APSS side. The driver acts as a bridge between the
 	  MHI and USB interface. If unsure, say N.
+
+config SUBSYS_LAST_ERR_LOG
+	bool "support last error log for subsystems"
+	help
+	  When a fatal error is encountered, few subsystems export the
+	  error log into SMEM. This driver supports the mechanism to read
+	  these logs and exports them to user via procfs.
+	  If unsure, say N
+
+config LAST_LOGS
+	bool "support last logs for system"
+	depends on DEBUG_FS
+	select SECURITY_STATUS
+	help
+	  When a fatal error is encountered on system, system reboots and
+	  saves the logs in last logs memory. This driver supports the mechanism
+	  to read these logs and exports them via debugfs.
+
+config SECURITY_STATUS
+	bool "Get security_status"
+	help
+	  Gets security status by checking oemandroidboot.securityflags
+	  parameter.

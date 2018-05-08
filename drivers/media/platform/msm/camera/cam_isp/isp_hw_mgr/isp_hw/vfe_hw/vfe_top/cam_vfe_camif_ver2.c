@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <uapi/media/cam_isp.h>
@@ -355,7 +360,6 @@ static int cam_vfe_camif_handle_irq_bottom_half(void *handler_priv,
 			CAM_DBG(CAM_ISP, "Received EPOCH");
 			ret = CAM_VFE_IRQ_STATUS_SUCCESS;
 		}
-		cam_vfe_put_evt_payload(payload->core_info, &payload);
 		break;
 	case CAM_ISP_HW_EVENT_REG_UPDATE:
 		if (irq_status0 & camif_priv->reg_data->reg_update_irq_mask) {
@@ -373,7 +377,6 @@ static int cam_vfe_camif_handle_irq_bottom_half(void *handler_priv,
 		if (irq_status1 & camif_priv->reg_data->error_irq_mask1) {
 			CAM_DBG(CAM_ISP, "Received ERROR\n");
 			ret = CAM_ISP_HW_ERROR_OVERFLOW;
-			cam_vfe_put_evt_payload(payload->core_info, &payload);
 		} else {
 			ret = CAM_ISP_HW_ERROR_NONE;
 		}

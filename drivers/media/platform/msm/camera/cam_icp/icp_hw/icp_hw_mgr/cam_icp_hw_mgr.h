@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #ifndef CAM_ICP_HW_MGR_H
@@ -183,6 +188,8 @@ struct cam_ctx_clk_info {
  * @temp_payload: Payload for destroy handle data
  * @ctx_id: Context Id
  * @clk_info: Current clock info of a context
+ * @watch_dog: watchdog timer handle
+ * @watch_dog_reset_counter: Counter for watch dog reset
  */
 struct cam_icp_hw_ctx_data {
 	void *context_priv;
@@ -200,6 +207,8 @@ struct cam_icp_hw_ctx_data {
 	struct ipe_bps_destroy temp_payload;
 	uint32_t ctx_id;
 	struct cam_ctx_clk_info clk_info;
+	struct cam_req_mgr_timer *watch_dog;
+	uint32_t watch_dog_reset_counter;
 };
 
 /**
@@ -222,6 +231,7 @@ struct icp_cmd_generic_blob {
  * @compressed_bw: Current compressed bandwidth voting
  * @hw_type: IPE/BPS device type
  * @watch_dog: watchdog timer handle
+ * @watch_dog_reset_counter: Counter for watch dog reset
  */
 struct cam_icp_clk_info {
 	uint32_t base_clk;
@@ -232,6 +242,7 @@ struct cam_icp_clk_info {
 	uint64_t compressed_bw;
 	uint32_t hw_type;
 	struct cam_req_mgr_timer *watch_dog;
+	uint32_t watch_dog_reset_counter;
 };
 
 /**
@@ -258,6 +269,8 @@ struct cam_icp_clk_info {
  * @dentry: Debugfs entry
  * @a5_debug: A5 debug flag
  * @icp_pc_flag: Flag to enable/disable power collapse
+ * @ipe_bps_pc_flag: Flag to enable/disable
+ *                   power collapse for ipe & bps
  * @icp_debug_clk: Set clock based on debug value
  * @icp_default_clk: Set this clok if user doesn't supply
  * @clk_info: Clock info of hardware
@@ -269,6 +282,12 @@ struct cam_icp_clk_info {
  * @ipe1_enable: Flag for IPE1
  * @bps_enable: Flag for BPS
  * @core_info: 32 bit value , tells IPE0/1 and BPS
+ * @a5_dev_intf : Device interface for A5
+ * @ipe0_dev_intf: Device interface for IPE0
+ * @ipe1_dev_intf: Device interface for IPE1
+ * @bps_dev_intf: Device interface for BPS
+ * @ipe_clk_state: IPE clock state flag
+ * @bps_clk_state: BPS clock state flag
  */
 struct cam_icp_hw_mgr {
 	struct mutex hw_mgr_mutex;
@@ -295,6 +314,7 @@ struct cam_icp_hw_mgr {
 	struct dentry *dentry;
 	bool a5_debug;
 	bool icp_pc_flag;
+	bool ipe_bps_pc_flag;
 	uint64_t icp_debug_clk;
 	uint64_t icp_default_clk;
 	struct cam_icp_clk_info clk_info[ICP_CLK_HW_MAX];
@@ -310,6 +330,8 @@ struct cam_icp_hw_mgr {
 	struct cam_hw_intf *ipe0_dev_intf;
 	struct cam_hw_intf *ipe1_dev_intf;
 	struct cam_hw_intf *bps_dev_intf;
+	bool ipe_clk_state;
+	bool bps_clk_state;
 };
 
 static int cam_icp_mgr_hw_close(void *hw_priv, void *hw_close_args);
