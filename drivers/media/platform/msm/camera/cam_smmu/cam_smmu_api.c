@@ -434,7 +434,7 @@ static int cam_smmu_iommu_fault_handler(struct iommu_domain *domain,
 		CAM_ERR(CAM_SMMU, "Error: domain = %pK, device = %pK",
 			domain, dev);
 		CAM_ERR(CAM_SMMU, "iova = %lX, flags = %d", iova, flags);
-		return 0;
+		return -EINVAL;
 	}
 
 	cb_name = (char *)token;
@@ -448,12 +448,12 @@ static int cam_smmu_iommu_fault_handler(struct iommu_domain *domain,
 		CAM_ERR(CAM_SMMU,
 			"Error: index is not valid, index = %d, token = %s",
 			idx, cb_name);
-		return 0;
+		return -EINVAL;
 	}
 
 	payload = kzalloc(sizeof(struct cam_smmu_work_payload), GFP_ATOMIC);
 	if (!payload)
-		return 0;
+		return -EINVAL;
 
 	payload->domain = domain;
 	payload->dev = dev;
@@ -468,7 +468,7 @@ static int cam_smmu_iommu_fault_handler(struct iommu_domain *domain,
 
 	schedule_work(&iommu_cb_set.smmu_work);
 
-	return 0;
+	return -EINVAL;
 }
 
 static int cam_smmu_translate_dir_to_iommu_dir(
@@ -2384,7 +2384,7 @@ int cam_smmu_map_user_iova(int handle, int ion_fd,
 	if (buf_state == CAM_SMMU_BUFF_EXIST) {
 		CAM_ERR(CAM_SMMU,
 			"ion_fd: %d already in the list", ion_fd);
-		rc = -EALREADY;
+		rc = 0;
 		goto get_addr_end;
 	}
 
@@ -2444,7 +2444,7 @@ int cam_smmu_map_kernel_iova(int handle, struct dma_buf *buf,
 	if (buf_state == CAM_SMMU_BUFF_EXIST) {
 		CAM_ERR(CAM_SMMU,
 			"dma_buf :%pK already in the list", buf);
-		rc = -EALREADY;
+		rc = 0;
 		goto get_addr_end;
 	}
 
@@ -3140,12 +3140,10 @@ static int cam_populate_smmu_context_banks(struct device *dev,
 		CAM_ERR(CAM_SMMU, "Error: failed to setup cb : %s", cb->name);
 		goto cb_init_fail;
 	}
-
 	if (cb->io_support && cb->mapping)
 		iommu_set_fault_handler(cb->mapping->domain,
 			cam_smmu_iommu_fault_handler,
 			(void *)cb->name);
-
 	/* increment count to next bank */
 	iommu_cb_set.cb_init_count++;
 

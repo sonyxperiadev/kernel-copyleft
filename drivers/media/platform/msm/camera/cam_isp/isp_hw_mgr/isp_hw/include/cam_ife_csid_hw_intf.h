@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _CAM_CSID_HW_INTF_H_
 #define _CAM_CSID_HW_INTF_H_
@@ -75,7 +80,6 @@ struct cam_ife_csid_hw_caps {
  * @cid:          cid (DT_ID) value for path, this is applicable for CSID path
  *                reserve
  * @node_res :    Reserved resource structure pointer
- * @pixel_count:  Number of pixel resources
  *
  */
 struct cam_csid_hw_reserve_resource_args {
@@ -87,7 +91,6 @@ struct cam_csid_hw_reserve_resource_args {
 	uint32_t                                  master_idx;
 	uint32_t                                  cid;
 	struct cam_isp_resource_node             *node_res;
-	int                                       pixel_count;
 };
 
 /**

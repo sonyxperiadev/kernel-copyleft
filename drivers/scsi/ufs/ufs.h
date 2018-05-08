@@ -32,6 +32,11 @@
  * any damages of any kind arising from your use or distribution of
  * this program.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _UFS_H
 #define _UFS_H
@@ -155,6 +160,7 @@ enum ufs_desc_def_size {
 	QUERY_DESC_INTERCONNECT_DEF_SIZE	= 0x06,
 	QUERY_DESC_GEOMETRY_DEF_SIZE		= 0x44,
 	QUERY_DESC_POWER_DEF_SIZE		= 0x62,
+	QUERY_DESC_DEVICE_HEALTH_DEF_SIZE	= 0x25,
 };
 
 /* Unit descriptor parameters offsets in bytes*/
@@ -206,6 +212,14 @@ enum device_desc_param {
 	DEVICE_DESC_PARAM_UD_LEN		= 0x1B,
 	DEVICE_DESC_PARAM_RTT_CAP		= 0x1C,
 	DEVICE_DESC_PARAM_FRQ_RTC		= 0x1D,
+	DEVICE_DESC_PARAM_FFU_SUPPORT		= 0x1F,
+	DEVICE_DESC_PARAM_FFU_TIMEOUT		= 0x20,
+	DEVICE_DESC_PARAM_QUEUE_DEPTH		= 0x21,
+	DEVICE_DESC_PARAM_DEVICE_VER		= 0x22,
+	DEVICE_DESC_PARAM_NUM_SEC_WP_AREA	= 0x24,
+	DEVICE_DESC_PARAM_PSM_MAX_DATA_SIZE	= 0x25,
+	DEVICE_DESC_PARAM_PSA_STATE_TIMEOUT	= 0x29,
+	DEVICE_DESC_PARAM_PRODUCT_REVISION	= 0x2A,
 };
 /*
  * Logical Unit Write Protect
@@ -505,6 +519,8 @@ struct ufs_dev_info {
 	u8	b_device_sub_class;
 	u16	w_manufacturer_id;
 	u8	i_product_name;
+	u16	specver;
+	u8	revision;
 
 	/* query flags */
 	bool f_power_on_wp_en;

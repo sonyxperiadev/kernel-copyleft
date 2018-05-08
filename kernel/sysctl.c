@@ -17,6 +17,11 @@
  * The list_for_each() macro wasn't appropriate for the sysctl loop.
  *  Removed it and replaced it with older style, 03/23/00, Bill Wendling
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/aio.h>
@@ -1573,6 +1578,15 @@ static struct ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= watermark_scale_factor_sysctl_handler,
 		.extra1		= &one,
+		.extra2		= &one_thousand,
+	},
+	{
+		.procname	= "watermark_high_factor_slope",
+		.data		= &watermark_high_factor_slope,
+		.maxlen		= sizeof(watermark_high_factor_slope),
+		.mode		= 0644,
+		.proc_handler	= watermark_scale_factor_sysctl_handler,
+		.extra1		= &one_hundred,
 		.extra2		= &one_thousand,
 	},
 	{

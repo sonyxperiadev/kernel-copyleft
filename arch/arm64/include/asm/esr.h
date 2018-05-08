@@ -152,6 +152,10 @@
 
 #define ESR_ELx_SYS64_ISS_SYS_OP_MASK	(ESR_ELx_SYS64_ISS_SYS_MASK | \
 					 ESR_ELx_SYS64_ISS_DIR_MASK)
+
+#define ESR_ELx_SYS64_ISS_SYS_CNTVCT	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 2, 14, 0) | \
+					 ESR_ELx_SYS64_ISS_DIR_READ)
+
 /*
  * User space cache operations have the following sysreg encoding
  * in System instructions.
@@ -173,6 +177,9 @@
 
 #define ESR_ELx_SYS64_ISS_SYS_CTR	ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 1, 0, 0)
 #define ESR_ELx_SYS64_ISS_SYS_CTR_READ	(ESR_ELx_SYS64_ISS_SYS_CTR | \
+					 ESR_ELx_SYS64_ISS_DIR_READ)
+
+#define ESR_ELx_SYS64_ISS_SYS_CNTFRQ	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 0, 14, 0) | \
 					 ESR_ELx_SYS64_ISS_DIR_READ)
 
 #ifndef __ASSEMBLY__

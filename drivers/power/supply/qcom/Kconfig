@@ -102,4 +102,25 @@ config QPNP_TYPEC
 	  USB power-delivery. The driver adds support to report these type-C
 	  parameters via the power-supply framework.
 
+config QNS_SYSTEM
+	bool "Qnovo QNS wrapper implementation"
+	default n
+	help
+	  Say Y here to enable support for QNS system.
+	  QNS is a battery charging controller and it necessary to access a
+	  kernel driver for a battery charging.
+	  This adds sysfs interface which enables QNS daemon to access it.
+
+config SOMC_CHARGER_EXTENSION
+	bool "Charger driver extension"
+	help
+	  Say Y here to enable extensional function of charger driver.
+
+config IDTP9221
+	bool "CONFIG_IDTP9221 driver"
+	depends on I2C
+	help
+	  Say Y here to enable the IDT P9221 wireless charging driver.
+	  The driver supports charger enable/disable.
+
 endmenu

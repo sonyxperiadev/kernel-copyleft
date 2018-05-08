@@ -813,6 +813,54 @@ config QPNP_MISC
 	  and the driver provides an API to check if this interrupt
 	  is available on the current PMIC chip.
 
+config SIM_DETECT
+	tristate "SIM_DETECT driver support"
+	default n
+	help
+	Say Y here
+	  if you want to support SIM_DETECT as detection device.
+	  This driver can be used for sending notifications via
+	  switch_class when sim card is inserted or removed.
+
+config RAMDUMP_TAGS
+	bool "Ramdump tags to communicate between kernel and ramdump"
+	default n
+	depends on !RAMDUMP_CRASH_LOGS
+	help
+	  This option enables a driver which can be interacted with to
+	  supply the ramdumper with more information about the current
+	  state of the crashing kernel such as build info, HWWD registers,
+	  additional CPU registers not stored in crash_notes, crashing
+	  application info etc. A small amount of memory will be set
+	  aside to hold the information which will later be used by
+	  the ramdump application.
+
+config RAMDUMP_MEMDESC
+	bool "Ramdump memory descriptors"
+	default n
+	help
+	  This is a ramdump_mem_desc driver which adds the
+	  memory descriptors in Normal mode into a piece of debug memory
+	  and split the contents and exports it as /proc/mem_desc
+	  in Ramdump mode to support ramdump functionality
+
+config POWERKEY_FORCECRASH
+	tristate "Force a crash on powerkey long press"
+	default n
+	help
+	  Say Y here if you want force crash functionality through power
+	  key. Triggers panic if power key is hold for more than 10secs.
+
+config ONESEG_TUNER_SMTVJ19X
+	tristate "ONESEG tuner driver for SMT-VJ19x"
+	default n
+	depends on SPI
+	help
+	  Select this module to enable 1seg Tuner Driver which supports
+	  1seg contents viewing.
+	  This module controls power switching and reset switching of
+	  SMT-VJ19x.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
@@ -825,4 +873,5 @@ source "drivers/misc/mic/Kconfig"
 source "drivers/misc/genwqe/Kconfig"
 source "drivers/misc/echo/Kconfig"
 source "drivers/misc/cxl/Kconfig"
+source "drivers/misc/mm_tuner/Kconfig"
 endmenu

@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  * Secure-Processor-Communication (SPCOM).
@@ -1044,7 +1049,7 @@ static int spcom_get_next_request_size(struct spcom_channel *ch)
 	mutex_lock(&ch->lock); /* re-lock after waiting */
 	/* Check Rx Abort on SP reset */
 	if (ch->rx_abort) {
-		pr_err("rx aborted.\n");
+		pr_err("rx aborted, ch [%s].\n", ch->name);
 		goto exit_error;
 	}
 
@@ -1091,13 +1096,14 @@ static void spcom_rx_abort_pending_server(void)
 		if (!ch->is_server)
 			continue;
 
-		/* The server might not be connected to a client.
-		 * Don't check if connected, only if open.
+		/* The ch REMOTE_DISCONNECT notification happens before
+		 * the LINK_DOWN notification,
+		 * so the channel is already closed.
 		 */
-		if (!spcom_is_channel_open(ch) || (ch->rx_abort))
+		if (ch->rx_abort)
 			continue;
 
-		pr_debug("rx-abort server ch [%s].\n", ch->name);
+		pr_err("rx-abort server ch [%s].\n", ch->name);
 		ch->rx_abort = true;
 		complete_all(&ch->rx_done);
 	}
@@ -2820,7 +2826,7 @@ static int __init spcom_init(void)
 {
 	int ret;
 
-	pr_info("spcom driver version 1.2 23-Aug-2017.\n");
+	pr_info("spcom driver version 1.3 28-Dec-2017.\n");
 
 	ret = platform_driver_register(&spcom_driver);
 	if (ret)

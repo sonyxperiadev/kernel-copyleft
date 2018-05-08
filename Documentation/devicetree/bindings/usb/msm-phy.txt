@@ -163,7 +163,6 @@ Optional properties:
    "tcsr_clamp_dig_n" : To enable/disable digital clamp to the phy. When
    de-asserted, it will prevent random leakage from qusb2 phy resulting from
    out of sequence turn on/off of 1p8, 3p3 and DVDD regulators.
-   "refgen_north_bg_reg" : address used to read REFGEN status for overriding QUSB PHY register.
  - clocks: a list of phandles to the PHY clocks. Use as per
    Documentation/devicetree/bindings/clock/clock-bindings.txt
  - clock-names: Names of the clocks in 1-1 correspondence with the "clocks"

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
@@ -140,7 +145,7 @@ int ipa_rm_inactivity_timer_init(enum ipa_rm_resource_name resource_name,
 	ipa_rm_it_handles[resource_name].work_in_progress = false;
 	pwlock = &(ipa_rm_it_handles[resource_name].w_lock);
 	name = ipa_rm_it_handles[resource_name].w_lock_name;
-	snprintf(name, MAX_WS_NAME, "IPA_RM%d\n", resource_name);
+	snprintf(name, MAX_WS_NAME, "IPA_RM%d", resource_name);
 	wakeup_source_init(pwlock, name);
 	INIT_DELAYED_WORK(&ipa_rm_it_handles[resource_name].work,
 			  ipa_rm_inactivity_timer_func);

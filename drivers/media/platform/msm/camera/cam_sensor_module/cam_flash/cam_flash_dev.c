@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include "cam_flash_dev.h"
@@ -82,7 +87,8 @@ static int32_t cam_flash_driver_cmd(struct cam_flash_ctrl *fctrl,
 	}
 	case CAM_RELEASE_DEV: {
 		CAM_DBG(CAM_FLASH, "CAM_RELEASE_DEV");
-		if (fctrl->flash_state != CAM_FLASH_STATE_ACQUIRE) {
+		if ((fctrl->flash_state == CAM_FLASH_STATE_INIT) ||
+			(fctrl->flash_state == CAM_FLASH_STATE_START)) {
 			CAM_WARN(CAM_FLASH,
 				"Cannot apply Release dev: Prev state:%d",
 				fctrl->flash_state);
@@ -131,7 +137,8 @@ static int32_t cam_flash_driver_cmd(struct cam_flash_ctrl *fctrl,
 	}
 	case CAM_START_DEV: {
 		CAM_DBG(CAM_FLASH, "CAM_START_DEV");
-		if (fctrl->flash_state != CAM_FLASH_STATE_CONFIG) {
+		if ((fctrl->flash_state == CAM_FLASH_STATE_INIT) ||
+			(fctrl->flash_state == CAM_FLASH_STATE_START)) {
 			CAM_WARN(CAM_FLASH,
 				"Cannot apply Start Dev: Prev state: %d",
 				fctrl->flash_state);

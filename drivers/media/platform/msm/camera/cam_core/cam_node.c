@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/debugfs.h>
 #include <linux/videodev2.h>
@@ -220,7 +225,7 @@ static int __cam_node_handle_flush_dev(struct cam_node *node,
 
 	rc = cam_context_handle_flush_dev(ctx, flush);
 	if (rc)
-		CAM_ERR(CAM_CORE, "FLush failure for node %s", node->name);
+		CAM_ERR(CAM_CORE, "Flush failure for node %s", node->name);
 
 	return rc;
 }

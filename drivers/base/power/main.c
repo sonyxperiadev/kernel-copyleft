@@ -16,6 +16,11 @@
  * domain dependencies may differ from the ancestral dependencies that the
  * subsystem list maintains.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/device.h>
 #include <linux/kallsyms.h>
@@ -34,6 +39,10 @@
 #include <linux/cpuidle.h>
 #include <linux/timer.h>
 #include <linux/wakeup_reason.h>
+#ifdef CONFIG_PM_WAKEUP_TIMES
+#include <linux/math64.h>
+#include <linux/wait.h>
+#endif
 
 #include "../base.h"
 #include "power.h"
@@ -57,6 +66,11 @@ static LIST_HEAD(dpm_late_early_list);
 static LIST_HEAD(dpm_noirq_list);
 
 struct suspend_stats suspend_stats;
+#ifdef CONFIG_PM_WAKEUP_TIMES
+struct suspend_stats_queue suspend_stats_queue;
+static ktime_t suspend_start_time;
+static ktime_t resume_start_time;
+#endif
 static DEFINE_MUTEX(dpm_list_mtx);
 static pm_message_t pm_transition;
 
@@ -375,6 +389,100 @@ static void dpm_show_time(ktime_t starttime, pm_message_t state, char *info)
 		info ?: "", info ? " " : "", pm_verb(state.event),
 		usecs / USEC_PER_MSEC, usecs % USEC_PER_MSEC);
 }
+
+#ifdef CONFIG_PM_WAKEUP_TIMES
+void dpm_log_start_time(pm_message_t state)
+{
+	switch (state.event) {
+	case PM_EVENT_RESUME:
+		resume_start_time = ktime_get_boottime();
+		break;
+	case PM_EVENT_SUSPEND:
+		suspend_start_time = ktime_get_boottime();
+		break;
+	default:
+		break;
+	}
+}
+EXPORT_SYMBOL_GPL(dpm_log_start_time);
+
+void dpm_log_wakeup_stats(pm_message_t state)
+{
+	ktime_t *start_time, *avg_time, end_time, duration, prev_duration, sum;
+	struct stats_wakeup_time *min_time, *max_time, *last_time, prev;
+	u64 avg_ns;
+	char buf[32] = {0};
+	unsigned int nr = 0;
+
+	switch (state.event) {
+	case PM_EVENT_RESUME:
+		snprintf(buf, sizeof(buf), "%s", "resume time:");
+		start_time = &resume_start_time;
+		min_time = &suspend_stats.resume_min_time;
+		max_time = &suspend_stats.resume_max_time;
+		last_time = &suspend_stats.resume_last_time;
+		avg_time = &suspend_stats.resume_avg_time;
+		break;
+	case PM_EVENT_SUSPEND:
+		snprintf(buf, sizeof(buf), "%s", "suspend time:");
+		start_time = &suspend_start_time;
+		min_time = &suspend_stats.suspend_min_time;
+		max_time = &suspend_stats.suspend_max_time;
+		last_time = &suspend_stats.suspend_last_time;
+		avg_time = &suspend_stats.suspend_avg_time;
+		break;
+	default:
+		return;
+	}
+
+	if (!ktime_to_ns(*start_time))
+		return;
+
+	/* Calculate duration and update last time */
+	end_time = ktime_get_boottime();
+	prev = *last_time;
+	prev_duration = ktime_sub(prev.end, prev.start);
+	last_time->end = end_time;
+	last_time->start = *start_time;
+	duration = ktime_sub(end_time, *start_time);
+
+	/* Update max time */
+	if (ktime_compare(duration,
+		ktime_sub(max_time->end, max_time->start)) > 0)
+		*max_time = *last_time;
+
+	/* Update min time */
+	if (!ktime_to_ns(ktime_sub(min_time->end, min_time->start)))
+		*min_time = *last_time;
+
+	if (ktime_compare(duration,
+		ktime_sub(min_time->end, min_time->start)) < 0)
+		*min_time = *last_time;
+
+	/* Compute the avg of current, previous and previous average times */
+	if (ktime_to_ns(prev_duration))
+		nr++;
+
+	if (ktime_to_ns(*avg_time))
+		nr++;
+
+	sum = ktime_add(ktime_add(*avg_time, prev_duration), duration);
+	avg_ns = div_u64(ktime_to_ns(sum), (nr + 1));
+	*avg_time = ktime_set(0, avg_ns);
+	*start_time = ktime_set(0, 0);
+
+	pr_debug("%s\n%s  %llums\n%s  %llums\n %s  %llums\n%s %llums\n", buf,
+			"  min:",
+			ktime_to_ms(ktime_sub(min_time->end, min_time->start)),
+			"  max:",
+			ktime_to_ms(ktime_sub(max_time->end, max_time->start)),
+			"  last:", ktime_to_ms(duration),
+			"  avg:", ktime_to_ms(*avg_time));
+	suspend_stats_queue.resume_done = 1;
+	wake_up(&suspend_stats_queue.wait_queue);
+}
+EXPORT_SYMBOL_GPL(dpm_log_wakeup_stats);
+#endif
 
 static int dpm_run_callback(pm_callback_t cb, struct device *dev,
 			    pm_message_t state, char *info)
