@@ -3107,6 +3107,17 @@ static void smblib_somc_wlc_fake_charging_work(struct work_struct *work)
 	struct smb_charger *chg = container_of(work, struct smb_charger,
 						wireless_wa_fake_charging_work);
 
+	rc = smblib_get_prop_batt_status(chg, &pval);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't read batt_status rc=%d\n", rc);
+		return;
+	}
+	if (pval.intval != POWER_SUPPLY_STATUS_CHARGING &&
+			pval.intval != POWER_SUPPLY_STATUS_FULL) {
+		smblib_dbg(chg, PR_SOMC, "don't enforce wireless fake\n");
+		return;
+	}
+
 	chg->wireless_wa_fake_charging = true;
 	smblib_dbg(chg, PR_SOMC, "wireless fake phase-1 is started.\n");
 	msleep(WIRELESS_WA_1ST_FAKE_TIME_MS);

@@ -2723,12 +2723,14 @@ static int icnss_service_notifier_notify(struct notifier_block *nb,
 
 	icnss_pr_info("PD service down, pd_state: %d, state: 0x%lx: cause: %s\n",
 		      *state, priv->state, icnss_pdr_cause[cause]);
-	memset(priv->crash_reason, 0, sizeof(priv->crash_reason));
-	snprintf(priv->crash_reason, sizeof(priv->crash_reason),
+	if (*state == USER_PD_STATE_CHANGE) {
+		memset(priv->crash_reason, 0, sizeof(priv->crash_reason));
+		snprintf(priv->crash_reason, sizeof(priv->crash_reason),
 		 "PD service down, pd_state: %d, state: 0x%lx: cause: %s\n",
 		 *state, priv->state, icnss_pdr_cause[cause]);
-	priv->data_ready = 1;
-	wake_up(&priv->wlan_pdr_debug_q);
+		priv->data_ready = 1;
+		wake_up(&priv->wlan_pdr_debug_q);
+	}
 
 event_post:
 	if (!test_bit(ICNSS_FW_DOWN, &priv->state)) {
