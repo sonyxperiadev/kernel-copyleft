@@ -11,6 +11,11 @@
  *
  * This software is licensed under the GNU GPL version 2.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __LINUX_USB_GADGET_H
 #define __LINUX_USB_GADGET_H
@@ -520,6 +525,7 @@ struct usb_gadget {
 	unsigned			is_selfpowered:1;
 	unsigned			deactivated:1;
 	unsigned			connected:1;
+	bool				l1_supported;
 	bool				remote_wakeup;
 };
 #define work_to_gadget(w)	(container_of((w), struct usb_gadget, work))

@@ -62,6 +62,7 @@ Currently, these files are in /proc/sys/vm:
 - user_reserve_kbytes
 - vfs_cache_pressure
 - watermark_scale_factor
+- watermark_high_factor_slope
 - zone_reclaim_mode
 
 ==============================================================
@@ -836,6 +837,20 @@ going to sleep prematurely (kswapd_low_wmark_hit_quickly) can indicate
 that the number of free pages kswapd maintains for latency reasons is
 too small for the allocation bursts occurring in the system. This knob
 can then be used to tune kswapd aggressiveness accordingly.
+
+=============================================================
+
+watermark_high_factor_slope:
+
+This factor is high mark for watermark_scale_factor.
+The unit is in percent.
+Max value is 1000 and min value is 100. (High watermark is the same as
+low water mark) Low watermark is min_wmark_pages + watermark_scale_factor.
+and high watermark is
+min_wmark_pages+(watermark_scale_factor * watermark_high_factor_slope).
+
+The default value is 200.
+
 
 ==============================================================
 

@@ -48,6 +48,11 @@
  * MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __SND_COMPRESS_PARAMS_H
 #define __SND_COMPRESS_PARAMS_H
 
@@ -106,7 +111,8 @@
 #define SND_AUDIOCODEC_DSD                   ((__u32) 0x00000022)
 #define SND_AUDIOCODEC_APTX                  ((__u32) 0x00000023)
 #define SND_AUDIOCODEC_TRUEHD                ((__u32) 0x00000024)
-#define SND_AUDIOCODEC_MAX                   SND_AUDIOCODEC_TRUEHD
+#define SND_AUDIOCODEC_LDAC                  ((__u32) 0x00000025)
+#define SND_AUDIOCODEC_MAX                   SND_AUDIOCODEC_LDAC
 
 /*
  * Profile and modes are listed with bit masks. This allows for a

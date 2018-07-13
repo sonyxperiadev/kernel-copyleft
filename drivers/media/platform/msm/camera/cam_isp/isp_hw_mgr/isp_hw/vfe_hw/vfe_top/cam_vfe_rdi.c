@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include "cam_vfe_rdi.h"
@@ -209,7 +214,6 @@ static int cam_vfe_rdi_handle_irq_bottom_half(void *handler_priv,
 			CAM_DBG(CAM_ISP, "Received REG UPDATE");
 			ret = CAM_VFE_IRQ_STATUS_SUCCESS;
 		}
-		cam_vfe_put_evt_payload(payload->core_info, &payload);
 		break;
 	default:
 		break;

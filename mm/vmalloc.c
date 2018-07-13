@@ -286,6 +286,7 @@ EXPORT_SYMBOL(vmalloc_to_pfn);
 /*** Global kva allocator ***/
 
 #define VM_VM_AREA	0x04
+#define VM_LAZY_FREE_DEFER	0x08
 
 static DEFINE_SPINLOCK(vmap_area_lock);
 /* Export for kexec only */
@@ -503,6 +504,20 @@ nocache:
 		if (addr + size < addr)
 			goto overflow;
 
+		/*
+		 * Put on hold this VA preventing it from being
+		 * removed from the list because of dropping the
+		 * vmap_area_lock. It means we are save to proceed
+		 * the search after the lock is taken again if we
+		 * were scheduled out.
+		 */
+		if (gfpflags_allow_blocking(gfp_mask) &&
+				!(first->flags & VM_LAZY_FREE_DEFER)) {
+			first->flags |= VM_LAZY_FREE_DEFER;
+			cond_resched_lock(&vmap_area_lock);
+			first->flags &= ~VM_LAZY_FREE_DEFER;
+		}
+
 		if (list_is_last(&first->list, &vmap_area_list))
 			goto found;
 
@@ -598,16 +613,6 @@ static void __free_vmap_area(struct vmap_area *va)
 }
 
 /*
- * Free a region of KVA allocated by alloc_vmap_area
- */
-static void free_vmap_area(struct vmap_area *va)
-{
-	spin_lock(&vmap_area_lock);
-	__free_vmap_area(va);
-	spin_unlock(&vmap_area_lock);
-}
-
-/*
  * Clear the pagetable entries of a given vmap_area
  */
 static void unmap_vmap_area(struct vmap_area *va)
@@ -690,6 +695,7 @@ static bool __purge_vmap_area_lazy(unsigned long start, unsigned long end)
 	struct vmap_area *va;
 	struct vmap_area *n_va;
 	bool do_free = false;
+	int va_nr_pages;
 
 	lockdep_assert_held(&vmap_purge_lock);
 
@@ -709,10 +715,19 @@ static bool __purge_vmap_area_lazy(unsigned long start, unsigned long end)
 
 	spin_lock(&vmap_area_lock);
 	llist_for_each_entry_safe(va, n_va, valist, purge_list) {
-		int nr = (va->va_end - va->va_start) >> PAGE_SHIFT;
+		if (unlikely(va->flags & VM_LAZY_FREE_DEFER)) {
+			/*
+			 * Put deferred VA back to the vmap_purge_list.
+			 * We do not need to modify vmap_lazy_nr since
+			 * the va will not be removed now.
+			 */
+			llist_add(&va->purge_list, &vmap_purge_list);
+			continue;
+		}
 
+		va_nr_pages = (va->va_end - va->va_start) >> PAGE_SHIFT;
 		__free_vmap_area(va);
-		atomic_sub(nr, &vmap_lazy_nr);
+		atomic_sub(va_nr_pages, &vmap_lazy_nr);
 		cond_resched_lock(&vmap_area_lock);
 	}
 	spin_unlock(&vmap_area_lock);
@@ -759,6 +774,24 @@ static void free_vmap_area_noflush(struct vmap_area *va)
 
 	if (unlikely(nr_lazy > lazy_max_pages()))
 		try_purge_vmap_area_lazy();
+}
+
+/*
+ * Free a region of KVA allocated by alloc_vmap_area
+ */
+static void free_vmap_area(struct vmap_area *va)
+{
+	bool do_lazy_free = false;
+
+	spin_lock(&vmap_area_lock);
+	if (unlikely(va->flags & VM_LAZY_FREE_DEFER))
+		do_lazy_free = true;
+	else
+		__free_vmap_area(va);
+	spin_unlock(&vmap_area_lock);
+
+	if (unlikely(do_lazy_free))
+		free_vmap_area_noflush(va);
 }
 
 /*

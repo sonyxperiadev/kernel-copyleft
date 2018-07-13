@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef UAPI_UFS_IOCTL_H_
 #define UAPI_UFS_IOCTL_H_
 
@@ -8,6 +13,7 @@
  *  SCSI_IOCTL_GET_PCI
  */
 #define UFS_IOCTL_QUERY			0x5388
+#define UFS_IOCTL_WRITE_BUFFER	0x53EF
 
 /**
  * struct ufs_ioctl_query_data - used to transfer data to and from user via ioctl
@@ -51,6 +57,11 @@ struct ufs_ioctl_query_data {
 	 * For Read/Write Attribute you will have to allocate 4 bytes
 	 * For Read/Write Flag you will have to allocate 1 byte
 	 */
+	__u8 buffer[0];
+};
+
+struct ufs_ioctl_write_buffer_data {
+	__u32 buf_size;
 	__u8 buffer[0];
 };
 

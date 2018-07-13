@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/ratelimit.h>
@@ -60,7 +65,7 @@ static const char drv_name[] = "vfe_bus";
 static uint32_t bus_error_irq_mask[3] = {
 	0x7800,
 	0x0000,
-	0x00C0,
+	0x0040,
 };
 
 enum cam_vfe_bus_packer_format {
@@ -106,6 +111,7 @@ struct cam_vfe_bus_ver2_common_data {
 	struct cam_vfe_bus_irq_evt_payload          evt_payload[
 		CAM_VFE_BUS_VER2_PAYLOAD_MAX];
 	struct list_head                            free_payload_list;
+	spinlock_t                                  spin_lock;
 	struct mutex                                bus_mutex;
 	uint32_t                                    secure_mode;
 	uint32_t                                    num_sec_out;
@@ -214,16 +220,23 @@ static int cam_vfe_bus_get_evt_payload(
 	struct cam_vfe_bus_ver2_common_data  *common_data,
 	struct cam_vfe_bus_irq_evt_payload  **evt_payload)
 {
+	int rc;
+
+	spin_lock(&common_data->spin_lock);
 	if (list_empty(&common_data->free_payload_list)) {
 		*evt_payload = NULL;
 		CAM_ERR_RATE_LIMIT(CAM_ISP, "No free payload");
-		return -ENODEV;
+		rc = -ENODEV;
+		goto done;
 	}
 
 	*evt_payload = list_first_entry(&common_data->free_payload_list,
 		struct cam_vfe_bus_irq_evt_payload, list);
 	list_del_init(&(*evt_payload)->list);
-	return 0;
+	rc = 0;
+done:
+	spin_unlock(&common_data->spin_lock);
+	return rc;
 }
 
 static enum cam_vfe_bus_comp_grp_id
@@ -254,6 +267,7 @@ static int cam_vfe_bus_put_evt_payload(void     *core_info,
 	struct cam_vfe_bus_ver2_common_data *common_data = NULL;
 	uint32_t  *ife_irq_regs = NULL;
 	uint32_t   status_reg0, status_reg1, status_reg2;
+	unsigned long flags;
 
 	if (!core_info) {
 		CAM_ERR(CAM_ISP, "Invalid param core_info NULL");
@@ -276,8 +290,12 @@ static int cam_vfe_bus_put_evt_payload(void     *core_info,
 	}
 
 	common_data = core_info;
+
+	spin_lock_irqsave(&common_data->spin_lock, flags);
 	list_add_tail(&(*evt_payload)->list,
 		&common_data->free_payload_list);
+	spin_unlock_irqrestore(&common_data->spin_lock, flags);
+
 	*evt_payload = NULL;
 
 	return 0;
@@ -987,7 +1005,7 @@ static int cam_vfe_bus_acquire_wm(
 		rsrc_data->height = 0;
 		rsrc_data->stride = 1;
 		rsrc_data->en_cfg = 0x3;
-	}  else if (rsrc_data->index == 9) {
+	}  else if (rsrc_data->index == 9 || rsrc_data->index == 10) {
 		/* Write master 9 - Raw dump */
 		rsrc_data->width = rsrc_data->width * 2;
 		rsrc_data->stride = rsrc_data->width;
@@ -2324,8 +2342,6 @@ static int cam_vfe_bus_error_irq_top_half(uint32_t evt_id,
 	}
 	cam_irq_controller_disable_irq(bus_priv->common_data.bus_irq_controller,
 		bus_priv->error_irq_handle);
-	cam_irq_controller_clear_and_mask(evt_id,
-		bus_priv->common_data.bus_irq_controller);
 
 	/* Returning error stops from enqueuing bottom half */
 	return -EFAULT;
@@ -2558,8 +2574,21 @@ static int cam_vfe_bus_update_wm(void *priv, void *cmd_args,
 		CAM_DBG(CAM_ISP, "WM %d image address 0x%x",
 			wm_data->index, reg_val_pair[j-1]);
 
-		frame_inc = io_cfg->planes[i].plane_stride *
-			io_cfg->planes[i].slice_height;
+		if (wm_data->en_ubwc) {
+			frame_inc = ALIGNUP(io_cfg->planes[i].plane_stride *
+			    io_cfg->planes[i].slice_height, 4096);
+			frame_inc += io_cfg->planes[i].meta_size;
+			CAM_DBG(CAM_ISP,
+				"WM %d frm %d: ht: %d stride %d meta: %d",
+				wm_data->index, frame_inc,
+				io_cfg->planes[i].slice_height,
+				io_cfg->planes[i].plane_stride,
+				io_cfg->planes[i].meta_size);
+		} else {
+			frame_inc = io_cfg->planes[i].plane_stride *
+				io_cfg->planes[i].slice_height;
+		}
+
 		CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, j,
 			wm_data->hw_regs->frame_inc, frame_inc);
 		CAM_DBG(CAM_ISP, "WM %d frame_inc %d",
@@ -2977,6 +3006,7 @@ int cam_vfe_bus_ver2_init(
 		}
 	}
 
+	spin_lock_init(&bus_priv->common_data.spin_lock);
 	INIT_LIST_HEAD(&bus_priv->common_data.free_payload_list);
 	for (i = 0; i < CAM_VFE_BUS_VER2_PAYLOAD_MAX; i++) {
 		INIT_LIST_HEAD(&bus_priv->common_data.evt_payload[i].list);

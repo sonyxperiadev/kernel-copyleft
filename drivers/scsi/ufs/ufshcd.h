@@ -33,6 +33,11 @@
  * any damages of any kind arising from your use or distribution of
  * this program.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _UFSHCD_H
 #define _UFSHCD_H
@@ -256,6 +261,7 @@ struct ufs_desc_size {
 	int interc_desc;
 	int unit_desc;
 	int conf_desc;
+	int dev_health_desc;
 };
 
 /**
@@ -565,6 +571,9 @@ struct debugfs_files {
 	struct fault_attr fail_attr;
 #endif
 	bool is_sys_suspended;
+	struct dentry *fw_revision;
+	struct dentry *dump_dev_health_desc;
+	struct dentry *serial;
 };
 
 /* tag stats statistics types */
@@ -1192,6 +1201,7 @@ out:
 }
 
 int ufshcd_read_device_desc(struct ufs_hba *hba, u8 *buf, u32 size);
+int ufshcd_read_device_health_desc(struct ufs_hba *hba, u8 *buf, u32 size);
 
 static inline bool ufshcd_is_hs_mode(struct ufs_pa_layer_attr *pwr_info)
 {

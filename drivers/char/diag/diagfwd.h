@@ -26,7 +26,7 @@
 #define GET_PD_CTXT(u)		((u & 0xFF000000) >> 24)
 
 #define CHK_OVERFLOW(bufStart, start, end, length) \
-	((((bufStart) <= (start)) && ((end) - (start) >= (length))) ? 1 : 0)
+((((bufStart) <= (start)) && (end - start >= (length)) && (length > 0)) ? 1 : 0)
 
 int diagfwd_init(void);
 void diagfwd_exit(void);

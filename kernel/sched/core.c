@@ -25,6 +25,11 @@
  *  2007-11-29  RT balancing improvements by Steven Rostedt, Gregory Haskins,
  *              Thomas Gleixner, Mike Kravetz
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kasan.h>
 #include <linux/mm.h>
@@ -161,6 +166,10 @@ int sysctl_sched_rt_runtime = 950000;
 
 /* cpus with isolated domains */
 cpumask_var_t cpu_isolated_map;
+
+#ifdef CONFIG_NO_HZ_COMMON
+DEFINE_PER_CPU(atomic_t, claim_wake_up_cpu) = ATOMIC_INIT(0);
+#endif
 
 struct rq *
 lock_rq_of(struct task_struct *p, struct rq_flags *flags)
@@ -1020,14 +1029,15 @@ static struct rq *move_queued_task(struct rq *rq, struct task_struct *p, int new
 
 	p->on_rq = TASK_ON_RQ_MIGRATING;
 	dequeue_task(rq, p, 0);
-	double_lock_balance(rq, cpu_rq(new_cpu));
+	walt_prepare_migrate(p, cpu_of(rq), new_cpu, true);
 	set_task_cpu(p, new_cpu);
-	double_rq_unlock(cpu_rq(new_cpu), rq);
+	raw_spin_unlock(&rq->lock);
 
 	rq = cpu_rq(new_cpu);
 
 	raw_spin_lock(&rq->lock);
 	BUG_ON(task_cpu(p) != new_cpu);
+	walt_finish_migrate(p, cpu_of(rq), new_cpu, true);
 	enqueue_task(rq, p, 0);
 	p->on_rq = TASK_ON_RQ_QUEUED;
 	check_preempt_curr(rq, p, 0);
@@ -1289,8 +1299,6 @@ void set_task_cpu(struct task_struct *p, unsigned int new_cpu)
 			p->sched_class->migrate_task_rq(p);
 		p->se.nr_migrations++;
 		perf_event_task_migrate(p);
-
-		fixup_busy_time(p, new_cpu);
 	}
 
 	__set_task_cpu(p, new_cpu);
@@ -1306,7 +1314,9 @@ static void __migrate_swap_task(struct task_struct *p, int cpu)
 
 		p->on_rq = TASK_ON_RQ_MIGRATING;
 		deactivate_task(src_rq, p, 0);
+		walt_prepare_migrate(p, cpu_of(src_rq), cpu, true);
 		set_task_cpu(p, cpu);
+		walt_finish_migrate(p, cpu_of(src_rq), cpu, true);
 		activate_task(dst_rq, p, 0);
 		p->on_rq = TASK_ON_RQ_QUEUED;
 		check_preempt_curr(dst_rq, p, 0);
@@ -1677,6 +1687,10 @@ int select_task_rq(struct task_struct *p, int cpu, int sd_flags, int wake_flags)
 		     (cpu_isolated(cpu) && !allow_isolated))
 		cpu = select_fallback_rq(task_cpu(p), p, allow_isolated);
 
+#ifdef CONFIG_NO_HZ_COMMON
+	if (unlikely(!atomic_read(&per_cpu(claim_wake_up_cpu, cpu))))
+		atomic_set(&per_cpu(claim_wake_up_cpu, cpu), 1);
+#endif
 	return cpu;
 }
 
@@ -1948,13 +1962,16 @@ bool cpus_share_cache(int this_cpu, int that_cpu)
 }
 #endif /* CONFIG_SMP */
 
-static void ttwu_queue(struct task_struct *p, int cpu, int wake_flags)
+static void ttwu_queue(struct task_struct *p, int cpu, int prev_cpu, int wake_flags)
 {
 	struct rq *rq = cpu_rq(cpu);
 	struct pin_cookie cookie;
 
 #if defined(CONFIG_SMP)
 	if (sched_feat(TTWU_QUEUE) && !cpus_share_cache(smp_processor_id(), cpu)) {
+		if (prev_cpu != cpu)
+			walt_finish_migrate(p, prev_cpu, cpu, false);
+
 		sched_clock_cpu(cpu); /* sync clocks x-cpu */
 		ttwu_queue_remote(p, cpu, wake_flags);
 		return;
@@ -1963,6 +1980,10 @@ static void ttwu_queue(struct task_struct *p, int cpu, int wake_flags)
 
 	raw_spin_lock(&rq->lock);
 	cookie = lockdep_pin_lock(&rq->lock);
+
+	if (prev_cpu != cpu)
+		walt_finish_migrate(p, prev_cpu, cpu, true);
+
 	ttwu_do_activate(rq, p, wake_flags, cookie);
 	lockdep_unpin_lock(&rq->lock, cookie);
 	raw_spin_unlock(&rq->lock);
@@ -2184,14 +2205,16 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	src_cpu = task_cpu(p);
 	if (src_cpu != cpu) {
 		wake_flags |= WF_MIGRATED;
+		walt_prepare_migrate(p, src_cpu, cpu, false);
 		set_task_cpu(p, cpu);
+		/* walt_finish_migrate is done in ttwu_queue */
 		notif_required = true;
 	}
 
 	note_task_waking(p, wallclock);
 #endif /* CONFIG_SMP */
 
-	ttwu_queue(p, cpu, wake_flags);
+	ttwu_queue(p, cpu, src_cpu, wake_flags);
 stat:
 	ttwu_stat(p, cpu, wake_flags);
 out:
@@ -5100,6 +5123,7 @@ long sched_getaffinity(pid_t pid, struct cpumask *mask)
 
 	raw_spin_lock_irqsave(&p->pi_lock, flags);
 	cpumask_and(mask, &p->cpus_allowed, cpu_active_mask);
+	cpumask_andnot(mask, mask, cpu_isolated_mask);
 	raw_spin_unlock_irqrestore(&p->pi_lock, flags);
 
 out_unlock:

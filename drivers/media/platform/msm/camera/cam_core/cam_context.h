@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #ifndef _CAM_CONTEXT_H_
@@ -110,6 +115,7 @@ struct cam_ctx_ioctl_ops {
  * @unlink:                Unlink the context
  * @apply_req:             Apply setting for the context
  * @flush_req:             Flush request to remove request ids
+ * @process_evt:           Handle event notification from CRM.(optional)
  *
  */
 struct cam_ctx_crm_ops {
@@ -123,6 +129,8 @@ struct cam_ctx_crm_ops {
 			struct cam_req_mgr_apply_request *apply);
 	int (*flush_req)(struct cam_context *ctx,
 			struct cam_req_mgr_flush_request *flush);
+	int (*process_evt)(struct cam_context *ctx,
+			struct cam_req_mgr_link_evt_data *evt_data);
 };
 
 
@@ -144,6 +152,8 @@ struct cam_ctx_ops {
  * struct cam_context - camera context object for the subdevice node
  *
  * @dev_name:              String giving name of device associated
+ * @dev_id:                ID of device associated
+ * @ctx_id:                ID for this context
  * @list:                  Link list entry
  * @sessoin_hdl:           Session handle
  * @dev_hdl:               Device handle
@@ -171,6 +181,8 @@ struct cam_ctx_ops {
  */
 struct cam_context {
 	const char                  *dev_name;
+	uint64_t                     dev_id;
+	uint32_t                     ctx_id;
 	struct list_head             list;
 	int32_t                      session_hdl;
 	int32_t                      dev_hdl;
@@ -273,6 +285,18 @@ int cam_context_handle_crm_flush_req(struct cam_context *ctx,
 		struct cam_req_mgr_flush_request *apply);
 
 /**
+ * cam_context_handle_crm_process_evt()
+ *
+ * @brief:        Handle process event command
+ *
+ * @ctx:          Object pointer for cam_context
+ * @process_evt:  process event command payload
+ *
+ */
+int cam_context_handle_crm_process_evt(struct cam_context *ctx,
+	struct cam_req_mgr_link_evt_data *process_evt);
+
+/**
  * cam_context_handle_acquire_dev()
  *
  * @brief:        Handle acquire device command
@@ -361,6 +385,8 @@ int cam_context_deinit(struct cam_context *ctx);
  *
  * @ctx:                   Object pointer for cam_context
  * @dev_name:              String giving name of device associated
+ * @dev_id:                ID of the device associated
+ * @ctx_id:                ID for this context
  * @crm_node_intf:         Function table for crm to context interface
  * @hw_mgr_intf:           Function table for context to hw interface
  * @req_list:              Requests storage
@@ -369,6 +395,8 @@ int cam_context_deinit(struct cam_context *ctx);
  */
 int cam_context_init(struct cam_context *ctx,
 		const char *dev_name,
+		uint64_t dev_id,
+		uint32_t ctx_id,
 		struct cam_req_mgr_kmd_ops *crm_node_intf,
 		struct cam_hw_mgr_intf *hw_mgr_intf,
 		struct cam_ctx_request *req_list,

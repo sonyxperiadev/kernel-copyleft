@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2018 The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -14,6 +14,11 @@
  *
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
@@ -3224,7 +3229,8 @@ static void sde_crtc_atomic_begin(struct drm_crtc *crtc,
 	 * smmu state is attached,
 	 */
 	if ((smmu_state->state != DETACHED) &&
-			(smmu_state->state != DETACH_ALL_REQ))
+			(smmu_state->state != DETACH_ALL_REQ) &&
+			sde_crtc->enabled)
 		sde_cp_crtc_apply_properties(crtc);
 
 	/*

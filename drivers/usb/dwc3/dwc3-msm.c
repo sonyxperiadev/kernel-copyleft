@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -47,6 +52,9 @@
 #include <linux/extcon.h>
 #include <linux/reset.h>
 #include <linux/clk/qcom.h>
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+#include <linux/usb/host_ext_event.h>
+#endif
 
 #include "power.h"
 #include "core.h"
@@ -178,6 +186,7 @@ static const struct usb_irq usb_irq_info[USB_MAX_IRQ] = {
 #define ID			0
 #define B_SESS_VLD		1
 #define B_SUSPEND		2
+#define A_VBUS_DROP_DET	3
 
 #define PM_QOS_SAMPLE_SEC	2
 #define PM_QOS_THRESHOLD	400
@@ -254,12 +263,14 @@ struct dwc3_msm {
 	struct extcon_dev	*extcon_vbus;
 	struct extcon_dev	*extcon_id;
 	struct extcon_dev	*extcon_eud;
+	struct extcon_dev	*extcon_vbus_drop;
 	struct notifier_block	vbus_nb;
 	struct notifier_block	id_nb;
 	struct notifier_block	eud_event_nb;
 	struct notifier_block	host_restart_nb;
 
 	struct notifier_block	host_nb;
+	struct notifier_block	vbus_drop_nb;
 
 	atomic_t                in_p3;
 	unsigned int		lpm_to_suspend_delay;
@@ -272,6 +283,7 @@ struct dwc3_msm {
 	struct delayed_work perf_vote_work;
 	struct delayed_work sdp_check;
 	struct mutex suspend_resume_mutex;
+	bool			send_vbus_drop_ue;
 };
 
 #define USB_HSPHY_3P3_VOL_MIN		3050000 /* uV */
@@ -2860,6 +2872,24 @@ static void check_for_sdp_connection(struct work_struct *w)
 	}
 }
 
+static int dwc3_msm_vbus_drop_notifier(struct notifier_block *nb,
+	unsigned long event, void *ptr)
+{
+	struct dwc3_msm *mdwc = container_of(nb, struct dwc3_msm, vbus_drop_nb);
+	struct extcon_dev *edev = ptr;
+
+	if (!edev) {
+		dev_err(mdwc->dev, "%s: edev null\n", __func__);
+		goto done;
+	}
+
+	set_bit(A_VBUS_DROP_DET, &mdwc->inputs);
+	pr_info("%s: receive ocp notification\n", __func__);
+	schedule_delayed_work(&mdwc->sm_work, 0);
+done:
+	return NOTIFY_DONE;
+}
+
 static int dwc3_msm_vbus_notifier(struct notifier_block *nb,
 	unsigned long event, void *ptr)
 {
@@ -2963,6 +2993,15 @@ static int dwc3_msm_extcon_register(struct dwc3_msm *mdwc, int start_idx)
 			dev_err(mdwc->dev, "failed to register blocking notifier\n");
 			goto err1;
 		}
+
+		mdwc->extcon_vbus_drop = edev;
+		mdwc->vbus_drop_nb.notifier_call = dwc3_msm_vbus_drop_notifier;
+		ret = extcon_register_notifier(edev, EXTCON_VBUS_DROP,
+				&mdwc->vbus_drop_nb);
+		if (ret < 0) {
+			dev_err(mdwc->dev, "failed to register notifier for USB-Drop\n");
+			goto err2;
+		}
 	}
 
 	edev = NULL;
@@ -2971,7 +3010,7 @@ static int dwc3_msm_extcon_register(struct dwc3_msm *mdwc, int start_idx)
 		edev = extcon_get_edev_by_phandle(mdwc->dev, 2);
 		if (IS_ERR(edev) && PTR_ERR(edev) != -ENODEV) {
 			ret = PTR_ERR(edev);
-			goto err2;
+			goto err3;
 		}
 	}
 
@@ -2982,11 +3021,15 @@ static int dwc3_msm_extcon_register(struct dwc3_msm *mdwc, int start_idx)
 				&mdwc->eud_event_nb);
 		if (ret < 0) {
 			dev_err(mdwc->dev, "failed to register notifier for EUD-USB\n");
-			goto err2;
+			goto err3;
 		}
 	}
 
 	return 0;
+err3:
+       if (mdwc->extcon_vbus_drop)
+               extcon_unregister_notifier(mdwc->extcon_vbus_drop, EXTCON_VBUS_DROP,
+                               &mdwc->vbus_drop_nb);
 err2:
 	if (mdwc->extcon_id)
 		extcon_unregister_blocking_notifier(mdwc->extcon_id,
@@ -3479,6 +3522,10 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 		if (pval.intval > 0)
 			dev_info(mdwc->dev, "charger detection in progress\n");
 	}
+	if (mdwc->extcon_vbus_drop && extcon_get_state(
+				mdwc->extcon_vbus_drop, EXTCON_VBUS_DROP))
+		dwc3_msm_vbus_drop_notifier(&mdwc->vbus_drop_nb, true,
+				mdwc->extcon_vbus_drop);
 
 	device_create_file(&pdev->dev, &dev_attr_mode);
 	device_create_file(&pdev->dev, &dev_attr_speed);
@@ -4110,6 +4157,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			mdwc->otg_state = OTG_STATE_B_PERIPHERAL;
 			work = 1;
 		} else {
+			mdwc->send_vbus_drop_ue = false;
 			dwc3_msm_gadget_vbus_draw(mdwc, 0);
 			dev_dbg(mdwc->dev, "Cable disconnected\n");
 		}
@@ -4174,9 +4222,22 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 		/* Switch to A-Device*/
 		if (test_bit(ID, &mdwc->inputs)) {
 			dev_dbg(mdwc->dev, "id\n");
+			clear_bit(A_VBUS_DROP_DET, &mdwc->inputs);
 			mdwc->otg_state = OTG_STATE_B_IDLE;
 			mdwc->vbus_retry_count = 0;
 			work = 1;
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+			host_send_uevent(USB_HOST_EXT_EVENT_NONE);
+#endif
+		} else if (test_bit(A_VBUS_DROP_DET, &mdwc->inputs)) {
+			dev_dbg(mdwc->dev, "vbus_drop_det\n");
+			/* staying on here until exit from A-Device */
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+			if (!mdwc->send_vbus_drop_ue) {
+				mdwc->send_vbus_drop_ue = true;
+				host_send_uevent(USB_HOST_EXT_EVENT_VBUS_DROP);
+			}
+#endif
 		} else {
 			mdwc->otg_state = OTG_STATE_A_HOST;
 			ret = dwc3_otg_start_host(mdwc, 1);
@@ -4207,6 +4268,20 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			mdwc->vbus_retry_count = 0;
 			mdwc->hc_died = false;
 			work = 1;
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+			host_send_uevent(USB_HOST_EXT_EVENT_NONE);
+#endif
+		} else if (test_bit(A_VBUS_DROP_DET, &mdwc->inputs)) {
+			dev_dbg(mdwc->dev, "vbus_drop_det\n");
+			dwc3_otg_start_host(mdwc, 0);
+			mdwc->otg_state = OTG_STATE_A_IDLE;
+			mdwc->vbus_retry_count = 0;
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+			if (!mdwc->send_vbus_drop_ue) {
+				mdwc->send_vbus_drop_ue = true;
+				host_send_uevent(USB_HOST_EXT_EVENT_VBUS_DROP);
+			}
+#endif
 		} else {
 			dev_dbg(mdwc->dev, "still in a_host state. Resuming root hub.\n");
 			dbg_event(0xFF, "XHCIResume", 0);

@@ -11,6 +11,11 @@
  * This code is licenced under the GPL version 2. For details see
  * kernel-base/COPYING.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/cpu.h>
 #include <linux/err.h>
 #include <linux/hrtimer.h>

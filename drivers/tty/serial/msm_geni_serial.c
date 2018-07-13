@@ -446,6 +446,8 @@ static void msm_geni_serial_set_mctrl(struct uart_port *uport,
 							SE_UART_MANUAL_RFR);
 	/* Write to flow control must complete before return to client*/
 	mb();
+	IPC_LOG_MSG(port->ipc_log_misc, "%s: Manual_rfr 0x%x\n",
+						__func__, uart_manual_rfr);
 }
 
 static const char *msm_geni_serial_get_type(struct uart_port *uport)
@@ -894,7 +896,6 @@ static void msm_geni_serial_start_tx(struct uart_port *uport)
 
 		msm_geni_serial_prep_dma_tx(uport);
 	}
-	IPC_LOG_MSG(msm_port->ipc_log_misc, "%s\n", __func__);
 	return;
 check_flow_ctrl:
 	geni_ios = geni_read_reg_nolog(uport->membase, SE_GENI_IOS);
@@ -963,7 +964,18 @@ static void stop_tx_sequencer(struct uart_port *uport)
 							SE_GENI_M_IRQ_CLEAR);
 	}
 	geni_write_reg_nolog(M_CMD_CANCEL_EN, uport, SE_GENI_M_IRQ_CLEAR);
-	IPC_LOG_MSG(port->ipc_log_misc, "%s\n", __func__);
+	/*
+	 * If we end up having to cancel an on-going Tx for non-console usecase
+	 * then it means there was some unsent data in the Tx FIFO, consequently
+	 * it means that there is a vote imbalance as we put in a vote during
+	 * start_tx() that is removed only as part of a "done" ISR. To balance
+	 * this out, remove the vote put in during start_tx().
+	 */
+	if (!uart_console(uport)) {
+		IPC_LOG_MSG(port->ipc_log_misc, "%s:Removing vote\n", __func__);
+		msm_geni_serial_power_off(uport);
+	}
+	IPC_LOG_MSG(port->ipc_log_misc, "%s:\n", __func__);
 }
 
 static void msm_geni_serial_stop_tx(struct uart_port *uport)
@@ -1727,7 +1739,8 @@ exit_startup:
 static int get_clk_cfg(unsigned long clk_freq, unsigned long *ser_clk)
 {
 	unsigned long root_freq[] = {7372800, 14745600, 19200000, 29491200,
-		32000000, 48000000, 64000000, 80000000, 96000000, 100000000};
+		32000000, 48000000, 64000000, 80000000, 96000000, 100000000,
+		102400000, 112000000, 120000000, 128000000};
 	int i;
 	int match = -1;
 
@@ -1806,6 +1819,9 @@ static void msm_geni_serial_set_termios(struct uart_port *uport,
 	unsigned long ser_clk_cfg = 0;
 	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 	unsigned long clk_rate;
+
+	if (!termios->c_cflag)
+		return;
 
 	if (!uart_console(uport)) {
 		int ret = msm_geni_serial_power_on(uport);
@@ -2520,6 +2536,8 @@ static int msm_geni_serial_runtime_suspend(struct device *dev)
 	 * set this to manual flow on.
 	 */
 	if (!port->manual_flow) {
+		u32 geni_ios;
+
 		uart_manual_rfr |= (UART_MANUAL_RFR_EN | UART_RFR_READY);
 		geni_write_reg_nolog(uart_manual_rfr, port->uport.membase,
 							SE_UART_MANUAL_RFR);
@@ -2528,6 +2546,11 @@ static int msm_geni_serial_runtime_suspend(struct device *dev)
 		 * doing a stop_rx else we could end up flowing off the peer.
 		 */
 		mb();
+		geni_ios = geni_read_reg_nolog(port->uport.membase,
+								SE_GENI_IOS);
+		IPC_LOG_MSG(port->ipc_log_pwr, "%s: Manual Flow ON 0x%x 0x%x\n",
+					 __func__, uart_manual_rfr, geni_ios);
+		udelay(10);
 	}
 	stop_rx_sequencer(&port->uport);
 	if ((geni_status & M_GENI_CMD_ACTIVE))
@@ -2609,6 +2632,7 @@ static int msm_geni_serial_sys_suspend_noirq(struct device *dev)
 			mutex_unlock(&tty_port->mutex);
 			return -EBUSY;
 		}
+		IPC_LOG_MSG(port->ipc_log_pwr, "%s\n", __func__);
 		mutex_unlock(&tty_port->mutex);
 	}
 	return 0;

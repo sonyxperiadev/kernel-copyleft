@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/init.h>
@@ -90,8 +95,9 @@ int cam_sync_register_callback(sync_callback cb_func,
 	}
 
 	/* Trigger callback if sync object is already in SIGNALED state */
-	if (row->state == CAM_SYNC_STATE_SIGNALED_SUCCESS ||
-		row->state == CAM_SYNC_STATE_SIGNALED_ERROR) {
+	if ((row->state == CAM_SYNC_STATE_SIGNALED_SUCCESS ||
+		row->state == CAM_SYNC_STATE_SIGNALED_ERROR) &&
+		(!row->remaining)) {
 		sync_cb->callback_func = cb_func;
 		sync_cb->cb_data = userdata;
 		sync_cb->sync_obj = sync_obj;

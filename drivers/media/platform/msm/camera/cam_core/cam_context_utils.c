@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/debugfs.h>
@@ -25,6 +30,9 @@
 #include "cam_sync_api.h"
 #include "cam_trace.h"
 #include "cam_debug_util.h"
+
+static uint cam_debug_ctx_req_list;
+module_param(cam_debug_ctx_req_list, uint, 0644);
 
 static inline int cam_context_validate_thread(void)
 {
@@ -56,7 +64,8 @@ int cam_context_buf_done_from_hw(struct cam_context *ctx,
 
 	spin_lock(&ctx->lock);
 	if (list_empty(&ctx->active_req_list)) {
-		CAM_ERR(CAM_CTXT, "no active request");
+		CAM_ERR(CAM_CTXT, "[%s][%d] no active request",
+			ctx->dev_name, ctx->ctx_id);
 		spin_unlock(&ctx->lock);
 		return -EIO;
 	}
@@ -66,14 +75,17 @@ int cam_context_buf_done_from_hw(struct cam_context *ctx,
 	trace_cam_buf_done("UTILS", ctx, req);
 
 	if (done->request_id != req->request_id) {
-		CAM_ERR(CAM_CTXT, "mismatch: done req[%lld], active req[%lld]",
+		CAM_ERR(CAM_CTXT,
+			"[%s][%d] mismatch: done req[%lld], active req[%lld]",
+			ctx->dev_name, ctx->ctx_id,
 			done->request_id, req->request_id);
 		spin_unlock(&ctx->lock);
 		return -EIO;
 	}
 
 	if (!req->num_out_map_entries) {
-		CAM_ERR(CAM_CTXT, "no output fence to signal");
+		CAM_ERR(CAM_CTXT, "[%s][%d] no output fence to signal",
+			ctx->dev_name, ctx->ctx_id);
 		spin_unlock(&ctx->lock);
 		return -EIO;
 	}
@@ -93,6 +105,11 @@ int cam_context_buf_done_from_hw(struct cam_context *ctx,
 		cam_sync_signal(req->out_map_entries[j].sync_id, result);
 		req->out_map_entries[j].sync_id = -1;
 	}
+
+	if (cam_debug_ctx_req_list & ctx->dev_id)
+		CAM_INFO(CAM_CTXT,
+			"[%s][%d] : Moving req[%llu] from active_list to free_list",
+			ctx->dev_name, ctx->ctx_id, req->request_id);
 
 	/*
 	 * another thread may be adding/removing from free list,
@@ -114,7 +131,8 @@ static int cam_context_apply_req_to_hw(struct cam_ctx_request *req,
 	struct cam_hw_config_args cfg;
 
 	if (!ctx->hw_mgr_intf) {
-		CAM_ERR(CAM_CTXT, "HW interface is not ready");
+		CAM_ERR(CAM_CTXT, "[%s][%d] HW interface is not ready",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -EFAULT;
 		goto end;
 	}
@@ -123,6 +141,11 @@ static int cam_context_apply_req_to_hw(struct cam_ctx_request *req,
 	list_del_init(&req->list);
 	list_add_tail(&req->list, &ctx->active_req_list);
 	spin_unlock(&ctx->lock);
+
+	if (cam_debug_ctx_req_list & ctx->dev_id)
+		CAM_INFO(CAM_CTXT,
+			"[%s][%d] : Moving req[%llu] from pending_list to active_list",
+			ctx->dev_name, ctx->ctx_id, req->request_id);
 
 	cfg.ctxt_to_hw_map = ctx->ctxt_to_hw_map;
 	cfg.hw_update_entries = req->hw_update_entries;
@@ -135,7 +158,13 @@ static int cam_context_apply_req_to_hw(struct cam_ctx_request *req,
 	if (rc) {
 		spin_lock(&ctx->lock);
 		list_del_init(&req->list);
+		list_add_tail(&req->list, &ctx->free_req_list);
 		spin_unlock(&ctx->lock);
+
+		if (cam_debug_ctx_req_list & ctx->dev_id)
+			CAM_INFO(CAM_CTXT,
+				"[%s][%d] : Moving req[%llu] from active_list to free_list",
+				ctx->dev_name, ctx->ctx_id, req->request_id);
 	}
 
 end:
@@ -159,6 +188,11 @@ static void cam_context_sync_callback(int32_t sync_obj, int status, void *data)
 		return;
 
 	ctx = req->ctx;
+	if (!ctx) {
+		CAM_ERR(CAM_CTXT, "Invalid ctx for req %llu", req->request_id);
+		return;
+	}
+
 	req->num_in_acked++;
 	if (req->num_in_acked == req->num_in_map_entries) {
 		apply.request_id = req->request_id;
@@ -174,8 +208,6 @@ static void cam_context_sync_callback(int32_t sync_obj, int status, void *data)
 			CAM_DBG(CAM_CTXT, "fence error: %d", sync_obj);
 			flush_cmd.req_id = req->request_id;
 			cam_context_flush_req_to_hw(ctx, &flush_cmd);
-			cam_context_putref(ctx);
-			return;
 		}
 
 		mutex_lock(&ctx->sync_mutex);
@@ -190,9 +222,19 @@ static void cam_context_sync_callback(int32_t sync_obj, int status, void *data)
 			list_del_init(&req->list);
 			list_add_tail(&req->list, &ctx->free_req_list);
 			spin_unlock(&ctx->lock);
+
+			if (cam_debug_ctx_req_list & ctx->dev_id)
+				CAM_INFO(CAM_CTXT,
+					"[%s][%d] : Moving req[%llu] from pending_list to free_list",
+					ctx->dev_name, ctx->ctx_id,
+					req->request_id);
 		}
 	}
+/* sony extension begin */
+#if 0
 	cam_context_putref(ctx);
+#endif
+/* sony extension end */
 }
 
 int32_t cam_context_release_dev_to_hw(struct cam_context *ctx,
@@ -206,7 +248,8 @@ int32_t cam_context_release_dev_to_hw(struct cam_context *ctx,
 	}
 
 	if ((!ctx->hw_mgr_intf) || (!ctx->hw_mgr_intf->hw_release)) {
-		CAM_ERR(CAM_CTXT, "HW interface is not ready");
+		CAM_ERR(CAM_CTXT, "[%s][%d] HW interface is not ready",
+			ctx->dev_name, ctx->ctx_id);
 		return -EINVAL;
 	}
 
@@ -241,7 +284,8 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 	}
 
 	if (!ctx->hw_mgr_intf) {
-		CAM_ERR(CAM_CTXT, "HW interface is not ready");
+		CAM_ERR(CAM_CTXT, "[%s][%d] HW interface is not ready",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -EFAULT;
 		goto end;
 	}
@@ -258,7 +302,8 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 	spin_unlock(&ctx->lock);
 
 	if (!req) {
-		CAM_ERR(CAM_CTXT, "No more request obj free");
+		CAM_ERR(CAM_CTXT, "[%s][%d] No more request obj free",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -ENOMEM;
 		goto end;
 	}
@@ -273,7 +318,8 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 		(uint64_t *) &packet_addr,
 		&len);
 	if (rc != 0) {
-		CAM_ERR(CAM_CTXT, "Can not get packet address");
+		CAM_ERR(CAM_CTXT, "[%s][%d] Can not get packet address",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -EINVAL;
 		goto free_req;
 	}
@@ -295,7 +341,9 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 	rc = ctx->hw_mgr_intf->hw_prepare_update(
 		ctx->hw_mgr_intf->hw_mgr_priv, &cfg);
 	if (rc != 0) {
-		CAM_ERR(CAM_CTXT, "Prepare config packet failed in HW layer");
+		CAM_ERR(CAM_CTXT,
+			"[%s][%d] Prepare config packet failed in HW layer",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -EFAULT;
 		goto free_req;
 	}
@@ -310,17 +358,43 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 		spin_lock(&ctx->lock);
 		list_add_tail(&req->list, &ctx->pending_req_list);
 		spin_unlock(&ctx->lock);
+
+		if (cam_debug_ctx_req_list & ctx->dev_id)
+			CAM_INFO(CAM_CTXT,
+				"[%s][%d] : Moving req[%llu] from free_list to pending_list",
+				ctx->dev_name, ctx->ctx_id, req->request_id);
+
 		for (i = 0; i < req->num_in_map_entries; i++) {
+/* sony extension begin */
+#if 0
 			cam_context_getref(ctx);
+#endif
+/* sony extension end */
 			rc = cam_sync_register_callback(
 					cam_context_sync_callback,
 					(void *)req,
 					req->in_map_entries[i].sync_id);
 			if (rc) {
 				CAM_ERR(CAM_CTXT,
-					"Failed register fence cb: %d ret = %d",
+					"[%s][%d] Failed register fence cb: %d ret = %d",
+					ctx->dev_name, ctx->ctx_id,
 					req->in_map_entries[i].sync_id, rc);
+				spin_lock(&ctx->lock);
+				list_del_init(&req->list);
+				spin_unlock(&ctx->lock);
+
+				if (cam_debug_ctx_req_list & ctx->dev_id)
+					CAM_INFO(CAM_CTXT,
+						"[%s][%d] : Moving req[%llu] from pending_list to free_list",
+						ctx->dev_name, ctx->ctx_id,
+						req->request_id);
+
+/* sony extension begin */
+#if 0
 				cam_context_putref(ctx);
+#endif
+/* sony extension end */
+
 				goto free_req;
 			}
 			CAM_DBG(CAM_CTXT, "register in fence cb: %d ret = %d",
@@ -355,7 +429,8 @@ int32_t cam_context_acquire_dev_to_hw(struct cam_context *ctx,
 	}
 
 	if (!ctx->hw_mgr_intf) {
-		CAM_ERR(CAM_CTXT, "HW interface is not ready");
+		CAM_ERR(CAM_CTXT, "[%s][%d] HW interface is not ready",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -EFAULT;
 		goto end;
 	}
@@ -365,14 +440,16 @@ int32_t cam_context_acquire_dev_to_hw(struct cam_context *ctx,
 		cmd->resource_hdl);
 
 	if (cmd->num_resources > CAM_CTX_RES_MAX) {
-		CAM_ERR(CAM_CTXT, "resource limit exceeded");
+		CAM_ERR(CAM_CTXT, "[%s][%d] resource limit exceeded",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -ENOMEM;
 		goto end;
 	}
 
 	/* for now we only support user pointer */
 	if (cmd->handle_type != 1)  {
-		CAM_ERR(CAM_CTXT, "Only user pointer is supported");
+		CAM_ERR(CAM_CTXT, "[%s][%d] Only user pointer is supported",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -EINVAL;
 		goto end;
 	}
@@ -387,7 +464,8 @@ int32_t cam_context_acquire_dev_to_hw(struct cam_context *ctx,
 	rc = ctx->hw_mgr_intf->hw_acquire(ctx->hw_mgr_intf->hw_mgr_priv,
 		&param);
 	if (rc != 0) {
-		CAM_ERR(CAM_CTXT, "Acquire device failed");
+		CAM_ERR(CAM_CTXT, "[%s][%d] Acquire device failed",
+			ctx->dev_name, ctx->ctx_id);
 		goto end;
 	}
 
@@ -404,7 +482,8 @@ int32_t cam_context_acquire_dev_to_hw(struct cam_context *ctx,
 	ctx->dev_hdl = cam_create_device_hdl(&req_hdl_param);
 	if (ctx->dev_hdl <= 0) {
 		rc = -EFAULT;
-		CAM_ERR(CAM_CTXT, "Can not create device handle");
+		CAM_ERR(CAM_CTXT, "[%s][%d] Can not create device handle",
+			ctx->dev_name, ctx->ctx_id);
 		goto free_hw;
 	}
 	cmd->dev_handle = ctx->dev_hdl;
@@ -430,6 +509,8 @@ int32_t cam_context_flush_ctx_to_hw(struct cam_context *ctx)
 	uint32_t i;
 	int rc = 0;
 
+	CAM_DBG(CAM_CTXT, "[%s] E: NRT flush ctx", ctx->dev_name);
+
 	/*
 	 * flush pending requests, take the sync lock to synchronize with the
 	 * sync callback thread so that the sync cb thread does not try to
@@ -440,27 +521,68 @@ int32_t cam_context_flush_ctx_to_hw(struct cam_context *ctx)
 	spin_lock(&ctx->lock);
 	list_splice_init(&ctx->pending_req_list, &temp_list);
 	spin_unlock(&ctx->lock);
+
+	if (cam_debug_ctx_req_list & ctx->dev_id)
+		CAM_INFO(CAM_CTXT,
+			"[%s][%d] : Moving all pending requests from pending_list to temp_list",
+			ctx->dev_name, ctx->ctx_id);
+
 	flush_args.num_req_pending = 0;
-	while (!list_empty(&temp_list)) {
+	while (true) {
+		spin_lock(&ctx->lock);
+		if (list_empty(&temp_list)) {
+			spin_unlock(&ctx->lock);
+			break;
+		}
+
 		req = list_first_entry(&temp_list,
 				struct cam_ctx_request, list);
+
 		list_del_init(&req->list);
+		spin_unlock(&ctx->lock);
 		req->flushed = 1;
+
 		flush_args.flush_req_pending[flush_args.num_req_pending++] =
 			req->req_priv;
-		for (i = 0; i < req->num_out_map_entries; i++)
-			if (req->out_map_entries[i].sync_id != -1)
-				cam_sync_signal(req->out_map_entries[i].sync_id,
+		for (i = 0; i < req->num_out_map_entries; i++) {
+			if (req->out_map_entries[i].sync_id != -1) {
+				rc = cam_sync_signal(
+					req->out_map_entries[i].sync_id,
 					CAM_SYNC_STATE_SIGNALED_ERROR);
+				if (rc == -EALREADY) {
+					CAM_ERR(CAM_CTXT,
+						"Req: %llu already signalled, sync_id:%d",
+						req->request_id,
+						req->out_map_entries[i].
+						sync_id);
+					break;
+				}
+			}
+		}
+
+/* sony extension begin */
+#if 1
+		for (i = 0; i < req->num_in_map_entries; i++)
+			if (req->in_map_entries[i].sync_id != -1) {
+				cam_sync_deregister_callback(
+					cam_context_sync_callback,
+					(void *)req,
+					req->in_map_entries[i].sync_id);
+			}
+#else
+		if (cam_debug_ctx_req_list & ctx->dev_id)
+			CAM_INFO(CAM_CTXT,
+				"[%s][%d] : Deleting req[%llu] from temp_list",
+				ctx->dev_name, ctx->ctx_id, req->request_id);
+#endif
+/* sony extension end */
 	}
 	mutex_unlock(&ctx->sync_mutex);
 
 	if (ctx->hw_mgr_intf->hw_flush) {
 		flush_args.num_req_active = 0;
 		spin_lock(&ctx->lock);
-		INIT_LIST_HEAD(&temp_list);
-		list_splice_init(&ctx->active_req_list, &temp_list);
-		list_for_each_entry(req, &temp_list, list) {
+		list_for_each_entry(req, &ctx->active_req_list, list) {
 			flush_args.flush_req_active[flush_args.num_req_active++]
 				= req->req_priv;
 		}
@@ -473,25 +595,72 @@ int32_t cam_context_flush_ctx_to_hw(struct cam_context *ctx)
 				ctx->hw_mgr_intf->hw_mgr_priv, &flush_args);
 		}
 	}
-
+/* sony extension begin */
 	while (!list_empty(&temp_list)) {
 		req = list_first_entry(&temp_list,
 			struct cam_ctx_request, list);
 		list_del_init(&req->list);
-		for (i = 0; i < req->num_out_map_entries; i++)
-			if (req->out_map_entries[i].sync_id != -1) {
-				cam_sync_signal(req->out_map_entries[i].sync_id,
-					CAM_SYNC_STATE_SIGNALED_ERROR);
-			}
 
 		spin_lock(&ctx->lock);
 		list_add_tail(&req->list, &ctx->free_req_list);
 		spin_unlock(&ctx->lock);
 		req->ctx = NULL;
 	}
-	INIT_LIST_HEAD(&ctx->active_req_list);
+/* sony extension end */
 
-	return rc;
+	INIT_LIST_HEAD(&temp_list);
+	spin_lock(&ctx->lock);
+	list_splice_init(&ctx->active_req_list, &temp_list);
+	INIT_LIST_HEAD(&ctx->active_req_list);
+	spin_unlock(&ctx->lock);
+
+	if (cam_debug_ctx_req_list & ctx->dev_id)
+		CAM_INFO(CAM_CTXT,
+			"[%s][%d] : Moving all requests from active_list to temp_list",
+			ctx->dev_name, ctx->ctx_id);
+
+	while (true) {
+		spin_lock(&ctx->lock);
+		if (list_empty(&temp_list)) {
+			spin_unlock(&ctx->lock);
+			break;
+		}
+		req = list_first_entry(&temp_list,
+			struct cam_ctx_request, list);
+		list_del_init(&req->list);
+		spin_unlock(&ctx->lock);
+
+		for (i = 0; i < req->num_out_map_entries; i++) {
+			if (req->out_map_entries[i].sync_id != -1) {
+				rc = cam_sync_signal(
+					req->out_map_entries[i].sync_id,
+					CAM_SYNC_STATE_SIGNALED_ERROR);
+				if (rc == -EALREADY) {
+					CAM_ERR(CAM_CTXT,
+						"Req: %llu already signalled ctx: %pK dev_name: %s dev_handle: %d ctx_state: %d",
+						req->request_id, req->ctx,
+						req->ctx->dev_name,
+						req->ctx->dev_hdl,
+						req->ctx->state);
+					break;
+				}
+			}
+		}
+
+		spin_lock(&ctx->lock);
+		list_add_tail(&req->list, &ctx->free_req_list);
+		spin_unlock(&ctx->lock);
+		req->ctx = NULL;
+
+		if (cam_debug_ctx_req_list & ctx->dev_id)
+			CAM_INFO(CAM_CTXT,
+				"[%s][%d] : Moving req[%llu] from temp_list to free_list",
+				ctx->dev_name, ctx->ctx_id, req->request_id);
+	}
+
+	CAM_DBG(CAM_CTXT, "[%s] X: NRT flush ctx", ctx->dev_name);
+
+	return 0;
 }
 
 int32_t cam_context_flush_req_to_hw(struct cam_context *ctx,
@@ -502,6 +671,8 @@ int32_t cam_context_flush_req_to_hw(struct cam_context *ctx,
 	uint32_t i;
 	int rc = 0;
 
+	CAM_DBG(CAM_CTXT, "[%s] E: NRT flush req", ctx->dev_name);
+
 	flush_args.num_req_pending = 0;
 	flush_args.num_req_active = 0;
 	mutex_lock(&ctx->sync_mutex);
@@ -510,7 +681,14 @@ int32_t cam_context_flush_req_to_hw(struct cam_context *ctx,
 		if (req->request_id != cmd->req_id)
 			continue;
 
+		if (cam_debug_ctx_req_list & ctx->dev_id)
+			CAM_INFO(CAM_CTXT,
+				"[%s][%d] : Deleting req[%llu] from pending_list",
+				ctx->dev_name, ctx->ctx_id, req->request_id);
+
+		list_del_init(&req->list);
 		req->flushed = 1;
+
 		flush_args.flush_req_pending[flush_args.num_req_pending++] =
 			req->req_priv;
 		break;
@@ -524,6 +702,8 @@ int32_t cam_context_flush_req_to_hw(struct cam_context *ctx,
 			list_for_each_entry(req, &ctx->active_req_list, list) {
 				if (req->request_id != cmd->req_id)
 					continue;
+
+				list_del_init(&req->list);
 
 				flush_args.flush_req_active[
 					flush_args.num_req_active++] =
@@ -541,22 +721,64 @@ int32_t cam_context_flush_req_to_hw(struct cam_context *ctx,
 		}
 	}
 
+/* sony extension begin */
+#if 1
+	if (flush_args.num_req_pending || flush_args.num_req_active) {
+		for (i = 0; i < req->num_out_map_entries; i++)
+			if (req->out_map_entries[i].sync_id != -1) {
+				rc = cam_sync_signal(
+					req->out_map_entries[i].sync_id,
+					CAM_SYNC_STATE_SIGNALED_ERROR);
+				if (rc == -EALREADY) {
+					CAM_ERR(CAM_CTXT,
+						"Req: %llu already signalled, sync_id:%d",
+						req->request_id,
+						req->out_map_entries[i].
+						sync_id);
+					break;
+				}
+			}
+		spin_lock(&ctx->lock);
+		list_add_tail(&req->list, &ctx->free_req_list);
+		spin_unlock(&ctx->lock);
+		req->ctx = NULL;
+	}
+#else
 	if (req) {
 		if (flush_args.num_req_pending || flush_args.num_req_active) {
-			list_del_init(&req->list);
 			for (i = 0; i < req->num_out_map_entries; i++)
-				if (req->out_map_entries[i].sync_id != -1)
-					cam_sync_signal(
+				if (req->out_map_entries[i].sync_id != -1) {
+					rc = cam_sync_signal(
 						req->out_map_entries[i].sync_id,
 						CAM_SYNC_STATE_SIGNALED_ERROR);
-			spin_lock(&ctx->lock);
-			list_add_tail(&req->list, &ctx->free_req_list);
-			spin_unlock(&ctx->lock);
-			req->ctx = NULL;
+					if (rc == -EALREADY) {
+						CAM_ERR(CAM_CTXT,
+							"Req: %llu already signalled, sync_id:%d",
+							req->request_id,
+							req->out_map_entries[i].
+							sync_id);
+						break;
+					}
+				}
+			if (flush_args.num_req_active) {
+				spin_lock(&ctx->lock);
+				list_add_tail(&req->list, &ctx->free_req_list);
+				spin_unlock(&ctx->lock);
+				req->ctx = NULL;
+
+				if (cam_debug_ctx_req_list & ctx->dev_id)
+					CAM_INFO(CAM_CTXT,
+						"[%s][%d] : Moving req[%llu] from active_list to free_list",
+						ctx->dev_name, ctx->ctx_id,
+						req->request_id);
+			}
 		}
 	}
+#endif
+/* sony extension end */
+	CAM_DBG(CAM_CTXT, "[%s] X: NRT flush req", ctx->dev_name);
 
-	return rc;
+	return 0;
 }
 
 int32_t cam_context_flush_dev_to_hw(struct cam_context *ctx,
@@ -572,7 +794,8 @@ int32_t cam_context_flush_dev_to_hw(struct cam_context *ctx,
 	}
 
 	if (!ctx->hw_mgr_intf) {
-		CAM_ERR(CAM_CTXT, "HW interface is not ready");
+		CAM_ERR(CAM_CTXT, "[%s][%d] HW interface is not ready",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -EFAULT;
 		goto end;
 	}
@@ -583,7 +806,8 @@ int32_t cam_context_flush_dev_to_hw(struct cam_context *ctx,
 		rc = cam_context_flush_req_to_hw(ctx, cmd);
 	else {
 		rc = -EINVAL;
-		CAM_ERR(CAM_CORE, "Invalid flush type %d", cmd->flush_type);
+		CAM_ERR(CAM_CORE, "[%s][%d] Invalid flush type %d",
+			ctx->dev_name, ctx->ctx_id, cmd->flush_type);
 	}
 
 end:
@@ -603,14 +827,17 @@ int32_t cam_context_start_dev_to_hw(struct cam_context *ctx,
 	}
 
 	if (!ctx->hw_mgr_intf) {
-		CAM_ERR(CAM_CTXT, "HW interface is not ready");
+		CAM_ERR(CAM_CTXT, "[%s][%d] HW interface is not ready",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -EFAULT;
 		goto end;
 	}
 
 	if ((cmd->session_handle != ctx->session_hdl) ||
 		(cmd->dev_handle != ctx->dev_hdl)) {
-		CAM_ERR(CAM_CTXT, "Invalid session hdl[%d], dev_handle[%d]",
+		CAM_ERR(CAM_CTXT,
+			"[%s][%d] Invalid session hdl[%d], dev_handle[%d]",
+			ctx->dev_name, ctx->ctx_id,
 			cmd->session_handle, cmd->dev_handle);
 		rc = -EPERM;
 		goto end;
@@ -622,7 +849,8 @@ int32_t cam_context_start_dev_to_hw(struct cam_context *ctx,
 				&arg);
 		if (rc) {
 			/* HW failure. user need to clean up the resource */
-			CAM_ERR(CAM_CTXT, "Start HW failed");
+			CAM_ERR(CAM_CTXT, "[%s][%d] Start HW failed",
+				ctx->dev_name, ctx->ctx_id);
 			goto end;
 		}
 	}
@@ -643,7 +871,8 @@ int32_t cam_context_stop_dev_to_hw(struct cam_context *ctx)
 	}
 
 	if (!ctx->hw_mgr_intf) {
-		CAM_ERR(CAM_CTXT, "HW interface is not ready");
+		CAM_ERR(CAM_CTXT, "[%s][%d] HW interface is not ready",
+			ctx->dev_name, ctx->ctx_id);
 		rc = -EFAULT;
 		goto end;
 	}
@@ -652,11 +881,9 @@ int32_t cam_context_stop_dev_to_hw(struct cam_context *ctx)
 	if (rc)
 		goto end;
 
-	if (ctx->ctxt_to_hw_map) {
-		rc = cam_context_flush_ctx_to_hw(ctx);
-		if (rc)
-			goto end;
-	}
+	rc = cam_context_flush_ctx_to_hw(ctx);
+	if (rc)
+		goto end;
 
 	/* stop hw first */
 	if (ctx->hw_mgr_intf->hw_stop) {

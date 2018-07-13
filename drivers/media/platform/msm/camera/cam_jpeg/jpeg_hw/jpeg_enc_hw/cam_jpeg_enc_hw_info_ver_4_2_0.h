@@ -9,6 +9,13 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * Copyright (C) 2017 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
 
 #ifndef CAM_JPEG_ENC_HW_INFO_TITAN170_H
 #define CAM_JPEG_ENC_HW_INFO_TITAN170_H

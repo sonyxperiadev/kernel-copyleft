@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -152,6 +157,7 @@ static bool get_dload_mode(void)
 	return dload_mode_enabled;
 }
 
+#if 0
 static void enable_emergency_dload_mode(void)
 {
 	int ret;
@@ -178,6 +184,7 @@ static void enable_emergency_dload_mode(void)
 	if (ret)
 		pr_err("Failed to set secure EDLOAD mode: %d\n", ret);
 }
+#endif
 
 static int dload_set(const char *val, struct kernel_param *kp)
 {
@@ -268,13 +275,24 @@ static void msm_restart_prepare(const char *cmd)
 				(cmd != NULL && cmd[0] != '\0'));
 	}
 
+	if (in_panic)
+		need_warm_reset = true;
+
 	/* Hard reset the PMIC unless memory contents must be maintained. */
 	if (need_warm_reset)
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 	else
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
 
-	if (cmd != NULL) {
+	if (in_panic) {
+		u32 prev_reason;
+
+		prev_reason = __raw_readl(restart_reason);
+		if (prev_reason != 0xABADF00D) {
+			__raw_writel(0xC0DEDEAD, restart_reason);
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_KERNEL_PANIC);
+		}
+	} else if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_BOOTLOADER);
@@ -320,15 +338,31 @@ static void msm_restart_prepare(const char *cmd)
 				} else {
 					qpnp_pon_set_restart_reason(
 						reset_reason);
+					if ((code & 0xff) == 'N') {
+						qpnp_pon_set_restart_reason(
+							PON_RESTART_REASON_SYSTEM);
+					} else if ((code & 0xff) == 'S') {
+						qpnp_pon_set_restart_reason(
+						PON_RESTART_REASON_XFL);
+					} else if ((code & 0xff) == 'P') {
+						qpnp_pon_set_restart_reason(
+						PON_RESTART_REASON_OEM_P);
+					}
+					__raw_writel(0x6f656d00 | (code & 0xff),
+						     restart_reason);
 				}
-				__raw_writel(0x6f656d00 | (code & 0xff),
-					     restart_reason);
 			}
+#if 0
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
+#endif
 		} else {
 			__raw_writel(0x77665501, restart_reason);
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
 		}
+	} else {
+		__raw_writel(0x77665501, restart_reason);
+		qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
 	}
 
 	flush_cache_all();
@@ -417,6 +451,7 @@ static void do_msm_poweroff(void)
 	set_dload_mode(0);
 #endif
 	qpnp_pon_system_pwr_off(PON_POWER_OFF_SHUTDOWN);
+	qpnp_pon_set_restart_reason(PON_RESTART_REASON_NONE);
 	/* Needed to bypass debug image on some chips */
 	if (!is_scm_armv8())
 		ret = scm_call_atomic2(SCM_SVC_BOOT,
@@ -677,6 +712,8 @@ skip_sysfs_create:
 		scm_deassert_ps_hold_supported = true;
 
 	set_dload_mode(download_mode);
+
+	qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 
 	return 0;
 

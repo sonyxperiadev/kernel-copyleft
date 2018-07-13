@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #ifndef _CAM_REQ_MGR_INTERFACE_H
@@ -81,9 +86,9 @@ struct cam_req_mgr_crm_cb {
  * @process_evt  : payload to generic event
  */
 struct cam_req_mgr_kmd_ops {
-	cam_req_mgr_get_dev_info      get_dev_info;
-	cam_req_mgr_link_setup        link_setup;
-	cam_req_mgr_apply_req         apply_req;
+	cam_req_mgr_get_dev_info     get_dev_info;
+	cam_req_mgr_link_setup       link_setup;
+	cam_req_mgr_apply_req        apply_req;
 	cam_req_mgr_flush_req        flush_req;
 	cam_req_mgr_process_evt      process_evt;
 };
@@ -182,6 +187,8 @@ enum cam_req_mgr_device_id {
  */
 enum cam_req_mgr_link_evt_type {
 	CAM_REQ_MGR_LINK_EVT_ERR,
+	CAM_REQ_MGR_LINK_EVT_PAUSE,
+	CAM_REQ_MGR_LINK_EVT_RESUME,
 	CAM_REQ_MGR_LINK_EVT_MAX,
 };
 

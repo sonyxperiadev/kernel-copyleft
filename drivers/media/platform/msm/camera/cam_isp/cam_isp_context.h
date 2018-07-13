@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -52,6 +52,7 @@ enum cam_isp_ctx_activated_substate {
 	CAM_ISP_CTX_ACTIVATED_BUBBLE_APPLIED,
 	CAM_ISP_CTX_ACTIVATED_HW_ERROR,
 	CAM_ISP_CTX_ACTIVATED_HALT,
+	CAM_ISP_CTX_ACTIVATED_FLUSH,
 	CAM_ISP_CTX_ACTIVATED_MAX,
 };
 
@@ -81,22 +82,22 @@ struct cam_isp_ctx_irq_ops {
  *                         the request has been completed.
  * @bubble_report:         Flag to track if bubble report is active on
  *                         current request
- * @packet_opcode_type:    Request packet opcode type,
- *                         ie INIT packet or update packet
+ * @hw_update_data:        HW update data for this request
  *
  */
 struct cam_isp_ctx_req {
-	struct cam_ctx_request          *base;
+	struct cam_ctx_request               *base;
 
-	struct cam_hw_update_entry       cfg[CAM_ISP_CTX_CFG_MAX];
-	uint32_t                         num_cfg;
-	struct cam_hw_fence_map_entry    fence_map_out[CAM_ISP_CTX_RES_MAX];
-	uint32_t                         num_fence_map_out;
-	struct cam_hw_fence_map_entry    fence_map_in[CAM_ISP_CTX_RES_MAX];
-	uint32_t                         num_fence_map_in;
-	uint32_t                         num_acked;
-	int32_t                          bubble_report;
-	uint32_t                         packet_opcode_type;
+	struct cam_hw_update_entry            cfg[CAM_ISP_CTX_CFG_MAX];
+	uint32_t                              num_cfg;
+	struct cam_hw_fence_map_entry         fence_map_out
+						[CAM_ISP_CTX_RES_MAX];
+	uint32_t                              num_fence_map_out;
+	struct cam_hw_fence_map_entry         fence_map_in[CAM_ISP_CTX_RES_MAX];
+	uint32_t                              num_fence_map_in;
+	uint32_t                              num_acked;
+	int32_t                               bubble_report;
+	struct cam_isp_prepare_hw_update_data hw_update_data;
 };
 
 /**
@@ -116,6 +117,7 @@ struct cam_isp_ctx_req {
  * @subscribe_event:       The irq event mask that CRM subscribes to, IFE will
  *                         invoke CRM cb at those event.
  * @last_applied_req_id:   Last applied request id
+ * @frame_skip_count:      Number of frame to skip before change state
  *
  */
 struct cam_isp_context {
@@ -131,10 +133,14 @@ struct cam_isp_context {
 
 	void                            *hw_ctx;
 	uint64_t                         sof_timestamp_val;
+/* sony extension begin */
+	bool                             hw_config_applied;
+/* sony extension end */
 	int32_t                          active_req_cnt;
 	int64_t                          reported_req_id;
 	uint32_t                         subscribe_event;
 	int64_t                          last_applied_req_id;
+	uint32_t                         frame_skip_count;
 };
 
 /**
@@ -145,12 +151,14 @@ struct cam_isp_context {
  * @ctx:                ISP context obj to be initialized
  * @bridge_ops:         Bridge call back funciton
  * @hw_intf:            ISP hw manager interface
+ * @ctx_id:             ID for this context
  *
  */
 int cam_isp_context_init(struct cam_isp_context *ctx,
 	struct cam_context *ctx_base,
 	struct cam_req_mgr_kmd_ops *bridge_ops,
-	struct cam_hw_mgr_intf *hw_intf);
+	struct cam_hw_mgr_intf *hw_intf,
+	uint32_t ctx_id);
 
 /**
  * cam_isp_context_deinit()

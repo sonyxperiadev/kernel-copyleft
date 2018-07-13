@@ -4,6 +4,11 @@
  *
  * Author : Stephen Smalley, <sds@epoch.ncsc.mil>
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _SS_SIDTAB_H_
 #define _SS_SIDTAB_H_
 
@@ -15,7 +20,7 @@ struct sidtab_node {
 	struct sidtab_node *next;
 };
 
-#define SIDTAB_HASH_BITS 7
+#define SIDTAB_HASH_BITS 12
 #define SIDTAB_HASH_BUCKETS (1 << SIDTAB_HASH_BITS)
 #define SIDTAB_HASH_MASK (SIDTAB_HASH_BUCKETS-1)
 
@@ -26,7 +31,7 @@ struct sidtab {
 	unsigned int nel;	/* number of elements */
 	unsigned int next_sid;	/* next SID to allocate */
 	unsigned char shutdown;
-#define SIDTAB_CACHE_LEN	3
+#define SIDTAB_CACHE_LEN	7
 	struct sidtab_node *cache[SIDTAB_CACHE_LEN];
 	spinlock_t lock;
 };

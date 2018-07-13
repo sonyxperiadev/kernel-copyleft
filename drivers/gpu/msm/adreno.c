@@ -2919,7 +2919,7 @@ static void adreno_gmu_regwrite(struct kgsl_device *device,
 	 * i.e. act like normal writel()
 	 */
 	wmb();
-	__raw_writel(value, reg);
+	__raw_writel_no_log(value, reg);
 }
 
 static void adreno_gmu_regread(struct kgsl_device *device,
