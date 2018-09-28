@@ -383,7 +383,7 @@ static int wsa881x_boost_ctrl(struct snd_soc_codec *codec, bool enable)
 					WSA881X_BOOST_SLOPE_COMP_ISENSE_FB,
 					0x03, 0x00);
 			snd_soc_update_bits(codec, WSA881X_BOOST_PRESET_OUT1,
-							0xF0, 0x70);
+							0xFF, 0x7F);
 			snd_soc_update_bits(codec, WSA881X_ANA_CTL, 0x03, 0x01);
 			snd_soc_update_bits(codec, WSA881X_SPKR_DRV_EN,
 								0x08, 0x08);

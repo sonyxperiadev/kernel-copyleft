@@ -37,8 +37,7 @@
 			   SND_JACK_UNSUPPORTED)
 
 #define WCD_MBHC_JACK_BUTTON_MASK (SND_JACK_BTN_0 | SND_JACK_BTN_1 | \
-				  SND_JACK_BTN_2 | SND_JACK_BTN_3 | \
-				  SND_JACK_BTN_4 | SND_JACK_BTN_5 )
+				  SND_JACK_BTN_2 | SND_JACK_BTN_3 )
 #define OCP_ATTEMPT 20
 #define HS_DETECT_PLUG_TIME_MS (3 * 1000)
 #define SPECIAL_HS_DETECT_TIME_MS (2 * 1000)
@@ -603,6 +602,48 @@ static void wcd_mbhc_hs_elec_irq(struct wcd_mbhc *mbhc, int irq_type,
 	}
 }
 
+static void wcd_enable_mbhc_supply(struct wcd_mbhc *mbhc,
+                        enum wcd_mbhc_plug_type plug_type)
+{
+
+        struct snd_soc_codec *codec = mbhc->codec;
+
+        /*
+         * Do not disable micbias if recording is going on or
+         * headset is inserted on the other side of the extn
+         * cable. If headset has been detected current source
+         * needs to be kept enabled for button detection to work.
+         * If the accessory type is invalid or unsupported, we
+         * dont need to enable either of them.
+         */
+        if (det_extn_cable_en && mbhc->is_extn_cable &&
+                mbhc->mbhc_cb && mbhc->mbhc_cb->extn_use_mb &&
+                mbhc->mbhc_cb->extn_use_mb(codec)) {
+                if (plug_type == MBHC_PLUG_TYPE_HEADPHONE ||
+                    plug_type == MBHC_PLUG_TYPE_HEADSET)
+                        wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
+        } else {
+                if (plug_type == MBHC_PLUG_TYPE_HEADSET) {
+                        if (mbhc->is_hs_recording || mbhc->micbias_enable)
+                                wcd_enable_curr_micbias(mbhc,
+                                                        WCD_MBHC_EN_MB);
+                        else if ((test_bit(WCD_MBHC_EVENT_PA_HPHL,
+                                &mbhc->event_state)) ||
+                                (test_bit(WCD_MBHC_EVENT_PA_HPHR,
+                                &mbhc->event_state)))
+                                        wcd_enable_curr_micbias(mbhc,
+                                                        WCD_MBHC_EN_PULLUP);
+                        else
+                                wcd_enable_curr_micbias(mbhc,
+                                                        WCD_MBHC_EN_CS);
+                } else if (plug_type == MBHC_PLUG_TYPE_HEADPHONE) {
+                        wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
+                } else {
+                        wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_NONE);
+                }
+        }
+}
+
 static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				enum snd_jack_types jack_type)
 {
@@ -658,6 +699,24 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 		hphlocp_off_report(mbhc, SND_JACK_OC_HPHL);
 		mbhc->current_plug = MBHC_PLUG_TYPE_NONE;
 	} else {
+		/* Exit if cable is already reported as lineout */
+		if (mbhc->impedance_detect &&
+			mbhc->mbhc_cb->compute_impedance &&
+			(mbhc->mbhc_cfg->linein_th != 0) &&
+			(!is_pa_on) && jack_type == SND_JACK_HEADPHONE &&
+			mbhc->current_plug == MBHC_PLUG_TYPE_HIGH_HPH) {
+			pr_debug("%s: Impedance already calculated\n",
+				__func__);
+			if ((mbhc->zl > mbhc->mbhc_cfg->linein_th &&
+				mbhc->zl < MAX_IMPED) &&
+				(mbhc->zr > mbhc->mbhc_cfg->linein_th &&
+				mbhc->zr < MAX_IMPED)) {
+				pr_debug("%s: cable already reported as lineout, exit\n",
+					__func__);
+				return;
+			}
+		}
+
 		/*
 		 * Report removal of current jack type.
 		 * Headphone to headset shouldn't report headphone
@@ -887,7 +946,31 @@ static void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 						SND_JACK_HEADPHONE);
 			if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET)
 				wcd_mbhc_report_plug(mbhc, 0, SND_JACK_HEADSET);
-		wcd_mbhc_report_plug(mbhc, 1, SND_JACK_UNSUPPORTED);
+		/*
+		* calculate impedance detection
+		* If Zl and Zr > 20k then it is special accessory
+		* otherwise unsupported cable.
+		*/
+		if (mbhc->impedance_detect &&
+			mbhc->mbhc_cb->compute_impedance) {
+			mbhc->mbhc_cb->compute_impedance(mbhc,
+				&mbhc->zl, &mbhc->zr);
+			if ((mbhc->zl > 20000) && (mbhc->zr > 20000)) {
+				pr_debug("%s: special accessory \n", __func__);
+				/* Toggle switch back */
+				//if (mbhc->mbhc_cfg->swap_gnd_mic &&
+				//	mbhc->mbhc_cfg->swap_gnd_mic(codec)) {
+				//	pr_debug("%s: US_EU gpio present,flip switch again\n"
+				//	, __func__);
+				//}
+				/* enable CS/MICBIAS for headset button detection to work */
+				wcd_enable_mbhc_supply(mbhc, MBHC_PLUG_TYPE_HEADSET);
+				wcd_mbhc_report_plug(mbhc, 1, SND_JACK_HEADSET);
+			}
+			else {
+				wcd_mbhc_report_plug(mbhc, 1, SND_JACK_UNSUPPORTED);
+			}
+		}
 	} else if (plug_type == MBHC_PLUG_TYPE_HEADSET) {
 		if (mbhc->mbhc_cfg->enable_anc_mic_detect)
 			anc_mic_found = wcd_mbhc_detect_anc_plug_type(mbhc);
@@ -1097,48 +1180,6 @@ static void wcd_mbhc_update_fsm_source(struct wcd_mbhc *mbhc,
 		break;
 
 	};
-}
-
-static void wcd_enable_mbhc_supply(struct wcd_mbhc *mbhc,
-			enum wcd_mbhc_plug_type plug_type)
-{
-
-	struct snd_soc_codec *codec = mbhc->codec;
-
-	/*
-	 * Do not disable micbias if recording is going on or
-	 * headset is inserted on the other side of the extn
-	 * cable. If headset has been detected current source
-	 * needs to be kept enabled for button detection to work.
-	 * If the accessory type is invalid or unsupported, we
-	 * dont need to enable either of them.
-	 */
-	if (det_extn_cable_en && mbhc->is_extn_cable &&
-		mbhc->mbhc_cb && mbhc->mbhc_cb->extn_use_mb &&
-		mbhc->mbhc_cb->extn_use_mb(codec)) {
-		if (plug_type == MBHC_PLUG_TYPE_HEADPHONE ||
-		    plug_type == MBHC_PLUG_TYPE_HEADSET)
-			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
-	} else {
-		if (plug_type == MBHC_PLUG_TYPE_HEADSET) {
-			if (mbhc->is_hs_recording || mbhc->micbias_enable)
-				wcd_enable_curr_micbias(mbhc,
-							WCD_MBHC_EN_MB);
-			else if ((test_bit(WCD_MBHC_EVENT_PA_HPHL,
-				&mbhc->event_state)) ||
-				(test_bit(WCD_MBHC_EVENT_PA_HPHR,
-				&mbhc->event_state)))
-					wcd_enable_curr_micbias(mbhc,
-							WCD_MBHC_EN_PULLUP);
-			else
-				wcd_enable_curr_micbias(mbhc,
-							WCD_MBHC_EN_CS);
-		} else if (plug_type == MBHC_PLUG_TYPE_HEADPHONE) {
-			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
-		} else {
-			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_NONE);
-		}
-	}
 }
 
 static bool wcd_mbhc_check_for_spl_headset(struct wcd_mbhc *mbhc,
@@ -1482,7 +1523,7 @@ enable_supply:
 	if (mbhc->mbhc_cb->mbhc_micbias_control)
 		wcd_mbhc_update_fsm_source(mbhc, plug_type);
 	else
-		wcd_enable_mbhc_supply(mbhc, plug_type);
+		wcd_enable_mbhc_supply(mbhc, mbhc->current_plug);
 exit:
 	if (mbhc->mbhc_cb->mbhc_micbias_control &&
 	    !mbhc->micbias_enable)

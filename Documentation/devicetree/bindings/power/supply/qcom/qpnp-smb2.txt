@@ -159,7 +159,7 @@ Charger specific properties:
   Usage:      optional
   Value type: <u32>
   Definition: Specifies the maximum charger buck/boost switching frequency in
-		 KHz. It overrides the max frequency defined for the charger.
+              KHz. It overrides the max frequency defined for the charger.
 
 - qcom,otg-deglitch-time-ms
   Usage:      optional
@@ -167,6 +167,43 @@ Charger specific properties:
   Definition: Specifies the deglitch interval for OTG detection.
 		If the value is not present, 50 msec is used as default.
 
+<<<<<<< HEAD
+- qcom,chg-usb-pre-safety-time
+  Usage:      optional
+  Value type: <u32>
+  Definition: SCHG_CHGR_PRE_CHARGE_SAFETY_TIMER_CFG for usb
+			#define PRE_CHARGE_SAFETY_TIMER_TMOUT_24MIN		0
+			#define PRE_CHARGE_SAFETY_TIMER_TMOUT_48MIN		1
+			#define PRE_CHARGE_SAFETY_TIMER_TMOUT_96MIN		2
+			#define PRE_CHARGE_SAFETY_TIMER_TMOUT_192MIN	3
+
+- qcom,chg-usb-fast-safety-time
+  Usage:      optional
+  Value type: <u32>
+  Definition: SCHG_CHGR_FAST_CHARGE_SAFETY_TIMER_CFG for usb
+			#define FAST_CHARGE_SAFETY_TIMER_TMOUT_192MIN	0
+			#define FAST_CHARGE_SAFETY_TIMER_TMOUT_384MIN	1
+			#define FAST_CHARGE_SAFETY_TIMER_TMOUT_768MIN	2
+			#define FAST_CHARGE_SAFETY_TIMER_TMOUT_1536MIN	3
+
+- qcom,chg-ac-pre-safety-time
+  Usage:      optional
+  Value type: <u32>
+  Definition: SCHG_CHGR_PRE_CHARGE_SAFETY_TIMER_CFG for ac
+			#define PRE_CHARGE_SAFETY_TIMER_TMOUT_24MIN		0
+			#define PRE_CHARGE_SAFETY_TIMER_TMOUT_48MIN		1
+			#define PRE_CHARGE_SAFETY_TIMER_TMOUT_96MIN		2
+			#define PRE_CHARGE_SAFETY_TIMER_TMOUT_192MIN	3
+
+- qcom,chg-ac-fast-safety-time
+  Usage:      optional
+  Value type: <u32>
+  Definition: SCHG_CHGR_FAST_CHARGE_SAFETY_TIMER_CFG for ac
+			#define FAST_CHARGE_SAFETY_TIMER_TMOUT_192MIN	0
+			#define FAST_CHARGE_SAFETY_TIMER_TMOUT_384MIN	1
+			#define FAST_CHARGE_SAFETY_TIMER_TMOUT_768MIN	2
+			#define FAST_CHARGE_SAFETY_TIMER_TMOUT_1536MIN	3
+=======
 - qcom,step-charging-enable
   Usage:      optional
   Value type: bool
@@ -178,10 +215,7 @@ Charger specific properties:
   Definition: WD bark-timeout in seconds. The possible values are
 		16, 32, 64, 128. If not defined it defaults to 64.
 
-- qcom,sw-jeita-enable
-  Usage:      optional
-  Value type: bool
-  Definition: Boolean flag which when present enables sw compensation for jeita
+>>>>>>> origin/o-nile-qcom-pre-ES5
 
 =============================================
 Second Level Nodes - SMB2 Charger Peripherals

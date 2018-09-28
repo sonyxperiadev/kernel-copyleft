@@ -24,7 +24,10 @@
 #include <linux/mmc/pm.h>
 #include <linux/mmc/ring_buffer.h>
 
+/* Default idle timeout for MMC devices: 3 seconds. */
 #define MMC_AUTOSUSPEND_DELAY_MS	3000
+/* Default idle timeout for SD cards: 5 minutes. */
+#define MMC_SDCARD_AUTOSUSPEND_DELAY_MS 30000
 
 struct mmc_ios {
 	unsigned int	clock;			/* clock rate */
@@ -599,6 +602,8 @@ struct mmc_host {
 #endif
 
 	bool sdr104_wa;
+	atomic_t rpmb_req_pending;
+	struct mutex		rpmb_req_mutex;
 	unsigned long		private[0] ____cacheline_aligned;
 };
 

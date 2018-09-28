@@ -81,7 +81,7 @@ static ssize_t power_supply_show_property(struct device *dev,
 		"Non compliant",
 	};
 	static char *typec_pr_text[] = {
-		"none", "dual power role", "sink", "source"
+		"none", "dual power role", "sink", "source", "sink_delay"
 	};
 	ssize_t ret = 0;
 	struct power_supply *psy = dev_get_drvdata(dev);
@@ -297,12 +297,25 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(hw_current_max),
 	POWER_SUPPLY_ATTR(real_type),
 	POWER_SUPPLY_ATTR(pr_swap),
+//CEI comment, FP225896 battery swelling S
+	POWER_SUPPLY_ATTR(lrc_socmin),
+	POWER_SUPPLY_ATTR(lrc_socmax),
+	POWER_SUPPLY_ATTR(lrc_enable),
+//CEI comment, FP225896 battery swelling E
+//CEI comment, RID001102 Battery Care ver 1.0 for DD S
+	POWER_SUPPLY_ATTR(smart_charging_activation),
+	POWER_SUPPLY_ATTR(smart_charging_interruption),
+	POWER_SUPPLY_ATTR(smart_charging_status),
+//CEI comment, RID001102 Battery Care ver 1.0 for DD E
+	POWER_SUPPLY_ATTR(max_charge_current),
+	POWER_SUPPLY_ATTR(tm_disable),//CEI comments, thermal mitigation
 	POWER_SUPPLY_ATTR(cc_step),
 	POWER_SUPPLY_ATTR(cc_step_sel),
 	POWER_SUPPLY_ATTR(sw_jeita_enabled),
 	POWER_SUPPLY_ATTR(pd_voltage_max),
 	POWER_SUPPLY_ATTR(pd_voltage_min),
 	POWER_SUPPLY_ATTR(sdp_current_max),
+	POWER_SUPPLY_ATTR(recharge_voltage),//CEI comments, soft charge v8
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_ATTR(charge_counter_ext),
 	/* Properties of type `const char *' */

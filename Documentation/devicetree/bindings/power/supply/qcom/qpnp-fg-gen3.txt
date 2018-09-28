@@ -385,6 +385,31 @@ First Level Node - FG Gen3 device
 		    property "qcom,slope-limit-temp-threshold" to make dynamic
 		    slope limit adjustment functional.
 
+- qcom,bp-jeita-fvc-en;
+	JEITA hot/cold soft/hard Limit reduces float voltage in CV mode
+	0 = Disabled
+	1 = Enabled
+- qcom,bp-jeita-ccc-en;
+	JEITA Temperature Hard Limit Pauses Charging
+	0 = Disabled
+	1 = Enabled
+- qcom,bp-jeita-hot-sl-fvc;
+	JEITA Hot Soft-Limit Float Voltage Compensation
+	0 = Disable
+	1 = Enable
+- qcom,bp-jeita-cold-sl-fvc;
+	JEITA Cold Soft-Limit Float Voltage Compensation
+	0 = Disable
+	1 = Enable
+- qcom,bp-jeita-hot-sl-ccc;
+	JEITA Hot Soft-Limit Charge Current Compensation
+	0 = Disable
+	1 = Enable
+- qcom,bp-jeita-cold-sl-ccc;
+	JEITA Cold Soft-Limit Charge Current Compensation
+	0 = Disable
+	1 = Enable
+
 ==========================================================
 Second Level Nodes - Peripherals managed by FG Gen3 driver
 ==========================================================

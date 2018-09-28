@@ -2419,6 +2419,11 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 	    (topology == VPM_TX_DM_RFECNS_COPP_TOPOLOGY))
 		rate = 16000;
 
+	//force ADM to be 24 bit always
+        if (path == ADM_PATH_PLAYBACK) {
+            pr_debug("%s: ADM_PATH_PLAYBACK set bit_width to 24 \n", __func__);
+            bit_width = 24;
+        }
 	/*
 	 * Routing driver reuses the same adm for streams with the same
 	 * app_type, sample_rate etc.

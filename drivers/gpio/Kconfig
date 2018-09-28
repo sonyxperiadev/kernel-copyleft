@@ -351,6 +351,7 @@ config GPIO_QPNP_PIN
 config GPIO_QPNP_PIN_DEBUG
 	bool "Qualcomm Technologies, Inc. QPNP GPIO debug support"
 	depends on GPIO_QPNP_PIN && DEBUG_FS
+	default y
 	help
 	  Say 'y' here to include debug support for the Qualcomm Technologies,
 	  Inc. QPNP GPIO driver.  This provides a userspace debug interface to

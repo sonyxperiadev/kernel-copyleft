@@ -123,6 +123,7 @@ static int hfi_process_sess_evt_seq_changed(u32 device_id,
 	event_notify.device_id = device_id;
 	event_notify.session_id = (void *)(uintptr_t)pkt->session_id;
 	event_notify.status = VIDC_ERR_NONE;
+	event_notify.pic_struct = MSM_VIDC_PIC_STRUCT_PROGRESSIVE;
 	num_properties_changed = pkt->event_data2;
 	switch (pkt->event_data1) {
 	case HFI_EVENT_DATA_SEQUENCE_CHANGED_SUFFICIENT_BUFFER_RESOURCES:

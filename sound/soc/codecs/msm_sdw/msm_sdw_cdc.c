@@ -82,8 +82,8 @@ static const struct msm_sdw_reg_mask_val msm_sdw_spkr_default[] = {
 	{MSM_SDW_COMPANDER8_CTL3, 0x80, 0x80},
 	{MSM_SDW_COMPANDER7_CTL7, 0x01, 0x01},
 	{MSM_SDW_COMPANDER8_CTL7, 0x01, 0x01},
-	{MSM_SDW_BOOST0_BOOST_CTL, 0x7C, 0x50},
-	{MSM_SDW_BOOST1_BOOST_CTL, 0x7C, 0x50},
+	{MSM_SDW_BOOST0_BOOST_CTL, 0x7C, 0x58},
+	{MSM_SDW_BOOST1_BOOST_CTL, 0x7C, 0x58},
 };
 
 static const struct msm_sdw_reg_mask_val msm_sdw_spkr_mode1[] = {
@@ -91,8 +91,8 @@ static const struct msm_sdw_reg_mask_val msm_sdw_spkr_mode1[] = {
 	{MSM_SDW_COMPANDER8_CTL3, 0x80, 0x00},
 	{MSM_SDW_COMPANDER7_CTL7, 0x01, 0x00},
 	{MSM_SDW_COMPANDER8_CTL7, 0x01, 0x00},
-	{MSM_SDW_BOOST0_BOOST_CTL, 0x7C, 0x44},
-	{MSM_SDW_BOOST1_BOOST_CTL, 0x7C, 0x44},
+	{MSM_SDW_BOOST0_BOOST_CTL, 0x7C, 0x48},
+	{MSM_SDW_BOOST1_BOOST_CTL, 0x7C, 0x48},
 };
 
 /**
@@ -1622,8 +1622,8 @@ static const struct msm_sdw_reg_mask_val msm_sdw_reg_init[] = {
 	{MSM_SDW_BOOST1_BOOST_CFG1, 0x3F, 0x12},
 	{MSM_SDW_BOOST1_BOOST_CFG2, 0x1C, 0x08},
 	{MSM_SDW_COMPANDER8_CTL7, 0x1E, 0x18},
-	{MSM_SDW_BOOST0_BOOST_CTL, 0x70, 0x50},
-	{MSM_SDW_BOOST1_BOOST_CTL, 0x70, 0x50},
+	{MSM_SDW_BOOST0_BOOST_CTL, 0x7C, 0x58},
+	{MSM_SDW_BOOST1_BOOST_CTL, 0x7C, 0x58},
 	{MSM_SDW_RX7_RX_PATH_CFG1, 0x08, 0x08},
 	{MSM_SDW_RX8_RX_PATH_CFG1, 0x08, 0x08},
 	{MSM_SDW_TOP_TOP_CFG1, 0x02, 0x02},
@@ -1924,6 +1924,9 @@ static int msm_sdw_probe(struct platform_device *pdev)
 			__func__, ret);
 		goto err_sdw_cdc;
 	}
+
+	regcache_cache_bypass(msm_sdw->regmap, true);
+
 	/* initialize the int_mclk1 */
 	msm_sdw->sdw_cdc_core_clk.clk_set_minor_version =
 			AFE_API_VERSION_I2S_CONFIG;

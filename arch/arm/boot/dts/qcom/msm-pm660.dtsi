@@ -46,6 +46,7 @@
 			qcom,system-reset;
 			qcom,store-hard-reset-reason;
 
+			qcom,s3-src = "resin";
 			qcom,pon_1 {
 				qcom,pon-type = <0>;
 				qcom,pull-up = <1>;
@@ -56,6 +57,32 @@
 				qcom,pon-type = <1>;
 				qcom,pull-up = <1>;
 				linux,code = <114>;
+			};
+		};
+
+		qcom,power-on-dp@800 {
+			compatible = "qcom,qpnp-power-on-dp";
+			reg = <0x800 0x100>;
+			interrupts = <0x0 0x8 0x0 IRQ_TYPE_NONE>,
+				     <0x0 0x8 0x1 IRQ_TYPE_NONE>,
+				     <0x0 0x8 0x4 IRQ_TYPE_NONE>,
+				     <0x0 0x8 0x5 IRQ_TYPE_NONE>;
+			interrupt-names = "kpdpwr", "resin",
+					"resin-bark", "kpdpwr-resin-bark";
+			qcom,pon-dbc-delay = <15625>;
+			qcom,system-reset;
+			qcom,store-hard-reset-reason;
+
+			qcom,pon_1 {
+				qcom,pon-type = <0>;
+				qcom,pull-up = <1>;
+				linux,code = <116>;
+			};
+
+			qcom,pon_2 {
+				qcom,pon-type = <1>;
+				qcom,pull-up = <1>;
+				linux,code = <115>;
 			};
 		};
 
@@ -158,6 +185,7 @@
 		pm660_coincell: qcom,coincell@2800 {
 			compatible = "qcom,qpnp-coincell";
 			reg = <0x2800 0x100>;
+			qcom,charge-enable = <0>;
 		};
 
 		pm660_rtc: qcom,pm660_rtc {
@@ -222,6 +250,54 @@
 				qcom,cal-val = <0>;
 			};
 
+			chan@4b {
+				label = "ufs_therm";
+				reg = <0x4e>;
+				qcom,decimation = <2>;
+				qcom,pre-div-channel-scaling = <0>;
+				qcom,calibration-type = "ratiometric";
+				qcom,scale-function = <2>;
+				qcom,hw-settle-time = <2>;
+				qcom,fast-avg-setup = <0>;
+				qcom,vadc-thermal-node;
+			};
+
+			chan@4g {
+				label = "pa_therm1";
+				reg = <0x4f>;
+				qcom,decimation = <2>;
+				qcom,pre-div-channel-scaling = <0>;
+				qcom,calibration-type = "ratiometric";
+				qcom,scale-function = <2>;
+				qcom,hw-settle-time = <2>;
+				qcom,fast-avg-setup = <0>;
+				qcom,vadc-thermal-node;
+			};
+
+			chan@4h {
+				label = "pa_therm2";
+				reg = <0x50>;
+				qcom,decimation = <2>;
+				qcom,pre-div-channel-scaling = <0>;
+				qcom,calibration-type = "ratiometric";
+				qcom,scale-function = <2>;
+				qcom,hw-settle-time = <2>;
+				qcom,fast-avg-setup = <0>;
+				qcom,vadc-thermal-node;
+			};
+
+			chan@53 {
+				label = "flash_therm";
+				reg = <0x53>;
+				qcom,decimation = <2>;
+				qcom,pre-div-channel-scaling = <0>;
+				qcom,calibration-type = "ratiometric";
+				qcom,scale-function = <17>;
+				qcom,hw-settle-time = <2>;
+				qcom,fast-avg-setup = <0>;
+				qcom,vadc-thermal-node;
+			};
+
 			chan@83 {
 				label = "vph_pwr";
 				reg = <0x83>;
@@ -261,7 +337,7 @@
 				qcom,decimation = <2>;
 				qcom,pre-div-channel-scaling = <0>;
 				qcom,calibration-type = "ratiometric";
-				qcom,scale-function = <2>;
+				qcom,scale-function = <17>;
 				qcom,hw-settle-time = <2>;
 				qcom,fast-avg-setup = <0>;
 			};
@@ -332,10 +408,16 @@
 
 			qcom,wipower-max-uw = <5000000>;
 			dpdm-supply = <&qusb_phy0>;
+			qcom,fv-max-uv = <4350000>;
+			qcom,chg-safety-time-enable = <1>;
+			qcom,chg-usb-pre-safety-time = <1>;
+			qcom,chg-ac-pre-safety-time = <1>;
+			qcom,chg-usb-fast-safety-time = <2>;
+			qcom,chg-ac-fast-safety-time = <2>;
 
+			qcom,float-option = <2>; /*CEI comment, Invalid charger support*/
 			qcom,thermal-mitigation
-					= <3000000 2500000 2000000 1500000
-						1000000 500000>;
+					= <2400000 1000000 500000 200000>;
 
 			qcom,chgr@1000 {
 				reg = <0x1000 0x100>;
@@ -539,6 +621,13 @@
 			#size-cells = <0>;
 			#io-channel-cells = <1>;
 			qcom,pmic-revid = <&pm660_revid>;
+			somc,reg-cfg =
+				      /* addr mask value */
+				      <0x83 0x07 0x04>, /* FG_ADC_RR_AUX_THERM_CFG */
+				      <0x88 0xFF 0xAF>, /* FG_ADC_RR_AUX_THERM_C1 */
+				      <0x89 0xFF 0x34>, /* FG_ADC_RR_AUX_THERM_C2 */
+				      <0x8A 0xFF 0xDF>, /* FG_ADC_RR_AUX_THERM_C3 */
+				      <0x8B 0xFF 0xA0>; /* FG_ADC_RR_AUX_THERM_HALF_RANGE */
 		};
 
 		pm660_fg: qpnp,fg {
@@ -555,7 +644,16 @@
 			qcom,fg-esr-timer-asleep = <256 256>;
 			qcom,fg-esr-timer-charging = <0 96>;
 			qcom,cycle-counter-en;
+			qcom,fg-sys-term-current = <(-200)>;
+			qcom,fg-cutoff-voltage = <3400>;
 			status = "okay";
+
+			qcom,fg-rsense-sel = <0>;
+			qcom,fg-chg-term-current = <150>;
+			qcom,fg-force-load-profile;
+			
+			qcom,slope-limit-temp-threshold = <10>;
+			qcom,slope-limit-coeffs = <1 1 1 1>;
 
 			qcom,fg-batt-soc@4000 {
 				status = "okay";
@@ -638,9 +736,9 @@
 			qcom,pmic-revid = <&pm660_revid>;
 			qcom,pmic-misc = <&pm660_misc>;
 			qcom,misc-clk-trim-error-reg = <0xf3>;
-			qcom,actuator-type = "lra";
+			qcom,actuator-type = "erm";
 			qcom,play-mode = "direct";
-			qcom,vmax-mv = <3200>;
+			qcom,vmax-mv = <3000>;
 			qcom,ilim-ma = <800>;
 			qcom,wave-shape = "square";
 			qcom,wave-play-rate-us = <6667>;

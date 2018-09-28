@@ -924,6 +924,27 @@ int __sched mutex_trylock(struct mutex *lock)
 }
 EXPORT_SYMBOL(mutex_trylock);
 
+int __sched mutex_trylock_spin(struct mutex *lock)
+{
+	int ret;
+
+	ret = __mutex_fastpath_trylock(&lock->count,
+					__mutex_trylock_slowpath);
+
+	if (!ret) {
+		preempt_disable();
+		ret = mutex_optimistic_spin(lock, NULL, 0);
+		if (ret)
+			mutex_acquire(&lock->dep_map, 0, 1, _RET_IP_);
+		preempt_enable();
+	}
+	if (ret)
+		mutex_set_owner(lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(mutex_trylock_spin);
+
 #ifndef CONFIG_DEBUG_LOCK_ALLOC
 int __sched
 __ww_mutex_lock(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)

@@ -558,11 +558,25 @@ struct qpnp_led_data {
 	int				turn_off_delay_ms;
 };
 
+static int cei_pwm_mode[3];
+static int cei_prev_pwm_mode[3];
 static DEFINE_MUTEX(flash_lock);
 static struct pwm_device *kpdbl_master;
 static u32 kpdbl_master_period_us;
 DECLARE_BITMAP(kpdbl_leds_in_use, NUM_KPDBL_LEDS);
 static bool is_kpdbl_master_turn_on;
+
+bool get_cei_pwm_mode(void)
+{
+	int i;
+
+	for (i = 0; i < 3; i++) {
+		if (cei_pwm_mode[i] != cei_prev_pwm_mode[i])
+			return true;
+	}
+	return true;
+}
+EXPORT_SYMBOL(get_cei_pwm_mode);
 
 static int
 qpnp_led_masked_write(struct qpnp_led_data *led, u16 addr, u8 mask, u8 val)
@@ -1712,7 +1726,9 @@ static int qpnp_rgb_set(struct qpnp_led_data *led)
 {
 	int rc;
 	int duty_us, duty_ns, period_us;
+	int led_id = (led->id - 3);
 
+	cei_pwm_mode[led_id] = led->rgb_cfg->pwm_cfg->mode;
 	if (led->cdev.brightness) {
 		if (!led->rgb_cfg->pwm_cfg->blinking)
 			led->rgb_cfg->pwm_cfg->mode =
@@ -1748,6 +1764,7 @@ static int qpnp_rgb_set(struct qpnp_led_data *led)
 				return rc;
 			}
 		}
+		cei_prev_pwm_mode[led_id] = cei_pwm_mode[led_id];
 		rc = qpnp_led_masked_write(led,
 			RGB_LED_EN_CTL(led->base),
 			led->rgb_cfg->enable, led->rgb_cfg->enable);

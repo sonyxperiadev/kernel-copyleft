@@ -20,7 +20,7 @@
 
 #include <linux/pmic-voter.h>
 
-#define NUM_MAX_CLIENTS		16
+//#define NUM_MAX_CLIENTS		16 //CEI comment, RID001102 Battery Care ver 1.0 for DD
 #define DEBUG_FORCE_CLIENT	"DEBUG_FORCE_CLIENT"
 
 static DEFINE_SPINLOCK(votable_list_slock);
@@ -57,6 +57,19 @@ struct votable {
 	struct dentry		*force_active_ent;
 };
 
+ //CEI comment, RID001102 Battery Care ver 1.0 for DD S
+int somc_chg_get_vote_clients(struct votable *votable, char *clients[])
+{
+	int i;
+	int num_clients = 0;
+	for (i = 0; i < votable->num_clients; i++) {
+		if (votable->client_strs[i])
+			clients[num_clients++] = votable->client_strs[i];
+	}
+	return num_clients;
+}
+ //CEI comment, RID001102 Battery Care ver 1.0 for DD E
+ 
 /**
  * vote_set_any()
  * @votable:	votable object

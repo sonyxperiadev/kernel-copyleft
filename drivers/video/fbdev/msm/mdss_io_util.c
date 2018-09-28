@@ -212,53 +212,144 @@ vreg_get_fail:
 } /* msm_dss_config_vreg */
 EXPORT_SYMBOL(msm_dss_config_vreg);
 
+int msm_dss_enable_vreg_name(struct dss_vreg *in_vreg, int num_vreg, const char *name, int enable)
+{
+	int i = 0, rc = 0;
+	bool need_sleep;
+	if (enable) {
+		for (i = 0; i < num_vreg; i++) {
+			if (0 == strcmp(in_vreg[i].vreg_name, name)) {
+				DEV_DBG("%s: %s enable \n", __func__, in_vreg[i].vreg_name);
+				rc = PTR_RET(in_vreg[i].vreg);
+				if (rc) {
+					DEV_ERR("%pS->%s: %s regulator error. rc=%d\n",
+						__builtin_return_address(0), __func__,
+						in_vreg[i].vreg_name, rc);
+					goto vreg_set_opt_mode_fail;
+				}
+				need_sleep = (regulator_is_enabled(in_vreg[i].vreg) == 0);
+				if (in_vreg[i].pre_on_sleep && need_sleep)
+					usleep_range(in_vreg[i].pre_on_sleep * 1000,
+						in_vreg[i].pre_on_sleep * 1000);
+				rc = regulator_set_load(in_vreg[i].vreg,
+					in_vreg[i].enable_load);
+				if (rc < 0) {
+					DEV_ERR("%pS->%s: %s set opt m fail\n",
+						__builtin_return_address(0), __func__,
+						in_vreg[i].vreg_name);
+					goto vreg_set_opt_mode_fail;
+				}
+				rc = regulator_enable(in_vreg[i].vreg);
+				if (in_vreg[i].post_on_sleep && need_sleep) {
+					DEV_DBG("%s: usleep_range %d\n", __func__,
+					         in_vreg[i].post_on_sleep * 1000);
+					usleep_range(in_vreg[i].post_on_sleep * 1000,
+						in_vreg[i].post_on_sleep * 1000);
+				}
+				if (rc < 0) {
+					DEV_ERR("%pS->%s: %s enable failed\n",
+						__builtin_return_address(0), __func__,
+						in_vreg[i].vreg_name);
+					goto disable_vreg;
+				}
+			}
+		}
+	} else {
+		for (i = num_vreg-1; i >= 0; i--) {
+			if (0 == strcmp(in_vreg[i].vreg_name, name)) {
+				DEV_DBG("%s: %s disable\n", __func__, in_vreg[i].vreg_name);
+				if (in_vreg[i].pre_off_sleep)
+					usleep_range(in_vreg[i].pre_off_sleep * 1000,
+						in_vreg[i].pre_off_sleep * 1000);
+				regulator_set_load(in_vreg[i].vreg,
+					in_vreg[i].disable_load);
+				regulator_disable(in_vreg[i].vreg);
+				if (in_vreg[i].post_off_sleep)
+					usleep_range(in_vreg[i].post_off_sleep * 1000,
+						in_vreg[i].post_off_sleep * 1000);
+			}
+		}
+	}
+	return rc;
+
+disable_vreg:
+	regulator_set_load(in_vreg[i].vreg, in_vreg[i].disable_load);
+
+vreg_set_opt_mode_fail:
+	for (i--; i >= 0; i--) {
+		if (in_vreg[i].pre_off_sleep)
+			usleep_range(in_vreg[i].pre_off_sleep * 1000,
+				in_vreg[i].pre_off_sleep * 1000);
+		regulator_set_load(in_vreg[i].vreg,
+			in_vreg[i].disable_load);
+		regulator_disable(in_vreg[i].vreg);
+		if (in_vreg[i].post_off_sleep)
+			usleep_range(in_vreg[i].post_off_sleep * 1000,
+				in_vreg[i].post_off_sleep * 1000);
+	}
+
+	return rc;
+} /* msm_dss_enable_vreg_name */
+EXPORT_SYMBOL(msm_dss_enable_vreg_name);
+
 int msm_dss_enable_vreg(struct dss_vreg *in_vreg, int num_vreg, int enable)
 {
 	int i = 0, rc = 0;
 	bool need_sleep;
 	if (enable) {
 		for (i = 0; i < num_vreg; i++) {
-			rc = PTR_RET(in_vreg[i].vreg);
-			if (rc) {
-				DEV_ERR("%pS->%s: %s regulator error. rc=%d\n",
-					__builtin_return_address(0), __func__,
-					in_vreg[i].vreg_name, rc);
-				goto vreg_set_opt_mode_fail;
-			}
-			need_sleep = !regulator_is_enabled(in_vreg[i].vreg);
-			if (in_vreg[i].pre_on_sleep && need_sleep)
-				usleep_range(in_vreg[i].pre_on_sleep * 1000,
-					in_vreg[i].pre_on_sleep * 1000);
-			rc = regulator_set_load(in_vreg[i].vreg,
-				in_vreg[i].enable_load);
-			if (rc < 0) {
-				DEV_ERR("%pS->%s: %s set opt m fail\n",
-					__builtin_return_address(0), __func__,
-					in_vreg[i].vreg_name);
-				goto vreg_set_opt_mode_fail;
-			}
-			rc = regulator_enable(in_vreg[i].vreg);
-			if (in_vreg[i].post_on_sleep && need_sleep)
-				usleep_range(in_vreg[i].post_on_sleep * 1000,
-					in_vreg[i].post_on_sleep * 1000);
-			if (rc < 0) {
-				DEV_ERR("%pS->%s: %s enable failed\n",
-					__builtin_return_address(0), __func__,
-					in_vreg[i].vreg_name);
-				goto disable_vreg;
+			if (0 != strncmp(in_vreg[i].vreg_name, "wqhd-vddio", 10) &&
+				0 != strncmp(in_vreg[i].vreg_name, "lab", 3) &&
+				0 != strncmp(in_vreg[i].vreg_name, "ibb", 3)) {
+				rc = PTR_RET(in_vreg[i].vreg);
+				if (rc) {
+					DEV_ERR("%pS->%s: %s regulator error. rc=%d\n",
+						__builtin_return_address(0), __func__,
+						in_vreg[i].vreg_name, rc);
+					goto vreg_set_opt_mode_fail;
+				}
+				need_sleep = !regulator_is_enabled(in_vreg[i].vreg);
+				DEV_DBG("%s: %s enable need_sleep=%d\n", __func__,
+						in_vreg[i].vreg_name, need_sleep);
+				if (in_vreg[i].pre_on_sleep && need_sleep)
+					usleep_range(in_vreg[i].pre_on_sleep * 1000,
+						in_vreg[i].pre_on_sleep * 1000);
+				rc = regulator_set_load(in_vreg[i].vreg,
+					in_vreg[i].enable_load);
+				if (rc < 0) {
+					DEV_ERR("%pS->%s: %s set opt m fail\n",
+						__builtin_return_address(0), __func__,
+						in_vreg[i].vreg_name);
+					goto vreg_set_opt_mode_fail;
+				}
+				rc = regulator_enable(in_vreg[i].vreg);
+				if (in_vreg[i].post_on_sleep && need_sleep)
+					usleep_range(in_vreg[i].post_on_sleep * 1000,
+						in_vreg[i].post_on_sleep * 1000);
+				if (rc < 0) {
+					DEV_ERR("%pS->%s: %s enable failed\n",
+						__builtin_return_address(0), __func__,
+						in_vreg[i].vreg_name);
+					goto disable_vreg;
+				}
 			}
 		}
 	} else {
 		for (i = num_vreg-1; i >= 0; i--) {
-			if (in_vreg[i].pre_off_sleep)
-				usleep_range(in_vreg[i].pre_off_sleep * 1000,
-					in_vreg[i].pre_off_sleep * 1000);
-			regulator_set_load(in_vreg[i].vreg,
-				in_vreg[i].disable_load);
-			regulator_disable(in_vreg[i].vreg);
-			if (in_vreg[i].post_off_sleep)
-				usleep_range(in_vreg[i].post_off_sleep * 1000,
-					in_vreg[i].post_off_sleep * 1000);
+			if (0 != strncmp(in_vreg[i].vreg_name, "wqhd-vddio", 10) &&
+				0 != strncmp(in_vreg[i].vreg_name, "lab", 3) &&
+				0 != strncmp(in_vreg[i].vreg_name, "ibb", 3)) {
+				DEV_DBG("%s: %s disable\n", __func__, in_vreg[i].vreg_name);
+				if (in_vreg[i].pre_off_sleep)
+					usleep_range(in_vreg[i].pre_off_sleep * 1000,
+						in_vreg[i].pre_off_sleep * 1000);
+				regulator_set_load(in_vreg[i].vreg,
+					in_vreg[i].disable_load);
+				regulator_disable(in_vreg[i].vreg);
+				if (in_vreg[i].post_off_sleep)
+					usleep_range(in_vreg[i].post_off_sleep * 1000,
+						in_vreg[i].post_off_sleep * 1000);
+			}
 		}
 	}
 	return rc;

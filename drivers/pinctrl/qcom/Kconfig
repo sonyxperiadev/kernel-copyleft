@@ -134,4 +134,10 @@ config PINCTRL_LPI
 	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
 	  LPI gpio controller block.
 
+config PINCTRL_SOMC
+	bool "SoMC pinctrl driver"
+	default n
+	help
+	  Select this to enable SoMC pinctrl driver.
+
 endif

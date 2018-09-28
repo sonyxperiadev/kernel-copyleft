@@ -4976,6 +4976,8 @@ static int ufshcd_link_startup(struct ufs_hba *hba)
 	if (!ufshcd_is_ufs_dev_active(hba))
 		link_startup_again = true;
 
+	ufshcd_dme_set(hba, UIC_ARG_MIB(PA_AVAILTXDATALANES), 0x1);
+
 link_startup:
 	do {
 		ufshcd_vops_link_startup_notify(hba, PRE_CHANGE);

@@ -28,6 +28,15 @@
 #include "smb-lib.h"
 #include "storm-watch.h"
 #include <linux/pmic-voter.h>
+//CEI comment, FP225896 battery swelling S
+#include <linux/alarmtimer.h>
+//CEI comment, FP225896 battery swelling E
+//CEI comment, soft charge S
+#ifdef CUSTOM_SOFT_CHARGE
+#include <linux/rtc.h>
+#endif
+//CEI comment, soft charge E
+#include <linux/cei_hw_id.h> //CEI comment, JEITA extension
 
 #define SMB2_DEFAULT_WPWR_UW	8000000
 
@@ -137,6 +146,20 @@ static struct smb_params v1_params = {
 		.max_u	= 2000,
 		.step_u	= 200,
 	},
+	.jeita_en_cfg 	= {
+		.name	= "jeita en cfg",
+		.reg	= JEITA_EN_CFG_REG,
+		.min_u	= 0,
+		.max_u	= 2000,
+		.step_u = 200,
+	},
+	.jeita_fvc_cfg 	= {
+		.name	= "jeita fvc cfg",
+		.reg	= JEITA_FVCOMP_CFG_REG,
+		.min_u	= 0,
+		.max_u	= 4725000,
+		.step_u = 7500,
+	},
 };
 
 static struct smb_params pm660_params = {
@@ -187,6 +210,11 @@ module_param_named(
 static int __weak_chg_icl_ua = 500000;
 module_param_named(
 	weak_chg_icl_ua, __weak_chg_icl_ua, int, S_IRUSR | S_IWUSR);
+
+static int __try_sink_enabled = 1;
+module_param_named(
+	try_sink_enabled, __try_sink_enabled, int, 0600
+);
 
 #define MICRO_1P5A		1500000
 #define MICRO_P1A		100000
@@ -286,6 +314,9 @@ static int smb2_parse_dt(struct smb2 *chip)
 				"Couldn't read threm limits rc = %d\n", rc);
 			return rc;
 		}
+		//CEI comments, thermal mitigation S
+		chg->TM_log = devm_kzalloc(chg->dev, byte_len, GFP_KERNEL);
+		//CEI comments, thermal mitigation E
 	}
 
 	of_property_read_u32(node, "qcom,float-option", &chip->dt.float_option);
@@ -304,6 +335,33 @@ static int smb2_parse_dt(struct smb2 *chip)
 		pr_err("qcom,chg-inhibit-threshold-mv is incorrect\n");
 		return -EINVAL;
 	}
+//CEI comment, safety timer switch S
+	rc = of_property_read_u32(node, "qcom,chg-safety-time-enable",
+				&chg->chg_safety_time_enable);
+	if (rc < 0) {
+		chg->chg_safety_time_enable = 1;
+		pr_err("qcom,chg-safety-time-enable is incorrect\n");
+	}
+//CEI comment, safety timer switch E
+	rc = of_property_read_u32(node, "qcom,chg-usb-pre-safety-time",
+				&chg->chg_usb_pre_c_safety_time);
+	if (rc < 0)
+		chg->chg_usb_pre_c_safety_time = PRE_CHARGE_SAFETY_TIMER_TMOUT_192MIN;
+
+	of_property_read_u32(node, "qcom,chg-usb-fast-safety-time",
+				&chg->chg_usb_fast_c_safety_time);
+	if (rc < 0)
+		chg->chg_usb_fast_c_safety_time = FAST_CHARGE_SAFETY_TIMER_TMOUT_1536MIN;
+
+	rc = of_property_read_u32(node, "qcom,chg-ac-pre-safety-time",
+				&chg->chg_ac_pre_c_safety_time);
+	if (rc < 0)
+		chg->chg_ac_pre_c_safety_time = PRE_CHARGE_SAFETY_TIMER_TMOUT_192MIN;
+
+	of_property_read_u32(node, "qcom,chg-ac-fast-safety-time",
+				&chg->chg_ac_fast_c_safety_time);
+	if (rc < 0)
+		chg->chg_ac_fast_c_safety_time = FAST_CHARGE_SAFETY_TIMER_TMOUT_1536MIN;
 
 	chip->dt.auto_recharge_soc = of_property_read_bool(node,
 						"qcom,auto-recharge-soc");
@@ -487,7 +545,9 @@ static int smb2_usb_set_prop(struct power_supply *psy,
 	int rc = 0;
 
 	mutex_lock(&chg->lock);
-	if (!chg->typec_present) {
+	if (!chg->typec_present &&
+		psp != POWER_SUPPLY_PROP_TYPEC_POWER_ROLE) {
+		pr_warn("set_prop is inhibited because typec is not present\n");
 		rc = -EINVAL;
 		goto unlock;
 	}
@@ -927,6 +987,29 @@ static enum power_supply_property smb2_batt_props[] = {
 	POWER_SUPPLY_PROP_DIE_HEALTH,
 	POWER_SUPPLY_PROP_RERUN_AICL,
 	POWER_SUPPLY_PROP_DP_DM,
+//CEI comment, FP225896 battery swelling S
+       POWER_SUPPLY_PROP_BATTERY_SWELLING_SOCMIN,
+       POWER_SUPPLY_PROP_BATTERY_SWELLING_SOCMAX,
+       POWER_SUPPLY_PROP_BATTERY_SWELLING_ENABLED,
+//CEI comment, FP225896 battery swelling E
+//CEI comment, RID001102 Battery Care ver 1.0 for DD S
+       POWER_SUPPLY_PROP_SMART_CHARGING_ACTIVATION,
+       POWER_SUPPLY_PROP_SMART_CHARGING_INTERRUPTION,
+       POWER_SUPPLY_PROP_SMART_CHARGING_STATUS,
+//CEI comment, RID001102 Battery Care ver 1.0 for DD E
+	POWER_SUPPLY_PROP_CHARGING_ENABLED,//CEI comment , charging disbale/enable node
+//TS comment, RID001485 Qnovo adaptive charging S
+        POWER_SUPPLY_PROP_MAX_CHARGE_CURRENT,
+//TS comment, RID001485 Qnovo adaptive charging E
+//CEI comments,  Qnovo adaptive charging S
+       POWER_SUPPLY_PROP_BATTERY_TYPE,
+//CEI comments,  Qnovo adaptive charging E
+//CEI comments, thermal mitigation S
+	POWER_SUPPLY_PROP_TM_DISABLE,
+//CEI comments, thermal mitigation E
+//CEI comment, safety timer switch S
+	POWER_SUPPLY_PROP_SAFETY_TIMER_ENABLE,
+//CEI comment, safety timer switch E
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 };
 
@@ -1009,6 +1092,19 @@ static int smb2_batt_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
 		rc = smblib_get_prop_batt_temp(chg, val);
+//CEI comment, JEITA extension S
+		if ( strcmp(get_cei_mb_id(), "SM12") == 0)
+			rc = smblib_SM12_JEITA_extension(chg, val);
+		else { // since qns will control ibat, so sm22 also need to set fcc by SW instead of HW cc compensation.
+			if (val->intval < 100 || val->intval > 450) {
+				vote(chg->fcc_votable, JEITA_EXTENSION_VOTER, true, 650000);
+				pr_debug("%s(): JEITA_EXTENSION_VOTER, fcc_votable vote 650mA\n",__func__);
+			} else {
+				vote(chg->fcc_votable, JEITA_EXTENSION_VOTER, false, 0);
+				pr_debug("%s(): JEITA_EXTENSION_VOTER, fcc_votable vote 0mA\n",__func__);
+			}
+		}
+//CEI comment, JEITA extension E
 		break;
 	case POWER_SUPPLY_PROP_TECHNOLOGY:
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
@@ -1033,9 +1129,61 @@ static int smb2_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_RERUN_AICL:
 		val->intval = 0;
 		break;
+//CEI comment, FP225896 battery swelling S
+       case POWER_SUPPLY_PROP_BATTERY_SWELLING_SOCMIN:
+               val->intval = chg->lrc_socmin;
+               break;
+       case POWER_SUPPLY_PROP_BATTERY_SWELLING_SOCMAX:
+               val->intval = chg->lrc_socmax;
+               break;
+       case POWER_SUPPLY_PROP_BATTERY_SWELLING_ENABLED:
+	       val->intval = chg->batt_swelling_en;
+               break;
+//CEI comment, FP225896 battery swelling E
+//CEI comment, RID001102 Battery Care ver 1.0 for DD S
+       case POWER_SUPPLY_PROP_SMART_CHARGING_ACTIVATION:
+		val->intval = chg->somc_params.smart.enabled;
+		break;
+       case POWER_SUPPLY_PROP_SMART_CHARGING_INTERRUPTION:
+       case POWER_SUPPLY_PROP_SMART_CHARGING_STATUS:
+		val->intval = chg->somc_params.smart.suspended;
+		break;
+//CEI comment, RID001102 Battery Care ver 1.0 for DD E
+//CEI comment S, charging disbale/enable node
+	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
+		val->intval = get_client_vote(chg->chg_disable_votable, USER_VOTER);
+		break;
+//CEI comment E, charging disbale/enable node	
+//TS comment, RID001485 Qnovo adaptive charging S
+	case POWER_SUPPLY_PROP_MAX_CHARGE_CURRENT:
+		val->intval = get_client_vote(chg->fcc_votable, QNS_VOTER);
+		break;
+//TS comment, RID001485 Qnovo adaptive charging E
+//CEI comments,  Qnovo adaptive charging S
+       case POWER_SUPPLY_PROP_BATTERY_TYPE:
+               chg->bms_psy = power_supply_get_by_name("bms");
+               if (!chg->bms_psy) {
+                       pr_err("%s() :bms psy not found\n", __func__);
+                       rc = -ENODEV;
+                       break;
+               }
+               rc = power_supply_get_property(chg->bms_psy,
+                       POWER_SUPPLY_PROP_BATTERY_TYPE, val);
+               break;
+//CEI comments,  Qnovo adaptive charging E
+//CEI comments, thermal mitigation S
+	case POWER_SUPPLY_PROP_TM_DISABLE:
+		val->intval = chg->TM_disable;
+		break;
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
 		rc = smblib_get_prop_batt_charge_counter(chg, val);
 		break;
+//CEI comments, thermal mitigation E
+//CEI comment, safety timer switch S
+       case POWER_SUPPLY_PROP_SAFETY_TIMER_ENABLE:
+               val->intval = chg->chg_safety_time_enable;
+               break;
+//CEI comment, safety timer switch E
 	default:
 		pr_err("batt power supply prop %d not supported\n", psp);
 		return -EINVAL;
@@ -1130,6 +1278,94 @@ static int smb2_batt_set_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMITED:
 		rc = smblib_set_prop_input_current_limited(chg, val);
 		break;
+	case POWER_SUPPLY_PROP_JEITA_EN_CFG:
+		rc = smblib_write(chg, chg->param.jeita_en_cfg.reg, val->intval);
+		if (rc < 0) {
+			pr_err("JEITA EN CFG Couldn't write 0x%02x rc=%d\n", val->intval, rc);
+			return rc;
+		}
+		break;
+	case POWER_SUPPLY_PROP_JEITA_FVC_CFG:
+		rc = smblib_set_charge_param(chg, &chg->param.jeita_fvc_cfg, val->intval);
+		if (rc < 0) {
+			pr_err("Couldn't configure jeita_fvc_cfg rc = %d\n", rc);
+			return rc;
+		}
+		break;
+	case POWER_SUPPLY_PROP_JEITA_CCC_CFG:
+		rc = smblib_set_charge_param(chg, &chg->param.jeita_cc_comp, val->intval);
+		if (rc < 0) {
+			pr_err("Couldn't configure jeita_cc_comp rc = %d\n", rc);
+			return rc;
+		}
+		break;
+//CEI comment, FP225896 battery swelling S
+       case POWER_SUPPLY_PROP_BATTERY_SWELLING_SOCMIN:
+               chg->lrc_socmin = val->intval;
+               break;
+       case POWER_SUPPLY_PROP_BATTERY_SWELLING_SOCMAX:
+               chg->lrc_socmax = val->intval;
+               break;
+       case POWER_SUPPLY_PROP_BATTERY_SWELLING_ENABLED:
+               if(val->intval == 0) {
+                       alarm_cancel(&chg->batt_swelling_timer);
+                       vote(chg->chg_disable_votable, BATT_SWELLING_VOTER, false, 0);
+		       chg->batt_swelling_en = 0;
+                       pr_info("cancel battery_swelling_timer timer\n");
+               } else {
+                       alarm_start(&chg->batt_swelling_timer, ktime_get_boottime());
+		       chg->batt_swelling_en = 1;
+                       pr_info("start battery_swelling_timer timer\n");
+               }
+               break;
+//CEI comment, FP225896 battery swelling E
+//CEI comment, RID001102 Battery Care ver 1.0 for DD S
+       case POWER_SUPPLY_PROP_SMART_CHARGING_ACTIVATION:
+		if (val->intval) {
+			pr_debug("Smart Charging was activated.\n");
+			chg->somc_params.smart.enabled = true;
+		}
+		break;
+       case POWER_SUPPLY_PROP_SMART_CHARGING_INTERRUPTION:
+		if (chg->somc_params.smart.enabled) {
+			chg->somc_params.smart.suspended = (bool)val->intval;
+			rc = somc_chg_smart_set_suspend(chg);
+			power_supply_changed(chg->batt_psy);
+		}
+		break;
+//CEI comment, RID001102 Battery Care ver 1.0 for DD E
+//CEI comment S, charging disbale/enable node
+	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
+		if(val->intval == 0)
+			vote(chg->chg_disable_votable, USER_VOTER, true, 0);
+		else
+			vote(chg->chg_disable_votable, USER_VOTER, false, 0);
+		break;
+//CEI comment E, charging disbale/enable node
+//TS comment, RID001485 Qnovo adaptive charging S
+	case POWER_SUPPLY_PROP_MAX_CHARGE_CURRENT:
+		vote(chg->fcc_votable, QNS_VOTER, true, val->intval);
+		break;
+//TS comment, RID001485 Qnovo adaptive charging E
+//CEI comments, thermal mitigation S
+	case POWER_SUPPLY_PROP_TM_DISABLE:
+		chg->TM_disable = val->intval;
+		break;
+//CEI comments, thermal mitigation E
+//CEI comment, safety timer switch S
+	case POWER_SUPPLY_PROP_SAFETY_TIMER_ENABLE:
+               if (val->intval == 0) {
+                       rc = smblib_masked_write(chg, SCHG_CHGR_CHARGE_SAFETY_TIMER_ENABLE_CFG,
+                               CHARGE_SAFETY_TIMER_ENABLE_CFG_MASK, 0);
+                       chg->chg_safety_time_enable = val->intval;
+               } else if (val->intval == 1) {
+                       rc = smblib_masked_write(chg, SCHG_CHGR_CHARGE_SAFETY_TIMER_ENABLE_CFG,
+                               CHARGE_SAFETY_TIMER_ENABLE_CFG_MASK, 3);        
+                       chg->chg_safety_time_enable = val->intval;
+               } else 
+                       pr_info("invalid parameter val->intval = %d\n", val->intval);
+               break;
+//CEI comment, safety timer switch E
 	default:
 		rc = -EINVAL;
 	}
@@ -1148,7 +1384,26 @@ static int smb2_batt_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_DP_DM:
 	case POWER_SUPPLY_PROP_RERUN_AICL:
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMITED:
+//CEI comment, FP225896 battery swelling S
+       case POWER_SUPPLY_PROP_BATTERY_SWELLING_SOCMIN:
+       case POWER_SUPPLY_PROP_BATTERY_SWELLING_SOCMAX:
+       case POWER_SUPPLY_PROP_BATTERY_SWELLING_ENABLED:
+//CEI comment, FP225896 battery swelling E
+//CEI comment, RID001102 Battery Care ver 1.0 for DD S
+       case POWER_SUPPLY_PROP_SMART_CHARGING_ACTIVATION:
+       case POWER_SUPPLY_PROP_SMART_CHARGING_INTERRUPTION:
+//CEI comment, RID001102 Battery Care ver 1.0 for DD E
+       case POWER_SUPPLY_PROP_CHARGING_ENABLED: //CEI comment S, charging disbale/enable node
+//TS comment, RID001485 Qnovo adaptive charging S
+	case POWER_SUPPLY_PROP_MAX_CHARGE_CURRENT:
+//TS comment, RID001485 Qnovo adaptive charging E
 	case POWER_SUPPLY_PROP_STEP_CHARGING_ENABLED:
+//CEI comments, thermal mitigation S
+	case POWER_SUPPLY_PROP_TM_DISABLE:
+//CEI comments, thermal mitigation E
+//CEI comment, safety timer switch S
+	case POWER_SUPPLY_PROP_SAFETY_TIMER_ENABLE:
+//CEI comment, safety timer switch E
 	case POWER_SUPPLY_PROP_SW_JEITA_ENABLED:
 		return 1;
 	default:
@@ -1448,6 +1703,708 @@ static int smb2_disable_typec(struct smb_charger *chg)
 	return rc;
 }
 
+//CEI comment, FP225896 battery swelling S
+static void battery_swelling_work(struct work_struct *work)
+{
+       union power_supply_propval pval = {0, };
+       int rc;
+       struct smb_charger *chg = container_of(work, struct smb_charger, batt_swelling_work);
+
+       rc = smblib_get_prop_batt_capacity(chg, &pval);
+       if (rc < 0)
+               pr_err("%s: Couldn't get batt capacity rc=%d\n", __func__, rc);
+
+       if (pval.intval <= chg->lrc_socmin) {
+               vote(chg->chg_disable_votable, BATT_SWELLING_VOTER, false, 0);
+               pr_info("%s: capacity %d <= %d percent\n", __func__, pval.intval, chg->lrc_socmin);
+       } else if (pval.intval >= chg->lrc_socmax) {
+               vote(chg->chg_disable_votable, BATT_SWELLING_VOTER, true, 0);
+               pr_info("%s: capacity %d >= %d percent\n", __func__, pval.intval, chg->lrc_socmax);
+       } else {
+               pr_info("%s: capacity between %d to %d percent\n", __func__, chg->lrc_socmin, chg->lrc_socmax);
+       }
+}
+
+static enum alarmtimer_restart smb2_battery_swelling_check(struct alarm *alarm, ktime_t now)
+{
+       struct smb_charger *chg = container_of(alarm, struct smb_charger, batt_swelling_timer);
+
+       pr_info("%s:ktime stamp at %lld\n", __func__, ktime_to_ms(ktime_get_boottime()));
+       schedule_work(&chg->batt_swelling_work);
+       alarm_forward_now(alarm, ktime_set(60,0));
+
+       return ALARMTIMER_RESTART;
+
+}
+
+//CEI comment, FP225896 battery swelling E
+
+//CEI comments, thermal mitigation S
+void thermal_mitigation_debug(struct smb_charger *chg) 
+{
+	int i =0;
+	int desc = 0;
+	char TM_str[300];
+	
+	for (i=0; i < chg->thermal_levels; i++) {
+		desc += sprintf(TM_str + desc,"TM_log[%d]=%d ", i , chg->TM_log[i]);
+	}
+	desc += sprintf(TM_str + desc,"TM_disable=%d ", chg->TM_disable);
+	
+	pr_info("%s(): %s\n", __func__, TM_str);
+}
+static int cei_debug_dump(struct smb_charger *chg)
+{
+	thermal_mitigation_debug(chg);
+	return 0;
+}
+//CEI comments, thermal mitigation E
+
+//CEI comment, soft charge S
+#ifdef CUSTOM_SOFT_CHARGE
+unsigned int SC30_timeA, SC30_timeB, SC30_timeC, SC30_timeTT;
+unsigned int SC31_timeA, SC31_timeB, SC31_timeC, SC31_timeTT;
+unsigned int soft_charge_en = 1;
+unsigned int soft_charge_thread_time = 600;
+char soft_charge31_LV1_time[9]={'\0'};
+char soft_charge31_LV2_time[9]={'\0'};
+
+#define BATT_TYPE_STR_SM12_SEND	"1309-2675"
+#define BATT_TYPE_STR_SM12_TDK	"1309-2682"
+#define BATT_TYPE_STR_SM22_SEND	"1308-3580"
+
+unsigned int SC30_aging_level = 0;
+unsigned int SC31_aging_level = 0;
+
+enum {
+	BATT_TYPE_SM12_SEND,
+	BATT_TYPE_SM12_TDK,
+	BATT_TYPE_SM22_SEND,
+};
+
+//SM12 use soft charge 3.1 start ------------
+
+#define SC31_TIMET_INDEX   3
+#define SC31_TIMEC_INDEX   2
+#define SC31_TIMEB_INDEX  1
+#define SC31_TIMEA_INDEX  0
+
+#define SC31_LV1_FLOAT_VOLTAGE  4360000  // 4357
+#define SC31_LV1_CC_CV_VOLTAGE  4347000
+#define SC31_LV1_RECHARGE_VOLTAGE  4260000
+#define SC31_LV2_FLOAT_VOLTAGE  4340000 //4335
+#define SC31_LV2_CC_CV_VOLTAGE  4325000
+#define SC31_LV2_RECHARGE_VOLTAGE  4240000
+
+#define SM12_SEND_LV1_timeA_FACTOR		486
+#define SM12_SEND_LV1_timeB_FACTOR		195
+#define SM12_SEND_LV1_timeC_FACTOR		126
+#define SM12_SEND_LV1_AGING_TIME			180000 // 50H = 3000M = 180000S
+
+#define SM12_SEND_LV2_timeA_FACTOR		541
+#define SM12_SEND_LV2_timeB_FACTOR		216
+#define SM12_SEND_LV2_timeC_FACTOR		140
+#define SM12_SEND_LV2_AGING_TIME			180000 // 50H = 3000M = 180000S
+
+#define SM12_TDK_LV1_timeA_FACTOR		486
+#define SM12_TDK_LV1_timeB_FACTOR		195
+#define SM12_TDK_LV1_timeC_FACTOR		126
+#define SM12_TDK_LV1_AGING_TIME				180000 // 50H = 3000M = 180000S
+
+#define SM12_TDK_LV2_timeA_FACTOR		541
+#define SM12_TDK_LV2_timeB_FACTOR		216
+#define SM12_TDK_LV2_timeC_FACTOR		140
+#define SM12_TDK_LV2_AGING_TIME				180000 // 50H = 3000M = 180000S
+//SM12 use soft charge 3.1 end ------------
+
+//SM22 use soft charge 3.0 strart ---------
+
+#define SC30_LV1_FLOAT_VOLTAGE  4300000 //4297
+#define SC30_LV1_CC_CV_VOLTAGE  4287000
+#define SC30_LV1_RECHARGE_VOLTAGE  4200000
+
+#define SM22_SEND_LV1_timeA_FACTOR		832
+#define SM22_SEND_LV1_timeB_FACTOR		273
+#define SM22_SEND_LV1_timeC_FACTOR		161
+#define SM22_SEND_LV1_AGING_TIME		900000 // 250H = 15000M = 900000S
+//SM22 use soft charge 3.0 end ---------
+static int soft_charge_update_battery_type(struct smb_charger *chg)
+{
+	union power_supply_propval pval = {0, };
+        int rc;	
+		
+	chg->bms_psy = power_supply_get_by_name("bms");
+
+	if (!chg->bms_psy) {
+		pr_err("[SC]%s() :bms psy not found\n", __func__);
+		return false;
+	}
+	rc = power_supply_get_property(chg->bms_psy,
+			POWER_SUPPLY_PROP_BATTERY_TYPE, &pval);
+
+	 if (rc < 0) {
+		pr_err("[SC]%s():  Couldn't get POWER_SUPPLY_PROP_BATTERY_TYPE , rc=%d\n", __func__, rc);
+		return false;
+	}
+		 
+	if (strcmp(BATT_TYPE_STR_SM12_SEND, pval.strval) == 0) {
+		chg->batt_type = 0;
+		pr_debug("[SC]%s(): battery type %d found\n", __func__, chg->batt_type);
+	} else if (strcmp(BATT_TYPE_STR_SM12_TDK, pval.strval) == 0) {
+		chg->batt_type = 1;
+		pr_debug("[SC]%s(): battery type %d found\n", __func__, chg->batt_type);
+	} else if (strcmp(BATT_TYPE_STR_SM22_SEND, pval.strval) == 0) {
+		chg->batt_type = 2;
+		pr_debug("[SC]%s(): battery type %d found\n", __func__, chg->batt_type);
+	} else {
+		chg->batt_type = -1;
+		pr_debug("[SC]%s(): battery type not found\n", __func__);
+		return false;
+	}
+	
+	return true;
+}
+static int cal_for_sm12_send(struct smb_charger *chg, int bat_vol, int bat_temp)
+{
+	unsigned int aging_level;
+	struct timespec ts;
+	struct rtc_time tm;
+	ssize_t retval;
+	
+	if (bat_vol > 4290) {
+		if (bat_temp >= 20 && bat_temp <= 30) {
+			SC31_timeA += soft_charge_thread_time;
+			pr_debug("[SC]less than 30 degrees and battery voltage more than 4.29 V\n");
+		} else if (bat_temp > 30 && bat_temp <= 40) {
+			SC31_timeB += soft_charge_thread_time;
+			pr_debug("[SC]between 30 and 40 degrees battery voltage more than 4.29 V\n");
+		} else if (bat_temp > 40) {
+			SC31_timeC += soft_charge_thread_time;
+			pr_debug("[SC]more than 40 degrees and battery voltage more than 4.29 V\n");
+		}
+	}
+
+
+	if (strcmp(soft_charge31_LV2_time, "\0")) { // LV2 already triggered
+		SC31_timeTT = SC31_timeA * 100/SM12_SEND_LV2_timeA_FACTOR + 
+			SC31_timeB * 100/SM12_SEND_LV2_timeB_FACTOR + 
+				       SC31_timeC * 100/SM12_SEND_LV2_timeC_FACTOR;
+		aging_level = 2;
+
+	} else if (strcmp(soft_charge31_LV1_time, "\0")) { //LV1 already triggered
+		SC31_timeTT = SC31_timeA * 100/SM12_SEND_LV2_timeA_FACTOR + 
+			SC31_timeB * 100/SM12_SEND_LV2_timeB_FACTOR + 
+				       SC31_timeC * 100/SM12_SEND_LV2_timeC_FACTOR;	
+		
+		if (SC31_timeTT > SM12_SEND_LV2_AGING_TIME) { // LV2 is triggering
+			getnstimeofday(&ts);
+			rtc_time_to_tm(ts.tv_sec, &tm);
+			retval = snprintf(soft_charge31_LV2_time, sizeof(soft_charge31_LV1_time), 
+				"%04d%02d%02d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+			aging_level = 2;		
+			pr_debug("[SC]%s() save data, aging_level %d, SC31_timeA %d, SC31_timeB %d, SC31_timeC %d, SC31_timeTT %d\n", 
+				__func__, aging_level, SC31_timeA, SC31_timeB, SC31_timeC, SC31_timeTT);
+			pr_debug("[SC]%s() lv2 triggered, soft_charge31_LV2_time %s\n", __func__, soft_charge31_LV2_time);
+		} else {
+			aging_level = 1;
+		}
+	} else {// both  LV1 and LV2 don't trigger yet
+		SC31_timeTT = SC31_timeA * 100 /SM12_SEND_LV1_timeA_FACTOR +
+				SC31_timeB * 100/SM12_SEND_LV1_timeB_FACTOR + SC31_timeC * 100/SM12_SEND_LV1_timeC_FACTOR;
+		
+		if (SC31_timeTT > SM12_SEND_LV1_AGING_TIME) { // LV1 is triggering
+			aging_level = 1;
+			SC31_timeA = 0;
+			SC31_timeB = 0;
+			SC31_timeC = 0;
+			SC31_timeTT = 0;
+			
+			getnstimeofday(&ts);
+			rtc_time_to_tm(ts.tv_sec, &tm);
+			retval = snprintf(soft_charge31_LV1_time, sizeof(soft_charge31_LV1_time), 
+				"%04d%02d%02d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+			
+			pr_debug("[SC]%s() save data, aging_level %d, SC31_timeA %d, SC31_timeB %d, SC31_timeC %d, SC31_timeTT %d\n", 
+				__func__, aging_level, SC31_timeA, SC31_timeB, SC31_timeC, SC31_timeTT);
+			pr_debug("[SC]%s() lv1 triggered, soft_charge31_LV1_time %s\n", __func__, soft_charge31_LV1_time);
+		} else {
+			aging_level = 0;
+		}
+	}
+
+//to avoid overflow S
+	if ( SC31_timeA >= 2147482648) {
+		SC31_timeA = 2147482648;
+		pr_debug("[SC] limit SC31_timeA %u\n ", SC31_timeA);
+	} else if (SC31_timeB >= 2147482648) { 
+		SC31_timeB = 2147482648;
+		pr_debug("[SC] limit SC31_timeB %u\n ", SC31_timeB);
+	} else if (SC31_timeC >= 2147482648) {
+		SC31_timeC = 2147482648;
+		pr_debug("[SC] limit SC31_timeC %u\n ", SC31_timeC);
+	} else if (SC31_timeTT >= 2147482648) {
+		SC31_timeTT = 2147482648;
+		pr_debug("[SC] limit SC31_timeTT %u\n ", SC31_timeTT);
+	}
+//to avoid overflow E
+	
+	pr_info("[SC]%s() aging_level %d, LV1 time %s, LV2 time %s", 
+			__func__, aging_level, soft_charge31_LV1_time, soft_charge31_LV2_time);
+			
+	pr_info("[SC]%s() SC31_timeA %d, SC31_timeB %d, SC31_timeC %d, SC31_timeTT %d, bat_vol %d, bat_temp %d\n", 
+			__func__, SC31_timeA, SC31_timeB, SC31_timeC, SC31_timeTT , bat_vol, bat_temp);
+
+	return aging_level;
+}
+
+static int cal_for_sm12_tdk(struct smb_charger *chg, int bat_vol, int bat_temp)
+{
+	unsigned int aging_level;
+	struct timespec ts;
+	struct rtc_time tm;
+	ssize_t retval;
+	
+	if (bat_vol > 4290) {
+		if (bat_temp >= 20 && bat_temp <= 30) {
+			SC31_timeA += soft_charge_thread_time;
+			pr_debug("[SC]less than 30 degrees and battery voltage more than 4.29 V\n");
+		} else if (bat_temp > 30 && bat_temp <= 40) {
+			SC31_timeB += soft_charge_thread_time;
+			pr_debug("[SC]between 30 and 40 degrees battery voltage more than 4.29 V\n");
+		} else if (bat_temp > 40) {
+			SC31_timeC += soft_charge_thread_time;
+			pr_debug("[SC]more than 40 degrees and battery voltage more than 4.29 V\n");
+		}
+	}
+
+	if (strcmp(soft_charge31_LV2_time, "\0")) { // LV2 already triggered
+		SC31_timeTT = SC31_timeA * 100/SM12_TDK_LV2_timeA_FACTOR + 
+			SC31_timeB * 100/SM12_TDK_LV2_timeB_FACTOR + 
+				       SC31_timeC * 100/SM12_TDK_LV2_timeC_FACTOR;
+		aging_level = 2;
+
+	} else if (strcmp(soft_charge31_LV1_time, "\0")) { //LV1 already triggered
+		SC31_timeTT = SC31_timeA * 100/SM12_TDK_LV2_timeA_FACTOR + 
+			SC31_timeB * 100/SM12_TDK_LV2_timeB_FACTOR + 
+				       SC31_timeC * 100/SM12_TDK_LV2_timeC_FACTOR;	
+		
+		if (SC31_timeTT > SM12_TDK_LV2_AGING_TIME) { // LV2 is triggering
+			getnstimeofday(&ts);
+			rtc_time_to_tm(ts.tv_sec, &tm);
+			retval = snprintf(soft_charge31_LV2_time, sizeof(soft_charge31_LV2_time),
+				"%04d%02d%02d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+			aging_level = 2;	
+			pr_debug("[SC]%s() save data, aging_level %d, SC31_timeA %d, SC31_timeB %d, SC31_timeC %d, SC31_timeTT %d\n", 
+				__func__, aging_level, SC31_timeA, SC31_timeB, SC31_timeC, SC31_timeTT);
+			pr_debug("[SC]%s() lv2 triggered, soft_charge31_LV2_time %s\n", __func__, soft_charge31_LV2_time);
+		} else {
+			aging_level = 1;
+		}
+	} else {// both  LV1 and LV2 don't trigger yet
+		SC31_timeTT = SC31_timeA * 100 /SM12_TDK_LV1_timeA_FACTOR + 
+				SC31_timeB * 100/SM12_TDK_LV1_timeB_FACTOR + SC31_timeC * 100/SM12_TDK_LV1_timeC_FACTOR;
+		
+		if (SC31_timeTT > SM12_TDK_LV1_AGING_TIME) { // LV1 is triggering
+			aging_level = 1;
+			SC31_timeA = 0;
+			SC31_timeB = 0;
+			SC31_timeC = 0;
+			SC31_timeTT = 0;
+			
+			getnstimeofday(&ts);
+			rtc_time_to_tm(ts.tv_sec, &tm);
+			retval = snprintf(soft_charge31_LV1_time, sizeof(soft_charge31_LV1_time), 
+				"%04d%02d%02d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+			
+			pr_debug("[SC]%s() save data, aging_level %d, SC31_timeA %d, SC31_timeB %d, SC31_timeC %d, SC31_timeTT %d\n", 
+				__func__, aging_level, SC31_timeA, SC31_timeB, SC31_timeC, SC31_timeTT);
+			pr_debug("[SC]%s() lv1 triggered, soft_charge31_LV1_time %s\n", __func__, soft_charge31_LV1_time);
+
+		} else {
+			aging_level = 0;
+		}
+	}
+
+//to avoid overflow S
+	if ( SC31_timeA >= 2147482648) {
+		SC31_timeA = 2147482648;
+		pr_debug("[SC] limit SC31_timeA %u\n ", SC31_timeA);
+	} else if (SC31_timeB >= 2147482648) { 
+		SC31_timeB = 2147482648;
+		pr_debug("[SC] limit SC31_timeB %u\n ", SC31_timeB);
+	} else if (SC31_timeC >= 2147482648) {
+		SC31_timeC = 2147482648;
+		pr_debug("[SC] limit SC31_timeC %u\n ", SC31_timeC);
+	} else if (SC31_timeTT >= 2147482648) {
+		SC31_timeTT = 2147482648;
+		pr_debug("[SC] limit SC31_timeTT %u\n ", SC31_timeTT);
+	}
+//to avoid overflow E
+
+	pr_info("[SC]%s() aging_level %d, LV1 time %s, LV2 time %s", 
+			__func__, aging_level, soft_charge31_LV1_time, soft_charge31_LV2_time);
+			
+	pr_info("[SC]%s() SC31_timeA %d, SC31_timeB %d, SC31_timeC %d, SC31_timeTT %d, bat_vol %d, bat_temp %d\n", 
+			__func__, SC31_timeA, SC31_timeB, SC31_timeC, SC31_timeTT , bat_vol, bat_temp);
+	
+	return aging_level;
+}
+
+
+static int cal_for_sm22_send(struct smb_charger *chg, int bat_vol, int bat_temp)
+{
+	unsigned int aging_level;
+
+	if (bat_vol > 4250) {
+		if (bat_temp >= 20 && bat_temp <= 30) {
+			SC30_timeA += soft_charge_thread_time;
+			pr_debug("[SC]less than 30 degrees and battery voltage more than 4.25 V\n");
+		} else if (bat_temp > 30 && bat_temp <= 40) {
+			SC30_timeB += soft_charge_thread_time;
+			pr_debug("[SC]between 30 and 40 degrees battery voltage more than 4.25 V\n");
+		} else if (bat_temp > 40) {
+			SC30_timeC += soft_charge_thread_time;
+			pr_debug("[SC]more than 40 degrees and battery voltage more than 4.25 V\n");
+		}
+	}
+	
+	SC30_timeTT = SC30_timeA * 100 /SM22_SEND_LV1_timeA_FACTOR + 
+				SC30_timeB * 100/SM22_SEND_LV1_timeB_FACTOR + SC30_timeC * 100/SM22_SEND_LV1_timeC_FACTOR;
+		
+	if (SC30_timeTT < SM22_SEND_LV1_AGING_TIME)
+		aging_level = 0;
+	else 
+		aging_level = 1;
+
+//to avoid overflow S
+	if ( SC30_timeA >= 2147482648) {
+		SC30_timeA = 2147482648;
+		pr_debug("[SC] limit SC30_timeA %u\n ", SC30_timeA);
+	} else if (SC30_timeB >= 2147482648) { 
+		SC30_timeB = 2147482648;
+		pr_debug("[SC] limit SC30_timeB %u\n ", SC30_timeB);
+	} else if (SC30_timeC >= 2147482648) {
+		SC30_timeC = 2147482648;
+		pr_debug("[SC] limit SC30_timeC %u\n ", SC30_timeC);
+	} else if (SC30_timeTT >= 2147482648) {
+		SC30_timeTT = 2147482648;
+		pr_debug("[SC] limit SC30_timeTT %u\n ", SC30_timeTT);
+	}
+//to avoid overflow E
+
+	pr_info("[SC]%s()  aging_level %d,time_A %d,time_B %d,time_C %d,time_T %d,bat_vol %d,bat_temp %d\n", 
+				__func__, aging_level, SC30_timeA, SC30_timeB, SC30_timeC, SC30_timeTT, bat_vol, bat_temp);
+	
+	return aging_level;
+}
+
+int set_soft_charge31_mode(struct smb_charger *chg, unsigned int determinate_aging_level)
+{
+	union power_supply_propval pval = {0, };
+        int rc;	
+		
+	chg->bms_psy = power_supply_get_by_name("bms");
+
+	if (!chg->bms_psy) {
+		pr_err("[SC]%s() : bms psy not found\n", __func__);
+		return false;
+	}
+		
+	if (determinate_aging_level == 1) {
+		vote(chg->fv_votable, BATT_PROFILE_VOTER, true, SC31_LV1_FLOAT_VOLTAGE);
+		pval.intval = SC31_LV1_CC_CV_VOLTAGE;
+		rc = power_supply_set_property(chg->bms_psy, POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE, 
+			&pval);
+		 if (rc < 0) {
+			pr_err("[SC]%s():  Couldn't set POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE , rc=%d\n", 
+				__func__, rc);
+		}
+		pval.intval = SC31_LV1_RECHARGE_VOLTAGE;
+		rc = power_supply_set_property(chg->bms_psy, POWER_SUPPLY_PROP_RECHARGE_VOLTAGE, 
+			&pval);
+		 if (rc < 0) {
+			pr_err("[SC]%s():  Couldn't set POWER_SUPPLY_PROP_RECHARGE_VOLTAGE , rc=%d\n", 
+				__func__, rc);
+		}
+		pr_debug("[SC]%s() determinate_aging_level %d\n", __func__, determinate_aging_level);
+	} else if (determinate_aging_level == 2) {
+		vote(chg->fv_votable, BATT_PROFILE_VOTER, true, SC31_LV2_FLOAT_VOLTAGE);
+		pval.intval = SC31_LV2_CC_CV_VOLTAGE;
+		rc = power_supply_set_property(chg->bms_psy, POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE, 
+			&pval);
+		 if (rc < 0) {
+			pr_err("[SC]%s():  Couldn't set POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE , rc=%d\n", 
+				__func__, rc);
+		}
+		pval.intval = SC31_LV2_RECHARGE_VOLTAGE;
+		rc = power_supply_set_property(chg->bms_psy, POWER_SUPPLY_PROP_RECHARGE_VOLTAGE, 
+			&pval);
+		 if (rc < 0) {
+			pr_err("[SC]%s():  Couldn't set POWER_SUPPLY_PROP_RECHARGE_VOLTAGE , rc=%d\n", 
+				__func__, rc);
+		}
+		 
+		pr_debug("[SC]%s() determinate_aging_level %d\n", __func__, determinate_aging_level);
+	} else {
+		pr_debug("[SC]%s() not limit aging level , determinate_aging_level %d\n", __func__, determinate_aging_level);
+	}
+	SC31_aging_level = determinate_aging_level;
+	
+	return true;
+}
+
+int set_soft_charge30_mode(struct smb_charger *chg, unsigned int determinate_aging_level)
+{	
+	union power_supply_propval pval = {0, };
+        int rc;	
+		
+	chg->bms_psy = power_supply_get_by_name("bms");
+
+	if (!chg->bms_psy) {
+		pr_err("[SC]%s() : bms psy not found\n", __func__);
+		return false;
+	}
+	if (determinate_aging_level == 1) {
+		vote(chg->fv_votable, BATT_PROFILE_VOTER, true, SC30_LV1_FLOAT_VOLTAGE);
+		pval.intval = SC30_LV1_CC_CV_VOLTAGE;
+		rc = power_supply_set_property(chg->bms_psy, POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE, 
+			&pval);
+		 if (rc < 0) {
+			pr_err("[SC]%s():  Couldn't set POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE , rc=%d\n", 
+				__func__, rc);
+		}
+		pval.intval = SC30_LV1_RECHARGE_VOLTAGE;
+		rc = power_supply_set_property(chg->bms_psy, POWER_SUPPLY_PROP_RECHARGE_VOLTAGE, 
+			&pval);
+		 if (rc < 0) {
+			pr_err("[SC]%s():  Couldn't set POWER_SUPPLY_PROP_RECHARGE_VOLTAGE , rc=%d\n", 
+				__func__, rc);
+		}
+		pr_debug("[SC]%s() determinate_aging_level %d\n", __func__, determinate_aging_level);
+	} else {
+		pr_debug("[SC]%s() not limit aging level , determinate_aging_level %d\n", __func__, determinate_aging_level);
+	}
+	SC30_aging_level = determinate_aging_level;
+	return true;
+}
+
+static void soft_charge_work(struct work_struct *work)
+{
+       unsigned int  determinate_aging_level;
+       union power_supply_propval bat_temp = {0, };
+       union power_supply_propval bat_vol = {0, };
+       int rc;
+       static unsigned int soft_charge_batt_type_init = 0;
+	   
+       struct smb_charger *chg = container_of(work, struct smb_charger, soft_charge_work);
+
+	if (soft_charge_en == false) {
+		pr_debug("[SC]%s() : soft charge work stop due to soft_charge_en = %d\n", __func__, soft_charge_en);
+		return;
+	}
+
+	rc = cei_debug_dump(chg);
+	
+	if (!soft_charge_batt_type_init) {
+		rc = soft_charge_update_battery_type(chg);
+		if (!rc) {
+			pr_err("[SC]%s() : soft_charge_update_battery_type not found battery type\n", __func__);
+			return;
+		}
+		soft_charge_batt_type_init = 1;
+	}
+	
+	chg->bms_psy = power_supply_get_by_name("bms");
+	
+	if (!chg->bms_psy) {
+		pr_err("[SC]%s() : bms psy not found\n", __func__);
+		return;
+	}
+	rc = power_supply_get_property(chg->bms_psy,
+			POWER_SUPPLY_PROP_TEMP, &bat_temp);
+	
+	if (rc < 0) {
+		pr_err("[SC]%s(): Couldn't get POWER_SUPPLY_PROP_TEMP , rc=%d\n", __func__, rc);
+		return;
+	}
+	
+	rc = smblib_get_prop_batt_voltage_now(chg, &bat_vol);
+	
+	if (rc < 0) {
+		pr_err("[SC]%s(): Couldn't get smblib_get_prop_batt_voltage_now , rc=%d\n", __func__, rc);
+		return;
+	}
+
+ 	switch (chg->batt_type) {
+ 	case BATT_TYPE_SM12_SEND:
+		 determinate_aging_level = cal_for_sm12_send(chg, bat_vol.intval/1000, bat_temp.intval/10);
+		 rc = set_soft_charge31_mode(chg, determinate_aging_level);
+		 if (rc < 0) {
+			pr_err("[SC]%s(): BATT_TYPE_SM12_SEND, set_soft_charge31_mode fail , rc=%d\n", __func__, rc);
+			return;
+		}
+		break;
+	case BATT_TYPE_SM12_TDK:
+		 determinate_aging_level= cal_for_sm12_tdk(chg, bat_vol.intval/1000, bat_temp.intval/10);
+		 rc = set_soft_charge31_mode(chg, determinate_aging_level);
+		 if (rc < 0) {
+			pr_err("[SC]%s(): BATT_TYPE_SM12_TDK, set_soft_charge31_mode fail , rc=%d\n", __func__, rc);
+			return;
+		}
+		break;
+	case BATT_TYPE_SM22_SEND:
+		determinate_aging_level = cal_for_sm22_send(chg, bat_vol.intval/1000, bat_temp.intval/10);
+		 rc = set_soft_charge30_mode(chg, determinate_aging_level);
+		 if (rc < 0) {
+			pr_err("[SC]%s(): BATT_TYPE_SM22_SEND, set_soft_charge30_mode fail , rc=%d\n", __func__, rc);
+			return;
+		}
+ 		break;
+ 	default:
+ 		break;
+ 	}	
+}
+
+static enum alarmtimer_restart smb2_soft_charge_check(struct alarm *alarm, ktime_t now)
+{
+       struct smb_charger *chg = container_of(alarm, struct smb_charger, soft_charge_timer);
+	ktime_t temp_time;
+       	pr_debug("[SC]%s():ktime stamp at %lld\n", __func__, ktime_to_ms(ktime_get_boottime()));
+       	schedule_work(&chg->soft_charge_work);
+       	alarm_forward_now(alarm, ktime_set(soft_charge_thread_time,0)); //check every 10 minutes
+       	temp_time = alarm_expires_remaining(alarm);
+       	pr_debug("[SC]%s():alarm remaining %lld \n" , __func__, ktime_to_ms(temp_time));
+
+       	return ALARMTIMER_RESTART;
+}
+
+static ssize_t show_soft_charge31_time(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	pr_info("[SC]%s(): soft_charge31_LV1_time=%s, soft_charge31_LV2_time=%s\n",
+		__func__,  soft_charge31_LV1_time, soft_charge31_LV2_time);
+
+	return sprintf(buf, "soft_charge31_LV1_time=%s, soft_charge31_LV2_time=%s\n", 
+		 soft_charge31_LV1_time, soft_charge31_LV2_time);
+}
+
+static ssize_t store_soft_charge31_time(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t size)
+{
+	char LV1_time[9], LV2_time[9];
+	
+	struct platform_device *pdev = to_platform_device(dev);
+	struct smb2 *chip = platform_get_drvdata(pdev);
+	struct smb_charger *chg = &chip->chg;
+	
+	if (sscanf(buf, "%s %s", LV1_time, LV2_time) == 2) {
+		if (!strcmp(LV1_time, "0"))
+			pr_info("[SC]%s(): LV1 time ignore 0 value", __func__);
+		else if (!strcmp(LV1_time, "-1")) {
+			strcpy(soft_charge31_LV1_time, "\0");
+			pr_info("[SC]%s(): LV1 time reset", __func__);
+		} else 
+			strcpy(soft_charge31_LV1_time, LV1_time);
+		
+		if (!strcmp(LV2_time, "0"))
+			pr_info("[SC]%s(): LV2 time ignore 0 value", __func__);
+		else if (!strcmp(LV2_time, "-1")) {
+			strcpy(soft_charge31_LV2_time, "\0");
+			pr_info("[SC]%s(): LV2 time reset", __func__);
+		} else
+			strcpy(soft_charge31_LV2_time, LV2_time)	;
+		
+		schedule_work(&chg->soft_charge_work);
+		pr_info("[SC]%s(): soft_charge31_LV1_time=%s, soft_charge31_LV2_time=%s, LV1_time=%s, LV2_time=%s\n",
+			__func__,  soft_charge31_LV1_time, soft_charge31_LV2_time, LV1_time, LV2_time);
+	} else
+		pr_info("[SC]%s(), argument ERROR\n", __func__);
+	
+	return size;
+}
+
+static DEVICE_ATTR(soft_charge31_time, 0664, show_soft_charge31_time, store_soft_charge31_time);
+
+
+static ssize_t show_soft_charge31_status(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	pr_info("[SC]%s(): show_SC30_Status: SC31_timeA=%u, SC31_timeB=%u, SC31_timeC=%u, SC31_timeA=%u\n",
+		__func__,  SC31_timeA, SC31_timeB, SC31_timeC, SC31_timeTT);
+
+	return sprintf(buf, "SC31_timeA=%u, SC31_timeB=%u, SC31_timeC=%u, SC31_aging_level=%u\n", 
+		 SC31_timeA, SC31_timeB, SC31_timeC, SC31_aging_level);
+}
+
+static ssize_t store_soft_charge31_status(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t size)
+{
+	if (sscanf(buf, "%u %u %u", &SC31_timeA, &SC31_timeB, &SC31_timeC) == 3) {
+		pr_info("[SC]%s(): SC31_timeA=%u, SC31_timeB=%u, SC31_timeC=%u\n",
+			__func__, SC31_timeA, SC31_timeB, SC31_timeC);
+	} else
+		pr_info("[SC]%s(), argument ERROR\n", __func__);
+
+	return size;
+}
+static DEVICE_ATTR(soft_charge31_status, 0664, show_soft_charge31_status, store_soft_charge31_status);
+
+static ssize_t show_soft_charge30_status(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	pr_info("[SC]%s(): show_SC30_Status: SC30_timeA=%u, SC30_timeB=%u, SC30_timeC=%u, SC30_timeTT=%u\n",
+		__func__,  SC30_timeA, SC30_timeB, SC30_timeC, SC30_timeTT);
+
+	return sprintf(buf, "SC30_timeA=%u, SC30_timeB=%u, SC30_timeC=%u, SC30_aging_level=%u\n", 
+		 SC30_timeA, SC30_timeB, SC30_timeC, SC30_aging_level);
+}
+
+static ssize_t store_soft_charge30_status(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t size)
+{
+	if (sscanf(buf, "%u %u %u", &SC30_timeA, &SC30_timeB, &SC30_timeC) == 3) {
+		pr_info("[SC]%s(): SC30_timeA=%u, SC30_timeB=%u, SC30_timeC=%u\n",
+			__func__, SC30_timeA, SC30_timeB, SC30_timeC);
+	} else
+		pr_info("[SC]%s(), argument ERROR\n", __func__);
+	return size;
+}
+static DEVICE_ATTR(soft_charge30_status, 0664, show_soft_charge30_status, store_soft_charge30_status);
+
+
+static ssize_t show_soft_charge_en(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "soft_charge_en=%d\n", soft_charge_en);
+}
+
+static ssize_t store_soft_charge_en(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t size)
+{
+	if (kstrtouint(buf, 10, &soft_charge_en) == 0) {
+		if (soft_charge_en != false)
+			soft_charge_en = true;
+	} else
+		pr_info("[SC]%s(): argument ERROR\n", __func__);
+
+	return size;
+}
+static DEVICE_ATTR(soft_charge_en, 0664, show_soft_charge_en, store_soft_charge_en);
+static ssize_t show_soft_charge_thread_time(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "soft_charge_en=%d\n", soft_charge_thread_time);
+}
+
+static ssize_t store_soft_charge_thread_time(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t size)
+{
+	if (kstrtouint(buf, 10, &soft_charge_thread_time) == 0) {
+		pr_info("[SC]%s(): soft_charge_thread_time = %d\n",
+			__func__, soft_charge_thread_time);
+	} else
+		pr_info("[SC]%s(): argument ERROR\n", __func__);
+
+	return size;
+}
+static DEVICE_ATTR(soft_charge_thread_time, 0664, show_soft_charge_thread_time, store_soft_charge_thread_time);
+#endif
+//CEI comment, soft charge E
 static int smb2_init_hw(struct smb2 *chip)
 {
 	struct smb_charger *chg = &chip->chg;
@@ -1496,6 +2453,7 @@ static int smb2_init_hw(struct smb2 *chip)
 	rc = smblib_set_charge_param(chg, &chg->param.otg_cl,
 				(chg->wa_flags & OTG_WA) ?
 				chg->param.otg_cl.min_u : chg->otg_cl_ua);
+
 	if (rc < 0) {
 		pr_err("Couldn't set otg current limit rc=%d\n", rc);
 		return rc;
@@ -1597,6 +2555,13 @@ static int smb2_init_hw(struct smb2 *chip)
 	if (rc < 0) {
 		dev_err(chg->dev,
 			"Couldn't configure VBUS for SW control rc=%d\n", rc);
+		return rc;
+	}
+
+	rc = smblib_masked_write(chg, TCCC_CHARGE_CURRENT_TERMINATION_CFG_REG,
+				TCCC_CHARGE_CURRENT_TERMINATION_SETTING_MASK, TCCC_CHARGE_CURRENT_TERMINATION_150MA);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't set term current rc=%d\n", rc);
 		return rc;
 	}
 
@@ -1749,6 +2714,30 @@ static int smb2_init_hw(struct smb2 *chip)
 			return rc;
 		}
 	}
+//CEI comment, safety timer switch S
+               rc = smblib_masked_write(chg, SCHG_CHGR_PRE_CHARGE_SAFETY_TIMER_CFG,
+                               PRE_CHARGE_SAFETY_TIMER_CFG_MASK,
+                               chg->chg_ac_pre_c_safety_time);
+               if (rc < 0) {
+                       pr_err("Couldn't write SCHG_CHGR_PRE_CHARGE_SAFETY_TIMER_CFG rc=%d\n", rc);
+               }
+
+               rc = smblib_masked_write(chg, SCHG_CHGR_FAST_CHARGE_SAFETY_TIMER_CFG,
+                               FAST_CHARGE_SAFETY_TIMER_CFG_MASK,
+                               chg->chg_ac_fast_c_safety_time);
+               if (rc < 0) {
+                       pr_err("Couldn't write SCHG_CHGR_FAST_CHARGE_SAFETY_TIMER_CFG rc=%d\n", rc);
+               }
+//CEI comment, safety timer switch E
+
+//CEI comment, set 4.5v for USBIN_5V_AICL_THRESHOLD S
+               rc = smblib_masked_write(chg, USBIN_5V_AICL_THRESHOLD_CFG_REG,
+                               USBIN_5V_AICL_THRESHOLD_CFG_MASK,
+                               0x5);
+               if (rc < 0) {
+                       pr_err("Couldn't write USBIN_5V_AICL_THRESHOLD_CFG_REG rc=%d\n", rc);
+               	}
+//CEI comment, set 4.5v for USBIN_5V_AICL_THRESHOLD E
 
 	return rc;
 }
@@ -2219,7 +3208,7 @@ static int smb2_probe(struct platform_device *pdev)
 	int rc = 0;
 	union power_supply_propval val;
 	int usb_present, batt_present, batt_health, batt_charge_type;
-
+	
 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
 		return -ENOMEM;
@@ -2228,6 +3217,7 @@ static int smb2_probe(struct platform_device *pdev)
 	chg->dev = &pdev->dev;
 	chg->param = v1_params;
 	chg->debug_mask = &__debug_mask;
+        chg->try_sink_enabled = &__try_sink_enabled;
 	chg->weak_chg_icl_ua = &__weak_chg_icl_ua;
 	chg->mode = PARALLEL_MASTER;
 	chg->irq_info = smb2_irqs;
@@ -2377,6 +3367,25 @@ static int smb2_probe(struct platform_device *pdev)
 	batt_charge_type = val.intval;
 
 	device_init_wakeup(chg->dev, true);
+
+//CEI comment, FP225896 battery swelling S
+       alarm_init(&chg->batt_swelling_timer, ALARM_BOOTTIME, smb2_battery_swelling_check);
+       INIT_WORK(&chg->batt_swelling_work, battery_swelling_work);
+//CEI comment, FP225896 battery swelling E
+
+//CEI comment, soft charge S
+#ifdef CUSTOM_SOFT_CHARGE
+       alarm_init(&chg->soft_charge_timer, ALARM_BOOTTIME, smb2_soft_charge_check);
+       INIT_WORK(&chg->soft_charge_work, soft_charge_work);
+       alarm_start(&chg->soft_charge_timer, ktime_add(ktime_get_boottime(), ktime_set(60,0)));
+       rc = device_create_file(chg->dev , &dev_attr_soft_charge_en);
+       rc = device_create_file(chg->dev , &dev_attr_soft_charge31_status);
+       rc = device_create_file(chg->dev , &dev_attr_soft_charge30_status);
+       rc = device_create_file(chg->dev , &dev_attr_soft_charge31_time);
+       rc = device_create_file(chg->dev , &dev_attr_soft_charge_thread_time);
+
+#endif
+//CEI comment, soft charge E
 
 	pr_info("QPNP SMB2 probed successfully usb:present=%d type=%d batt:present = %d health = %d charge = %d\n",
 		usb_present, chg->real_charger_type,

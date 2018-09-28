@@ -287,6 +287,14 @@ struct fg_batt_props {
 	int		float_volt_uv;
 	int		vbatt_full_mv;
 	int		fastchg_curr_ma;
+	bool	jeita_en_fvc;
+	bool	jeita_en_ccc;
+	bool	jeita_en_hot_sl_fvc;
+	bool	jeita_en_cold_sl_fvc;
+	bool	jeita_en_hot_sl_ccc;
+	bool	jeita_en_cold_sl_ccc;
+	int jeita_fvc_config;
+	int jeita_ccc_config;
 };
 
 struct fg_cyc_ctr_data {
@@ -421,6 +429,7 @@ struct fg_chip {
 	int			last_msoc;
 	int			last_recharge_volt_mv;
 	int			esr_timer_charging_default[NUM_ESR_TIMERS];
+	int			batt_num;//CEI comment, battery health feature 
 	enum slope_limit_status	slope_limit_sts;
 	bool			profile_available;
 	bool			profile_loaded;
@@ -434,12 +443,17 @@ struct fg_chip {
 	bool			esr_flt_cold_temp_en;
 	bool			slope_limit_en;
 	bool			use_ima_single_mode;
+	bool			cei_alien_battery;
 	struct completion	soc_update;
 	struct completion	soc_ready;
 	struct delayed_work	profile_load_work;
 	struct work_struct	status_change_work;
 	struct delayed_work	ttf_work;
 	struct delayed_work	sram_dump_work;
+	//CEI comment, battery health feature S
+	bool fake_charge_full;
+	bool fake_charge_full_design;
+	//CEI comment, battery health feature E
 };
 
 /* Debugfs data structures are below */

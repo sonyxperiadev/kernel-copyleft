@@ -38,7 +38,7 @@
 #define Q_REG_STATUS1_GPIO_EN_MASK	0x80
 #define Q_REG_STATUS1_MPP_EN_MASK	0x80
 
-#define Q_NUM_CTL_REGS			0xD
+/* #define Q_NUM_CTL_REGS			0xD */
 
 /* revision registers base address offsets */
 #define Q_REG_DIG_MINOR_REV		0x0
@@ -151,25 +151,6 @@
 #define Q_REG_APASS_SEL_SHIFT		0
 #define Q_REG_APASS_SEL_MASK		0x3
 
-enum qpnp_pin_param_type {
-	Q_PIN_CFG_MODE,
-	Q_PIN_CFG_OUTPUT_TYPE,
-	Q_PIN_CFG_INVERT,
-	Q_PIN_CFG_PULL,
-	Q_PIN_CFG_VIN_SEL,
-	Q_PIN_CFG_OUT_STRENGTH,
-	Q_PIN_CFG_SRC_SEL,
-	Q_PIN_CFG_MASTER_EN,
-	Q_PIN_CFG_AOUT_REF,
-	Q_PIN_CFG_AIN_ROUTE,
-	Q_PIN_CFG_CS_OUT,
-	Q_PIN_CFG_APASS_SEL,
-	Q_PIN_CFG_DTEST_SEL,
-	Q_PIN_CFG_INVALID,
-};
-
-#define Q_NUM_PARAMS			Q_PIN_CFG_INVALID
-
 /* param error checking */
 #define QPNP_PIN_GPIO_MODE_INVALID		3
 #define QPNP_PIN_GPIO_LV_MV_MODE_INVALID	4
@@ -193,35 +174,7 @@ enum qpnp_pin_param_type {
 #define QPNP_PIN_APASS_SEL_INVALID		4
 #define QPNP_PIN_DTEST_SEL_INVALID		4
 
-struct qpnp_pin_spec {
-	uint8_t slave;			/* 0-15 */
-	uint16_t offset;		/* 0-255 */
-	uint32_t gpio_chip_idx;		/* offset from gpio_chip base */
-	uint32_t pmic_pin;		/* PMIC pin number */
-	int irq;			/* logical IRQ number */
-	u8 regs[Q_NUM_CTL_REGS];	/* Control regs */
-	u8 num_ctl_regs;		/* usable number on this pin */
-	u8 type;			/* peripheral type */
-	u8 subtype;			/* peripheral subtype */
-	u8 dig_major_rev;
-	struct device_node *node;
-	enum qpnp_pin_param_type params[Q_NUM_PARAMS];
-	struct qpnp_pin_chip *q_chip;
-};
-
-struct qpnp_pin_chip {
-	struct gpio_chip	gpio_chip;
-	struct platform_device	*pdev;
-	struct regmap		*regmap;
-	struct qpnp_pin_spec	**pmic_pins;
-	struct qpnp_pin_spec	**chip_gpios;
-	uint32_t		pmic_pin_lowest;
-	uint32_t		pmic_pin_highest;
-	struct device_node	*int_ctrl;
-	struct list_head	chip_list;
-	struct dentry		*dfs_dir;
-	bool			chip_registered;
-};
+int pmic_chip_number = 0;
 
 static LIST_HEAD(qpnp_pin_chips);
 static DEFINE_MUTEX(qpnp_pin_chips_lock);
@@ -779,6 +732,43 @@ int qpnp_pin_map(const char *name, uint32_t pmic_pin)
 }
 EXPORT_SYMBOL(qpnp_pin_map);
 
+int qpnp_get_pmic_chip_number(void)
+{
+	return pmic_chip_number;
+}
+EXPORT_SYMBOL_GPL(qpnp_get_pmic_chip_number);
+
+struct qpnp_pin_chip  *qpnp_pin_chip_dev_get(int count)
+{
+	struct qpnp_pin_chip *q_chip;
+	int index;
+
+	mutex_lock(&qpnp_pin_chips_lock);
+	for (q_chip = list_entry((&qpnp_pin_chips)->next
+		, typeof(*q_chip), chip_list)
+		, index = 0
+		; (&q_chip->chip_list != (&qpnp_pin_chips) && (index < count))
+		; q_chip = list_entry(q_chip->chip_list.next, typeof(*q_chip)
+		, chip_list), index++)
+		;
+	mutex_unlock(&qpnp_pin_chips_lock);
+
+	return q_chip;
+}
+EXPORT_SYMBOL(qpnp_pin_chip_dev_get);
+
+int check_pin_config(enum qpnp_pin_param_type idx,
+			struct qpnp_pin_spec *q_spec,
+			uint32_t val)
+{
+	int rc = 0;
+
+	rc = qpnp_pin_check_config(idx, q_spec, 0);
+
+	return rc;
+}
+EXPORT_SYMBOL(check_pin_config);
+
 static int qpnp_pin_to_irq(struct gpio_chip *gpio_chip, unsigned int offset)
 {
 	struct qpnp_pin_chip *q_chip = dev_get_drvdata(gpio_chip->dev);
@@ -1265,6 +1255,23 @@ static int qpnp_pin_reg_attr(enum qpnp_pin_param_type type,
 	return 0;
 }
 
+int qpnp_pin_info_get(enum qpnp_pin_param_type idx,
+			struct qpnp_pin_spec *q_spec, int *val)
+{
+	struct qpnp_pin_reg cfg = {};
+	int rc;
+
+	rc = qpnp_pin_reg_attr(idx, &cfg, q_spec);
+
+	if (rc)
+		return rc;
+
+	*val = q_reg_get(&q_spec->regs[cfg.idx], cfg.shift, cfg.mask);
+
+	return 0;
+}
+EXPORT_SYMBOL(qpnp_pin_info_get);
+
 static int qpnp_pin_debugfs_get(void *data, u64 *val)
 {
 	enum qpnp_pin_param_type *idx = data;
@@ -1335,27 +1342,6 @@ DEFINE_SIMPLE_ATTRIBUTE(qpnp_pin_fops, qpnp_pin_debugfs_get,
 			qpnp_pin_debugfs_set, "%llu\n");
 
 #define DEBUGFS_BUF_SIZE 11 /* supports 2^32 in decimal */
-
-struct qpnp_pin_debugfs_args {
-	enum qpnp_pin_param_type type;
-	const char *filename;
-};
-
-static struct qpnp_pin_debugfs_args dfs_args[Q_NUM_PARAMS] = {
-	{ Q_PIN_CFG_MODE, "mode" },
-	{ Q_PIN_CFG_OUTPUT_TYPE, "output_type" },
-	{ Q_PIN_CFG_INVERT, "invert" },
-	{ Q_PIN_CFG_PULL, "pull" },
-	{ Q_PIN_CFG_VIN_SEL, "vin_sel" },
-	{ Q_PIN_CFG_OUT_STRENGTH, "out_strength" },
-	{ Q_PIN_CFG_SRC_SEL, "src_sel" },
-	{ Q_PIN_CFG_MASTER_EN, "master_en" },
-	{ Q_PIN_CFG_AOUT_REF, "aout_ref" },
-	{ Q_PIN_CFG_AIN_ROUTE, "ain_route" },
-	{ Q_PIN_CFG_CS_OUT, "cs_out" },
-	{ Q_PIN_CFG_APASS_SEL, "apass_sel" },
-	{ Q_PIN_CFG_DTEST_SEL, "dtest-sel" },
-};
 
 static int qpnp_pin_debugfs_create(struct qpnp_pin_chip *q_chip)
 {
@@ -1445,6 +1431,7 @@ static int qpnp_pin_is_valid_pin(struct qpnp_pin_spec *q_spec)
 	return 0;
 }
 
+
 static int qpnp_pin_probe(struct platform_device *pdev)
 {
 	struct qpnp_pin_chip *q_chip;
@@ -1482,6 +1469,15 @@ static int qpnp_pin_probe(struct platform_device *pdev)
 	list_add(&q_chip->chip_list, &qpnp_pin_chips);
 	mutex_unlock(&qpnp_pin_chips_lock);
 
+	rc = of_property_read_string(pdev->dev.of_node, "label",
+			&pin_dev_name);
+	if (rc < 0) {
+		dev_err(&pdev->dev,
+			"Couldn't find lable in node rc = %d\n", rc);
+		goto err_probe;
+	}
+
+	pmic_chip_number++;
 	/* first scan through nodes to find the range required for allocation */
 	i = 0;
 	for_each_available_child_of_node(pdev->dev.of_node, child) {

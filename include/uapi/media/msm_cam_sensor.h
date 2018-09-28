@@ -27,6 +27,7 @@
 #define MSM_ACTUATOR_MOVE_SIGNED_NEAR  1
 
 #define MAX_ACTUATOR_REGION  5
+#define MAX_ACTUATOR_NAME_SIZE 32
 
 #define MAX_EEPROM_NAME 32
 
@@ -442,6 +443,19 @@ struct park_lens_data_t {
 	uint32_t max_step;
 };
 
+struct msm_actuator_opcode {
+	uint32_t prog;
+	uint32_t coeff;
+	uint32_t pheripheral;
+	uint32_t memory;
+};
+
+struct msm_actuator_board_info {
+	char actuator_name[MAX_ACTUATOR_NAME_SIZE];
+	struct msm_actuator_opcode opcode;
+	uint16_t fw_tx_size;
+};
+
 struct msm_actuator_params_t {
 	enum actuator_type act_type;
 	uint8_t reg_tbl_size;
@@ -454,6 +468,7 @@ struct msm_actuator_params_t {
 	struct msm_actuator_reg_params_t *reg_tbl_params;
 	struct reg_settings_t *init_settings;
 	struct park_lens_data_t park_lens;
+	struct msm_actuator_board_info board_info;
 };
 
 struct msm_actuator_set_info_t {

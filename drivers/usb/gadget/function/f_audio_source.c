@@ -246,6 +246,7 @@ struct audio_source_config {
 
 struct audio_dev {
 	struct usb_function		func;
+	u8				ctrl_id;
 	struct snd_card			*card;
 	struct snd_pcm			*pcm;
 	struct snd_pcm_substream *substream;
@@ -599,6 +600,16 @@ static int audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	return 0;
 }
 
+static int audio_get_alt(struct usb_function *f, unsigned intf)
+{
+	struct audio_dev *audio = func_to_audio(f);
+	if (intf == audio->ctrl_id) {
+		return 0;
+	}
+
+	return audio->in_ep->enabled ? 1 : 0;
+}
+
 static void audio_disable(struct usb_function *f)
 {
 	struct audio_dev	*audio = func_to_audio(f);
@@ -665,6 +676,8 @@ audio_bind(struct usb_configuration *c, struct usb_function *f)
 	status = usb_interface_id(c, f);
 	if (status < 0)
 		goto fail;
+        audio->ctrl_id = status;
+
 	ac_interface_desc.bInterfaceNumber = status;
 
 	/* AUDIO_AC_INTERFACE */
@@ -862,6 +875,7 @@ static struct audio_dev _audio_dev = {
 		.bind = audio_bind,
 		.unbind = audio_unbind,
 		.set_alt = audio_set_alt,
+		.get_alt = audio_get_alt,
 		.setup = audio_setup,
 		.disable = audio_disable,
 		.free_func = audio_free_func,

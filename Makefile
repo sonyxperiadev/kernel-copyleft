@@ -402,6 +402,14 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -std=gnu89 $(call cc-option,-fno-PIE)
 
 
+ifeq ($(CEI_BUILD_SKU),CEI_FACTORY)
+  KBUILD_CFLAGS += -DCEI_FACTORY
+endif
+
+ifeq ($(TARGET_BUILD_VARIANT),user)
+  KBUILD_CFLAGS += -DCONFIG_IS_USER_BUILD
+endif
+
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__ $(call cc-option,-fno-PIE)

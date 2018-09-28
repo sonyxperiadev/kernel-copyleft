@@ -73,7 +73,7 @@ static unsigned int _dispatcher_q_inflight_hi = 15;
 static unsigned int _dispatcher_q_inflight_lo = 4;
 
 /* Command batch timeout (in milliseconds) */
-unsigned int adreno_drawobj_timeout = 2000;
+unsigned int adreno_drawobj_timeout = 4000;//mys
 
 /* Interval for reading and comparing fault detection registers */
 static unsigned int _fault_timer_interval = 200;

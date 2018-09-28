@@ -2147,7 +2147,7 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 stat:
 	ttwu_stat(p, cpu, wake_flags);
 out:
-	raw_spin_unlock_irqrestore(&p->pi_lock, flags);
+	raw_spin_unlock(&p->pi_lock);
 
 	if (freq_notif_allowed) {
 		if (!same_freq_domain(src_cpu, cpu)) {
@@ -2159,6 +2159,8 @@ out:
 			check_for_freq_change(cpu_rq(cpu), true, false);
 		}
 	}
+
+	local_irq_restore(flags);
 
 	return success;
 }
@@ -2311,11 +2313,11 @@ void sched_exit(struct task_struct *p)
 	reset_task_stats(p);
 	p->ravg.mark_start = wallclock;
 	p->ravg.sum_history[0] = EXITING_TASK_MARKER;
-	free_task_load_ptrs(p);
 
 	enqueue_task(rq, p, 0);
 	clear_ed_task(p, rq);
 	task_rq_unlock(rq, p, &flags);
+	free_task_load_ptrs(p);
 }
 #endif /* CONFIG_SCHED_HMP */
 

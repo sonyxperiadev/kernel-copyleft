@@ -201,6 +201,9 @@ struct regulator_init_data {
 	void *driver_data;	/* core does not touch this */
 };
 
+struct regulator_dev  *regulator_dev_get(int count);
+int regulator_number(void);
+
 #ifdef CONFIG_REGULATOR
 void regulator_has_full_constraints(void);
 int regulator_suspend_prepare(suspend_state_t state);

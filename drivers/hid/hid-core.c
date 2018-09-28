@@ -1703,6 +1703,9 @@ int hid_connect(struct hid_device *hdev, unsigned int connect_mask)
 		 buf, bus, hdev->version >> 8, hdev->version & 0xff,
 		 type, hdev->name, hdev->phys);
 
+	if (!strcmp(type, "Mouse"))
+		hid_state = 1;
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(hid_connect);
@@ -1718,6 +1721,8 @@ void hid_disconnect(struct hid_device *hdev)
 	if (hdev->claimed & HID_CLAIMED_HIDRAW)
 		hidraw_disconnect(hdev);
 	hdev->claimed = 0;
+	if (hid_state)
+		hid_state = 0;
 }
 EXPORT_SYMBOL_GPL(hid_disconnect);
 

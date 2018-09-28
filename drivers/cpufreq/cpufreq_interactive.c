@@ -53,7 +53,7 @@ struct cpufreq_interactive_policyinfo {
 	u64 max_freq_hyst_start_time;
 	struct rw_semaphore enable_sem;
 	bool reject_notification;
-	bool notif_pending;
+	atomic_t notif_pending;
 	unsigned long notif_cpu;
 	int governor_enabled;
 	struct cpufreq_interactive_tunables *cached_tunables;
@@ -479,6 +479,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 	bool skip_hispeed_logic, skip_min_sample_time;
 	bool jump_to_max_no_ts = false;
 	bool jump_to_max = false;
+	bool notif_pending = false;
 	bool start_hyst = true;
 
 	if (!down_read_trylock(&ppol->enable_sem))
@@ -491,10 +492,15 @@ static void cpufreq_interactive_timer(unsigned long data)
 	spin_lock_irqsave(&ppol->target_freq_lock, flags);
 	spin_lock(&ppol->load_lock);
 
+	if (atomic_read(&ppol->notif_pending)) {
+		(void) hrtimer_try_to_cancel(&ppol->notif_timer);
+		atomic_set(&ppol->notif_pending, 0);
+		notif_pending = true;
+	}
+
 	skip_hispeed_logic =
-		tunables->ignore_hispeed_on_notif && ppol->notif_pending;
-	skip_min_sample_time = tunables->fast_ramp_down && ppol->notif_pending;
-	ppol->notif_pending = false;
+		tunables->ignore_hispeed_on_notif && notif_pending;
+	skip_min_sample_time = tunables->fast_ramp_down && notif_pending;
 	now = ktime_to_us(ktime_get());
 	ppol->last_evaluated_jiffy = get_jiffies_64();
 
@@ -796,7 +802,6 @@ static int load_change_callback(struct notifier_block *nb, unsigned long val,
 	unsigned long cpu = (unsigned long) data;
 	struct cpufreq_interactive_policyinfo *ppol = per_cpu(polinfo, cpu);
 	struct cpufreq_interactive_tunables *tunables;
-	unsigned long flags;
 
 	if (!ppol || ppol->reject_notification)
 		return 0;
@@ -810,14 +815,13 @@ static int load_change_callback(struct notifier_block *nb, unsigned long val,
 	if (!tunables->use_sched_load || !tunables->use_migration_notif)
 		goto exit;
 
-	spin_lock_irqsave(&ppol->target_freq_lock, flags);
-	ppol->notif_pending = true;
-	ppol->notif_cpu = cpu;
-	spin_unlock_irqrestore(&ppol->target_freq_lock, flags);
+	if (!atomic_cmpxchg(&ppol->notif_pending, 0, 1)) {
+		ppol->notif_cpu = cpu;
+		if (!hrtimer_is_queued(&ppol->notif_timer))
+			hrtimer_start(&ppol->notif_timer, ms_to_ktime(1),
+				HRTIMER_MODE_REL);
+	}
 
-	if (!hrtimer_is_queued(&ppol->notif_timer))
-		hrtimer_start(&ppol->notif_timer, ms_to_ktime(1),
-			      HRTIMER_MODE_REL);
 exit:
 	up_read(&ppol->enable_sem);
 	return 0;
@@ -830,18 +834,29 @@ static enum hrtimer_restart cpufreq_interactive_hrtimer(struct hrtimer *timer)
 	int cpu;
 
 	if (!down_read_trylock(&ppol->enable_sem))
-		return 0;
-	if (!ppol->governor_enabled) {
-		up_read(&ppol->enable_sem);
-		return 0;
-	}
+		goto no_restart;
+
+	if (!ppol->governor_enabled)
+		goto up_read_no_restart;
+
+	/*
+	 * We race here with a policy timer, but it is not
+	 * a big issue. Just leave the callback, because
+	 * notification has already been handled by the
+	 * normal periodic timer.
+	 */
+	if (!atomic_read(&ppol->notif_pending))
+		goto up_read_no_restart;
+
 	cpu = ppol->notif_cpu;
 	trace_cpufreq_interactive_load_change(cpu);
 	del_timer(&ppol->policy_timer);
 	del_timer(&ppol->policy_slack_timer);
 	cpufreq_interactive_timer(cpu);
 
+up_read_no_restart:
 	up_read(&ppol->enable_sem);
+no_restart:
 	return HRTIMER_NORESTART;
 }
 
@@ -1762,7 +1777,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		ppol->hispeed_validate_time = ppol->floor_validate_time;
 		ppol->min_freq = policy->min;
 		ppol->reject_notification = true;
-		ppol->notif_pending = false;
+		atomic_set(&ppol->notif_pending, 0);
 		down_write(&ppol->enable_sem);
 		del_timer_sync(&ppol->policy_timer);
 		del_timer_sync(&ppol->policy_slack_timer);

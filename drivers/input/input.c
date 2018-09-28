@@ -1692,7 +1692,13 @@ static int input_dev_suspend(struct device *dev)
 	 * Keys that are pressed now are unlikely to be
 	 * still pressed when we resume.
 	 */
-	input_dev_release_keys(input_dev);
+	/* CEI patch for issue [JIMODM67-14705]
+	 * To avoid doing input_dev_release_keys (key up behavior) when the input_dev belongs to touch driver.
+	 * Due to touch driver move key up behavior to driver's resume,
+	 * system suspend procedure may be pended by touch event when input_dev runs input_dev_release_keys.
+	 */
+	if (strcmp(input_dev->name ? input_dev->name : "", "synaptics_dsx"))
+		input_dev_release_keys(input_dev);
 
 	/* Turn off LEDs and sounds, if any are active. */
 	input_dev_toggle(input_dev, false);

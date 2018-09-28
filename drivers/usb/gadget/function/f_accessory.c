@@ -41,6 +41,7 @@
 
 #include <linux/configfs.h>
 #include <linux/usb/composite.h>
+#include <linux/cei_hw_id.h>
 
 #define MAX_INST_NAME_LEN        40
 #define BULK_BUFFER_SIZE    16384
@@ -699,6 +700,7 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 	ssize_t r = count;
 	unsigned xfer;
 	int ret;
+	int sendZLP = 0;
 
 	pr_debug("acc_write(%zu)\n", count);
 
@@ -707,7 +709,14 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 		return -ENODEV;
 	}
 
-	while (count > 0) {
+	if ((count & (dev->ep_in->maxpacket - 1)) == 0)
+		sendZLP = 1;
+
+	while ((count > 0) || (sendZLP == 1)) {
+		/* exit after sending ZLP */
+		if (count == 0)
+			sendZLP = 0;
+
 		if (!dev->online) {
 			pr_debug("acc_write dev->error\n");
 			r = -EIO;
@@ -732,8 +741,9 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 			/*
 			 * If the data length is a multple of the
 			 * maxpacket size then send a zero length packet(ZLP).
+			 *
+			 * req->zero = ((xfer % dev->ep_in->maxpacket) == 0);
 			 */
-			req->zero = ((xfer % dev->ep_in->maxpacket) == 0);
 		}
 		if (copy_from_user(req->buf, buf, xfer)) {
 			r = -EFAULT;
@@ -790,7 +800,13 @@ static long acc_ioctl(struct file *fp, unsigned code, unsigned long value)
 	case ACCESSORY_IS_START_REQUESTED:
 		return dev->start_requested;
 	case ACCESSORY_GET_AUDIO_MODE:
-		return dev->audio_mode;
+                //SM42 not support AOA v2 Audio due to Andorid CDD
+                if(strcmp(get_cei_mb_id(), "SM42") == 0) {
+			return 0;
+                } else {
+			return dev->audio_mode;
+                }
+
 	}
 	if (!src)
 		return -EINVAL;

@@ -26,6 +26,8 @@
 #include <linux/delay.h>
 #include <linux/leds-qpnp-wled.h>
 #include <linux/qpnp/qpnp-revid.h>
+#include <linux/gpio.h>
+#include <linux/cei_hw_id.h>
 
 /* base addresses */
 #define QPNP_WLED_CTRL_BASE		"qpnp-wled-ctrl-base"
@@ -168,6 +170,8 @@
 #define QPNP_WLED_FS_CURR_MASK		GENMASK(3, 0)
 #define QPNP_WLED_FS_CURR_MIN_UA	0
 #define QPNP_WLED_FS_CURR_MAX_UA	30000
+#define QPNP_WLED_FS_CURR_40MA		20000
+#define QPNP_WLED_FS_CURR_35MA		17500
 #define QPNP_WLED_FS_CURR_STEP_UA	2500
 #define QPNP_WLED_CABC_MASK		0x80
 #define QPNP_WLED_CABC_SHIFT		7
@@ -233,6 +237,8 @@
 
 #define QPNP_WLED_AVDD_MV_TO_REG(val) \
 		((val - QPNP_WLED_AVDD_MIN_MV) / QPNP_WLED_AVDD_STEP_MV)
+
+#define DISP_SEL_GPIO                     56      //GPIO number for LCD_SELECT
 
 /* output feedback mode */
 enum qpnp_wled_fdbk_op {
@@ -601,6 +607,7 @@ static int qpnp_wled_module_en(struct qpnp_wled *wled,
 	if (rc < 0)
 		return rc;
 
+	pr_debug("qpnp_wled_module_en state=%d\n", state);
 	/*
 	 * Wait for at least 10ms before enabling OVP fault interrupt after
 	 * enabling the module so that soft start is completed. Also, this
@@ -2026,6 +2033,34 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 	return 0;
 }
 
+static int read_gpio_value(int gpio)
+{
+	int err, value;
+
+	if (!gpio_is_valid(gpio)) {
+		pr_err(" GPIO(%d) is not valid.\n", gpio);
+		return -1;
+	}
+
+	err = gpio_request(gpio, "disp_temp_gpio");
+	if (err < 0) {
+		pr_err(" Resquesst GPIO(%d) failed.\n", gpio);
+		return err;
+	}
+
+	err = gpio_direction_input(gpio);
+	if (err < 0) {
+		pr_err(" Set GPIO(%d) direction to input failed\n", gpio);
+		return err;
+	}
+
+    value = gpio_get_value(gpio);
+	pr_info(" gpio(%d) value = %d\n", gpio, value);
+
+	gpio_free(gpio);
+	return value;
+}
+
 /* parse wled dtsi parameters */
 static int qpnp_wled_parse_dt(struct qpnp_wled *wled)
 {
@@ -2033,7 +2068,7 @@ static int qpnp_wled_parse_dt(struct qpnp_wled *wled)
 	struct property *prop;
 	const char *temp_str;
 	u32 temp_val;
-	int rc, i;
+	int rc, i, gpio_val=-1;
 	u8 *strings;
 
 	wled->cdev.name = "wled";
@@ -2306,6 +2341,27 @@ static int qpnp_wled_parse_dt(struct qpnp_wled *wled)
 		dev_err(&pdev->dev, "Unable to read full scale current\n");
 		return rc;
 	}
+
+	if (strcmp(get_cei_mb_id(), "SM12") == 0) {
+		gpio_val = read_gpio_value(DISP_SEL_GPIO);
+		if (gpio_val == 1) {
+			wled->fs_curr_ua = QPNP_WLED_FS_CURR_35MA;
+			dev_info(&pdev->dev, "truly LCM, set fs-curr-ua to %d\n", wled->fs_curr_ua);
+		} else if (gpio_val == 0) {
+			wled->fs_curr_ua = QPNP_WLED_FS_CURR_40MA;
+			dev_info(&pdev->dev, "csot LCM, set fs-curr-ua to %d\n", wled->fs_curr_ua);
+		} else {
+			dev_warn(&pdev->dev, "Read DISP_SEL_GPIO(%d) failed, so don't change fs-curr-ua\n",
+								DISP_SEL_GPIO);
+		}
+	} else if (strcmp(get_cei_mb_id(), "SM22") == 0 ||
+		strcmp(get_cei_mb_id(), "SM42") == 0) {
+		wled->fs_curr_ua = QPNP_WLED_FS_CURR_40MA;
+		dev_info(&pdev->dev, "SM22 innolux or SM42 tianma LCM, set fs-curr-ua to %d\n", wled->fs_curr_ua);
+	} else {
+		dev_warn(&pdev->dev, "Invalid main board id, so don't change fs-curr-ua\n");
+	}
+	dev_info(&pdev->dev, "Mainboard id=%s, disp_sel=%d, fs-curr-ua=%d\n", get_cei_mb_id(), gpio_val, wled->fs_curr_ua);
 
 	wled->cons_sync_write_delay_us = 0;
 	rc = of_property_read_u32(pdev->dev.of_node,

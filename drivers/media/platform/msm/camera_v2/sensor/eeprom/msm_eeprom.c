@@ -26,6 +26,74 @@ DEFINE_MSM_MUTEX(msm_eeprom_mutex);
 static struct v4l2_file_operations msm_eeprom_v4l2_subdev_fops;
 #endif
 
+int g_imx300_inf=0;
+int g_imx300_macro=0;
+int g_imx234_inf=0;
+int g_imx234_macro=0;
+int g_imx300_read = 0;
+int g_imx234_read = 0;
+int g_af_nodes_created = 0;
+
+static ssize_t show_imx300_inf(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    if (g_imx300_read == 0)
+	g_imx300_inf = 0;
+
+    return sprintf(buf, "%d\n", g_imx300_inf);
+}
+
+static ssize_t show_imx300_macro(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    if (g_imx300_read == 0)
+	g_imx300_macro = 0;
+
+    return sprintf(buf, "%d\n", g_imx300_macro);
+}
+
+static ssize_t show_imx234_inf(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    if (g_imx234_read == 0)
+	g_imx234_inf = 0;
+
+    return sprintf(buf, "%d\n", g_imx234_inf);
+}
+
+static ssize_t show_imx234_macro(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    if (g_imx234_read == 0)
+	g_imx234_macro= 0;
+
+    return sprintf(buf, "%d\n", g_imx234_macro);
+}
+
+static DEVICE_ATTR(imx300_macro, 0664, show_imx300_macro, NULL);
+static DEVICE_ATTR(imx300_inf, 0664, show_imx300_inf, NULL);
+static DEVICE_ATTR(imx234_macro, 0664, show_imx234_macro, NULL);
+static DEVICE_ATTR(imx234_inf, 0664, show_imx234_inf, NULL);
+
+void create_node(void)
+{
+    struct kobject *kobject_cam;
+    int err=0;
+
+    if (g_af_nodes_created == 0) {
+        kobject_cam = kobject_create_and_add("camera", NULL);
+        err = sysfs_create_file(kobject_cam, &dev_attr_imx300_inf.attr);
+        if (err)
+            printk("%s: create imx300_inf failed\n", __func__);
+        err = sysfs_create_file(kobject_cam, &dev_attr_imx300_macro.attr);
+        if (err)
+            printk("%s: create imx300_macro failed\n", __func__);
+        err = sysfs_create_file(kobject_cam, &dev_attr_imx234_inf.attr);
+        if (err)
+            printk("%s: create imx234_inf failed\n", __func__);
+        err = sysfs_create_file(kobject_cam, &dev_attr_imx234_macro.attr);
+        if (err)
+            printk("%s: create imx234_macro failed\n", __func__);
+        g_af_nodes_created = 1;
+    }
+}
+
 /**
   * msm_get_read_mem_size - Get the total size for allocation
   * @eeprom_map_array:	mem map
@@ -416,6 +484,17 @@ static int eeprom_parse_memory_map(struct msm_eeprom_ctrl_t *e_ctrl,
 	memptr = e_ctrl->cal_data.mapdata;
 	for (i = 0; i < e_ctrl->cal_data.num_data; i++)
 		CDBG("memory_data[%d] = 0x%X\n", i, memptr[i]);
+	if (0 == strcmp(e_ctrl->eboard_info->eeprom_name, "sony_imx300")) {
+		g_imx300_inf = e_ctrl->cal_data.mapdata[0x18]<<8 | e_ctrl->cal_data.mapdata[0x19];
+		g_imx300_macro = e_ctrl->cal_data.mapdata[0x1c]<<8 | e_ctrl->cal_data.mapdata[0x1d];
+		g_imx300_read = 1;
+	}
+
+	if (0 == strcmp(e_ctrl->eboard_info->eeprom_name, "sony_imx234")) {		
+		g_imx234_inf = e_ctrl->cal_data.mapdata[0x84]<<8 | e_ctrl->cal_data.mapdata[0x85];
+		g_imx234_macro = e_ctrl->cal_data.mapdata[0x88]<<8 | e_ctrl->cal_data.mapdata[0x89];
+		g_imx234_read = 1;
+	}
 	return rc;
 
 clean_up:
@@ -1456,6 +1535,7 @@ static int eeprom_init_config32(struct msm_eeprom_ctrl_t *e_ctrl,
 		goto free_mem;
 	}
 
+        create_node();
 	rc = eeprom_parse_memory_map(e_ctrl, mem_map_array);
 	if (rc < 0) {
 		pr_err("%s:%d memory map parse failed\n",
@@ -1675,6 +1755,11 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 	if (rc < 0) {
 		pr_err("%s failed %d\n", __func__, __LINE__);
 		e_ctrl->userspace_probe = 1;
+                rc = of_property_read_string(of_node, "cei,eeprom-name", &eb_info->eeprom_name);
+                if (rc < 0) {
+		    pr_err("%s read cci,eeprom-name failed %d\n", __func__, __LINE__);
+                }
+
 	}
 
 	rc = msm_eeprom_get_dt_data(e_ctrl);

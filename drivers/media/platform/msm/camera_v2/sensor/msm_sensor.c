@@ -17,12 +17,19 @@
 #include "msm_camera_i2c_mux.h"
 #include <linux/regulator/rpm-smd-regulator.h>
 #include <linux/regulator/consumer.h>
+#include <linux/gpio.h>
+#include <linux/proc_fs.h>
 
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
 static struct msm_camera_i2c_fn_t msm_sensor_cci_func_tbl;
 static struct msm_camera_i2c_fn_t msm_sensor_secure_func_tbl;
+
+#define GPIO_CAMERA_ID_8M  49
+#define camera_info_size 64
+char cei_cid_name[camera_info_size];
+bool initCamIdNode = FALSE;
 
 static void msm_sensor_adjust_mclk(struct msm_camera_power_ctrl_t *ctrl)
 {
@@ -270,6 +277,20 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 
 	pr_debug("%s: read id: 0x%x expected id 0x%x:\n",
 			__func__, chipid, slave_info->sensor_id);
+	if (chipid == 0x219) {
+		int CAM_ID_8M;
+		CAM_ID_8M = gpio_get_value(GPIO_CAMERA_ID_8M);
+		snprintf(cei_cid_name,sizeof(cei_cid_name),"%d",CAM_ID_8M);
+		pr_err("%s CAM_ID_8M: %d", __func__, CAM_ID_8M);
+
+		if (CAM_ID_8M == 1) {
+			chipid = 0x221;
+			snprintf(cei_cid_name,sizeof(cei_cid_name),"%d",CAM_ID_8M);
+			pr_debug("%s 8M camera id %x change read id: 0x%x\n",
+				__func__, CAM_ID_8M, chipid);
+		}
+	}
+
 	if (msm_sensor_id_by_mask(s_ctrl, chipid) != slave_info->sensor_id) {
 		pr_err("%s chip id %x does not match %x\n",
 				__func__, chipid, slave_info->sensor_id);
@@ -1486,6 +1507,25 @@ static struct msm_camera_i2c_fn_t msm_sensor_secure_func_tbl = {
 	.i2c_write_table_sync_block = msm_camera_tz_i2c_write_table_sync_block,
 };
 
+/* Camera id */
+static int subsys_camera_id_read(struct seq_file *m, void *v)
+{
+	CDBG("subsys_camera_id_read %s\n", cei_cid_name);
+	seq_printf(m, "%s\n", cei_cid_name);
+	return 0;
+};
+
+static int proc_cameraId_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, subsys_camera_id_read, NULL);
+};
+
+static  struct file_operations fcamera_proc_fopsReturnId = {
+	.owner = THIS_MODULE,
+	.open  = proc_cameraId_open,
+	.read  = seq_read,
+};
+
 int32_t msm_sensor_init_default_params(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	struct msm_camera_cci_client *cci_client = NULL;
@@ -1547,6 +1587,13 @@ int32_t msm_sensor_init_default_params(struct msm_sensor_ctrl_t *s_ctrl)
 	mount_pos = mount_pos | ((s_ctrl->sensordata->sensor_info->
 					sensor_mount_angle / 90) << 8);
 	s_ctrl->msm_sd.sd.entity.flags = mount_pos | MEDIA_ENT_FL_DEFAULT;
+
+	/* Camera id */
+	memset(cei_cid_name, 0, camera_info_size);
+	if (!initCamIdNode) {
+		proc_create("driver/camsensorid", 0, NULL, &fcamera_proc_fopsReturnId);
+		initCamIdNode = TRUE;
+	}
 
 	return 0;
 }

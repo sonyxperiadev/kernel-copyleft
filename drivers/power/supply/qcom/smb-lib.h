@@ -19,6 +19,10 @@
 #include <linux/regulator/consumer.h>
 #include <linux/extcon.h>
 #include "storm-watch.h"
+#include <linux/alarmtimer.h> //CEI comment, FP225896 battery swelling
+#include <linux/cei_hw_id.h> //CEI comment, JEITA extension
+
+#define CUSTOM_SOFT_CHARGE //CEI comment, soft charge
 
 enum print_reason {
 	PR_INTERRUPT	= BIT(0),
@@ -35,6 +39,8 @@ enum print_reason {
 #define QC_VOTER			"QC_VOTER"
 #define PL_USBIN_USBIN_VOTER		"PL_USBIN_USBIN_VOTER"
 #define USB_PSY_VOTER			"USB_PSY_VOTER"
+#define JEITA_EXTENSION_VOTER			"JEITA_EXTENSION_VOTER"//CEI comment, JEITA extension
+#define BATTCHG_SMART_EN_VOTER		"BATTCHG_SMART_EN_VOTER" //CEI comment, RID001102 Battery Care ver 1.0 for DD 
 #define PL_TAPER_WORK_RUNNING_VOTER	"PL_TAPER_WORK_RUNNING_VOTER"
 #define PL_QNOVO_VOTER			"PL_QNOVO_VOTER"
 #define USBIN_V_VOTER			"USBIN_V_VOTER"
@@ -64,12 +70,15 @@ enum print_reason {
 #define BATT_PROFILE_VOTER		"BATT_PROFILE_VOTER"
 #define OTG_DELAY_VOTER			"OTG_DELAY_VOTER"
 #define USBIN_I_VOTER			"USBIN_I_VOTER"
+#define BATT_SWELLING_VOTER            "BATT_SWELLING_VOTER" //CEI comment, FP225896 battery swelling
 #define WEAK_CHARGER_VOTER		"WEAK_CHARGER_VOTER"
-
+#define LIMIT_ICL_VOTER "LIMIT_ICL_VOTER"//CEI comment, to solve uch10 issue
 #define VCONN_MAX_ATTEMPTS	3
 #define OTG_MAX_ATTEMPTS	3
 #define BOOST_BACK_STORM_COUNT	3
 #define WEAK_CHG_STORM_COUNT	8
+
+#define QNS_VOTER		"QNS_VOTER"   //TS comment, RID001485 Qnovo adaptive charging
 
 enum smb_mode {
 	PARALLEL_MASTER = 0,
@@ -125,6 +134,12 @@ enum smb_irq_index {
 	TEMPERATURE_CHANGE_IRQ,
 	SWITCH_POWER_OK_IRQ,
 	SMB_IRQ_MAX,
+};
+
+enum try_sink_exit_mode {
+	ATTACHED_SRC = 0,
+	ATTACHED_SINK,
+	UNATTACHED_SINK,
 };
 
 struct smb_irq_info {
@@ -197,6 +212,8 @@ struct smb_params {
 	struct smb_chg_param	jeita_cc_comp;
 	struct smb_chg_param	freq_buck;
 	struct smb_chg_param	freq_boost;
+	struct smb_chg_param	jeita_en_cfg;
+	struct smb_chg_param	jeita_fvc_cfg;
 };
 
 struct parallel_params {
@@ -223,6 +240,18 @@ struct reg_info {
 	const char	*desc;
 };
 
+//CEI comment, RID001102 Battery Care ver 1.0 for DD S
+struct somc_smart_charge {
+	bool			enabled;
+	bool			suspended;
+	struct delayed_work	wdog_work;
+	struct mutex		smart_charge_lock;
+};
+struct chg_somc_params {
+	struct somc_smart_charge	smart;
+};
+//CEI comment, RID001102 Battery Care ver 1.0 for DD E
+
 struct smb_charger {
 	struct device		*dev;
 	char			*name;
@@ -231,6 +260,7 @@ struct smb_charger {
 	struct smb_params	param;
 	struct smb_iio		iio;
 	int			*debug_mask;
+	int                     *try_sink_enabled;
 	enum smb_mode		mode;
 	struct smb_chg_freq	chg_freq;
 	int			smb_version;
@@ -340,6 +370,7 @@ struct smb_charger {
 	u32			wa_flags;
 	bool			cc2_detach_wa_active;
 	bool			typec_en_dis_active;
+	bool			try_sink_active;
 	int			boost_current_ua;
 	int			temp_speed_reading_count;
 
@@ -353,6 +384,39 @@ struct smb_charger {
 	/* qnovo */
 	int			usb_icl_delta_ua;
 	int			pulse_cnt;
+
+	/* safety time setting */
+	int			chg_usb_pre_c_safety_time;
+	int			chg_usb_fast_c_safety_time;
+	int			chg_ac_pre_c_safety_time;
+	int			chg_ac_fast_c_safety_time;
+	int 			chg_safety_time_enable;//CEI comment, safety timer switch
+
+//CEI comment, FP225896 battery swelling S
+       unsigned int lrc_socmax;
+       unsigned int lrc_socmin;
+       struct work_struct batt_swelling_work;
+       struct alarm batt_swelling_timer;
+       unsigned int batt_swelling_en; 
+//CEI comment, FP225896 battery swelling E
+
+//CEI comment, RID001102 Battery Care ver 1.0 for DD S
+       struct chg_somc_params somc_params;
+//CEI comment, RID001102 Battery Care ver 1.0 for DD E
+
+//CEI comment, soft charge S
+#ifdef CUSTOM_SOFT_CHARGE
+       int soft_charge_batt_type;
+       struct work_struct soft_charge_work;
+       struct alarm soft_charge_timer;
+       int batt_type;
+       int soft_charge31_LV1_data[4];
+#endif
+//CEI comment, soft charge E
+//CEI comments, thermal mitigation S
+	int TM_disable;
+	int *TM_log;
+//CEI comments, thermal mitigation E
 };
 
 int smblib_read(struct smb_charger *chg, u16 addr, u8 *val);
@@ -517,7 +581,11 @@ int smblib_get_prop_pr_swap_in_progress(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_set_prop_pr_swap_in_progress(struct smb_charger *chg,
 				const union power_supply_propval *val);
+void smblib_usb_typec_change(struct smb_charger *chg);
 
 int smblib_init(struct smb_charger *chg);
 int smblib_deinit(struct smb_charger *chg);
+int somc_chg_smart_set_suspend(struct smb_charger *chg); //CEI comment, RID001102 Battery Care ver 1.0 for DD
+int smblib_SM12_JEITA_extension(struct smb_charger *chg,
+				union power_supply_propval *val);//CEI comment, JEITA extension
 #endif /* __SMB2_CHARGER_H */
