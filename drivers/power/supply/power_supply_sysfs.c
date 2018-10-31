@@ -10,6 +10,11 @@
  *
  *  You may use this code as per GPL version 2
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/ctype.h>
 #include <linux/device.h>
@@ -323,6 +328,30 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(parallel_batfet_mode),
 	POWER_SUPPLY_ATTR(min_icl),
 	POWER_SUPPLY_ATTR(moisture_detected),
+	POWER_SUPPLY_ATTR(smart_charging_activation),
+	POWER_SUPPLY_ATTR(smart_charging_interruption),
+	POWER_SUPPLY_ATTR(smart_charging_status),
+	POWER_SUPPLY_ATTR(lrc_enable),
+	POWER_SUPPLY_ATTR(lrc_socmax),
+	POWER_SUPPLY_ATTR(lrc_socmin),
+	POWER_SUPPLY_ATTR(lrc_not_startup),
+	POWER_SUPPLY_ATTR(dcin_valid),
+	POWER_SUPPLY_ATTR(usbin_valid),
+	POWER_SUPPLY_ATTR(wireless_suspend_for_dev1),
+	POWER_SUPPLY_ATTR(wireless_mode),
+	POWER_SUPPLY_ATTR(wireless_thermal_v_limit),
+	POWER_SUPPLY_ATTR(skin_temp),
+	POWER_SUPPLY_ATTR(max_charge_current),
+	POWER_SUPPLY_ATTR(auth),
+	POWER_SUPPLY_ATTR(charge_full_raw),
+	POWER_SUPPLY_ATTR(learning_counter),
+	POWER_SUPPLY_ATTR(recharge_counter),
+	POWER_SUPPLY_ATTR(full_counter),
+	POWER_SUPPLY_ATTR(real_temp),
+	POWER_SUPPLY_ATTR(legacy_cable_status),
+	POWER_SUPPLY_ATTR(running_status),
+	POWER_SUPPLY_ATTR(charger_type_determined),
+	POWER_SUPPLY_ATTR(monotonic_soc),
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_ATTR(charge_counter_ext),
 	/* Properties of type `const char *' */
@@ -330,6 +359,8 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(manufacturer),
 	POWER_SUPPLY_ATTR(serial_number),
 	POWER_SUPPLY_ATTR(battery_type),
+	POWER_SUPPLY_ATTR(charger_type),
+	POWER_SUPPLY_ATTR(wireless_status),
 };
 
 static struct attribute *

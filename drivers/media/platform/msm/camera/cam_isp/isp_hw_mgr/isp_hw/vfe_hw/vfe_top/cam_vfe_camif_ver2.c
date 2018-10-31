@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/slab.h>
@@ -234,13 +239,6 @@ static int cam_vfe_camif_resource_start(
 	CAM_DBG(CAM_ISP, "hw id:%d core_cfg val:%d", camif_res->hw_intf->hw_idx,
 		val);
 
-	cam_io_w_mb(0x00400040, rsrc_data->mem_base +
-		rsrc_data->camif_reg->camif_config);
-	cam_io_w_mb(0x1, rsrc_data->mem_base +
-			rsrc_data->camif_reg->line_skip_pattern);
-	cam_io_w_mb(0x1, rsrc_data->mem_base +
-			rsrc_data->camif_reg->pixel_skip_pattern);
-
 	/* epoch config with 20 line */
 	cam_io_w_mb(rsrc_data->reg_data->epoch_line_cfg,
 		rsrc_data->mem_base + rsrc_data->camif_reg->epoch_irq);
@@ -355,7 +353,6 @@ static int cam_vfe_camif_handle_irq_bottom_half(void *handler_priv,
 			CAM_DBG(CAM_ISP, "Received EPOCH");
 			ret = CAM_VFE_IRQ_STATUS_SUCCESS;
 		}
-		cam_vfe_put_evt_payload(payload->core_info, &payload);
 		break;
 	case CAM_ISP_HW_EVENT_REG_UPDATE:
 		if (irq_status0 & camif_priv->reg_data->reg_update_irq_mask) {
@@ -373,7 +370,6 @@ static int cam_vfe_camif_handle_irq_bottom_half(void *handler_priv,
 		if (irq_status1 & camif_priv->reg_data->error_irq_mask1) {
 			CAM_DBG(CAM_ISP, "Received ERROR\n");
 			ret = CAM_ISP_HW_ERROR_OVERFLOW;
-			cam_vfe_put_evt_payload(payload->core_info, &payload);
 		} else {
 			ret = CAM_ISP_HW_ERROR_NONE;
 		}

@@ -120,4 +120,19 @@ extern void rt_mutex_adjust_prio(struct task_struct *task);
 # include "rtmutex.h"
 #endif
 
+/*
+ * Waiter structure basic initialization. A waiter is not considered
+ * actually usable until it after calling task_blocks_on_rt_mutex()
+ * which setups up the relevant entries.
+ */
+static inline void
+rt_mutex_init_waiter(struct rt_mutex_waiter *waiter)
+{
+       debug_rt_mutex_init_waiter(waiter);
+
+       RB_CLEAR_NODE(&waiter->pi_tree_entry);
+       RB_CLEAR_NODE(&waiter->tree_entry);
+       waiter->task = NULL;
+}
+
 #endif

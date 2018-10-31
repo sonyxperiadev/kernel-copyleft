@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -118,6 +118,15 @@ void dsi_phy_hw_v3_0_regulator_disable(struct dsi_phy_hw *phy)
 	/* Nothing to be done for DSI PHY regulator disable */
 }
 
+void dsi_phy_hw_v3_0_toggle_resync_fifo(struct dsi_phy_hw *phy)
+{
+	DSI_W32(phy, DSIPHY_CMN_RBUF_CTRL, 0x00);
+	/* ensure that the FIFO is off */
+	wmb();
+	DSI_W32(phy, DSIPHY_CMN_RBUF_CTRL, 0x1);
+	/* ensure that the FIFO is toggled back on */
+	wmb();
+}
 
 static int dsi_phy_hw_v3_0_is_pll_on(struct dsi_phy_hw *phy)
 {
@@ -187,10 +196,31 @@ static void dsi_phy_hw_v3_0_lane_settings(struct dsi_phy_hw *phy,
 		DSI_W32(phy, DSIPHY_LNX_OFFSET_BOT_CTRL(i), 0x0);
 		DSI_W32(phy, DSIPHY_LNX_TX_DCTRL(i), tx_dctrl[i]);
 	}
+}
 
-	/* Toggle BIT 0 to release freeze I/0 */
-	DSI_W32(phy, DSIPHY_LNX_TX_DCTRL(3), 0x05);
-	DSI_W32(phy, DSIPHY_LNX_TX_DCTRL(3), 0x04);
+void dsi_phy_hw_v3_0_clamp_ctrl(struct dsi_phy_hw *phy, bool enable)
+{
+	u32 reg;
+
+	pr_debug("enable=%s\n", enable ? "true" : "false");
+
+	/*
+	 * DSI PHY lane clamps, also referred to as PHY FreezeIO is
+	 * enalbed by default as part of the initialization sequnce.
+	 * This would get triggered anytime the chip FreezeIO is asserted.
+	 */
+	if (enable)
+		return;
+
+	/*
+	 * Toggle BIT 0 to exlplictly release PHY freeze I/0 to disable
+	 * the clamps.
+	 */
+	reg = DSI_R32(phy, DSIPHY_LNX_TX_DCTRL(3));
+	DSI_W32(phy, DSIPHY_LNX_TX_DCTRL(3), reg | BIT(0));
+	wmb(); /* Ensure that the freezeio bit is toggled */
+	DSI_W32(phy, DSIPHY_LNX_TX_DCTRL(3), reg & ~BIT(0));
+	wmb(); /* Ensure that the freezeio bit is toggled */
 }
 
 /**
