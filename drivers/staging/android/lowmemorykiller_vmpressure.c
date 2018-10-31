@@ -58,6 +58,8 @@ void balance_cache(void)
 
 		do_kill = kill_needed(lrw->key, mask, &cp);
 
+		if (death_pending_len >= cp.dynamic_max_queue_len)
+			__lmk_death_pending_morgue();
 		if (death_pending_len >= cp.dynamic_max_queue_len) {
 			lmk_inc_stats(LMK_BUSY);
 			cp.selected_tasksize = SHRINK_STOP;
