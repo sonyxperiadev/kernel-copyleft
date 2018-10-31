@@ -122,7 +122,7 @@ int dsi_dsc_create_pps_buf_cmd(struct msm_display_dsc_info *dsc, char *buf,
 	*bp++ = 1;
 	*bp++ = 0;
 	*bp++ = 0;
-	*bp++ = 10;
+	*bp++ = 0;
 	*bp++ = 0;
 	*bp++ = 128;
 

@@ -67,6 +67,15 @@ static const struct of_device_id dsi_display_dt_match[] = {
 	{}
 };
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+enum {
+	DSI_DISPLAY_MODE_SWITCH_NONE = 0,
+	DSI_DISPLAY_MODE_SWITCH_SEND,
+	DSI_DISPLAY_MODE_SWITCH_SKIP,
+	DSI_DISPLAY_MODE_SWITCH_SKIP2,
+};
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+
 static struct dsi_display *main_display;
 
 struct dsi_display *dsi_display_get_main_display(void)
@@ -1215,9 +1224,19 @@ static int dsi_display_set_clamp(struct dsi_display *display, bool enable)
 	m_ctrl = &display->ctrl[display->cmd_master_idx];
 	ulps_enabled = display->ulps_enabled;
 
+	/*
+	 * Clamp control can be either through the DSI controller or
+	 * the DSI PHY depending on hardware variation
+	 */
 	rc = dsi_ctrl_set_clamp_state(m_ctrl->ctrl, enable, ulps_enabled);
 	if (rc) {
-		pr_err("DSI Clamp state change(%d) failed\n", enable);
+		pr_err("DSI ctrl clamp state change(%d) failed\n", enable);
+		return rc;
+	}
+
+	rc = dsi_phy_set_clamp_state(m_ctrl->phy, enable);
+	if (rc) {
+		pr_err("DSI phy clamp state change(%d) failed\n", enable);
 		return rc;
 	}
 
@@ -1231,7 +1250,18 @@ static int dsi_display_set_clamp(struct dsi_display *display, bool enable)
 			pr_err("DSI Clamp state change(%d) failed\n", enable);
 			return rc;
 		}
+
+		rc = dsi_phy_set_clamp_state(ctrl->phy, enable);
+		if (rc) {
+			pr_err("DSI phy clamp state change(%d) failed\n",
+				enable);
+			return rc;
+		}
+
+		pr_debug("Clamps %s for ctrl%d\n",
+			enable ? "enabled" : "disabled", i);
 	}
+
 	display->clamp_enabled = enable;
 	return 0;
 }
@@ -2536,12 +2566,14 @@ static void dsi_display_ctrl_irq_update(struct dsi_display *display, bool en)
 
 int dsi_pre_clkoff_cb(void *priv,
 			   enum dsi_clk_type clk,
+			   enum dsi_lclk_type l_type,
 			   enum dsi_clk_state new_state)
 {
 	int rc = 0;
 	struct dsi_display *display = priv;
 
-	if ((clk & DSI_LINK_CLK) && (new_state == DSI_CLK_OFF)) {
+	if ((clk & DSI_LINK_CLK) && (new_state == DSI_CLK_OFF) &&
+		(l_type && DSI_LINK_LP_CLK)) {
 		/*
 		 * If ULPS feature is enabled, enter ULPS first.
 		 * However, when blanking the panel, we should enter ULPS
@@ -2591,13 +2623,14 @@ int dsi_pre_clkoff_cb(void *priv,
 
 int dsi_post_clkon_cb(void *priv,
 			   enum dsi_clk_type clk,
+			   enum dsi_lclk_type l_type,
 			   enum dsi_clk_state curr_state)
 {
 	int rc = 0;
 	struct dsi_display *display = priv;
 	bool mmss_clamp = false;
 
-	if (clk & DSI_CORE_CLK) {
+	if ((clk & DSI_LINK_CLK) && (l_type & DSI_LINK_LP_CLK)) {
 		mmss_clamp = display->clamp_enabled;
 		/*
 		 * controller setup is needed if coming out of idle
@@ -2605,6 +2638,13 @@ int dsi_post_clkon_cb(void *priv,
 		 */
 		if (mmss_clamp)
 			dsi_display_ctrl_setup(display);
+
+		/*
+		 * Phy setup is needed if coming out of idle
+		 * power collapse with clamps enabled.
+		 */
+		if (display->phy_idle_power_off || mmss_clamp)
+			dsi_display_phy_idle_on(display, mmss_clamp);
 
 		if (display->ulps_enabled && mmss_clamp) {
 			/*
@@ -2644,17 +2684,11 @@ int dsi_post_clkon_cb(void *priv,
 			goto error;
 		}
 
-		/*
-		 * Phy setup is needed if coming out of idle
-		 * power collapse with clamps enabled.
-		 */
-		if (display->phy_idle_power_off || mmss_clamp)
-			dsi_display_phy_idle_on(display, mmss_clamp);
-
 		/* enable dsi to serve irqs */
 		dsi_display_ctrl_irq_update(display, true);
 	}
-	if (clk & DSI_LINK_CLK) {
+
+	if ((clk & DSI_LINK_CLK) && (l_type & DSI_LINK_HS_CLK)) {
 		/*
 		 * Toggle the resync FIFO everytime clock changes, except
 		 * when cont-splash screen transition is going on.
@@ -2679,6 +2713,7 @@ error:
 
 int dsi_post_clkoff_cb(void *priv,
 			    enum dsi_clk_type clk_type,
+			    enum dsi_lclk_type l_type,
 			    enum dsi_clk_state curr_state)
 {
 	int rc = 0;
@@ -2709,6 +2744,7 @@ int dsi_post_clkoff_cb(void *priv,
 
 int dsi_pre_clkon_cb(void *priv,
 			  enum dsi_clk_type clk_type,
+			  enum dsi_lclk_type l_type,
 			  enum dsi_clk_state new_state)
 {
 	int rc = 0;
@@ -3654,10 +3690,16 @@ static int dsi_display_bind(struct device *dev,
 			goto error_ctrl_deinit;
 		}
 
-		memcpy(&info.c_clks[i], &display_ctrl->ctrl->clk_info.core_clks,
-			sizeof(struct dsi_core_clk_info));
-		memcpy(&info.l_clks[i], &display_ctrl->ctrl->clk_info.link_clks,
-			sizeof(struct dsi_link_clk_info));
+		memcpy(&info.c_clks[i],
+				(&display_ctrl->ctrl->clk_info.core_clks),
+				sizeof(struct dsi_core_clk_info));
+		memcpy(&info.l_hs_clks[i],
+				(&display_ctrl->ctrl->clk_info.hs_link_clks),
+				sizeof(struct dsi_link_hs_clk_info));
+		memcpy(&info.l_lp_clks[i],
+				(&display_ctrl->ctrl->clk_info.lp_link_clks),
+				sizeof(struct dsi_link_lp_clk_info));
+
 		info.c_clks[i].phandle = &priv->phandle;
 		info.bus_handle[i] =
 			display_ctrl->ctrl->axi_bus_info.bus_handle;
@@ -5102,7 +5144,12 @@ error_ctrl_clk_off:
 	(void)dsi_display_clk_ctrl(display->dsi_clk_handle,
 			DSI_CORE_CLK, DSI_CLK_OFF);
 error_panel_post_unprep:
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	if (!display->panel->lp11_init)
+		(void)dsi_panel_post_unprepare(display->panel);
+#else
 	(void)dsi_panel_post_unprepare(display->panel);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 error:
 	mutex_unlock(&display->display_lock);
 	return rc;
@@ -5229,6 +5276,20 @@ int dsi_display_pre_kickoff(struct dsi_display *display,
 
 	rc = dsi_display_set_roi(display, params->rois);
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	if (display->mode_switch_state == DSI_DISPLAY_MODE_SWITCH_SKIP2) {
+		display->mode_switch_state = DSI_DISPLAY_MODE_SWITCH_SKIP;
+	} else if (display->mode_switch_state == DSI_DISPLAY_MODE_SWITCH_SKIP) {
+		display->mode_switch_state = DSI_DISPLAY_MODE_SWITCH_SEND;
+	} else if (display->mode_switch_state == DSI_DISPLAY_MODE_SWITCH_SEND) {
+		rc = dsi_panel_switch(display->panel);
+		if (rc)
+			pr_err("[%s] failed to switch DSI panel mode, rc=%d\n",
+				   display->name, rc);
+		display->mode_switch_state = DSI_DISPLAY_MODE_SWITCH_NONE;
+	}
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+
 	return rc;
 }
 
@@ -5316,12 +5377,14 @@ int dsi_display_enable(struct dsi_display *display)
 	mode = display->panel->cur_mode;
 
 	if (mode->dsi_mode_flags & DSI_MODE_FLAG_DMS) {
+#ifndef CONFIG_DRM_SDE_SPECIFIC_PANEL
 		rc = dsi_panel_post_switch(display->panel);
 		if (rc) {
 			pr_err("[%s] failed to switch DSI panel mode, rc=%d\n",
 				   display->name, rc);
 			goto error;
 		}
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 	} else {
 		rc = dsi_panel_enable(display->panel);
 		if (rc) {
@@ -5343,15 +5406,27 @@ int dsi_display_enable(struct dsi_display *display)
 				display->name, rc);
 			goto error;
 		}
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+		display->mode_switch_state = DSI_DISPLAY_MODE_SWITCH_SKIP2;
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 	}
 
 	if (mode->dsi_mode_flags & DSI_MODE_FLAG_DMS) {
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+		rc = dsi_panel_post_switch(display->panel);
+		if (rc) {
+			pr_err("[%s] failed to switch DSI panel mode, rc=%d\n",
+				   display->name, rc);
+			goto error;
+		}
+#else
 		rc = dsi_panel_switch(display->panel);
 		if (rc)
 			pr_err("[%s] failed to switch DSI panel mode, rc=%d\n",
 				   display->name, rc);
 
 		goto error;
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 	}
 
 	if (display->config.panel_mode == DSI_OP_VIDEO_MODE) {
@@ -5362,12 +5437,23 @@ int dsi_display_enable(struct dsi_display *display)
 			goto error_disable_panel;
 		}
 	} else if (display->config.panel_mode == DSI_OP_CMD_MODE) {
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+		if (!(mode->dsi_mode_flags & DSI_MODE_FLAG_DMS)) {
+			rc = dsi_display_cmd_engine_enable(display);
+			if (rc) {
+				pr_err("[%s]failed to enable DSI cmd engine, rc=%d\n",
+				       display->name, rc);
+				goto error_disable_panel;
+			}
+		}
+#else
 		rc = dsi_display_cmd_engine_enable(display);
 		if (rc) {
 			pr_err("[%s]failed to enable DSI cmd engine, rc=%d\n",
 			       display->name, rc);
 			goto error_disable_panel;
 		}
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 	} else {
 		pr_err("[%s] Invalid configuration\n", display->name);
 		rc = -EINVAL;
