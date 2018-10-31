@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "msm-dsi-catalog:[%s] " fmt, __func__
 #include <linux/errno.h>
@@ -69,7 +74,6 @@ static void dsi_catalog_cmn_init(struct dsi_ctrl_hw *ctrl,
 	ctrl->ops.get_hw_version = dsi_ctrl_hw_cmn_get_hw_version;
 	ctrl->ops.wait_for_cmd_mode_mdp_idle =
 		dsi_ctrl_hw_cmn_wait_for_cmd_mode_mdp_idle;
-	ctrl->ops.set_continuous_clk = dsi_ctrl_hw_cmn_set_continuous_clk;
 
 	switch (version) {
 	case DSI_CTRL_VERSION_1_4:

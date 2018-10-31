@@ -1312,7 +1312,6 @@ static struct platform_driver rpmh_mbox_driver = {
 	.driver = {
 		.name = KBUILD_MODNAME,
 		.of_match_table = rsc_drv_match,
-		.suppress_bind_attrs = true,
 	},
 };
 

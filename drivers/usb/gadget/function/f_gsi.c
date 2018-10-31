@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "f_gsi.h"
 #include "rndis.h"
@@ -94,21 +99,6 @@ static inline bool usb_gsi_remote_wakeup_allowed(struct usb_function *f)
 	log_event_dbg("%s: remote_wakeup_allowed:%s", __func__,
 			(remote_wakeup_allowed ? "true" : "false"));
 	return remote_wakeup_allowed;
-}
-
-static void usb_gsi_check_pending_wakeup(struct usb_function *f)
-{
-	struct f_gsi *gsi = func_to_gsi(f);
-
-	/*
-	 * If host suspended bus without receiving notification request then
-	 * initiate remote-wakeup. As driver won't be able to do it later since
-	 * notification request is already queued.
-	 */
-	if (gsi->c_port.notify_req_queued && usb_gsi_remote_wakeup_allowed(f)) {
-		mod_timer(&gsi->gsi_rw_timer, jiffies + msecs_to_jiffies(2000));
-		log_event_dbg("%s: pending response, arm rw_timer\n", __func__);
-	}
 }
 
 static void post_event(struct gsi_data_port *port, u8 event)
@@ -1849,9 +1839,6 @@ static void gsi_ctrl_notify_resp_complete(struct usb_ep *ep,
 	gsi->c_port.notify_req_queued = false;
 	spin_unlock_irqrestore(&gsi->c_port.lock, flags);
 
-	log_event_dbg("%s: status:%d req_queued:%d",
-		__func__, status, gsi->c_port.notify_req_queued);
-
 	switch (status) {
 	case -ECONNRESET:
 	case -ESHUTDOWN:
@@ -2512,7 +2499,6 @@ static void gsi_suspend(struct usb_function *f)
 	 */
 	if (gsi->prot_id == USB_PROT_GPS_CTRL) {
 		log_event_dbg("%s: suspend done\n", __func__);
-		usb_gsi_check_pending_wakeup(f);
 		return;
 	}
 
@@ -2522,7 +2508,16 @@ static void gsi_suspend(struct usb_function *f)
 	post_event(&gsi->d_port, EVT_SUSPEND);
 	queue_work(gsi->d_port.ipa_usb_wq, &gsi->d_port.usb_ipa_w);
 	log_event_dbg("gsi suspended");
-	usb_gsi_check_pending_wakeup(f);
+
+	/*
+	 * If host suspended bus without receiving notification request then
+	 * initiate remote-wakeup. As driver won't be able to do it later since
+	 * notification request is already queued.
+	 */
+	if (gsi->c_port.notify_req_queued && usb_gsi_remote_wakeup_allowed(f)) {
+		mod_timer(&gsi->gsi_rw_timer, jiffies + msecs_to_jiffies(2000));
+		log_event_dbg("%s: pending response, arm rw_timer\n", __func__);
+	}
 }
 
 static void gsi_resume(struct usb_function *f)
@@ -2575,11 +2570,6 @@ static void gsi_resume(struct usb_function *f)
 static int gsi_get_status(struct usb_function *f)
 {
 	unsigned int remote_wakeup_en_status = f->func_wakeup_allowed ? 1 : 0;
-	struct f_gsi *gsi = func_to_gsi(f);
-
-	/* Disable function remote wake-up for DPL interface */
-	if (gsi->prot_id == USB_PROT_DIAG_IPA)
-		return 0;
 
 	return (remote_wakeup_en_status << FUNC_WAKEUP_ENABLE_SHIFT) |
 		(1 << FUNC_WAKEUP_CAPABLE_SHIFT);
@@ -2861,7 +2851,6 @@ static int gsi_bind(struct usb_configuration *c, struct usb_function *f)
 	struct f_gsi *gsi = func_to_gsi(f);
 	struct rndis_params *params;
 	struct net_device *net;
-	struct gsi_opts *opts;
 	char *name = NULL;
 	int status;
 	__u8  class;
@@ -2887,6 +2876,17 @@ static int gsi_bind(struct usb_configuration *c, struct usb_function *f)
 
 	switch (gsi->prot_id) {
 	case USB_PROT_RNDIS_IPA:
+		/* "Wireless" RNDIS6; auto-detected by Windows */
+		pr_debug("%s: linux_support=%d\n",  __func__,
+							gsi->linux_support);
+		if (gsi->linux_support) {
+			pr_info("%s: RNDIS5\n",  __func__);
+			gsi->rndis_id = WIRELESS_CONTROLLER_REMOTE_NDIS;
+		} else {
+			pr_info("%s: RNDIS6\n",  __func__);
+			gsi->rndis_id = MISC_RNDIS_OVER_ETHERNET;
+		}
+
 		info.string_defs = rndis_gsi_string_defs;
 		info.ctrl_desc = &rndis_gsi_control_intf;
 		info.ctrl_str_idx = 0;
@@ -3069,15 +3069,18 @@ static int gsi_bind(struct usb_configuration *c, struct usb_function *f)
 		info.notify_buf_len = sizeof(struct usb_cdc_notification);
 		mbim_gsi_desc.wMaxSegmentSize = cpu_to_le16(0x800);
 
-		if (cdev->use_os_string) {
-			f->os_desc_table = kzalloc(sizeof(*f->os_desc_table),
-						GFP_KERNEL);
-			if (!f->os_desc_table)
-				return -ENOMEM;
-			opts = container_of(f->fi, struct gsi_opts, func_inst);
-			f->os_desc_n = 1;
-			f->os_desc_table[0].os_desc = &opts->os_desc;
-			f->os_desc_table[0].if_id = gsi->data_id;
+		/*
+		 * If MBIM is bound in a config other than the first, tell
+		 * Windows about it by returning the num as a string in the
+		 * OS descriptor's subCompatibleID field. Windows only supports
+		 * up to config #4.
+		 */
+		if (c->bConfigurationValue >= 2 &&
+				c->bConfigurationValue <= 4) {
+			log_event_dbg("MBIM in configuration %d",
+					c->bConfigurationValue);
+			mbim_gsi_ext_config_desc.function.subCompatibleID[0] =
+				c->bConfigurationValue + '0';
 		}
 		break;
 	case USB_PROT_RMNET_IPA:
@@ -3267,7 +3270,6 @@ skip_ipa_init:
 
 dereg_rndis:
 	rndis_deregister(gsi->params);
-	kfree(f->os_desc_table);
 fail:
 	return status;
 }
@@ -3299,11 +3301,8 @@ skip_ipa_dinit:
 		rndis_deregister(gsi->params);
 	}
 
-	if (gsi->prot_id == USB_PROT_MBIM_IPA) {
-		kfree(f->os_desc_table);
-		f->os_desc_table = NULL;
-		f->os_desc_n = 0;
-	}
+	if (gsi->prot_id == USB_PROT_MBIM_IPA)
+		mbim_gsi_ext_config_desc.function.subCompatibleID[0] = 0;
 
 	if (gadget_is_superspeed(c->cdev->gadget)) {
 		usb_free_descriptors(f->ss_descriptors);
@@ -3408,6 +3407,8 @@ static struct f_gsi *gsi_function_init(void)
 
 	gsi->gsi_rw_timer_interval = DEFAULT_RW_TIMER_INTERVAL;
 	setup_timer(&gsi->gsi_rw_timer, gsi_rw_timer_func, (unsigned long) gsi);
+
+	gsi->linux_support = false;
 
 	return gsi;
 }
@@ -3570,6 +3571,51 @@ static ssize_t gsi_info_show(struct config_item *item, char *page)
 	return ret;
 }
 
+static ssize_t gsi_linux_support_show(struct config_item *item, char *page)
+{
+	struct f_gsi *gsi = to_gsi_opts(item)->gsi;
+	int ret;
+
+	switch (gsi->prot_id) {
+	case IPA_USB_RNDIS:
+		/* "Y\n\0" 3characters */
+		ret = snprintf(page, 3, "%c\n", gsi->linux_support ? 'Y' : 'N');
+		break;
+	default:
+		ret = EBADR;
+		break;
+	}
+
+	return ret;
+}
+
+static ssize_t gsi_linux_support_store(struct config_item *item,
+						 const char *page, size_t len)
+{
+	struct f_gsi *gsi = to_gsi_opts(item)->gsi;
+	bool val;
+	int ret = 0;
+
+	switch (gsi->prot_id) {
+	case IPA_USB_RNDIS:
+		ret = strtobool(page, &val);
+		if (ret)
+			break;
+		gsi->linux_support = val;
+		pr_info("%s: set linux_support=%d.\n",  __func__,
+							gsi->linux_support);
+		break;
+	default:
+		ret = -EBADR;
+		break;
+	}
+
+	if (ret)
+		len = ret;
+	return len;
+}
+
+CONFIGFS_ATTR(gsi_, linux_support);
 CONFIGFS_ATTR_RO(gsi_, info);
 
 static struct configfs_attribute *gsi_attrs[] = {
@@ -3610,6 +3656,7 @@ CONFIGFS_ATTR(gsi_, rndis_class_id);
 
 static struct configfs_attribute *gsi_rndis_attrs[] = {
 	&gsi_attr_info,
+	&gsi_attr_linux_support,
 	&gsi_attr_rndis_class_id,
 	NULL,
 };
@@ -3626,8 +3673,6 @@ static int gsi_set_inst_name(struct usb_function_instance *fi,
 	int name_len, prot_id, ret = 0;
 	struct gsi_opts *opts;
 	struct f_gsi *gsi;
-	struct usb_os_desc *descs[1];
-	char *names[1];
 
 	opts = container_of(fi, struct gsi_opts, func_inst);
 
@@ -3645,15 +3690,6 @@ static int gsi_set_inst_name(struct usb_function_instance *fi,
 	if (prot_id == USB_PROT_RNDIS_IPA)
 		config_group_init_type_name(&opts->func_inst.group, "",
 					    &gsi_func_rndis_type);
-	if (prot_id == IPA_USB_MBIM) {
-		opts->os_desc.ext_compat_id = opts->ext_compat_id;
-		INIT_LIST_HEAD(&opts->os_desc.ext_prop);
-		descs[0] = &opts->os_desc;
-		names[0] = "MBIM";
-		opts->interf_group = usb_os_desc_prepare_interf_dir(
-						&opts->func_inst.group, 1,
-						descs, names, THIS_MODULE);
-	}
 
 	gsi = opts->gsi = __gsi[prot_id];
 	opts->gsi->prot_id = prot_id;
@@ -3668,11 +3704,8 @@ static void gsi_free_inst(struct usb_function_instance *f)
 {
 	struct gsi_opts *opts = container_of(f, struct gsi_opts, func_inst);
 
-	if (opts) {
-		if (opts->gsi && opts->gsi->c_port.ctrl_device.fops)
-			misc_deregister(&opts->gsi->c_port.ctrl_device);
-		kfree(opts->interf_group);
-	}
+	if (opts && opts->gsi && opts->gsi->c_port.ctrl_device.fops)
+		misc_deregister(&opts->gsi->c_port.ctrl_device);
 
 	kfree(opts);
 }

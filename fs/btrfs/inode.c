@@ -1230,8 +1230,6 @@ static noinline int csum_exist_in_range(struct btrfs_root *root,
 		list_del(&sums->list);
 		kfree(sums);
 	}
-	if (ret < 0)
-		return ret;
 	return 1;
 }
 
@@ -1383,23 +1381,10 @@ next_slot:
 				goto out_check;
 			if (btrfs_extent_readonly(root, disk_bytenr))
 				goto out_check;
-			ret = btrfs_cross_ref_exist(trans, root, ino,
+			if (btrfs_cross_ref_exist(trans, root, ino,
 						  found_key.offset -
-						  extent_offset, disk_bytenr);
-			if (ret) {
-				/*
-				 * ret could be -EIO if the above fails to read
-				 * metadata.
-				 */
-				if (ret < 0) {
-					if (cow_start != (u64)-1)
-						cur_offset = cow_start;
-					goto error;
-				}
-
-				WARN_ON_ONCE(nolock);
+						  extent_offset, disk_bytenr))
 				goto out_check;
-			}
 			disk_bytenr += extent_offset;
 			disk_bytenr += cur_offset - found_key.offset;
 			num_bytes = min(end + 1, extent_end) - cur_offset;
@@ -1417,20 +1402,8 @@ next_slot:
 			 * this ensure that csum for a given extent are
 			 * either valid or do not exist.
 			 */
-			ret = csum_exist_in_range(root, disk_bytenr, num_bytes);
-			if (ret) {
-				/*
-				 * ret could be -EIO if the above fails to read
-				 * metadata.
-				 */
-				if (ret < 0) {
-					if (cow_start != (u64)-1)
-						cur_offset = cow_start;
-					goto error;
-				}
-				WARN_ON_ONCE(nolock);
+			if (csum_exist_in_range(root, disk_bytenr, num_bytes))
 				goto out_check;
-			}
 			if (!btrfs_inc_nocow_writers(root->fs_info,
 						     disk_bytenr))
 				goto out_check;
@@ -9588,7 +9561,6 @@ static int btrfs_rename_exchange(struct inode *old_dir,
 	u64 new_idx = 0;
 	u64 root_objectid;
 	int ret;
-	int ret2;
 	bool root_log_pinned = false;
 	bool dest_log_pinned = false;
 
@@ -9779,8 +9751,7 @@ out_fail:
 			dest_log_pinned = false;
 		}
 	}
-	ret2 = btrfs_end_transaction(trans, root);
-	ret = ret ? ret : ret2;
+	ret = btrfs_end_transaction(trans, root);
 out_notrans:
 	if (new_ino == BTRFS_FIRST_FREE_OBJECTID)
 		up_read(&dest->fs_info->subvol_sem);

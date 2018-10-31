@@ -63,7 +63,6 @@ static int vprintk_nmi(const char *fmt, va_list args)
 	struct nmi_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
 	int add = 0;
 	size_t len;
-	va_list ap;
 
 again:
 	len = atomic_read(&s->len);
@@ -80,9 +79,7 @@ again:
 	if (!len)
 		smp_rmb();
 
-	va_copy(ap, args);
-	add = vsnprintf(s->buffer + len, sizeof(s->buffer) - len, fmt, ap);
-	va_end(ap);
+	add = vsnprintf(s->buffer + len, sizeof(s->buffer) - len, fmt, args);
 
 	/*
 	 * Do it once again if the buffer has been flushed in the meantime.

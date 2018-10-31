@@ -15,6 +15,11 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __SDE_ENCODER_H__
 #define __SDE_ENCODER_H__
@@ -256,12 +261,5 @@ int sde_encoder_display_failure_notification(struct drm_encoder *enc);
  * @Return:     true if successful in updating the encoder structure
  */
 int sde_encoder_in_clone_mode(struct drm_encoder *enc);
-
-/**
- * sde_encoder_control_idle_pc - control enable/disable of idle power collapse
- * @drm_enc:    Pointer to drm encoder structure
- * @enable:	enable/disable flag
- */
-void sde_encoder_control_idle_pc(struct drm_encoder *enc, bool enable);
 
 #endif /* __SDE_ENCODER_H__ */

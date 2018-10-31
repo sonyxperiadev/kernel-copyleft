@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "cam_lrme_hw_core.h"
 #include "cam_lrme_hw_soc.h"
@@ -449,8 +454,8 @@ static int cam_lrme_hw_util_flush_ctx(struct cam_hw_info *lrme_hw,
 		cb_args.cb_type = CAM_LRME_CB_PUT_FRAME;
 		cb_args.frame_req = req_submit;
 		if (lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb)
-			lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb(
-				lrme_core->hw_mgr_cb.data, &cb_args);
+			lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb(lrme_core->
+				hw_mgr_cb.data, &cb_args);
 	} else if (req_submit) {
 		submit_args.frame_req = req_submit;
 		submit_args.hw_update_entries = req_submit->hw_update_entries;
@@ -468,8 +473,8 @@ static int cam_lrme_hw_util_flush_ctx(struct cam_hw_info *lrme_hw,
 		cb_args.cb_type = CAM_LRME_CB_PUT_FRAME;
 		cb_args.frame_req = req_proc;
 		if (lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb)
-			lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb(
-				lrme_core->hw_mgr_cb.data, &cb_args);
+			lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb(lrme_core->
+				hw_mgr_cb.data, &cb_args);
 	} else if (req_proc) {
 		submit_args.frame_req = req_proc;
 		submit_args.hw_update_entries = req_proc->hw_update_entries;
@@ -511,8 +516,8 @@ static int cam_lrme_hw_util_flush_req(struct cam_hw_info *lrme_hw,
 		cb_args.cb_type = CAM_LRME_CB_PUT_FRAME;
 		cb_args.frame_req = req_submit;
 		if (lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb)
-			lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb(
-				lrme_core->hw_mgr_cb.data, &cb_args);
+			lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb(lrme_core->
+				hw_mgr_cb.data, &cb_args);
 	} else if (req_submit) {
 		submit_args.frame_req = req_submit;
 		submit_args.hw_update_entries = req_submit->hw_update_entries;
@@ -530,8 +535,8 @@ static int cam_lrme_hw_util_flush_req(struct cam_hw_info *lrme_hw,
 		cb_args.cb_type = CAM_LRME_CB_PUT_FRAME;
 		cb_args.frame_req = req_proc;
 		if (lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb)
-			lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb(
-				lrme_core->hw_mgr_cb.data, &cb_args);
+			lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb(lrme_core->
+				hw_mgr_cb.data, &cb_args);
 	} else if (req_proc) {
 		submit_args.frame_req = req_proc;
 		submit_args.hw_update_entries = req_proc->hw_update_entries;
@@ -745,8 +750,8 @@ int cam_lrme_hw_process_irq(void *priv, void *data)
 	}
 
 	if (lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb) {
-		lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb(
-			lrme_core->hw_mgr_cb.data, &cb_args);
+		lrme_core->hw_mgr_cb.cam_lrme_hw_mgr_cb(lrme_core->
+			hw_mgr_cb.data, &cb_args);
 	} else {
 		CAM_ERR(CAM_LRME, "No hw mgr cb");
 		rc = -EINVAL;
@@ -1118,7 +1123,7 @@ irqreturn_t cam_lrme_hw_irq(int irq_num, void *data)
 
 	if (!data) {
 		CAM_ERR(CAM_LRME, "Invalid data in IRQ callback");
-		return IRQ_NONE;
+		return -EINVAL;
 	}
 
 	lrme_hw = (struct cam_hw_info *)data;
@@ -1179,7 +1184,7 @@ irqreturn_t cam_lrme_hw_irq(int irq_num, void *data)
 		task = cam_req_mgr_workq_get_task(lrme_core->work);
 		if (!task) {
 			CAM_ERR(CAM_LRME, "no empty task available");
-			return IRQ_NONE;
+			return -ENOMEM;
 		}
 		work_data = (struct cam_lrme_hw_work_data *)task->payload;
 		work_data->top_irq_status = top_irq_status;

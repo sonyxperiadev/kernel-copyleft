@@ -63,15 +63,7 @@ int ipa3_enable_data_path(u32 clnt_hdl)
 	IPADBG("Enabling data path\n");
 	if (IPA_CLIENT_IS_CONS(ep->client)) {
 		memset(&holb_cfg, 0, sizeof(holb_cfg));
-		/*
-		 * Set HOLB on USB DPL CONS to avoid IPA stall
-		 * if DPL client is not pulling the data
-		 * on other end from IPA hw.
-		 */
-		if (ep->client == IPA_CLIENT_USB_DPL_CONS)
-			holb_cfg.en = IPA_HOLB_TMR_EN;
-		else
-			holb_cfg.en = IPA_HOLB_TMR_DIS;
+		holb_cfg.en = IPA_HOLB_TMR_DIS;
 		holb_cfg.tmr_val = 0;
 		res = ipa3_cfg_ep_holb(clnt_hdl, &holb_cfg);
 	}
@@ -1331,32 +1323,27 @@ exit:
 }
 
 /*
- * Set reset ep_delay for CLEINT PROD pipe
+ * Set USB PROD pipe delay for MBIM/RMNET config
  * Clocks, should be voted before calling this API
  * locks should be taken before calling this API
  */
 
-int ipa3_set_reset_client_prod_pipe_delay(bool set_reset,
-		enum ipa_client_type client)
+void ipa3_set_usb_prod_pipe_delay(void)
 {
-	int result = 0;
+	int result;
 	int pipe_idx;
 	struct ipa3_ep_context *ep;
 	struct ipa_ep_cfg_ctrl ep_ctrl;
 
 	memset(&ep_ctrl, 0, sizeof(struct ipa_ep_cfg_ctrl));
-	ep_ctrl.ipa_ep_delay = set_reset;
+	ep_ctrl.ipa_ep_delay = true;
 
-	if (IPA_CLIENT_IS_CONS(client)) {
-		IPAERR("client (%d) not PROD\n", client);
-		return -EINVAL;
-	}
 
-	pipe_idx = ipa3_get_ep_mapping(client);
+	pipe_idx = ipa3_get_ep_mapping(IPA_CLIENT_USB_PROD);
 
 	if (pipe_idx == IPA_EP_NOT_ALLOCATED) {
-		IPAERR("client (%d) not valid\n", client);
-		return -EINVAL;
+		IPAERR("client (%d) not valid\n", IPA_CLIENT_USB_PROD);
+		return;
 	}
 
 	ep = &ipa3_ctx->ep[pipe_idx];
@@ -1373,59 +1360,6 @@ int ipa3_set_reset_client_prod_pipe_delay(bool set_reset,
 			IPADBG("client (ep: %d) success\n", pipe_idx);
 	}
 	client_lock_unlock_cb(pipe_idx, false);
-	return result;
-}
-
-int ipa3_set_reset_client_cons_pipe_sus_holb(bool set_reset,
-		enum ipa_client_type client)
-{
-	int pipe_idx;
-	struct ipa3_ep_context *ep;
-	struct ipa_ep_cfg_ctrl ep_suspend;
-	struct ipa_ep_cfg_holb ep_holb;
-
-	memset(&ep_suspend, 0, sizeof(ep_suspend));
-	memset(&ep_holb, 0, sizeof(ep_holb));
-
-	ep_suspend.ipa_ep_suspend = set_reset;
-	ep_holb.tmr_val = 0;
-	ep_holb.en = set_reset;
-
-	if (IPA_CLIENT_IS_PROD(client)) {
-		IPAERR("client (%d) not CONS\n", client);
-		return -EINVAL;
-	}
-
-	pipe_idx = ipa3_get_ep_mapping(client);
-
-	if (pipe_idx == IPA_EP_NOT_ALLOCATED) {
-		IPAERR("client (%d) not valid\n", client);
-		return -EINVAL;
-	}
-
-	ep = &ipa3_ctx->ep[pipe_idx];
-	/* Setting sus/holb on MHI_CONS with skip_ep_cfg */
-	client_lock_unlock_cb(pipe_idx, true);
-	if (ep->valid && ep->skip_ep_cfg) {
-		if (ipa3_ctx->ipa_hw_type < IPA_HW_v4_0)
-			ipahal_write_reg_n_fields(
-					IPA_ENDP_INIT_CTRL_n,
-					pipe_idx, &ep_suspend);
-		/*
-		 * ipa3_cfg_ep_holb is not used here because we are
-		 * setting HOLB on Q6 pipes, and from APPS perspective
-		 * they are not valid, therefore, the above function
-		 * will fail.
-		 */
-		ipahal_write_reg_n_fields(
-			IPA_ENDP_INIT_HOL_BLOCK_TIMER_n,
-			pipe_idx, &ep_holb);
-		ipahal_write_reg_n_fields(
-			IPA_ENDP_INIT_HOL_BLOCK_EN_n,
-			pipe_idx, &ep_holb);
-	}
-	client_lock_unlock_cb(pipe_idx, false);
-	return 0;
 }
 
 void ipa3_xdci_ep_delay_rm(u32 clnt_hdl)

@@ -15,6 +15,11 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 
@@ -926,12 +931,6 @@ static void sde_kms_prepare_commit(struct msm_kms *kms,
 		return;
 	}
 
-	if (sde_kms->first_kickoff) {
-		sde_power_scale_reg_bus(&priv->phandle, sde_kms->core_client,
-			VOTE_INDEX_HIGH, false);
-		sde_kms->first_kickoff = false;
-	}
-
 	for_each_crtc_in_state(state, crtc, crtc_state, i) {
 		list_for_each_entry(encoder, &dev->mode_config.encoder_list,
 				head) {
@@ -1691,16 +1690,6 @@ void sde_kms_timeline_status(struct drm_device *dev)
 
 	drm_for_each_crtc(crtc, dev)
 		sde_crtc_timeline_status(crtc);
-
-	if (mutex_is_locked(&dev->mode_config.mutex)) {
-		/*
-		 *Probably locked from last close dumping status anyway
-		 */
-		SDE_ERROR("dumping conn_timeline without mode_config lock\n");
-		drm_for_each_connector(conn, dev)
-			sde_conn_timeline_status(conn);
-		return;
-	}
 
 	mutex_lock(&dev->mode_config.mutex);
 	drm_for_each_connector(conn, dev)
@@ -2664,15 +2653,7 @@ static int sde_kms_cont_splash_config(struct msm_kms *kms)
 		SDE_DEBUG("info.is_connected = %s, info.is_primary = %s\n",
 			((info.is_connected) ? "true" : "false"),
 			((info.is_primary) ? "true" : "false"));
-
-		/**
-		 * Since we are supporting one DSI for splash, use the display
-		 * which is marked as primary.
-		 */
-		if (!info.is_primary)
-			continue;
-		else
-			break;
+		break;
 	}
 
 	if (!encoder) {
@@ -3097,10 +3078,8 @@ static void sde_kms_handle_power_event(u32 event_type, void *usr)
 	if (event_type == SDE_POWER_EVENT_POST_ENABLE) {
 		sde_irq_update(msm_kms, true);
 		sde_vbif_init_memtypes(sde_kms);
-		sde_kms->first_kickoff = true;
 	} else if (event_type == SDE_POWER_EVENT_PRE_DISABLE) {
 		sde_irq_update(msm_kms, false);
-		sde_kms->first_kickoff = false;
 	}
 }
 

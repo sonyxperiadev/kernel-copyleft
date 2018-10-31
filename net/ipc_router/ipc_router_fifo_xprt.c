@@ -12,7 +12,6 @@
 #include <linux/types.h>
 #include <linux/skbuff.h>
 #include <linux/sched.h>
-#include <microvisor/microvisor.h>
 
 #define MODULE_NAME "ipc_router_fifo_xprt"
 #define XPRT_NAME_LEN 32
@@ -255,7 +254,7 @@ static void xprt_read_data(struct work_struct *work)
 	hdr_len = sizeof(struct rr_header_v1);
 	while (1) {
 		rx_avail = fifo_rx_avail(&xprtp->rx_pipe);
-		if (!rx_avail)
+		if (!rx_avail || (rx_avail < hdr_len))
 			break;
 
 		fifo_rx_peak(&xprtp->rx_pipe, &hdr, 0, hdr_len);

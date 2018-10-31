@@ -102,14 +102,11 @@ struct cnss_platform_cap {
 	u32 cap_flag;
 };
 
-/* WLAN driver status, keep it aligned with cnss2 */
+/* WLAN driver status */
 enum cnss_driver_status {
 	CNSS_UNINITIALIZED,
 	CNSS_INITIALIZED,
-	CNSS_LOAD_UNLOAD,
-	CNSS_RECOVERY,
-	CNSS_FW_DOWN,
-	CNSS_SSR_FAIL,
+	CNSS_LOAD_UNLOAD
 };
 
 enum cnss_runtime_request {
@@ -123,8 +120,6 @@ enum cnss_runtime_request {
 	CNSS_PM_GET_NORESUME,
 };
 
-extern struct dma_iommu_mapping *cnss_smmu_get_mapping(void);
-extern int cnss_smmu_map(phys_addr_t paddr, uint32_t *iova_addr, size_t size);
 extern int cnss_get_fw_image(struct image_desc_info *image_desc_info);
 extern void cnss_runtime_init(struct device *dev, int auto_delay);
 extern void cnss_runtime_exit(struct device *dev);

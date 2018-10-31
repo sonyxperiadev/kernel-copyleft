@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/module.h>
 #include <linux/fb.h>
 #include <linux/file.h>
@@ -541,7 +546,7 @@ int kgsl_context_init(struct kgsl_device_private *dev_priv,
 	 */
 	spin_lock(&proc_priv->ctxt_count_lock);
 	if (atomic_read(&proc_priv->ctxt_count) > KGSL_MAX_CONTEXTS_PER_PROC) {
-		KGSL_DRV_ERR_RATELIMIT(device,
+		KGSL_DRV_ERR(device,
 			"Per process context limit reached for pid %u",
 			dev_priv->process_priv->pid);
 		spin_unlock(&proc_priv->ctxt_count_lock);
@@ -1119,8 +1124,7 @@ static int kgsl_release(struct inode *inodep, struct file *filep)
 	/* Close down the process wide resources for the file */
 	kgsl_process_private_close(dev_priv, dev_priv->process_priv);
 
-	/* Destroy the device-specific structure */
-	device->ftbl->device_private_destroy(dev_priv);
+	kfree(dev_priv);
 
 	result = kgsl_close_device(device);
 	pm_runtime_put(&device->pdev->dev);
@@ -1188,7 +1192,7 @@ static int kgsl_open(struct inode *inodep, struct file *filep)
 	}
 	result = 0;
 
-	dev_priv = device->ftbl->device_private_create();
+	dev_priv = kzalloc(sizeof(struct kgsl_device_private), GFP_KERNEL);
 	if (dev_priv == NULL) {
 		result = -ENOMEM;
 		goto err;

@@ -15,6 +15,11 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _SDE_CRTC_H_
 #define _SDE_CRTC_H_
@@ -56,18 +61,6 @@ enum sde_crtc_client_type {
 enum sde_crtc_output_capture_point {
 	CAPTURE_MIXER_OUT,
 	CAPTURE_DSPP_OUT
-};
-
-/**
- * enum sde_crtc_idle_pc_state: states of idle power collapse
- * @IDLE_PC_NONE: no-op
- * @IDLE_PC_ENABLE: enable idle power-collapse
- * @IDLE_PC_DISABLE: disable idle power-collapse
- */
-enum sde_crtc_idle_pc_state {
-	IDLE_PC_NONE,
-	IDLE_PC_ENABLE,
-	IDLE_PC_DISABLE,
 };
 
 /**

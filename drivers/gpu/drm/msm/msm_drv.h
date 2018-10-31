@@ -15,6 +15,11 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __MSM_DRV_H__
 #define __MSM_DRV_H__
@@ -158,7 +163,6 @@ enum msm_mdp_crtc_property {
 	CRTC_PROP_CAPTURE_OUTPUT,
 
 	CRTC_PROP_ENABLE_SUI_ENHANCEMENT,
-	CRTC_PROP_IDLE_PC_STATE,
 
 	/* total # of properties */
 	CRTC_PROP_COUNT

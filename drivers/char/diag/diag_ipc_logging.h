@@ -26,7 +26,9 @@
 #define DIAG_DEBUG_BRIDGE	0x0040
 #define DIAG_DEBUG_CONTROL	0x0080
 
-#ifdef CONFIG_IPC_LOGGING
+#define DIAG_DEBUG
+
+#ifdef DIAG_DEBUG
 extern uint16_t diag_debug_mask;
 extern void *diag_ipc_log;
 

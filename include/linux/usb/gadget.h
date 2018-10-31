@@ -539,7 +539,6 @@ struct usb_gadget {
 	u32				extra_buf_alloc;
 	bool				l1_supported;
 	bool				is_chipidea;
-	bool				self_powered;
 };
 #define work_to_gadget(w)	(container_of((w), struct usb_gadget, work))
 

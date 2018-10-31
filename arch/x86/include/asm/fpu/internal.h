@@ -62,7 +62,7 @@ extern u64 fpu__get_supported_xfeatures_mask(void);
  */
 static __always_inline __pure bool use_eager_fpu(void)
 {
-	return true;
+	return static_cpu_has(X86_FEATURE_EAGER_FPU);
 }
 
 static __always_inline __pure bool use_xsaveopt(void)

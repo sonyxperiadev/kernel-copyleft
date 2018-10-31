@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _PFK_EXT4_H_
 #define _PFK_EXT4_H_
@@ -24,9 +29,7 @@ int pfk_ext4_parse_inode(const struct bio *bio,
 	const struct inode *inode,
 	struct pfk_key_info *key_info,
 	enum ice_cryto_algo_mode *algo,
-	bool *is_pfe,
-	unsigned int *data_unit,
-	const char *storage_type);
+	bool *is_pfe);
 
 bool pfk_ext4_allow_merge_bio(const struct bio *bio1,
 	const struct bio *bio2, const struct inode *inode1,

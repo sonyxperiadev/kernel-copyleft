@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _CAM_CSID_HW_INTF_H_
 #define _CAM_CSID_HW_INTF_H_
@@ -138,13 +143,12 @@ struct cam_csid_reset_cfg_args {
 /**
  * struct cam_csid_get_time_stamp_args-  time stamp capture arguments
  * @res_node :   resource to get the time stamp
- * @time_stamp_val : captured time stamp
- * @boot_timestamp : boot time stamp
+ * @ time_stamp_val : captured time stamp
+ *
  */
 struct cam_csid_get_time_stamp_args {
 	struct cam_isp_resource_node      *node_res;
 	uint64_t                           time_stamp_val;
-	uint64_t                           boot_timestamp;
 };
 
 /**
@@ -153,7 +157,6 @@ struct cam_csid_get_time_stamp_args {
 enum cam_ife_csid_cmd_type {
 	CAM_IFE_CSID_CMD_GET_TIME_STAMP,
 	CAM_IFE_CSID_SET_CSID_DEBUG,
-	CAM_IFE_CSID_SOF_IRQ_DEBUG,
 	CAM_IFE_CSID_CMD_MAX,
 };
 

@@ -169,7 +169,6 @@ Optional properties:
    "tcsr_clamp_dig_n" : To enable/disable digital clamp to the phy. When
    de-asserted, it will prevent random leakage from qusb2 phy resulting from
    out of sequence turn on/off of 1p8, 3p3 and DVDD regulators.
-   "refgen_north_bg_reg" : address used to read REFGEN status for overriding QUSB PHY register.
  - clocks: a list of phandles to the PHY clocks. Use as per
    Documentation/devicetree/bindings/clock/clock-bindings.txt
  - clock-names: Names of the clocks in 1-1 correspondence with the "clocks"
@@ -191,8 +190,6 @@ Optional properties:
  - qcom,tune2-efuse-correction: The value to be adjusted from fused value for
    improved rise/fall times.
  - qcom,host-chirp-erratum: Indicates host chirp fix is required.
- - qcom,override-bias-ctrl2: Indicates override is done from driver for
-   BIAS_CTRL2 register.
  - nvmem-cells: specifies the handle to represent the SoC revision.
    usually it is defined by qfprom device node.
  - nvmem-cell-names: specifies the given nvmem cell name as defined in

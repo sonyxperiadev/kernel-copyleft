@@ -15,6 +15,11 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 #include <linux/kthread.h>
@@ -200,8 +205,7 @@ enum sde_enc_rc_states {
  * @disp_info:			local copy of msm_display_info struct
  * @misr_enable:		misr enable/disable status
  * @misr_frame_count:		misr frame count before start capturing the data
- * @idle_pc_enabled:		indicate if idle power collapse is enabled
- *				currently. This can be controlled by user-mode
+ * @idle_pc_supported:		indicate if idle power collaps is supported
  * @rc_lock:			resource control mutex lock to protect
  *				virt encoder over various state changes
  * @rc_state:			resource controller state
@@ -251,7 +255,7 @@ struct sde_encoder_virt {
 	bool misr_enable;
 	u32 misr_frame_count;
 
-	bool idle_pc_enabled;
+	bool idle_pc_supported;
 	struct mutex rc_lock;
 	enum sde_enc_rc_states rc_state;
 	struct kthread_delayed_work delayed_off_work;
@@ -259,7 +263,6 @@ struct sde_encoder_virt {
 	struct kthread_work input_event_work;
 	struct kthread_work esd_trigger_work;
 	struct input_handler *input_handler;
-	bool input_handler_registered;
 	struct msm_display_topology topology;
 	bool vblank_enabled;
 
@@ -267,8 +270,6 @@ struct sde_encoder_virt {
 	struct sde_rect cur_conn_roi;
 	struct sde_rect prv_conn_roi;
 	struct drm_crtc *crtc;
-
-	bool elevated_ahb_vote;
 };
 
 #define to_sde_encoder_virt(x) container_of(x, struct sde_encoder_virt, base)
@@ -744,7 +745,6 @@ void sde_encoder_destroy(struct drm_encoder *drm_enc)
 	if (sde_enc->input_handler) {
 		kfree(sde_enc->input_handler);
 		sde_enc->input_handler = NULL;
-		sde_enc->input_handler_registered = false;
 	}
 
 	kfree(sde_enc);
@@ -1854,7 +1854,6 @@ static int _sde_encoder_resource_control_helper(struct drm_encoder *drm_enc,
 			return rc;
 		}
 
-		sde_enc->elevated_ahb_vote = true;
 		/* enable DSI clks */
 		rc = sde_connector_clk_ctrl(sde_enc->cur_master->connector,
 				true);
@@ -1928,25 +1927,6 @@ static void sde_encoder_input_event_handler(struct input_handle *handle,
 				&sde_enc->input_event_work);
 }
 
-void sde_encoder_control_idle_pc(struct drm_encoder *drm_enc, bool enable)
-{
-	struct sde_encoder_virt *sde_enc;
-
-	if (!drm_enc) {
-		SDE_ERROR("invalid encoder\n");
-		return;
-	}
-	sde_enc = to_sde_encoder_virt(drm_enc);
-
-	/* return early if there is no state change */
-	if (sde_enc->idle_pc_enabled == enable)
-		return;
-
-	sde_enc->idle_pc_enabled = enable;
-
-	SDE_DEBUG("idle-pc state:%d\n", sde_enc->idle_pc_enabled);
-	SDE_EVT32(sde_enc->idle_pc_enabled);
-}
 
 static int sde_encoder_resource_control(struct drm_encoder *drm_enc,
 		u32 sw_event)
@@ -1973,7 +1953,7 @@ static int sde_encoder_resource_control(struct drm_encoder *drm_enc,
 	 * when idle_pc is not supported, process only KICKOFF, STOP and MODESET
 	 * events and return early for other events (ie wb display).
 	 */
-	if (!sde_enc->idle_pc_enabled &&
+	if (!sde_enc->idle_pc_supported &&
 			(sw_event != SDE_ENC_RC_EVENT_KICKOFF &&
 			sw_event != SDE_ENC_RC_EVENT_PRE_MODESET &&
 			sw_event != SDE_ENC_RC_EVENT_POST_MODESET &&
@@ -1981,9 +1961,9 @@ static int sde_encoder_resource_control(struct drm_encoder *drm_enc,
 			sw_event != SDE_ENC_RC_EVENT_PRE_STOP))
 		return 0;
 
-	SDE_DEBUG_ENC(sde_enc, "sw_event:%d, idle_pc:%d\n",
-			sw_event, sde_enc->idle_pc_enabled);
-	SDE_EVT32_VERBOSE(DRMID(drm_enc), sw_event, sde_enc->idle_pc_enabled,
+	SDE_DEBUG_ENC(sde_enc, "sw_event:%d, idle_pc_supported:%d\n", sw_event,
+			sde_enc->idle_pc_supported);
+	SDE_EVT32_VERBOSE(DRMID(drm_enc), sw_event, sde_enc->idle_pc_supported,
 			sde_enc->rc_state, SDE_EVTLOG_FUNC_ENTRY);
 
 	switch (sw_event) {
@@ -2373,7 +2353,7 @@ static int sde_encoder_resource_control(struct drm_encoder *drm_enc,
 		break;
 	}
 
-	SDE_EVT32_VERBOSE(DRMID(drm_enc), sw_event, sde_enc->idle_pc_enabled,
+	SDE_EVT32_VERBOSE(DRMID(drm_enc), sw_event, sde_enc->idle_pc_supported,
 			sde_enc->rc_state, SDE_EVTLOG_FUNC_EXIT);
 	return 0;
 }
@@ -2636,7 +2616,6 @@ static int _sde_encoder_input_handler(
 	input_handler->private = sde_enc;
 
 	sde_enc->input_handler = input_handler;
-	sde_enc->input_handler_registered = false;
 
 	return rc;
 }
@@ -2715,12 +2694,14 @@ static void sde_encoder_virt_enable(struct drm_encoder *drm_enc)
 	struct msm_compression_info *comp_info = NULL;
 	struct drm_display_mode *cur_mode = NULL;
 	struct msm_mode_info mode_info;
+	struct msm_display_info *disp_info;
 
 	if (!drm_enc) {
 		SDE_ERROR("invalid encoder\n");
 		return;
 	}
 	sde_enc = to_sde_encoder_virt(drm_enc);
+	disp_info = &sde_enc->disp_info;
 
 	if (!sde_kms_power_resource_is_enabled(drm_enc->dev)) {
 		SDE_ERROR("power resource is not enabled\n");
@@ -2758,14 +2739,12 @@ static void sde_encoder_virt_enable(struct drm_encoder *drm_enc)
 		return;
 	}
 
-	if (sde_enc->input_handler && !sde_enc->input_handler_registered) {
+	if (sde_enc->input_handler) {
 		ret = _sde_encoder_input_handler_register(
 				sde_enc->input_handler);
 		if (ret)
 			SDE_ERROR(
 			"input handler registration failed, rc = %d\n", ret);
-		else
-			sde_enc->input_handler_registered = true;
 	}
 
 	ret = sde_encoder_resource_control(drm_enc, SDE_ENC_RC_EVENT_KICKOFF);
@@ -2843,16 +2822,13 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 
 	SDE_EVT32(DRMID(drm_enc));
 
-	if (sde_enc->input_handler && sde_enc->input_handler_registered) {
-		input_unregister_handler(sde_enc->input_handler);
-		sde_enc->input_handler_registered = false;
-	}
-
-
 	/* wait for idle */
 	sde_encoder_wait_for_event(drm_enc, MSM_ENC_TX_COMPLETE);
 
 	kthread_flush_work(&sde_enc->input_event_work);
+
+	if (sde_enc->input_handler)
+		input_unregister_handler(sde_enc->input_handler);
 
 	/*
 	 * For primary command mode encoders, execute the resource control
@@ -3327,8 +3303,6 @@ static void _sde_encoder_kickoff_phys(struct sde_encoder_virt *sde_enc)
 	struct sde_hw_ctl *ctl;
 	uint32_t i, pending_flush;
 	unsigned long lock_flags;
-	struct msm_drm_private *priv = NULL;
-	struct sde_kms *sde_kms = NULL;
 
 	if (!sde_enc) {
 		SDE_ERROR("invalid encoder\n");
@@ -3406,20 +3380,6 @@ static void _sde_encoder_kickoff_phys(struct sde_encoder_virt *sde_enc)
 	_sde_encoder_trigger_start(sde_enc->cur_master);
 
 	spin_unlock_irqrestore(&sde_enc->enc_spinlock, lock_flags);
-
-	if (sde_enc->elevated_ahb_vote) {
-		priv = sde_enc->base.dev->dev_private;
-		if (priv != NULL) {
-			sde_kms = to_sde_kms(priv->kms);
-			if (sde_kms != NULL) {
-				sde_power_scale_reg_bus(&priv->phandle,
-						sde_kms->core_client,
-						VOTE_INDEX_LOW,
-						false);
-			}
-		}
-		sde_enc->elevated_ahb_vote = false;
-	}
 }
 
 static void _sde_encoder_ppsplit_swap_intf_for_right_only_update(
@@ -4528,7 +4488,7 @@ static int sde_encoder_setup_display(struct sde_encoder_virt *sde_enc,
 
 	if ((disp_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE) ||
 	    (disp_info->capabilities & MSM_DISPLAY_CAP_VID_MODE))
-		sde_enc->idle_pc_enabled = sde_kms->catalog->has_idle_pc;
+		sde_enc->idle_pc_supported = sde_kms->catalog->has_idle_pc;
 
 	mutex_lock(&sde_enc->enc_lock);
 	for (i = 0; i < disp_info->num_of_h_tiles && !ret; i++) {

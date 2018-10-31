@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "icnss: " fmt
 
@@ -39,6 +44,7 @@
 #include <linux/qpnp/qpnp-adc.h>
 #include <linux/etherdevice.h>
 #include <linux/of_gpio.h>
+#include <linux/poll.h>
 #include <soc/qcom/memory_dump.h>
 #include <soc/qcom/icnss.h>
 #include <soc/qcom/msm_qmi_interface.h>
@@ -284,8 +290,6 @@ enum icnss_driver_state {
 	ICNSS_HOST_TRIGGERED_PDR,
 	ICNSS_FW_DOWN,
 	ICNSS_DRIVER_UNLOADING,
-	ICNSS_REJUVENATE,
-	ICNSS_MODE_ON,
 };
 
 struct ce_irq_list {
@@ -475,6 +479,9 @@ static struct icnss_priv {
 	struct mutex dev_lock;
 	uint32_t fw_error_fatal_irq;
 	uint32_t fw_early_crash_irq;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
+	wait_queue_head_t wlan_pdr_debug_q;
+	int data_ready;
 } *penv;
 
 #ifdef CONFIG_ICNSS_DEBUG
@@ -1174,14 +1181,6 @@ bool icnss_is_fw_down(void)
 }
 EXPORT_SYMBOL(icnss_is_fw_down);
 
-bool icnss_is_rejuvenate(void)
-{
-	if (!penv)
-		return false;
-	else
-		return test_bit(ICNSS_REJUVENATE, &penv->state);
-}
-EXPORT_SYMBOL(icnss_is_rejuvenate);
 
 int icnss_power_off(struct device *dev)
 {
@@ -1610,16 +1609,6 @@ static int wlfw_wlan_mode_send_sync_msg(enum wlfw_driver_mode_enum_v01 mode)
 		goto out;
 	}
 	penv->stats.mode_resp++;
-
-	if (mode == QMI_WLFW_OFF_V01) {
-		icnss_pr_dbg("Clear mode on 0x%lx, mode: %d\n",
-			     penv->state, mode);
-		clear_bit(ICNSS_MODE_ON, &penv->state);
-	} else {
-		icnss_pr_dbg("Set mode on 0x%lx, mode: %d\n",
-			     penv->state, mode);
-		set_bit(ICNSS_MODE_ON, &penv->state);
-	}
 
 	return 0;
 
@@ -2113,7 +2102,6 @@ static void icnss_qmi_wlfw_clnt_ind(struct qmi_handle *handle,
 		event_data->crashed = true;
 		event_data->fw_rejuvenate = true;
 		fw_down_data.crashed = true;
-		set_bit(ICNSS_REJUVENATE, &penv->state);
 		icnss_call_driver_uevent(penv, ICNSS_UEVENT_FW_DOWN,
 					 &fw_down_data);
 		icnss_driver_event_post(ICNSS_DRIVER_EVENT_PD_SERVICE_DOWN,
@@ -2211,7 +2199,6 @@ static int icnss_driver_event_server_arrive(void *data)
 
 err_setup_msa:
 	icnss_assign_msa_perm_all(penv, ICNSS_MSA_PERM_HLOS_ALL);
-	clear_bit(ICNSS_MSA0_ASSIGNED, &penv->state);
 err_power_on:
 	icnss_hw_power_off(penv);
 fail:
@@ -2305,7 +2292,6 @@ static int icnss_pd_restart_complete(struct icnss_priv *priv)
 
 	icnss_call_driver_shutdown(priv);
 
-	clear_bit(ICNSS_REJUVENATE, &penv->state);
 	clear_bit(ICNSS_PD_RESTART, &priv->state);
 	priv->early_crash_ind = false;
 
@@ -2356,7 +2342,6 @@ static int icnss_driver_event_fw_ready_ind(void *data)
 		return -ENODEV;
 
 	set_bit(ICNSS_FW_READY, &penv->state);
-	clear_bit(ICNSS_MODE_ON, &penv->state);
 
 	icnss_pr_info("WLAN FW is ready: 0x%lx\n", penv->state);
 
@@ -2820,6 +2805,15 @@ static int icnss_service_notifier_notify(struct notifier_block *nb,
 
 	icnss_pr_info("PD service down, pd_state: %d, state: 0x%lx: cause: %s\n",
 		      *state, priv->state, icnss_pdr_cause[cause]);
+	if (*state == USER_PD_STATE_CHANGE) {
+		memset(priv->crash_reason, 0, sizeof(priv->crash_reason));
+		snprintf(priv->crash_reason, sizeof(priv->crash_reason),
+		 "PD service down, pd_state: %d, state: 0x%lx: cause: %s\n",
+		 *state, priv->state, icnss_pdr_cause[cause]);
+		priv->data_ready = 1;
+		wake_up(&priv->wlan_pdr_debug_q);
+	}
+
 event_post:
 	if (!test_bit(ICNSS_FW_DOWN, &priv->state)) {
 		set_bit(ICNSS_FW_DOWN, &priv->state);
@@ -3311,12 +3305,6 @@ int icnss_wlan_enable(struct device *dev, struct icnss_wlan_enable_cfg *config,
 		return -EINVAL;
 	}
 
-	if (test_bit(ICNSS_MODE_ON, &penv->state)) {
-		icnss_pr_err("Already Mode on, ignoring wlan_enable state: 0x%lx\n",
-			     penv->state);
-		return -EINVAL;
-	}
-
 	icnss_pr_dbg("Mode: %d, config: %p, host_version: %s\n",
 		     mode, config, host_version);
 
@@ -3530,6 +3518,7 @@ int icnss_trigger_recovery(struct device *dev)
 		goto out;
 	}
 
+	WARN_ON(1);
 	icnss_pr_warn("Initiate PD restart at WLAN FW, state: 0x%lx\n",
 		      priv->state);
 
@@ -3554,7 +3543,6 @@ static int icnss_smmu_init(struct icnss_priv *priv)
 	int atomic_ctx = 1;
 	int s1_bypass = 1;
 	int fast = 1;
-	int stall_disable = 1;
 	int ret = 0;
 
 	icnss_pr_dbg("Initializing SMMU\n");
@@ -3598,16 +3586,6 @@ static int icnss_smmu_init(struct icnss_priv *priv)
 			goto set_attr_fail;
 		}
 		icnss_pr_dbg("SMMU FAST map set\n");
-
-		ret = iommu_domain_set_attr(mapping->domain,
-					    DOMAIN_ATTR_CB_STALL_DISABLE,
-					    &stall_disable);
-		if (ret < 0) {
-			icnss_pr_err("Set stall disable map attribute failed, err = %d\n",
-				     ret);
-			goto set_attr_fail;
-		}
-		icnss_pr_dbg("SMMU STALL DISABLE map set\n");
 	}
 
 	ret = arm_iommu_attach_device(&priv->pdev->dev, mapping);
@@ -4029,14 +4007,8 @@ static int icnss_stats_show_state(struct seq_file *s, struct icnss_priv *priv)
 		case ICNSS_FW_DOWN:
 			seq_puts(s, "FW DOWN");
 			continue;
-		case ICNSS_REJUVENATE:
-			seq_puts(s, "FW REJUVENATE");
-			continue;
 		case ICNSS_DRIVER_UNLOADING:
 			seq_puts(s, "DRIVER UNLOADING");
-			continue;
-		case ICNSS_MODE_ON:
-			seq_puts(s, "MODE ON DONE");
 		}
 
 		seq_printf(s, "UNKNOWN-%d", i);
@@ -4405,6 +4377,39 @@ static int icnss_regread_open(struct inode *inode, struct file *file)
 	return single_open(file, icnss_regread_show, inode->i_private);
 }
 
+static unsigned int wlan_pdr_crash_reason_poll(struct file *filp,
+		struct poll_table_struct *wait)
+{
+	unsigned int mask = 0;
+	struct icnss_priv *priv = filp->private_data;
+
+	poll_wait(filp, &priv->wlan_pdr_debug_q, wait);
+
+	if (priv->data_ready)
+		mask |= (POLLIN | POLLRDNORM);
+
+	return mask;
+}
+
+static ssize_t wlan_pdr_crash_reason_read(struct file *filp, char __user *ubuf,
+		size_t cnt, loff_t *ppos)
+{
+	int r;
+	char buf[SUBSYS_CRASH_REASON_LEN];
+	ssize_t size = 0;
+	struct icnss_priv *priv = filp->private_data;
+
+	memset(buf, 0, sizeof(buf));
+	r = snprintf(buf, sizeof(buf), "%s", priv->crash_reason);
+	size = simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+	if (*ppos == r) {
+		memset(priv->crash_reason, 0, sizeof(priv->crash_reason));
+		priv->data_ready = 0;
+	}
+
+	return size;
+}
+
 static const struct file_operations icnss_regread_fops = {
 	.read           = seq_read,
 	.write          = icnss_regread_write,
@@ -4412,6 +4417,30 @@ static const struct file_operations icnss_regread_fops = {
 	.owner          = THIS_MODULE,
 	.llseek         = seq_lseek,
 };
+
+static const struct file_operations wlan_pdr_crash_reason_fops = {
+	.open 	= simple_open,
+	.read   = wlan_pdr_crash_reason_read,
+	.poll   = wlan_pdr_crash_reason_poll,
+	.llseek = default_llseek,
+};
+
+static void wlan_pdr_debugfs_create(struct dentry *root_dentry,
+			struct icnss_priv *priv)
+{
+	struct dentry *crash_reason_dentry;
+
+	crash_reason_dentry = debugfs_create_dir("crash_reason",
+							root_dentry);
+	if (IS_ERR(crash_reason_dentry))
+		icnss_pr_err("Unable to create debugfs %ld\n",
+					PTR_ERR(crash_reason_dentry));
+	else
+		debugfs_create_file("wlan_pdr_crash_reason", S_IRUGO | S_IWUSR,
+					crash_reason_dentry, priv,
+					&wlan_pdr_crash_reason_fops);
+
+}
 
 #ifdef CONFIG_ICNSS_DEBUG
 static int icnss_debugfs_create(struct icnss_priv *priv)
@@ -4438,6 +4467,7 @@ static int icnss_debugfs_create(struct icnss_priv *priv)
 			    &icnss_regread_fops);
 	debugfs_create_file("reg_write", 0600, root_dentry, priv,
 			    &icnss_regwrite_fops);
+	wlan_pdr_debugfs_create(root_dentry);
 
 out:
 	return ret;
@@ -4460,6 +4490,8 @@ static int icnss_debugfs_create(struct icnss_priv *priv)
 
 	debugfs_create_file("stats", 0600, root_dentry, priv,
 			    &icnss_stats_fops);
+	wlan_pdr_debugfs_create(root_dentry, priv);
+
 	return 0;
 }
 #endif
@@ -4684,6 +4716,7 @@ static int icnss_probe(struct platform_device *pdev)
 		goto out_smmu_deinit;
 	}
 
+	init_waitqueue_head(&priv->wlan_pdr_debug_q);
 	INIT_WORK(&priv->event_work, icnss_driver_event_work);
 	INIT_WORK(&priv->qmi_recv_msg_work, icnss_qmi_wlfw_clnt_notify_work);
 	INIT_LIST_HEAD(&priv->event_list);

@@ -95,18 +95,17 @@ static int lz4_uncompress(struct squashfs_sb_info *msblk, void *strm,
 	struct squashfs_page_actor *output)
 {
 	int res;
-	size_t dest_len = output->length;
 	struct squashfs_lz4 *stream = strm;
 
 	squashfs_bh_to_buf(bh, b, stream->input, offset, length,
 		msblk->devblksize);
-	res = lz4_decompress_unknownoutputsize(stream->input, length,
-					stream->output, &dest_len);
-	if (res)
+	res = LZ4_decompress_safe(stream->input, stream->output,
+		length, output->length);
+	if (res < 0)
 		return -EIO;
-	squashfs_buf_to_actor(stream->output, output, dest_len);
+	squashfs_buf_to_actor(stream->output, output, res);
 
-	return dest_len;
+	return res;
 }
 
 const struct squashfs_decompressor squashfs_lz4_comp_ops = {

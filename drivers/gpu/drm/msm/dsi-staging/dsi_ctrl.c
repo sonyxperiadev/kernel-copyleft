@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"dsi-ctrl:[%s] " fmt, __func__
 
@@ -915,7 +920,10 @@ static int dsi_ctrl_copy_and_pad_cmd(struct dsi_ctrl *dsi_ctrl,
 	/* send embedded BTA for read commands */
 	if ((buf[2] & 0x3f) == MIPI_DSI_DCS_READ)
 		buf[3] |= BIT(5);
-
+	if (((buf[2] & 0x3f) == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) ||
+		((buf[2] & 0x3f) == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) ||
+		((buf[2] & 0x3f) == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM))
+		buf[3] |= BIT(5);
 	*buffer = buf;
 	*size = len;
 
@@ -1239,10 +1247,9 @@ kickoff:
 			}
 		}
 
-		if (dsi_ctrl->hw.ops.mask_error_intr &&
-		    !dsi_ctrl->esd_check_underway)
+		if (dsi_ctrl->hw.ops.mask_error_intr)
 			dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw,
-						BIT(DSI_FIFO_OVERFLOW), false);
+					BIT(DSI_FIFO_OVERFLOW), false);
 		dsi_ctrl->hw.ops.reset_cmd_fifo(&dsi_ctrl->hw);
 
 		/*
@@ -2604,16 +2611,6 @@ void dsi_ctrl_isr_configure(struct dsi_ctrl *dsi_ctrl, bool enable)
 	mutex_unlock(&dsi_ctrl->ctrl_lock);
 }
 
-void dsi_ctrl_set_continuous_clk(struct dsi_ctrl *dsi_ctrl, bool enable)
-{
-	if (!dsi_ctrl)
-		return;
-
-	mutex_lock(&dsi_ctrl->ctrl_lock);
-	dsi_ctrl->hw.ops.set_continuous_clk(&dsi_ctrl->hw, enable);
-	mutex_unlock(&dsi_ctrl->ctrl_lock);
-}
-
 int dsi_ctrl_soft_reset(struct dsi_ctrl *dsi_ctrl)
 {
 	if (!dsi_ctrl)
@@ -2899,8 +2896,7 @@ int dsi_ctrl_cmd_tx_trigger(struct dsi_ctrl *dsi_ctrl, u32 flags)
 						dsi_ctrl->cell_index);
 			}
 		}
-		if (dsi_ctrl->hw.ops.mask_error_intr &&
-				!dsi_ctrl->esd_check_underway)
+		if (dsi_ctrl->hw.ops.mask_error_intr)
 			dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw,
 					BIT(DSI_FIFO_OVERFLOW), false);
 
@@ -3398,8 +3394,7 @@ u32 dsi_ctrl_collect_misr(struct dsi_ctrl *dsi_ctrl)
 	return misr;
 }
 
-void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl, u32 idx,
-		bool mask_enable)
+void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl)
 {
 	if (!dsi_ctrl || !dsi_ctrl->hw.ops.error_intr_ctrl
 			|| !dsi_ctrl->hw.ops.clear_error_status) {
@@ -3412,23 +3407,9 @@ void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl, u32 idx,
 	 * register
 	 */
 	mutex_lock(&dsi_ctrl->ctrl_lock);
-	if (idx & BIT(DSI_ERR_INTR_ALL)) {
-		/*
-		 * The behavior of mask_enable is different in ctrl register
-		 * and mask register and hence mask_enable is manipulated for
-		 * selective error interrupt masking vs total error interrupt
-		 * masking.
-		 */
-
-		dsi_ctrl->hw.ops.error_intr_ctrl(&dsi_ctrl->hw, !mask_enable);
-		dsi_ctrl->hw.ops.clear_error_status(&dsi_ctrl->hw,
+	dsi_ctrl->hw.ops.error_intr_ctrl(&dsi_ctrl->hw, false);
+	dsi_ctrl->hw.ops.clear_error_status(&dsi_ctrl->hw,
 					DSI_ERROR_INTERRUPT_COUNT);
-	} else {
-		dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw, idx,
-								mask_enable);
-		dsi_ctrl->hw.ops.clear_error_status(&dsi_ctrl->hw,
-					DSI_ERROR_INTERRUPT_COUNT);
-	}
 	mutex_unlock(&dsi_ctrl->ctrl_lock);
 }
 

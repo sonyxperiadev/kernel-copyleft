@@ -163,7 +163,7 @@
 		};
 	};
 
-	reserved_mem: reserved-memory {
+	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;

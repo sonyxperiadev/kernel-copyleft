@@ -1,0 +1,59 @@
+/* arch/arm64/boot/dts/somc/somc-tama-touch_aurora.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2017 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+
+&qupv3_se5_i2c {
+	 sw49501@28 {	/* define new client device(lg4951), slave addr is 0x28 */
+		pinctrl-0 = <&qupv3_se5_i2c_active>;
+		pinctrl-1 = <&qupv3_se5_i2c_sleep>;
+		compatible = "siw,sw49501";	/* compatible name (see ouch_lg4951.c) */
+		reg = <0x28>;		/* chip select indicator : spi->chip_select */
+		interrupt-parent = <&tlmm>;
+		interrupts = <125 0x2>;
+		irqflags = <0x2002>;		/* IRQF_ONESHOT(0x2000) | IRQF_TRIGGER_FALLING(0x2) */
+
+		chip_flags = <0>;
+
+		reset-gpio = <&tlmm 99 0x00>;
+		irq-gpio = <&tlmm 125 0x00>;
+
+		/* Caps */
+		max_x = <2160>;
+		max_y = <3840>;
+		max_pressure = <0xff>;
+		max_width = <15>;
+		max_orientation = <1>;
+		max_id = <10>;
+
+		/* role */
+		hw_reset_delay = <210>;
+		sw_reset_delay = <90>;
+		use_lpwg = <1>;
+		use_lpwg_test = <1>;
+
+		/* firmware */
+		use_firmware = <1>;		/* enable firmware control */
+		use_fw_upgrade = <1>;		/* auto-update during driver initialization */
+		fw_image = "{root}/vendor/firmware/touch_module_id_0x04.img";
+		/* absoulte path */
+		font_image = "/sdcard/siw/lg4951_font_data.bin";
+	};
+};
+

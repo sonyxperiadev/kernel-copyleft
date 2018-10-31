@@ -513,7 +513,7 @@ static int32_t msm_sensor_create_pd_settings(void *setting,
 	int c, end;
 	struct msm_sensor_power_setting pd_tmp;
 
-	pr_err("Generating power_down_setting\n");
+	pr_err("Generating power_down_setting");
 
 #ifdef CONFIG_COMPAT
 	if (is_compat_task()) {
@@ -603,7 +603,7 @@ static int32_t msm_sensor_get_power_down_settings(void *setting,
 
 	/* Print power setting */
 	for (i = 0; i < size_down; i++) {
-		CDBG("DOWN seq_type %d seq_val %d config_val %ld delay %d\n",
+		CDBG("DOWN seq_type %d seq_val %d config_val %ld delay %d",
 			pd[i].seq_type, pd[i].seq_val,
 			pd[i].config_val, pd[i].delay);
 	}
@@ -657,7 +657,7 @@ static int32_t msm_sensor_get_power_up_settings(void *setting,
 
 	/* Print power setting */
 	for (i = 0; i < size; i++) {
-		CDBG("UP seq_type %d seq_val %d config_val %ld delay %d\n",
+		CDBG("UP seq_type %d seq_val %d config_val %ld delay %d",
 			pu[i].seq_type, pu[i].seq_val,
 			pu[i].config_val, pu[i].delay);
 	}

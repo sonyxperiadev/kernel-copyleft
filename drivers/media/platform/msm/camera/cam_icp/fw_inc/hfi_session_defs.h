@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _CAM_HFI_SESSION_DEFS_H
 #define _CAM_HFI_SESSION_DEFS_H
@@ -261,8 +266,8 @@ enum bps_io_images {
 };
 
 struct frame_buffer {
-	uint32_t buf_ptr[MAX_NUM_OF_IMAGE_PLANES];
-	uint32_t meta_buf_ptr[MAX_NUM_OF_IMAGE_PLANES];
+	uint32_t buffer_ptr[MAX_NUM_OF_IMAGE_PLANES];
+	uint32_t meta_buffer_ptr[MAX_NUM_OF_IMAGE_PLANES];
 } __packed;
 
 struct bps_frame_process_data {

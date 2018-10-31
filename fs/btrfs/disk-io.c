@@ -59,8 +59,7 @@
 				 BTRFS_HEADER_FLAG_RELOC |\
 				 BTRFS_SUPER_FLAG_ERROR |\
 				 BTRFS_SUPER_FLAG_SEEDING |\
-				 BTRFS_SUPER_FLAG_METADUMP |\
-				 BTRFS_SUPER_FLAG_METADUMP_V2)
+				 BTRFS_SUPER_FLAG_METADUMP)
 
 static const struct extent_io_ops btree_extent_io_ops;
 static void end_workqueue_fn(struct btrfs_work *work);

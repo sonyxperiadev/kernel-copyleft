@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 #include <linux/debugfs.h>
@@ -32,6 +37,7 @@
 
 #define TO_S15D16(_x_)	((_x_) << 7)
 
+#define MULTIPLE_CONN_DETECTED(x) (x > 1)
 /**
  * sde_rgb2yuv_601l - rgb to yuv color space conversion matrix
  *
@@ -452,9 +458,11 @@ static void sde_encoder_phys_wb_setup_cdp(struct sde_encoder_phys *phys_enc)
 static void _sde_enc_phys_wb_detect_cwb(struct sde_encoder_phys *phys_enc,
 		struct drm_crtc_state *crtc_state)
 {
-	struct drm_encoder *encoder;
+	struct drm_connector *conn;
+	struct drm_connector_state *conn_state;
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
 	const struct sde_wb_cfg *wb_cfg = wb_enc->hw_wb->caps;
+	int conn_count = 0;
 
 	phys_enc->in_clone_mode = false;
 
@@ -462,15 +470,20 @@ static void _sde_enc_phys_wb_detect_cwb(struct sde_encoder_phys *phys_enc,
 	if (!(wb_cfg->features & BIT(SDE_WB_HAS_CWB)))
 		return;
 
-	 /* if any other encoder is connected to same crtc enable clone mode*/
-	drm_for_each_encoder(encoder, crtc_state->crtc->dev) {
-		if (encoder->crtc != crtc_state->crtc)
-			continue;
-		if (phys_enc->parent != encoder) {
-			phys_enc->in_clone_mode = true;
-			break;
-		}
+	/* Count the number of connectors on the given crtc */
+	drm_for_each_connector(conn, crtc_state->crtc->dev) {
+		conn_state =
+			drm_atomic_get_connector_state(crtc_state->state, conn);
+		if ((conn->state && conn->state->crtc == crtc_state->crtc) ||
+				(conn_state &&
+				 conn_state->crtc == crtc_state->crtc))
+			conn_count++;
 	}
+
+
+	/* Enable clone mode If crtc has multiple connectors & one is WB */
+	if (MULTIPLE_CONN_DETECTED(conn_count))
+		phys_enc->in_clone_mode = true;
 
 	SDE_DEBUG("detect CWB - status:%d\n", phys_enc->in_clone_mode);
 }

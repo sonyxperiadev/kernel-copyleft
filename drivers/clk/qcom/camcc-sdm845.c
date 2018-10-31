@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "clk: %s: " fmt, __func__
 
@@ -854,7 +859,7 @@ static struct clk_rcg2 cam_cc_mclk0_clk_src = {
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_ops,
 		VDD_CX_FMAX_MAP2(
-			MIN, 19200000,
+			MIN, 8000000,
 			LOWER, 34285714),
 	},
 };

@@ -1,0 +1,43 @@
+/* arch/arm64/boot/dts/somc/somc-tama-nfc_carillon-xtal.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2017 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+&qupv3_se10_i2c {
+	felica_ldo@1e {
+		compatible = "rohm,bd7602";
+		reg = <0x1e>;
+	};
+	felica@29 {
+		compatible = "sony,cxd224x-i2c";
+		reg = <0x29>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <63 0x2002>;
+		sony,nfc_int = <&tlmm 63 0>;
+		sony,nfc_wake = <&tlmm 62 0>;
+
+		pinctrl-names = "felica_active","felica_suspend";
+		pinctrl-0 = <&sdm_gpio_63>;
+		pinctrl-1 = <&sdm_gpio_63>;
+	};
+};
+
+&soc {
+	felica,pm-ops {
+		compatible = "sony,cxd224x-pm-ops";
+	};
+};

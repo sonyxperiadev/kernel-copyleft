@@ -24,18 +24,6 @@
 
 void __check_vmalloc_seq(struct mm_struct *mm);
 
-#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-void arm_init_bp_hardening(void);
-void arm_apply_bp_hardening(void);
-#else
-static inline void arm_init_bp_hardening(void)
-{
-}
-static inline void arm_apply_bp_hardening(void)
-{
-}
-#endif
-
 #ifdef CONFIG_CPU_HAS_ASID
 
 void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk);
@@ -75,10 +63,8 @@ static inline void check_and_switch_context(struct mm_struct *mm,
 		 * finish_arch_post_lock_switch() call.
 		 */
 		mm->context.switch_pending = 1;
-	else {
-		arm_apply_bp_hardening();
+	else
 		cpu_switch_mm(mm->pgd, mm);
-	}
 }
 
 #ifndef MODULE

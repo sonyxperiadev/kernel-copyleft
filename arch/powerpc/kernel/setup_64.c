@@ -679,7 +679,6 @@ static int __init disable_hardlockup_detector(void)
 	return 0;
 }
 early_initcall(disable_hardlockup_detector);
-#endif /* CONFIG_HARDLOCKUP_DETECTOR */
 
 #ifdef CONFIG_PPC_BOOK3S_64
 static enum l1d_flush_type enabled_flush_types;
@@ -717,6 +716,9 @@ static void do_nothing(void *unused)
 
 void rfi_flush_enable(bool enable)
 {
+	if (rfi_flush == enable)
+		return;
+
 	if (enable) {
 		do_rfi_flush_fixups(enabled_flush_types);
 		on_each_cpu(do_nothing, NULL, 1);
@@ -726,14 +728,10 @@ void rfi_flush_enable(bool enable)
 	rfi_flush = enable;
 }
 
-static void __ref init_fallback_flush(void)
+static void init_fallback_flush(void)
 {
 	u64 l1d_size, limit;
 	int cpu;
-
-	/* Only allocate the fallback flush area once (at boot time). */
-	if (l1d_flush_fallback_area)
-		return;
 
 	l1d_size = ppc64_caches.dsize;
 	limit = min(safe_stack_limit(), ppc64_rma_size);
@@ -752,18 +750,18 @@ static void __ref init_fallback_flush(void)
 	}
 }
 
-void setup_rfi_flush(enum l1d_flush_type types, bool enable)
+void __init setup_rfi_flush(enum l1d_flush_type types, bool enable)
 {
 	if (types & L1D_FLUSH_FALLBACK) {
-		pr_info("rfi-flush: fallback displacement flush available\n");
+		pr_info("rfi-flush: Using fallback displacement flush\n");
 		init_fallback_flush();
 	}
 
 	if (types & L1D_FLUSH_ORI)
-		pr_info("rfi-flush: ori type flush available\n");
+		pr_info("rfi-flush: Using ori type flush\n");
 
 	if (types & L1D_FLUSH_MTTRIG)
-		pr_info("rfi-flush: mttrig type flush available\n");
+		pr_info("rfi-flush: Using mttrig type flush\n");
 
 	enabled_flush_types = types;
 
@@ -774,18 +772,12 @@ void setup_rfi_flush(enum l1d_flush_type types, bool enable)
 #ifdef CONFIG_DEBUG_FS
 static int rfi_flush_set(void *data, u64 val)
 {
-	bool enable;
-
 	if (val == 1)
-		enable = true;
+		rfi_flush_enable(true);
 	else if (val == 0)
-		enable = false;
+		rfi_flush_enable(false);
 	else
 		return -EINVAL;
-
-	/* Only do anything if we're changing state */
-	if (enable != rfi_flush)
-		rfi_flush_enable(enable);
 
 	return 0;
 }
@@ -805,4 +797,13 @@ static __init int rfi_flush_debugfs_init(void)
 }
 device_initcall(rfi_flush_debugfs_init);
 #endif
+
+ssize_t cpu_show_meltdown(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	if (rfi_flush)
+		return sprintf(buf, "Mitigation: RFI Flush\n");
+
+	return sprintf(buf, "Vulnerable\n");
+}
 #endif /* CONFIG_PPC_BOOK3S_64 */
+#endif

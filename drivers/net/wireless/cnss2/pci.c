@@ -433,7 +433,7 @@ static int cnss_qca6290_powerup(struct cnss_pci_data *pci_priv)
 		goto power_off;
 	}
 
-	timeout = cnss_get_boot_timeout(&pci_priv->pci_dev->dev);
+	timeout = cnss_get_qmi_timeout();
 
 	ret = cnss_pci_start_mhi(pci_priv);
 	if (ret) {
@@ -1357,61 +1357,6 @@ void cnss_pci_fw_boot_timeout_hdlr(struct cnss_pci_data *pci_priv)
 			       CNSS_REASON_TIMEOUT);
 }
 
-struct dma_iommu_mapping *cnss_smmu_get_mapping(struct device *dev)
-{
-	struct cnss_pci_data *pci_priv = cnss_get_pci_priv(to_pci_dev(dev));
-
-	if (!pci_priv)
-		return NULL;
-
-	return pci_priv->smmu_mapping;
-}
-EXPORT_SYMBOL(cnss_smmu_get_mapping);
-
-int cnss_smmu_map(struct device *dev,
-		  phys_addr_t paddr, uint32_t *iova_addr, size_t size)
-{
-	struct cnss_pci_data *pci_priv = cnss_get_pci_priv(to_pci_dev(dev));
-	unsigned long iova;
-	size_t len;
-	int ret = 0;
-
-	if (!pci_priv)
-		return -ENODEV;
-
-	if (!iova_addr) {
-		cnss_pr_err("iova_addr is NULL, paddr %pa, size %zu\n",
-			    &paddr, size);
-		return -EINVAL;
-	}
-
-	len = roundup(size + paddr - rounddown(paddr, PAGE_SIZE), PAGE_SIZE);
-	iova = roundup(pci_priv->smmu_iova_ipa_start, PAGE_SIZE);
-
-	if (iova >=
-	    (pci_priv->smmu_iova_ipa_start + pci_priv->smmu_iova_ipa_len)) {
-		cnss_pr_err("No IOVA space to map, iova %lx, smmu_iova_ipa_start %pad, smmu_iova_ipa_len %zu\n",
-			    iova,
-			    &pci_priv->smmu_iova_ipa_start,
-			    pci_priv->smmu_iova_ipa_len);
-		return -ENOMEM;
-	}
-
-	ret = iommu_map(pci_priv->smmu_mapping->domain, iova,
-			rounddown(paddr, PAGE_SIZE), len,
-			IOMMU_READ | IOMMU_WRITE);
-	if (ret) {
-		cnss_pr_err("PA to IOVA mapping failed, ret %d\n", ret);
-		return ret;
-	}
-
-	pci_priv->smmu_iova_ipa_start = iova + len;
-	*iova_addr = (uint32_t)(iova + paddr - rounddown(paddr, PAGE_SIZE));
-
-	return 0;
-}
-EXPORT_SYMBOL(cnss_smmu_map);
-
 int cnss_get_soc_info(struct device *dev, struct cnss_soc_info *info)
 {
 	struct cnss_pci_data *pci_priv = cnss_get_pci_priv(to_pci_dev(dev));
@@ -1769,7 +1714,7 @@ void cnss_pci_collect_dump_info(struct cnss_pci_data *pci_priv, bool in_panic)
 	cnss_pr_dbg("Collect remote heap dump segment\n");
 
 	for (i = 0; i < plat_priv->fw_mem_seg_len; i++) {
-		if (fw_mem[i].type == CNSS_MEM_TYPE_DDR) {
+		if (fw_mem[i].type == QMI_WLFW_MEM_TYPE_DDR_V01) {
 			dump_seg->address = fw_mem[i].pa;
 			dump_seg->v_address = fw_mem[i].va;
 			dump_seg->size = fw_mem[i].size;
@@ -1929,9 +1874,6 @@ static int cnss_pci_register_mhi(struct cnss_pci_data *pci_priv)
 	mhi_ctrl->runtime_put = cnss_mhi_pm_runtime_put_noidle;
 
 	mhi_ctrl->rddm_size = pci_priv->plat_priv->ramdump_info_v2.ramdump_size;
-	mhi_ctrl->sbl_size = SZ_512K;
-	mhi_ctrl->seg_len = SZ_512K;
-	mhi_ctrl->fbc_download = true;
 
 	mhi_ctrl->log_buf = ipc_log_context_create(CNSS_IPC_LOG_PAGES,
 						   "cnss-mhi", 0);
@@ -2204,17 +2146,6 @@ static int cnss_pci_probe(struct pci_dev *pci_dev,
 		cnss_pr_dbg("smmu_iova_start: %pa, smmu_iova_len: %zu\n",
 			    &pci_priv->smmu_iova_start,
 			    pci_priv->smmu_iova_len);
-
-		res = platform_get_resource_byname(plat_priv->plat_dev,
-						   IORESOURCE_MEM,
-						   "smmu_iova_ipa");
-		if (res) {
-			pci_priv->smmu_iova_ipa_start = res->start;
-			pci_priv->smmu_iova_ipa_len = resource_size(res);
-			cnss_pr_dbg("smmu_iova_ipa_start: %pa, smmu_iova_ipa_len: %zu\n",
-				    &pci_priv->smmu_iova_ipa_start,
-				    pci_priv->smmu_iova_ipa_len);
-		}
 
 		ret = cnss_pci_init_smmu(pci_priv);
 		if (ret) {

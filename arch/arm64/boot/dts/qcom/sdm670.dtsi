@@ -560,15 +560,7 @@
 			alloc-ranges = <0 0x00000000 0 0xffffffff>;
 			reusable;
 			alignment = <0 0x400000>;
-			size = <0 0x800000>;
-		};
-
-		sdsp_mem: sdsp_region {
-			compatible = "shared-dma-pool";
-			alloc-ranges = <0 0x00000000 0 0xffffffff>;
-			reusable;
-			alignment = <0 0x400000>;
-			size = <0 0x400000>;
+			size = <0 0xc00000>;
 		};
 
 		qseecom_ta_mem: qseecom_ta_region {
@@ -1875,7 +1867,7 @@
 		ufs-qcom-crypto = <&ufs_ice>;
 
 		lanes-per-direction = <1>;
-
+		spm-level = <5>;
 		dev-ref-clk-freq = <0>; /* 19.2 MHz */
 
 		clock-names =

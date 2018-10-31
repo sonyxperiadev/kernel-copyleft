@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -40,7 +45,6 @@ static int cam_context_handle_hw_event(void *context, uint32_t evt_id,
 int cam_context_shutdown(struct cam_context *ctx)
 {
 	int rc = 0;
-	int32_t ctx_hdl = ctx->dev_hdl;
 
 	if (ctx->state_machine[ctx->state].ioctl_ops.stop_dev) {
 		rc = ctx->state_machine[ctx->state].ioctl_ops.stop_dev(
@@ -55,8 +59,6 @@ int cam_context_shutdown(struct cam_context *ctx)
 			CAM_ERR(CAM_CORE, "Error while dev release %d", rc);
 	}
 
-	if (!rc)
-		rc = cam_destroy_device_hdl(ctx_hdl);
 	return rc;
 }
 
@@ -267,6 +269,11 @@ int cam_context_handle_acquire_dev(struct cam_context *ctx,
 int cam_context_handle_release_dev(struct cam_context *ctx,
 	struct cam_release_dev_cmd *cmd)
 {
+/* sony extension begin */
+	struct cam_ctx_request *req = NULL;
+	int numReq = 0;
+	uint32_t i;
+/* sony extension end */
 	int rc;
 
 	if (!ctx->state_machine) {
@@ -288,6 +295,41 @@ int cam_context_handle_release_dev(struct cam_context *ctx,
 			ctx->dev_hdl, ctx->state);
 		rc = -EPROTO;
 	}
+/* sony extension begin */
+	while (!list_empty(&ctx->active_req_list)) {
+		req = list_first_entry(&ctx->active_req_list,
+				struct cam_ctx_request, list);
+		list_del_init(&req->list);
+		numReq ++;
+	}
+
+	while (!list_empty(&ctx->wait_req_list)) {
+		req = list_first_entry(&ctx->wait_req_list,
+				struct cam_ctx_request, list);
+		list_del_init(&req->list);
+		numReq ++;
+	}
+
+	while (!list_empty(&ctx->pending_req_list)) {
+		req = list_first_entry(&ctx->pending_req_list,
+				struct cam_ctx_request, list);
+		list_del_init(&req->list);
+		numReq ++;
+	}
+
+	while (!list_empty(&ctx->free_req_list)) {
+		req = list_first_entry(&ctx->free_req_list,
+				struct cam_ctx_request, list);
+		list_del_init(&req->list);
+		numReq ++;
+	}
+
+	for (i = 0; i < ctx->req_size; i++) {
+		INIT_LIST_HEAD(&ctx->req_list[i].list);
+		list_add_tail(&ctx->req_list[i].list, &ctx->free_req_list);
+		ctx->req_list[i].ctx = ctx;
+	}
+/* sony extension end */
 	mutex_unlock(&ctx->ctx_mutex);
 
 	return rc;
@@ -355,7 +397,7 @@ int cam_context_handle_start_dev(struct cam_context *ctx,
 {
 	int rc = 0;
 
-	if (!ctx || !ctx->state_machine) {
+	if (!ctx->state_machine) {
 		CAM_ERR(CAM_CORE, "Context is not ready");
 		return -EINVAL;
 	}
@@ -384,7 +426,7 @@ int cam_context_handle_stop_dev(struct cam_context *ctx,
 {
 	int rc = 0;
 
-	if (!ctx || !ctx->state_machine) {
+	if (!ctx->state_machine) {
 		CAM_ERR(CAM_CORE, "Context is not ready");
 		return -EINVAL;
 	}

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/module.h>
@@ -153,8 +158,8 @@ static int cam_jpeg_dma_probe(struct platform_device *pdev)
 		rc = -ENOMEM;
 		goto error_alloc_core;
 	}
-	core_info = (struct cam_jpeg_dma_device_core_info *)
-		jpeg_dma_dev->core_info;
+	core_info = (struct cam_jpeg_dma_device_core_info *)jpeg_dma_dev->
+		core_info;
 
 	match_dev = of_match_device(pdev->dev.driver->of_match_table,
 		&pdev->dev);
@@ -220,7 +225,6 @@ static struct platform_driver cam_jpeg_dma_driver = {
 		.name = "cam-jpeg-dma",
 		.owner = THIS_MODULE,
 		.of_match_table = cam_jpeg_dma_dt_match,
-		.suppress_bind_attrs = true,
 	},
 };
 

@@ -24,7 +24,6 @@
 
 #include <linux/types.h>
 #include <linux/kvm_types.h>
-#include <asm/cpufeature.h>
 #include <asm/kvm.h>
 #include <asm/kvm_asm.h>
 #include <asm/kvm_mmio.h>
@@ -359,12 +358,9 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
 				       unsigned long vector_ptr)
 {
 	/*
-	 * Call initialization code, and switch to the full blown HYP code.
-	 * If the cpucaps haven't been finalized yet, something has gone very
-	 * wrong, and hyp will crash and burn when it uses any
-	 * cpus_have_const_cap() wrapper.
+	 * Call initialization code, and switch to the full blown
+	 * HYP code.
 	 */
-	BUG_ON(!static_branch_likely(&arm64_const_caps_ready));
 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
 }
 
@@ -402,7 +398,7 @@ static inline void __cpu_init_stage2(void)
 
 static inline bool kvm_arm_harden_branch_predictor(void)
 {
-	return cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR);
+	return cpus_have_cap(ARM64_HARDEN_BRANCH_PREDICTOR);
 }
 
 #endif /* __ARM64_KVM_HOST_H__ */

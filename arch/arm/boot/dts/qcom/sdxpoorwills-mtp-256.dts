@@ -20,7 +20,3 @@
 		"qcom,sdxpoorwills", "qcom,mtp";
 	qcom,board-id = <8 0x0>;
 };
-
-&blsp1_uart2b_hs {
-	status = "okay";
-};

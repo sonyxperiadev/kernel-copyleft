@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018, Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017, Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/time.h>
@@ -160,10 +165,12 @@ static int ufs_qcom_enable_lane_clks(struct ufs_qcom_host *host)
 		if (err)
 			goto disable_tx_l0;
 
+#ifndef CONFIG_SCSI_UFS_RESTRICT_TX_LANES
 		/* The tx lane1 clk could be muxed, hence keep this optional */
 		if (host->tx_l1_sync_clk)
 			ufs_qcom_host_clk_enable(dev, "tx_lane1_sync_clk",
 						 host->tx_l1_sync_clk);
+#endif
 	}
 	host->is_lane_clks_enabled = true;
 	goto out;
@@ -207,9 +214,11 @@ static int ufs_qcom_init_lane_clks(struct ufs_qcom_host *host)
 			goto out;
 		}
 
+#ifndef CONFIG_SCSI_UFS_RESTRICT_TX_LANES
 		/* The tx lane1 clk could be muxed, hence keep this optional */
 		ufs_qcom_host_clk_get(dev, "tx_lane1_sync_clk",
 					&host->tx_l1_sync_clk);
+#endif
 	}
 out:
 	return err;
@@ -727,11 +736,6 @@ static int ufs_qcom_config_vreg(struct device *dev,
 
 	reg = vreg->reg;
 	if (regulator_count_voltages(reg) > 0) {
-		uA_load = on ? vreg->max_uA : 0;
-		ret = regulator_set_load(vreg->reg, uA_load);
-		if (ret)
-			goto out;
-
 		min_uV = on ? vreg->min_uV : 0;
 		ret = regulator_set_voltage(reg, min_uV, vreg->max_uV);
 		if (ret) {
@@ -739,6 +743,11 @@ static int ufs_qcom_config_vreg(struct device *dev,
 					__func__, vreg->name, ret);
 			goto out;
 		}
+
+		uA_load = on ? vreg->max_uA : 0;
+		ret = regulator_set_load(vreg->reg, uA_load);
+		if (ret)
+			goto out;
 	}
 out:
 	return ret;
@@ -897,21 +906,17 @@ static int ufs_qcom_crypto_req_setup(struct ufs_hba *hba,
 		req = lrbp->cmd->request;
 	else
 		return 0;
-
-	/* Use request LBA or given dun as the DUN value */
+	/*
+	 * Right now ICE do not support variable dun but can be
+	 * taken as future enhancement
+	 * if (bio_dun(req->bio)) {
+	 *      dun @bio can be split, so we have to adjust offset
+	 *      *dun = bio_dun(req->bio);
+	 * } else
+	 */
 	if (req->bio) {
-#ifdef CONFIG_PFK
-		if (bio_dun(req->bio)) {
-			/* dun @bio can be split, so we have to adjust offset */
-			*dun = bio_dun(req->bio);
-		} else {
-			*dun = req->bio->bi_iter.bi_sector;
-			*dun >>= UFS_QCOM_ICE_TR_DATA_UNIT_4_KB;
-		}
-#else
 		*dun = req->bio->bi_iter.bi_sector;
 		*dun >>= UFS_QCOM_ICE_TR_DATA_UNIT_4_KB;
-#endif
 	}
 
 	ret = ufs_qcom_ice_req_setup(host, lrbp->cmd, cc_index, enable);

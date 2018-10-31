@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _DSI_CATALOG_H_
 #define _DSI_CATALOG_H_
@@ -223,7 +228,5 @@ void dsi_ctrl_hw_kickoff_non_embedded_mode(struct dsi_ctrl_hw *ctrl,
 
 /* Definitions specific to 2.2 DSI controller hardware */
 bool dsi_ctrl_hw_22_get_cont_splash_status(struct dsi_ctrl_hw *ctrl);
-
-void dsi_ctrl_hw_cmn_set_continuous_clk(struct dsi_ctrl_hw *ctrl, bool enable);
 
 #endif /* _DSI_CATALOG_H_ */

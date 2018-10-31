@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,12 +10,19 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __SUBSYS_RESTART_H
 #define __SUBSYS_RESTART_H
 
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
+
+#define SUBSYS_CRASH_REASON_LEN 512
 
 struct subsys_device;
 extern struct bus_type subsys_bus_type;
@@ -34,30 +41,6 @@ enum crash_status {
 
 struct device;
 struct module;
-
-enum ssr_comm {
-	SUBSYS_TO_SUBSYS_SYSMON,
-	SUBSYS_TO_HLOS,
-	HLOS_TO_SUBSYS_SYSMON_SHUTDOWN,
-	NUM_SSR_COMMS,
-};
-
-/**
- * struct subsys_notif_timeout - timeout data used by notification timeout hdlr
- * @comm_type: Specifies if the type of communication being tracked is
- * through sysmon between two subsystems, subsystem notifier call chain, or
- * sysmon shutdown.
- * @dest_name: subsystem to which sysmon notification is being sent to
- * @source_name: subsystem which generated event that notification is being sent
- * for
- * @timer: timer for scheduling timeout
- */
-struct subsys_notif_timeout {
-	enum ssr_comm comm_type;
-	const char *dest_name;
-	const char *source_name;
-	struct timer_list timer;
-};
 
 /**
  * struct subsys_desc - subsystem descriptor
@@ -99,6 +82,7 @@ struct subsys_desc {
 	irqreturn_t (*err_fatal_handler)(int irq, void *dev_id);
 	irqreturn_t (*stop_ack_handler)(int irq, void *dev_id);
 	irqreturn_t (*wdog_bite_handler)(int irq, void *dev_id);
+	irqreturn_t (*periph_hang_handler)(int irq, void *dev_id);
 	irqreturn_t (*generic_handler)(int irq, void *dev_id);
 	int is_not_loadable;
 	int err_fatal_gpio;
@@ -106,6 +90,7 @@ struct subsys_desc {
 	unsigned int err_ready_irq;
 	unsigned int stop_ack_irq;
 	unsigned int wdog_bite_irq;
+	unsigned int periph_hang_irq;
 	unsigned int generic_irq;
 	int force_stop_gpio;
 	int ramdump_disable_gpio;
@@ -119,9 +104,6 @@ struct subsys_desc {
 	bool system_debug;
 	bool ignore_ssr_failure;
 	const char *edge;
-#ifdef CONFIG_SETUP_SSR_NOTIF_TIMEOUTS
-	struct subsys_notif_timeout timeout_data;
-#endif /* CONFIG_SETUP_SSR_NOTIF_TIMEOUTS */
 };
 
 /**
@@ -164,6 +146,9 @@ void notify_proxy_vote(struct device *device);
 void notify_proxy_unvote(struct device *device);
 void complete_err_ready(struct subsys_device *subsys);
 extern int wait_for_shutdown_ack(struct subsys_desc *desc);
+
+extern int subsystem_crash_reason(const char *name, char *reason);
+extern void update_crash_reason(struct subsys_device *dev, char *, int);
 #else
 
 static inline int subsys_get_restart_level(struct subsys_device *dev)
@@ -224,6 +209,14 @@ static inline void notify_proxy_unvote(struct device *device) { }
 static inline int wait_for_shutdown_ack(struct subsys_desc *desc)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline void update_crash_reason(struct subsys_device *dev
+						char *reason, int size) { }
+
+static inline int subsystem_crash_reason(const char *name, char *reason)
+{
+	return 0;
 }
 #endif /* CONFIG_MSM_SUBSYSTEM_RESTART */
 

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef PFK_KC_H_
 #define PFK_KC_H_
@@ -19,7 +24,7 @@ int pfk_kc_init(void);
 int pfk_kc_deinit(void);
 int pfk_kc_load_key_start(const unsigned char *key, size_t key_size,
 		const unsigned char *salt, size_t salt_size, u32 *key_index,
-		bool async, unsigned int data_unit);
+		bool async);
 void pfk_kc_load_key_end(const unsigned char *key, size_t key_size,
 		const unsigned char *salt, size_t salt_size);
 int pfk_kc_remove_key_with_salt(const unsigned char *key, size_t key_size,
@@ -27,7 +32,6 @@ int pfk_kc_remove_key_with_salt(const unsigned char *key, size_t key_size,
 int pfk_kc_remove_key(const unsigned char *key, size_t key_size);
 int pfk_kc_clear(void);
 void pfk_kc_clear_on_reset(void);
-const char *pfk_kc_get_storage_type(void);
 extern char *saved_command_line;
 
 
