@@ -160,12 +160,11 @@ int diag_md_write(int id, unsigned char *buf, int len, int ctx)
 		return -EIO;
 	}
 	pid = session_info->pid;
+	mutex_unlock(&driver->md_session_lock);
 
 	ch = &diag_md[id];
-	if (!ch || !ch->md_info_inited) {
-		mutex_unlock(&driver->md_session_lock);
+	if (!ch || !ch->md_info_inited)
 		return -EINVAL;
-	}
 
 	spin_lock_irqsave(&ch->lock, flags);
 	for (i = 0; i < ch->num_tbl_entries && !found; i++) {
@@ -181,10 +180,8 @@ int diag_md_write(int id, unsigned char *buf, int len, int ctx)
 	}
 	spin_unlock_irqrestore(&ch->lock, flags);
 
-	if (found) {
-		mutex_unlock(&driver->md_session_lock);
+	if (found)
 		return -ENOMEM;
-	}
 
 	spin_lock_irqsave(&ch->lock, flags);
 	for (i = 0; i < ch->num_tbl_entries && !found; i++) {
@@ -197,7 +194,6 @@ int diag_md_write(int id, unsigned char *buf, int len, int ctx)
 		}
 	}
 	spin_unlock_irqrestore(&ch->lock, flags);
-	mutex_unlock(&driver->md_session_lock);
 
 	if (!found) {
 		pr_err_ratelimited("diag: Unable to find an empty space in table, please reduce logging rate, proc: %d\n",
@@ -206,7 +202,6 @@ int diag_md_write(int id, unsigned char *buf, int len, int ctx)
 	}
 
 	found = 0;
-	mutex_lock(&driver->diagchar_mutex);
 	for (i = 0; i < driver->num_clients && !found; i++) {
 		if ((driver->client_map[i].pid != pid) ||
 		    (driver->client_map[i].pid == 0))
@@ -220,7 +215,6 @@ int diag_md_write(int id, unsigned char *buf, int len, int ctx)
 		pr_debug("diag: wake up logging process\n");
 		wake_up_interruptible(&driver->wait_q);
 	}
-	mutex_unlock(&driver->diagchar_mutex);
 
 	if (!found)
 		return -EINVAL;

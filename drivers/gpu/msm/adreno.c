@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/module.h>
 #include <linux/uaccess.h>
 #include <linux/sched.h>
@@ -294,11 +299,11 @@ void adreno_efuse_speed_bin_array(struct adreno_device *adreno_dev)
 	 */
 	count = of_property_count_u32_elems(device->pdev->dev.of_node,
 				"qcom,gpu-speed-bin-vectors");
-
-	if ((count <= 0) || (count % vector_size))
+	if (count <= 0)
 		return;
 
-	bin_vector = kmalloc_array(count, sizeof(unsigned int), GFP_KERNEL);
+	bin_vector = kmalloc(sizeof(count * sizeof(unsigned int)),
+			GFP_KERNEL);
 	if (bin_vector == NULL) {
 		KGSL_DRV_ERR(device,
 				"Unable to allocate memory for speed-bin vector\n");
@@ -3211,7 +3216,7 @@ static void adreno_gmu_regwrite(struct kgsl_device *device,
 	 * i.e. act like normal writel()
 	 */
 	wmb();
-	__raw_writel(value, reg);
+	__raw_writel_no_log(value, reg);
 }
 
 static void adreno_gmu_regread(struct kgsl_device *device,

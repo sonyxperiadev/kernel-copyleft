@@ -19,9 +19,12 @@
 
 struct fscrypt_ctx;
 
-/* iv sector for security/pfe/pfk_fscrypt.c and f2fs */
+/* iv sector for security/pfe/pfk_fscrypt.c and f2fs. sizeof is required
+ * to accommodate 32 bit targets.
+ */
 #define PG_DUN(i, p)                                            \
-	(((((u64)(i)->i_ino) & 0xffffffff) << 32) | ((p)->index & 0xffffffff))
+	((((i)->i_ino & 0xffffffff) << (sizeof((i)->i_ino)/2)) | \
+				((p)->index & 0xffffffff))
 
 struct fscrypt_info;
 
@@ -251,30 +254,5 @@ static inline int fscrypt_encrypt_symlink(struct inode *inode,
 		return __fscrypt_encrypt_symlink(inode, target, len, disk_link);
 	return 0;
 }
-
-/* fscrypt_ice.c */
-#ifdef CONFIG_PFK
-extern int fscrypt_using_hardware_encryption(const struct inode *inode);
-extern void fscrypt_set_ice_dun(const struct inode *inode,
-	struct bio *bio, u64 dun);
-extern bool fscrypt_mergeable_bio(struct bio *bio, u64 dun, bool bio_encrypted);
-#else
-static inline int fscrypt_using_hardware_encryption(const struct inode *inode)
-{
-	return 0;
-}
-
-static inline void fscrypt_set_ice_dun(const struct inode *inode,
-	struct bio *bio, u64 dun)
-{
-	return;
-}
-
-static inline bool fscrypt_mergeable_bio(struct bio *bio,
-	u64 dun, bool bio_encrypted)
-{
-	return true;
-}
-#endif
 
 #endif	/* _LINUX_FSCRYPT_H */

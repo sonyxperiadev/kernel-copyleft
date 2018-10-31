@@ -14,6 +14,11 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/spinlock.h>
 #include <linux/shmem_fs.h>
@@ -79,9 +84,6 @@ static struct page **get_pages_vram(struct drm_gem_object *obj,
 static struct page **get_pages(struct drm_gem_object *obj)
 {
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
-
-	if (obj->import_attach)
-		return msm_obj->pages;
 
 	if (!msm_obj->pages) {
 		struct drm_device *dev = obj->dev;
@@ -575,13 +577,8 @@ void *msm_gem_get_vaddr_locked(struct drm_gem_object *obj)
 		struct page **pages = get_pages(obj);
 		if (IS_ERR(pages))
 			return ERR_CAST(pages);
-		if (obj->import_attach)
-			msm_obj->vaddr = dma_buf_vmap(
-				      obj->import_attach->dmabuf);
-		else
-			msm_obj->vaddr = vmap(pages, obj->size >> PAGE_SHIFT,
+		msm_obj->vaddr = vmap(pages, obj->size >> PAGE_SHIFT,
 				VM_MAP, pgprot_writecombine(PAGE_KERNEL));
-
 		if (msm_obj->vaddr == NULL)
 			return ERR_PTR(-ENOMEM);
 	}
@@ -667,11 +664,7 @@ void msm_gem_vunmap(struct drm_gem_object *obj)
 	if (!msm_obj->vaddr || WARN_ON(!is_vunmapable(msm_obj)))
 		return;
 
-	if (obj->import_attach)
-		dma_buf_vunmap(obj->import_attach->dmabuf, msm_obj->vaddr);
-	else
-		vunmap(msm_obj->vaddr);
-
+	vunmap(msm_obj->vaddr);
 	msm_obj->vaddr = NULL;
 }
 
@@ -1024,7 +1017,7 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 	struct msm_gem_object *msm_obj;
 	struct drm_gem_object *obj = NULL;
 	uint32_t size;
-	int ret;
+	int ret, npages;
 
 	/* if we don't have IOMMU, don't bother pretending we can import: */
 	if (!iommu_present(&platform_bus_type)) {
@@ -1045,9 +1038,19 @@ struct drm_gem_object *msm_gem_import(struct drm_device *dev,
 
 	drm_gem_private_object_init(dev, obj, size);
 
+	npages = size / PAGE_SIZE;
+
 	msm_obj = to_msm_bo(obj);
 	msm_obj->sgt = sgt;
-	msm_obj->pages = NULL;
+	msm_obj->pages = drm_malloc_ab(npages, sizeof(struct page *));
+	if (!msm_obj->pages) {
+		ret = -ENOMEM;
+		goto fail;
+	}
+
+	ret = drm_prime_sg_to_page_addr_arrays(sgt, msm_obj->pages, NULL, npages);
+	if (ret)
+		goto fail;
 
 	return obj;
 

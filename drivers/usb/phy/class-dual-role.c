@@ -13,6 +13,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/ctype.h>
 #include <linux/device.h>
@@ -405,7 +410,7 @@ static umode_t dual_role_attr_is_visible(struct kobject *kobj,
 			if (dual_role->desc->property_is_writeable &&
 			    dual_role_property_is_writeable(dual_role, property)
 			    > 0)
-				mode |= S_IWUSR;
+				mode |= S_IWUSR | S_IWGRP;
 
 			return mode;
 		}

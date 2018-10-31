@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __SDE_ENCODER_PHYS_H__
 #define __SDE_ENCODER_PHYS_H__

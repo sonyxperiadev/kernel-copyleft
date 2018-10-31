@@ -5,6 +5,11 @@
  * (for either host or peripheral roles) don't use these calls; they
  * continue to use just usb_device and usb_gadget.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __LINUX_USB_PHY_H
 #define __LINUX_USB_PHY_H
@@ -119,6 +124,9 @@ struct usb_phy {
 	/* callback to indicate port is being reset or reset the port */
 	void	(*start_port_reset)(struct usb_phy *x);
 
+	/* initialize special */
+	int	(*init_sp)(struct usb_phy *x);
+
 	/* effective for B devices, ignored for A-peripheral */
 	int	(*set_power)(struct usb_phy *x,
 				unsigned mA);
@@ -228,6 +236,15 @@ usb_phy_start_port_reset(struct usb_phy *x)
 		return;
 
 	x->start_port_reset(x);
+}
+
+static inline int
+usb_phy_init_sp(struct usb_phy *x)
+{
+	if (x && x->init_sp)
+		return x->init_sp(x);
+
+	return -EINVAL;
 }
 
 static inline int

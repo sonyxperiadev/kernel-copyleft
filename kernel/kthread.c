@@ -5,6 +5,11 @@
  * even if we're invoked from userspace (think modprobe, hotplug cpu,
  * etc.).
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/sched.h>
 #include <linux/kthread.h>
 #include <linux/completion.h>
@@ -290,8 +295,10 @@ static struct task_struct *__kthread_create_on_node(int (*threadfn)(void *data),
 	task = create->result;
 	if (!IS_ERR(task)) {
 		static const struct sched_param param = { .sched_priority = 0 };
+		char name[TASK_COMM_LEN];
 
-		vsnprintf(task->comm, sizeof(task->comm), namefmt, args);
+		vsnprintf(name, sizeof(name), namefmt, args);
+		set_task_comm(task, name);
 		/*
 		 * root may have changed our (kthreadd's) priority or CPU mask.
 		 * The kernel thread should not inherit these properties.

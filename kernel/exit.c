@@ -3,6 +3,11 @@
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -53,8 +58,8 @@
 #include <linux/oom.h>
 #include <linux/writeback.h>
 #include <linux/shm.h>
+#include <linux/oom_score_notifier.h>
 #include <linux/kcov.h>
-#include <linux/cpufreq_times.h>
 
 #include "sched/tune.h"
 
@@ -95,6 +100,8 @@ static void __exit_signal(struct task_struct *tsk)
 	spin_lock(&sighand->siglock);
 
 	posix_cpu_timers_exit(tsk);
+	oom_score_notify_free(tsk);
+
 	if (group_dead) {
 		posix_cpu_timers_exit_group(tsk);
 		tty = sig->tty;
@@ -172,9 +179,6 @@ void release_task(struct task_struct *p)
 {
 	struct task_struct *leader;
 	int zap_leader;
-#ifdef CONFIG_CPU_FREQ_TIMES
-	cpufreq_task_times_exit(p);
-#endif
 repeat:
 	/* don't need to get the RCU readlock here - the process is dead and
 	 * can't be modifying its own credentials. But shut RCU-lockdep up */

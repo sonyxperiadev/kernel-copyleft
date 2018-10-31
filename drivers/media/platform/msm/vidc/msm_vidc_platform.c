@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/debugfs.h>
 #include <linux/dma-mapping.h>
@@ -120,7 +125,7 @@ static struct msm_vidc_common_data sdm845_common_data[] = {
 	},
 	{
 		.key = "qcom,max-secure-instances",
-		.value = 2,
+		.value = 5,
 	},
 	{
 		.key = "qcom,max-hw-load",
@@ -153,10 +158,6 @@ static struct msm_vidc_common_data sdm845_common_data[] = {
 	{
 		.key = "qcom,debug-timeout",
 		.value = 0,
-	},
-	{
-		.key = "qcom,enable-idle-indicator",
-		.value = 1,
 	},
 };
 
@@ -209,10 +210,6 @@ static struct msm_vidc_common_data sdm670_common_data_v0[] = {
 		.key = "qcom,hw-resp-timeout",
 		.value = 1000,
 	},
-	{
-		.key = "qcom,enable-idle-indicator",
-		.value = 1,
-	},
 };
 
 static struct msm_vidc_common_data sdm670_common_data_v1[] = {
@@ -263,10 +260,6 @@ static struct msm_vidc_common_data sdm670_common_data_v1[] = {
 	{
 		.key = "qcom,hw-resp-timeout",
 		.value = 1000,
-	},
-	{
-		.key = "qcom,enable-idle-indicator",
-		.value = 1,
 	},
 };
 

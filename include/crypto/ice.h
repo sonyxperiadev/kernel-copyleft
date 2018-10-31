@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _QCOM_INLINE_CRYPTO_ENGINE_H_
 #define _QCOM_INLINE_CRYPTO_ENGINE_H_
@@ -47,18 +52,6 @@ struct ice_data_setting {
 	bool				sw_forced_context_switch;
 	bool				decr_bypass;
 	bool				encr_bypass;
-};
-
-/* MSM ICE Crypto Data Unit of target DUN of Transfer Request */
-enum ice_crypto_data_unit {
-	ICE_CRYPTO_DATA_UNIT_512_B          = 0,
-	ICE_CRYPTO_DATA_UNIT_1_KB           = 1,
-	ICE_CRYPTO_DATA_UNIT_2_KB           = 2,
-	ICE_CRYPTO_DATA_UNIT_4_KB           = 3,
-	ICE_CRYPTO_DATA_UNIT_8_KB           = 4,
-	ICE_CRYPTO_DATA_UNIT_16_KB          = 5,
-	ICE_CRYPTO_DATA_UNIT_32_KB          = 6,
-	ICE_CRYPTO_DATA_UNIT_64_KB          = 7,
 };
 
 typedef void (*ice_error_cb)(void *, u32 error);

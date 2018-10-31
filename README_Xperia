@@ -1,0 +1,84 @@
+Configuration files can be found in arch/arm64/configs.
+
+  defconfig using in common:
+    sdm845-perf_defconfig
+
+  diffconfigs for each product:
+    Xperia XZ2 H8216/H8266/H8296    => akari_diffconfig
+    Xperia XZ2 SO-03K               => akari_dcm_diffconfig
+    Xperia XZ2 SOV37                => akari_kddi_diffconfig
+    Xperia XZ2 702SO                => akari_sbm_diffconfig
+    Xperia XZ2 Compact H8314/H8324  => apollo_diffconfig
+    Xperia XZ2 Compact SO-05K       => apollo_dcm_diffconfig
+    Xperia XZ2 Premium H8116/H8166  => aurora_diffconfig
+    Xperia XZ2 Premium SO-04K       => aurora_dcm_diffconfig
+    Xperia XZ2 Premium SOV38        => aurora_kddi_diffconfig
+    Xperia XZ3 H8416/H9436/H9493    => akatsuki_diffconfig
+
+
+How to build your kernel:
+
+  Prerequisites:
+
+    * mkbootimg - boot.img generator
+      Reference)
+      https://android.googlesource.com/platform/system/core/+/master/mkbootimg/
+
+    * dtc - Device Tree Compiler, called from make
+      Reference)
+      https://android.googlesource.com/platform/external/dtc/
+
+    * mkdtimg - dtbo.img generator
+    * ufdt_apply_overlay - Tools related to Device Tree Overlay, called from make
+      Reference)
+      https://android.googlesource.com/platform/system/libufdt/
+
+    * The ARM cross-compiler
+      You can use prebuild executable binary which is included in
+      standard Android repository. Please visit to external site.
+      Reference)
+      https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/
+
+  Step 1: Build Your Kernel
+    $ cd kernel/msm-4.9
+
+    $ export ARCH=arm64
+    $ export DTC_EXT=<path-to-dtc-executable>
+    $ export DTC_OVERLAY_TEST_EXT=<path-to-ufdt_apply_overlay-executable>
+    $ export KCFLAGS=-mno-android
+
+    $ export PATH=<path-to-cross-compiler-executables>:$PATH
+      NOTE: Please set the location of the ARM cross-compiler.
+
+    $ export CROSS_COMPILE=<toolchain-prefix>
+      NOTE: Please set the prefix of the ARM cross-compiler.
+            ex) aarch64-linux-android-
+
+    $ export KBUILD_DIFFCONFIG=akari_diffconfig
+      NOTE: Please set a configuration file you want to build.
+
+    $ make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out sdm845-perf_defconfig
+    $ make CONFIG_BUILD_ARM64_DT_OVERLAY=y O=./out
+
+    You can see out/arch/arm64/boot/Image.gz-dtb if you succeed in building.
+
+
+  Step 2: Assembling the boot.img
+    (In the Linux Kernel directory)
+    $ mkbootimg \
+        --kernel out/arch/arm64/boot/Image.gz-dtb \
+        --os_version "9.0.0" --os_patch_level "2018-08-01" \
+        --cmdline "androidboot.hardware=qcom androidboot.console=ttyMSM0 video=vfb:640x400,bpp=32,memsize=3072000 msm_rtb.filter=0x237 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 service_locator.enable=1 swiotlb=2048 androidboot.configfs=true androidboot.usbcontroller=a600000.dwc3 firmware_class.path=/vendor/firmware_mnt/image loop.max_part=7 zram.backend=z3fold loop.max_part=7 panic_on_err=1 msm_drm.dsi_display0=dsi_panel_cmd_display:config0 buildvariant=userdebug" \
+        --base 0x00000000 \
+        --kernel_offset 0x00008000 \
+        --tags_offset 0x00000100 \
+        --pagesize 4096 \
+        -o boot.img
+
+      NOTE: Since Android O, you need to set 'os_version' and 'os_patch_level'
+            parameter for mkbootimg according to your base Android system image.
+
+  Step 3: Assembling the dtbo.img
+    (In the Linux Kernel directory)
+    $ mkdtimg create dtbo.img --page_size=4096 `find out/arch/arm64/boot/dts -name "*.dtbo"`
+

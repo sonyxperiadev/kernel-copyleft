@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _CAM_ISP_HW_MGR_INTF_H_
 #define _CAM_ISP_HW_MGR_INTF_H_
@@ -51,41 +56,6 @@ enum cam_isp_hw_err_type {
 };
 
 /**
- *  enum cam_isp_hw_stop_cmd - Specify the stop command type
- */
-enum cam_isp_hw_stop_cmd {
-	CAM_ISP_HW_STOP_AT_FRAME_BOUNDARY,
-	CAM_ISP_HW_STOP_IMMEDIATELY,
-	CAM_ISP_HW_STOP_MAX,
-};
-
-/**
- * struct cam_isp_stop_args - hardware stop arguments
- *
- * @hw_stop_cmd:               Hardware stop command type information
- * @stop_only                  Send stop only to hw drivers. No Deinit to be
- *                             done.
- *
- */
-struct cam_isp_stop_args {
-	enum cam_isp_hw_stop_cmd      hw_stop_cmd;
-	bool                          stop_only;
-};
-
-/**
- * struct cam_isp_start_args - isp hardware start arguments
- *
- * @config_args:               Hardware configuration commands.
- * @start_only                 Send start only to hw drivers. No init to
- *                             be done.
- *
- */
-struct cam_isp_start_args {
-	struct cam_hw_config_args     hw_config;
-	bool                          start_only;
-};
-
-/**
  * struct cam_isp_bw_config_internal - Internal Bandwidth configuration
  *
  * @usage_type:                 Usage type (Single/Dual)
@@ -124,13 +94,11 @@ struct cam_isp_prepare_hw_update_data {
 /**
  * struct cam_isp_hw_sof_event_data - Event payload for CAM_HW_EVENT_SOF
  *
- * @timestamp:   Time stamp for the sof event
- * @boot_time:   Boot time stamp for the sof event
+ * @timestamp:     Time stamp for the sof event
  *
  */
 struct cam_isp_hw_sof_event_data {
 	uint64_t       timestamp;
-	uint64_t       boot_time;
 };
 
 /**
@@ -196,7 +164,6 @@ enum cam_isp_hw_mgr_command {
 	CAM_ISP_HW_MGR_CMD_IS_RDI_ONLY_CONTEXT,
 	CAM_ISP_HW_MGR_CMD_PAUSE_HW,
 	CAM_ISP_HW_MGR_CMD_RESUME_HW,
-	CAM_ISP_HW_MGR_CMD_SOF_DEBUG,
 	CAM_ISP_HW_MGR_CMD_MAX,
 };
 
@@ -212,7 +179,6 @@ struct cam_isp_hw_cmd_args {
 	uint32_t                            cmd_type;
 	union {
 		uint32_t                      is_rdi_only_context;
-		uint32_t                      sof_irq_enable;
 	} u;
 };
 

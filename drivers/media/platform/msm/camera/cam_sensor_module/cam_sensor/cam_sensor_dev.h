@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _CAM_SENSOR_DEV_H_
 #define _CAM_SENSOR_DEV_H_
@@ -90,10 +95,6 @@ struct intf_params {
  * @sensor_info: Sensor query cap structure
  * @bridge_intf: Bridge interface structure
  * @device_name: Sensor device structure
- * @streamon_count: Count to hold the number of times stream on called
- * @streamoff_count: Count to hold the number of times stream off called
- * @bob_reg_index: Hold to BoB regulator index
- * @bob_pwm_switch: Boolean flag to switch into PWM mode for BoB regulator
  */
 struct cam_sensor_ctrl_t {
 	struct platform_device *pdev;
@@ -113,10 +114,6 @@ struct cam_sensor_ctrl_t {
 	struct  cam_sensor_query_cap sensor_info;
 	struct intf_params bridge_intf;
 	char device_name[20];
-	uint32_t streamon_count;
-	uint32_t streamoff_count;
-	int bob_reg_index;
-	bool bob_pwm_switch;
 };
 
 #endif /* _CAM_SENSOR_DEV_H_ */

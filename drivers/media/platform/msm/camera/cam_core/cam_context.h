@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _CAM_CONTEXT_H_
 #define _CAM_CONTEXT_H_
@@ -70,7 +75,7 @@ struct cam_ctx_request {
 	uint32_t                      num_in_map_entries;
 	struct cam_hw_fence_map_entry out_map_entries[CAM_CTX_CFG_MAX];
 	uint32_t                      num_out_map_entries;
-	atomic_t                      num_in_acked;
+	uint32_t                      num_in_acked;
 	uint32_t                      num_out_acked;
 	int                           flushed;
 	struct cam_context           *ctx;

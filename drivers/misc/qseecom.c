@@ -12,6 +12,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "QSEECOM: %s: " fmt, __func__
 
@@ -199,7 +204,6 @@ struct qseecom_registered_app_list {
 	char app_name[MAX_APP_NAME_SIZE];
 	u32  app_arch;
 	bool app_blocked;
-	u32  check_block;
 	u32  blocked_on_listener_id;
 };
 
@@ -1658,9 +1662,8 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 	int rc = 0;
 	uint32_t lstnr;
 	unsigned long flags;
-	struct qseecom_client_listener_data_irsp send_data_rsp = {0};
-	struct qseecom_client_listener_data_64bit_irsp send_data_rsp_64bit
-									= {0};
+	struct qseecom_client_listener_data_irsp send_data_rsp;
+	struct qseecom_client_listener_data_64bit_irsp send_data_rsp_64bit;
 	struct qseecom_registered_listener_list *ptr_svc = NULL;
 	sigset_t new_sigset;
 	sigset_t old_sigset;
@@ -1758,38 +1761,32 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 		}
 err_resp:
 		qseecom.send_resp_flag = 0;
-		if (ptr_svc) {
-			ptr_svc->send_resp_flag = 0;
-			table = ptr_svc->sglistinfo_ptr;
-		}
+		ptr_svc->send_resp_flag = 0;
+		table = ptr_svc->sglistinfo_ptr;
 		if (qseecom.qsee_version < QSEE_VERSION_40) {
 			send_data_rsp.listener_id  = lstnr;
 			send_data_rsp.status = status;
-			if (table) {
-				send_data_rsp.sglistinfo_ptr =
-					(uint32_t)virt_to_phys(table);
-				send_data_rsp.sglistinfo_len =
-					SGLISTINFO_TABLE_SIZE;
-				dmac_flush_range((void *)table,
-					(void *)table + SGLISTINFO_TABLE_SIZE);
-			}
+			send_data_rsp.sglistinfo_ptr =
+				(uint32_t)virt_to_phys(table);
+			send_data_rsp.sglistinfo_len =
+				SGLISTINFO_TABLE_SIZE;
+			dmac_flush_range((void *)table,
+				(void *)table + SGLISTINFO_TABLE_SIZE);
 			cmd_buf = (void *)&send_data_rsp;
 			cmd_len = sizeof(send_data_rsp);
 		} else {
 			send_data_rsp_64bit.listener_id  = lstnr;
 			send_data_rsp_64bit.status = status;
-			if (table) {
-				send_data_rsp_64bit.sglistinfo_ptr =
-					virt_to_phys(table);
-				send_data_rsp_64bit.sglistinfo_len =
-					SGLISTINFO_TABLE_SIZE;
-				dmac_flush_range((void *)table,
-					(void *)table + SGLISTINFO_TABLE_SIZE);
-			}
+			send_data_rsp_64bit.sglistinfo_ptr =
+				virt_to_phys(table);
+			send_data_rsp_64bit.sglistinfo_len =
+				SGLISTINFO_TABLE_SIZE;
+			dmac_flush_range((void *)table,
+				(void *)table + SGLISTINFO_TABLE_SIZE);
 			cmd_buf = (void *)&send_data_rsp_64bit;
 			cmd_len = sizeof(send_data_rsp_64bit);
 		}
-		if (qseecom.whitelist_support == false || table == NULL)
+		if (qseecom.whitelist_support == false)
 			*(uint32_t *)cmd_buf = QSEOS_LISTENER_DATA_RSP_COMMAND;
 		else
 			*(uint32_t *)cmd_buf =
@@ -1813,10 +1810,8 @@ err_resp:
 
 		ret = qseecom_scm_call(SCM_SVC_TZSCHEDULER, 1,
 					cmd_buf, cmd_len, resp, sizeof(*resp));
-		if (ptr_svc) {
-			ptr_svc->listener_in_use = false;
-			__qseecom_clean_listener_sglistinfo(ptr_svc);
-		}
+		ptr_svc->listener_in_use = false;
+		__qseecom_clean_listener_sglistinfo(ptr_svc);
 		if (ret) {
 			pr_err("scm_call() failed with err: %d (app_id = %d)\n",
 				ret, data->client.app_id);
@@ -1969,9 +1964,8 @@ static int __qseecom_reentrancy_process_incomplete_cmd(
 	int rc = 0;
 	uint32_t lstnr;
 	unsigned long flags;
-	struct qseecom_client_listener_data_irsp send_data_rsp = {0};
-	struct qseecom_client_listener_data_64bit_irsp send_data_rsp_64bit
-									= {0};
+	struct qseecom_client_listener_data_irsp send_data_rsp;
+	struct qseecom_client_listener_data_64bit_irsp send_data_rsp_64bit;
 	struct qseecom_registered_listener_list *ptr_svc = NULL;
 	sigset_t new_sigset;
 	sigset_t old_sigset;
@@ -2062,36 +2056,30 @@ static int __qseecom_reentrancy_process_incomplete_cmd(
 			status  = QSEOS_RESULT_SUCCESS;
 		}
 err_resp:
-		if (ptr_svc)
-			table = ptr_svc->sglistinfo_ptr;
+		table = ptr_svc->sglistinfo_ptr;
 		if (qseecom.qsee_version < QSEE_VERSION_40) {
 			send_data_rsp.listener_id  = lstnr;
 			send_data_rsp.status = status;
-			if (table) {
-				send_data_rsp.sglistinfo_ptr =
-					(uint32_t)virt_to_phys(table);
-				send_data_rsp.sglistinfo_len =
-						SGLISTINFO_TABLE_SIZE;
-				dmac_flush_range((void *)table,
-					(void *)table + SGLISTINFO_TABLE_SIZE);
-			}
+			send_data_rsp.sglistinfo_ptr =
+				(uint32_t)virt_to_phys(table);
+			send_data_rsp.sglistinfo_len = SGLISTINFO_TABLE_SIZE;
+			dmac_flush_range((void *)table,
+				(void *)table + SGLISTINFO_TABLE_SIZE);
 			cmd_buf = (void *)&send_data_rsp;
 			cmd_len = sizeof(send_data_rsp);
 		} else {
 			send_data_rsp_64bit.listener_id  = lstnr;
 			send_data_rsp_64bit.status = status;
-			if (table) {
-				send_data_rsp_64bit.sglistinfo_ptr =
-					virt_to_phys(table);
-				send_data_rsp_64bit.sglistinfo_len =
-					SGLISTINFO_TABLE_SIZE;
-				dmac_flush_range((void *)table,
-					(void *)table + SGLISTINFO_TABLE_SIZE);
-			}
+			send_data_rsp_64bit.sglistinfo_ptr =
+				virt_to_phys(table);
+			send_data_rsp_64bit.sglistinfo_len =
+				SGLISTINFO_TABLE_SIZE;
+			dmac_flush_range((void *)table,
+				(void *)table + SGLISTINFO_TABLE_SIZE);
 			cmd_buf = (void *)&send_data_rsp_64bit;
 			cmd_len = sizeof(send_data_rsp_64bit);
 		}
-		if (qseecom.whitelist_support == false || table == NULL)
+		if (qseecom.whitelist_support == false)
 			*(uint32_t *)cmd_buf = QSEOS_LISTENER_DATA_RSP_COMMAND;
 		else
 			*(uint32_t *)cmd_buf =
@@ -2114,11 +2102,9 @@ err_resp:
 
 		ret = qseecom_scm_call(SCM_SVC_TZSCHEDULER, 1,
 					cmd_buf, cmd_len, resp, sizeof(*resp));
-		if (ptr_svc) {
-			ptr_svc->listener_in_use = false;
-			__qseecom_clean_listener_sglistinfo(ptr_svc);
-			wake_up_interruptible(&ptr_svc->listener_block_app_wq);
-		}
+		ptr_svc->listener_in_use = false;
+		__qseecom_clean_listener_sglistinfo(ptr_svc);
+		wake_up_interruptible(&ptr_svc->listener_block_app_wq);
 
 		if (ret) {
 			pr_err("scm_call() failed with err: %d (app_id = %d)\n",
@@ -2204,7 +2190,6 @@ static void __qseecom_reentrancy_check_if_this_app_blocked(
 	sigset_t new_sigset, old_sigset;
 
 	if (qseecom.qsee_reentrancy_support) {
-		ptr_app->check_block++;
 		while (ptr_app->app_blocked || qseecom.app_block_ref_cnt > 1) {
 			/* thread sleep until this app unblocked */
 			sigfillset(&new_sigset);
@@ -2219,7 +2204,6 @@ static void __qseecom_reentrancy_check_if_this_app_blocked(
 			mutex_lock(&app_access_lock);
 			sigprocmask(SIG_SETMASK, &old_sigset, NULL);
 		}
-		ptr_app->check_block--;
 	}
 }
 
@@ -2488,7 +2472,6 @@ static int qseecom_load_app(struct qseecom_dev_handle *data, void __user *argp)
 					MAX_APP_NAME_SIZE);
 		entry->app_blocked = false;
 		entry->blocked_on_listener_id = 0;
-		entry->check_block = 0;
 
 		/* Deallocate the handle */
 		if (!IS_ERR_OR_NULL(ihandle))
@@ -2588,6 +2571,11 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 		goto unload_exit;
 	}
 
+	if (!memcmp(data->client.app_name, "tzxflattest", strlen("tzxflattest"))) {
+		pr_debug("Do not unload tzxflattest app from tz\n");
+		goto unload_exit;
+	}
+
 	__qseecom_cleanup_app(data);
 	__qseecom_reentrancy_check_if_no_app_blocked(TZ_OS_APP_SHUTDOWN_ID);
 
@@ -2599,8 +2587,7 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 				if (!strcmp((void *)ptr_app->app_name,
 					(void *)data->client.app_name)) {
 					found_app = true;
-					if (ptr_app->app_blocked ||
-							ptr_app->check_block)
+					if (ptr_app->app_blocked)
 						app_crash = false;
 					if (app_crash || ptr_app->ref_cnt == 1)
 						unload = true;
@@ -2662,7 +2649,6 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 		}
 	}
 
-unload_exit:
 	if (found_app) {
 		spin_lock_irqsave(&qseecom.registered_app_list_lock, flags1);
 		if (app_crash) {
@@ -2685,6 +2671,7 @@ unload_exit:
 		spin_unlock_irqrestore(&qseecom.registered_app_list_lock,
 								flags1);
 	}
+unload_exit:
 	qseecom_unmap_ion_allocated_memory(data);
 	data->released = true;
 	return ret;
@@ -4551,7 +4538,6 @@ recheck:
 		entry->app_arch = app_arch;
 		entry->app_blocked = false;
 		entry->blocked_on_listener_id = 0;
-		entry->check_block = 0;
 		spin_lock_irqsave(&qseecom.registered_app_list_lock, flags);
 		list_add_tail(&entry->list, &qseecom.registered_app_list_head);
 		spin_unlock_irqrestore(&qseecom.registered_app_list_lock,
@@ -5466,7 +5452,6 @@ static int qseecom_query_app_loaded(struct qseecom_dev_handle *data,
 				MAX_APP_NAME_SIZE);
 			entry->app_blocked = false;
 			entry->blocked_on_listener_id = 0;
-			entry->check_block = 0;
 			spin_lock_irqsave(&qseecom.registered_app_list_lock,
 				flags);
 			list_add_tail(&entry->list,

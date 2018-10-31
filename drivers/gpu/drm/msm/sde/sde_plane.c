@@ -15,6 +15,11 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 
@@ -3059,7 +3064,6 @@ int sde_plane_confirm_hw_rsvps(struct drm_plane *plane,
 				rstate->out_fb ? rstate->out_fb->base.id : -1,
 				hw_blk->id);
 	}
-
 	return 0;
 }
 

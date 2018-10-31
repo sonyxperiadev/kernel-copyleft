@@ -135,6 +135,15 @@ config QPNP_LINEAR_CHARGER
 	  The power supply framework is used to communicate battery and
 	  usb properties to userspace and other driver consumers like USB.
 
+config QNS_SYSTEM
+	bool "Qnovo QNS wrapper implementation"
+	default n
+	help
+	  Say Y here to enable support for QNS system.
+	  QNS is a battery charging controller and it necessary to access a
+	  kernel driver for a battery charging.
+	  This adds sysfs interface which enables QNS daemon to access it.
+
 config QPNP_TYPEC
 	tristate "QPNP Type-C driver"
 	depends on MFD_SPMI_PMIC
@@ -162,5 +171,17 @@ config SMB1390_CHARGE_PUMP
 	  Say Y to include support for SMB1390 Charge Pump.
 	  SMB1390 is a div2 charge pump capable of delivering 6A charge current
 	  with very high efficiency.
+
+config SOMC_CHARGER_EXTENSION
+	bool "Charger driver extension"
+	help
+	  Say Y here to enable extensional function of charger driver.
+
+config IDTP9221
+	bool "CONFIG_IDTP9221 driver"
+	depends on I2C
+	help
+	  Say Y here to enable the IDT P9221 wireless charging driver.
+	  The driver supports charger enable/disable.
 
 endmenu

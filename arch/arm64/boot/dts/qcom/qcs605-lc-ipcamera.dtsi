@@ -194,7 +194,3 @@
 &wcd9335 {
 	/delete-property/ cdc-vdd-mic-bias-supply;
 };
-
-&int_codec {
-	status = "disabled";
-};

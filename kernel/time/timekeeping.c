@@ -7,6 +7,11 @@
  *  Please see that file for copyright and history logs.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/timekeeper_internal.h>
 #include <linux/module.h>
@@ -1511,20 +1516,8 @@ void __weak read_boot_clock64(struct timespec64 *ts)
 	ts->tv_nsec = 0;
 }
 
-/*
- * Flag reflecting whether timekeeping_resume() has injected sleeptime.
- *
- * The flag starts of false and is only set when a suspend reaches
- * timekeeping_suspend(), timekeeping_resume() sets it to false when the
- * timekeeper clocksource is not stopping across suspend and has been
- * used to update sleep time. If the timekeeper clocksource has stopped
- * then the flag stays true and is used by the RTC resume code to decide
- * whether sleeptime must be injected and if so the flag gets false then.
- *
- * If a suspend fails before reaching timekeeping_resume() then the flag
- * stays false and prevents erroneous sleeptime injection.
- */
-static bool suspend_timing_needed;
+/* Flag for if timekeeping_resume() has injected sleeptime */
+static bool sleeptime_injected;
 
 /* Flag for if there is a persistent clock on this platform */
 static bool persistent_clock_exists;
@@ -1623,7 +1616,13 @@ static void __timekeeping_inject_sleeptime(struct timekeeper *tk,
  */
 bool timekeeping_rtc_skipresume(void)
 {
-	return !suspend_timing_needed;
+	struct timekeeper *tk = &tk_core.timekeeper;
+	struct clocksource *clock = tk->tkr_mono.clock;
+
+	if (sleeptime_injected || (clock->flags & CLOCK_SOURCE_SUSPEND_NONSTOP))
+		return true;
+
+	return false;
 }
 
 /**
@@ -1659,8 +1658,6 @@ void timekeeping_inject_sleeptime64(struct timespec64 *delta)
 	raw_spin_lock_irqsave(&timekeeper_lock, flags);
 	write_seqcount_begin(&tk_core.seq);
 
-	suspend_timing_needed = false;
-
 	timekeeping_forward_now(tk);
 
 	__timekeeping_inject_sleeptime(tk, delta);
@@ -1685,8 +1682,8 @@ void timekeeping_resume(void)
 	unsigned long flags;
 	struct timespec64 ts_new, ts_delta;
 	cycle_t cycle_now, cycle_delta;
-	bool inject_sleeptime = false;
 
+	sleeptime_injected = false;
 	read_persistent_clock64(&ts_new);
 
 	clockevents_resume();
@@ -1732,16 +1729,14 @@ void timekeeping_resume(void)
 		nsec += ((u64) cycle_delta * mult) >> shift;
 
 		ts_delta = ns_to_timespec64(nsec);
-		inject_sleeptime = true;
+		sleeptime_injected = true;
 	} else if (timespec64_compare(&ts_new, &timekeeping_suspend_time) > 0) {
 		ts_delta = timespec64_sub(ts_new, timekeeping_suspend_time);
-		inject_sleeptime = true;
+		sleeptime_injected = true;
 	}
 
-	if (inject_sleeptime) {
-		suspend_timing_needed = false;
+	if (sleeptime_injected)
 		__timekeeping_inject_sleeptime(tk, &ts_delta);
-	}
 
 	/* Re-base the last cycle value */
 	tk->tkr_mono.cycle_last = cycle_now;
@@ -1775,8 +1770,6 @@ int timekeeping_suspend(void)
 	 */
 	if (timekeeping_suspend_time.tv_sec || timekeeping_suspend_time.tv_nsec)
 		persistent_clock_exists = true;
-
-	suspend_timing_needed = true;
 
 	raw_spin_lock_irqsave(&timekeeper_lock, flags);
 	write_seqcount_begin(&tk_core.seq);

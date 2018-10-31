@@ -50,7 +50,6 @@
 		.intr_cfg_reg = REG_BASE + 0x8 + REG_SIZE * id,		\
 		.intr_status_reg = REG_BASE + 0xc + REG_SIZE * id,	\
 		.intr_target_reg = REG_BASE + 0x8 + REG_SIZE * id,	\
-		.dir_conn_reg = REG_BASE + 0xab000,\
 		.mux_bit = 2,			\
 		.pull_bit = 0,			\
 		.drv_bit = 6,			\
@@ -65,7 +64,6 @@
 		.intr_polarity_bit = 1,		\
 		.intr_detection_bit = 2,	\
 		.intr_detection_width = 2,	\
-		.dir_conn_en_bit = 8,		\
 	}
 
 #define SDC_QDSD_PINGROUP(pg_name, ctl, pull, drv)	\
@@ -1153,7 +1151,7 @@ static struct msm_gpio_mux_input sdxpoorwills_mux_in[] = {
 	{42, 80},
 	{43, 82},
 	{44, 83},
-	{45, 84, 1},
+	{45, 84},
 	{46, 86},
 	{47, 87},
 	{48, 88},
@@ -1198,17 +1196,6 @@ static struct msm_pdc_mux_output sdxpoorwills_mux_out[] = {
 	{0, 195},
 };
 
-static struct msm_dir_conn sdxpoorwills_dir_conn[] = {
-	{0, 220},
-	{0, 219},
-	{0, 218},
-	{0, 217},
-	{0, 216},
-	{0, 215},
-	{0, 214},
-	{0, 213},
-};
-
 static const struct msm_pinctrl_soc_data sdxpoorwills_pinctrl = {
 	.pins = sdxpoorwills_pins,
 	.npins = ARRAY_SIZE(sdxpoorwills_pins),
@@ -1222,9 +1209,6 @@ static const struct msm_pinctrl_soc_data sdxpoorwills_pinctrl = {
 	.n_pdc_mux_out = ARRAY_SIZE(sdxpoorwills_mux_out),
 	.n_pdc_mux_offset = 20,
 	.ngpios = 100,
-	.dir_conn_irq_base = 220,
-	.dir_conn = sdxpoorwills_dir_conn,
-	.n_dir_conns = ARRAY_SIZE(sdxpoorwills_dir_conn),
 };
 
 static int sdxpoorwills_pinctrl_probe(struct platform_device *pdev)

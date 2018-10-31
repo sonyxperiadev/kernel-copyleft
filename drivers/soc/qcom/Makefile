@@ -108,3 +108,15 @@ obj-$(CONFIG_QCOM_QDSS_BRIDGE) += qdss_bridge.o
 obj-$(CONFIG_MSM_BAM_DMUX) += bam_dmux.o
 obj-$(CONFIG_WCNSS_CORE) += wcnss/
 obj-$(CONFIG_BIG_CLUSTER_MIN_FREQ_ADJUST) += big_cluster_min_freq_adjust.o
+obj-$(CONFIG_ARCH_SDM845) += debug_memory.o
+obj-$(CONFIG_RAMDUMP_TAGS) += board-rdtags.o
+CFLAGS_board-rdtags.o  := \
+       -D"INFO_PRODUCT=\"$(if $(TARGET_PRODUCT),$(TARGET_PRODUCT),unknown)\"" \
+       -D"INFO_VARIANT= \
+       \"$(if $(TARGET_BUILD_VARIANT),$(TARGET_BUILD_VARIANT),unknown)\"" \
+       -D"INFO_BUILDID= \
+       \"$(if $(SEMC_SYSTEM_VERSION),$(SEMC_SYSTEM_VERSION),private)\""
+obj-$(CONFIG_SUBSYS_LAST_ERR_LOG) += last_subsys_errlog.o
+obj-$(CONFIG_LAST_LOGS) += last_logs.o
+obj-$(CONFIG_SECURITY_STATUS) += security_status.o
+obj-$(CONFIG_ARCH_SDM845) += console_setup.o

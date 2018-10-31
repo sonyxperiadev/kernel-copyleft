@@ -102,6 +102,8 @@ module_param(dl_intr_threshold, uint, 0644);
 enum u_bam_event_type {
 	U_BAM_DISCONNECT_E = 0,
 	U_BAM_CONNECT_E,
+	U_BAM_SUSPEND_E,
+	U_BAM_RESUME_E
 };
 
 struct bam_ch_info {
@@ -118,6 +120,9 @@ struct bam_ch_info {
 	struct gbam_port	*port;
 	struct work_struct	write_tobam_w;
 	struct work_struct	write_tohost_w;
+
+	struct usb_request	*rx_req;
+	struct usb_request	*tx_req;
 
 	/* stats */
 	unsigned int		pending_pkts_with_bam;
@@ -138,6 +143,7 @@ struct bam_ch_info {
 };
 
 struct gbam_port {
+	bool			is_connected;
 	enum u_bam_event_type	last_event;
 	unsigned int		port_num;
 	spinlock_t		port_lock_ul;
@@ -157,6 +163,12 @@ static struct bam_portmaster {
 	struct gbam_port *port;
 	struct platform_driver pdrv;
 } bam_ports[BAM_DMUX_NUM_FUNCS];
+
+struct  u_bam_data_connect_info {
+	u32 usb_bam_pipe_idx;
+	u32 peer_pipe_idx;
+	unsigned long usb_bam_handle;
+};
 
 static void gbam_start_rx(struct gbam_port *port);
 static void gbam_notify(void *p, int event, unsigned long data);
@@ -1045,6 +1057,7 @@ static int gbam_port_alloc(enum bam_dmux_func_type func)
 	port->port_num = func;
 
 	/* port initialization */
+	port->is_connected = false;
 	spin_lock_init(&port->port_lock_ul);
 	spin_lock_init(&port->port_lock_dl);
 	spin_lock_init(&port->port_lock);
@@ -1342,6 +1355,10 @@ int gbam_connect(struct data_port *gr, enum bam_dmux_func_type func)
 	if (ret) {
 		pr_err("%s: usb_ep_enable failed eptype:IN ep:%pK",
 			__func__, gr->in);
+		usb_ep_free_request(port->port_usb->out, d->rx_req);
+		d->rx_req = NULL;
+		usb_ep_free_request(port->port_usb->in, d->tx_req);
+		d->tx_req = NULL;
 		goto exit;
 	}
 	gr->in->driver_data = port;
@@ -1358,6 +1375,10 @@ int gbam_connect(struct data_port *gr, enum bam_dmux_func_type func)
 					__func__, gr->out);
 			gr->in->driver_data = NULL;
 			usb_ep_disable(gr->in);
+			usb_ep_free_request(port->port_usb->out, d->rx_req);
+			d->rx_req = NULL;
+			usb_ep_free_request(port->port_usb->in, d->tx_req);
+			d->tx_req = NULL;
 			goto exit;
 		}
 		gr->out->driver_data = port;

@@ -13,6 +13,11 @@
  * are on the same disk on different partitions on devices with poor random
  * access behavior.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "dm-verity.h"
 #include "dm-verity-fec.h"
@@ -20,6 +25,10 @@
 #include <linux/module.h>
 #include <linux/reboot.h>
 #include <linux/vmalloc.h>
+
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
 
 #define DM_MSG_PREFIX			"verity"
 
@@ -40,6 +49,21 @@
 static unsigned dm_verity_prefetch_cluster = DM_VERITY_DEFAULT_PREFETCH_SIZE;
 
 module_param_named(prefetch_cluster, dm_verity_prefetch_cluster, uint, S_IRUGO | S_IWUSR);
+
+#ifdef CONFIG_PANIC_ON_DM_VERITY_ERRORS
+static unsigned dm_verity_panic_on_err;
+static int __init get_verity_panic_value(char *str)
+{
+	int val = 0;
+	if (get_option(&str, &val)) {
+		if (val < 0)
+			return -EINVAL;
+		dm_verity_panic_on_err = val;
+	}
+	return 0;
+}
+early_param("panic_on_err", get_verity_panic_value);
+#endif
 
 struct dm_verity_prefetch_work {
 	struct work_struct work;
@@ -190,6 +214,25 @@ static void verity_hash_at_level(struct dm_verity *v, sector_t block, int level,
 		*offset = idx << (v->hash_dev_block_bits - v->hash_per_block_bits);
 }
 
+static void add_verity_corruption_tag(struct block_device *bdev,
+				unsigned long long blk)
+{
+	char verity_blk[64];
+	int count = 0;
+
+	if (!bdev || !(bdev->bd_part) ||
+			!(bdev->bd_part->info) ||
+			!(bdev->bd_part->info->volname[0])) {
+		pr_err("%s failed\n", __func__);
+		return;
+	}
+
+	count = snprintf(verity_blk, sizeof(verity_blk),
+			"%s %lld", bdev->bd_part->info->volname, blk);
+
+	rdtags_add_tag("rdtag_verity_corruption", verity_blk, count);
+}
+
 /*
  * Handle verification errors.
  */
@@ -220,8 +263,18 @@ static int verity_handle_err(struct dm_verity *v, enum verity_block_type type,
 		BUG();
 	}
 
+#ifdef CONFIG_PANIC_ON_DM_VERITY_ERRORS
+	if (dm_verity_panic_on_err) {
+#ifdef CONFIG_RAMDUMP_TAGS
+		add_verity_corruption_tag(v->data_dev->bdev, block);
+#endif
+		panic("%s: %s block %llu is corrupted",
+			v->data_dev->name, type_str, block);
+	}
+#else
 	DMERR("%s: %s block %llu is corrupted", v->data_dev->name, type_str,
 		block);
+#endif
 
 	if (v->corrupted_errs == DM_VERITY_MAX_CORRUPTED_ERRS)
 		DMERR("%s: reached maximum errors", v->data_dev->name);

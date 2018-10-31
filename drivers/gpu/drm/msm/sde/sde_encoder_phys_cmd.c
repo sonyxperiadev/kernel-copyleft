@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 #include "sde_encoder_phys.h"
@@ -32,7 +37,7 @@
 #define to_sde_encoder_phys_cmd(x) \
 	container_of(x, struct sde_encoder_phys_cmd, base)
 
-#define PP_TIMEOUT_MAX_TRIALS	2
+#define PP_TIMEOUT_MAX_TRIALS	10
 
 /*
  * Tearcheck sync start and continue thresholds are empirically found
@@ -380,7 +385,9 @@ static void sde_encoder_phys_cmd_cont_splash_mode_set(
 	}
 
 	phys_enc->cached_mode = *adj_mode;
+#ifndef CONFIG_DRM_SDE_SPECIFIC_PANEL
 	phys_enc->enable_state = SDE_ENC_ENABLED;
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 	if (!phys_enc->hw_ctl || !phys_enc->hw_pp) {
 		SDE_DEBUG("invalid ctl:%d pp:%d\n",

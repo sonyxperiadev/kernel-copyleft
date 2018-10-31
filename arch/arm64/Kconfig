@@ -13,6 +13,7 @@ config ARM64
 	select ARCH_HAS_GCOV_PROFILE_ALL
 	select ARCH_HAS_GIGANTIC_PAGE
 	select ARCH_HAS_KCOV
+	select ARCH_HAS_CRASH_NOTES if CRASH_NOTES
 	select ARCH_HAS_SG_CHAIN
 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
 	select ARCH_INLINE_READ_LOCK if !PREEMPT
@@ -934,6 +935,7 @@ endif
 
 config ARM64_SW_TTBR0_PAN
 	bool "Emulate Privileged Access Never using TTBR0_EL1 switching"
+	depends on BROKEN       # Temporary while switch_mm is reworked
 	help
 	  Enabling this option prevents the kernel from accessing
 	  user-space memory directly by pointing TTBR0_EL1 to a reserved
@@ -997,6 +999,15 @@ config ARM64_VHE
 	  Selecting this option allows the VHE feature to be detected
 	  at runtime, and does not affect processors that do not
 	  implement this feature.
+
+config ARM64_FLUSH_CONSOLE_ON_RESTART
+	bool "Force flush the console on restart"
+	help
+	  If the console is locked while the system is rebooted, the messages
+	  in the temporary logbuffer would not have propogated to all the
+	  console drivers. This option forces the console lock to be
+	  released if it failed to be acquired, which will cause all the
+	  pending messages to be flushed.
 
 endmenu
 
@@ -1219,6 +1230,18 @@ config BUILD_ARM64_DT_OVERLAY
 	depends on OF
 	help
 	  This option enables support for DT overlay compilation.
+
+config ARCH_HAS_CRASH_NOTES
+	bool
+
+config CRASH_NOTES
+	bool "Support storing crash notes at panic"
+	depends on !KEXEC
+	help
+	  Generate kdump style crash notes at the time of a panic and fill it
+	  with the crashed context to support analysis of the memory dump with
+	  tools like Redhat CRASH.
+
 endmenu
 
 menu "Userspace binary formats"

@@ -1,0 +1,89 @@
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2018 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+qcom,aurora_tmm_4250mv {
+	qcom, = <24>;
+	somc,initial-capacity-uah = <3554000>;
+	qcom,max-voltage-uv = <4245000>;
+	qcom,fg-cc-cv-threshold-mv = <4235>;
+	qcom,fastchg-current-ma = <2550>;
+	qcom,batt-id-kohm = <330>;
+	qcom,battery-beta = <4050>;
+	qcom,battery-type = "1310-1690-3";
+	qcom,checksum = <0xD865>;
+	qcom,gui-version = "PMI8998GUI - 2.0.0.58";
+	qcom,fg-profile-data = [
+		 0F 20 34 05
+		 6E 0A AD FC
+		 AD 1C 4F 01
+		 05 ED F7 FD
+		 9A 18 06 22
+		 9B 3D D4 43
+		 65 00 00 00
+		 11 00 00 00
+		 00 00 6B CB
+		 86 D5 00 9C
+		 2A 00 08 00
+		 BF E5 EC D5
+		 59 05 3D FB
+		 42 04 9E 03
+		 C5 ED 44 22
+		 49 06 09 20
+		 27 00 14 00
+		 1D 20 8F 05
+		 14 0A 69 FD
+		 A8 1C 4C 02
+		 37 04 69 02
+		 93 18 C5 22
+		 98 45 20 53
+		 70 00 00 00
+		 0E 00 00 00
+		 00 00 7D D5
+		 08 B5 EE CB
+		 23 00 00 00
+		 4C E3 EC D5
+		 E4 05 51 FA
+		 53 FD 84 03
+		 AC 06 B7 0B
+		 9E 33 CC FF
+		 07 10 00 00
+		 58 0C EB 43
+		 23 00 40 00
+		 C3 01 0A FA
+		 FF 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 00 00 00 00
+	];
+};

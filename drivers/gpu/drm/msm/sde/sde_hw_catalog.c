@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 #include <linux/slab.h>
@@ -3257,7 +3262,7 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 	} else if (IS_SDM845_TARGET(hw_rev)) {
 		/* update sdm845 target here */
 		sde_cfg->has_wb_ubwc = true;
-		sde_cfg->has_cwb_support = true;
+		sde_cfg->has_cwb_support = false;
 		sde_cfg->perf.min_prefill_lines = 24;
 		sde_cfg->vbif_qos_nlvl = 8;
 		sde_cfg->ts_prefill_rev = 2;

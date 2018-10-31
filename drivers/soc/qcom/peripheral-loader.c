@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/string.h>
@@ -43,6 +48,9 @@
 #include <trace/events/trace_msm_pil_event.h>
 
 #include "peripheral-loader.h"
+#ifdef CONFIG_RAMDUMP_MEMDESC
+#include <linux/ramdump_mem_desc.h>
+#endif
 
 #define pil_err(desc, fmt, ...)						\
 	dev_err(desc->dev, "%s: " fmt, desc->name, ##__VA_ARGS__)
@@ -849,8 +857,11 @@ static int pil_load_seg(struct pil_desc *desc, struct pil_seg *seg)
 		if (fw->size != seg->filesz) {
 			pil_err(desc, "Blob size %u doesn't match %lu\n",
 					ret, seg->filesz);
+			release_firmware(fw);
 			return -EPERM;
 		}
+
+		release_firmware(fw);
 	}
 
 	/* Zero out trailing memory */
@@ -938,6 +949,43 @@ static int pil_notify_aop(struct pil_desc *desc, char *status)
 
 	return mbox_send_message(desc->mbox, &pkt);
 }
+
+#ifdef CONFIG_RAMDUMP_MEMDESC
+/* Tag the subsystem information in ramdump memory descriptors */
+static void get_mem_desc_subsys_name(const struct pil_priv *priv,
+					struct mem_desc *mem_desc_subsys)
+{
+	if (!strncmp(priv->desc->name, "modem", MEM_DESC_NAME_SIZE))
+		strlcpy(mem_desc_subsys->name, "amsscore", MEM_DESC_NAME_SIZE);
+	else {
+		snprintf(mem_desc_subsys->name, MEM_DESC_NAME_SIZE, "%score",
+				priv->desc->name);
+	}
+}
+
+static void add_mem_desc_subsys_info(const struct pil_priv *priv)
+{
+	struct mem_desc mem_desc_subsys;
+
+	mem_desc_subsys.phys_addr = priv->region_start;
+	mem_desc_subsys.size = priv->region_end - priv->region_start;
+	mem_desc_subsys.flags = MEM_DESC_CORE;
+	get_mem_desc_subsys_name(priv, &mem_desc_subsys);
+	ramdump_add_mem_desc(&mem_desc_subsys);
+}
+
+static void remove_mem_desc_subsys_info(const struct pil_priv *priv)
+{
+	struct mem_desc mem_desc_subsys;
+
+	mem_desc_subsys.phys_addr = priv->region_start;
+	mem_desc_subsys.size = priv->region_end - priv->region_start;
+	mem_desc_subsys.flags = MEM_DESC_CORE;
+	get_mem_desc_subsys_name(priv, &mem_desc_subsys);
+	ramdump_remove_mem_desc(&mem_desc_subsys);
+}
+
+#endif
 
 /* Synchronize request_firmware() with suspend */
 static DECLARE_RWSEM(pil_pm_rwsem);
@@ -1062,6 +1110,10 @@ int pil_boot(struct pil_desc *desc)
 		hyp_assign = true;
 	}
 
+#ifdef CONFIG_RAMDUMP_MEMDESC
+	add_mem_desc_subsys_info(priv);
+#endif
+
 	trace_pil_event("before_load_seg", desc);
 	list_for_each_entry(seg, &desc->priv->segs, list) {
 		ret = pil_load_seg(desc, seg);
@@ -1119,6 +1171,9 @@ out:
 			}
 			if (desc->clear_fw_region && priv->region_start)
 				pil_clear_segment(desc);
+#ifdef CONFIG_RAMDUMP_MEMDESC
+			remove_mem_desc_subsys_info(priv);
+#endif
 			dma_free_attrs(desc->dev, priv->region_size,
 					priv->region, priv->region_start,
 					desc->attrs);
@@ -1159,6 +1214,10 @@ void pil_shutdown(struct pil_desc *desc)
 	if (ret < 0)
 		pr_warn("pil: failed to send OFF message to AOP rc:%d\n", ret);
 	desc->modem_ssr = true;
+
+#ifdef CONFIG_RAMDUMP_MEMDESC
+	remove_mem_desc_subsys_info(priv);
+#endif
 }
 EXPORT_SYMBOL(pil_shutdown);
 

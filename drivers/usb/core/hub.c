@@ -7,6 +7,11 @@
  * (C) Copyright 2001 Brad Hards (bhards@bigpond.net.au)
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -4653,6 +4658,18 @@ hub_port_init(struct usb_hub *hub, struct usb_device *udev, int port1,
 	}
 
 	usb_detect_quirks(udev);
+
+	if ((udev->quirks & USB_QUIRK_VENDOR_SPEC_PHY_INIT) &&
+		udev->level == 1) {
+		retval = usb_phy_init_sp(hcd->usb_phy);
+		if (retval == 0) {
+			/* hub port reset if phy initialized */
+			hub_port_reset(hub, port1, udev,
+					HUB_ROOT_RESET_TIME, false);
+			retval = -EINVAL;
+			goto fail;
+		}
+	}
 
 	if (udev->wusb == 0 && le16_to_cpu(udev->descriptor.bcdUSB) >= 0x0201) {
 		retval = usb_get_bos_descriptor(udev);

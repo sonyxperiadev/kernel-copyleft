@@ -17,6 +17,11 @@
  * under the terms of the Apache 2.0 License OR version 2 of the GNU
  * General Public License.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "sdcardfs.h"
 #include "linux/ctype.h"
@@ -185,5 +190,6 @@ const struct dentry_operations sdcardfs_ci_dops = {
 	.d_hash	= sdcardfs_hash_ci,
 	.d_compare	= sdcardfs_cmp_ci,
 	.d_canonical_path = sdcardfs_canonical_path,
+	.d_delete	= always_delete_dentry,
 };
 

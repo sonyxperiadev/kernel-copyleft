@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "skeleton64.dtsi"
 #include <dt-bindings/clock/qcom,gcc-sdm845.h>
@@ -1491,10 +1496,8 @@
 
 		qcom,restore-after-cx-collapse;
 
-		qcom,clk-rates = <400000 20000000 25000000
-					50000000 100000000 201500000>;
-		qcom,bus-speed-mode = "SDR12", "SDR25", "SDR50", "DDR50",
-				      "SDR104";
+		qcom,clk-rates = <400000 20000000 25000000 40000000 80000000>;
+		qcom,bus-speed-mode = "DDR50";
 
 		qcom,devfreq,freq-table = <50000000 201500000>;
 		clocks = <&clock_gcc GCC_SDCC2_AHB_CLK>,
@@ -1540,7 +1543,8 @@
 					  "gpll0_mss_clk", "snoc_axi_clk",
 					  "mnoc_axi_clk";
 
-		interrupts = <0 266 1>;
+		interrupts = <0 266 1>,
+			     <GIC_SPI 390 IRQ_TYPE_EDGE_RISING>;
 		vdd_cx-supply = <&pm8998_s9_level>;
 		vdd_cx-voltage = <RPMH_REGULATOR_LEVEL_TURBO>;
 		vdd_mx-supply = <&pm8998_s6_level>;

@@ -26,7 +26,11 @@
 #include "pfk_ice.h"
 
 
-#define TZ_ES_CONFIG_SET_ICE_KEY 0x4
+/**********************************/
+/** global definitions		 **/
+/**********************************/
+
+#define TZ_ES_SET_ICE_KEY 0x2
 #define TZ_ES_INVALIDATE_ICE_KEY 0x3
 
 /* index 0 and 1 is reserved for FDE */
@@ -34,45 +38,44 @@
 
 #define MAX_ICE_KEY_INDEX 31
 
-#define TZ_ES_CONFIG_SET_ICE_KEY_ID \
-	TZ_SYSCALL_CREATE_SMC_ID(TZ_OWNER_SIP, TZ_SVC_ES, \
-		TZ_ES_CONFIG_SET_ICE_KEY)
+
+#define TZ_ES_SET_ICE_KEY_ID \
+	TZ_SYSCALL_CREATE_SMC_ID(TZ_OWNER_SIP, TZ_SVC_ES, TZ_ES_SET_ICE_KEY)
+
 
 #define TZ_ES_INVALIDATE_ICE_KEY_ID \
 		TZ_SYSCALL_CREATE_SMC_ID(TZ_OWNER_SIP, \
 			TZ_SVC_ES, TZ_ES_INVALIDATE_ICE_KEY)
 
-#define TZ_ES_CONFIG_SET_ICE_KEY_PARAM_ID \
+
+#define TZ_ES_SET_ICE_KEY_PARAM_ID \
 	TZ_SYSCALL_CREATE_PARAM_ID_5( \
 		TZ_SYSCALL_PARAM_TYPE_VAL, \
 		TZ_SYSCALL_PARAM_TYPE_BUF_RW, TZ_SYSCALL_PARAM_TYPE_VAL, \
-		TZ_SYSCALL_PARAM_TYPE_VAL, TZ_SYSCALL_PARAM_TYPE_VAL)
+		TZ_SYSCALL_PARAM_TYPE_BUF_RW, TZ_SYSCALL_PARAM_TYPE_VAL)
 
 #define TZ_ES_INVALIDATE_ICE_KEY_PARAM_ID \
 	TZ_SYSCALL_CREATE_PARAM_ID_1( \
 	TZ_SYSCALL_PARAM_TYPE_VAL)
 
-#define ICE_BUFFER_SIZE 64
+#define ICE_KEY_SIZE 32
+#define ICE_SALT_SIZE 32
 
-enum {
-	TZ_CIPHER_MODE_XTS_128 = 0,
-	TZ_CIPHER_MODE_CBC_128 = 1,
-	TZ_CIPHER_MODE_XTS_256 = 3,
-	TZ_CIPHER_MODE_CBC_256 = 4
-};
-
-static uint8_t ice_buffer[ICE_BUFFER_SIZE];
+static uint8_t ice_key[ICE_KEY_SIZE];
+static uint8_t ice_salt[ICE_KEY_SIZE];
 
 int qti_pfk_ice_set_key(uint32_t index, uint8_t *key, uint8_t *salt,
-			char *storage_type, unsigned int data_unit)
+			char *storage_type)
 {
 	struct scm_desc desc = {0};
 	int ret, ret1;
-	char *tzbuf = (char *)ice_buffer;
+	char *tzbuf_key = (char *)ice_key;
+	char *tzbuf_salt = (char *)ice_salt;
 	char *s_type = storage_type;
 
 	uint32_t smc_id = 0;
-	u32 size = ICE_BUFFER_SIZE / 2;
+	u32 tzbuflen_key = sizeof(ice_key);
+	u32 tzbuflen_salt = sizeof(ice_salt);
 
 	if (index < MIN_ICE_KEY_INDEX || index > MAX_ICE_KEY_INDEX) {
 		pr_err("%s Invalid index %d\n", __func__, index);
@@ -83,7 +86,7 @@ int qti_pfk_ice_set_key(uint32_t index, uint8_t *key, uint8_t *salt,
 		return -EINVAL;
 	}
 
-	if (!tzbuf) {
+	if (!tzbuf_key || !tzbuf_salt) {
 		pr_err("%s No Memory\n", __func__);
 		return -ENOMEM;
 	}
@@ -93,21 +96,23 @@ int qti_pfk_ice_set_key(uint32_t index, uint8_t *key, uint8_t *salt,
 		return -EINVAL;
 	}
 
-	memset(tzbuf, 0, ICE_BUFFER_SIZE);
+	memset(tzbuf_key, 0, tzbuflen_key);
+	memset(tzbuf_salt, 0, tzbuflen_salt);
 
-	memcpy(ice_buffer, key, size);
-	memcpy(ice_buffer + size, salt, size);
+	memcpy(ice_key, key, tzbuflen_key);
+	memcpy(ice_salt, salt, tzbuflen_salt);
 
-	dmac_flush_range(tzbuf, tzbuf + ICE_BUFFER_SIZE);
+	dmac_flush_range(tzbuf_key, tzbuf_key + tzbuflen_key);
+	dmac_flush_range(tzbuf_salt, tzbuf_salt + tzbuflen_salt);
 
-	smc_id = TZ_ES_CONFIG_SET_ICE_KEY_ID;
+	smc_id = TZ_ES_SET_ICE_KEY_ID;
 
-	desc.arginfo = TZ_ES_CONFIG_SET_ICE_KEY_PARAM_ID;
+	desc.arginfo = TZ_ES_SET_ICE_KEY_PARAM_ID;
 	desc.args[0] = index;
-	desc.args[1] = virt_to_phys(tzbuf);
-	desc.args[2] = ICE_BUFFER_SIZE;
-	desc.args[3] = TZ_CIPHER_MODE_XTS_256;
-	desc.args[4] = data_unit;
+	desc.args[1] = virt_to_phys(tzbuf_key);
+	desc.args[2] = tzbuflen_key;
+	desc.args[3] = virt_to_phys(tzbuf_salt);
+	desc.args[4] = tzbuflen_salt;
 
 	ret = qcom_ice_setup_ice_hw((const char *)s_type, true);
 

@@ -1,0 +1,48 @@
+/* arch/arm64/boot/dts/somc/sdm845-tama-aurora_kddi.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (C) 2017 Sony Mobile Communications Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+#include "sdm845-tama-aurora_jp-common.dtsi"
+
+&soc {
+	/* SPI: QUP4 */
+	spi@890000 {
+		pinctrl-0 = <&sdm_gpio_89 &sdm_gpio_90 &sdm_gpio_91 &sdm_gpio_92>;
+		pinctrl-1 = <&sdm_gpio_89 &sdm_gpio_90 &sdm_gpio_91 &sdm_gpio_92>;
+		spi-max-frequency = <25000000>;
+		status = "okay";
+
+		tmm3spi@0 {
+			compatible = "socionext,mn553-spi";
+			reg = <0>;
+			spi-max-frequency = <25000000>;
+			spi-mode = <0>;
+		};
+	};
+
+	dtv_tuner: mn88553 {
+		compatible = "socionext,mn88553";
+		interrupt-parent = <&tlmm>;
+		interrupts = <26 0>;
+		gpios = <&pm8998_gpios 16 0>,  /* DTV_ACTIVE  */
+				<&tlmm 25 0>,          /* DTV_RESET_N */
+				<&tlmm 26 0>;          /* DTV_INT     */
+	};
+};
+
+#include "somc-tama-nfc_carillon-xtal.dtsi"

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt)	"haptics: %s: " fmt, __func__
 
@@ -168,13 +173,17 @@
 /* Other definitions */
 #define HAP_BRAKE_PAT_LEN		4
 #define HAP_WAVE_SAMP_LEN		8
-#define NUM_WF_SET			4
+#define NUM_WF_SET			10
 #define HAP_WAVE_SAMP_SET_LEN		(HAP_WAVE_SAMP_LEN * NUM_WF_SET)
 #define HAP_RATE_CFG_STEP_US		5
 #define HAP_WAVE_PLAY_RATE_US_MIN	0
 #define HAP_DEF_WAVE_PLAY_RATE_US	5715
 #define HAP_WAVE_PLAY_RATE_US_MAX	20475
 #define HAP_MAX_PLAY_TIME_MS		15000
+
+/* Auto resonance error retry count */
+#define HAP_AUTO_RES_MAX_CNT_AUDIO	6
+#define HAP_AUTO_RES_ERR_RETRY_MAX_CNT_AUDIO	500
 
 enum hap_brake_pat {
 	NO_BRAKE = 0,
@@ -358,6 +367,9 @@ struct hap_chip {
 	bool				play_irq_en;
 	bool				auto_res_err_recovery_hw;
 	bool				vcc_pon_enabled;
+	bool				auto_res_err_audio;
+	u8					auto_res_cnt_audio;
+	u16					auto_res_err_retry_cnt_audio;
 };
 
 static int qpnp_haptics_parse_buffer_dt(struct hap_chip *chip);
@@ -596,16 +608,22 @@ static void qpnp_haptics_update_lra_frequency(struct hap_chip *chip)
 	if ((val & AUTO_RES_ERROR_BIT) ||
 		((play_rate_code <= chip->drive_period_code_min_limit) ||
 		(play_rate_code >= chip->drive_period_code_max_limit))) {
-		if (val & AUTO_RES_ERROR_BIT)
+		if (val & AUTO_RES_ERROR_BIT) {
 			pr_debug("Auto-resonance error %x\n", val);
-		else
+			chip->auto_res_cnt_audio = 0;
+		} else
 			pr_debug("play rate %x out of bounds [min: 0x%x, max: 0x%x]\n",
 				play_rate_code,
 				chip->drive_period_code_min_limit,
 				chip->drive_period_code_max_limit);
-		rc = qpnp_haptics_auto_res_enable(chip, false);
-		if (rc < 0)
-			pr_debug("Auto-resonance disable failed\n");
+
+		if (chip->play_mode == HAP_AUDIO) {
+			chip->auto_res_err_audio = true;
+		} else {
+			rc = qpnp_haptics_auto_res_enable(chip, false);
+			if (rc < 0)
+				pr_debug("Auto-resonance disable failed\n");
+		}
 		return;
 	}
 
@@ -755,15 +773,22 @@ static int qpnp_haptics_play(struct hap_chip *chip, bool enable)
 
 		if (chip->play_mode == HAP_BUFFER)
 			time_ms = get_buffer_mode_duration(chip);
-		hrtimer_start(&chip->stop_timer,
-			ktime_set(time_ms / MSEC_PER_SEC,
-			(time_ms % MSEC_PER_SEC) * NSEC_PER_MSEC),
-			HRTIMER_MODE_REL);
+		if (chip->play_mode != HAP_AUDIO)
+		    hrtimer_start(&chip->stop_timer,
+			    ktime_set(time_ms / MSEC_PER_SEC,
+			    (time_ms % MSEC_PER_SEC) * NSEC_PER_MSEC),
+			    HRTIMER_MODE_REL);
 
 		rc = qpnp_haptics_auto_res_enable(chip, true);
 		if (rc < 0) {
 			pr_err("Error in enabling auto_res, rc=%d\n", rc);
 			goto out;
+		}
+
+		if (chip->play_mode == HAP_AUDIO) {
+			chip->auto_res_err_audio = false;
+			chip->auto_res_cnt_audio = 0;
+			chip->auto_res_err_retry_cnt_audio = 0;
 		}
 
 		if (is_sw_lra_auto_resonance_control(chip))
@@ -844,6 +869,33 @@ static enum hrtimer_restart hap_auto_res_err_poll_timer(struct hrtimer *timer)
 {
 	struct hap_chip *chip = container_of(timer, struct hap_chip,
 					auto_res_err_poll_timer);
+	int rc = 0;
+	u8 val = 0;
+	if (chip->play_mode == HAP_AUDIO) {
+		if (chip->auto_res_err_audio) {
+			val = 0;
+			rc = qpnp_haptics_write_reg(chip, HAP_EN_CTL_REG(chip), &val, 1);
+			if (rc < 0)
+				pr_debug("Error in disabling module forcibly\n");
+			val = HAP_EN_BIT;
+			rc = qpnp_haptics_write_reg(chip, HAP_EN_CTL_REG(chip), &val, 1);
+			if (rc < 0)
+				pr_debug("Error in enbling module forcibly\n");
+			chip->auto_res_err_audio = false;
+			chip->auto_res_err_retry_cnt_audio++;
+		} else {
+			chip->auto_res_cnt_audio++;
+		}
+		qpnp_haptics_update_lra_frequency(chip);
+		if ((HAP_AUTO_RES_MAX_CNT_AUDIO > chip->auto_res_cnt_audio)
+				&& (HAP_AUTO_RES_ERR_RETRY_MAX_CNT_AUDIO > chip->auto_res_err_retry_cnt_audio)) {
+			hrtimer_forward(&chip->auto_res_err_poll_timer, ktime_get(),
+					ktime_set(0, AUTO_RES_ERR_POLL_TIME_NS));
+			return HRTIMER_RESTART;
+		} else {
+			return HRTIMER_NORESTART;
+		}
+	}
 
 	if (!(chip->status_flags & AUTO_RESONANCE_ENABLED))
 		return HRTIMER_NORESTART;
@@ -1335,24 +1387,25 @@ static irqreturn_t qpnp_haptics_play_irq_handler(int irq, void *data)
 	struct hap_chip *chip = data;
 	int rc;
 
+	if (chip->module_en == 0)
+		goto irq_handled;
+
 	if (chip->play_mode != HAP_BUFFER)
 		goto irq_handled;
 
-	if (chip->wave_samp[chip->wave_samp_idx + HAP_WAVE_SAMP_LEN] > 0) {
-		chip->wave_samp_idx += HAP_WAVE_SAMP_LEN;
-		if (chip->wave_samp_idx >= ARRAY_SIZE(chip->wave_samp)) {
-			pr_debug("Samples over\n");
-		} else {
-			pr_debug("moving to next sample set %d\n",
-				chip->wave_samp_idx);
+	chip->wave_samp_idx += HAP_WAVE_SAMP_LEN;
+	if (chip->wave_samp_idx >= ARRAY_SIZE(chip->wave_samp)) {
+		pr_debug("Samples over\n");
+	} else {
+		pr_debug("moving to next sample set %d\n",
+			chip->wave_samp_idx);
 
-			/* Moving to next set of wave sample */
-			rc = qpnp_haptics_buffer_config(chip, NULL, false);
-			if (rc < 0) {
-				pr_err("Error in configuring buffer, rc=%d\n",
-					rc);
-				goto irq_handled;
-			}
+		/* Moving to next set of wave sample */
+		rc = qpnp_haptics_buffer_config(chip, NULL, false);
+		if (rc < 0) {
+			pr_err("Error in configuring buffer, rc=%d\n",
+				rc);
+			goto irq_handled;
 		}
 	}
 
@@ -1529,6 +1582,8 @@ static ssize_t qpnp_haptics_store_activate(struct device *dev,
 		atomic_set(&chip->state, 1);
 		schedule_work(&chip->haptics_work);
 	} else {
+		if (is_sw_lra_auto_resonance_control(chip))
+			hrtimer_cancel(&chip->auto_res_err_poll_timer);
 		rc = qpnp_haptics_mod_enable(chip, false);
 		if (rc < 0) {
 			pr_err("Error in disabling module, rc=%d\n", rc);
@@ -1567,6 +1622,7 @@ static ssize_t qpnp_haptics_store_play_mode(struct device *dev,
 	struct hap_chip *chip = container_of(cdev, struct hap_chip, cdev);
 	char str[HAP_STR_SIZE + 1];
 	int rc = 0, temp, old_mode;
+	u8 val = 0;
 
 	rc = parse_string(buf, str);
 	if (rc < 0)
@@ -1583,6 +1639,8 @@ static ssize_t qpnp_haptics_store_play_mode(struct device *dev,
 	else
 		return -EINVAL;
 
+	rc = qpnp_haptics_write_reg(chip, HAP_BRAKE_REG(chip), &val, 1);
+
 	if (temp == chip->play_mode)
 		return count;
 
@@ -1598,7 +1656,7 @@ static ssize_t qpnp_haptics_store_play_mode(struct device *dev,
 			}
 		}
 
-		rc = qpnp_haptics_buffer_config(chip, NULL, true);
+		rc = qpnp_haptics_buffer_config(chip, NULL, false);
 	} else if (temp == HAP_PWM) {
 		rc = qpnp_haptics_parse_pwm_dt(chip);
 		if (!rc)
@@ -1668,6 +1726,8 @@ static ssize_t qpnp_haptics_store_wf_samp(struct device *dev,
 	chip->wf_samp_len = i;
 	for (i = 0; i < ARRAY_SIZE(chip->wave_samp); i++)
 		chip->wave_samp[i] = samp[i];
+
+	chip->wave_samp_idx = 0;
 
 	rc = qpnp_haptics_buffer_config(chip, NULL, false);
 	if (rc < 0) {
@@ -1971,7 +2031,10 @@ static int qpnp_haptics_parse_buffer_dt(struct hap_chip *chip)
 {
 	struct device_node *node = chip->pdev->dev.of_node;
 	u32 temp;
+	/*
 	int rc, i, wf_samp_len;
+	*/
+	int rc, wf_samp_len;
 
 	if (chip->wave_rep_cnt > 0 || chip->wave_s_rep_cnt > 0)
 		return 0;
@@ -2012,8 +2075,10 @@ static int qpnp_haptics_parse_buffer_dt(struct hap_chip *chip)
 		}
 	} else {
 		/* Use default values */
+		/*
 		for (i = 0; i < HAP_WAVE_SAMP_LEN; i++)
 			chip->wave_samp[i] = HAP_WF_SAMP_MAX;
+		*/
 
 		wf_samp_len = HAP_WAVE_SAMP_LEN;
 	}
