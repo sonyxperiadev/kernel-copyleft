@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "cam_cci_dev.h"
 #include "cam_req_mgr_dev.h"
@@ -16,7 +21,13 @@
 #include "cam_cci_core.h"
 
 #define CCI_MAX_DELAY 1000000
+/* sony extension begin */
+#if 1
+#define CCI_TIMEOUT msecs_to_jiffies(50)
+#else
 #define CCI_TIMEOUT msecs_to_jiffies(500)
+#endif
+/* sony extension end */
 
 static struct v4l2_subdev *g_cci_subdev;
 
@@ -24,6 +35,7 @@ struct v4l2_subdev *cam_cci_get_subdev(void)
 {
 	return g_cci_subdev;
 }
+EXPORT_SYMBOL(cam_cci_get_subdev);
 
 static long cam_cci_subdev_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)

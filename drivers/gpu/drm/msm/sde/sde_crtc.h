@@ -15,6 +15,11 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _SDE_CRTC_H_
 #define _SDE_CRTC_H_
@@ -266,6 +271,7 @@ struct sde_crtc {
 	struct list_head ad_dirty;
 	struct list_head ad_active;
 	struct list_head user_event_list;
+	bool mdss_bus_vote;
 
 	struct mutex crtc_lock;
 	struct mutex crtc_cp_lock;

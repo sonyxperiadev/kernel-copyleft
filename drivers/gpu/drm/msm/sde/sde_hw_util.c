@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 
 #include <uapi/drm/sde_drm.h>
@@ -80,7 +85,7 @@ void sde_reg_write(struct sde_hw_blk_reg_map *c,
 	if (c->log_mask & sde_hw_util_log_mask)
 		SDE_DEBUG_DRIVER("[%s:0x%X] <= 0x%X\n",
 				name, c->blk_off + reg_off, val);
-	writel_relaxed(val, c->base_off + c->blk_off + reg_off);
+	writel_relaxed_no_log(val, c->base_off + c->blk_off + reg_off);
 }
 
 int sde_reg_read(struct sde_hw_blk_reg_map *c, u32 reg_off)

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _CAM_IFE_HW_MGR_H_
 #define _CAM_IFE_HW_MGR_H_
@@ -17,9 +22,6 @@
 #include "cam_vfe_hw_intf.h"
 #include "cam_ife_csid_hw_intf.h"
 #include "cam_tasklet_util.h"
-
-/* MAX IFE instance */
-#define CAM_IFE_HW_NUM_MAX                       4
 
 /* enum cam_ife_hw_mgr_res_type - manager resource node type */
 enum cam_ife_hw_mgr_res_type {

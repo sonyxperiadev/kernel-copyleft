@@ -87,8 +87,23 @@ obj-$(CONFIG_QTI_RPM_STATS_LOG) += rpm_stats.o
 ifdef CONFIG_MSM_RPM_SMD
 	obj-$(CONFIG_QTI_RPM_STATS_LOG) += rpm_master_stat.o
 endif
+ifdef CONFIG_QTI_RPMH_API
+	obj-$(CONFIG_QTI_RPM_STATS_LOG) += rpmh_master_stat.o
+endif
 obj-$(CONFIG_QCOM_SMCINVOKE) += smcinvoke.o
 obj-$(CONFIG_QMP_DEBUGFS_CLIENT) += qmp-debugfs-client.o
 obj-$(CONFIG_MSM_REMOTEQDSS) += remoteqdss.o
 obj-$(CONFIG_QSEE_IPC_IRQ_BRIDGE) += qsee_ipc_irq_bridge.o
 obj-$(CONFIG_QCOM_QDSS_BRIDGE) += qdss_bridge.o
+obj-$(CONFIG_ARCH_SDM845) += debug_memory.o
+obj-$(CONFIG_RAMDUMP_TAGS) += board-rdtags.o
+CFLAGS_board-rdtags.o  := \
+       -D"INFO_PRODUCT=\"$(if $(TARGET_PRODUCT),$(TARGET_PRODUCT),unknown)\"" \
+       -D"INFO_VARIANT= \
+       \"$(if $(TARGET_BUILD_VARIANT),$(TARGET_BUILD_VARIANT),unknown)\"" \
+       -D"INFO_BUILDID= \
+       \"$(if $(SEMC_SYSTEM_VERSION),$(SEMC_SYSTEM_VERSION),private)\""
+obj-$(CONFIG_SUBSYS_LAST_ERR_LOG) += last_subsys_errlog.o
+obj-$(CONFIG_LAST_LOGS) += last_logs.o
+obj-$(CONFIG_SECURITY_STATUS) += security_status.o
+obj-$(CONFIG_ARCH_SDM845) += console_setup.o

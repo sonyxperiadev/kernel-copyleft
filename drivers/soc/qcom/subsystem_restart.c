@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "subsys-restart: %s(): " fmt, __func__
 
@@ -170,6 +175,8 @@ struct subsys_device {
 	int restart_level;
 	int crash_count;
 	struct subsys_soc_restart_order *restart_order;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
+	int data_ready;
 	bool do_ramdump_on_put;
 	struct cdev char_dev;
 	dev_t dev_no;
@@ -340,10 +347,39 @@ void subsys_default_online(struct subsys_device *dev)
 }
 EXPORT_SYMBOL(subsys_default_online);
 
+void update_crash_reason(struct subsys_device *subsys,
+				char *smem_reason, int size)
+{
+	memcpy(subsys->crash_reason, smem_reason, size);
+	subsys->data_ready = 1;
+}
+EXPORT_SYMBOL(update_crash_reason);
+
+static void subsys_notify_crash_reason(struct subsys_device *subsys)
+{
+	if (subsys->data_ready && subsys->restart_level != RESET_SOC) {
+		sysfs_notify(&subsys->dev.kobj, NULL, "crash_reason");
+	}
+}
+
+static ssize_t crash_reason_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int r = 0;
+	struct subsys_device *subsys = to_subsys(dev);
+
+	r = snprintf(buf, PAGE_SIZE, "%s\n", subsys->crash_reason);
+	subsys->data_ready = 0;
+	memset(subsys->crash_reason, 0, sizeof(subsys->crash_reason));
+
+	return r;
+}
+
 static struct device_attribute subsys_attrs[] = {
 	__ATTR_RO(name),
 	__ATTR_RO(state),
 	__ATTR_RO(crash_count),
+	__ATTR_RO(crash_reason),
 	__ATTR(restart_level, 0644, restart_level_show, restart_level_store),
 	__ATTR(firmware_name, 0644, firmware_name_show, firmware_name_store),
 	__ATTR(system_debug, 0644, system_debug_show, system_debug_store),
@@ -550,6 +586,10 @@ static void enable_all_irqs(struct subsys_device *dev)
 		enable_irq(dev->desc->wdog_bite_irq);
 		irq_set_irq_wake(dev->desc->wdog_bite_irq, 1);
 	}
+	if (dev->desc->periph_hang_irq && dev->desc->periph_hang_handler) {
+		enable_irq(dev->desc->periph_hang_irq);
+		irq_set_irq_wake(dev->desc->periph_hang_irq, 1);
+	}
 	if (dev->desc->err_fatal_irq && dev->desc->err_fatal_handler)
 		enable_irq(dev->desc->err_fatal_irq);
 	if (dev->desc->stop_ack_irq && dev->desc->stop_ack_handler)
@@ -567,6 +607,10 @@ static void disable_all_irqs(struct subsys_device *dev)
 	if (dev->desc->wdog_bite_irq && dev->desc->wdog_bite_handler) {
 		disable_irq(dev->desc->wdog_bite_irq);
 		irq_set_irq_wake(dev->desc->wdog_bite_irq, 0);
+	}
+	if (dev->desc->periph_hang_irq && dev->desc->periph_hang_handler) {
+		disable_irq(dev->desc->periph_hang_irq);
+		irq_set_irq_wake(dev->desc->periph_hang_irq, 0);
 	}
 	if (dev->desc->err_fatal_irq && dev->desc->err_fatal_handler)
 		disable_irq(dev->desc->err_fatal_irq);
@@ -1003,6 +1047,7 @@ static void subsystem_restart_wq_func(struct work_struct *work)
 	track->p_state = SUBSYS_RESTARTING;
 	spin_unlock_irqrestore(&track->s_lock, flags);
 
+	subsys_notify_crash_reason(dev);
 	/* Collect ram dumps for all subsystems in order here */
 	for_each_subsys_device(list, count, NULL, subsystem_ramdump);
 
@@ -1102,7 +1147,7 @@ int subsystem_restart_dev(struct subsys_device *dev)
 		return -EBUSY;
 	}
 
-	pr_info("Restart sequence requested for %s, restart_level = %s.\n",
+	pr_warn("Restart sequence requested for %s, restart_level = %s.\n",
 		name, restart_levels[dev->restart_level]);
 
 	if (disable_restart_work == DISABLE_SSR) {
@@ -1171,6 +1216,18 @@ int subsystem_crashed(const char *name)
 	return 0;
 }
 EXPORT_SYMBOL(subsystem_crashed);
+
+int subsystem_crash_reason(const char *name, char *msg)
+{
+	struct subsys_device *dev = find_subsys(name);
+	if (!dev)
+		return -ENODEV;
+	update_crash_reason(dev, msg, SUBSYS_CRASH_REASON_LEN);
+	subsys_notify_crash_reason(dev);
+
+	return 0;
+}
+EXPORT_SYMBOL(subsystem_crash_reason);
 
 void subsys_set_crash_status(struct subsys_device *dev,
 				enum crash_status crashed)
@@ -1507,6 +1564,10 @@ static int subsys_parse_devicetree(struct subsys_desc *desc)
 	if (ret > 0)
 		desc->wdog_bite_irq = ret;
 
+	ret = platform_get_irq(pdev, 1);
+	if (ret > 0)
+		desc->periph_hang_irq = ret;
+
 	if (of_property_read_bool(pdev->dev.of_node,
 					"qcom,pil-generic-irq-handler")) {
 		ret = platform_get_irq(pdev, 0);
@@ -1568,6 +1629,18 @@ static int subsys_setup_irqs(struct subsys_device *subsys)
 		disable_irq(desc->wdog_bite_irq);
 	}
 
+	if (desc->periph_hang_irq && desc->periph_hang_handler) {
+		ret = devm_request_irq(desc->dev, desc->periph_hang_irq,
+			desc->periph_hang_handler,
+			IRQF_TRIGGER_RISING, desc->name, desc);
+		if (ret < 0) {
+			dev_err(desc->dev, "[%s]: Unable to register periph hang handler!: %d\n",
+				desc->name, ret);
+			return ret;
+		}
+		disable_irq(desc->periph_hang_irq);
+	}
+
 	if (desc->generic_irq && desc->generic_handler) {
 		ret = devm_request_irq(desc->dev, desc->generic_irq,
 			desc->generic_handler,
@@ -1608,6 +1681,8 @@ static void subsys_free_irqs(struct subsys_device *subsys)
 		devm_free_irq(desc->dev, desc->stop_ack_irq, desc);
 	if (desc->wdog_bite_irq && desc->wdog_bite_handler)
 		devm_free_irq(desc->dev, desc->wdog_bite_irq, desc);
+	if (desc->periph_hang_irq && desc->periph_hang_handler)
+		devm_free_irq(desc->dev, desc->periph_hang_irq, desc);
 	if (desc->err_ready_irq)
 		devm_free_irq(desc->dev, desc->err_ready_irq, subsys);
 }

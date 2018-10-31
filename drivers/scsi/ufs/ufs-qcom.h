@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef UFS_QCOM_H_
 #define UFS_QCOM_H_
@@ -39,7 +44,12 @@
 #define FAST 2
 
 #define UFS_QCOM_LIMIT_NUM_LANES_RX	2
+#ifdef CONFIG_SCSI_UFS_RESTRICT_TX_LANES
+#define UFS_QCOM_LIMIT_NUM_LANES_TX	1
+#else
 #define UFS_QCOM_LIMIT_NUM_LANES_TX	2
+#endif
+
 #define UFS_QCOM_LIMIT_HSGEAR_RX	UFS_HS_G3
 #define UFS_QCOM_LIMIT_HSGEAR_TX	UFS_HS_G3
 #define UFS_QCOM_LIMIT_PWMGEAR_RX	UFS_PWM_G4

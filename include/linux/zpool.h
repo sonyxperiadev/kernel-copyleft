@@ -7,6 +7,11 @@
  * storage pool implementations.  Typically, this is used to
  * store compressed memory.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _ZPOOL_H_
 #define _ZPOOL_H_
@@ -60,6 +65,9 @@ void zpool_unmap_handle(struct zpool *pool, unsigned long handle);
 
 u64 zpool_get_total_size(struct zpool *pool);
 
+unsigned long zpool_compact(struct zpool *pool);
+
+unsigned long zpool_get_num_compacted(struct zpool *zpool);
 
 /**
  * struct zpool_driver - driver implementation for zpool
@@ -101,6 +109,10 @@ struct zpool_driver {
 	void (*unmap)(void *pool, unsigned long handle);
 
 	u64 (*total_size)(void *pool);
+
+	unsigned long (*compact)(void *pool);
+
+	unsigned long (*get_num_compacted)(void *pool);
 };
 
 void zpool_register_driver(struct zpool_driver *driver);

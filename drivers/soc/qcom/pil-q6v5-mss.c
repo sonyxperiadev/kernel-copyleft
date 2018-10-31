@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -38,11 +43,10 @@
 #define PROXY_TIMEOUT_MS	10000
 #define MAX_SSR_REASON_LEN	256U
 #define STOP_ACK_TIMEOUT_MS	1000
-#define QDSP6SS_NMI_STATUS	0x44
 
 #define subsys_to_drv(d) container_of(d, struct modem_data, subsys_desc)
 
-static void log_modem_sfr(void)
+static void log_modem_sfr(struct modem_data *drv)
 {
 	u32 size;
 	char *smem_reason, reason[MAX_SSR_REASON_LEN];
@@ -59,12 +63,13 @@ static void log_modem_sfr(void)
 	}
 
 	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
+	update_crash_reason(drv->subsys, smem_reason, size);
 	pr_err("modem subsystem failure reason: %s.\n", reason);
 }
 
 static void restart_modem(struct modem_data *drv)
 {
-	log_modem_sfr();
+	log_modem_sfr(drv);
 	drv->ignore_errors = true;
 	subsystem_restart_dev(drv->subsys);
 }
@@ -72,17 +77,12 @@ static void restart_modem(struct modem_data *drv)
 static irqreturn_t modem_err_fatal_intr_handler(int irq, void *dev_id)
 {
 	struct modem_data *drv = subsys_to_drv(dev_id);
-	u32 nmi_status = readl_relaxed(drv->q6->reg_base + QDSP6SS_NMI_STATUS);
 
 	/* Ignore if we're the one that set the force stop GPIO */
 	if (drv->crash_shutdown)
 		return IRQ_HANDLED;
 
-	if (nmi_status & 0x04)
-		pr_err("%s: Fatal error on the modem due to TZ NMI\n",
-			__func__);
-	else
-		pr_err("%s: Fatal error on the modem\n", __func__);
+	pr_err("Fatal error on the modem.\n");
 	subsys_set_crash_status(drv->subsys, CRASH_STATUS_ERR_FATAL);
 	restart_modem(drv);
 	return IRQ_HANDLED;
@@ -202,6 +202,19 @@ static irqreturn_t modem_wdog_bite_intr_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t modem_periph_hang_intr_handler(int irq, void *dev_id)
+{
+	struct modem_data *drv = subsys_to_drv(dev_id);
+
+	if (drv->ignore_errors)
+		return IRQ_HANDLED;
+
+	pr_err("Modem hang detected by AOP!\n");
+	subsys_set_crash_status(drv->subsys, CRASH_STATUS_WDOG_BITE);
+	restart_modem(drv);
+	return IRQ_HANDLED;
+}
+
 static int pil_subsys_init(struct modem_data *drv,
 					struct platform_device *pdev)
 {
@@ -217,6 +230,7 @@ static int pil_subsys_init(struct modem_data *drv,
 	drv->subsys_desc.err_fatal_handler = modem_err_fatal_intr_handler;
 	drv->subsys_desc.stop_ack_handler = modem_stop_ack_intr_handler;
 	drv->subsys_desc.wdog_bite_handler = modem_wdog_bite_intr_handler;
+	drv->subsys_desc.periph_hang_handler = modem_periph_hang_intr_handler;
 
 	drv->q6->desc.modem_ssr = false;
 	drv->q6->desc.signal_aop = of_property_read_bool(pdev->dev.of_node,

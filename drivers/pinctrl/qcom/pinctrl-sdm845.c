@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/of.h>
@@ -1660,10 +1665,10 @@ static struct msm_dir_conn sdm845_dir_conn[] = {
 	{11, 514},
 	{20, 515},
 	{22, 516},
-	{24, 517},
+	/* {24, 517}, */
 	{26, 518},
 	{30, 519},
-	{31, 632},
+	/* {31, 632}, */
 	{32, 521},
 	{34, 522},
 	{36, 523},
@@ -1719,7 +1724,7 @@ static struct msm_dir_conn sdm845_dir_conn[] = {
 	{121, 611},
 	{122, 612},
 	{123, 613},
-	{124, 614},
+	/* {124, 614}, */
 	{125, 615},
 	{126, 616},
 	{127, 617},

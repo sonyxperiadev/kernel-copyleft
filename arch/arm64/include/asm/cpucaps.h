@@ -15,6 +15,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __ASM_CPUCAPS_H
 #define __ASM_CPUCAPS_H
 
@@ -35,6 +40,9 @@
 #define ARM64_HYP_OFFSET_LOW			14
 #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
 
-#define ARM64_NCAPS				16
+#define ARM64_UNMAP_KERNEL_AT_EL0		16
+#define	ARM64_WORKAROUND_QCOM_FALKOR_E1003	17
+
+#define ARM64_NCAPS				18
 
 #endif /* __ASM_CPUCAPS_H */

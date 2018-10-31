@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +9,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #ifndef _DSI_PHY_H_
@@ -218,6 +223,15 @@ int dsi_phy_clk_cb_register(struct msm_dsi_phy *phy,
 int dsi_phy_idle_ctrl(struct msm_dsi_phy *phy, bool enable);
 
 /**
+ * dsi_phy_set_clamp_state() - configure clamps for DSI lanes
+ * @phy:        DSI PHY handle.
+ * @enable:     boolean to specify clamp enable/disable.
+ *
+ * Return: error code.
+ */
+int dsi_phy_set_clamp_state(struct msm_dsi_phy *phy, bool enable);
+
+/**
  * dsi_phy_set_clk_freq() - set DSI PHY clock frequency setting
  * @phy:          DSI PHY handle
  * @clk_freq:     link clock frequency
@@ -248,6 +262,16 @@ int dsi_phy_set_timing_params(struct msm_dsi_phy *phy,
  * Return: error code.
  */
 int dsi_phy_lane_reset(struct msm_dsi_phy *phy);
+
+/**
+ * dsi_phy_toggle_resync_fifo() - toggle resync retime FIFO
+ * @phy:          DSI PHY handle
+ *
+ * Toggle the resync retime FIFO to synchronize the data paths.
+ * This should be done everytime there is a change in the link clock
+ * rate
+ */
+void dsi_phy_toggle_resync_fifo(struct msm_dsi_phy *phy);
 
 /**
  * dsi_phy_drv_register() - register platform driver for dsi phy
