@@ -413,7 +413,7 @@ static umode_t dual_role_attr_is_visible(struct kobject *kobj,
 			if (dual_role->desc->property_is_writeable &&
 			    dual_role_property_is_writeable(dual_role, property)
 			    > 0)
-				mode |= S_IWUSR;
+				mode |= S_IWUSR | S_IWGRP;
 
 			return mode;
 		}

@@ -37,6 +37,10 @@
 
 #define MDSS_PINCTRL_STATE_DEFAULT "mdss_default"
 #define MDSS_PINCTRL_STATE_SLEEP  "mdss_sleep"
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+#define MDSS_PINCTRL_STATE_TOUCH_ACTIVE "mdss_touch_active"
+#define MDSS_PINCTRL_STATE_TOUCH_SUSPEND  "mdss_touch_suspend"
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 enum mdss_mdp_clk_type {
 	MDSS_CLK_AHB,

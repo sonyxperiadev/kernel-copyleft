@@ -118,10 +118,13 @@ int adm_send_params_v5(int port_id, int copp_idx, char *params,
 int adm_dolby_dap_send_params(int port_id, int copp_idx, char *params,
 			      uint32_t params_length);
 
+int adm_ahc_send_params(int port_id, int copp_idx, char *params,
+			uint32_t params_length);
+
 int adm_set_pp_params(int port_id, int copp_idx,
 		      struct mem_mapping_hdr *mem_hdr, u8 *param_data,
 		      u32 params_size);
-
+		      
 int adm_pack_and_set_one_pp_param(int port_id, int copp_idx,
 				  struct param_hdr_v3 param_hdr,
 				  u8 *param_data);
@@ -224,4 +227,6 @@ int adm_programable_channel_mixer(int port_id, int copp_idx, int session_id,
 			struct msm_pcm_channel_mixer *ch_mixer,
 			int channel_index);
 void adm_set_native_mode(int mode);
+int adm_set_rampup_clipper(int port_id, int copp_idx, uint32_t enable,
+				uint32_t module_id);
 #endif /* __Q6_ADM_V2_H__ */

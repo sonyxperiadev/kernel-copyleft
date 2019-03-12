@@ -6665,7 +6665,12 @@ static void pp_ad_calc_worker(struct work_struct *work)
 	sysfs_notify_dirent(mdp5_data->ad_event_sd);
 	if (!ad->calc_itr) {
 		ad->state &= ~PP_AD_STATE_VSYNC;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		if (ctl->ops.remove_vsync_handler)
+			ctl->ops.remove_vsync_handler(ctl, &ad->handle);
+#else
 		ctl->ops.remove_vsync_handler(ctl, &ad->handle);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	}
 	mutex_unlock(&ad->lock);
 

@@ -1218,6 +1218,10 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 		goto cmd_done;
 	}
 
+	if (idata->ic.opcode == MMC_FFU_INVOKE_OP) {
+		err = mmc_ffu_invoke(card, idata->buf);
+		goto cmd_done;
+	}
 	mmc_get_card(card);
 
 	if (mmc_card_cmdq(card)) {
@@ -1537,12 +1541,19 @@ static int get_card_status(struct mmc_card *card, u32 *status, int retries)
 	return err;
 }
 
+#define EXE_ERRORS \
+	(R1_OUT_OF_RANGE |   /* Command argument out of range */ \
+	 R1_ADDRESS_ERROR |   /* Misaligned address */ \
+	 R1_WP_VIOLATION |    /* Tried to write to protected block */ \
+	 R1_CARD_ECC_FAILED | /* ECC error */ \
+	 R1_ERROR)            /* General/unknown error */
+
 static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 		bool hw_busy_detect, struct request *req, int *gen_err)
 {
 	unsigned long timeout = jiffies + msecs_to_jiffies(timeout_ms);
 	int err = 0;
-	u32 status;
+	u32 status, first_status = 0;
 
 	do {
 		err = get_card_status(card, &status, 5);
@@ -1551,6 +1562,9 @@ static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 			       req->rq_disk->disk_name, err);
 			return err;
 		}
+
+		if (!first_status)
+			first_status = status;
 
 		if (status & R1_ERROR) {
 			pr_err("%s: %s: error sending status cmd, status %#x\n",
@@ -1581,6 +1595,14 @@ static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 		 */
 	} while (!(status & R1_READY_FOR_DATA) ||
 		 (R1_CURRENT_STATE(status) == R1_STATE_PRG));
+
+	/* Check for errors during cmd execution. In this case
+	 * the execution was terminated. */
+	if (first_status & EXE_ERRORS) {
+		pr_err("%s: error during r/w command, err status %#x, status %#x\n",
+		       req->rq_disk->disk_name, first_status, status);
+		return MMC_BLK_ABORT;
+	}
 
 	return err;
 }
@@ -2264,12 +2286,25 @@ static int mmc_blk_err_check(struct mmc_card *card,
 		return MMC_BLK_ABORT;
 	}
 
+	/* Check execution mode errors. If stop cmd was sent, these
+	 * errors would be reported in response to it. In this case
+	 * the execution is retried using single-block read. */
+	if (brq->stop.resp[0] & EXE_ERRORS) {
+		pr_err("%s: error during r/w command, stop response %#x\n",
+		       req->rq_disk->disk_name, brq->stop.resp[0]);
+		return MMC_BLK_RETRY_SINGLE;
+	}
+
 	/*
 	 * Everything else is either success, or a data error of some
 	 * kind.  If it was a write, we may have transitioned to
 	 * program mode, which we have to wait for it to complete.
+	 * If pre defined block count (CMD23) was used, no stop
+	 * cmd was sent and we need to read status to check
+	 * for errors during cmd execution.
 	 */
-	if (!mmc_host_is_spi(card->host) && rq_data_dir(req) != READ) {
+	if (!mmc_host_is_spi(card->host) &&
+	    (rq_data_dir(req) != READ || brq->sbc.opcode == MMC_SET_BLOCK_COUNT)) {
 		int err;
 
 		/* Check stop command response */
@@ -3850,6 +3885,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 				break;
 			goto cmd_abort;
 		}
+		case MMC_BLK_RETRY_SINGLE:
 		case MMC_BLK_ECC_ERR:
 			if (brq->data.blocks > 1) {
 				/* Redo read one sector at a time */
@@ -4693,6 +4729,8 @@ static const struct mmc_fixup blk_fixups[] =
 		  MMC_QUIRK_SEC_ERASE_TRIM_BROKEN),
 	MMC_FIXUP("VZL00M", CID_MANFID_SAMSUNG, CID_OEMID_ANY, add_quirk_mmc,
 		  MMC_QUIRK_SEC_ERASE_TRIM_BROKEN),
+	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_MICRON, CID_OEMID_ANY, add_quirk_mmc,
+		  MMC_QUIRK_BROKEN_CLK_GATING),
 
 	END_FIXUP
 };
@@ -4716,7 +4754,7 @@ static int mmc_blk_probe(struct mmc_card *card)
 
 	string_get_size((u64)get_capacity(md->disk), 512, STRING_UNITS_2,
 			cap_str, sizeof(cap_str));
-	pr_info("%s: %s %s %s %s\n",
+	pr_err("%s: %s %s %s %s\n",
 		md->disk->disk_name, mmc_card_id(card), mmc_card_name(card),
 		cap_str, md->read_only ? "(ro)" : "");
 
@@ -4736,7 +4774,13 @@ static int mmc_blk_probe(struct mmc_card *card)
 	}
 
 	pm_runtime_use_autosuspend(&card->dev);
-	pm_runtime_set_autosuspend_delay(&card->dev, MMC_AUTOSUSPEND_DELAY_MS);
+
+	if (mmc_card_sd(card))
+		pm_runtime_set_autosuspend_delay(&card->dev,
+			MMC_SDCARD_AUTOSUSPEND_DELAY_MS);
+	else
+		pm_runtime_set_autosuspend_delay(&card->dev, MMC_AUTOSUSPEND_DELAY_MS);
+
 	pm_runtime_use_autosuspend(&card->dev);
 
 	/*

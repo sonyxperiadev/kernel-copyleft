@@ -690,6 +690,36 @@ static int wsa881x_set_visense(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int wsa881x_set_boost_level(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	u8 wsa_boost_level = 0;
+
+	dev_dbg(codec->dev, "%s: ucontrol->value.integer.value[0]  = %ld\n",
+		__func__, ucontrol->value.integer.value[0]);
+
+	wsa_boost_level = ucontrol->value.integer.value[0];
+	snd_soc_update_bits(codec, WSA881X_BOOST_PRESET_OUT1,
+			0xff, wsa_boost_level);
+
+	return 0;
+}
+
+static int wsa881x_get_boost_level(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	u8 wsa_boost_level = 0;
+
+	wsa_boost_level = snd_soc_read(codec, WSA881X_BOOST_PRESET_OUT1);
+	ucontrol->value.integer.value[0] = wsa_boost_level;
+	dev_dbg(codec->dev, "%s: boost level = 0x%x\n", __func__,
+		wsa_boost_level);
+
+	return 0;
+}
+
 static const struct snd_kcontrol_new wsa881x_snd_controls[] = {
 	SOC_SINGLE_EXT("COMP Switch", SND_SOC_NOPM, 0, 1, 0,
 		wsa881x_get_compander, wsa881x_set_compander),
@@ -699,6 +729,9 @@ static const struct snd_kcontrol_new wsa881x_snd_controls[] = {
 
 	SOC_SINGLE_EXT("VISENSE Switch", SND_SOC_NOPM, 0, 1, 0,
 		wsa881x_get_visense, wsa881x_set_visense),
+
+	SOC_SINGLE_EXT("Boost Level", SND_SOC_NOPM, 0, 0xff, 0,
+		wsa881x_get_boost_level, wsa881x_set_boost_level),
 };
 
 static const struct snd_kcontrol_new swr_dac_port[] = {
@@ -1010,7 +1043,7 @@ static void wsa881x_init(struct snd_soc_codec *codec)
 			    0x03, 0x00);
 	if (snd_soc_read(codec, WSA881X_OTP_REG_0))
 		snd_soc_update_bits(codec, WSA881X_BOOST_PRESET_OUT1,
-				    0xF0, 0x70);
+				    0xFF, 0x7B);
 	snd_soc_update_bits(codec, WSA881X_BOOST_PRESET_OUT2,
 			    0xF0, 0x30);
 	snd_soc_update_bits(codec, WSA881X_SPKR_DRV_EN, 0x08, 0x08);
@@ -1295,6 +1328,8 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 			__func__);
 		goto dev_err;
 	}
+	mutex_init(&wsa881x->res_lock);
+	mutex_init(&wsa881x->temp_lock);
 
 	return 0;
 

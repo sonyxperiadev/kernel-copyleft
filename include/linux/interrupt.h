@@ -63,6 +63,9 @@
  *                wakeup devices users need to implement wakeup detection in
  *                their interrupt handlers.
  */
+#ifdef CONFIG_SOMC_LCD_OCP_ENABLED
+#define IRQF_DISABLED		0x00000020
+#endif /* CONFIG_SOMC_LCD_OCP_ENABLED */
 #define IRQF_SHARED		0x00000080
 #define IRQF_PROBE_SHARED	0x00000100
 #define __IRQF_TIMER		0x00000200

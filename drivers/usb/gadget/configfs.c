@@ -96,6 +96,7 @@ struct gadget_info {
 	struct work_struct work;
 	struct device *dev;
 #endif
+	bool isMSOSDesc;
 };
 
 static inline struct gadget_info *to_gadget_info(struct config_item *item)
@@ -145,6 +146,10 @@ struct gadget_config_name {
 
 #define MAX_USB_STRING_LEN	126
 #define MAX_USB_STRING_WITH_NULL_LEN	(MAX_USB_STRING_LEN+1)
+
+/* vendor code */
+#define MSOS_VENDOR_CODE	0x08
+#define MSOS_GOOGLE_VENDOR_CODE	0x01
 
 static int usb_string_copy(const char *s, char **s_copy)
 {
@@ -332,6 +337,14 @@ err:
 	return ret;
 }
 
+static ssize_t gadget_dev_desc_isMSOSDesc_show(struct config_item *item,
+		char *page)
+{
+	struct gadget_info *gi = to_gadget_info(item);
+
+	return snprintf(page, 3, "%s\n", gi->isMSOSDesc ? "Y" : "N");
+}
+
 CONFIGFS_ATTR(gadget_dev_desc_, bDeviceClass);
 CONFIGFS_ATTR(gadget_dev_desc_, bDeviceSubClass);
 CONFIGFS_ATTR(gadget_dev_desc_, bDeviceProtocol);
@@ -341,6 +354,7 @@ CONFIGFS_ATTR(gadget_dev_desc_, idProduct);
 CONFIGFS_ATTR(gadget_dev_desc_, bcdDevice);
 CONFIGFS_ATTR(gadget_dev_desc_, bcdUSB);
 CONFIGFS_ATTR(gadget_dev_desc_, UDC);
+CONFIGFS_ATTR_RO(gadget_dev_desc_, isMSOSDesc);
 
 static struct configfs_attribute *gadget_root_attrs[] = {
 	&gadget_dev_desc_attr_bDeviceClass,
@@ -352,6 +366,7 @@ static struct configfs_attribute *gadget_root_attrs[] = {
 	&gadget_dev_desc_attr_bcdDevice,
 	&gadget_dev_desc_attr_bcdUSB,
 	&gadget_dev_desc_attr_UDC,
+	&gadget_dev_desc_attr_isMSOSDesc,
 	NULL,
 };
 
@@ -1522,6 +1537,14 @@ static int android_setup(struct usb_gadget *gadget,
 	if (value < 0)
 		value = composite_setup(gadget, c);
 
+	if ((c->bRequestType & USB_TYPE_MASK) == USB_TYPE_VENDOR) {
+		if (((c->bRequest == MSOS_GOOGLE_VENDOR_CODE) ||
+			(c->bRequest == MSOS_VENDOR_CODE)) &&
+			(c->bRequestType & USB_DIR_IN) && le16_to_cpu(c->wIndex == 4)) {
+			gi->isMSOSDesc = true;
+		}
+	}
+
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (c->bRequest == USB_REQ_SET_CONFIGURATION &&
 						cdev->config) {
@@ -1568,6 +1591,7 @@ static void android_disconnect(struct usb_gadget *gadget)
 	if (!gi->unbinding)
 		schedule_work(&gi->work);
 	composite_disconnect(gadget);
+	gi->isMSOSDesc = false;
 }
 #endif
 

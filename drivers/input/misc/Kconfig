@@ -320,6 +320,10 @@ config INPUT_COBALT_BTNS
 	  To compile this driver as a module, choose M here: the
 	  module will be called cobalt_btns.
 
+config INPUT_FP_EGIS
+       bool "Fingerprint EGIS device"
+       default y
+
 config INPUT_WISTRON_BTNS
 	tristate "x86 Wistron laptop button interface"
 	depends on X86_32
@@ -843,5 +847,12 @@ config INPUT_STMVL53L0
 
 	 To compile this driver as a module, choose M here: the
 	 module will be called stmvl53l0.
+
+config INPUT_S5712
+	tristate "S5712 driver support"
+	default n
+	help
+	  Say Y here if you want to support S-5712
+	  as bipolar detection device.
 
 endif

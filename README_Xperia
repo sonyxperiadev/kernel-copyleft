@@ -1,0 +1,60 @@
+Configuration files can be found in arch/arm64/configs.
+
+  defconfig using in common:
+    sdm660-perf_defconfig
+
+  diffconfigs for each product:
+    Xperia 10       => kirin_diffconfig
+    Xperia 10 Plus  => mermaid_diffconfig
+
+
+How to build your kernel:
+
+  Prerequisites:
+
+    * ramdisk.img - root fs
+
+    * mkbootimg - boot.img generator
+
+    * The ARM cross-compiler
+      You can use prebuild executable binary which is included in
+      standard Android repository. Please visit to external site.
+      In case of this platform, we recommend to use gcc 4.9 or later
+      such as aarch64-linux-android-4.9 to avoid known issues.
+
+
+  Step 1: Build Your Kernel
+    $ cd kernel/msm-4.4
+
+    $ export ARCH=arm64
+
+    $ export PATH=<path-to-cross-compiler-executables>:$PATH
+      NOTE: Please set the location of the ARM cross-compiler.
+
+    $ export CROSS_COMPILE=<toolchain-prefix>
+      NOTE: Please set the prefix of the ARM cross-compiler.
+            ex) aarch64-linux-android-
+
+    $ export KBUILD_DIFFCONFIG=kirin_diffconfig
+      NOTE: Please set a configuration file you want to build.
+
+    $ make sdm660-perf_defconfig O=./out ARCH=arm64 
+
+    $ make O=./out
+
+    You can see arch/arm64/boot/Image.gz-dtb if you succeed in building.
+
+
+  Step 2: Assembling the boot.img
+    (In the Linux Kernel directory)
+    $ mkbootimg \
+      --kernel out/arch/arm64/boot/Image.gz-dtb \
+      --ramdisk ramdisk-recovery.img \
+      --cmdline "androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x37 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 sched_enable_hmp=1 sched_enable_power_aware=1 service_locator.enable=1 swiotlb=1 firmware_class.path=/vendor/firmware_mnt/image loop.max_part=7 panic_on_err=1 loop.max_part=7 buildvariant=userdebug veritykeyid=id:$(openssl x509 -in verity_dev_keys.x509 -text | grep keyid | sed 's/://g' | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]' | sed 's/keyid//g')" \
+      --base 0x00000000 \
+      --pagesize 4096 \
+      --os_version 9 \
+      --os_patch_level 2019-02-01 \
+      --header_version 1 \
+      --output boot.img
+

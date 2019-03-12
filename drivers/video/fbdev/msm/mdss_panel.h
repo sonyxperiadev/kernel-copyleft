@@ -521,6 +521,9 @@ struct mipi_panel_info {
 	char dma_trigger;
 	/* Dynamic Switch Support */
 	enum dynamic_mode_switch dms_mode;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	bool switch_mode_pending;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	u32 pixel_packing;
 	u32 dsi_pclk_rate;
@@ -932,6 +935,10 @@ struct mdss_panel_info {
 
 	/* esc clk recommended for the panel */
 	u32 esc_clk_rate_hz;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	const char *panel_id_name;
+	int dsi_master;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 };
 
 struct mdss_panel_timing {
@@ -966,6 +973,10 @@ struct mdss_panel_timing {
 
 	struct mdss_mdp_pp_tear_check te;
 	struct mdss_panel_roi_alignment roi_alignment;
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	bool koff_thshold_enable;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 };
 
 struct mdss_panel_data {
@@ -973,6 +984,10 @@ struct mdss_panel_data {
 	void (*set_backlight) (struct mdss_panel_data *pdata, u32 bl_level);
 	int (*apply_display_setting)(struct mdss_panel_data *pdata, u32 mode);
 	unsigned char *mmss_cc_base;
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct platform_device *panel_pdev;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	/**
 	 * event_handler() - callback handler for MDP core events

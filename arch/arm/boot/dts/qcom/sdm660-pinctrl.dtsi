@@ -20,6 +20,50 @@
 		interrupt-controller;
 		#interrupt-cells = <2>;
 
+		 /* for SM13 Egis Fingerprint et512, GPIO_20 : FP_RESET_N */
+		msm_gpio_20: msm_gpio_20 {
+			mux {
+				pins = "gpio20";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio20";
+				drive-strength = <2>;
+				bias-disable;
+				output-low;
+			};
+		};
+
+		/* for SM13 Egis Fingerprint et512, GPIO_20 : FP_RESET_N, state device active*/
+		msm_gpio_20_output_high: msm_gpio_20_output_high {
+			mux {
+				pins = "gpio20";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio20";
+				drive-strength = <2>;
+				bias-disable;
+				output-high;
+			};
+		};
+
+		/* for SM13 Egis Fingerprint et512, GPIO_72 : FP_INT_N */
+		msm_gpio_72: msm_gpio_72 {
+			mux {
+				pins = "gpio72";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio72";
+				drive-strength = <2>;
+				bias-pull-down;
+			};
+		};
+
 		uart_console_active: uart_console_active {
 			mux {
 				pins = "gpio4", "gpio5";
@@ -1747,7 +1791,7 @@
 				drive-strength = <2>;
 			};
 		};
-
+/*
 		ts_mux {
 			ts_active: ts_active {
 				mux {
@@ -1788,5 +1832,6 @@
 				};
 			};
 		};
+*/
 	};
 };

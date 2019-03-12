@@ -636,6 +636,8 @@ static int __init populate_rootfs(void)
 		printk(KERN_INFO "Trying to unpack rootfs image as initramfs...\n");
 		err = unpack_to_rootfs((char *)initrd_start,
 			initrd_end - initrd_start);
+		if (err)
+			panic("panic in %s()", __func__);
 		if (!err) {
 			free_initrd();
 			goto done;

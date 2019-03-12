@@ -1310,6 +1310,7 @@ static int ext4_ext_grow_indepth(handle_t *handle, struct inode *inode,
 	}
 
 	/* move top-level index/leaf into new block */
+	memset(bh->b_data, 0, bh->b_size);
 	memmove(bh->b_data, EXT4_I(inode)->i_data,
 		sizeof(EXT4_I(inode)->i_data));
 

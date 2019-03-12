@@ -486,6 +486,9 @@ enum msm_vfe_camif_state {
 
 struct msm_vfe_src_info {
 	uint32_t frame_id;
+#if defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
+	uint32_t request_frame_id;
+#endif // #if defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
 	uint32_t reg_update_frame_id;
 	uint8_t active;
 	uint8_t stream_count;
@@ -762,11 +765,6 @@ struct msm_vfe_common_subdev {
 	struct msm_vfe_common_dev_data *common_data;
 };
 
-struct isp_proc {
-	uint32_t  kernel_sofid;
-	uint32_t  vfeid;
-};
-
 struct vfe_device {
 	/* Driver private data */
 	struct platform_device *pdev;
@@ -851,7 +849,7 @@ struct vfe_device {
 	uint32_t recovery_irq1_mask;
 	/* total bandwidth per vfe */
 	uint64_t total_bandwidth;
-	struct isp_proc *isp_page;
+	struct isp_kstate *isp_page;
 };
 
 struct vfe_parent_device {

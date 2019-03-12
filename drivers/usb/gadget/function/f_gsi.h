@@ -244,6 +244,7 @@ struct f_gsi {
 
 	struct gsi_data_port d_port;
 	struct gsi_ctrl_port c_port;
+	bool linux_support;
 };
 
 static inline struct f_gsi *func_to_gsi(struct usb_function *f)

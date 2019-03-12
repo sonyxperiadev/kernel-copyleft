@@ -1353,9 +1353,16 @@ int qcom_batt_init(void)
 		goto release_wakeup_source;
 	}
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->fv_votable = create_votable("FV", VOTE_MAX,
 					pl_fv_vote_callback,
 					chip);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	chip->fv_votable = create_votable("FV", VOTE_MIN,
+					pl_fv_vote_callback,
+					chip);
+#endif
 	if (IS_ERR(chip->fv_votable)) {
 		rc = PTR_ERR(chip->fv_votable);
 		goto destroy_votable;

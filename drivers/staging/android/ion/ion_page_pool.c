@@ -99,7 +99,7 @@ void *ion_page_pool_alloc(struct ion_page_pool *pool, bool *from_pool)
 
 	*from_pool = true;
 
-	if (mutex_trylock(&pool->mutex)) {
+	if (mutex_trylock_spin(&pool->mutex)) {
 		if (pool->high_count)
 			page = ion_page_pool_remove(pool, true);
 		else if (pool->low_count)

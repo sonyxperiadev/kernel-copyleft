@@ -48,6 +48,89 @@ static struct msm_actuator *actuators[] = {
 	&msm_bivcm_actuator_table,
 };
 
+static struct class *hall_class;
+
+static ssize_t msm_actuator_hall_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	uint16_t hall = 0, curpos = 0;
+	int32_t rc = 0;
+	enum msm_camera_i2c_reg_addr_type save_addr_type;
+	struct msm_actuator_ctrl_t *o_ctrl = dev_get_drvdata(dev);
+	uint16_t hall_addr = 0x3C;
+
+#if defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
+	if (o_ctrl->pdev->id == 0)
+	{
+		hall_addr = 0x0C;
+	}
+#endif
+
+	if (o_ctrl->step_position_table != NULL)
+	{
+		save_addr_type = o_ctrl->i2c_client.addr_type;
+		o_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_BYTE_ADDR;
+
+		curpos = o_ctrl->step_position_table[o_ctrl->curr_step_pos];
+
+		rc = o_ctrl->i2c_client.i2c_func_tbl->i2c_read(
+			&o_ctrl->i2c_client,
+			hall_addr,
+			&hall,
+			MSM_CAMERA_I2C_WORD_DATA);
+		if (rc != 0)
+		{
+			CDBG("hall read error! rc = %d\n",rc);
+		}
+
+		o_ctrl->i2c_client.addr_type = save_addr_type;
+	}
+
+	return sprintf(buf, "%d(0x%x) %d\n", hall, hall, curpos);
+}
+
+static ssize_t msm_actuator_hall_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	return size;
+}
+static DEVICE_ATTR(hall, 0644, msm_actuator_hall_show, msm_actuator_hall_store);
+
+static int hall_class_created = 0;
+static int32_t msm_actuator_register_hall_device(struct msm_actuator_ctrl_t *o_ctrl, int _id)
+{
+	struct device *hall_device = NULL;
+#if !defined( CONFIG_MACH_SONY_KIRIN) && !defined(CONFIG_MACH_SONY_KIRIN_DSDS)
+	char hall_name[10] = {0};
+#endif // #if !defined( CONFIG_MACH_SONY_KIRIN) || !defined(CONFIG_MACH_SONY_KIRIN_DSDS)
+
+	CDBG("Enter\n");
+	if(hall_class_created == 0)
+	{
+		hall_class = class_create(THIS_MODULE, "HALL");
+		if (IS_ERR(hall_class)) {
+			int ret = PTR_ERR(hall_class);
+
+			CDBG("Unable to create class, err = %d\n", ret);
+			return ret;
+		}
+		hall_class_created = 1;
+	}
+
+#if defined( CONFIG_MACH_SONY_KIRIN) || defined(CONFIG_MACH_SONY_KIRIN_DSDS)
+	hall_device = device_create(hall_class, NULL, 0, (void *)o_ctrl, "MAIN_HALL");
+#else
+	sprintf(hall_name, "hall%d", _id);
+	hall_device = device_create(hall_class, NULL, _id, (void *)o_ctrl, hall_name);
+#endif // #if defined( CONFIG_MACH_SONY_KIRIN) || defined(CONFIG_MACH_SONY_KIRIN_DSDS)
+
+	if (NULL == hall_device)
+		return -EIO;
+
+	device_create_file(hall_device, &dev_attr_hall);
+
+	CDBG("Exit\n");
+	return 0;
+}
+
 static int32_t msm_actuator_piezo_set_default_focus(
 	struct msm_actuator_ctrl_t *a_ctrl,
 	struct msm_actuator_move_params_t *move_params)
@@ -181,10 +264,60 @@ static int msm_actuator_bivcm_handle_i2c_ops(
 		reg_setting.size = 1;
 		switch (write_arr[i].reg_write_type) {
 		case MSM_ACTUATOR_WRITE_DAC:
+#if defined( CONFIG_MACH_SONY_KIRIN) || defined(CONFIG_MACH_SONY_KIRIN_DSDS)
+			{
+				short signed Hall_Max = 0x5000;
+				short signed Hall_Min = 0xBC00;
+				unsigned short Min_Pos = 0, Max_Pos = 1023;
+				unsigned short ivalue2 = 0, k = 0;
+
+				k = (Hall_Max - Hall_Min) / (Max_Pos - Min_Pos);
+
+				ivalue2 = (unsigned short)((k * next_lens_position) + Hall_Min);
+
+				CDBG("next_lens_position=%d ivalue2=0x%x\n", next_lens_position, ivalue2);
+
+				if ((short)ivalue2 < (short)Hall_Min) {
+					ivalue2 = Hall_Min;
+				}
+				if ((short)ivalue2 > (short)Hall_Max) {
+					ivalue2 = Hall_Max;
+				}
+
+				value = ivalue2;
+			}
+#elif defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
+			if (a_ctrl->pdev->id == 0)
+			{
+				value = (next_lens_position <<
+				write_arr[i].data_shift) |
+				((hw_dword & write_arr[i].hw_mask) >>
+				write_arr[i].hw_shift);
+			}
+			else
+			{
+				int16_t Hall_Max = 0x4500;
+				int16_t Hall_Min = 0xBB00;
+				uint16_t Min_Pos = 0;
+				uint16_t Max_Pos = 1023;
+
+				value = next_lens_position * (Hall_Min - Hall_Max) / (Max_Pos - Min_Pos + 1) + (uint16_t)(Hall_Max);
+				if((int16_t)value < (int16_t)Hall_Min)
+				{
+					value = Hall_Min;
+				}
+				if((int16_t)value > (int16_t)Hall_Max)
+				{
+					value = Hall_Max;
+				}
+			}
+			CDBG("next_lens_position=%d, value=0x%X\n", next_lens_position, value);
+#else
 			value = (next_lens_position <<
 			write_arr[i].data_shift) |
 			((hw_dword & write_arr[i].hw_mask) >>
 			write_arr[i].hw_shift);
+#endif
 			if (write_arr[i].reg_addr != 0xFFFF) {
 				i2c_byte1 = write_arr[i].reg_addr;
 				i2c_byte2 = value;
@@ -2035,6 +2168,10 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	msm_actuator_t->msm_sd.sd.devnode->fops =
 		&msm_actuator_v4l2_subdev_fops;
 
+#if defined( CONFIG_MACH_SONY_KIRIN) || defined(CONFIG_MACH_SONY_KIRIN_DSDS)
+	if (pdev->id == 0)
+#endif
+		msm_actuator_register_hall_device(msm_actuator_t, pdev->id);
 	CDBG("Exit\n");
 	return rc;
 }

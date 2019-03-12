@@ -2856,6 +2856,13 @@ int adreno_dispatcher_idle(struct adreno_device *adreno_dev)
 
 	mutex_unlock(&device->mutex);
 
+	/*
+	 * Flush the worker to make sure all executing
+	 * or pending dispatcher works on worker are
+	 * finished
+	 */
+	flush_kthread_worker(&kgsl_driver.worker);
+
 	ret = wait_for_completion_timeout(&dispatcher->idle_gate,
 			msecs_to_jiffies(ADRENO_IDLE_TIMEOUT));
 	if (ret == 0) {

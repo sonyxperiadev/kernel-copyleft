@@ -41,6 +41,15 @@ config SND_SOC_QDSP_DEBUG
 	 is inducing kernel panic upon encountering critical
 	 errors from DSP audio modules
 
+config AHC
+	bool "Enable Automatic Headset Compensation"
+	depends on SND_SOC_MSM_QDSP6V2_INTF
+	help
+	 To add support for Automatic Headset Compensation post processing.
+	 This support is to configure the post processing parameters
+	 to DSP. The configuration includes enabling and setting up
+	 the IIR tuning filter and MBDRC in the DSP.
+
 config DOLBY_DS2
 	bool "Enable Dolby DS2"
 	depends on SND_SOC_MSM_QDSP6V2_INTF
@@ -59,6 +68,15 @@ config DOLBY_LICENSE
 	 and retain DAP set license functionality only.
 	 This is required by Dolby GEF implementation which needs
 	 nothing but dolby license validation functionality in driver.
+
+config FORCE_24BIT_COPP
+	bool "Configure COPP in ADSP as 24-bit"
+	depends on SND_SOC_MSM_QDSP6V2_INTF
+	default n
+	help
+	 To configure COPP in ADSP as 24bit for media playback.
+	 This can avoid quantization error for 16-bit media playback
+	 when IIR/MBDRC filters are enabled.
 
 config DTS_EAGLE
 	bool "Enable DTS Eagle Support"

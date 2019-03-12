@@ -107,6 +107,7 @@ struct f_rndis_qc {
 	u16				cdc_filter;
 	bool				net_ready_trigger;
 	bool				use_wceis;
+	bool				linux_support;
 };
 
 static struct ipa_usb_init_params rndis_ipa_params;
@@ -1497,10 +1498,34 @@ static ssize_t qcrndis_wceis_store(struct config_item *item,
 	return len;
 }
 
+static ssize_t qcrndis_linux_support_show(struct config_item *item, char *page)
+{
+	struct f_rndis_qc	*rndis = to_f_qc_rndis_opts(item)->rndis;
+
+	return snprintf(page, PAGE_SIZE, "%d\n", rndis->linux_support);
+}
+
+static ssize_t qcrndis_linux_support_store(struct config_item *item,
+			const char *page, size_t len)
+{
+	struct f_rndis_qc	*rndis = to_f_qc_rndis_opts(item)->rndis;
+	bool val;
+
+	if (kstrtobool(page, &val))
+		return -EINVAL;
+
+	rndis->linux_support = val;
+	rndis->use_wceis = rndis->linux_support;
+
+	return len;
+}
+
 CONFIGFS_ATTR(qcrndis_, wceis);
+CONFIGFS_ATTR(qcrndis_, linux_support);
 
 static struct configfs_attribute *qcrndis_attrs[] = {
 	&qcrndis_attr_wceis,
+	&qcrndis_attr_linux_support,
 	NULL,
 };
 

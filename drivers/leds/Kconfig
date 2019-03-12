@@ -624,6 +624,13 @@ config LEDS_QPNP_WLED
 	  variable brightness.  It also supports outputting the Avdd supply for
 	  AMOLED displays.
 
+config LEDS_QPNP_RGB_SCALE
+	bool "Support for QPNP RGB LED brightness scale"
+	depends on LEDS_QPNP
+	default n
+	help
+	  Adds kernel support for scaling the RGB LED brightness.
+
 config LEDS_SYSCON
 	bool "LED support for LEDs on system controllers"
 	depends on LEDS_CLASS=y

@@ -1,0 +1,36 @@
+/* arch/arm64/boot/dts/somc/somc-ganges-touch.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&i2c_1 {
+	status = "okay";
+
+	synaptics@70 {
+		compatible = "synaptics,dsx-i2c";
+		reg = <0x70>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <45 0x2008>;
+		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
+		pinctrl-0 = <&ts_int_active &ts_lcd_id_active>;
+		pinctrl-1 = <&ts_int_suspend &ts_lcd_id_suspend>;
+		synaptics,pwr-reg-name = "avdd";
+		synaptics,bus-reg-name = "vdd";
+		synaptics,ub-i2c-addr = <0x20>;
+		/* IRQF_ONESHOT | IRQF_TRIGGER_LOW */
+		synaptics,irq-gpio = <&tlmm 45 0x2008>;
+		synaptics,irq-on-state = <0>;
+		synaptics,power-delay-ms = <200>;
+		synaptics,reset-delay-ms = <200>;
+		synaptics,reset-on-state = <0>;
+		synaptics,reset-active-ms = <20>;
+
+	};
+};

@@ -319,6 +319,19 @@
 		#size-cells = <2>;
 		ranges;
 
+		debug_region: debug_region@ffb00000 {
+			compatible = "removed-dma-pool", "qcom,debug_memory";
+			no-map;
+			reg = <0 0xffb00000 0 0x100000>;
+			label = "debug_mem";
+		};
+
+		pstore_reserve_mem: pstore_reserve_mem_region_region@ffc00000 {
+			compatible = "removed-dma-pool";
+			no-map;
+			reg = <0 0xffc00000 0 0x00100000>;
+		};
+
 		wlan_msa_guard: wlan_msa_guard@85600000 {
 			compatible = "removed-dma-pool";
 			no-map;
@@ -454,6 +467,16 @@
 		#redistributor-regions = <1>;
 		redistributor-stride = <0x0 0x20000>;
 		interrupts = <1 9 4>;
+	};
+
+	ramoops {
+		compatible = "ramoops";
+		memory-region = <&pstore_reserve_mem>;
+		record-size = <0x0 0x1000>;
+		console-size = <0x0 0x40000>;
+		ftrace-size = <0x0 0x0>;
+		pmsg-size = <0x0 0x0>;
+		ecc-size = <0x0 0x0>;
 	};
 
 	timer {
@@ -677,14 +700,10 @@
 		clock-names = "core", "iface";
 	};
 
+ /* for EGIS, ET512 used GPIO 72 for IRQ wake source */
+/* Disable QC fingerprint sensor*/
 	qcom,qbt1000 {
-		compatible = "qcom,qbt1000";
-		clock-names = "core", "iface";
-		clocks = <&clock_gcc GCC_BLSP1_QUP3_SPI_APPS_CLK>,
-			<&clock_gcc GCC_BLSP1_AHB_CLK>;
-		clock-frequency = <15000000>;
-		qcom,ipc-gpio = <&tlmm 72 0>;
-		qcom,finger-detect-gpio = <&pm660_gpios 11 0>;
+               status = "disabled";
 	};
 
 	qcom,sensor-information {
@@ -1920,6 +1939,7 @@
 		qcom,xprt-linkid = <1>;
 		qcom,xprt-version = <1>;
 		qcom,fragmented-data;
+		qcom,dynamic-wakeup-source;
 	};
 
 	qcom,ipc_router_cdsp_xprt {
@@ -2680,6 +2700,18 @@
 			debounce-interval = <15>;
 		};
 	};
+
+                egistec {
+                       compatible = "etspi,et510";
+                       spi-max-frequency = <1000000>;
+                       et512_vcc-supply = <&pm660l_l6>;
+                       input-device-name = "et510";
+                       interrupt-parent = <&tlmm>;
+                       interrupts = <72 0x0>;
+                       egis,reset-gpio    = <&tlmm 20 0>;
+                       egis,irq-gpio      = <&tlmm 72 0>;
+               };
+
 };
 
 &blsp2_uart1_hs {

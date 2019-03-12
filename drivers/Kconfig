@@ -212,6 +212,8 @@ source "drivers/bif/Kconfig"
 
 source "drivers/sensors/Kconfig"
 
+source "drivers/cei/Kconfig"
+
 source "drivers/tee/Kconfig"
 
 endmenu

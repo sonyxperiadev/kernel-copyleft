@@ -2436,7 +2436,7 @@ static void adreno_regwrite(struct kgsl_device *device,
 	/*ensure previous writes post before this one,
 	 * i.e. act like normal writel() */
 	wmb();
-	__raw_writel(value, reg);
+	__raw_writel_no_log(value, reg);
 }
 
 /**

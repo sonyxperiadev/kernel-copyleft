@@ -111,3 +111,15 @@ obj-$(CONFIG_QCOM_CX_IPEAK) += cx_ipeak.o
 obj-$(CONFIG_MSM_CACHE_M4M_ERP64) += cache_m4m_erp64.o
 obj-$(CONFIG_MSM_HAB) += hab/
 obj-$(CONFIG_QCOM_QDSS_BRIDGE) += qdss_bridge.o
+obj-$(CONFIG_ARCH_SDM630) += debug_memory.o
+obj-$(CONFIG_RAMDUMP_TAGS) += board-rdtags.o
+CFLAGS_board-rdtags.o  := \
+       -D"INFO_PRODUCT=\"$(if $(TARGET_PRODUCT),$(TARGET_PRODUCT),unknown)\"" \
+       -D"INFO_VARIANT= \
+       \"$(if $(TARGET_BUILD_VARIANT),$(TARGET_BUILD_VARIANT),unknown)\"" \
+       -D"INFO_BUILDID= \
+       \"$(if $(SEMC_SYSTEM_VERSION),$(SEMC_SYSTEM_VERSION),private)\""
+obj-$(CONFIG_SUBSYS_LAST_ERR_LOG) += last_subsys_errlog.o
+obj-$(CONFIG_LAST_LOGS) += last_logs.o
+obj-$(CONFIG_SECURITY_STATUS) += security_status.o
+obj-$(CONFIG_ARCH_SDM630) += console_setup.o

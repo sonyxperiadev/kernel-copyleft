@@ -108,6 +108,60 @@ config ARCH_SDM630
 	  If you do not wish to build a kernel that runs
 	  on this chipset,say 'N' here.
 
+config ARCH_SONY_GANGES
+    bool "Sony Mobile Ganges platform"
+    depends on ARCH_SDM630
+    help
+    Support for the SONY Mobile Ganges platform
+    which is based on QCOM SDM630 chipset.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_PIONEER
+    bool "Sony Mobile Pioneer"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Pioneer device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_KIRIN
+    bool "Sony Mobile Kirin"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Kirin device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_KIRIN_DSDS
+    bool "Sony Mobile Kirin Dsds"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Kirin DS device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_MERMAID
+    bool "Sony Mobile Mermaid"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Mermaid device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_MERMAID_DSDS
+    bool "Sony Mobile Mermaid Dsds"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Mermaid DS device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
 config ARCH_ROCKCHIP
 	bool "Rockchip Platforms"
 	select ARCH_HAS_RESET_CONTROLLER

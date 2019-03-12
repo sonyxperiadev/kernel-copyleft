@@ -539,6 +539,13 @@ static void msm_anlg_cdc_mbhc_common_micb_ctrl(struct snd_soc_codec *codec,
 		mask = 0xFF;
 		val = (enable ? 0xC0 : 0x00);
 		break;
+#ifdef CONFIG_HIGH_VOL_MIC
+	case MBHC_COMMON_MICB_SET_18_VAL:
+		reg = MSM89XX_PMIC_ANALOG_MICB_1_VAL;
+		mask = 0xFF;
+		val = (enable ? 0x20 : 0x00);
+		break;
+#endif
 	case MBHC_COMMON_MICB_TAIL_CURR:
 		reg = MSM89XX_PMIC_ANALOG_MICB_1_EN;
 		mask = 0x04;
@@ -3994,9 +4001,15 @@ static void msm_anlg_cdc_configure_cap(struct snd_soc_codec *codec,
 		snd_soc_update_bits(codec, MSM89XX_PMIC_ANALOG_MICB_1_EN,
 				0x40, (pdata->micbias2_cap_mode << 6));
 	} else if (micbias1) {
+#ifdef CONFIG_HIGH_VOL_MIC
+		msm_anlg_cdc_mbhc_common_micb_ctrl(codec, MBHC_COMMON_MICB_SET_VAL, true);
+#endif
 		snd_soc_update_bits(codec, MSM89XX_PMIC_ANALOG_MICB_1_EN,
 				0x40, (pdata->micbias1_cap_mode << 6));
 	} else {
+#ifdef CONFIG_HIGH_VOL_MIC
+		msm_anlg_cdc_mbhc_common_micb_ctrl(codec, MBHC_COMMON_MICB_SET_18_VAL, true);
+#endif
 		snd_soc_update_bits(codec, MSM89XX_PMIC_ANALOG_MICB_1_EN,
 				0x40, 0x00);
 	}
