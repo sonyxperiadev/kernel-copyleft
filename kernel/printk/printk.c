@@ -2175,6 +2175,13 @@ void suspend_console(void)
 	up_console_sem();
 }
 
+int is_console_suspended(void)
+{
+	if (!console_suspend_enabled)
+		return 0;
+	return console_suspended;
+}
+
 void resume_console(void)
 {
 	if (!console_suspend_enabled)

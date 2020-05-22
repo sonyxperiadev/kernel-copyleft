@@ -608,13 +608,7 @@ static void pstore_console_write(struct console *con, const char *s, unsigned c)
 
 		if (c > psinfo->bufsize)
 			c = psinfo->bufsize;
-
-		if (oops_in_progress) {
-			if (!spin_trylock_irqsave(&psinfo->buf_lock, flags))
-				break;
-		} else {
-			spin_lock_irqsave(&psinfo->buf_lock, flags);
-		}
+		spin_lock_irqsave(&psinfo->buf_lock, flags);
 		record.buf = (char *)s;
 		record.size = c;
 		psinfo->write(&record);

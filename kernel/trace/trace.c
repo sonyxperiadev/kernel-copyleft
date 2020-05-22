@@ -2827,6 +2827,7 @@ static void put_trace_buf(void)
 	this_cpu_dec(trace_percpu_buffer->nesting);
 }
 
+#ifdef CONFIG_TRACE_PRINTK
 static int alloc_percpu_trace_buffer(void)
 {
 	struct trace_buffer_struct *buffers;
@@ -2838,11 +2839,13 @@ static int alloc_percpu_trace_buffer(void)
 	trace_percpu_buffer = buffers;
 	return 0;
 }
+#endif
 
 static int buffers_allocated;
 
 void trace_printk_init_buffers(void)
 {
+#ifdef CONFIG_TRACE_PRINTK
 	if (buffers_allocated)
 		return;
 
@@ -2879,6 +2882,9 @@ void trace_printk_init_buffers(void)
 	 */
 	if (global_trace.trace_buffer.buffer)
 		tracing_start_cmdline_record();
+#else
+	return;
+#endif
 }
 
 void trace_printk_start_comm(void)

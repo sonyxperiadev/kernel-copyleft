@@ -58,6 +58,7 @@
 #include <linux/oom.h>
 #include <linux/writeback.h>
 #include <linux/shm.h>
+#include <linux/oom_score_notifier.h>
 #include <linux/kcov.h>
 #include <linux/random.h>
 #include <linux/rcuwait.h>
@@ -113,6 +114,7 @@ static void __exit_signal(struct task_struct *tsk)
 			posix_cpu_timers_exit_group(tsk);
 	}
 #endif
+	oom_score_notify_free(tsk);
 
 	if (group_dead) {
 		tty = sig->tty;

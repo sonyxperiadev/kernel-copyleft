@@ -2243,6 +2243,22 @@ int regulator_enable(struct regulator *regulator)
 }
 EXPORT_SYMBOL_GPL(regulator_enable);
 
+/**
+ * regulator_get_ref_cnt - get reference count
+ * @regulator: regulator source
+ *
+ */
+int regulator_get_ref_cnt(struct regulator *regulator)
+{
+	int ret = -1;
+
+	if (regulator)
+		ret = regulator->rdev->use_count;
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(regulator_get_ref_cnt);
+
 static int _regulator_do_disable(struct regulator_dev *rdev)
 {
 	int ret;

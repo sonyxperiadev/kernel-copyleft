@@ -299,7 +299,6 @@ void store_cdrom_address(u8 *dest, int msf, u32 addr)
 {
 	if (msf) {
 		/* Convert to Minutes-Seconds-Frames */
-		addr >>= 2;		/* Convert to 2048-byte frames */
 		addr += 2*75;		/* Lead-in occupies 2 seconds */
 		dest[3] = addr % 75;	/* Frames */
 		addr /= 75;

@@ -1,0 +1,1 @@
+obj-m := spi-qup-qcom-cloned.o

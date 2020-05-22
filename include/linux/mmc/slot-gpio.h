@@ -36,4 +36,7 @@ bool mmc_can_gpio_cd(struct mmc_host *host);
 void mmc_register_extcon(struct mmc_host *host);
 void mmc_unregister_extcon(struct mmc_host *host);
 
+void mmc_gpio_init_uim2(struct mmc_host *host, unsigned int gpio);
+void mmc_gpio_set_uim2_en(struct mmc_host *host, int value);
+void mmc_gpio_tray_close_set_uim2(struct mmc_host *host, int value);
 #endif

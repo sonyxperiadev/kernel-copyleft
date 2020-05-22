@@ -373,6 +373,7 @@ int qcom_pdc_init(struct device_node *node,
 	if (pin_count % IRQS_PER_REG)
 		max_enable_regs++;
 
+	kfree(pdc_domain->name);
 	pdc_domain->name = "qcom,pdc";
 
 	return 0;

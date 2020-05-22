@@ -1,0 +1,4 @@
+obj-m := sony_carillon_nfc.o
+sony_carillon_nfc-objs := main_module.o
+sony_carillon_nfc-objs += cxd224x/cxd224x-i2c.o
+sony_carillon_nfc-objs += bd7602/bd7602.o

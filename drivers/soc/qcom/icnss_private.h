@@ -17,6 +17,7 @@
 #include <linux/iio/consumer.h>
 #include <linux/kobject.h>
 #include <linux/esoc_client.h>
+#include <soc/qcom/subsystem_restart.h>
 
 #define icnss_ipc_log_string(_x...) do {				\
 	if (icnss_ipc_log_context)					\
@@ -386,6 +387,9 @@ struct icnss_priv {
 	struct esoc_desc *esoc_client;
 	struct esoc_client_hook esoc_ops;
 	struct completion notif_complete;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
+	wait_queue_head_t wlan_pdr_debug_q;
+	int data_ready;
 };
 
 int icnss_call_driver_uevent(struct icnss_priv *priv,
