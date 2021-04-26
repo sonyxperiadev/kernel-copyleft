@@ -453,6 +453,9 @@ int dsi_panel_driver_power_off(struct dsi_panel *panel)
 	if (spec_pdata->opec_mode == 1)
 		spec_pdata->opec_mode = 0;
 
+	if (spec_pdata->hmd_mode == 1)
+		spec_pdata->hmd_mode = 0;
+
 	if (spec_pdata->lp11_off) {
 		usleep_range(spec_pdata->lp11_off * 1000,
 				spec_pdata->lp11_off * 1000 + 100);
@@ -867,7 +870,7 @@ int dsi_panel_driver_parse_dt(struct dsi_panel *panel,
 	rc = of_property_read_u32(np, "somc,pw-wait-after-off-touch-vddh", &tmp);
 	spec_pdata->touch_vddh_off = !rc ? tmp : 0;
 
-	rc = of_property_read_u32(np, "somc,pw-wait-downperiod", &tmp);
+	rc = of_property_read_u32(np, "somc,pw-wait-down_period", &tmp);
 	spec_pdata->down_period = !rc ? tmp : 0;
 
 	rc = of_property_read_u32(np, "somc,pw-wait-after-off-touch-reset", &tmp);
@@ -1164,6 +1167,43 @@ static ssize_t dsi_panel_driver_opec_mode_show(struct device *dev,
 	struct dsi_display *display = dev_get_drvdata(dev);
 
 	return scnprintf(buf, PAGE_SIZE, "%u", display->panel->spec_pdata->opec_mode);
+}
+
+static ssize_t dsi_panel_driver_hmd_mode_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct dsi_display *display = dev_get_drvdata(dev);
+	struct dsi_panel *panel = display->panel;
+	int mode;
+
+	mutex_lock(&display->display_lock);
+	if (!panel->spec_pdata->display_onoff_state) {
+		pr_err("%s: Display is off, can't set hmd status\n", __func__);
+		goto hmd_error;
+	}
+
+	if (sscanf(buf, "%d", &mode) < 0) {
+		pr_err("%s: sscanf failed to set mode. keep current mode=%d\n",
+			__func__, panel->spec_pdata->hmd_mode);
+		goto hmd_error;
+	}
+
+	dsi_panel_set_hmd_mode(panel, mode);
+
+	mutex_unlock(&display->display_lock);
+	return count;
+
+hmd_error:
+	mutex_unlock(&display->display_lock);
+	return -EINVAL;
+}
+
+static ssize_t dsi_panel_driver_hmd_mode_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct dsi_display *display = dev_get_drvdata(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%u", display->panel->spec_pdata->hmd_mode);
 }
 
 static void update_res_buf(char *string)
@@ -1558,6 +1598,9 @@ static struct device_attribute panel_attributes[] = {
 	__ATTR(opec_mode, S_IRUSR|S_IRGRP|S_IWUSR|S_IWGRP,
 		dsi_panel_driver_opec_mode_show,
 		dsi_panel_driver_opec_mode_store),
+	__ATTR(hmd_mode, S_IRUSR|S_IRGRP|S_IWUSR|S_IWGRP,
+		dsi_panel_driver_hmd_mode_show,
+		dsi_panel_driver_hmd_mode_store),
 };
 
 static u32 dsi_panel_driver_get_area(struct dsi_panel *panel, u32 level)
