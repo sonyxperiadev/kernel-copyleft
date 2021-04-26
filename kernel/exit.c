@@ -3,6 +3,11 @@
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -68,6 +73,8 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
+#include <trace/events/task.h>
+
 static void __unhash_process(struct task_struct *p, bool group_dead)
 {
 	nr_threads--;
@@ -114,6 +121,7 @@ static void __exit_signal(struct task_struct *tsk)
 			posix_cpu_timers_exit_group(tsk);
 	}
 #endif
+	trace_task_exit(tsk);
 
 	if (group_dead) {
 		tty = sig->tty;

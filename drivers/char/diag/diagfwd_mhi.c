@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2014-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -192,12 +192,9 @@ static void mhi_buf_tbl_remove(struct diag_mhi_info *mhi_info, int type,
 		list_del(&item->link);
 		if (type == TYPE_MHI_READ_CH) {
 			DIAG_LOG(DIAG_DEBUG_MHI,
-			"Freeing read channel buffer: %pK\n", buf);
+			"Callback received on buffer:%pK from mhi\n", buf);
 			diagmem_free(driver, item->buf, mhi_info->mempool);
 		}
-		DIAG_LOG(DIAG_DEBUG_MHI,
-		"Removing %s channel item entry from table: %pK\n",
-			mhi_info->name, buf);
 		kfree(item);
 		found = 1;
 	}
@@ -235,7 +232,7 @@ static void mhi_buf_tbl_clear(struct diag_mhi_info *mhi_info)
 				&mhi_info->read_done_list, link) {
 				if (tp->buf == buf) {
 					DIAG_LOG(DIAG_DEBUG_MHI,
-						"Read buffer:%pK removed from table for ch:%s\n",
+						"buffer:%pK removed from table for ch:%s\n",
 						buf, mhi_info->name);
 					list_del(&tp->link);
 					kfree(tp);
@@ -257,9 +254,6 @@ static void mhi_buf_tbl_clear(struct diag_mhi_info *mhi_info)
 			item = list_entry(start, struct diag_mhi_buf_tbl_t,
 					  link);
 			list_del(&item->link);
-			DIAG_LOG(DIAG_DEBUG_MHI,
-			"Write buffer %pK removed from table for ch: %s\n",
-			buf, mhi_info->name);
 			diag_remote_dev_write_done(mhi_info->dev_id, item->buf,
 						   item->len, mhi_info->id);
 			kfree(item);
@@ -286,9 +280,6 @@ static int __mhi_close(struct diag_mhi_info *mhi_info, int close_flag)
 
 	if (close_flag == CLOSE_CHANNELS) {
 		mutex_lock(&mhi_info->ch_mutex);
-		DIAG_LOG(DIAG_DEBUG_MHI,
-			"diag: %s mhi channel closed, calling mhi unprepare\n",
-			mhi_info->name);
 		mhi_unprepare_from_transfer(mhi_info->mhi_dev);
 		mutex_unlock(&mhi_info->ch_mutex);
 	}
@@ -302,20 +293,15 @@ static int mhi_close(int token, int ch)
 	int dev_idx = get_id_from_token(token);
 
 	if (dev_idx < 0 || dev_idx >= NUM_MHI_DEV) {
-		pr_err("diag: %s: invalid index %d\n", __func__, dev_idx);
+		pr_err("diag: In %s, invalid index %d\n", __func__, dev_idx);
 		return -EINVAL;
 	}
 
-	if (ch < 0 || ch >= NUM_MHI_CHAN) {
-		pr_err("diag: %s: invalid channel %d\n", __func__, ch);
-		return -EINVAL;
-	}
+	if (ch < 0 || ch >= NUM_MHI_CHAN)
+		pr_err("diag: In %s, invalid channel %d\n", __func__, ch);
 
-	if (!diag_mhi[dev_idx][ch].enabled) {
-		pr_err("diag: %s: invalid device node for index: %d, ch: %d\n",
-			__func__, dev_idx, ch);
+	if (!diag_mhi[dev_idx][ch].enabled)
 		return -ENODEV;
-	}
 	/*
 	 * This function is called whenever the channel needs to be closed
 	 * explicitly by Diag. Close both the read and write channels (denoted
@@ -348,16 +334,9 @@ static int __mhi_open(struct diag_mhi_info *mhi_info, int token, int open_flag)
 		return -ENODEV;
 	if (open_flag == OPEN_CHANNELS) {
 		if ((atomic_read(&(mhi_info->read_ch.opened))) &&
-			(atomic_read(&(mhi_info->write_ch.opened)))) {
-			DIAG_LOG(DIAG_DEBUG_MHI,
-			"Read and write channel already open: %s\n",
-			mhi_info->name);
+			(atomic_read(&(mhi_info->write_ch.opened))))
 			return 0;
-		}
 		mutex_lock(&mhi_info->ch_mutex);
-		DIAG_LOG(DIAG_DEBUG_MHI,
-			"Prepare mhi for transfer on port: %s\n",
-			mhi_info->name);
 		err = mhi_prepare_for_transfer(mhi_info->mhi_dev);
 		mutex_unlock(&mhi_info->ch_mutex);
 		if (err) {
@@ -367,9 +346,9 @@ static int __mhi_open(struct diag_mhi_info *mhi_info, int token, int open_flag)
 		}
 		atomic_set(&mhi_info->read_ch.opened, 1);
 		atomic_set(&mhi_info->write_ch.opened, 1);
-		DIAG_LOG(DIAG_DEBUG_MHI,
-			 "opened mhi read/write channel, port: %s\n",
-			mhi_info->name);
+		DIAG_LOG(DIAG_DEBUG_BRIDGE,
+			 "opened mhi read/write channel, port: %d\n",
+			mhi_info->id);
 	} else if (open_flag == CHANNELS_OPENED) {
 		if (!atomic_read(&(mhi_info->read_ch.opened)) ||
 		    !atomic_read(&(mhi_info->write_ch.opened))) {
@@ -459,7 +438,7 @@ static void mhi_read_done_work_fn(struct work_struct *work)
 		spin_unlock_irqrestore(&mhi_info->read_ch.lock, flags);
 		if (!buf)
 			break;
-		DIAG_LOG(DIAG_DEBUG_MHI,
+		DIAG_LOG(DIAG_DEBUG_BRIDGE,
 			"read from mhi port %d buf %pK len:%d\n",
 			mhi_info->id, buf, len);
 		/*
@@ -525,7 +504,7 @@ static void mhi_read_work_fn(struct work_struct *work)
 			goto fail;
 		}
 
-		DIAG_LOG(DIAG_DEBUG_MHI,
+		DIAG_LOG(DIAG_DEBUG_BRIDGE,
 			 "queueing a read buf %pK, ch: %s\n",
 			 buf, mhi_info->name);
 
@@ -574,65 +553,54 @@ static int mhi_write(int token, int ch, unsigned char *buf, int len, int ctxt)
 	unsigned long flags;
 	struct diag_mhi_ch_t *ch_info = NULL;
 	int dev_idx = get_id_from_token(token);
-	struct diag_mhi_info *mhi_info = NULL;
 
 	if (dev_idx < 0 || dev_idx >= NUM_MHI_DEV) {
-		pr_err_ratelimited("diag: %s: invalid index %d\n", __func__,
+		pr_err_ratelimited("diag: In %s, invalid index %d\n", __func__,
 				   dev_idx);
 		return -EINVAL;
 	}
 
 	if (ch < 0 || ch >= NUM_MHI_CHAN) {
-		pr_err_ratelimited("diag: %s: invalid chan %d\n", __func__,
+		pr_err_ratelimited("diag: In %s, invalid chan %d\n", __func__,
 				   ch);
 		return -EINVAL;
 	}
 
 	if (!buf || len <= 0) {
-		pr_err("diag: %s: ch: %d, invalid buf %pK len %d\n",
+		pr_err("diag: In %s, ch %d, invalid buf %pK len %d\n",
 			__func__, dev_idx, buf, len);
 		return -EINVAL;
 	}
 
-	mhi_info = &diag_mhi[dev_idx][ch];
-
-	if (!mhi_info) {
-		pr_err_ratelimited("diag: %s, Invalid MHI info\n",
-				   __func__);
-		return -EINVAL;
-	}
-
-	if (!mhi_info->enabled) {
-		pr_err_ratelimited("diag: %s: MHI channel %s is not enabled\n",
-				   __func__, mhi_info->name);
+	if (!diag_mhi[dev_idx][ch].enabled) {
+		pr_err_ratelimited("diag: In %s, MHI channel %s is not enabled\n",
+				   __func__, diag_mhi[dev_idx][ch].name);
 		return -EIO;
 	}
 
-	ch_info = &mhi_info->write_ch;
+	ch_info = &diag_mhi[dev_idx][ch].write_ch;
 	if (!(atomic_read(&(ch_info->opened)))) {
-		pr_err_ratelimited("diag: %s: MHI write channel %s is not open\n",
-				   __func__, mhi_info->name);
+		pr_err_ratelimited("diag: In %s, MHI write channel %s is not open\n",
+				   __func__, diag_mhi[dev_idx][ch].name);
 		return -EIO;
 	}
 
 	spin_lock_irqsave(&ch_info->lock, flags);
-	err = mhi_buf_tbl_add(mhi_info, TYPE_MHI_WRITE_CH, buf,
+	err = mhi_buf_tbl_add(&diag_mhi[dev_idx][ch], TYPE_MHI_WRITE_CH, buf,
 			      len);
 	if (err) {
 		spin_unlock_irqrestore(&ch_info->lock, flags);
 		goto fail;
 	}
-	DIAG_LOG(DIAG_DEBUG_MHI, "diag: queueing a write buf %pK, ch: %s\n",
-		 buf, mhi_info->name);
 
-	err = mhi_queue_transfer(mhi_info->mhi_dev, DMA_TO_DEVICE,
+	err = mhi_queue_transfer(diag_mhi[dev_idx][ch].mhi_dev, DMA_TO_DEVICE,
 					buf, len, mhi_flags);
 	spin_unlock_irqrestore(&ch_info->lock, flags);
 	if (err) {
 		DIAG_LOG(DIAG_DEBUG_MHI,
-			"diag: Cannot write to MHI channel: %s, len %d, err: %d\n",
-			mhi_info->name, len, err);
-		mhi_buf_tbl_remove(mhi_info, TYPE_MHI_WRITE_CH,
+			"diag: Cannot write to MHI channel %s, len %d, err: %d\n",
+			__func__, diag_mhi[dev_idx][ch].name, len, err);
+		mhi_buf_tbl_remove(&diag_mhi[dev_idx][ch], TYPE_MHI_WRITE_CH,
 					buf, len);
 		goto fail;
 	}
@@ -720,7 +688,7 @@ static void diag_mhi_read_cb(struct mhi_device *mhi_dev,
 		spin_lock_irqsave(&mhi_info->read_ch.lock, flags);
 		tp = kmalloc(sizeof(*tp), GFP_ATOMIC);
 		if (!tp) {
-			DIAG_LOG(DIAG_DEBUG_MHI,
+			DIAG_LOG(DIAG_DEBUG_BRIDGE,
 			"no mem for list\n");
 			spin_unlock_irqrestore(&mhi_info->read_ch.lock, flags);
 			return;
@@ -729,7 +697,7 @@ static void diag_mhi_read_cb(struct mhi_device *mhi_dev,
 				&mhi_info->read_ch.buf_tbl, link) {
 			if (item->buf == buf) {
 				DIAG_LOG(DIAG_DEBUG_MHI,
-				"Read callback received on buffer:%pK from mhi\n",
+				"Callback received on buffer:%pK from mhi\n",
 					buf);
 				tp->buf = buf;
 				tp->len = result->bytes_xferd;
@@ -769,9 +737,6 @@ static void diag_mhi_write_cb(struct mhi_device *mhi_dev,
 					__func__);
 		return;
 	}
-	DIAG_LOG(DIAG_DEBUG_MHI,
-		"Write callback received on buffer:%pK from mhi\n",
-		buf);
 	mhi_buf_tbl_remove(mhi_info, TYPE_MHI_WRITE_CH, buf,
 				   result->bytes_xferd);
 	diag_remote_dev_write_done(mhi_info->dev_id, buf,
@@ -791,11 +756,6 @@ static void diag_mhi_remove(struct mhi_device *mhi_dev)
 		return;
 	if (!mhi_info->enabled)
 		return;
-
-	DIAG_LOG(DIAG_DEBUG_MHI,
-		"Remove called on mhi channel: %s\n",
-		mhi_info->name);
-
 	__mhi_close(mhi_info, CHANNELS_CLOSED);
 	spin_lock_irqsave(&mhi_info->lock, flags);
 	mhi_info->enabled = 0;
@@ -836,11 +796,11 @@ static int diag_mhi_probe(struct mhi_device *mhi_dev,
 	}
 
 	mhi_info = &diag_mhi[dev_idx][ch];
-	DIAG_LOG(DIAG_DEBUG_MHI,
+	DIAG_LOG(DIAG_DEBUG_BRIDGE,
 		"received probe for dev:%d ch:%d\n",
 		dev_idx, ch);
 	mhi_info->mhi_dev = mhi_dev;
-	DIAG_LOG(DIAG_DEBUG_MHI,
+	DIAG_LOG(DIAG_DEBUG_BRIDGE,
 		"diag: mhi device is ready to open\n");
 	spin_lock_irqsave(&mhi_info->lock, flags);
 	mhi_info->enabled = 1;
@@ -924,7 +884,7 @@ int diag_mhi_init(void)
 					ch, dev_idx, err);
 				goto fail;
 			}
-			DIAG_LOG(DIAG_DEBUG_MHI,
+			DIAG_LOG(DIAG_DEBUG_BRIDGE,
 					"mhi dev %d port %d initialized\n",
 					dev_idx, ch);
 		}

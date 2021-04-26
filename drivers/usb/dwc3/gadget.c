@@ -809,7 +809,6 @@ out:
 
 static void dwc3_remove_requests(struct dwc3 *dwc, struct dwc3_ep *dep)
 {
-	int retries = 40;
 	struct dwc3_request		*req;
 
 	dbg_log_string("START for %s(%d)", dep->name, dep->number);
@@ -818,7 +817,7 @@ static void dwc3_remove_requests(struct dwc3 *dwc, struct dwc3_ep *dep)
 	if (dep->number == 1 && dwc->ep0state != EP0_SETUP_PHASE) {
 		unsigned int dir;
 
-		dbg_log_string("CTRLPEND(%d)", dwc->ep0state);
+		dbg_log_string("CTRLPEND", dwc->ep0state);
 		dir = !!dwc->ep0_expect_in;
 		if (dwc->ep0state == EP0_DATA_PHASE)
 			dwc3_ep0_end_control_data(dwc, dwc->eps[dir]);
@@ -828,14 +827,6 @@ static void dwc3_remove_requests(struct dwc3 *dwc, struct dwc3_ep *dep)
 		dwc->eps[0]->trb_enqueue = 0;
 		dwc->eps[1]->trb_enqueue = 0;
 	}
-
-	do {
-		udelay(50);
-	} while ((dep->flags & DWC3_EP_END_TRANSFER_PENDING) && --retries);
-
-	if (!retries)
-		dbg_log_string("ep end_xfer cmd completion timeout for %d",
-				dep->number);
 
 	/* - giveback all requests to gadget driver */
 	while (!list_empty(&dep->started_list)) {
@@ -873,15 +864,6 @@ static void dwc3_stop_active_transfers(struct dwc3 *dwc)
 				DWC3_CONTROLLER_NOTIFY_CLEAR_DB, 0);
 
 		dwc3_remove_requests(dwc, dep);
-		if (dep->endpoint.ep_type != EP_TYPE_GSI &&
-					!dep->endpoint.endless) {
-			if (dep->trb_pool) {
-				memset(&dep->trb_pool[0], 0,
-					sizeof(struct dwc3_trb) *
-							dep->num_trbs);
-				dbg_event(dep->number, "Clr_TRB", 0);
-			}
-		}
 	}
 	dbg_log_string("DONE");
 }
@@ -3059,8 +3041,6 @@ static void dwc3_endpoint_interrupt(struct dwc3 *dwc,
 
 		if (cmd == DWC3_DEPCMD_ENDTRANSFER) {
 			dep->flags &= ~DWC3_EP_END_TRANSFER_PENDING;
-			dbg_log_string("DWC3_DEPEVT_EPCMDCMPLT (%d)",
-							dep->number);
 			wake_up(&dep->wait_end_transfer);
 		}
 		break;
@@ -3334,7 +3314,7 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 	if (dwc->ep0state != EP0_SETUP_PHASE) {
 		unsigned int	dir;
 
-		dbg_event(0xFF, "CONTRPEND(%d)", dwc->ep0state);
+		dbg_event(0xFF, "CONTRPEND", dwc->ep0state);
 		dir = !!dwc->ep0_expect_in;
 		if (dwc->ep0state == EP0_DATA_PHASE)
 			dwc3_ep0_end_control_data(dwc, dwc->eps[dir]);
@@ -3343,7 +3323,6 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 		dwc3_ep0_stall_and_restart(dwc);
 	}
 
-	dwc->delayed_status = false;
 	dwc3_stop_active_transfers(dwc);
 	dwc3_clear_stall_all_ep(dwc);
 

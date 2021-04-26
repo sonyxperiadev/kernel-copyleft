@@ -50,16 +50,6 @@
 
 /* #define FORCE_RUN_APPLICATION_FIRMWARE */
 
-#define SYNA_VTG_MIN_UV	2800000
-
-#define SYNA_VTG_MAX_UV	3300000
-
-#define SYNA_LOAD_MAX_UA 30000
-
-#define SYNA_VDD_VTG_MIN_UV 1800000
-
-#define SYNA_VDD_VTG_MAX_UV 2000000
-
 #define NOTIFIER_PRIORITY 2
 
 #define RESPONSE_TIMEOUT_MS 3000
@@ -1921,22 +1911,6 @@ static int syna_tcm_enable_regulator(struct syna_tcm_hcd *tcm_hcd, bool en)
 	}
 
 	if (tcm_hcd->bus_reg) {
-		retval = regulator_set_voltage(tcm_hcd->bus_reg,
-				SYNA_VDD_VTG_MIN_UV, SYNA_VDD_VTG_MAX_UV);
-		if (retval) {
-			LOGE(tcm_hcd->pdev->dev.parent,
-				"set bus regulator voltage failed\n");
-			goto exit;
-		}
-
-		retval = regulator_set_load(tcm_hcd->bus_reg,
-						SYNA_LOAD_MAX_UA);
-		if (retval) {
-			LOGE(tcm_hcd->pdev->dev.parent,
-				"set bus regulator load failed\n");
-			goto exit;
-		}
-
 		retval = regulator_enable(tcm_hcd->bus_reg);
 		if (retval < 0) {
 			LOGE(tcm_hcd->pdev->dev.parent,
@@ -1946,23 +1920,6 @@ static int syna_tcm_enable_regulator(struct syna_tcm_hcd *tcm_hcd, bool en)
 	}
 
 	if (tcm_hcd->pwr_reg) {
-		if (regulator_count_voltages(tcm_hcd->pwr_reg) > 0) {
-			retval = regulator_set_voltage(tcm_hcd->pwr_reg,
-				SYNA_VTG_MIN_UV, SYNA_VTG_MAX_UV);
-			if (retval) {
-				LOGE(tcm_hcd->pdev->dev.parent,
-					"set power regulator voltage failed\n");
-				goto disable_bus_reg;
-			}
-			retval = regulator_set_load(tcm_hcd->pwr_reg,
-							SYNA_LOAD_MAX_UA);
-			if (retval) {
-				LOGE(tcm_hcd->pdev->dev.parent,
-					"set power regulator load failed\n");
-				goto disable_bus_reg;
-			}
-		}
-
 		retval = regulator_enable(tcm_hcd->pwr_reg);
 		if (retval < 0) {
 			LOGE(tcm_hcd->pdev->dev.parent,
@@ -1975,22 +1932,12 @@ static int syna_tcm_enable_regulator(struct syna_tcm_hcd *tcm_hcd, bool en)
 	return 0;
 
 disable_pwr_reg:
-	if (tcm_hcd->pwr_reg) {
-		if (regulator_count_voltages(tcm_hcd->pwr_reg) > 0) {
-			regulator_set_load(tcm_hcd->pwr_reg, 0);
-			regulator_set_voltage(tcm_hcd->pwr_reg, 0,
-							SYNA_VTG_MAX_UV);
-		}
+	if (tcm_hcd->pwr_reg)
 		regulator_disable(tcm_hcd->pwr_reg);
-	}
 
 disable_bus_reg:
-	if (tcm_hcd->bus_reg) {
-		regulator_set_load(tcm_hcd->bus_reg, 0);
-		regulator_set_voltage(tcm_hcd->bus_reg, 0,
-						SYNA_VDD_VTG_MAX_UV);
+	if (tcm_hcd->bus_reg)
 		regulator_disable(tcm_hcd->bus_reg);
-	}
 
 exit:
 	return retval;
@@ -2904,12 +2851,6 @@ static int syna_tcm_resume(struct device *dev)
 	if (!tcm_hcd->in_suspend)
 		return 0;
 
-	retval = syna_tcm_enable_regulator(tcm_hcd, true);
-	if (retval < 0) {
-		LOGE(tcm_hcd->pdev->dev.parent,
-				"Failed to enable regulators\n");
-	}
-
 	retval = pinctrl_select_state(
 			tcm_hcd->ts_pinctrl,
 			tcm_hcd->pinctrl_state_active);
@@ -3004,7 +2945,6 @@ static int syna_tcm_suspend(struct device *dev)
 {
 	struct syna_tcm_module_handler *mod_handler;
 	struct syna_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
-	int retval;
 
 	if (tcm_hcd->in_suspend || !tcm_hcd->init_okay)
 		return 0;
@@ -3027,17 +2967,11 @@ static int syna_tcm_suspend(struct device *dev)
 		}
 	}
 
-	retval = syna_tcm_enable_regulator(tcm_hcd, false);
-	if (retval < 0) {
-		LOGE(tcm_hcd->pdev->dev.parent,
-				"Failed to disable regulators\n");
-	}
-
 	mutex_unlock(&mod_pool.mutex);
 
 	tcm_hcd->in_suspend = true;
 
-	return retval;
+	return 0;
 }
 #endif
 

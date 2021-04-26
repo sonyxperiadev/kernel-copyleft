@@ -111,7 +111,7 @@ static int diagfwd_bridge_mux_write_done(unsigned char *buf, int len,
 		return -EINVAL;
 	ch = &bridge_info[buf_ctx];
 	if (ch->dev_ops && ch->dev_ops->fwd_complete) {
-		DIAG_LOG(DIAG_DEBUG_BRIDGE,
+		DIAG_LOG(DIAG_DEBUG_MHI,
 		"Write done completion received for buf %pK len:%d\n",
 			buf, len);
 		ch->dev_ops->fwd_complete(ch->id, ch->ctxt, buf, len, 0);

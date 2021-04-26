@@ -13,6 +13,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __LINUX_PSTORE_RAM_H__
 #define __LINUX_PSTORE_RAM_H__
@@ -96,7 +101,7 @@ struct ramoops_platform_data {
 	unsigned long	record_size;
 	unsigned long	console_size;
 	unsigned long	ftrace_size;
-	unsigned long	pmsg_size;
+	unsigned long	*pmsg_size;
 	int		dump_oops;
 	u32		flags;
 	struct persistent_ram_ecc_info ecc_info;

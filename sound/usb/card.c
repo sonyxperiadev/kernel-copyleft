@@ -32,6 +32,11 @@
  *     this type *correctly*.  SB extigy looks as if it supports, but it's
  *     indeed an AC3 stream packed in SPDIF frames (i.e. no real AC3 stream).
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 
 #include <linux/bitops.h>
@@ -756,7 +761,6 @@ static int usb_audio_probe(struct usb_interface *intf,
 	chip->num_interfaces++;
 	usb_set_intfdata(intf, chip);
 	intf->needs_remote_wakeup = 1;
-	usb_enable_autosuspend(chip->dev);
 	atomic_dec(&chip->active);
 	mutex_unlock(&register_mutex);
 	return 0;

@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/cdev.h>
 #include <linux/device.h>
@@ -31,6 +36,7 @@ static ssize_t write_pmsg(struct file *file, const char __user *buf,
 	pstore_record_init(&record, psinfo);
 	record.type = PSTORE_TYPE_PMSG;
 	record.size = count;
+	record.part = iminor(file_inode(file));
 
 	/* check outside lock, page in any data. write_user also checks */
 	if (!access_ok(VERIFY_READ, buf, count))
@@ -50,6 +56,7 @@ static const struct file_operations pmsg_fops = {
 
 static struct class *pmsg_class;
 static int pmsg_major;
+static int pmsg_cnt;
 #define PMSG_NAME "pmsg"
 #undef pr_fmt
 #define pr_fmt(fmt) PMSG_NAME ": " fmt
@@ -64,6 +71,7 @@ static char *pmsg_devnode(struct device *dev, umode_t *mode)
 void pstore_register_pmsg(void)
 {
 	struct device *pmsg_device;
+	int i;
 
 	pmsg_major = register_chrdev(0, PMSG_NAME, &pmsg_fops);
 	if (pmsg_major < 0) {
@@ -78,12 +86,18 @@ void pstore_register_pmsg(void)
 	}
 	pmsg_class->devnode = pmsg_devnode;
 
-	pmsg_device = device_create(pmsg_class, NULL, MKDEV(pmsg_major, 0),
-					NULL, "%s%d", PMSG_NAME, 0);
-	if (IS_ERR(pmsg_device)) {
-		pr_err("failed to create device\n");
-		goto err_device;
+	pmsg_cnt = pstore_get_pmsg_cnt();
+	for (i = 0; i < pmsg_cnt; i++) {
+		pmsg_device = device_create(pmsg_class, NULL,
+				MKDEV(pmsg_major, i), NULL, "%s%d",
+				PMSG_NAME, i);
+
+		if (IS_ERR(pmsg_device)) {
+			pr_err("failed to create device\n");
+			goto err_device;
+		}
 	}
+
 	return;
 
 err_device:
@@ -96,7 +110,11 @@ err:
 
 void pstore_unregister_pmsg(void)
 {
-	device_destroy(pmsg_class, MKDEV(pmsg_major, 0));
+	int i;
+
+	for (i = 0; i < pmsg_cnt; i++)
+		device_destroy(pmsg_class, MKDEV(pmsg_major, i));
+
 	class_destroy(pmsg_class);
 	unregister_chrdev(pmsg_major, PMSG_NAME);
 }
