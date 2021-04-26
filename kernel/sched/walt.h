@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
+/*
+ * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
  */
 
 #ifndef __WALT_H
@@ -12,21 +17,6 @@
 #include <linux/sched/core_ctl.h>
 
 #define MAX_NR_CLUSTERS			3
-
-#ifdef CONFIG_HZ_300
-/*
- * Tick interval becomes to 3333333 due to
- * rounding error when HZ=300.
- */
-#define DEFAULT_SCHED_RAVG_WINDOW (3333333 * 6)
-#else
-/* Default window size (in ns) = 20ms */
-#define DEFAULT_SCHED_RAVG_WINDOW 20000000
-#endif
-
-/* Max window size (in ns) = 1s */
-#define MAX_SCHED_RAVG_WINDOW 1000000000
-#define NR_WINDOWS_PER_SEC (NSEC_PER_SEC / DEFAULT_SCHED_RAVG_WINDOW)
 
 #define WINDOW_STATS_RECENT		0
 #define WINDOW_STATS_MAX		1
@@ -64,6 +54,7 @@ extern void update_task_ravg(struct task_struct *p, struct rq *rq, int event,
 						u64 wallclock, u64 irqtime);
 
 extern unsigned int walt_big_tasks(int cpu);
+extern u64 walt_get_prev_group_run_sum(struct rq *rq);
 
 static inline void
 inc_nr_big_task(struct walt_sched_stats *stats, struct task_struct *p)
@@ -159,6 +150,10 @@ extern void fixup_walt_sched_stats_common(struct rq *rq, struct task_struct *p,
 extern void inc_rq_walt_stats(struct rq *rq, struct task_struct *p);
 extern void dec_rq_walt_stats(struct rq *rq, struct task_struct *p);
 extern void fixup_busy_time(struct task_struct *p, int new_cpu);
+extern void walt_prepare_migrate(struct task_struct *p,
+		int src_cpu, int new_cpu, bool locked);
+extern void walt_finish_migrate(struct task_struct *p,
+		int src_cpu, int new_cpu, bool locked);
 extern void init_new_task_load(struct task_struct *p);
 extern void mark_task_starting(struct task_struct *p);
 extern void set_window_start(struct rq *rq);
@@ -379,15 +374,6 @@ static inline void walt_rq_dump(int cpu)
 	struct task_struct *tsk = cpu_curr(cpu);
 	int i;
 
-	/*
-	 * Increment the task reference so that it can't be
-	 * freed on a remote CPU. Since we are going to
-	 * enter panic, there is no need to decrement the
-	 * task reference. Decrementing the task reference
-	 * can't be done in atomic context, especially with
-	 * rq locks held.
-	 */
-	get_task_struct(tsk);
 	printk_deferred("CPU:%d nr_running:%u current: %d (%s)\n",
 			cpu, rq->nr_running, tsk->pid, tsk->comm);
 
@@ -412,8 +398,7 @@ static inline void walt_rq_dump(int cpu)
 		printk_deferred("rq->load_subs[%d].new_subs=%llu)\n", i,
 				rq->load_subs[i].new_subs);
 	}
-	if (!exiting_task(tsk))
-		walt_task_dump(tsk);
+	walt_task_dump(tsk);
 	SCHED_PRINT(sched_capacity_margin_up[cpu]);
 	SCHED_PRINT(sched_capacity_margin_down[cpu]);
 }
@@ -465,6 +450,11 @@ static inline unsigned int walt_big_tasks(int cpu)
 	return 0;
 }
 
+static inline u64 walt_get_prev_group_run_sum(struct rq *rq)
+{
+	return 0;
+}
+
 static inline void walt_adjust_nr_big_tasks(struct rq *rq,
 		int delta, bool inc)
 {
@@ -485,6 +475,10 @@ static inline void walt_dec_cumulative_runnable_avg(struct rq *rq,
 }
 
 static inline void fixup_busy_time(struct task_struct *p, int new_cpu) { }
+static inline void walt_prepare_migrate(struct task_struct *p,
+		int src_cpu, int new_cpu, bool locked) { }
+static inline void walt_finish_migrate(struct task_struct *p,
+		int src_cpu, int new_cpu, bool locked) { }
 static inline void init_new_task_load(struct task_struct *p)
 {
 }

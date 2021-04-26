@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  */
 
 #ifndef _MSM_CVP_INTERNAL_H_
@@ -179,6 +179,20 @@ enum profiling_points {
 	MAX_PROFILING_POINTS,
 };
 
+struct cvp_buf_type {
+	s32 fd;
+	u32 size;
+	u32 offset;
+	u32 flags;
+	union {
+		struct dma_buf *dbuf;
+		struct {
+			u32 reserved1;
+			u32 reserved2;
+		};
+	};
+};
+
 struct cvp_clock_data {
 	int buffer_counter;
 	int load;
@@ -284,7 +298,7 @@ struct cvp_session_event {
 
 struct msm_cvp_core {
 	struct list_head list;
-	struct mutex lock, power_lock;
+	struct mutex lock;
 	int id;
 	dev_t dev_num;
 	struct cdev cdev;

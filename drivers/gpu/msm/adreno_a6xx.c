@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/firmware.h>
@@ -446,8 +446,8 @@ static void a6xx_start(struct adreno_device *adreno_dev)
 	kgsl_regwrite(device, A6XX_UCHE_FILTER_CNTL, 0x804);
 	kgsl_regwrite(device, A6XX_UCHE_CACHE_WAYS, 0x4);
 
-	if (adreno_is_a640_family(adreno_dev) ||
-		adreno_is_a650_family(adreno_dev)) {
+	/* ROQ sizes are twice as big on a640/a680 than on a630 */
+	if (ADRENO_GPUREV(adreno_dev) >= ADRENO_REV_A640) {
 		kgsl_regwrite(device, A6XX_CP_ROQ_THRESHOLDS_2, 0x02000140);
 		kgsl_regwrite(device, A6XX_CP_ROQ_THRESHOLDS_1, 0x8040362C);
 	} else if (adreno_is_a612(adreno_dev) || adreno_is_a610(adreno_dev)) {
@@ -1313,19 +1313,11 @@ static const char *a6xx_fault_block_uche(struct kgsl_device *device,
 	unsigned int uche_client_id = 0;
 	static char str[40];
 
-	/*
-	 * Smmu driver takes a vote on CX gdsc before calling the kgsl pagefault
-	 * handler. If there is contention for device mutex in this path and the
-	 * dispatcher fault handler is holding this lock, trying to turn off CX
-	 * gdsc will fail during the reset. So to avoid blocking here, try to
-	 * lock device mutex and return if it fails.
-	 */
-	if (!mutex_trylock(&device->mutex))
-		return "UCHE";
+	mutex_lock(&device->mutex);
 
 	if (!kgsl_state_is_awake(device)) {
 		mutex_unlock(&device->mutex);
-		return "UCHE";
+		return "UCHE: unknown";
 	}
 
 	kgsl_regread(device, A6XX_UCHE_CLIENT_PF, &uche_client_id);
@@ -1333,7 +1325,7 @@ static const char *a6xx_fault_block_uche(struct kgsl_device *device,
 
 	/* Ignore the value if the gpu is in IFPC */
 	if (uche_client_id == SCOOBYDOO)
-		return "UCHE";
+		return "UCHE: unknown";
 
 	uche_client_id &= A6XX_UCHE_CLIENT_PF_CLIENT_ID_MASK;
 	snprintf(str, sizeof(str), "UCHE: %s",

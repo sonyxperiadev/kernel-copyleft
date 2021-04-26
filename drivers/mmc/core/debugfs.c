@@ -7,6 +7,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/moduleparam.h>
 #include <linux/export.h>
 #include <linux/debugfs.h>
@@ -511,6 +516,50 @@ void mmc_remove_host_debugfs(struct mmc_host *host)
 	debugfs_remove_recursive(host->debugfs_root);
 }
 
+#ifdef CONFIG_MMC_CMD_DEBUG
+static int mmc_cmd_stats_show(struct seq_file *s, void *data)
+{
+	int i;
+	struct mmc_card *card = s->private;
+	unsigned long long t;
+	unsigned long rem_nsec;
+
+	if (card->cmd_stats.wrapped) {
+		for (i = card->cmd_stats.next_idx; i < CMD_QUEUE_SIZE; i++) {
+			t = card->cmd_stats.cmdq[i].timestamp;
+			rem_nsec = do_div(t, 1000000000);
+			seq_printf(s, "[%5llu.%06lu] CMD%u arg %08x flags %08x\n",
+				t, (rem_nsec/1000),
+				card->cmd_stats.cmdq[i].opcode,
+				card->cmd_stats.cmdq[i].arg,
+				card->cmd_stats.cmdq[i].flags);
+		}
+	}
+
+	for (i = 0; i < card->cmd_stats.next_idx; i++) {
+		t = card->cmd_stats.cmdq[i].timestamp;
+		rem_nsec = do_div(t, 1000000000);
+		seq_printf(s, "[%5llu.%06lu] CMD%u arg %08x flags %08x\n",
+			t, (rem_nsec/1000),
+			card->cmd_stats.cmdq[i].opcode,
+			card->cmd_stats.cmdq[i].arg,
+			card->cmd_stats.cmdq[i].flags);
+	}
+
+	return 0;
+}
+
+static int mmc_cmd_stats_open(struct inode *inode, struct file *filp)
+{
+	return single_open(filp, mmc_cmd_stats_show, inode->i_private);
+}
+
+static const struct file_operations mmc_dbg_card_rq_cmdq_fops = {
+	.open		= mmc_cmd_stats_open,
+	.read		= seq_read,
+};
+#endif
+
 void mmc_add_card_debugfs(struct mmc_card *card)
 {
 	struct mmc_host	*host = card->host;
@@ -533,8 +582,14 @@ void mmc_add_card_debugfs(struct mmc_card *card)
 	if (!debugfs_create_x32("state", 0400, root, &card->state))
 		goto err;
 
-	return;
+#ifdef CONFIG_MMC_CMD_DEBUG
+	if (mmc_card_mmc(card) || mmc_card_sd(card))
+		if (!debugfs_create_file("mmc_cmd_stats", S_IRUSR, root,
+				card, &mmc_dbg_card_rq_cmdq_fops))
+			goto err;
+#endif
 
+	return;
 err:
 	debugfs_remove_recursive(root);
 	card->debugfs_root = NULL;

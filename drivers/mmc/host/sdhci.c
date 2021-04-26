@@ -12,6 +12,11 @@
  *
  *     - JMicron (hardware and technical support)
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/ktime.h>
@@ -891,12 +896,6 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd,
 	/* Unspecified timeout, assume max */
 	if (!data && !cmd->busy_timeout)
 		return 0xE;
-
-	/* During initialization, don't use max timeout as the clock is slow */
-	if ((host->quirks2 & SDHCI_QUIRK2_USE_RESERVED_MAX_TIMEOUT) &&
-		(host->clock > 400000)) {
-		return 0xF;
-	}
 
 	/* timeout in us */
 	target_timeout = sdhci_target_timeout(host, cmd, data);
@@ -3442,7 +3441,9 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 				intmask, host->data->error,
 				ktime_to_ms(ktime_sub(ktime_get(),
 				host->data_start_time)));
-			sdhci_dumpregs(host);
+
+			if (host->mmc->ios.timing != MMC_TIMING_UHS_SDR104)
+				sdhci_dumpregs(host);
 		}
 		sdhci_finish_data(host);
 	} else {
