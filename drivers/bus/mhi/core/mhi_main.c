@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved. */
 
@@ -1153,7 +1158,12 @@ static int parse_rsc_event(struct mhi_controller *mhi_cntrl,
 
 	result.transaction_status = (ev_code == MHI_EV_CC_OVERFLOW) ?
 		-EOVERFLOW : 0;
-	result.bytes_xferd = xfer_len;
+/* SONY_BEGIN (Changes related to CR#2677376) */
+	//result.bytes_xferd = xfer_len;
+
+	/* truncate to buf len if xfer_len is larger */
+	result.bytes_xferd = min_t(u16, xfer_len, buf_info->len);
+/* SONY_END (Changes related to CR#2677376) */
 	result.buf_addr = buf_info->cb_buf;
 	result.dir = mhi_chan->dir;
 
@@ -1401,6 +1411,15 @@ int mhi_process_data_event_ring(struct mhi_controller *mhi_cntrl,
 			local_rp->ptr, local_rp->dword[0], local_rp->dword[1]);
 
 		chan = MHI_TRE_GET_EV_CHID(local_rp);
+/* SONY_BEGIN (Changes related to CR#2617422) */
+		if (chan >= mhi_cntrl->max_chan) {
+			MHI_ERR("invalid channel id %u\n", chan);
+/* SONY_BEGIN (Changes related to CR#2673763) */
+			//continue;
+			goto next_er_element;
+/* SONY_END (Changes related to CR#2673763) */
+		 }
+/* SONY_END (Changes related to CR#2617422) */
 		mhi_chan = &mhi_cntrl->mhi_chan[chan];
 
 		if (likely(type == MHI_PKT_TYPE_TX_EVENT)) {
@@ -1410,7 +1429,9 @@ int mhi_process_data_event_ring(struct mhi_controller *mhi_cntrl,
 			parse_rsc_event(mhi_cntrl, local_rp, mhi_chan);
 			event_quota--;
 		}
-
+/* SONY_BEGIN (Changes related to CR#2673763) */
+next_er_element:
+/* SONY_END (Changes related to CR#2673763) */
 		mhi_recycle_ev_ring_element(mhi_cntrl, ev_ring);
 		local_rp = ev_ring->rp;
 		dev_rp = mhi_to_virtual(ev_ring, er_ctxt->rp);
