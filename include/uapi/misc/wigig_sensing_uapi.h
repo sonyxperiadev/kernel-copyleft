@@ -24,7 +24,6 @@ struct wigig_sensing_change_mode {
 	enum wigig_sensing_mode mode;
 	bool has_channel;
 	uint32_t channel;
-	uint32_t burst_size;
 };
 
 enum wigig_sensing_event {

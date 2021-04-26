@@ -9,6 +9,11 @@
  *
  *  You may use this code as per GPL version 2
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -806,6 +811,9 @@ static const struct thermal_cooling_device_ops psy_tcd_ops = {
 static int psy_register_cooler(struct device *dev, struct power_supply *psy)
 {
 	int i;
+
+	pr_warn("%s: Don't register psy cooling device\n", __func__);
+	return 0;
 
 	/* Register for cooling device if psy can control charging */
 	for (i = 0; i < psy->desc->num_properties; i++) {

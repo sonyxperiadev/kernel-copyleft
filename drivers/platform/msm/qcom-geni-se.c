@@ -69,6 +69,8 @@ struct bus_vectors {
  * @bus_bw_set_noc:	Clock plan for DDR path.
  * @cur_bus_bw_idx:	Current index within the bus clock plan.
  * @cur_bus_bw_idx_noc:	Current index within the DDR path clock plan.
+ * @num_clk_levels:	Number of valid clock levels in clk_perf_tbl.
+ * @clk_perf_tbl:	Table of clock frequency input to Serial Engine clock.
  * @log_ctx:		Logging context to hold the debug information.
  * @vectors:		Structure to store Master End and Slave End IDs for
 			QUPv3 clock and DDR path bus BW request.
@@ -105,6 +107,8 @@ struct geni_se_device {
 	unsigned long *bus_bw_set_noc;
 	int cur_bus_bw_idx;
 	int cur_bus_bw_idx_noc;
+	unsigned int num_clk_levels;
+	unsigned long *clk_perf_tbl;
 	void *log_ctx;
 	struct bus_vectors *vectors;
 	int num_paths;
@@ -1131,31 +1135,31 @@ int geni_se_clk_tbl_get(struct se_geni_rsc *rsc, unsigned long **tbl)
 	mutex_lock(&geni_se_dev->geni_dev_lock);
 	*tbl = NULL;
 
-	if (rsc->clk_perf_tbl) {
-		*tbl = rsc->clk_perf_tbl;
-		ret = rsc->num_clk_levels;
+	if (geni_se_dev->clk_perf_tbl) {
+		*tbl = geni_se_dev->clk_perf_tbl;
+		ret = geni_se_dev->num_clk_levels;
 		goto exit_se_clk_tbl_get;
 	}
 
-	rsc->clk_perf_tbl = kzalloc(sizeof(*rsc->clk_perf_tbl) *
+	geni_se_dev->clk_perf_tbl = kzalloc(sizeof(*geni_se_dev->clk_perf_tbl) *
 						MAX_CLK_PERF_LEVEL, GFP_KERNEL);
-	if (!rsc->clk_perf_tbl) {
+	if (!geni_se_dev->clk_perf_tbl) {
 		ret = -ENOMEM;
 		goto exit_se_clk_tbl_get;
 	}
 
 	for (i = 0; i < MAX_CLK_PERF_LEVEL; i++) {
-		rsc->clk_perf_tbl[i] = clk_round_rate(rsc->se_clk,
+		geni_se_dev->clk_perf_tbl[i] = clk_round_rate(rsc->se_clk,
 								prev_freq + 1);
-		if (rsc->clk_perf_tbl[i] == prev_freq) {
-			rsc->clk_perf_tbl[i] = 0;
+		if (geni_se_dev->clk_perf_tbl[i] == prev_freq) {
+			geni_se_dev->clk_perf_tbl[i] = 0;
 			break;
 		}
-		prev_freq = rsc->clk_perf_tbl[i];
+		prev_freq = geni_se_dev->clk_perf_tbl[i];
 	}
-	rsc->num_clk_levels = i;
-	*tbl = rsc->clk_perf_tbl;
-	ret = rsc->num_clk_levels;
+	geni_se_dev->num_clk_levels = i;
+	*tbl = geni_se_dev->clk_perf_tbl;
+	ret = geni_se_dev->num_clk_levels;
 exit_se_clk_tbl_get:
 	mutex_unlock(&geni_se_dev->geni_dev_lock);
 	return ret;
@@ -1257,35 +1261,6 @@ int geni_se_tx_dma_prep(struct device *wrapper_dev, void __iomem *base,
 EXPORT_SYMBOL(geni_se_tx_dma_prep);
 
 /**
- * geni_se_rx_dma_start() - Prepare the Serial Engine registers for RX DMA
-				transfers.
- * @base:		Base address of the SE register block.
- * @rx_len:		Length of the RX buffer.
- * @rx_dma:		Pointer to store the mapped DMA address.
- *
- * This function is used to prepare the Serial Engine registers for DMA RX.
- *
- * Return:	None.
- */
-void geni_se_rx_dma_start(void __iomem *base, int rx_len, dma_addr_t *rx_dma)
-{
-
-	if (!*rx_dma || !base || !rx_len)
-		return;
-
-	geni_write_reg(7, base, SE_DMA_RX_IRQ_EN_SET);
-	geni_write_reg(GENI_SE_DMA_PTR_L(*rx_dma), base, SE_DMA_RX_PTR_L);
-	geni_write_reg(GENI_SE_DMA_PTR_H(*rx_dma), base, SE_DMA_RX_PTR_H);
-	/* RX does not have EOT bit */
-	geni_write_reg(0, base, SE_DMA_RX_ATTR);
-
-	/* Ensure that above register writes went through */
-	mb();
-	geni_write_reg(rx_len, base, SE_DMA_RX_LEN);
-}
-EXPORT_SYMBOL(geni_se_rx_dma_start);
-
-/**
  * geni_se_rx_dma_prep() - Prepare the Serial Engine for RX DMA transfer
  * @wrapper_dev:	QUPv3 Wrapper Device to which the RX buffer is mapped.
  * @base:		Base address of the SE register block.
@@ -1310,8 +1285,12 @@ int geni_se_rx_dma_prep(struct device *wrapper_dev, void __iomem *base,
 	if (ret)
 		return ret;
 
-	geni_se_rx_dma_start(base, rx_len, rx_dma);
-
+	geni_write_reg(7, base, SE_DMA_RX_IRQ_EN_SET);
+	geni_write_reg(GENI_SE_DMA_PTR_L(*rx_dma), base, SE_DMA_RX_PTR_L);
+	geni_write_reg(GENI_SE_DMA_PTR_H(*rx_dma), base, SE_DMA_RX_PTR_H);
+	/* RX does not have EOT bit */
+	geni_write_reg(0, base, SE_DMA_RX_ATTR);
+	geni_write_reg(rx_len, base, SE_DMA_RX_LEN);
 	return 0;
 }
 EXPORT_SYMBOL(geni_se_rx_dma_prep);
