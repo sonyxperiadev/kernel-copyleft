@@ -56,7 +56,6 @@ extern unsigned int sysctl_sched_coloc_busy_hyst_max_ms;
 extern unsigned int sysctl_sched_window_stats_policy;
 extern unsigned int sysctl_sched_ravg_window_nr_ticks;
 extern unsigned int sysctl_sched_dynamic_ravg_window_enable;
-extern unsigned int sysctl_sched_prefer_spread;
 
 extern int
 walt_proc_group_thresholds_handler(struct ctl_table *table, int write,
@@ -77,7 +76,7 @@ extern int sched_updown_migrate_handler(struct ctl_table *table,
 					size_t *lenp, loff_t *ppos);
 #endif
 
-#if defined(CONFIG_PREEMPTIRQ_EVENTS) || defined(CONFIG_PREEMPT_TRACER)
+#if defined(CONFIG_PREEMPT_TRACER) || defined(CONFIG_DEBUG_PREEMPT)
 extern unsigned int sysctl_preemptoff_tracing_threshold_ns;
 #endif
 #if defined(CONFIG_PREEMPTIRQ_EVENTS) && defined(CONFIG_IRQSOFF_TRACER)

@@ -16,6 +16,11 @@
  *  for newbie kernel hackers. It features several pointers to major
  *  kernel subsystems and hints as to where to find out what things do.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/oom.h>
 #include <linux/mm.h>
@@ -44,6 +49,7 @@
 #include <linux/memory_hotplug.h>
 #include <linux/show_mem_notifier.h>
 #include <linux/psi.h>
+#include <uapi/linux/sched/types.h>
 
 #include <asm/tlb.h>
 #include "internal.h"
@@ -836,7 +842,11 @@ static void wake_oom_reaper(struct task_struct *tsk)
 
 static int __init oom_init(void)
 {
+	struct sched_param param = { .sched_priority = 1 };
+
 	oom_reaper_th = kthread_run(oom_reaper, NULL, "oom_reaper");
+	sched_setscheduler_nocheck(oom_reaper_th, SCHED_FIFO,
+					 &param);
 	return 0;
 }
 subsys_initcall(oom_init)
@@ -1021,7 +1031,8 @@ static bool task_will_free_mem(struct task_struct *task)
 	return ret;
 }
 
-static void __oom_kill_process(struct task_struct *victim)
+static void __oom_kill_process(struct task_struct *victim,
+			       struct oom_control *oc)
 {
 	struct task_struct *p;
 	struct mm_struct *mm;
@@ -1051,6 +1062,18 @@ static void __oom_kill_process(struct task_struct *victim)
 	 * reserves from the user space under its control.
 	 */
 	do_send_sig_info(SIGKILL, SEND_SIG_FORCED, victim, PIDTYPE_TGID);
+	if (oc) {
+		trace_oom_sigkill(victim->pid,	victim->comm,
+				  oc->chosen_points,
+				  get_mm_rss(victim->mm),
+				  oc->gfp_mask);
+	} else {
+		trace_oom_sigkill(victim->pid,	victim->comm,
+				  0,
+				  get_mm_rss(victim->mm),
+				  0);
+	}
+
 	mark_oom_victim(victim);
 	pr_err("Killed process %d (%s) total-vm:%lukB, anon-rss:%lukB, file-rss:%lukB, shmem-rss:%lukB oom_score_adj=%hd\n",
 		task_pid_nr(victim), victim->comm, K(victim->mm->total_vm),
@@ -1105,12 +1128,13 @@ static void __oom_kill_process(struct task_struct *victim)
  * Kill provided task unless it's secured by setting
  * oom_score_adj to OOM_SCORE_ADJ_MIN.
  */
-static int oom_kill_memcg_member(struct task_struct *task, void *unused)
+static int oom_kill_memcg_member(struct task_struct *task, void *oom_ctl)
 {
+	struct oom_control *oc = oom_ctl;
 	if (task->signal->oom_score_adj != OOM_SCORE_ADJ_MIN &&
 	    !is_global_init(task)) {
 		get_task_struct(task);
-		__oom_kill_process(task);
+		__oom_kill_process(task, oc);
 	}
 	return 0;
 }
@@ -1199,7 +1223,7 @@ static void oom_kill_process(struct oom_control *oc, const char *message,
 	 */
 	if (oc->only_positive_adj)
 		ulmk_update_last_kill();
-	__oom_kill_process(victim);
+	__oom_kill_process(victim, oc);
 
 	/*
 	 * If necessary, kill all tasks in the selected memory cgroup.

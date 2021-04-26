@@ -7,6 +7,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef MMC_SLOT_GPIO_H
 #define MMC_SLOT_GPIO_H
@@ -37,5 +42,5 @@ bool mmc_can_gpio_cd(struct mmc_host *host);
 bool mmc_can_gpio_ro(struct mmc_host *host);
 void mmc_register_extcon(struct mmc_host *host);
 void mmc_unregister_extcon(struct mmc_host *host);
-
+void mmc_gpio_tray_close_set_uim2(struct mmc_host *host, int value);
 #endif

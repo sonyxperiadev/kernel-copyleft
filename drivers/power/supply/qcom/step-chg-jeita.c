@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
@@ -225,6 +230,11 @@ EXPORT_SYMBOL(read_range_data_from_node);
 
 static int get_step_chg_jeita_setting_from_profile(struct step_chg_info *chip)
 {
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	chip->sw_jeita_cfg_valid = false;
+	return -ENODATA;
+#endif
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	struct device_node *batt_node, *profile_node;
 	u32 max_fv_uv, max_fcc_ma;
 	const char *batt_type_str;
@@ -355,6 +365,7 @@ static int get_step_chg_jeita_setting_from_profile(struct step_chg_info *chip)
 	}
 
 	return rc;
+#endif
 }
 
 static void get_config_work(struct work_struct *work)
