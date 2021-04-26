@@ -11,12 +11,17 @@
  * Released under the terms of GNU General Public License Version 2.0
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _ZRAM_DRV_H_
 #define _ZRAM_DRV_H_
 
 #include <linux/rwsem.h>
-#include <linux/zsmalloc.h>
+#include <linux/zpool.h>
 #include <linux/crypto.h>
 #include <linux/spinlock.h>
 
@@ -111,7 +116,7 @@ struct zram_hash {
 
 struct zram {
 	struct zram_table_entry *table;
-	struct zs_pool *mem_pool;
+	struct zpool *mem_pool;
 	struct zcomp *comp;
 	struct gendisk *disk;
 	struct zram_hash *hash;

@@ -1,6 +1,11 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -11,6 +16,7 @@
 #include <linux/err.h>
 #include <linux/qpnp/qpnp-revid.h>
 #include <linux/of.h>
+#include <linux/sysfs.h>
 
 #define REVID_REVISION1	0x0
 #define REVID_REVISION2	0x1
@@ -59,9 +65,6 @@ static const char *const pmic_names[] = {
 	[PM8150L_SUBTYPE] = "PM8150L",
 	[PM6150_SUBTYPE] = "PM6150",
 	[PM7250B_SUBTYPE] = "PM7250B",
-	[PM6350_SUBTYPE] = "PM6350",
-	[PMK8350_SUBTYPE] = "PMK8350",
-	[PMR735B_SUBTYPE] = "PMR735B",
 	[PM6125_SUBTYPE] = "PM6125",
 	[PM8008_SUBTYPE] = "PM8008",
 	[SMB1355_SUBTYPE] = "SMB1355",
@@ -161,6 +164,33 @@ static size_t build_pmic_string(char *buf, size_t n, int sid,
 
 #define PMIC_PERIPHERAL_TYPE		0x51
 #define PMIC_STRING_MAXLENGTH		80
+static ssize_t pmic_rev_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+	int len = 0;
+	char pmic_buf[PMIC_STRING_MAXLENGTH] = { 0 };
+	struct pmic_revid_data *revid_data = get_revid_data(dev->of_node);
+
+	if (IS_ERR(revid_data)) {
+		pr_err("failed to get revid %ld\n", PTR_ERR(revid_data));
+		return PTR_ERR(revid_data);
+	}
+
+	len += snprintf(pmic_buf + len, PMIC_STRING_MAXLENGTH - len,
+				"v%d.%d", revid_data->rev4, revid_data->rev3);
+	if (revid_data->rev2 || revid_data->rev1)
+		len += snprintf(pmic_buf + len, PMIC_STRING_MAXLENGTH - len,
+				".%d", revid_data->rev2);
+	if (revid_data->rev1)
+		len += snprintf(pmic_buf + len, PMIC_STRING_MAXLENGTH - len,
+				".%d", revid_data->rev1);
+
+	len = scnprintf(buf, PMIC_STRING_MAXLENGTH, "%s", pmic_buf);
+	return len;
+}
+
+DEVICE_ATTR(revision, 0644, pmic_rev_show, NULL);
+
 static int qpnp_revid_probe(struct platform_device *pdev)
 {
 	u8 rev1, rev2, rev3, rev4, pmic_type, pmic_subtype, pmic_status;
@@ -247,6 +277,10 @@ static int qpnp_revid_probe(struct platform_device *pdev)
 	option2 = (pmic_status >> 2) & 0x3;
 	option3 = (pmic_status >> 4) & 0x3;
 	option4 = (pmic_status >> 6) & 0x3;
+
+	rc = sysfs_create_file(&pdev->dev.kobj, &dev_attr_revision.attr);
+	if (rc)
+		pr_err("Failed to create pmic_rev_info sysfs entry\n");
 
 	build_pmic_string(pmic_string, PMIC_STRING_MAXLENGTH,
 			  to_spmi_device(pdev->dev.parent)->usid,

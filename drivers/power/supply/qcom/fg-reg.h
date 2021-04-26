@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  */
 
@@ -35,6 +40,9 @@
 #define BATT_THERM_PULL_UP_MASK			GENMASK(1, 0)
 
 #define ADC_RR_BATT_THERM_FREQ(chip)		(chip->rradc_base + 0x82)
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define BATT_THERM_FREQ_1S			1
+#endif
 
 #define ADC_RR_BATT_TEMP_LSB(chip)		(chip->rradc_base + 0x88)
 #define ADC_RR_BATT_TEMP_MSB(chip)		(chip->rradc_base + 0x89)

@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
@@ -826,17 +831,13 @@ static int __read_queue(struct cvp_iface_q_info *qinfo, u8 *packet,
 		 */
 		mb();
 		*pb_tx_req_is_set = 0;
-		if (write_idx != queue->qhdr_write_idx) {
-			queue->qhdr_rx_req = 0;
-		} else {
-			spin_unlock(&qinfo->hfi_lock);
-			dprintk(CVP_DBG,
-				"%s queue is empty, rx_req = %u, tx_req = %u, read_idx = %u\n",
-				receive_request ? "message" : "debug",
-				queue->qhdr_rx_req, queue->qhdr_tx_req,
-				queue->qhdr_read_idx);
-			return -ENODATA;
-		}
+		spin_unlock(&qinfo->hfi_lock);
+		dprintk(CVP_DBG,
+			"%s queue is empty, rx_req = %u, tx_req = %u, read_idx = %u\n",
+			receive_request ? "message" : "debug",
+			queue->qhdr_rx_req, queue->qhdr_tx_req,
+			queue->qhdr_read_idx);
+		return -ENODATA;
 	}
 
 	read_ptr = (u32 *)((qinfo->q_array.align_virtual_addr) +
@@ -880,7 +881,7 @@ static int __read_queue(struct cvp_iface_q_info *qinfo, u8 *packet,
 		rc = -ENODATA;
 	}
 
-	if (new_read_idx != queue->qhdr_write_idx)
+	if (read_idx != write_idx)
 		queue->qhdr_rx_req = 0;
 	else
 		queue->qhdr_rx_req = receive_request;
@@ -2750,6 +2751,15 @@ static int __check_core_registered(struct iris_hfi_device *device,
 	return -EINVAL;
 }
 
+static void cvpss_hfi_crash_reason(struct cvp_hfi_sfr_struct *vsfr)
+{
+	char msg[SUBSYS_CRASH_REASON_LEN];
+
+	snprintf(msg, sizeof(msg), "SFR Message from FW : %s",
+						vsfr->rg_data);
+	subsystem_crash_reason("cvpss", msg);
+}
+
 static void __process_fatal_error(
 		struct iris_hfi_device *device)
 {
@@ -2783,6 +2793,7 @@ static void iris_hfi_pm_handler(struct work_struct *work)
 	int rc = 0;
 	struct msm_cvp_core *core;
 	struct iris_hfi_device *device;
+	char msg[SUBSYS_CRASH_REASON_LEN];
 
 	core = list_first_entry(&cvp_driver->cores, struct msm_cvp_core, list);
 	if (core)
@@ -2805,6 +2816,9 @@ static void iris_hfi_pm_handler(struct work_struct *work)
 		dprintk(CVP_WARN, "Failed to PC for %d times\n",
 				device->skip_pc_count);
 		device->skip_pc_count = 0;
+		snprintf(msg, sizeof(msg),
+			"Failed to PC %d times\n", device->skip_pc_count);
+		subsystem_crash_reason("cvpss", msg);
 		__process_fatal_error(device);
 		return;
 	}
@@ -2934,29 +2948,24 @@ skip_power_off:
 	return -EAGAIN;
 }
 
-static void print_sfr_message(struct iris_hfi_device *device)
+static void __process_sys_error(struct iris_hfi_device *device)
 {
 	struct cvp_hfi_sfr_struct *vsfr = NULL;
-	u32 vsfr_size = 0;
-	void *p = NULL;
 
 	vsfr = (struct cvp_hfi_sfr_struct *)device->sfr.align_virtual_addr;
 	if (vsfr) {
-		if (vsfr->bufSize != device->sfr.mem_size) {
-			dprintk(CVP_ERR, "Invalid SFR buf size %d actual %d\n",
-			vsfr->bufSize, device->sfr.mem_size);
-			return;
-		}
-		vsfr_size = vsfr->bufSize - sizeof(u32);
-		p = memchr(vsfr->rg_data, '\0', vsfr_size);
+		void *p = memchr(vsfr->rg_data, '\0', vsfr->bufSize);
 		/*
 		 * SFR isn't guaranteed to be NULL terminated
+		 * since SYS_ERROR indicates that Iris is in the
+		 * process of crashing.
 		 */
 		if (p == NULL)
-			vsfr->rg_data[vsfr_size - 1] = '\0';
+			vsfr->rg_data[vsfr->bufSize - 1] = '\0';
 
 		dprintk(CVP_ERR, "SFR Message from FW: %s\n",
 				vsfr->rg_data);
+		cvpss_hfi_crash_reason(vsfr);
 	}
 }
 
@@ -3077,7 +3086,7 @@ static void process_system_msg(struct msm_cvp_cb_info *info,
 
 	switch (info->response_type) {
 	case HAL_SYS_ERROR:
-		print_sfr_message(device);
+		__process_sys_error(device);
 		break;
 	case HAL_SYS_RELEASE_RESOURCE_DONE:
 		dprintk(CVP_DBG, "Received SYS_RELEASE_RESOURCE\n");
@@ -3204,6 +3213,8 @@ static int __response_handler(struct iris_hfi_device *device)
 	}
 
 	if (device->intr_status & CVP_FATAL_INTR_BMSK) {
+		struct cvp_hfi_sfr_struct *vsfr = (struct cvp_hfi_sfr_struct *)
+			device->sfr.align_virtual_addr;
 		struct msm_cvp_cb_info info = {
 			.response_type = HAL_SYS_WATCHDOG_TIMEOUT,
 			.response.cmd = {
@@ -3211,8 +3222,11 @@ static int __response_handler(struct iris_hfi_device *device)
 			}
 		};
 
-		print_sfr_message(device);
-
+		if (vsfr) {
+			dprintk(CVP_ERR, "SFR Message from FW: %s\n",
+					vsfr->rg_data);
+			cvpss_hfi_crash_reason(vsfr);
+		}
 		if (device->intr_status & CVP_WRAPPER_INTR_MASK_CPU_NOC_BMSK)
 			dprintk(CVP_ERR, "Received Xtensa NOC error\n");
 

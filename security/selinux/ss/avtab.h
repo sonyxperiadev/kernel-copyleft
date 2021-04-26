@@ -7,6 +7,11 @@
  *
  *  Author : Stephen Smalley, <sds@tycho.nsa.gov>
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /* Updated: Frank Mayer <mayerf@tresys.com> and Karl MacMillan <kmacmillan@tresys.com>
  *
@@ -114,7 +119,7 @@ struct avtab_node *avtab_search_node(struct avtab *h, struct avtab_key *key);
 
 struct avtab_node *avtab_search_node_next(struct avtab_node *node, int specified);
 
-#define MAX_AVTAB_HASH_BITS 16
+#define MAX_AVTAB_HASH_BITS 18
 #define MAX_AVTAB_HASH_BUCKETS (1 << MAX_AVTAB_HASH_BITS)
 
 #endif	/* _SS_AVTAB_H_ */
