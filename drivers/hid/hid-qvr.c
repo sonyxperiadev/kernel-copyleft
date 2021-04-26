@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -46,8 +46,7 @@
 #include "hid-qvr.h"
 #include "hid-trace.h"
 
-#define TIME_OUT_START_STOP_MS 500
-#define TIME_OUT_READ_WRITE_MS 20
+#define WAIT_EVENT_INT_TOUT 20
 
 #define QVR_START_IMU		_IO('q', 1)
 #define QVR_STOP_IMU		_IO('q', 2)
@@ -64,7 +63,6 @@ struct qvr_buf_index {
 	uint8_t padding[60];
 };
 
-// struct must be 64 bit aligned
 struct qvr_sensor_t {
 	uint64_t gts;
 	uint64_t ats;
@@ -72,19 +70,13 @@ struct qvr_sensor_t {
 	s32 gx;
 	s32 gy;
 	s32 gz;
-	u32 gNumerator;
-	u32 gDenominator;
 	s32 ax;
 	s32 ay;
 	s32 az;
-	u32 aNumerator;
-	u32 aDenominator;
 	s32 mx;
 	s32 my;
 	s32 mz;
-	u32 mNumerator;
-	u32 mDenominator;
-	uint8_t padding[44];
+	uint8_t padding[4];
 };
 
 struct qvr_calib_data {
@@ -113,6 +105,7 @@ struct qvr_external_sensor {
 
 static DECLARE_WAIT_QUEUE_HEAD(wq);
 static struct qvr_external_sensor qvr_external_sensor;
+static uint8_t DEBUG_ORIENTATION;
 
 static int read_calibration_len(void)
 {
@@ -135,7 +128,7 @@ static int read_calibration_len(void)
 
 	ret = wait_event_interruptible_timeout(wq,
 		sensor->calib_data_len != -1,
-		msecs_to_jiffies(TIME_OUT_READ_WRITE_MS));
+		msecs_to_jiffies(WAIT_EVENT_INT_TOUT));
 	if (ret == 0) {
 		kfree(hid_buf);
 		return -ETIME;
@@ -180,7 +173,7 @@ static uint8_t *read_calibration_data(void)
 			HID_REQ_SET_REPORT);
 		ret = wait_event_interruptible_timeout(wq,
 			sensor->calib_data_recv == 1,
-			msecs_to_jiffies(TIME_OUT_READ_WRITE_MS));
+			msecs_to_jiffies(WAIT_EVENT_INT_TOUT));
 		if (ret == 0) {
 			pr_err("%s:get calibration data timeout\n", __func__);
 			kfree(hid_buf);
@@ -228,7 +221,7 @@ static int control_imu_stream(bool status)
 		HID_FEATURE_REPORT,
 		HID_REQ_SET_REPORT);
 	ret = wait_event_interruptible_timeout(wq, sensor->ext_ack == 1,
-		msecs_to_jiffies(TIME_OUT_START_STOP_MS));
+		msecs_to_jiffies(WAIT_EVENT_INT_TOUT));
 	if (!ret && status) {
 		pr_debug("qvr: falling back - start IMU stream failed\n");
 		hid_buf[0] = QVR_HID_REPORT_ID_CAL;
@@ -262,6 +255,10 @@ static int qvr_send_package_wrap(u8 *message, int msize, struct hid_device *hid)
 	memcpy((void *)&imuData, (void *)message,
 		sizeof(struct external_imu_format));
 	if (!sensor->ts_base) {
+		if (imuData.gNumerator == 1 && imuData.aNumerator == 1)
+			DEBUG_ORIENTATION = 1;
+		else
+			DEBUG_ORIENTATION = 0;
 		pr_debug("qvr msize = %d reportID=%d padding=%d\n"
 			"qvr version=%d numImu=%d nspip=%d pSize=%d\n"
 			"qvr imuID=%d sampleID=%d temp=%d\n",
@@ -288,9 +285,9 @@ static int qvr_send_package_wrap(u8 *message, int msize, struct hid_device *hid)
 	if (!sensor->ts_offset)
 		sensor->ts_offset = imuData.gts0;
 	index_buf = (struct qvr_buf_index *)((uintptr_t)sensor->vaddr +
-		(sensor->vsize / 2));
+		(sensor->vsize / 2) + (8 * sizeof(*sensor_buf)));
 	sensor_buf = (struct qvr_sensor_t *)((uintptr_t)sensor->vaddr +
-		(sensor->vsize / 2) + sizeof(struct qvr_buf_index));
+		(sensor->vsize / 2));
 
 	data = (struct qvr_sensor_t *)&(sensor_buf[buf_index]);
 	if (sensor->ts_offset > imuData.gts0)
@@ -305,30 +302,27 @@ static int qvr_send_package_wrap(u8 *message, int msize, struct hid_device *hid)
 		data->mts = data->ats;
 	data->gts = data->ats;
 
-	data->ax = imuData.ax0;
-	data->ay = imuData.ay0;
-	data->az = imuData.az0;
-	data->gx = imuData.gx0;
-	data->gy = imuData.gy0;
-	data->gz = imuData.gz0;
-	data->mx = imuData.my0;
-	data->my = imuData.mx0;
-	data->mz = imuData.mz0;
-	data->ax = imuData.ax0;
-	data->ay = imuData.ay0;
-	data->az = imuData.az0;
-	data->gx = imuData.gx0;
-	data->gy = imuData.gy0;
-	data->gz = imuData.gz0;
-	data->mx = imuData.my0;
-	data->my = imuData.mx0;
-	data->mz = imuData.mz0;
-	data->aNumerator = imuData.aNumerator;
-	data->aDenominator = imuData.aDenominator;
-	data->gNumerator = imuData.gNumerator;
-	data->gDenominator = imuData.gDenominator;
-	data->mNumerator = imuData.mNumerator;
-	data->mDenominator = imuData.mDenominator;
+	if (DEBUG_ORIENTATION == 1) {
+		data->ax = -imuData.ax0;
+		data->ay = imuData.ay0;
+		data->az = -imuData.az0;
+		data->gx = -imuData.gx0;
+		data->gy = imuData.gy0;
+		data->gz = -imuData.gz0;
+		data->mx = -imuData.my0;
+		data->my = -imuData.mx0;
+		data->mz = -imuData.mz0;
+	} else {
+		data->ax = -imuData.ay0;
+		data->ay = -imuData.ax0;
+		data->az = -imuData.az0;
+		data->gx = -imuData.gy0;
+		data->gy = -imuData.gx0;
+		data->gz = -imuData.gz0;
+		data->mx = -imuData.my0;
+		data->my = -imuData.mx0;
+		data->mz = -imuData.mz0;
+	}
 
 	trace_qvr_recv_sensor("gyro", data->gts, data->gx, data->gy, data->gz);
 	trace_qvr_recv_sensor("accel", data->ats, data->ax, data->ay, data->az);
@@ -498,14 +492,6 @@ static int qvr_external_sensor_probe(struct hid_device *hdev,
 	struct qvr_external_sensor *sensor = &qvr_external_sensor;
 	int ret;
 	char *node_name = "qcom,smp2p-interrupt-qvrexternal-5-out";
-
-	//For devices with non-standard HID report descriptors, it is
-	//required to force the registration of an input device.
-	hdev->quirks |= HID_QUIRK_HIDINPUT_FORCE;
-
-	//Devices with non-standard incoming events need to use this quirk.
-	hdev->quirks |= HID_QUIRK_INCREMENT_USAGE_ON_DUPLICATE;
-
 	sensor->hdev = hdev;
 
 	ret = register_smp2p(&hdev->dev, node_name, &sensor->gpio_info_out);

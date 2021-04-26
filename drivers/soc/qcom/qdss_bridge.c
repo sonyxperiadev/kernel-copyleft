@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  */
 
 #define KMSG_COMPONENT "QDSS diag bridge"
@@ -108,7 +108,6 @@ static int qdss_create_buf_tbl(struct qdss_bridge_drvdata *drvdata)
 
 		buf = kzalloc(drvdata->mtu, GFP_KERNEL);
 		usb_req = kzalloc(sizeof(*usb_req), GFP_KERNEL);
-		init_completion(&usb_req->write_done);
 
 		entry->buf = buf;
 		entry->usb_req = usb_req;
@@ -460,8 +459,7 @@ static void usb_notifier(void *priv, unsigned int event,
 		break;
 
 	case USB_QDSS_DISCONNECT:
-		if (drvdata->opened == ENABLE)
-			usb_qdss_free_req(drvdata->usb_ch);
+		/* Leave MHI/USB open.Only close on MHI disconnect */
 		break;
 
 	case USB_QDSS_DATA_WRITE_DONE:

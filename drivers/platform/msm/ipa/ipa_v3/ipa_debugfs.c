@@ -378,6 +378,131 @@ static ssize_t ipa3_read_keep_awake(struct file *file, char __user *ubuf,
 	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, nbytes);
 }
 
+static ssize_t ipa3_read_mpm_ring_size_dl(struct file *file, char __user *ubuf,
+	size_t count, loff_t *ppos)
+{
+	int nbytes;
+
+	nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
+				"IPA_MPM_RING_SIZE_DL = %d\n",
+				ipa3_ctx->mpm_ring_size_dl);
+
+	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, nbytes);
+}
+
+static ssize_t ipa3_read_mpm_ring_size_ul(struct file *file, char __user *ubuf,
+	size_t count, loff_t *ppos)
+{
+	int nbytes;
+
+	nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
+				"IPA_MPM_RING_SIZE_UL = %d\n",
+				ipa3_ctx->mpm_ring_size_ul);
+
+	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, nbytes);
+}
+
+static ssize_t ipa3_read_mpm_uc_thresh(struct file *file, char __user *ubuf,
+	size_t count, loff_t *ppos)
+{
+	int nbytes;
+
+	nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
+				"IPA_MPM_UC_THRESH = %d\n",
+				ipa3_ctx->mpm_uc_thresh);
+
+	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, nbytes);
+}
+
+static ssize_t ipa3_read_mpm_teth_aggr_size(struct file *file,
+	char __user *ubuf,
+	size_t count, loff_t *ppos)
+{
+	int nbytes;
+
+	nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
+				"IPA_MPM_TETH_AGGR_SIZE = %d\n",
+				ipa3_ctx->mpm_teth_aggr_size);
+
+	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, nbytes);
+}
+
+static ssize_t ipa3_write_mpm_ring_size_dl(struct file *file,
+	const char __user *buf,
+	size_t count, loff_t *ppos)
+{
+	s8 option = 0;
+	int ret;
+
+	ret = kstrtos8_from_user(buf, count, 0, &option);
+	if (ret)
+		return ret;
+	/* as option is type s8, max it can take is 127 */
+	if ((option > 0) && (option <= IPA_MPM_MAX_RING_LEN))
+		ipa3_ctx->mpm_ring_size_dl = option;
+	else
+		IPAERR("Invalid dl ring size =%d: range is 1 to %d\n",
+			option, IPA_MPM_MAX_RING_LEN);
+	return count;
+}
+
+static ssize_t ipa3_write_mpm_ring_size_ul(struct file *file,
+	const char __user *buf,
+	size_t count, loff_t *ppos)
+{
+	s8 option = 0;
+	int ret;
+
+	ret = kstrtos8_from_user(buf, count, 0, &option);
+	if (ret)
+		return ret;
+	/* as option is type s8, max it can take is 127 */
+	if ((option > 0) && (option <= IPA_MPM_MAX_RING_LEN))
+		ipa3_ctx->mpm_ring_size_ul = option;
+	else
+		IPAERR("Invalid ul ring size =%d: range is 1 to %d\n",
+			option, IPA_MPM_MAX_RING_LEN);
+	return count;
+}
+
+static ssize_t ipa3_write_mpm_uc_thresh(struct file *file,
+	const char __user *buf,
+	size_t count, loff_t *ppos)
+{
+	s8 option = 0;
+	int ret;
+
+	ret = kstrtos8_from_user(buf, count, 0, &option);
+	if (ret)
+		return ret;
+	/* as option is type s8, max it can take is 127 */
+	if ((option > 0) && (option <= IPA_MPM_MAX_UC_THRESH))
+		ipa3_ctx->mpm_uc_thresh = option;
+	else
+		IPAERR("Invalid uc thresh =%d: range is 1 to %d\n",
+			option, IPA_MPM_MAX_UC_THRESH);
+	return count;
+}
+
+static ssize_t ipa3_write_mpm_teth_aggr_size(struct file *file,
+	const char __user *buf,
+	size_t count, loff_t *ppos)
+{
+	s8 option = 0;
+	int ret;
+
+	ret = kstrtos8_from_user(buf, count, 0, &option);
+	if (ret)
+		return ret;
+	/* as option is type s8, max it can take is 127 */
+	if ((option > 0) && (option <= IPA_MAX_TETH_AGGR_BYTE_LIMIT))
+		ipa3_ctx->mpm_teth_aggr_size = option;
+	else
+		IPAERR("Invalid teth aggr size =%d: range is 1 to %d\n",
+			option, IPA_MAX_TETH_AGGR_BYTE_LIMIT);
+	return count;
+}
+
 static ssize_t ipa3_read_hdr(struct file *file, char __user *ubuf, size_t count,
 		loff_t *ppos)
 {
@@ -721,8 +846,7 @@ static ssize_t ipa3_read_rt(struct file *file, char __user *ubuf, size_t count,
 	list_for_each_entry(tbl, &set->head_rt_tbl_list, link) {
 		i = 0;
 		list_for_each_entry(entry, &tbl->head_rt_rule_list, link) {
-			if (entry->proc_ctx &&
-				(!ipa3_check_idr_if_freed(entry->proc_ctx))) {
+			if (entry->proc_ctx) {
 				ofst = entry->proc_ctx->offset_entry->offset;
 				ofst_words =
 					(ofst +
@@ -1146,7 +1270,6 @@ static ssize_t ipa3_read_stats(struct file *file, char __user *ubuf,
 		"lan_repl_rx_empty=%u\n"
 		"flow_enable=%u\n"
 		"flow_disable=%u\n",
-		"rx_page_drop_cnt=%u\n",
 		ipa3_ctx->stats.tx_sw_pkts,
 		ipa3_ctx->stats.tx_hw_pkts,
 		ipa3_ctx->stats.tx_non_linear,
@@ -1162,8 +1285,7 @@ static ssize_t ipa3_read_stats(struct file *file, char __user *ubuf,
 		ipa3_ctx->stats.lan_rx_empty,
 		ipa3_ctx->stats.lan_repl_rx_empty,
 		ipa3_ctx->stats.flow_enable,
-		ipa3_ctx->stats.flow_disable,
-		ipa3_ctx->stats.rx_page_drop_cnt);
+		ipa3_ctx->stats.flow_disable);
 	cnt += nbytes;
 
 	for (i = 0; i < IPAHAL_PKT_STATUS_EXCEPTION_MAX; i++) {
@@ -2414,22 +2536,6 @@ done:
 	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, cnt);
 }
 
-static ssize_t ipa3_read_app_clk_vote(
-	struct file *file,
-	char __user *ubuf,
-	size_t count,
-	loff_t *ppos)
-{
-	int cnt =
-		scnprintf(
-			dbg_buff,
-			IPA_MAX_MSG_LEN,
-			"%u\n",
-			ipa3_ctx->app_clock_vote.cnt);
-
-	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, cnt);
-}
-
 static void ipa_dump_status(struct ipahal_pkt_status *status)
 {
 	IPA_DUMP_STATUS_FIELD(status_opcode);
@@ -2571,6 +2677,26 @@ static const struct ipa3_debugfs_file debugfs_files[] = {
 			.write = ipa3_write_keep_awake,
 		}
 	}, {
+		"mpm_ring_size_dl", IPA_READ_WRITE_MODE, NULL, {
+			.read = ipa3_read_mpm_ring_size_dl,
+			.write = ipa3_write_mpm_ring_size_dl,
+		}
+	}, {
+		"mpm_ring_size_ul", IPA_READ_WRITE_MODE, NULL, {
+			.read = ipa3_read_mpm_ring_size_ul,
+			.write = ipa3_write_mpm_ring_size_ul,
+		}
+	}, {
+		"mpm_uc_thresh", IPA_READ_WRITE_MODE, NULL, {
+			.read = ipa3_read_mpm_uc_thresh,
+			.write = ipa3_write_mpm_uc_thresh,
+		}
+	}, {
+		"mpm_teth_aggr_size", IPA_READ_WRITE_MODE, NULL, {
+			.read = ipa3_read_mpm_teth_aggr_size,
+			.write = ipa3_write_mpm_teth_aggr_size,
+		}
+	}, {
 		"holb", IPA_WRITE_ONLY_MODE, NULL, {
 			.write = ipa3_write_ep_holb,
 		}
@@ -2707,11 +2833,7 @@ static const struct ipa3_debugfs_file debugfs_files[] = {
 		"usb_gsi_stats", IPA_READ_ONLY_MODE, NULL, {
 			.read = ipa3_read_usb_gsi_stats,
 		}
-	}, {
-		"app_clk_vote_cnt", IPA_READ_ONLY_MODE, NULL, {
-			.read = ipa3_read_app_clk_vote,
-		}
-	},
+	}
 };
 
 void ipa3_debugfs_init(void)

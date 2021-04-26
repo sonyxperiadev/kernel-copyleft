@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef UAPI_UFS_H_
 #define UAPI_UFS_H_
 
@@ -85,5 +90,23 @@ enum query_opcode {
 	UPIU_QUERY_OPCODE_CLEAR_FLAG	= 0x7,
 	UPIU_QUERY_OPCODE_TOGGLE_FLAG	= 0x8,
 	UPIU_QUERY_OPCODE_MAX,
+};
+
+enum purge_status {
+	PURGE_STATUS_IDLE			= 0x00,
+	PURGE_STATUS_IN_PROGRESS	= 0x01,
+	PURGE_STATUS_STOPPED		= 0x02,
+	PURGE_STATUS_COMPLETED		= 0x03,
+	PURGE_STATUS_BUSY			= 0x04,
+	PURGE_STATUS_GENERAL_ERROR	= 0x05,
+};
+
+enum ffu_status {
+	FFU_STATUS_NO_INFOMATION	= 0x00,
+	FFU_STATUS_SUCCESS			= 0x01,
+	FFU_STATUS_CORRUPTION_ERROR	= 0x02,
+	FFU_STATUS_INTERNAL_ERROR	= 0x03,
+	FFU_STATUS_VERSION_MISMATCH	= 0x04,
+	FFU_STATUS_GENERAL_ERROR	= 0xFF,
 };
 #endif /* UAPI_UFS_H_ */

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -590,10 +590,10 @@ static int ipa3_qmi_init_modem_send_sync_msg(void)
 	}
 	req.hw_stats_quota_base_addr_valid = true;
 	req.hw_stats_quota_base_addr =
-		IPA_MEM_PART(stats_quota_q6_ofst) + smem_restr_bytes;
+		IPA_MEM_PART(stats_quota_ofst) + smem_restr_bytes;
 
 	req.hw_stats_quota_size_valid = true;
-	req.hw_stats_quota_size = IPA_MEM_PART(stats_quota_q6_size);
+	req.hw_stats_quota_size = IPA_MEM_PART(stats_quota_size);
 
 	req.hw_drop_stats_base_addr_valid = true;
 	req.hw_drop_stats_base_addr =
@@ -1508,11 +1508,6 @@ static void ipa3_q6_clnt_svc_arrive(struct work_struct *work)
 	int rc;
 	struct ipa_master_driver_init_complt_ind_msg_v01 ind;
 
-	if (unlikely(!ipa_q6_clnt)) {
-		IPAWANERR("Invalid q6 clnt.Ignore sending ind.\n");
-		return;
-	}
-
 	rc = kernel_connect(ipa_q6_clnt->sock,
 		(struct sockaddr *) &ipa3_qmi_ctx->server_sq,
 		sizeof(ipa3_qmi_ctx->server_sq),
@@ -1571,11 +1566,6 @@ static void ipa3_q6_clnt_svc_arrive(struct work_struct *work)
 			ipa_master_driver_init_complt_ind_msg_v01));
 		ind.master_driver_init_status.result =
 			IPA_QMI_RESULT_SUCCESS_V01;
-
-		if (unlikely(!ipa3_svc_handle)) {
-			IPAWANERR("Invalid svc handle.Ignore sending ind.\n");
-			return;
-		}
 
 		rc = qmi_send_indication(ipa3_svc_handle,
 			&ipa3_qmi_ctx->client_sq,
@@ -2071,6 +2061,7 @@ int ipa3_qmi_set_aggr_info(enum ipa_aggr_enum_type_v01 aggr_enum_type)
 
 	/* replace to right qmap format */
 	aggr_req.aggr_info[1].aggr_type = aggr_enum_type;
+	aggr_req.aggr_info[1].bytes_count = ipa3_ctx->mpm_teth_aggr_size;
 	aggr_req.aggr_info[2].aggr_type = aggr_enum_type;
 	aggr_req.aggr_info[3].aggr_type = aggr_enum_type;
 	aggr_req.aggr_info[4].aggr_type = aggr_enum_type;

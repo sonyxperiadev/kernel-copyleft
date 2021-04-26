@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
  */
 
@@ -8,6 +13,8 @@
 
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
+
+#define SUBSYS_CRASH_REASON_LEN 512
 
 struct subsys_device;
 extern struct bus_type subsys_bus_type;
@@ -168,6 +175,9 @@ void complete_err_ready(struct subsys_device *subsys);
 void complete_shutdown_ack(struct subsys_device *subsys);
 struct subsys_device *find_subsys_device(const char *str);
 extern int wait_for_shutdown_ack(struct subsys_desc *desc);
+
+extern int subsystem_crash_reason(const char *name, char *reason);
+extern void update_crash_reason(struct subsys_device *dev, char *, int);
 #else
 
 static inline int subsys_get_restart_level(struct subsys_device *dev)
@@ -229,6 +239,14 @@ static inline void notify_before_auth_and_reset(struct device *device) { }
 static inline int wait_for_shutdown_ack(struct subsys_desc *desc)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline void update_crash_reason(struct subsys_device *dev,
+						char *reason, int size) { }
+
+static inline int subsystem_crash_reason(const char *name, char *reason)
+{
+	return 0;
 }
 #endif /* CONFIG_MSM_SUBSYSTEM_RESTART */
 

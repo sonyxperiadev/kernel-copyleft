@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __LINUX_PWM_H
 #define __LINUX_PWM_H
 
@@ -783,5 +788,39 @@ static inline void pwmchip_sysfs_unexport(struct pwm_chip *chip)
 {
 }
 #endif /* CONFIG_PWM_SYSFS */
+
+#ifdef CONFIG_PWM_QTI_LPG
+
+/*
+ * ramp_config: Lookup table (LUT) parameters
+ * @step_ms: time before loading next LUT pattern [ms]
+ * @pause_hi_count: pause multiplier at high index
+ * @pause_lo_count: pause multiplier at low index
+ * @hi_index: LUT high index for ramp
+ * @lo_index: LUT low index for ramp
+ * @ramp_dir_low_to_hi: ramp work from low to high
+ * @pattern_repeat: reapeat LUT array pattern
+ * @toggle: toggle to return index or start
+ */
+struct ramp_config {
+	u16	step_ms;
+	u32	pause_hi_count;
+	u32	pause_lo_count;
+	u8	hi_idx;
+	u8	lo_idx;
+	bool	ramp_dir_low_to_hi;
+	bool	pattern_repeat;
+	bool	toggle;
+	u32	*pattern;
+	u32	pattern_length;
+};
+
+int pwm_config_lut(struct pwm_device *pwm,
+		struct ramp_config *pwm_lut);
+
+int pwm_get_max_pwm_value(struct pwm_device *pwm);
+void pwm_set_max_pwm_value(struct pwm_device *pwm, int max);
+
+#endif /* CONFIG_PWM_QTI_LPG */
 
 #endif /* __LINUX_PWM_H */

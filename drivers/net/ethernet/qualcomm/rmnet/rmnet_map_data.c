@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
  *
  * RMNET Data MAP protocol
  *
@@ -535,6 +535,7 @@ void rmnet_map_v5_checksum_uplink_packet(struct sk_buff *skb,
 
 		check = rmnet_map_get_csum_field(proto, trans);
 		if (check) {
+			*check = 0;
 			skb->ip_summed = CHECKSUM_NONE;
 			/* Ask for checksum offloading */
 			ul_header->csum_valid_required = 1;
@@ -1401,46 +1402,17 @@ static struct sk_buff *rmnet_map_build_skb(struct rmnet_port *port)
 	return skb;
 }
 
-static void rmnet_map_send_agg_skb(struct rmnet_port *port, unsigned long flags)
-{
-	struct sk_buff *agg_skb;
-
-	if (!port->agg_skb) {
-		spin_unlock_irqrestore(&port->agg_lock, flags);
-		return;
-	}
-
-	agg_skb = port->agg_skb;
-	/* Reset the aggregation state */
-	port->agg_skb = NULL;
-	port->agg_count = 0;
-	memset(&port->agg_time, 0, sizeof(struct timespec));
-	port->agg_state = 0;
-	spin_unlock_irqrestore(&port->agg_lock, flags);
-	hrtimer_cancel(&port->hrtimer);
-	dev_queue_xmit(agg_skb);
-}
-
 void rmnet_map_tx_aggregate(struct sk_buff *skb, struct rmnet_port *port)
 {
 	struct timespec diff, last;
-	int size;
+	int size, agg_count = 0;
+	struct sk_buff *agg_skb;
 	unsigned long flags;
 
 new_packet:
 	spin_lock_irqsave(&port->agg_lock, flags);
 	memcpy(&last, &port->agg_last, sizeof(struct timespec));
 	getnstimeofday(&port->agg_last);
-
-	if ((port->data_format & RMNET_EGRESS_FORMAT_PRIORITY) &&
-	    skb->priority) {
-		/* Send out any aggregated SKBs we have */
-		rmnet_map_send_agg_skb(port, flags);
-		/* Send out the priority SKB. Not holding agg_lock anymore */
-		skb->protocol = htons(ETH_P_MAP);
-		dev_queue_xmit(skb);
-		return;
-	}
 
 	if (!port->agg_skb) {
 		/* Check to see if we should agg first. If the traffic is very
@@ -1481,7 +1453,15 @@ new_packet:
 	if (skb->len > size ||
 	    port->agg_count >= port->egress_agg_params.agg_count ||
 	    diff.tv_sec > 0 || diff.tv_nsec > rmnet_agg_time_limit) {
-		rmnet_map_send_agg_skb(port, flags);
+		agg_skb = port->agg_skb;
+		agg_count = port->agg_count;
+		port->agg_skb = 0;
+		port->agg_count = 0;
+		memset(&port->agg_time, 0, sizeof(struct timespec));
+		port->agg_state = 0;
+		spin_unlock_irqrestore(&port->agg_lock, flags);
+		hrtimer_cancel(&port->hrtimer);
+		dev_queue_xmit(agg_skb);
 		goto new_packet;
 	}
 
