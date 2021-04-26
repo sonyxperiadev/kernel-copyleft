@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 
 #define DRIVER_NAME "radio-silabs"
@@ -1354,6 +1359,38 @@ static int get_rssi(struct silabs_fm_device *radio, u8 *prssi)
 	return retval;
 }
 
+static int update_audmode(struct silabs_fm_device *radio)
+{
+	int retval = 0;
+
+	mutex_lock(&radio->lock);
+
+	memset(radio->write_buf, 0, WRITE_REG_NUM);
+
+	/* track command that is being sent to chip.*/
+	radio->cmd = FM_RSQ_STATUS_CMD;
+	radio->write_buf[0] = FM_RSQ_STATUS_CMD;
+	radio->write_buf[1] = 1;
+
+	retval = send_cmd(radio, RSQ_STATUS_CMD_LEN);
+	if (retval < 0) {
+		FMDERR("%s: get_rsq_status failed with error %d\n",
+				__func__, retval);
+		goto send_cmd_fail;
+	}
+
+	FMDBG("%s: Blend percent %d, Pilot indicator %d",
+			__func__, radio->read_buf[3] & 0x7F, radio->read_buf[3] >> 7);
+	if ((radio->read_buf[3] & 0x7F) == 0)
+		silabs_fm_q_event(radio, SILABS_EVT_MONO);
+	else
+		silabs_fm_q_event(radio, SILABS_EVT_STEREO);
+
+send_cmd_fail:
+	mutex_unlock(&radio->lock);
+	return retval;
+}
+
 static bool is_valid_freq(struct silabs_fm_device *radio, u32 freq)
 {
 	u32 band_low_limit = radio->recv_conf.band_low_limit * TUNE_STEP_SIZE;
@@ -1559,9 +1596,6 @@ static void silabs_af_tune(struct work_struct *work)
 	}
 
 
-	/* Disable all other interrupts except STC, RDS */
-	retval = configure_interrupts(radio, ENABLE_STC_RDS_INTERRUPTS);
-
 	/* Mute until AF tuning finishes */
 	retval = set_hard_mute(radio, true);
 
@@ -1678,11 +1712,10 @@ err_tune_fail:
 
 	/* Clear the stale RDS int bit. */
 	get_rds_status(radio);
-	retval = configure_interrupts(radio, ENABLE_STC_RDS_INTERRUPTS);
 
 	/* Clear the stale RSQ int bit. */
 	get_rssi(radio, &rssi);
-	retval = configure_interrupts(radio, ENABLE_RSQ_INTERRUPTS);
+	retval = configure_interrupts(radio, ENABLE_ALL_INTERRUPTS);
 
 end:
 	/* Unmute */
@@ -1773,6 +1806,7 @@ static int configure_interrupts(struct silabs_fm_device *radio, u8 val)
 	int retval = 0;
 	u16 prop_val = 0;
 
+	FMDBG("%s val=%d", __func__, val);
 	switch (val) {
 	case DISABLE_ALL_INTERRUPTS:
 		prop_val = 0;
@@ -1780,13 +1814,14 @@ static int configure_interrupts(struct silabs_fm_device *radio, u8 val)
 		if (retval < 0)
 			FMDERR("%s: error disabling interrupts\n", __func__);
 		break;
-	case ENABLE_STC_RDS_INTERRUPTS:
-		/* enable STC and RDS interrupts. */
-		prop_val = RDS_INT_BIT_MASK | STC_INT_BIT_MASK;
+	case ENABLE_ALL_INTERRUPTS:
+		/* enable STC, RDS and RSQ interrupts. */
+		prop_val = RDS_INT_BIT_MASK | STC_INT_BIT_MASK
+			| RSQ_INT_BIT_MASK | RSQ_REP_BIT_MASK;
 
 		retval = set_property(radio, GPO_IEN_PROP, prop_val);
 		if (retval < 0)
-			FMDERR("%s: error enabling STC, RDS interrupts\n",
+			FMDERR("%s: error enabling STC, RDS and RSQ interrupts\n",
 				__func__);
 		break;
 	case ENABLE_STC_INTERRUPTS:
@@ -1797,22 +1832,9 @@ static int configure_interrupts(struct silabs_fm_device *radio, u8 val)
 		if (retval < 0)
 			FMDERR("%s: error enabling STC interrupts\n", __func__);
 		break;
-	case ENABLE_RDS_INTERRUPTS:
-		/* enable RDS interrupts. */
-		prop_val = RDS_INT_BIT_MASK | STC_INT_BIT_MASK;
-		if (radio->is_af_jump_enabled)
-			prop_val |= RSQ_INT_BIT_MASK;
-
-		retval = set_property(radio, GPO_IEN_PROP, prop_val);
-		if (retval < 0)
-			FMDERR("%s: error enabling RDS interrupts\n",
-				__func__);
-		break;
 	case DISABLE_RDS_INTERRUPTS:
 		/* disable RDS interrupts. */
-		prop_val = STC_INT_BIT_MASK;
-		if (radio->is_af_jump_enabled)
-			prop_val |= RSQ_INT_BIT_MASK;
+		prop_val = STC_INT_BIT_MASK | RSQ_INT_BIT_MASK | RSQ_REP_BIT_MASK;
 
 		retval = set_property(radio, GPO_IEN_PROP, prop_val);
 		if (retval < 0)
@@ -1821,7 +1843,7 @@ static int configure_interrupts(struct silabs_fm_device *radio, u8 val)
 		break;
 	case ENABLE_RSQ_INTERRUPTS:
 		/* enable RSQ interrupts. */
-		prop_val = RSQ_INT_BIT_MASK | STC_INT_BIT_MASK;
+		prop_val = RSQ_INT_BIT_MASK | STC_INT_BIT_MASK | RSQ_REP_BIT_MASK;
 		if (radio->lp_mode != true)
 			prop_val |= RDS_INT_BIT_MASK;
 
@@ -1927,7 +1949,7 @@ static int initialize_recv(struct silabs_fm_device *radio)
 
 	retval = set_property(radio,
 				FM_RSQ_INT_SOURCE_PROP,
-				RSSI_LOW_TH_INT_BIT_MASK);
+				BLEND_TH_INT_BIT_MASK);
 	if (retval < 0)	{
 		FMDERR("%s: FM_RSQ_INT_SOURCE_PROP fail error %d\n",
 				__func__, retval);
@@ -2031,7 +2053,7 @@ static int enable(struct silabs_fm_device *radio)
 	mutex_unlock(&radio->lock);
 
 	/* enable interrupts */
-	retval = configure_interrupts(radio, ENABLE_STC_RDS_INTERRUPTS);
+	retval = configure_interrupts(radio, ENABLE_ALL_INTERRUPTS);
 	if (retval < 0)
 		FMDERR("In %s, configure_interrupts failed with error %d\n",
 				__func__, retval);
@@ -2346,6 +2368,7 @@ static void silabs_interrupts_handler(struct silabs_fm_device *radio)
 
 		/* clear RSQ interrupt bits until AF tune is complete. */
 		(void)get_rssi(radio, &rssi);
+		(void)update_audmode(radio);
 		/* Don't process RSQ until AF tune is complete. */
 		if (radio->is_af_tune_in_progress == true)
 			return;
@@ -3055,14 +3078,14 @@ static int silabs_fm_vidioc_s_ctrl(struct file *file, void *priv,
 		FMDBG("In %s, V4L2_CID_PRIVATE_SILABS_LP_MODE, val is %d\n",
 			__func__, ctrl->value);
 		if (ctrl->value) {
-			/* disable RDS interrupts */
-			retval = configure_interrupts(radio,
-					ENABLE_RDS_INTERRUPTS);
+			/* disable RDS and RSQ interrupts */
+			retval = configure_interrupts(radio, ENABLE_STC_INTERRUPTS);
 			radio->lp_mode = true;
 		} else {
-			/* enable RDS interrupts */
-			retval = configure_interrupts(radio,
-					DISABLE_RDS_INTERRUPTS);
+			/* update once LP mode is set to 0*/
+			(void)update_audmode(radio);
+			/* enable all interrupts */
+			retval = configure_interrupts(radio, ENABLE_ALL_INTERRUPTS);
 			radio->lp_mode = false;
 		}
 
@@ -3075,14 +3098,31 @@ static int silabs_fm_vidioc_s_ctrl(struct file *file, void *priv,
 	case V4L2_CID_PRIVATE_SILABS_AF_JUMP:
 		FMDBG("%s: V4L2_CID_PRIVATE_SILABS_AF_JUMP, val is %d\n",
 			__func__, ctrl->value);
-		if (ctrl->value)
-			/* enable RSQ interrupts */
-			retval = configure_interrupts(radio,
+		if (ctrl->value) {
+			/* set RSSI based RSQ interrupts */
+			retval = set_property(radio,
+						FM_RSQ_INT_SOURCE_PROP,
+						RSSI_LOW_TH_INT_BIT_MASK
+						| BLEND_TH_INT_BIT_MASK);
+			if (retval < 0) {
+				FMDERR("%s: FM_RSQ_INT_SOURCE_PROP fail error %d\n",
+						__func__, retval);
+				goto end;
+			}
+		} else {
+			/* disable RSSI based RSQ interrupts */
+			retval = set_property(radio,
+						FM_RSQ_INT_SOURCE_PROP,
+						BLEND_TH_INT_BIT_MASK);
+			if (retval < 0) {
+				FMDERR("%s: FM_RSQ_INT_SOURCE_PROP fail error %d\n",
+						__func__, retval);
+				goto end;
+			}
+		}
+		/* enable RSQ interrupts */
+		retval = configure_interrupts(radio,
 					ENABLE_RSQ_INTERRUPTS);
-		else
-			/* disable RSQ interrupts */
-			retval = configure_interrupts(radio,
-					DISABLE_RSQ_INTERRUPTS);
 		if (retval < 0) {
 			FMDERR("%s: setting AF jump mode failed %d\n",
 				__func__, retval);
@@ -3179,78 +3219,80 @@ static int silabs_fm_set_stereo_mono_mode(struct file *file, void *priv,
 	int retval = 0;
 	struct silabs_fm_device *radio = video_get_drvdata(video_devdata(file));
 
+	FMDBG("%s: Audmode is set to %d\n", __func__, tuner->audmode);
+
 	if (tuner->audmode == V4L2_TUNER_MODE_MONO) {
 		retval = set_property(radio, FM_BLEND_RSSI_STEREO_THRESHOLD,
-					0x31); // default value
+				0x7F); // Force mono
 		if (retval < 0) {
-			FMDERR("%s: mono, set rssi stereo failed\n", __func__);
+			FMDERR("%s: Mono, set RSSI stereo threshold failed\n", __func__);
 			goto set_failed;
 		}
 		retval = set_property(radio, FM_BLEND_RSSI_MONO_THRESHOLD,
-					0x1E); // default value
+				0x7F); // Force mono
 		if (retval < 0) {
-			FMDERR("%s: mono, set rssi mono failed\n", __func__);
+			FMDERR("%s: Mono, set RSSI mono threshold failed\n", __func__);
 			goto set_failed;
 		}
 		retval = set_property(radio, FM_BLEND_SNR_STEREO_THRESHOLD,
-					0x1B); // default value
+				0x7F); // Force mono
 		if (retval < 0) {
-			FMDERR("%s: mono, set snr stereo failed\n", __func__);
+			FMDERR("%s: Mono, set SNR stereo threshold failed\n", __func__);
 			goto set_failed;
 		}
 		retval = set_property(radio, FM_BLEND_SNR_MONO_THRESHOLD,
-					0x0E); // default value
+				0x7F); // Force mono
 		if (retval < 0) {
-			FMDERR("%s: mono, set snr mono failed\n", __func__);
+			FMDERR("%s: Mono, set SNR mono threshold failed\n", __func__);
 			goto set_failed;
 		}
 		retval = set_property(radio, FM_BLEND_MULTIPATH_STEREO_THRESHOLD,
-					0x14); // default value
+				0); // Force mono
 		if (retval < 0) {
-			FMDERR("%s: mono, set blend multipath stereo failed\n", __func__);
+			FMDERR("%s: Mono, set Multipath stereo threshold failed\n", __func__);
 			goto set_failed;
 		}
 		retval = set_property(radio, FM_BLEND_MULTIPATH_MONO_THRESHOLD,
-					0x3C); // default value
+				0); // Force mono
 		if (retval < 0) {
-			FMDERR("%s: mono, set blend multipath mono failed\n", __func__);
+			FMDERR("%s: Mono, set Multipath mono threshold failed\n", __func__);
 			goto set_failed;
 		}
 	} else if (tuner->audmode == V4L2_TUNER_MODE_STEREO) {
 		retval = set_property(radio, FM_BLEND_RSSI_STEREO_THRESHOLD,
-					0); // force to stereo
+				0x31); // Try stereo
 		if (retval < 0) {
-			FMDERR("%s: stereo, set rssi stereo failed\n", __func__);
+			FMDERR("%s: Stereo, set RSSI stereo threshold failed\n", __func__);
 			goto set_failed;
 		}
 		retval = set_property(radio, FM_BLEND_RSSI_MONO_THRESHOLD,
-					0); // force to stereo
+				0); // Try stereo
 		if (retval < 0) {
-			FMDERR("%s: stereo, set rssi mono failed\n", __func__);
+			FMDERR("%s: Stereo, RSSI mono threshold failed\n", __func__);
 			goto set_failed;
 		}
 		retval = set_property(radio, FM_BLEND_SNR_STEREO_THRESHOLD,
-					0); // force to stereo
+				0x1B); // Try stereo
 		if (retval < 0) {
-			FMDERR("%s: stereo, set snr stereo failed\n", __func__);
+			FMDERR("%s: Stereo, set SNR stereo threshold failed\n", __func__);
 			goto set_failed;
 		}
 		retval = set_property(radio, FM_BLEND_SNR_MONO_THRESHOLD,
-					0); // force to stereo
+				0); // Try stereo
 		if (retval < 0) {
-			FMDERR("%s: stereo, set snr mono failed\n", __func__);
+			FMDERR("%s: Stereo, set SNR mono threshold failed\n", __func__);
 			goto set_failed;
 		}
 		retval = set_property(radio, FM_BLEND_MULTIPATH_STEREO_THRESHOLD,
-					100); // force to stereo
+				0x14); // Try stereo
 		if (retval < 0) {
-			FMDERR("%s: stereo, set blend multipath stereo failed\n", __func__);
+			FMDERR("%s: Stereo, set Multipath stereo threshold failed\n", __func__);
 			goto set_failed;
 		}
 		retval = set_property(radio, FM_BLEND_MULTIPATH_MONO_THRESHOLD,
-					100); // force to stereo
+				0x64); // Try stereo
 		if (retval < 0) {
-			FMDERR("%s: stereo, set blend multipath mono failed\n", __func__);
+			FMDERR("%s: Stereo, set Multipath mono threshold failed\n", __func__);
 			goto set_failed;
 		}
 	}
@@ -3434,6 +3476,7 @@ static int silabs_fm_vidioc_g_frequency(struct file *file, void *priv,
 
 	FMDBG("In %s, freq is %d, rssi %u, snr %u\n",
 		__func__, f * TUNE_STEP_SIZE, rssi, snr);
+	(void)update_audmode(radio);
 
 send_cmd_fail:
 	return retval;

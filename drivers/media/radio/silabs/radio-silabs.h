@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __RADIO_SILABS_H
 #define __RADIO_SILABS_H
@@ -198,10 +203,12 @@ static const unsigned char MAX_SRCH_MODE = 0x02;
 #define CTS_INT_BIT_MASK           (1 << 7)
 #define ERR_BIT_MASK               (1 << 6)
 #define RSQ_INT_BIT_MASK           (1 << 3)
+#define RSQ_REP_BIT_MASK           (1 << 11)
 /* set RDS repeat int bit along with RDS int bit */
 #define RDS_INT_BIT_MASK           (0x0404)
 #define STC_INT_BIT_MASK            1
 #define RSSI_LOW_TH_INT_BIT_MASK    1
+#define BLEND_TH_INT_BIT_MASK      (1 << 7)
 #define RDS_INT_DISABLE_MASK	    0x9
 #define RSQ_INT_DISABLE_MASK	    0x5
 #define HARD_MUTE_MASK		    0x3
@@ -442,9 +449,8 @@ enum silabs_region_t {
 
 enum silabs_interrupts_t {
 	DISABLE_ALL_INTERRUPTS,
-	ENABLE_STC_RDS_INTERRUPTS,
+	ENABLE_ALL_INTERRUPTS,
 	ENABLE_STC_INTERRUPTS,
-	ENABLE_RDS_INTERRUPTS,
 	DISABLE_RDS_INTERRUPTS,
 	ENABLE_RSQ_INTERRUPTS,
 	DISABLE_RSQ_INTERRUPTS

@@ -167,11 +167,11 @@ config ARCH_SONY_EDO
 	If you enable this config,
 	please use SONY Mobile device tree.
 
-config MACH_SONY_PDX203_J
-	bool "Sony Mobile PDX-203 J"
+config MACH_SONY_PDX204
+	bool "Sony Mobile PDX-204"
 	depends on ARCH_SONY_EDO
 	help
-	Support for the SONY Mobile PDX-203 J device
+	Support for the SONY Mobile PDX-204 device
 	which is based on SONY Edo platform.
 	If you enable this config,
 	please use SONY Mobile device tree.

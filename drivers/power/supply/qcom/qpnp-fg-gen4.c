@@ -1879,9 +1879,16 @@ static int fg_gen4_set_ki_coeff_dischg(struct fg_dev *fg, int ki_coeff_low,
 	return 0;
 }
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define KI_COEFF_LOW_DISCHG_DEFAULT	367
 #define KI_COEFF_MED_DISCHG_DEFAULT	62
 #define KI_COEFF_HI_DISCHG_DEFAULT	0
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define KI_COEFF_LOW_DISCHG_DEFAULT	184
+#define KI_COEFF_MED_DISCHG_DEFAULT	123
+#define KI_COEFF_HI_DISCHG_DEFAULT	62
+#endif
 static int fg_gen4_adjust_ki_coeff_dischg(struct fg_dev *fg)
 {
 	struct fg_gen4_chip *chip = container_of(fg, struct fg_gen4_chip, fg);
@@ -7019,27 +7026,57 @@ static int fg_parse_ki_coefficients(struct fg_dev *fg)
 	of_property_read_u32(node, "qcom,ki-coeff-low-chg",
 		&chip->dt.ki_coeff_low_chg);
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->dt.ki_coeff_med_chg = 62;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	chip->dt.ki_coeff_med_chg = 123;
+#endif
 	of_property_read_u32(node, "qcom,ki-coeff-med-chg",
 		&chip->dt.ki_coeff_med_chg);
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->dt.ki_coeff_hi_chg = 0;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	chip->dt.ki_coeff_hi_chg = 62;
+#endif
 	of_property_read_u32(node, "qcom,ki-coeff-hi-chg",
 		&chip->dt.ki_coeff_hi_chg);
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->dt.ki_coeff_lo_med_chg_thr_ma = 500;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	chip->dt.ki_coeff_lo_med_chg_thr_ma = 63;
+#endif
 	of_property_read_u32(node, "qcom,ki-coeff-chg-low-med-thresh-ma",
 		&chip->dt.ki_coeff_lo_med_chg_thr_ma);
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->dt.ki_coeff_med_hi_chg_thr_ma = 1000;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	chip->dt.ki_coeff_med_hi_chg_thr_ma = 500;
+#endif
 	of_property_read_u32(node, "qcom,ki-coeff-chg-med-hi-thresh-ma",
 		&chip->dt.ki_coeff_med_hi_chg_thr_ma);
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->dt.ki_coeff_lo_med_dchg_thr_ma = 50;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	chip->dt.ki_coeff_lo_med_dchg_thr_ma = 63;
+#endif
 	of_property_read_u32(node, "qcom,ki-coeff-dischg-low-med-thresh-ma",
 		&chip->dt.ki_coeff_lo_med_dchg_thr_ma);
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	chip->dt.ki_coeff_med_hi_dchg_thr_ma = 100;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	chip->dt.ki_coeff_med_hi_dchg_thr_ma = 500;
+#endif
 	of_property_read_u32(node, "qcom,ki-coeff-dischg-med-hi-thresh-ma",
 		&chip->dt.ki_coeff_med_hi_dchg_thr_ma);
 

@@ -152,6 +152,7 @@ struct panel_specific_pdata {
 	int hbm_mode;
 	int pre_sod_mode;
 	int opec_mode;
+	int hmd_mode;
 
 	bool display_onoff_state;
 
