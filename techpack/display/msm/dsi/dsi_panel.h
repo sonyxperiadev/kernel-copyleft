@@ -297,8 +297,6 @@ int dsi_panel_set_hbm_mode(struct dsi_panel *panel, int mode);
 int dsi_panel_set_flm2_mode(struct dsi_panel *panel, int mode);
 
 int dsi_panel_set_opec_mode(struct dsi_panel *panel, int mode);
-
-int dsi_panel_set_hmd_mode(struct dsi_panel *panel, int mode);
 #endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 int dsi_panel_prepare(struct dsi_panel *panel);

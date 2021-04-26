@@ -1856,8 +1856,6 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"somc,mdss-dsi-flm2-off-command",
 	"somc,mdss-dsi-opec-on-command",
 	"somc,mdss-dsi-opec-off-command",
-	"somc,mdss-dsi-hmd-on-command",
-	"somc,mdss-dsi-hmd-off-command",
 #endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 };
 
@@ -1894,8 +1892,6 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"somc,mdss-dsi-flm2-off-command-state",
 	"somc,mdss-dsi-opec-on-command-state",
 	"somc,mdss-dsi-opec-off-command-state",
-	"somc,mdss-dsi-hmd-on-command-state",
-	"somc,mdss-dsi-hmd-off-command-state",
 #endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 };
 
@@ -4317,37 +4313,6 @@ int dsi_panel_set_opec_mode(struct dsi_panel *panel, int mode)
 	} else {
 		panel->spec_pdata->opec_mode = mode;
 		pr_notice("%s: set OPEC mode=%d\n", __func__, mode);
-	}
-	mutex_unlock(&panel->panel_lock);
-
-	return rc;
-}
-
-int dsi_panel_set_hmd_mode(struct dsi_panel *panel, int mode)
-{
-	int rc = 0;
-
-	if (panel == NULL) {
-		pr_err("invalid params\n");
-		return -EINVAL;
-	}
-
-	mutex_lock(&panel->panel_lock);
-	if (!panel->spec_pdata->display_onoff_state) {
-		pr_err("%s: Display is off, can't set HMD mode\n", __func__);
-		mutex_unlock(&panel->panel_lock);
-		return -EAGAIN;
-	}
-
-	rc = (mode == 0) ? dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HMD_OFF) :
-			dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HMD_ON);
-
-	if (rc != 0) {
-		pr_err("[%s] failed to send DSI_CMD_SET_HMD_XX(%d) cmd, rc=%d\n",
-			panel->name, mode, rc);
-	} else {
-		panel->spec_pdata->hmd_mode = mode;
-		pr_notice("%s: set HMD mode=%d\n", __func__, mode);
 	}
 	mutex_unlock(&panel->panel_lock);
 
