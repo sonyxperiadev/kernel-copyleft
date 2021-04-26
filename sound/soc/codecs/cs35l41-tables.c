@@ -149,6 +149,7 @@ bool cs35l41_readable_reg(struct device *dev, unsigned int reg)
 	case CS35L41_PROTECT_REL_ERR_IGN:
 	case CS35L41_GPIO_PAD_CONTROL:
 	case CS35L41_JTAG_CONTROL:
+	case CS35L41_DEVID_OTP:
 	case CS35L41_PLL_CLK_CTRL:
 	case CS35L41_DSP_CLK_CTRL:
 	case CS35L41_GLOBAL_CLK_CTRL:
@@ -617,6 +618,7 @@ bool cs35l41_volatile_reg(struct device *dev, unsigned int reg)
 	case CS35L41_SFT_RESET:
 	case CS35L41_FABID:
 	case CS35L41_REVID:
+	case CS35L41_DEVID_OTP:
 	case CS35L41_DTEMP_EN:
 	case CS35L41_IRQ1_STATUS:
 	case CS35L41_IRQ1_STATUS1:
@@ -712,7 +714,7 @@ bool cs35l41_volatile_reg(struct device *dev, unsigned int reg)
 }
 
 static const struct cs35l41_otp_packed_element_t
-					otp_map_1[CS35L41_NUM_OTP_ELEM] = {
+					otp_map_1[] = {
 	/* addr         shift   size */
 	{0x00002030,	0,	4}, /*TRIM_OSC_FREQ_TRIM*/
 	{0x00002030,	7,	1}, /*TRIM_OSC_TRIM_DONE*/
@@ -816,7 +818,7 @@ static const struct cs35l41_otp_packed_element_t
 };
 
 static const struct cs35l41_otp_packed_element_t
-					otp_map_2[CS35L41_NUM_OTP_ELEM] = {
+					otp_map_2[] = {
 	/* addr         shift   size */
 	{0x00002030,	0,	4}, /*TRIM_OSC_FREQ_TRIM*/
 	{0x00002030,	7,	1}, /*TRIM_OSC_TRIM_DONE*/
@@ -920,35 +922,52 @@ static const struct cs35l41_otp_packed_element_t
 };
 
 const struct cs35l41_otp_map_element_t
-				cs35l41_otp_map_map[CS35L41_NUM_OTP_MAPS] = {
+				cs35l41_otp_map_map[] = {
 	{
+		.devid_otp = CS35L41_CHIP_ID,	/* unset by OTP */
 		.id = 0x01,
 		.map = otp_map_1,
-		.num_elements = CS35L41_NUM_OTP_ELEM,
+		.num_elements = ARRAY_SIZE(otp_map_1),
 		.bit_offset = 16,
 		.word_offset = 2,
 	},
 	{
+		.devid_otp = CS35L41_CHIP_ID,	/* unset by OTP */
 		.id = 0x02,
 		.map = otp_map_2,
-		.num_elements = CS35L41_NUM_OTP_ELEM,
+		.num_elements = ARRAY_SIZE(otp_map_2),
 		.bit_offset = 16,
 		.word_offset = 2,
 	},
 	{
+		.devid_otp = CS35L41_CHIP_ID,	/* unset by OTP */
 		.id = 0x06,
 		.map = otp_map_2,
-		.num_elements = CS35L41_NUM_OTP_ELEM,
+		.num_elements = ARRAY_SIZE(otp_map_2),
 		.bit_offset = 16,
 		.word_offset = 2,
 	},
 	{
+		.devid_otp = CS35L41_CHIP_ID,	/* unset by OTP */
 		.id = 0x08,
 		.map = otp_map_1,
-		.num_elements = CS35L41_NUM_OTP_ELEM,
+		.num_elements = ARRAY_SIZE(otp_map_1),
 		.bit_offset = 16,
 		.word_offset = 2,
 	},
+	{
+		.devid_otp = CS35L41LV_CHIP_ID,
+		.id = 0x01,
+		.map = otp_map_1,
+		.num_elements = ARRAY_SIZE(otp_map_1),
+		.bit_offset = 16,
+		.word_offset = 4,
+	},
+};
+
+const struct cs35l41_otp_maps cs35l41_otp_maps = {
+	.map = cs35l41_otp_map_map,
+	.len = ARRAY_SIZE(cs35l41_otp_map_map),
 };
 
 
@@ -967,4 +986,25 @@ const unsigned int cs35l41_ctl_cache_regs[CS35L41_CTRL_CACHE_SIZE] = {
 	CS35L41_PWR_CTRL2,
 	CS35L41_BSTCVRT_VCTRL1,
 	CS35L41_BSTCVRT_VCTRL2,
+};
+
+const struct cs35l41_otp_trim_region_t
+			cs35l41_trim_cache_regs[CS35L41_TRIM_CACHE_REGIONS] = {
+	{0x00002030, 1},
+	{0x0000208c, 2},
+	{0x0000300C, 1},
+	{0x0000394C, 5},
+	{0x0000416C, 1},
+	{0x00004160, 1},
+	{0x00004170, 1},
+	{0x00004360, 1},
+	{0x00004448, 2},
+	{0x00006E30, 14},
+	{0x00007418, 2},
+	{0x00007434, 1},
+	{0x00007068, 1},
+	{0x0000410C, 1},
+	{0x0000400C, 1},
+	{0x00004000, 1},
+	{0x00017040, 2},
 };
