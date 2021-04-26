@@ -4,5 +4,4 @@ Configuration files can be found in arch/arm64/configs.
     kona-perf_defconfig
 
   diffconfigs for each product:
-    Xperia 1 II SO-51A/SOG01 => pdx203_j_diffconfig
-
+    Xperia 5 II XQ-AS62/XQ-AS72 => pdx206_diffconfig
