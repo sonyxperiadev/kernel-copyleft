@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2014-2015, 2017-2019, The Linux Foundation. All rights reserved.
  */
 
@@ -32,7 +37,7 @@
 #define DEF_RAMDUMP_DELAY		2000
 #define DEF_SHUTDOWN_TIMEOUT		10000
 #define DEF_MDM9X55_RESET_TIME		203
-#define RD_BUF_SIZE			100
+#define RD_BUF_SIZE			SUBSYS_CRASH_REASON_LEN
 #define SFR_MAX_RETRIES			10
 #define SFR_RETRY_INTERVAL		1000
 #define MDM_DBG_OFFSET			0x934

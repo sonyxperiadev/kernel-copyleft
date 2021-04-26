@@ -126,7 +126,10 @@ out:
 /* 1 = delete, 0 = cache */
 static int sdcardfs_d_delete(const struct dentry *d)
 {
-	return SDCARDFS_SB(d->d_sb)->options.nocache ? 1 : 0;
+	if (SDCARDFS_SB(d->d_sb)->options.nocache)
+		return d->d_inode && !S_ISDIR(d->d_inode->i_mode);
+
+	return 0;
 }
 
 static void sdcardfs_d_release(struct dentry *dentry)

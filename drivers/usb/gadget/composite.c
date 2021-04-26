@@ -1901,11 +1901,7 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		f = cdev->config->interface[intf];
 		if (!f)
 			break;
-
-		if (USB_CONFIG_ATT_WAKEUP & cdev->config->bmAttributes)
-			status = f->get_status ? f->get_status(f) : 0;
-		else
-			status = 0;
+		status = f->get_status ? f->get_status(f) : 0;
 		if (status < 0)
 			break;
 		put_unaligned_le16(status & 0x0000ffff, req->buf);

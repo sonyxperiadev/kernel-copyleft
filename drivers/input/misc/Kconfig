@@ -874,4 +874,34 @@ config INPUT_SC27XX_VIBRA
 	  To compile this driver as a module, choose M here. The module will
 	  be called sc27xx_vibra.
 
+config TOUCH_DRIVER_NOT_USE_VARIABLE_LENGTH_ARRAY
+	tristate "touch driver variable length array support"
+	default y
+	help
+	Say Y here if you can use variable length array.
+
+config TOUCH_DRIVER_NOT_SOD_PROXIMITY
+	tristate "touch driver not proximity sensor for Sod mode"
+	default y
+	help
+	Say Y here if you can use sod proximity.
+
+config HALL_SENSOR_NOT_USE_SWITCH
+	tristate "switch class support"
+	default y
+	help
+	Say N here if you can use switch_class.
+
+config HALL_SENSOR_NOT_USE_SETUP_TIMER
+	tristate "setup_timer macor support"
+	default y
+	help
+	Say N here if you can use setup_timer.
+
+config TOUCH_DRIVER_EDO_ADAPATION
+	tristate "touch driver edo adaption"
+	default y
+	help
+	Say Y here if this is a edo platform project.
+
 endif

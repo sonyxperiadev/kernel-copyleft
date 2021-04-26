@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
  */
 
@@ -281,6 +286,7 @@ struct f_gsi {
 	u8 debugfs_rw_timer_enable;
 	u16 gsi_rw_timer_interval;
 	bool host_supports_flow_control;
+	bool linux_support;
 };
 
 static inline struct f_gsi *func_to_gsi(struct usb_function *f)

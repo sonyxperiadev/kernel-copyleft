@@ -133,15 +133,6 @@ config QCOM_LITO_LLCC
 	  data required to configure LLCC so that clients can start using the
 	  LLCC slices.
 
-config QCOM_LAGOON_LLCC
-	tristate "Qualcomm Technologies, Inc. LAGOON LLCC driver"
-	depends on QCOM_LLCC
-	help
-	  Qualcomm Technologies, Inc. platform specific LLCC driver for LAGOON.
-	  Say yes here to enable the LLCC driver for LAGOON. This provides
-	  data required to configure LLCC so that clients can start using the
-	  LLCC slices.
-
 config QCOM_SDM845_LLCC
 	tristate "Qualcomm Technologies, Inc. SDM845 LLCC driver"
 	depends on QCOM_LLCC
@@ -672,6 +663,13 @@ config QCOM_SMP2P_SLEEPSTATE
 	  notifications from the remote to prevent suspend on the local
 	  processor.
 
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on QCOM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
+
 config QCOM_QDSS_BRIDGE
 	bool "Configure bridge driver for QTI/Qualcomm Technologies, Inc. MDM"
 	depends on MHI_BUS
@@ -846,8 +844,6 @@ config QCOM_HYP_CORE_CTL
 	  CPUs can be assigned to the other guest OS by the hypervisor.
 	  An offline CPU is considered as a reserved CPU since this OS can't use
 	  it.
-
-source "drivers/soc/qcom/icnss2/Kconfig"
 
 config ICNSS
 	tristate "Platform driver for Q6 integrated connectivity"

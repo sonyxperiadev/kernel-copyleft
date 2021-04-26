@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
+/*
  * Scheduler internal types and methods:
  */
 #include <linux/sched.h>
@@ -895,6 +900,7 @@ struct rq {
 #endif
 	#define CPU_LOAD_IDX_MAX 5
 	unsigned long		cpu_load[CPU_LOAD_IDX_MAX];
+	unsigned int nr_pinned_tasks;
 #ifdef CONFIG_NO_HZ_COMMON
 #ifdef CONFIG_SMP
 	unsigned long		last_load_update_tick;
@@ -1010,8 +1016,6 @@ struct rq {
 	int			prev_top;
 	int			curr_top;
 	bool			notif_pending;
-	u64			last_cc_update;
-	u64			cycles;
 #endif /* CONFIG_SCHED_WALT */
 
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
@@ -2420,6 +2424,7 @@ extern void cfs_bandwidth_usage_dec(void);
 
 #define nohz_flags(cpu)	(&cpu_rq(cpu)->nohz_flags)
 
+DECLARE_PER_CPU(atomic_t, claim_wake_up_cpu);
 extern void nohz_balance_exit_idle(struct rq *rq);
 #else
 static inline void nohz_balance_exit_idle(struct rq *rq) { }

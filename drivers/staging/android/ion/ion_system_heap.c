@@ -1,9 +1,14 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0
 /*
  * drivers/staging/android/ion/ion_system_heap.c
  *
  * Copyright (C) 2011 Google, Inc.
- * Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019, The Linux Foundation. All rights reserved.
  *
  */
 
@@ -78,7 +83,7 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
 
 	page = ion_page_pool_alloc(pool, from_pool);
 
-	if (pool_auto_refill_en && pool->order &&
+	if (pool_auto_refill_en &&
 	    pool_count_below_lowmark(pool) && vmid <= 0) {
 		wake_up_process(heap->kworker[cached]);
 	}
@@ -246,15 +251,7 @@ static int ion_heap_alloc_pages_mem(struct pages_mem *pages_mem)
 
 	page_tbl_size = sizeof(struct page *) * (pages_mem->size >> PAGE_SHIFT);
 	if (page_tbl_size > SZ_8K) {
-		/*
-		 * Do fallback to ensure we have a balance between
-		 * performance and availability.
-		 */
-		pages = kmalloc(page_tbl_size,
-				__GFP_COMP | __GFP_NORETRY |
-				__GFP_NOWARN);
-		if (!pages)
-			pages = vmalloc(page_tbl_size);
+		pages = vmalloc(page_tbl_size);
 	} else {
 		pages = kmalloc(page_tbl_size, GFP_KERNEL);
 	}
@@ -637,7 +634,7 @@ static void ion_system_heap_destroy_pools(struct ion_page_pool **pools)
  */
 static int ion_system_heap_create_pools(struct ion_system_heap *sys_heap,
 					struct ion_page_pool **pools,
-					bool cached)
+					bool cached, bool movable)
 {
 	int i;
 
@@ -647,7 +644,8 @@ static int ion_system_heap_create_pools(struct ion_system_heap *sys_heap,
 
 		if (orders[i])
 			gfp_flags = high_order_gfp_flags;
-		pool = ion_page_pool_create(gfp_flags, orders[i], cached);
+		pool = ion_page_pool_create(gfp_flags, orders[i], cached,
+					movable);
 		if (!pool)
 			goto err_create_pool;
 		pool->dev = sys_heap->heap.priv;
@@ -729,13 +727,13 @@ struct ion_heap *ion_system_heap_create(struct ion_platform_heap *data)
 		if (is_secure_vmid_valid(i))
 			if (ion_system_heap_create_pools(heap,
 							 heap->secure_pools[i],
-							 false))
+							 false, false))
 				goto destroy_secure_pools;
 
-	if (ion_system_heap_create_pools(heap, heap->uncached_pools, false))
+	if (ion_system_heap_create_pools(heap, heap->uncached_pools, false, false))
 		goto destroy_secure_pools;
 
-	if (ion_system_heap_create_pools(heap, heap->cached_pools, true))
+	if (ion_system_heap_create_pools(heap, heap->cached_pools, true, true))
 		goto destroy_uncached_pools;
 
 	if (pool_auto_refill_en) {
