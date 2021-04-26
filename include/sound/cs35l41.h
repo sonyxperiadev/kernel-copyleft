@@ -34,7 +34,7 @@ struct cs35l41_platform_data {
 	bool lrclk_frc;
 	bool right_channel;
 	bool amp_gain_zc;
-	bool ng_enable;
+	bool dsp_ng_enable;
 	bool tuning_has_prefix;
 	bool invert_pcm;
 	bool hibernate_enable;
@@ -44,8 +44,11 @@ struct cs35l41_platform_data {
 	int bst_ipk;
 	int bst_cap;
 	int temp_warn_thld;
-	int ng_pcm_thld;
-	int ng_delay;
+	int dsp_ng_pcm_thld;
+	int dsp_ng_delay;
+	unsigned int hw_ng_sel;
+	unsigned int hw_ng_delay;
+	unsigned int hw_ng_thld;
 	int dout_hiz;
 	struct irq_cfg irq_config1;
 	struct irq_cfg irq_config2;
@@ -122,6 +125,7 @@ struct cs35l41_private {
 	struct mutex force_int_lock;
 	struct cs35l41_vol_ctl vol_ctl;
 	unsigned int ctl_cache[CS35L41_CTRL_CACHE_SIZE];
+	u32 trim_cache[CS35L41_TRIM_CACHE_SIZE];
 };
 
 int cs35l41_probe(struct cs35l41_private *cs35l41,
