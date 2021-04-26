@@ -616,6 +616,13 @@ config USB_CONFIGFS_F_PTP
 	  at the file level. Thus exposing the relevant content but hiding
 	  the system/restricted files.
 
+config USB_ANDROID_PRODUCTION
+	bool "Production capable Android gadget"
+	depends on USB_CONFIGFS
+	default n
+	help
+	  Provides an Android gadget where iSerialNumber is set to 0.
+
 source "drivers/usb/gadget/legacy/Kconfig"
 
 endif # USB_GADGET

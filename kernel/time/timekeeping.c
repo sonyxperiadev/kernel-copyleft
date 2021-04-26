@@ -1622,7 +1622,13 @@ static void __timekeeping_inject_sleeptime(struct timekeeper *tk,
  */
 bool timekeeping_rtc_skipresume(void)
 {
-	return !suspend_timing_needed;
+	struct timekeeper *tk = &tk_core.timekeeper;
+	struct clocksource *clock = tk->tkr_mono.clock;
+
+	if (!suspend_timing_needed || (clock->flags & CLOCK_SOURCE_SUSPEND_NONSTOP))
+		return true;
+
+	return false;
 }
 
 /**

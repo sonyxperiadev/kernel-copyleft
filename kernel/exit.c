@@ -68,6 +68,8 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
+#include <trace/events/task.h>
+
 static void __unhash_process(struct task_struct *p, bool group_dead)
 {
 	nr_threads--;
@@ -114,6 +116,7 @@ static void __exit_signal(struct task_struct *tsk)
 			posix_cpu_timers_exit_group(tsk);
 	}
 #endif
+	trace_task_exit(tsk);
 
 	if (group_dead) {
 		tty = sig->tty;

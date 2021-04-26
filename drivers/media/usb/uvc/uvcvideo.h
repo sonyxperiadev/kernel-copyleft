@@ -170,9 +170,6 @@
 #define DRIVER_VERSION		"1.1.1"
 
 /* Number of isochronous URBs. */
-#define UVC_URBS		5
-/* Maximum number of packets per URB. */
-#define UVC_MAX_PACKETS		32
 /* Maximum status buffer size in bytes of interrupt URB. */
 #define UVC_MAX_STATUS_SIZE	16
 
@@ -483,6 +480,11 @@ struct uvc_stats_stream {
 	unsigned int scr_sof;		/* STC.SOF of the last packet */
 	unsigned int min_sof;		/* Minimum STC.SOF value */
 	unsigned int max_sof;		/* Maximum STC.SOF value */
+#ifdef CONFIG_SOMC_UVC_EXTENSION
+	struct timespec init_ts;	/* Stream initialized timestamp */
+	struct timespec cur_ts;		/* Stream current timestamp */
+	unsigned int urb_act_len;	/* urb actual transferred length */
+#endif
 };
 
 #define UVC_METATADA_BUF_SIZE 1024
@@ -535,9 +537,22 @@ struct uvc_streaming {
 		u32 max_payload_size;
 	} bulk;
 
-	struct urb *urb[UVC_URBS];
-	char *urb_buffer[UVC_URBS];
-	dma_addr_t urb_dma[UVC_URBS];
+	struct urb **urb;
+	char **urb_buffer;
+	dma_addr_t *urb_dma;
+	unsigned int urbs_num;
+#ifdef CONFIG_SOMC_UVC_EXTENSION
+	atomic_t urb_ext_active;
+	struct workqueue_struct *uvc_wq;
+	unsigned int specify_cpu;
+	struct urb_ext {
+		struct urb *urb;
+		ktime_t urb_ts;
+		struct work_struct complete_work;
+		void *context;
+		int urb_id;
+	} **urb_ext;
+#endif
 	unsigned int urb_size;
 
 	u32 sequence;
@@ -658,6 +673,12 @@ extern unsigned int uvc_no_drop_param;
 extern unsigned int uvc_trace_param;
 extern unsigned int uvc_timeout_param;
 extern unsigned int uvc_hw_timestamps_param;
+extern unsigned int uvc_urbs_bulk_param;
+extern unsigned int uvc_urbs_isoc_param;
+extern unsigned int uvc_maxpackets_param;
+#ifdef CONFIG_SOMC_UVC_EXTENSION
+extern unsigned int uvc_specify_cpu;
+#endif
 
 #define uvc_trace(flag, msg...) \
 	do { \

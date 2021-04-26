@@ -19,6 +19,7 @@
 
 /* Registers Address */
 #define GEN_DEV_SET_REG			0x00
+#define AUX_CH_CTRL_REG			0x09
 #define CHIP_VERSION_REG		0x17
 
 #define REDRIVER_REG_MAX		0x1f
@@ -210,9 +211,10 @@ static void ssusb_redriver_gen_dev_set(
 		struct ssusb_redriver *redriver, bool on)
 {
 	int ret;
-	u8 val;
+	u8 val, aux_val;
 
 	val = 0;
+	aux_val = 0x02;
 
 	switch (redriver->op_mode) {
 	case OP_MODE_USB:
@@ -235,6 +237,7 @@ static void ssusb_redriver_gen_dev_set(
 
 		/* Set to default USB Mode */
 		val |= (0x5 << OP_MODE_SHIFT);
+		aux_val = 0x02;
 
 		break;
 	case OP_MODE_DP:
@@ -244,6 +247,7 @@ static void ssusb_redriver_gen_dev_set(
 
 		/* Set to DP 4 Lane Mode (OP Mode 2) */
 		val |= (0x2 << OP_MODE_SHIFT);
+		aux_val = 0x00;
 
 		break;
 	case OP_MODE_USB_AND_DP:
@@ -265,6 +269,7 @@ static void ssusb_redriver_gen_dev_set(
 				redriver->op_mode);
 			goto err_exit;
 		}
+		aux_val = 0x00;
 
 		break;
 	default:
@@ -274,6 +279,17 @@ static void ssusb_redriver_gen_dev_set(
 			redriver->host_active);
 		goto err_exit;
 	}
+
+	aux_val |= (redriver->typec_orientation	== ORIENTATION_CC1) ?
+		0x00 : 0x01;
+
+	ret = redriver_i2c_reg_set(redriver, AUX_CH_CTRL_REG, aux_val);
+	if (ret < 0)
+		goto err_exit;
+
+	dev_dbg(redriver->dev,
+		"redriver chip, aux_ch_ctrl 0x%02x = 0x%02x\n",
+			AUX_CH_CTRL_REG, aux_val);
 
 	/* exit/enter deep-sleep power mode */
 	if (on)

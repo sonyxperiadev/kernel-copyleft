@@ -308,7 +308,7 @@ static int mmc_read_switch(struct mmc_card *card)
 	 * The argument does not matter, as the support bits do not
 	 * change with the arguments.
 	 */
-	err = mmc_sd_switch(card, 0, 0, 0, status);
+	err = mmc_sd_switch(card, 0, 0, 1, status);
 	if (err) {
 		/*
 		 * If the host or the card can't do the switch,
@@ -426,14 +426,16 @@ static void sd_update_bus_speed_mode(struct mmc_card *card)
 
 	if ((card->host->caps & MMC_CAP_UHS_SDR104) &&
 	    (card->sw_caps.sd3_bus_mode & SD_MODE_UHS_SDR104)) {
-		card->sd_bus_speed = UHS_SDR104_BUS_SPEED;
+		/* card->sd_bus_speed = UHS_SDR104_BUS_SPEED; */
+		card->sd_bus_speed = UHS_DDR50_BUS_SPEED;
 	} else if ((card->host->caps & MMC_CAP_UHS_DDR50) &&
 		   (card->sw_caps.sd3_bus_mode & SD_MODE_UHS_DDR50)) {
 		card->sd_bus_speed = UHS_DDR50_BUS_SPEED;
 	} else if ((card->host->caps & (MMC_CAP_UHS_SDR104 |
 		    MMC_CAP_UHS_SDR50)) && (card->sw_caps.sd3_bus_mode &
 		    SD_MODE_UHS_SDR50)) {
-		card->sd_bus_speed = UHS_SDR50_BUS_SPEED;
+		/* card->sd_bus_speed = UHS_SDR50_BUS_SPEED; */
+		card->sd_bus_speed = UHS_DDR50_BUS_SPEED;
 	} else if ((card->host->caps & (MMC_CAP_UHS_SDR104 |
 		    MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_SDR25)) &&
 		   (card->sw_caps.sd3_bus_mode & SD_MODE_UHS_SDR25)) {

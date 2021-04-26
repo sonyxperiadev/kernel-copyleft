@@ -23,7 +23,10 @@
 #include <linux/mmc/pm.h>
 #include <linux/dma-direction.h>
 
+/* Default idle timeout for MMC devices: 3 seconds. */
 #define MMC_AUTOSUSPEND_DELAY_MS	3000
+/* Default idle timeout for SD cards: 30 seconds. */
+#define MMC_SDCARD_AUTOSUSPEND_DELAY_MS 30000
 
 struct mmc_ios {
 	unsigned int	clock;		/* clock rate */
@@ -592,6 +595,11 @@ struct mmc_host {
 
 	int			dsr_req;	/* DSR value is valid */
 	u32			dsr;	/* optional driver stage (DSR) value */
+
+#ifdef CONFIG_BLOCK
+	int			latency_hist_enabled;
+	struct io_latency_state io_lat_s;
+#endif
 
 	/* Command Queue Engine (CQE) support */
 	const struct mmc_cqe_ops *cqe_ops;

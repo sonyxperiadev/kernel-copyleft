@@ -714,6 +714,13 @@ config QCOM_SMP2P_SLEEPSTATE
 	  notifications from the remote to prevent suspend on the local
 	  processor.
 
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on QCOM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
+
 config QCOM_QDSS_BRIDGE
 	bool "Configure bridge driver for QTI/Qualcomm Technologies, Inc. MDM"
 	depends on MHI_BUS

@@ -38,6 +38,15 @@ unsigned int uvc_no_drop_param;
 static unsigned int uvc_quirks_param = -1;
 unsigned int uvc_trace_param;
 unsigned int uvc_timeout_param = UVC_CTRL_STREAMING_TIMEOUT;
+#ifdef CONFIG_SOMC_UVC_EXTENSION
+unsigned int uvc_urbs_bulk_param = 800;
+unsigned int uvc_urbs_isoc_param = 5;
+unsigned int uvc_specify_cpu = 4;
+#else
+unsigned int uvc_urbs_bulk_param = 76;
+unsigned int uvc_urbs_isoc_param = 5;
+#endif
+unsigned int uvc_maxpackets_param = 64;
 
 /* ------------------------------------------------------------------------
  * Video formats
@@ -2368,7 +2377,16 @@ module_param_named(trace, uvc_trace_param, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(trace, "Trace level bitmask");
 module_param_named(timeout, uvc_timeout_param, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(timeout, "Streaming control requests timeout");
-
+module_param_named(urbs_bulk, uvc_urbs_bulk_param, uint, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(urbs_bulk, "URBs for bulk transfer");
+module_param_named(urbs_isoc, uvc_urbs_isoc_param, uint, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(urbs_isoc, "URBs for isochronous transfer");
+module_param_named(maxpackets, uvc_maxpackets_param, uint, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(maxpackets, "Max Packets");
+#ifdef CONFIG_SOMC_UVC_EXTENSION
+module_param_named(specify_cpu, uvc_specify_cpu, uint, 0644);
+MODULE_PARM_DESC(specify_cpu, "Specify CPU# on worker");
+#endif
 /* ------------------------------------------------------------------------
  * Driver initialization and cleanup
  */

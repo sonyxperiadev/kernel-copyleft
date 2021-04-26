@@ -19,6 +19,7 @@
 #include <linux/cdev.h>
 #include <linux/srcu.h>
 #include <linux/atomic.h>
+#include <linux/vmalloc.h>
 #include <soc/qcom/ramdump.h>
 #include <linux/dma-mapping.h>
 #include <linux/of.h>
@@ -229,7 +230,7 @@ static ssize_t ramdump_read(struct file *filep, char __user *buf, size_t count,
 		goto ramdump_done;
 	}
 
-	alignbuf = kzalloc(copy_size, GFP_KERNEL);
+	alignbuf = vzalloc(copy_size);
 	if (!alignbuf) {
 		rd_dev->ramdump_status = -1;
 		ret = -ENOMEM;
@@ -265,7 +266,7 @@ static ssize_t ramdump_read(struct file *filep, char __user *buf, size_t count,
 		goto ramdump_done;
 	}
 
-	kfree(finalbuf);
+	vfree(finalbuf);
 	if (!vaddr && origdevice_mem)
 		dma_unremap(rd_dev->dev->parent, origdevice_mem, copy_size);
 
@@ -283,7 +284,7 @@ ramdump_done:
 		dma_unremap(rd_dev->dev->parent, origdevice_mem, copy_size);
 
 	srcu_read_unlock(&rd_dev->rd_srcu, srcu_idx);
-	kfree(finalbuf);
+	vfree(finalbuf);
 	*pos = 0;
 	reset_ramdump_entry(entry);
 	return ret;

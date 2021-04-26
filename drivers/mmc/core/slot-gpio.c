@@ -18,7 +18,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/extcon.h>
-
+#include <linux/sony_ext_uim_ctrl.h>
 #include "slot-gpio.h"
 
 struct mmc_gpio {
@@ -27,23 +27,62 @@ struct mmc_gpio {
 	bool override_ro_active_level;
 	bool override_cd_active_level;
 	irqreturn_t (*cd_gpio_isr)(int irq, void *dev_id);
+	bool status;
 	char *ro_label;
 	u32 cd_debounce_delay_ms;
 	char cd_label[];
 };
+
+int mmc_gpio_get_status(struct mmc_host *host)
+{
+	int ret = -ENOSYS;
+	struct mmc_gpio *ctx = host->slot.handler_priv;
+
+	if (!ctx || !gpio_is_valid(desc_to_gpio(ctx->cd_gpio)))
+		goto out;
+
+	ret = !gpio_get_value_cansleep(desc_to_gpio(ctx->cd_gpio)) ^
+		!!(host->caps2 & MMC_CAP2_CD_ACTIVE_HIGH);
+out:
+	return ret;
+}
 
 static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 {
 	/* Schedule a card detection after a debounce timeout */
 	struct mmc_host *host = dev_id;
 	struct mmc_gpio *ctx = host->slot.handler_priv;
+	int status;
 	int present = host->ops->get_cd(host);
 
 	pr_debug("%s: cd gpio irq, gpio state %d (CARD_%s)\n",
 		mmc_hostname(host), present, present?"INSERT":"REMOVAL");
 
-	host->trigger_card_event = true;
-	mmc_detect_change(host, msecs_to_jiffies(ctx->cd_debounce_delay_ms));
+	if (!host->ops)
+		goto out;
+
+	status = mmc_gpio_get_status(host);
+	if (unlikely(status < 0))
+		goto out;
+
+#ifdef CONFIG_SONY_EXT_UIM_CTRL
+	if (status == 0)
+		sony_ext_uim_ctrl_set_uim2_detect_en(0);
+#endif /* CONFIG_SONY_EXT_UIM_CTRL */
+
+	if (status ^ ctx->status) {
+		pr_info("%s: slot status change detected (%d -> %d), GPIO_ACTIVE_%s\n",
+				mmc_hostname(host), ctx->status, status,
+				(host->caps2 & MMC_CAP2_CD_ACTIVE_HIGH) ?
+				"HIGH" : "LOW");
+		ctx->status = status;
+
+		host->trigger_card_event = true;
+
+		/* Schedule a card detection after a debounce timeout */
+		mmc_detect_change(host, msecs_to_jiffies(ctx->cd_debounce_delay_ms));
+	}
+out:
 
 	return IRQ_HANDLED;
 }
@@ -156,6 +195,12 @@ void mmc_gpiod_request_cd_irq(struct mmc_host *host)
 	 */
 	if (!(host->caps & MMC_CAP_NEEDS_POLL))
 		irq = gpiod_to_irq(ctx->cd_gpio);
+
+	ret = mmc_gpio_get_status(host);
+	if (ret < 0)
+		pr_warn("%s: failed to init cd_gpio status\n", mmc_hostname(host));
+	else
+		ctx->status = ret;
 
 	if (irq >= 0) {
 		if (!ctx->cd_gpio_isr)
@@ -408,3 +453,13 @@ bool mmc_can_gpio_ro(struct mmc_host *host)
 	return ctx->ro_gpio ? true : false;
 }
 EXPORT_SYMBOL(mmc_can_gpio_ro);
+
+void mmc_gpio_tray_close_set_uim2(struct mmc_host *host, int value)
+{
+	struct mmc_gpio *ctx = host->slot.handler_priv;
+
+	if (ctx && ctx->status)
+		sony_ext_uim_ctrl_set_uim2_detect_en(value);
+
+}
+EXPORT_SYMBOL(mmc_gpio_tray_close_set_uim2);

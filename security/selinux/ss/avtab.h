@@ -114,7 +114,7 @@ struct avtab_node *avtab_search_node(struct avtab *h, struct avtab_key *key);
 
 struct avtab_node *avtab_search_node_next(struct avtab_node *node, int specified);
 
-#define MAX_AVTAB_HASH_BITS 16
+#define MAX_AVTAB_HASH_BITS 18
 #define MAX_AVTAB_HASH_BUCKETS (1 << MAX_AVTAB_HASH_BITS)
 
 #endif	/* _SS_AVTAB_H_ */
