@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/vmalloc.h>
 #include <asm/cacheflush.h>
@@ -98,16 +103,19 @@ static struct page *
 _kgsl_pool_get_page(struct kgsl_page_pool *pool)
 {
 	struct page *p = NULL;
+	int deleted = 0;
 
 	spin_lock(&pool->list_lock);
 	if (pool->page_count) {
 		p = list_first_entry(&pool->page_list, struct page, lru);
 		pool->page_count--;
 		list_del(&p->lru);
+		deleted = 1;
 	}
 	spin_unlock(&pool->list_lock);
-	mod_node_page_state(page_pgdat(p), NR_INDIRECTLY_RECLAIMABLE_BYTES,
-				-(PAGE_SIZE << pool->pool_order));
+	if (deleted)
+		mod_node_page_state(page_pgdat(p), NR_INDIRECTLY_RECLAIMABLE_BYTES,
+				    -(PAGE_SIZE << pool->pool_order));
 	return p;
 }
 

@@ -632,6 +632,13 @@ choice
 	  controller, and the relevant drivers for each function declared
 	  by the device.
 
+config USB_ANDROID_PRODUCTION
+	boolean "Production capable Android gadget"
+	depends on USB_CONFIGFS
+	default n
+	help
+	  Provides an Android gadget where iSerialNumber is set to 0.
+
 source "drivers/usb/gadget/legacy/Kconfig"
 
 endchoice

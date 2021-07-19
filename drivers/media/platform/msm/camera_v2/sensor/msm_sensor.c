@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include "msm_sensor.h"
 #include "msm_sd.h"
 #include "camera.h"
@@ -145,6 +150,8 @@ int msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 	if (s_ctrl->is_secure)
 		msm_camera_tz_i2c_power_down(sensor_i2c_client);
 
+		s_ctrl->thermal_info.status = -ENODEV;
+
 	return msm_camera_power_down(power_info, sensor_device_type,
 		sensor_i2c_client);
 }
@@ -219,6 +226,7 @@ int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 		}
 	}
 
+		s_ctrl->thermal_info.status = -EINVAL;
 	return rc;
 }
 
@@ -406,6 +414,23 @@ static int msm_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl,
 	CDBG("%s:%d %s cfgtype = %d\n", __func__, __LINE__,
 		s_ctrl->sensordata->sensor_name, cdata->cfgtype);
 	switch (cdata->cfgtype) {
+	case CFG_SONY_CAMERA_SET_THERMAL: {
+		int32_t thermal = 0;
+
+		if (copy_from_user(&thermal,
+			(int32_t *)compat_ptr(cdata->cfg.setting),
+			sizeof(int32_t))) {
+			pr_err("%s:%d failed\n", __func__, __LINE__);
+			rc = -EFAULT;
+			break;
+		}
+		s_ctrl->thermal_info.thermal = thermal;
+		s_ctrl->thermal_info.status = TRUE;
+		CDBG("huangchen thermal status: %d, value:%d",
+			s_ctrl->thermal_info.status,
+			s_ctrl->thermal_info.thermal);
+		break;
+	}
 	case CFG_GET_SENSOR_INFO:
 		memcpy(cdata->cfg.sensor_info.sensor_name,
 			s_ctrl->sensordata->sensor_name,
@@ -1574,6 +1599,9 @@ int32_t msm_sensor_init_default_params(struct msm_sensor_ctrl_t *s_ctrl)
 			s_ctrl->sensordata->sensor_info->sensor_mount_angle /
 			90) << 8);
 	s_ctrl->msm_sd.sd.entity.flags = mount_pos | MEDIA_ENT_FL_DEFAULT;
+
+		s_ctrl->thermal_info.status = -ENODEV;
+		s_ctrl->thermal_info.thermal = 0;
 
 	return 0;
 }

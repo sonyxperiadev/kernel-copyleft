@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/workqueue.h>
@@ -25,6 +30,7 @@
 #include <linux/wait.h>
 #include <linux/cdev.h>
 #include <linux/atomic.h>
+#include <linux/vmalloc.h>
 #include <soc/qcom/ramdump.h>
 #include <linux/dma-mapping.h>
 #include <linux/of.h>
@@ -220,7 +226,7 @@ static ssize_t ramdump_read(struct file *filep, char __user *buf, size_t count,
 		goto ramdump_done;
 	}
 
-	alignbuf = kzalloc(copy_size, GFP_KERNEL);
+	alignbuf = vzalloc(copy_size);
 	if (!alignbuf) {
 		rd_dev->ramdump_status = -1;
 		ret = -ENOMEM;
@@ -256,7 +262,7 @@ static ssize_t ramdump_read(struct file *filep, char __user *buf, size_t count,
 		goto ramdump_done;
 	}
 
-	kfree(finalbuf);
+	vfree(finalbuf);
 	if (!vaddr && origdevice_mem)
 		dma_unremap(rd_dev->dev->parent, origdevice_mem, copy_size);
 
@@ -271,7 +277,7 @@ ramdump_done:
 	if (!vaddr && origdevice_mem)
 		dma_unremap(rd_dev->dev->parent, origdevice_mem, copy_size);
 
-	kfree(finalbuf);
+	vfree(finalbuf);
 	*pos = 0;
 	reset_ramdump_entry(entry);
 	return ret;

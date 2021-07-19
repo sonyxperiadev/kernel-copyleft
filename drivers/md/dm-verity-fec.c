@@ -8,6 +8,11 @@
  * Software Foundation; either version 2 of the License, or (at your option)
  * any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "dm-verity-fec.h"
 #include <linux/math64.h>
@@ -556,6 +561,7 @@ void verity_fec_dtr(struct dm_verity *v)
 	mempool_destroy(f->rs_pool);
 	mempool_destroy(f->prealloc_pool);
 	mempool_destroy(f->extra_pool);
+	mempool_destroy(f->output_pool);
 	kmem_cache_destroy(f->cache);
 
 	if (f->data_bufio)

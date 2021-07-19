@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "skeleton64.dtsi"
 #include <dt-bindings/interrupt-controller/arm-gic.h>
@@ -594,6 +599,39 @@
 			size = <0 0x2000000>;
 			linux,cma-default;
 		};
+
+		debug_region: debug_region@ffb00000 {
+			compatible = "removed-dma-pool", "qcom,debug_memory";
+			no-map;
+			reg = <0 0xffb00000 0 0xc0000>;
+			label = "debug_mem";
+		};
+
+		last_log_region: last_log_region@ffbc0000 {
+			compatible = "removed-dma-pool", "qcom,last_log_memory";
+			no-map;
+			reg = <0 0xffbc0000 0 0x80000>;
+			label = "last_log";
+			phandle = "log";
+		};
+
+		ramoops: ramoops@ffc00000 {
+			compatible = "removed-dma-pool", "ramoops";
+			no-map;
+			reg = <0 0xffc40000 0 0x000c0000>;
+			record-size = <0x1000>;
+			console-size = <0x40000>;
+			ftrace-size = <0x0>;
+			msg-size = <0x20000 0x20000>;
+			cc-size = <0x0>;
+		};
+
+		cmdline_region: cmdline_region@ffd00000 {
+			compatible = "removed-dma-pool", "cmdline_region";
+			no-map;
+			reg = <0 0xffd40000 0 0x1000>;
+			label = "cmdline_region";
+		};
 	};
 };
 
@@ -1161,6 +1199,50 @@
 		interrupts = <0 22 0>;
 		clock-names = "atb_clk";
 		clocks = <&clock_rpmcc RPM_QDSS_CLK>;
+	};
+
+	restart-reason {
+		compatible = "qcom,restart-reason";
+		unknown {
+			cmd = "unknown";
+			reg-val = <0x00 0x77665501>;
+		};
+
+		recovery {
+			cmd = "recovery";
+			reg-val = <0x01 0x77665500>;
+			reboot-cmd;
+		};
+
+		bootloader {
+			cmd = "bootloader";
+			reg-val = <0x02 0x77665500>;
+			reboot-cmd;
+		};
+
+		rtc {
+			cmd = "rtc";
+			reg-val = <0x03 0x77665500>;
+			reboot-cmd;
+		};
+
+		dm-verity-device-corrupted {
+			cmd = "dm-verity device corrupted";
+			reg-val = <0x04 0x77665508>;
+			reboot-cmd;
+		};
+
+		dm-verity-enforcing {
+			cmd = "dm-verity enforcing";
+			reg-val = <0x05 0x77665509>;
+			reboot-cmd;
+		};
+
+		keys-clear {
+			cmd = "keys clear";
+			reg-val = <0x06 0x7766550A>;
+			reboot-cmd;
+		};
 	};
 
 	pil_modem: qcom,mss@6080000 {

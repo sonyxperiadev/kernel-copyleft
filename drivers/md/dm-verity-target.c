@@ -13,6 +13,11 @@
  * are on the same disk on different partitions on devices with poor random
  * access behavior.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "dm-verity.h"
 #include "dm-verity-fec.h"

@@ -297,6 +297,14 @@ static int hiddev_open(struct inode *inode, struct file *file)
 	spin_unlock_irq(&list->hiddev->list_lock);
 
 	mutex_lock(&hiddev->existancelock);
+	/*
+	 * recheck exist with existance lock held to
+	 * avoid opening a disconnected device
+	 */
+	if (!list->hiddev->exist) {
+		res = -ENODEV;
+		goto bail_unlock;
+	}
 	if (!list->hiddev->open++)
 		if (list->hiddev->exist) {
 			struct hid_device *hid = hiddev->hid;
@@ -313,6 +321,10 @@ bail_normal_power:
 	hid_hw_power(hid, PM_HINT_NORMAL);
 bail_unlock:
 	mutex_unlock(&hiddev->existancelock);
+
+	spin_lock_irq(&list->hiddev->list_lock);
+	list_del(&list->node);
+	spin_unlock_irq(&list->hiddev->list_lock);
 bail:
 	file->private_data = NULL;
 	vfree(list);
@@ -508,16 +520,16 @@ static noinline int hiddev_ioctl_usage(struct hiddev *hiddev, unsigned int cmd, 
 							       report->maxfield);
 
 			field = report->field[uref->field_index];
+		}
 
-			if (cmd == HIDIOCGCOLLECTIONINDEX) {
-				if (uref->usage_index >= field->maxusage)
-					goto inval;
+		if (cmd == HIDIOCGCOLLECTIONINDEX) {
+			if (uref->usage_index >= field->maxusage)
+				goto inval;
 				uref->usage_index =
 					array_index_nospec(uref->usage_index,
 							   field->maxusage);
-			} else if (uref->usage_index >= field->report_count)
-				goto inval;
-		}
+		} else if (uref->usage_index >= field->report_count)
+			goto inval;
 
 		if (cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) {
 			if (uref_multi->num_values > HID_MAX_MULTI_USAGES ||

@@ -7,6 +7,11 @@
  *  Please see that file for copyright and history logs.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/timekeeper_internal.h>
 #include <linux/module.h>
@@ -1576,7 +1581,13 @@ static void __timekeeping_inject_sleeptime(struct timekeeper *tk,
  */
 bool timekeeping_rtc_skipresume(void)
 {
-	return sleeptime_injected;
+	struct timekeeper *tk = &tk_core.timekeeper;
+	struct clocksource *clock = tk->tkr_mono.clock;
+
+	if (sleeptime_injected || (clock->flags & CLOCK_SOURCE_SUSPEND_NONSTOP))
+		return true;
+
+	return false;
 }
 
 /**

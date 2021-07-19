@@ -31,6 +31,11 @@
  *   in normal mode for loads > 10mA and in IDLE mode for load <= 10mA.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __LINUX_REGULATOR_CONSUMER_H_
 #define __LINUX_REGULATOR_CONSUMER_H_
@@ -224,6 +229,7 @@ void devm_regulator_bulk_unregister_supply_alias(struct device *dev,
 
 /* regulator output control and status */
 int __must_check regulator_enable(struct regulator *regulator);
+int regulator_get_ref_cnt(struct regulator *regulator);
 int regulator_disable(struct regulator *regulator);
 int regulator_force_disable(struct regulator *regulator);
 int regulator_is_enabled(struct regulator *regulator);
@@ -395,6 +401,11 @@ static inline void devm_regulator_bulk_unregister_supply_alias(
 }
 
 static inline int regulator_enable(struct regulator *regulator)
+{
+	return 0;
+}
+
+static inline int regulator_get_ref_cnt(struct regulator *regulator)
 {
 	return 0;
 }

@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <asm/dma-iommu.h>
 #include <asm/memory.h>
@@ -3228,6 +3233,7 @@ static void venus_hfi_pm_handler(struct work_struct *work)
 	int rc = 0;
 	struct venus_hfi_device *device = list_first_entry(
 			&hal_ctxt.dev_head, struct venus_hfi_device, list);
+	char msg[SUBSYS_CRASH_REASON_LEN];
 
 	if (!device) {
 		dprintk(VIDC_ERR, "%s: NULL device\n", __func__);
@@ -3244,6 +3250,9 @@ static void venus_hfi_pm_handler(struct work_struct *work)
 		dprintk(VIDC_WARN, "Failed to PC for %d times\n",
 				device->skip_pc_count);
 		device->skip_pc_count = 0;
+		snprintf(msg, sizeof(msg),
+			"Failed to prepare for PC, rc : %d\n", rc);
+		subsystem_crash_reason("venus", msg);
 		__process_fatal_error(device);
 		return;
 	}
@@ -3373,6 +3382,15 @@ skip_power_off:
 	return -EAGAIN;
 }
 
+static void venus_hfi_crash_reason(struct hfi_sfr_struct *vsfr)
+{
+	char msg[SUBSYS_CRASH_REASON_LEN];
+
+	snprintf(msg, sizeof(msg), "SFR Message from FW : %s",
+						vsfr->rg_data);
+	subsystem_crash_reason("venus", msg);
+}
+
 static void __process_sys_error(struct venus_hfi_device *device)
 {
 	struct hfi_sfr_struct *vsfr = NULL;
@@ -3390,6 +3408,7 @@ static void __process_sys_error(struct venus_hfi_device *device)
 
 		dprintk(VIDC_ERR, "SFR Message from FW: %s\n",
 				vsfr->rg_data);
+		venus_hfi_crash_reason(vsfr);
 	}
 }
 
@@ -3544,9 +3563,11 @@ static int __response_handler(struct venus_hfi_device *device)
 			}
 		};
 
-		if (vsfr)
+		if (vsfr) {
 			dprintk(VIDC_ERR, "SFR Message from FW: %s\n",
 					vsfr->rg_data);
+			venus_hfi_crash_reason(vsfr);
+		}
 
 		dprintk(VIDC_ERR, "Received watchdog timeout\n");
 		packets[packet_count++] = info;

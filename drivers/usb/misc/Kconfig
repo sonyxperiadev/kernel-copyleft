@@ -298,3 +298,8 @@ config USB_QCOM_DIAG_BRIDGE
 	  driver.
 	  To compile this driver as a module, choose M here: the
 	  module will be called diag_bridge.  If unsure, choose N.
+
+config USB_SOMC_SLG4R41505
+	tristate "Enable driver for water detection by SOMC"
+	help
+	  Say Y here if you want to use water detection driver.

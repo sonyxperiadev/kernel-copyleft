@@ -34,18 +34,51 @@ config ANDROID_LOW_MEMORY_KILLER
 	  scripts (/init.rc), and it defines priority values with minimum free memory size
 	  for each priority.
 
+config ANDROID_LOW_MEMORY_KILLER_TNG
+	bool "Android Low Memory Killer TNG"
+	select OOM_SCORE_NOTIFIER
+	---help---
+	  The NEXT generation (TNG) lowmemorykiller.
+	  Registers processes to be killed when low memory conditions, this is useful
+	  as there is no particular swap space on android.
+
+	  The registered process will kills according to the priorities in android init
+	  scripts (/init.rc), and it defines priority values with minimum free memory size
+	  for each priority.
+
+config ANDROID_LOW_MEMORY_KILLER_TNG_VMPRESSURE
+	bool "Android Low Memory Killer TNG vmpressure"
+	---help---
+	  This hooks in to qualcomm vmpressure notifiers for kernel tasks.
+
+config ANDROID_LOW_MEMORY_KILLER_TNG_PSI
+	bool "Android Low Memory Killer TNG PSI"
+	depends on PSI
+	---help---
+	  Use PSI memory pressure to hint lowmemorykiller TNG about currect memory needs.
+
 config ANDROID_LOW_MEMORY_KILLER_AUTODETECT_OOM_ADJ_VALUES
 	bool "Android Low Memory Killer: detect oom_adj values"
-	depends on ANDROID_LOW_MEMORY_KILLER
+	depends on ANDROID_LOW_MEMORY_KILLER || ANDROID_LOW_MEMORY_KILLER_TNG
 	default y
 	---help---
 	  Detect oom_adj values written to
 	  /sys/module/lowmemorykiller/parameters/adj and convert them
 	  to oom_score_adj values.
 
-source "drivers/staging/android/ion/Kconfig"
+config ANDROID_LOW_MEMORY_KILLER_STATS
+	bool "Android Low Memory Killer: collect statistics"
+	default n
+	help
+	  Create a file in /proc/lmkstats that includes
+	  collected statistics about kills, scans and counts
+	  and  interaction with the shrinker. Its content
+	  will be different depending on lmk implementation used
+	  in TNG lowmemorykiller.
 
-source "drivers/staging/android/fiq_debugger/Kconfig"
+
+
+source "drivers/staging/android/ion/Kconfig"
 
 endif # if ANDROID
 

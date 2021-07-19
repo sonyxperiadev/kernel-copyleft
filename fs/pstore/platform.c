@@ -17,6 +17,11 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "pstore: " fmt
 
@@ -608,13 +613,7 @@ static void pstore_console_write(struct console *con, const char *s, unsigned c)
 
 		if (c > psinfo->bufsize)
 			c = psinfo->bufsize;
-
-		if (oops_in_progress) {
-			if (!spin_trylock_irqsave(&psinfo->buf_lock, flags))
-				break;
-		} else {
-			spin_lock_irqsave(&psinfo->buf_lock, flags);
-		}
+		spin_lock_irqsave(&psinfo->buf_lock, flags);
 		record.buf = (char *)s;
 		record.size = c;
 		psinfo->write(&record);

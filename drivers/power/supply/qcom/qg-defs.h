@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __QG_DEFS_H__
 #define __QG_DEFS_H__
@@ -37,6 +42,9 @@
 #define TTF_AWAKE_VOTER			"TTF_AWAKE_VOTER"
 #define SLEEP_EXIT_DATA_VOTER		"SLEEP_EXIT_DATA_VOTER"
 #define SLEEP_EXIT_VOTER		"SLEEP_EXIT_VOTER"
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define PSY_CHG_VOTER			"PSY_CHG_VOTER"
+#endif
 
 #define V_RAW_TO_UV(V_RAW)		div_u64(194637ULL * (u64)V_RAW, 1000)
 #define FIFO_V_RESET_VAL		0x8000

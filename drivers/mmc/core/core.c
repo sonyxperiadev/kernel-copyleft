@@ -10,6 +10,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -1218,6 +1223,24 @@ static int mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 
 	if (mmc_card_removed(host->card))
 		return -ENOMEDIUM;
+
+#ifdef CONFIG_MMC_CMD_DEBUG
+	if (host->card) {
+		struct mmc_cmdq *cq = NULL;
+		cq = &host->card->cmd_stats.cmdq[host->card->
+						cmd_stats.next_idx];
+		cq->opcode = mrq->cmd->opcode;
+		cq->arg = mrq->cmd->arg;
+		cq->flags = mrq->cmd->flags;
+		cq->timestamp = sched_clock();
+		host->card->cmd_stats.next_idx++;
+
+		if (host->card->cmd_stats.next_idx == CMD_QUEUE_SIZE) {
+			host->card->cmd_stats.next_idx = 0;
+			host->card->cmd_stats.wrapped = 1;
+		}
+	}
+#endif
 
 	mmc_mrq_pr_debug(host, mrq);
 
@@ -3022,7 +3045,10 @@ int mmc_set_uhs_voltage(struct mmc_host *host, u32 ocr)
 
 	host->card_clock_off = false;
 	/* Wait for at least 1 ms according to spec */
-	mmc_delay(1);
+	if (host->caps & MMC_CAP_NONREMOVABLE)
+		mmc_delay(1);
+	else
+		mmc_delay(40);
 
 	/*
 	 * Failure to switch is indicated by the card holding
@@ -4232,9 +4258,12 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 		if (!mmc_attach_sdio(host))
 			return 0;
 
-	if (!(host->caps2 & MMC_CAP2_NO_SD))
+	if (!(host->caps2 & MMC_CAP2_NO_SD)) {
 		if (!mmc_attach_sd(host))
 			return 0;
+		else
+			mmc_gpio_tray_close_set_uim2(host, 1);
+	}
 
 	if (!(host->caps2 & MMC_CAP2_NO_MMC))
 		if (!mmc_attach_mmc(host))
@@ -4430,6 +4459,8 @@ void mmc_stop_host(struct mmc_host *host)
 	host->rescan_disable = 1;
 	cancel_delayed_work_sync(&host->detect);
 
+	mmc_gpio_set_uim2_en(host, 0);
+
 	/* clear pm flags now and let card drivers set them as needed */
 	host->pm_flags = 0;
 
@@ -4502,6 +4533,139 @@ int mmc_power_restore_host(struct mmc_host *host)
 	return ret;
 }
 EXPORT_SYMBOL(mmc_power_restore_host);
+
+/*
+ * Fill in the mmc_request structure given a set of transfer parameters.
+ */
+void mmc_prepare_mrq(struct mmc_card *card,
+	struct mmc_request *mrq, struct scatterlist *sg, unsigned sg_len,
+	unsigned dev_addr, unsigned blocks, unsigned blksz, int write)
+{
+	BUG_ON(!mrq || !mrq->cmd || !mrq->data || !mrq->stop);
+
+	if (blocks > 1) {
+		mrq->cmd->opcode = write ?
+			MMC_WRITE_MULTIPLE_BLOCK : MMC_READ_MULTIPLE_BLOCK;
+		pr_err("%s: ffu prepare MULTIPLE \n",
+					mmc_hostname(card->host));
+	} else {
+		mrq->cmd->opcode = write ?
+			MMC_WRITE_BLOCK : MMC_READ_SINGLE_BLOCK;
+		pr_err("%s: ffu prepare SINGLE \n",
+					mmc_hostname(card->host));
+	}
+
+	mrq->cmd->arg = dev_addr;
+	if (!mmc_card_blockaddr(card))
+		mrq->cmd->arg <<= 9;
+
+	mrq->cmd->flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+
+	if (blocks == 1)
+		mrq->stop = NULL;
+	else {
+		mrq->stop->opcode = MMC_STOP_TRANSMISSION;
+		mrq->stop->arg = 0;
+		mrq->stop->flags = MMC_RSP_R1B | MMC_CMD_AC;
+	}
+
+	mrq->data->blksz = blksz;
+	mrq->data->blocks = blocks;
+	mrq->data->flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
+	mrq->data->sg = sg;
+	mrq->data->sg_len = sg_len;
+
+	mmc_set_data_timeout(mrq->data, card);
+}
+EXPORT_SYMBOL(mmc_prepare_mrq);
+
+static int mmc_busy(struct mmc_command *cmd)
+{
+	return !(cmd->resp[0] & R1_READY_FOR_DATA) ||
+		(R1_CURRENT_STATE(cmd->resp[0]) == R1_STATE_PRG);
+}
+
+/*
+ * Wait for the card to finish the busy state
+ */
+int mmc_wait_busy(struct mmc_card *card)
+{
+	int ret, busy = 0;
+	struct mmc_command cmd = {0};
+
+	memset(&cmd, 0, sizeof(struct mmc_command));
+	cmd.opcode = MMC_SEND_STATUS;
+	cmd.arg = card->rca << 16;
+	cmd.flags = MMC_RSP_SPI_R2 | MMC_RSP_R1 | MMC_CMD_AC;
+
+	do {
+		ret = mmc_wait_for_cmd(card->host, &cmd, 0);
+		if (ret)
+			break;
+
+		if (!busy && mmc_busy(&cmd)) {
+			busy = 1;
+			if (card->host->caps & MMC_CAP_WAIT_WHILE_BUSY) {
+				pr_warn("%s: Warning: Host did not "
+					"wait for busy state to end.\n",
+					mmc_hostname(card->host));
+			}
+		}
+
+	} while (mmc_busy(&cmd));
+
+	return ret;
+}
+EXPORT_SYMBOL(mmc_wait_busy);
+
+int mmc_check_result(struct mmc_request *mrq)
+{
+	int ret;
+
+	BUG_ON(!mrq || !mrq->cmd || !mrq->data);
+
+	ret = 0;
+
+	if (!ret && mrq->cmd->error)
+		ret = mrq->cmd->error;
+	if (!ret && mrq->data->error)
+		ret = mrq->data->error;
+	if (!ret && mrq->stop && mrq->stop->error)
+		ret = mrq->stop->error;
+	if (!ret && mrq->data->bytes_xfered !=
+		mrq->data->blocks * mrq->data->blksz)
+		ret = -EPERM;
+
+	return ret;
+}
+EXPORT_SYMBOL(mmc_check_result);
+
+/*
+ * transfer with certain parameters
+ */
+int mmc_simple_transfer(struct mmc_card *card,
+	struct scatterlist *sg, unsigned sg_len, unsigned dev_addr,
+	unsigned blocks, unsigned blksz, int write)
+{
+	struct mmc_request mrq = {0};
+	struct mmc_command cmd = {0};
+	struct mmc_command stop = {0};
+	struct mmc_data data = {0};
+
+	mrq.cmd = &cmd;
+	mrq.data = &data;
+	mrq.stop = &stop;
+
+	mmc_prepare_mrq(card, &mrq, sg, sg_len, dev_addr,
+		blocks, blksz, write);
+
+	mmc_wait_for_req(card->host, &mrq);
+
+	mmc_wait_busy(card);
+
+	return mmc_check_result(&mrq);
+}
+EXPORT_SYMBOL(mmc_simple_transfer);
 
 #ifdef CONFIG_PM_SLEEP
 /* Do the card removal on suspend if card is assumed removeable

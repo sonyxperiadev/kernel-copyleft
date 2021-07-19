@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef MSM_SENSOR_H
 #define MSM_SENSOR_H
@@ -34,6 +39,8 @@
 #include "msm_camera_i2c.h"
 #include "msm_camera_dt_util.h"
 #include "msm_sd.h"
+
+#include <linux/thermal.h>
 
 #define DEFINE_MSM_MUTEX(mutexname) \
 	static struct mutex mutexname = __MUTEX_INITIALIZER(mutexname)
@@ -63,6 +70,11 @@ struct msm_sensor_fn_t {
 	int (*sensor_match_id)(struct msm_sensor_ctrl_t *);
 };
 
+struct thermal_info {
+	int32_t thermal;
+	int status;
+};
+
 struct msm_sensor_ctrl_t {
 	struct platform_device *pdev;
 	struct mutex *msm_sensor_mutex;
@@ -90,6 +102,8 @@ struct msm_sensor_ctrl_t {
 	uint8_t is_csid_tg_mode;
 	uint32_t is_secure;
 	uint8_t bypass_video_node_creation;
+	struct thermal_info thermal_info;
+	struct thermal_zone_device *thermal_zone_dev;
 };
 
 int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void *argp);

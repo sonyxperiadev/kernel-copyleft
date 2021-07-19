@@ -7,6 +7,11 @@
  *
  *  Card driver specific definitions.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_CARD_H
 #define LINUX_MMC_CARD_H
 
@@ -84,6 +89,8 @@ struct mmc_ext_csd {
 	bool			hpi_en;			/* HPI enablebit */
 	bool			hpi;			/* HPI support bit */
 	unsigned int		hpi_cmd;		/* cmd used as HPI */
+	bool			ffu_capable;		/* FFU support */
+	bool			ffu_mode_op;		/* FFU mode operation */
 	bool			bkops;		/* background support bit */
 	bool			man_bkops_en;	/* manual bkops enable bit */
 	bool			auto_bkops_en;	/* auto bkops enable bit */
@@ -93,7 +100,6 @@ struct mmc_ext_csd {
 	bool			boot_ro_lockable;
 	u8			raw_ext_csd_cmdq;	/* 15 */
 	u8			raw_ext_csd_cache_ctrl;	/* 33 */
-	bool			ffu_capable;	/* Firmware upgrade support */
 	bool			cmdq_en;	/* Command Queue enabled */
 	bool			cmdq_support;	/* Command Queue supported */
 	unsigned int		cmdq_depth;	/* Command Queue depth */
@@ -166,7 +172,7 @@ struct sd_switch_caps {
 #define HIGH_SPEED_MAX_DTR	50000000
 #define UHS_SDR104_MAX_DTR	208000000
 #define UHS_SDR50_MAX_DTR	100000000
-#define UHS_DDR50_MAX_DTR	50000000
+#define UHS_DDR50_MAX_DTR	40000000
 #define UHS_SDR25_MAX_DTR	UHS_DDR50_MAX_DTR
 #define UHS_SDR12_MAX_DTR	25000000
 	unsigned int		sd3_bus_mode;
@@ -310,6 +316,25 @@ enum mmc_pon_type {
 
 #define MMC_QUIRK_CMDQ_DELAY_BEFORE_DCMD 6 /* microseconds */
 
+#ifdef CONFIG_MMC_CMD_DEBUG
+#define CMD_QUEUE_SIZE CONFIG_MMC_CMD_QUEUE_SIZE
+#endif
+
+#ifdef CONFIG_MMC_CMD_DEBUG
+struct mmc_cmdq {
+	u32		opcode;
+	u32		arg;
+	u32		flags;
+	u64		timestamp;
+};
+
+struct mmc_cmd_stats {
+	u32 next_idx;
+	u32 wrapped;
+	struct mmc_cmdq cmdq[CMD_QUEUE_SIZE];
+};
+#endif
+
 /*
  * MMC device
  */
@@ -396,6 +421,9 @@ struct mmc_card {
 	struct notifier_block   reboot_notify;
 	enum mmc_pon_type	pon_type;
 	bool cmdq_init;
+#ifdef CONFIG_MMC_CMD_DEBUG
+	struct mmc_cmd_stats cmd_stats;
+#endif
 	struct mmc_bkops_info bkops;
 };
 

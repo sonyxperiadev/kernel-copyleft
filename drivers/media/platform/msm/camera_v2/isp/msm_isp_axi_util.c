@@ -969,9 +969,17 @@ void msm_isp_increment_frame_id(struct vfe_device *vfe_dev,
 		spin_unlock_irqrestore(
 			&vfe_dev->common_data->common_dev_data_lock, flags);
 	} else {
-		spin_unlock_irqrestore(
-			&vfe_dev->common_data->common_dev_data_lock, flags);
 		if (frame_src == VFE_PIX_0) {
+			if (vfe_dev->pdev->id == 0) {
+				ms_res->master_index =
+					vfe_dev->axi_data.src_info[
+					frame_src].frame_id;
+			} else if (vfe_dev->pdev->id == 1 &&
+				vfe_dev->axi_data.src_info[
+				frame_src].frame_id == 0) {
+				vfe_dev->axi_data.src_info[frame_src].frame_id =
+					ms_res->master_index;
+			}
 			vfe_dev->axi_data.src_info[frame_src].frame_id +=
 				vfe_dev->axi_data.src_info[
 					frame_src].sof_counter_step;
@@ -983,6 +991,8 @@ void msm_isp_increment_frame_id(struct vfe_device *vfe_dev,
 		} else {
 			vfe_dev->axi_data.src_info[frame_src].frame_id++;
 		}
+		spin_unlock_irqrestore(
+			&vfe_dev->common_data->common_dev_data_lock, flags);
 	}
 	if (vfe_dev->is_split && vfe_dev->dual_vfe_sync_mode) {
 		struct vfe_device *temp_dev;
@@ -4528,6 +4538,10 @@ void msm_isp_process_axi_irq_stream(struct vfe_device *vfe_dev,
 
 		frame_id_diff = vfe_dev->irq_sof_id - frame_id;
 		if (stream_info->controllable_output && frame_id_diff > 1) {
+			pr_err("%s: scheduling problem do recovery irq_sof_id %d frame_id %d\n",
+				__func__, vfe_dev->irq_sof_id, frame_id);
+		}
+		if (stream_info->controllable_output && frame_id_diff > 100) {
 			pr_err_ratelimited("%s: scheduling problem do recovery irq_sof_id %d frame_id %d\n",
 				__func__, vfe_dev->irq_sof_id, frame_id);
 			/* scheduling problem need to do recovery */

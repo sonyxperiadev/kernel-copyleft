@@ -16,6 +16,11 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 /*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2016 Intel Corporation
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
@@ -49,6 +54,10 @@
 #include "msm_kms.h"
 #include "sde_wb.h"
 #include "sde_dbg.h"
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+#include "dsi-staging/dsi_panel_driver.h"
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 /*
  * MSM driver version:
@@ -769,6 +778,10 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 
 	drm_kms_helper_poll_init(ddev);
 	place_marker("M - DISPLAY Driver Ready");
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	incell_driver_init(priv);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 	return 0;
 

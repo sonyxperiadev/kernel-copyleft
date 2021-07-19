@@ -9,6 +9,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/err.h>
 #include <linux/of.h>
@@ -33,6 +38,10 @@
 
 #define DEFAULT_CMD6_TIMEOUT_MS	500
 #define MIN_CACHE_EN_TIMEOUT_MS 1600
+
+#define MMC_FFU_DISACMD5 0x01
+
+static char disable_ffu_cmd5;
 
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
@@ -659,7 +668,7 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.strobe_support = ext_csd[EXT_CSD_STROBE_SUPPORT];
 		card->ext_csd.cmdq_support = ext_csd[EXT_CSD_CMDQ_SUPPORT];
 		card->ext_csd.fw_version = ext_csd[EXT_CSD_FIRMWARE_VERSION];
-		pr_info("%s: eMMC FW version: 0x%02x\n",
+		pr_err("%s: eMMC FW version: 0x%02x\n",
 			mmc_hostname(card->host),
 			card->ext_csd.fw_version);
 		if (card->ext_csd.cmdq_support) {
@@ -2304,10 +2313,27 @@ err:
 	return err;
 }
 
+static int __init mmc_parse_flag(char *disable_cmd5)
+{
+	unsigned long val;
+
+	if (kstrtoul(disable_cmd5, 16, &val))
+		return -EINVAL;
+
+	if (val & MMC_FFU_DISACMD5)
+		disable_ffu_cmd5 = 1;
+
+	return 0;
+}
+early_param("disable_cmd5", mmc_parse_flag);
+
 static int mmc_can_sleepawake(struct mmc_host *host)
 {
-	return host && (host->caps2 & MMC_CAP2_SLEEP_AWAKE) && host->card &&
-		(host->card->ext_csd.rev >= 3);
+	if (1 == disable_ffu_cmd5)
+		return false;
+	else
+		return host && (host->caps2 & MMC_CAP2_SLEEP_AWAKE) && host->card &&
+			(host->card->ext_csd.rev >= 3);
 }
 
 static int mmc_sleepawake(struct mmc_host *host, bool sleep)
@@ -2956,7 +2982,7 @@ static int mmc_can_reset(struct mmc_card *card)
 	return 1;
 }
 
-static int mmc_reset(struct mmc_host *host)
+int mmc_reset(struct mmc_host *host)
 {
 	struct mmc_card *card = host->card;
 	int ret;

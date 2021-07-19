@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Completely Fair Scheduling (CFS) Class (SCHED_NORMAL/SCHED_BATCH)
@@ -5370,6 +5375,10 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se) {
 		add_nr_running(rq, 1);
+
+		if (unlikely(p->nr_cpus_allowed == 1))
+			rq->nr_pinned_tasks++;
+
 		inc_rq_walt_stats(rq, p);
 		if (!task_new)
 			update_overutilized_status(rq);
@@ -5443,6 +5452,10 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se) {
 		sub_nr_running(rq, 1);
+
+		if (unlikely(p->nr_cpus_allowed == 1))
+			rq->nr_pinned_tasks--;
+
 		dec_rq_walt_stats(rq, p);
 	}
 
@@ -9331,7 +9344,15 @@ redo:
 		if (env->idle != CPU_NOT_IDLE && env->src_rq->nr_running <= 1)
 			break;
 
-		p = list_first_entry(tasks, struct task_struct, se.group_node);
+		/*
+		 * Another CPU can place tasks, since we do not hold dst_rq lock
+		 * while doing balancing. If newly idle CPU already got something,
+		 * give up to reduce a latency.
+		 */
+		if (env->idle == CPU_NEWLY_IDLE && env->dst_rq->nr_running > 0)
+			break;
+
+		p = list_last_entry(tasks, struct task_struct, se.group_node);
 
 		env->loop++;
 		/* We've more or less seen every task there is, call it quits */
@@ -9353,6 +9374,8 @@ redo:
 		if (sched_feat(LB_MIN) && load < 16 && !env->sd->nr_balance_failed)
 			goto next;
 
+
+		if (env->idle != CPU_NEWLY_IDLE) {
 		/*
 		 * p is not running task when we goes until here, so if p is one
 		 * of the 2 task in src cpu rq and not the running one,
@@ -9361,10 +9384,11 @@ redo:
 		 * there is situation to ignore big task, it is needed
 		 * to skip the task load bigger than 2*imbalance.
 		 */
-		if (((cpu_rq(env->src_cpu)->nr_running > 2) ||
-			(env->flags & LBF_IGNORE_BIG_TASKS)) &&
-			((load / 2) > env->imbalance))
-			goto next;
+			if (((cpu_rq(env->src_cpu)->nr_running > 2) ||
+				(env->flags & LBF_IGNORE_BIG_TASKS)) &&
+				((load / 2) > env->imbalance))
+				goto next;
+		}
 
 		detach_task(p, env);
 		list_add(&p->se.group_node, &env->tasks);
@@ -12035,6 +12059,22 @@ static inline bool nohz_kick_needed(struct rq *rq, bool only_update)
 	if (rq->nr_running >= 2 &&
 	    (!energy_aware() || cpu_overutilized(cpu)))
 		return true;
+
+	if (unlikely(rq->nr_pinned_tasks > 0)) {
+		int delta = rq->nr_running - rq->nr_pinned_tasks;
+
+		/*
+		 * Check if it is possible to "unload" this CPU in case
+		 * of having pinned/affine tasks. Do not disturb idle
+		 * core if one of the below condition is true:
+		 *
+		 * - there is one pinned task and it is not "current"
+		 * - all tasks are pinned to this CPU
+		 */
+		if (delta < 2)
+			if (current->nr_cpus_allowed > 1 || !delta)
+				return false;
+	}
 
 	if (energy_aware())
 		return false;

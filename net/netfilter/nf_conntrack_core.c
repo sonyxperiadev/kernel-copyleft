@@ -35,6 +35,7 @@
 #include <linux/mm.h>
 #include <linux/nsproxy.h>
 #include <linux/rculist_nulls.h>
+#include <linux/kmemleak.h>
 
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_l3proto.h>
@@ -1186,6 +1187,7 @@ __nf_conntrack_alloc(struct net *net,
 	ct = kmem_cache_alloc(nf_conntrack_cachep, gfp);
 	if (ct == NULL)
 		goto out;
+	kmemleak_not_leak(ct);
 
 	spin_lock_init(&ct->lock);
 	ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple = *orig;

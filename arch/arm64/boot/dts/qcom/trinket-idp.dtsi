@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/iio/qcom,spmi-vadc.h>
@@ -75,6 +80,7 @@
 	};
 };
 
+/*
 &qupv3_se1_i2c {
 	status = "ok";
 	nq@28 {
@@ -93,7 +99,7 @@
 		pinctrl-1 = <&nfc_int_suspend &nfc_enable_suspend
 				&nfc_clk_req_suspend>;
 	};
-};
+};*/
 
 &sdhc_1 {
 	vdd-supply = <&pm6125_l24>;
@@ -142,10 +148,6 @@
 };
 
 &pmi632_charger {
-	qcom,battery-data = <&mtp_batterydata>;
-	qcom,suspend-input-on-debug-batt;
-	qcom,sw-jeita-enable;
-	qcom,step-charging-enable;
 	/* SMB1355 only */
 	qcom,sec-charger-config = <2>;
 	dpdm-supply = <&qusb_phy0>;
@@ -153,8 +155,6 @@
 	qcom,smb-temp-max = <800>;
 	qcom,auto-recharge-soc = <98>;
 	qcom,flash-disable-soc = <10>;
-	qcom,hw-die-temp-mitigation;
-	qcom,hw-connector-mitigation;
 	qcom,connector-internal-pull-kohm = <100>;
 	qcom,float-option = <1>;
 	qcom,thermal-mitigation = <3000000 2500000
@@ -337,47 +337,4 @@
 	qcom,mdss-dsi-bl-max-level = <4095>;
 	qcom,platform-reset-gpio = <&tlmm 90 0>;
 	qcom,platform-bklight-en-gpio = <&pmi632_gpios 6 0>;
-};
-
-&qupv3_se2_i2c {
-	status = "okay";
-	qcom,i2c-touch-active="synaptics,tcm-i2c";
-
-	synaptics_tcm@20 {
-		compatible = "synaptics,tcm-i2c";
-		reg = <0x20>;
-		interrupt-parent = <&tlmm>;
-		interrupts = <88 0x2008>;
-		pinctrl-names = "pmx_ts_active","pmx_ts_suspend",
-					"pmx_ts_release";
-		pinctrl-0 = <&ts_int_active &ts_reset_active>;
-		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
-		pinctrl-2 = <&ts_release>;
-		synaptics,irq-gpio = <&tlmm 88 0x2008>;
-		synaptics,irq-on-state = <0>;
-		synaptics,reset-gpio = <&tlmm 87 0x00>;
-		synaptics,reset-on-state = <0>;
-		synaptics,reset-active-ms = <20>;
-		synaptics,reset-delay-ms = <200>;
-		synaptics,power-delay-ms = <200>;
-		synaptics,ubl-i2c-addr = <0x20>;
-		synaptics,y-flip;
-	};
-
-	himax_ts@48 {
-		compatible = "himax,hxcommon";
-		reg = <0x48>;
-		interrupt-parent = <&tlmm>;
-		interrupts = <88 0x2008>;
-		pinctrl-names = "pmx_ts_active","pmx_ts_suspend",
-			"pmx_ts_release";
-		pinctrl-0 = <&ts_int_active &ts_reset_active>;
-		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
-		pinctrl-2 = <&ts_release>;
-		himax,panel-coords = <0 1080 0 2160>;
-		himax,display-coords = <0 1080 0 2160>;
-		himax,irq-gpio = <&tlmm 88 0x00>;
-		himax,rst-gpio = <&tlmm 87 0x00>;
-		report_type = <1>;
-	};
 };
