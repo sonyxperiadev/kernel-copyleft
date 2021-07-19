@@ -55,7 +55,8 @@
  * Reduced memory usage can improve speed, due to cache effect
  * Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
  */
-#define LZ4_MEMORY_USAGE 14
+/* We only use LZ4 for ZRAM, so the block are 4K in size. 1K is enough */
+#define LZ4_MEMORY_USAGE 10
 
 #define LZ4_MAX_INPUT_SIZE	0x7E000000 /* 2 113 929 216 bytes */
 #define LZ4_COMPRESSBOUND(isize)	(\

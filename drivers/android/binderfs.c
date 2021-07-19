@@ -160,7 +160,7 @@ static int binderfs_binder_device_create(struct inode *ref_inode,
 	device->context.name = name;
 	device->miscdev.name = name;
 	device->miscdev.minor = minor;
-	mutex_init(&device->context.context_mgr_node_lock);
+	rt_mutex_init(&device->context.context_mgr_node_lock);
 
 	req->major = MAJOR(binderfs_dev);
 	req->minor = minor;

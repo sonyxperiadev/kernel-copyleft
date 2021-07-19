@@ -2344,6 +2344,9 @@ static void msm_geni_serial_set_termios(struct uart_port *uport,
 	int uart_sampling;
 	int clk_freq_diff;
 
+	if (!termios->c_cflag)
+		return;
+
 	/* QUP_2.5.0 and older RUMI has sampling rate as 32 */
 	if (port->rumi_platform && port->is_console) {
 		geni_write_reg_nolog(0x21, uport->membase, GENI_SER_M_CLK_CFG);

@@ -56,6 +56,39 @@ TRACE_EVENT(task_rename,
 		__entry->newcomm, __entry->oom_score_adj)
 );
 
+TRACE_EVENT(task_exit,
+
+	TP_PROTO(struct task_struct *task),
+
+	TP_ARGS(task),
+
+	TP_STRUCT__entry(
+		__field(pid_t,	pid)
+		__field(short,	oom_score_adj)
+		__field(int,	exit_signal)
+		__field(int,	exit_code)
+		__field(int,	exit_state)
+		__field(bool,	leader)
+		__array(char,	comm, TASK_COMM_LEN)
+	),
+
+	TP_fast_assign(
+		__entry->pid = task->pid;
+		__entry->oom_score_adj = task->signal->oom_score_adj;
+		__entry->exit_signal = task->exit_signal;
+		__entry->exit_code = task->exit_code;
+		__entry->exit_state = task->exit_state;
+		__entry->leader = thread_group_leader(task);
+		memcpy(__entry->comm, task->comm, TASK_COMM_LEN);
+	),
+
+	TP_printk("pid=%d oom_score_adj=%hd exit_signal=%d exit_code=%d exit_state=0x%x leader=%d comm=%s",
+		  __entry->pid,
+		  __entry->oom_score_adj, __entry->exit_signal,
+		  __entry->exit_code, __entry->exit_state,
+		  __entry->leader, __entry->comm)
+);
+
 #endif
 
 /* This part must be outside protection */

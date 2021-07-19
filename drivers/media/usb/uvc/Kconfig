@@ -18,3 +18,8 @@ config USB_VIDEO_CLASS_INPUT_EVDEV
 	  to report button events.
 
 	  If you are in doubt, say Y.
+
+config SOMC_UVC_EXTENSION
+	bool "UVC driver extension"
+	help
+	  Say Y here to enable extensional function of uvc driver.

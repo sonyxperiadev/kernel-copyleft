@@ -1111,6 +1111,9 @@ struct ufs_hba {
 	atomic_t scsi_block_reqs_cnt;
 	bool restore_needed;
 
+	int latency_hist_enabled;
+	struct io_latency_state io_lat_s;
+
 	bool phy_init_g4;
 	bool force_g4;
 	bool wb_enabled;

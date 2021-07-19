@@ -16,6 +16,7 @@
 #include <linux/wait.h>
 #include <linux/mhi.h>
 #include "mhi_internal.h"
+#include <soc/qcom/subsystem_restart.h>
 
 static void mhi_process_sfr(struct mhi_controller *mhi_cntrl,
 	struct file_info *info)
@@ -25,6 +26,7 @@ static void mhi_process_sfr(struct mhi_controller *mhi_cntrl,
 	u32 file_size = info->file_size;
 	u32 rem_seg_len = info->rem_seg_len;
 	u32 seg_idx = info->seg_idx;
+	char msg[SUBSYS_CRASH_REASON_LEN];
 
 	sfr_buf = kzalloc(file_size + 1, GFP_KERNEL);
 	if (!sfr_buf)
@@ -56,6 +58,9 @@ static void mhi_process_sfr(struct mhi_controller *mhi_cntrl,
 		}
 	}
 	sfr_buf[info->file_size] = '\0';
+
+	strlcpy(msg, sfr_buf, SUBSYS_CRASH_REASON_LEN);
+	subsystem_crash_reason("wlan", msg);
 
 	/* force sfr string to log in kernel msg */
 	MHI_ERR("%s\n", sfr_buf);
