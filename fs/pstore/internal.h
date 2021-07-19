@@ -20,9 +20,11 @@ static inline void pstore_unregister_ftrace(void) {}
 #ifdef CONFIG_PSTORE_PMSG
 extern void pstore_register_pmsg(void);
 extern void pstore_unregister_pmsg(void);
+extern int pstore_get_pmsg_cnt(void);
 #else
 static inline void pstore_register_pmsg(void) {}
 static inline void pstore_unregister_pmsg(void) {}
+static inline void pstore_get_pmsg_cnt(void) {}
 #endif
 
 extern struct pstore_info *psinfo;

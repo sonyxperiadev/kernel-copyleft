@@ -967,8 +967,10 @@ static void qrtr_fwd_pkt(struct sk_buff *skb, struct qrtr_cb *cb)
 
 	qrtr_skb_align_linearize(skb);
 	node = qrtr_node_lookup(cb->dst_node);
-	if (!node)
+	if (!node) {
+		kfree_skb(skb);
 		return;
+	}
 
 	qrtr_node_enqueue(node, skb, cb->type, &from, &to, 0);
 	qrtr_node_release(node);

@@ -194,6 +194,14 @@ extern void mutex_lock_io(struct mutex *lock);
  * Returns 1 if the mutex has been acquired successfully, and 0 on contention.
  */
 extern int mutex_trylock(struct mutex *lock);
+#ifndef CONFIG_DEBUG_LOCK_ALLOC
+extern int mutex_trylock_spin(struct mutex *lock);
+#else
+static inline int mutex_trylock_spin(struct mutex *lock)
+{
+	return mutex_trylock(lock);
+}
+#endif
 extern void mutex_unlock(struct mutex *lock);
 
 extern int atomic_dec_and_mutex_lock(atomic_t *cnt, struct mutex *lock);

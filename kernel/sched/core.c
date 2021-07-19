@@ -66,6 +66,10 @@ __read_mostly int scheduler_running;
  */
 int sysctl_sched_rt_runtime = 950000;
 
+#ifdef CONFIG_NO_HZ_COMMON
+cpumask_t cpu_wclaimed_mask;
+#endif
+
 /*
  * __task_rq_lock - lock the rq @p resides on.
  */
@@ -1523,20 +1527,23 @@ static inline bool is_cpu_allowed(struct task_struct *p, int cpu)
 static struct rq *move_queued_task(struct rq *rq, struct rq_flags *rf,
 				   struct task_struct *p, int new_cpu)
 {
+	int src_cpu = cpu_of(rq);
+
 	lockdep_assert_held(&rq->lock);
 
 	WRITE_ONCE(p->on_rq, TASK_ON_RQ_MIGRATING);
 	dequeue_task(rq, p, DEQUEUE_NOCLOCK);
-	double_lock_balance(rq, cpu_rq(new_cpu));
 	if (!(rq->clock_update_flags & RQCF_UPDATED))
 		update_rq_clock(rq);
+	walt_prepare_migrate(p, src_cpu, new_cpu, true);
 	set_task_cpu(p, new_cpu);
-	double_rq_unlock(cpu_rq(new_cpu), rq);
+	rq_unlock(rq, rf);
 
 	rq = cpu_rq(new_cpu);
 
 	rq_lock(rq, rf);
 	BUG_ON(task_cpu(p) != new_cpu);
+	walt_finish_migrate(p, src_cpu, new_cpu, true);
 	enqueue_task(rq, p, 0);
 	p->on_rq = TASK_ON_RQ_QUEUED;
 	check_preempt_curr(rq, p, 0);
@@ -1797,8 +1804,6 @@ void set_task_cpu(struct task_struct *p, unsigned int new_cpu)
 		p->se.nr_migrations++;
 		rseq_migrate(p);
 		perf_event_task_migrate(p);
-
-		fixup_busy_time(p, new_cpu);
 	}
 
 	__set_task_cpu(p, new_cpu);
@@ -1818,7 +1823,9 @@ static void __migrate_swap_task(struct task_struct *p, int cpu)
 
 		p->on_rq = TASK_ON_RQ_MIGRATING;
 		deactivate_task(src_rq, p, 0);
+		walt_prepare_migrate(p, cpu_of(src_rq), cpu_of(dst_rq), true);
 		set_task_cpu(p, cpu);
+		walt_finish_migrate(p, cpu_of(src_rq), cpu_of(dst_rq), true);
 		activate_task(dst_rq, p, 0);
 		p->on_rq = TASK_ON_RQ_QUEUED;
 		check_preempt_curr(dst_rq, p, 0);
@@ -2204,6 +2211,9 @@ int select_task_rq(struct task_struct *p, int cpu, int sd_flags, int wake_flags,
 			(cpu_isolated(cpu) && !allow_isolated))
 		cpu = select_fallback_rq(task_cpu(p), p, allow_isolated);
 
+#ifdef CONFIG_NO_HZ_COMMON
+	cpumask_test_and_set_cpu(cpu, &cpu_wclaimed_mask);
+#endif
 	return cpu;
 }
 
@@ -2484,7 +2494,7 @@ bool cpus_share_cache(int this_cpu, int that_cpu)
 }
 #endif /* CONFIG_SMP */
 
-static void ttwu_queue(struct task_struct *p, int cpu, int wake_flags)
+static void ttwu_queue(struct task_struct *p, int cpu, int prev_cpu, int wake_flags)
 {
 	struct rq *rq = cpu_rq(cpu);
 	struct rq_flags rf;
@@ -2492,6 +2502,9 @@ static void ttwu_queue(struct task_struct *p, int cpu, int wake_flags)
 #if defined(CONFIG_SMP)
 	if ((sched_feat(TTWU_QUEUE) && !cpus_share_cache(smp_processor_id(), cpu)) ||
 			walt_want_remote_wakeup()) {
+		if (prev_cpu != cpu)
+			walt_finish_migrate(p, prev_cpu, cpu, false);
+
 		sched_clock_cpu(cpu); /* Sync clocks across CPUs */
 		ttwu_queue_remote(p, cpu, wake_flags);
 		return;
@@ -2500,6 +2513,10 @@ static void ttwu_queue(struct task_struct *p, int cpu, int wake_flags)
 
 	rq_lock(rq, &rf);
 	update_rq_clock(rq);
+
+	if (prev_cpu != cpu)
+		walt_finish_migrate(p, prev_cpu, cpu, true);
+
 	ttwu_do_activate(rq, p, wake_flags, &rf);
 	rq_unlock(rq, &rf);
 }
@@ -2644,6 +2661,7 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags,
 {
 	unsigned long flags;
 	int cpu, success = 0;
+	int src_cpu;
 
 	/*
 	 * If we are going to wake up a thread waiting for CONDITION we
@@ -2731,10 +2749,13 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags,
 
 	cpu = select_task_rq(p, p->wake_cpu, SD_BALANCE_WAKE, wake_flags,
 			     sibling_count_hint);
-	if (task_cpu(p) != cpu) {
+	src_cpu = task_cpu(p);
+	if (src_cpu != cpu) {
 		wake_flags |= WF_MIGRATED;
+		walt_prepare_migrate(p, src_cpu, cpu, false);
 		psi_ttwu_dequeue(p);
 		set_task_cpu(p, cpu);
+		/* walt_finish_migrate is done in ttwu_queue */
 	}
 
 #else /* CONFIG_SMP */
@@ -2746,7 +2767,7 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags,
 
 #endif /* CONFIG_SMP */
 
-	ttwu_queue(p, cpu, wake_flags);
+	ttwu_queue(p, cpu, src_cpu, wake_flags);
 stat:
 	ttwu_stat(p, cpu, wake_flags);
 out:

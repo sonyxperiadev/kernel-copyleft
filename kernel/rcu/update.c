@@ -53,6 +53,7 @@
 #include <linux/rcupdate_wait.h>
 #include <linux/sched/isolation.h>
 #include <linux/kprobes.h>
+#include <linux/slab.h>
 
 #define CREATE_TRACE_POINTS
 
@@ -220,6 +221,7 @@ static int __init rcu_set_runtime_mode(void)
 {
 	rcu_test_sync_prims();
 	rcu_scheduler_active = RCU_SCHEDULER_RUNNING;
+	kfree_rcu_scheduler_running();
 	rcu_test_sync_prims();
 	return 0;
 }
@@ -884,6 +886,10 @@ module_param(rcu_self_test_sched, bool, 0444);
 
 static int rcu_self_test_counter;
 
+struct early_boot_kfree_rcu {
+	struct rcu_head rh;
+};
+
 static void test_callback(struct rcu_head *r)
 {
 	rcu_self_test_counter++;
@@ -893,8 +899,13 @@ static void test_callback(struct rcu_head *r)
 static void early_boot_test_call_rcu(void)
 {
 	static struct rcu_head head;
+	struct early_boot_kfree_rcu *rhp;
 
 	call_rcu(&head, test_callback);
+
+	rhp = kmalloc(sizeof(*rhp), GFP_KERNEL);
+	if (!WARN_ON_ONCE(!rhp))
+		kfree_rcu(rhp, rh);
 }
 
 static void early_boot_test_call_rcu_bh(void)
