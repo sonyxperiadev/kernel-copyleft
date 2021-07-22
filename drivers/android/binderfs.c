@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2018 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/compiler_types.h>
 #include <linux/errno.h>
@@ -160,7 +165,7 @@ static int binderfs_binder_device_create(struct inode *ref_inode,
 	device->context.name = name;
 	device->miscdev.name = name;
 	device->miscdev.minor = minor;
-	mutex_init(&device->context.context_mgr_node_lock);
+	rt_mutex_init(&device->context.context_mgr_node_lock);
 
 	req->major = MAJOR(binderfs_dev);
 	req->minor = minor;

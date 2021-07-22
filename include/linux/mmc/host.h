@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2016 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  *  linux/include/linux/mmc/host.h
  *
  *  Host driver specific definitions.
@@ -19,6 +24,9 @@
 #include <linux/mmc/pm.h>
 #include <linux/dma-direction.h>
 #include <linux/ipc_logging.h>
+
+/* Default idle timeout for SD cards: 30 seconds. */
+#define MMC_SDCARD_AUTOSUSPEND_DELAY_MS 30000
 
 struct mmc_ios {
 	unsigned int	clock;			/* clock rate */

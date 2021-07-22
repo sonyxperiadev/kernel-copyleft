@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2017 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Scheduler internal types and methods:
  */
 #include <linux/sched.h>
@@ -2554,6 +2559,7 @@ extern void cfs_bandwidth_usage_dec(void);
 
 #define nohz_flags(cpu)	(&cpu_rq(cpu)->nohz_flags)
 
+extern cpumask_t cpu_wclaimed_mask;
 extern void nohz_balance_exit_idle(struct rq *rq);
 #else
 static inline void nohz_balance_exit_idle(struct rq *rq) { }

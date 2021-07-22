@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
@@ -5105,6 +5110,8 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 	int ret = 0;
 	unsigned long delay = 0;
 	const char *state;
+	struct power_supply *usb_bc_psy;
+	union power_supply_propval pval = {0, };
 
 	if (mdwc->dwc3)
 		dwc = platform_get_drvdata(mdwc->dwc3);
@@ -5148,6 +5155,17 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 		pm_runtime_enable(mdwc->dev);
 		/* fall-through */
 	case DRD_STATE_IDLE:
+		usb_bc_psy = power_supply_get_by_name("usb_bc");
+		if (usb_bc_psy) {
+			power_supply_get_property(usb_bc_psy,
+					POWER_SUPPLY_PROP_USB_TYPE, &pval);
+			if (pval.intval == POWER_SUPPLY_USB_TYPE_DCP) {
+				dev_info(mdwc->dev,
+					"current usb type is DCP, do not change OTG state from DRD_STATE_IDLE\n");
+				break;
+			}
+		}
+
 		if (test_bit(WAIT_FOR_LPM, &mdwc->inputs)) {
 			dev_dbg(mdwc->dev, "still not in lpm, wait.\n");
 			break;

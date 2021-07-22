@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2020 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -838,12 +843,6 @@ int geni_se_iommu_free_buf(struct device *wrapper_dev, dma_addr_t *iova,
  */
 void geni_se_dump_dbg_regs(struct se_geni_rsc *rsc, void __iomem *base,
 				void *ipc);
-
-/*
- * This function is used to remove proxy ICC BW vote put from common driver
- * probe on behalf of earlycon usecase.
- */
-void geni_se_remove_earlycon_icc_vote(struct device *dev);
 #else
 static inline unsigned int geni_read_reg_nolog(void __iomem *base, int offset)
 {

@@ -10,6 +10,11 @@
  * Released under the terms of 3-clause BSD License
  * Released under the terms of GNU General Public License Version 2.0
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2019 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 /*
  * Following is how we use various fields and flags of underlying
@@ -351,7 +356,7 @@ static void destroy_cache(struct zs_pool *pool)
 static unsigned long cache_alloc_handle(struct zs_pool *pool, gfp_t gfp)
 {
 	return (unsigned long)kmem_cache_alloc(pool->handle_cachep, gfp &
-		~(__GFP_HIGHMEM|__GFP_MOVABLE|__GFP_CMA|__GFP_OFFLINABLE));
+		~(__GFP_HIGHMEM|__GFP_MOVABLE|__GFP_OFFLINABLE));
 }
 
 static void cache_free_handle(struct zs_pool *pool, unsigned long handle)
@@ -362,7 +367,7 @@ static void cache_free_handle(struct zs_pool *pool, unsigned long handle)
 static struct zspage *cache_alloc_zspage(struct zs_pool *pool, gfp_t flags)
 {
 	return kmem_cache_alloc(pool->zspage_cachep, flags &
-		~(__GFP_HIGHMEM|__GFP_MOVABLE|__GFP_CMA|__GFP_OFFLINABLE));
+		~(__GFP_HIGHMEM|__GFP_MOVABLE|__GFP_OFFLINABLE));
 }
 
 static void cache_free_zspage(struct zs_pool *pool, struct zspage *zspage)

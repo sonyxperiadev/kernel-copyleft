@@ -914,4 +914,23 @@ config INPUT_STPMIC1_ONKEY
 	  To compile this driver as a module, choose M here: the
 	  module will be called stpmic1_onkey.
 
+config TOUCH_DRIVER_NOT_SOD_PROXIMITY
+	tristate "touch driver not proximity sensor for Sod mode"
+	default y
+	help
+	Say Y here if you can use sod proximity.
+
+config HALL_SENSOR_NOT_USE_SWITCH
+	tristate "switch class support"
+	default y
+	help
+	Say N here if you can use switch_class.
+
+config HALL_SENSOR_NOT_USE_SETUP_TIMER
+	tristate "setup_timer macor support"
+	default y
+	help
+	Say N here if you can use setup_timer.
+
 endif
+

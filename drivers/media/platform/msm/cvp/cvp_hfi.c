@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2019 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
@@ -29,6 +34,8 @@
 #include "cvp_hfi_helper.h"
 #include "cvp_hfi_io.h"
 #include "msm_cvp_dsp.h"
+
+#include <soc/qcom/subsystem_restart.h>
 
 #define FIRMWARE_SIZE			0X00A00000
 #define REG_ADDR_OFFSET_BITMASK	0x000FFFFF
@@ -2553,6 +2560,15 @@ static int __check_core_registered(struct iris_hfi_device *device,
 	return -EINVAL;
 }
 
+static void evass_hfi_crash_reason(struct cvp_hfi_sfr_struct *vsfr)
+{
+	char msg[SUBSYS_CRASH_REASON_LEN];
+
+	snprintf(msg, sizeof(msg), "SFR Message from FW : %s",
+						vsfr->rg_data);
+	subsystem_crash_reason("evass", msg);
+}
+
 static void __process_fatal_error(
 		struct iris_hfi_device *device)
 {
@@ -2586,6 +2602,7 @@ static void iris_hfi_pm_handler(struct work_struct *work)
 	int rc = 0;
 	struct msm_cvp_core *core;
 	struct iris_hfi_device *device;
+	char msg[SUBSYS_CRASH_REASON_LEN];
 
 	core = list_first_entry(&cvp_driver->cores, struct msm_cvp_core, list);
 	if (core)
@@ -2608,6 +2625,9 @@ static void iris_hfi_pm_handler(struct work_struct *work)
 		dprintk(CVP_WARN, "Failed to PC for %d times\n",
 				device->skip_pc_count);
 		device->skip_pc_count = 0;
+		snprintf(msg, sizeof(msg),
+			"Failed to PC %d times\n", device->skip_pc_count);
+		subsystem_crash_reason("evass", msg);
 		__process_fatal_error(device);
 		return;
 	}
@@ -2757,6 +2777,7 @@ static void __process_sys_error(struct iris_hfi_device *device)
 
 		dprintk(CVP_ERR, "SFR Message from FW: %s\n",
 				vsfr->rg_data);
+		evass_hfi_crash_reason(vsfr);
 	}
 }
 

@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: ((GPL-2.0+ WITH Linux-syscall-note) OR BSD-3-Clause) */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2020 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  *  Video for Linux Two header file
  *
  *  Copyright (C) 1999-2012 the contributors
@@ -58,7 +63,7 @@
 #define _UAPI__LINUX_VIDEODEV2_H
 
 #ifndef __KERNEL__
-#include <sys/time.h>
+#include <linux/time.h>
 #endif
 #include <linux/compiler.h>
 #include <linux/ioctl.h>

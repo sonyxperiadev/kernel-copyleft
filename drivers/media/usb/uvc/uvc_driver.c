@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *      uvc_driver.c  --  USB Video Class driver
@@ -2205,6 +2210,16 @@ static int uvc_probe(struct usb_interface *intf,
 		udev->product ? udev->product : "<unnamed>",
 		le16_to_cpu(udev->descriptor.idVendor),
 		le16_to_cpu(udev->descriptor.idProduct));
+
+	/* Skip RGB Camera detection of Nreal Light. */
+	if (le16_to_cpu(udev->descriptor.idVendor) == 0x0817
+		&& le16_to_cpu(udev->descriptor.idProduct) == 0x0909)
+		goto error;
+
+	/* Skip SLAM Camera detection of Nreal Light. */
+	if (le16_to_cpu(udev->descriptor.idVendor) == 0x05a9
+		&& le16_to_cpu(udev->descriptor.idProduct) == 0x0680)
+		goto error;
 
 	if (dev->quirks != dev->info->quirks) {
 		uvc_printk(KERN_INFO, "Forcing device quirks to 0x%x by module "

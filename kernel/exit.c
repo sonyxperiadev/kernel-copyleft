@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2019 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/kernel/exit.c
@@ -69,6 +74,8 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
+#include <trace/events/task.h>
+
 static void __unhash_process(struct task_struct *p, bool group_dead)
 {
 	nr_threads--;
@@ -115,6 +122,7 @@ static void __exit_signal(struct task_struct *tsk)
 			posix_cpu_timers_exit_group(tsk);
 	}
 #endif
+	trace_task_exit(tsk);
 
 	if (group_dead) {
 		tty = sig->tty;

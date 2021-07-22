@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2017 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
  */
 
@@ -9,6 +14,8 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/device.h>
+
+#define SUBSYS_CRASH_REASON_LEN 512
 
 struct subsys_device;
 extern struct bus_type subsys_bus_type;
@@ -155,6 +162,9 @@ static inline void complete_shutdown_ack(struct subsys_desc *desc)
 	complete(&desc->shutdown_ack);
 }
 struct subsys_device *find_subsys_device(const char *str);
+
+extern int subsystem_crash_reason(const char *name, char *reason);
+extern void update_crash_reason(struct subsys_device *dev, char *, int);
 #else
 
 static inline int subsystem_restart_dev(struct subsys_device *dev)
@@ -207,6 +217,13 @@ enum crash_status subsys_get_crash_status(struct subsys_device *dev)
 static inline void notify_proxy_vote(struct device *device) { }
 static inline void notify_proxy_unvote(struct device *device) { }
 static inline void notify_before_auth_and_reset(struct device *device) { }
+static inline void update_crash_reason(struct subsys_device *dev,
+						char *reason, int size) { }
+
+static inline int subsystem_crash_reason(const char *name, char *reason)
+{
+	return 0;
+}
 #endif /* CONFIG_MSM_SUBSYSTEM_RESTART */
 
 /* Helper wrappers */

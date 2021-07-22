@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2018 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * An access vector table (avtab) is a hash table
  * of access vectors and transition types indexed
  * by a type pair and a class.  An access vector
@@ -110,7 +115,7 @@ struct avtab_node *avtab_search_node(struct avtab *h, struct avtab_key *key);
 
 struct avtab_node *avtab_search_node_next(struct avtab_node *node, int specified);
 
-#define MAX_AVTAB_HASH_BITS 16
+#define MAX_AVTAB_HASH_BITS 18
 #define MAX_AVTAB_HASH_BUCKETS (1 << MAX_AVTAB_HASH_BITS)
 
 #endif	/* _SS_AVTAB_H_ */

@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2019 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * drivers/mmc/host/sdhci-msm.c - Qualcomm SDHCI Platform driver
@@ -1673,6 +1678,16 @@ static void sdhci_msm_set_uhs_signaling(struct sdhci_host *host,
 
 	if (mmc->ios.timing == MMC_TIMING_MMC_HS400)
 		sdhci_msm_hs400(host, &mmc->ios);
+}
+
+/*
+ * Ensure larger discard size by always setting max_busy_timeout to zero.
+ * This will always return max_busy_timeout as zero to the sdhci layer.
+ */
+
+static unsigned int sdhci_msm_get_max_timeout_count(struct sdhci_host *host)
+{
+	return 0;
 }
 
 #define MAX_PROP_SIZE 32
@@ -3456,7 +3471,7 @@ static const struct sdhci_ops sdhci_msm_ops = {
 	.get_max_clock = sdhci_msm_get_max_clock,
 	.set_bus_width = sdhci_set_bus_width,
 	.set_uhs_signaling = sdhci_msm_set_uhs_signaling,
-
+	.get_max_timeout_count = sdhci_msm_get_max_timeout_count,
 #if defined(CONFIG_SDC_QTI)
 	.dump_vendor_regs = sdhci_msm_dump_vendor_regs,
 #endif
@@ -3479,7 +3494,12 @@ static const struct sdhci_pltfm_data sdhci_msm_pdata = {
 		  SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 |
 		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK,
 
+#ifdef CONFIG_MMC_DDR50_MAX_LIMIT
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+		   SDHCI_QUIRK2_BROKEN_SDR104_SDR50,
+#else
 	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+#endif
 	.ops = &sdhci_msm_ops,
 };
 
@@ -4131,6 +4151,7 @@ static void sdhci_msm_set_caps(struct sdhci_msm_host *msm_host)
 {
 	msm_host->mmc->caps |= MMC_CAP_AGGRESSIVE_PM;
 	msm_host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_NEED_RSP_BUSY;
+	msm_host->mmc->caps |= MMC_CAP_CD_WAKE;
 }
 
 static int sdhci_msm_probe(struct platform_device *pdev)
@@ -4392,7 +4413,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 
 #if defined(CONFIG_SDC_QTI)
 	host->timeout_clk_div = 4;
+#if defined(CONFIG_MMC_ENABLE_CLK_SCALE)
 	msm_host->mmc->caps2 |= MMC_CAP2_CLK_SCALE;
+#endif
 #endif
 	sdhci_msm_setup_pm(pdev, msm_host);
 
@@ -4417,12 +4440,6 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 		goto pm_runtime_disable;
 	sdhci_msm_set_regulator_caps(msm_host);
 
-	/*
-	 * Ensure larger discard size by setting max_busy_timeout.
-	 * This has to set only after sdhci_add_host so that our
-	 * value won't be over-written.
-	 */
-	host->mmc->max_busy_timeout = 0;
 #if defined(CONFIG_SDC_QTI)
 	sdhci_msm_init_sysfs(pdev);
 #endif
