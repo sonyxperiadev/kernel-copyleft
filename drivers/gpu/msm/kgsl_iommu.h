@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __KGSL_IOMMU_H
 #define __KGSL_IOMMU_H
 
@@ -31,7 +36,7 @@
 	(MMU_FEATURE(__mmu, KGSL_MMU_64BIT) ? \
 		KGSL_IOMMU_GLOBAL_MEM_BASE64 : KGSL_IOMMU_GLOBAL_MEM_BASE32)
 
-#define KGSL_IOMMU_SECURE_SIZE SZ_256M
+#define KGSL_IOMMU_SECURE_SIZE (SZ_256M + SZ_32M)
 #define KGSL_IOMMU_SECURE_END(_mmu) KGSL_IOMMU_GLOBAL_MEM_BASE(_mmu)
 
 #define KGSL_IOMMU_SVM_BASE32		0x300000

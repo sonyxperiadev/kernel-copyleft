@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "msm_camera_dt_util.h"
 #include "msm_camera_io_util.h"
@@ -1421,7 +1426,7 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 	enum msm_camera_device_type_t device_type,
 	struct msm_camera_i2c_client *sensor_i2c_client)
 {
-	int rc = 0, index = 0, no_gpio = 0, ret = 0;
+	int rc = 0, index = 0, no_gpio = 0, ret = 0, vdig_ref_cnt = 0;
 	struct msm_sensor_power_setting *power_setting = NULL;
 
 	CDBG("%s:%d\n", __func__, __LINE__);
@@ -1577,20 +1582,33 @@ power_up_failed:
 				[power_setting->seq_val], GPIOF_OUT_INIT_LOW);
 			break;
 		case SENSOR_VREG:
-			if (power_setting->seq_val < ctrl->num_vreg)
+			if (power_setting->seq_val < ctrl->num_vreg) {
+				if (power_setting->seq_val == CAM_VDIG)
+					vdig_ref_cnt =
+						regulator_get_ref_cnt(
+							*((struct regulator **)
+							&power_setting->data[0]));
 				msm_camera_config_single_vreg(ctrl->dev,
 					&ctrl->cam_vreg
 					[power_setting->seq_val],
 					(struct regulator **)
 					&power_setting->data[0],
 					0);
-			else
+			} else{
 				pr_err("%s:%d:seq_val: %d > num_vreg: %d\n",
 					__func__, __LINE__,
 					power_setting->seq_val, ctrl->num_vreg);
+			}
 
-			msm_cam_sensor_handle_reg_gpio(power_setting->seq_val,
-				ctrl->gpio_conf, GPIOF_OUT_INIT_LOW);
+			if (power_setting->seq_val == CAM_VDIG
+					&& vdig_ref_cnt > 1) {
+				CDBG("CAM_VDIG ref cnt =%d\n", vdig_ref_cnt);
+			} else{
+				msm_cam_sensor_handle_reg_gpio(CAM_VIO,
+					ctrl->gpio_conf,
+					GPIOF_OUT_INIT_LOW);
+			}
+
 			break;
 		case SENSOR_I2C_MUX:
 			if (ctrl->i2c_conf && ctrl->i2c_conf->use_i2c_mux)
@@ -1650,6 +1668,7 @@ int msm_camera_power_down(struct msm_camera_power_ctrl_t *ctrl,
 	int index = 0, ret = 0;
 	struct msm_sensor_power_setting *pd = NULL;
 	struct msm_sensor_power_setting *ps;
+	int vdig_ref_cnt = 0;
 
 	CDBG("%s:%d\n", __func__, __LINE__);
 	if (!ctrl || !sensor_i2c_client) {
@@ -1702,25 +1721,37 @@ int msm_camera_power_down(struct msm_camera_power_ctrl_t *ctrl,
 						pd->seq_type,
 						pd->seq_val);
 			if (ps) {
-				if (pd->seq_val < ctrl->num_vreg)
+				if (pd->seq_val < ctrl->num_vreg) {
+					if (pd->seq_val == CAM_VDIG) {
+						vdig_ref_cnt =
+							regulator_get_ref_cnt(
+								*((struct regulator **)
+								&ps->data[0]));
+					}
 					msm_camera_config_single_vreg(ctrl->dev,
 						&ctrl->cam_vreg
 						[pd->seq_val],
 						(struct regulator **)
 						&ps->data[0],
 						0);
-				else
+				} else{
 					pr_err("%s:%d:seq_val:%d > num_vreg: %d\n",
 						__func__, __LINE__, pd->seq_val,
 						ctrl->num_vreg);
+				}
 			} else
 				pr_err("%s error in power up/down seq data\n",
 								__func__);
-			ret = msm_cam_sensor_handle_reg_gpio(pd->seq_val,
-				ctrl->gpio_conf, GPIOF_OUT_INIT_LOW);
-			if (ret < 0)
-				pr_err("ERR:%s Error while disabling VREG GPIO\n",
-					__func__);
+
+			if (pd->seq_val == CAM_VDIG && vdig_ref_cnt > 1) {
+				CDBG("CAM_VDIG ref cnt =%d\n", vdig_ref_cnt);
+			} else{
+				ret = msm_cam_sensor_handle_reg_gpio(CAM_VIO,
+					ctrl->gpio_conf, GPIOF_OUT_INIT_LOW);
+				if (ret < 0)
+					pr_err("ERR:%s Error disabling VREG GPIO\n",
+						__func__);
+			}
 			break;
 		case SENSOR_I2C_MUX:
 			if (ctrl->i2c_conf && ctrl->i2c_conf->use_i2c_mux)

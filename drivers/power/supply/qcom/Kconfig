@@ -143,4 +143,14 @@ config SMB358_CHARGER
 	  The driver reports the charger status via the power supply framework.
 	  A charger status change triggers an IRQ via the device STAT pin.
 
+config SOMC_CHARGER_EXTENSION
+	bool "Charger driver extension"
+	help
+	  Say Y here to enable extensional function of charger driver.
+
+config SOMC_CHARGER_XFL
+	bool "XFL specific code in charger driver"
+	help
+	  Say Y here to enable specific code for XFL kernel.
+
 endmenu

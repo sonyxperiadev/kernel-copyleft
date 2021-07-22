@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/spmi/spmi.h>
@@ -542,9 +547,9 @@
 				qcom,default-led-trigger = "flash0_trigger";
 				qcom,id = <0>;
 				qcom,current-ma = <1000>;
-				qcom,duration-ms = <1280>;
+				qcom,duration-ms = <450>;
 				qcom,ires-ua = <12500>;
-				qcom,hdrm-voltage-mv = <400>;
+				qcom,hdrm-voltage-mv = <325>;
 				qcom,hdrm-vol-hi-lo-win-mv = <100>;
 			};
 
@@ -555,33 +560,33 @@
 				qcom,default-led-trigger = "flash1_trigger";
 				qcom,id = <1>;
 				qcom,current-ma = <1000>;
-				qcom,duration-ms = <1280>;
+				qcom,duration-ms = <450>;
 				qcom,ires-ua = <12500>;
-				qcom,hdrm-voltage-mv = <400>;
+				qcom,hdrm-voltage-mv = <325>;
 				qcom,hdrm-vol-hi-lo-win-mv = <100>;
 			};
 
 			pmi632_torch0: qcom,torch_0 {
 				label = "torch";
 				qcom,led-name = "led:torch_0";
-				qcom,max-current = <500>;
+				qcom,max-current = <100>;
 				qcom,default-led-trigger = "torch0_trigger";
 				qcom,id = <0>;
-				qcom,current-ma = <300>;
+				qcom,current-ma = <25>;
 				qcom,ires-ua = <12500>;
-				qcom,hdrm-voltage-mv = <400>;
+				qcom,hdrm-voltage-mv = <325>;
 				qcom,hdrm-vol-hi-lo-win-mv = <100>;
 			};
 
 			pmi632_torch1: qcom,torch_1 {
 				label = "torch";
 				qcom,led-name = "led:torch_1";
-				qcom,max-current = <500>;
+				qcom,max-current = <100>;
 				qcom,default-led-trigger = "torch1_trigger";
 				qcom,id = <1>;
-				qcom,current-ma = <300>;
+				qcom,current-ma = <25>;
 				qcom,ires-ua = <12500>;
-				qcom,hdrm-voltage-mv = <400>;
+				qcom,hdrm-voltage-mv = <325>;
 				qcom,hdrm-vol-hi-lo-win-mv = <100>;
 			};
 

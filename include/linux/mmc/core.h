@@ -5,6 +5,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_CORE_H
 #define LINUX_MMC_CORE_H
 
@@ -27,6 +32,7 @@ enum mmc_blk_status {
 	MMC_BLK_ECC_ERR,
 	MMC_BLK_NOMEDIUM,
 	MMC_BLK_NEW_REQUEST,
+	MMC_BLK_RETRY_SINGLE,
 };
 
 struct mmc_command {
@@ -218,12 +224,22 @@ extern void mmc_check_bkops(struct mmc_card *card);
 extern void mmc_start_manual_bkops(struct mmc_card *card);
 extern int mmc_set_auto_bkops(struct mmc_card *card, bool enable);
 extern void mmc_flush_detect_work(struct mmc_host *host);
+extern int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd);
 extern int mmc_cmdq_hw_reset(struct mmc_host *host);
 extern int mmc_try_claim_host(struct mmc_host *host, unsigned int delay);
 
 extern void mmc_get_card(struct mmc_card *card);
 extern void mmc_put_card(struct mmc_card *card);
 extern void __mmc_put_card(struct mmc_card *card);
+
+extern void mmc_prepare_mrq(struct mmc_card *card,
+	struct mmc_request *mrq, struct scatterlist *sg, unsigned sg_len,
+	unsigned dev_addr, unsigned blocks, unsigned blksz, int write);
+extern int mmc_wait_busy(struct mmc_card *card);
+extern int mmc_check_result(struct mmc_request *mrq);
+extern int mmc_simple_transfer(struct mmc_card *card,
+	struct scatterlist *sg, unsigned sg_len, unsigned dev_addr,
+	unsigned blocks, unsigned blksz, int write);
 extern void mmc_blk_init_bkops_statistics(struct mmc_card *card);
 
 extern void mmc_deferred_scaling(struct mmc_host *host);
@@ -244,4 +260,25 @@ int mmc_wait_for_cmd(struct mmc_host *host, struct mmc_command *cmd,
 int mmc_hw_reset(struct mmc_host *host);
 void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card);
 
+/*
+ * eMMC5.0 Field Firmware Update (FFU) opcodes
+*/
+#define MMC_FFU_INVOKE_OP 302
+
+#define MMC_FFU_MODE_SET 0x1
+#define MMC_FFU_MODE_NORMAL 0x0
+#define MMC_FFU_INSTALL_SET 0x2
+
+#ifdef CONFIG_MMC_FFU
+#define MMC_FFU_FEATURES 0x1
+#define FFU_FEATURES(ffu_features) (ffu_features & MMC_FFU_FEATURES)
+
+int mmc_ffu_invoke(struct mmc_card *card, const char *name);
+
+#else
+static inline int mmc_ffu_invoke(struct mmc_card *card, const char *name)
+{
+	return -ENOSYS;
+}
+#endif
 #endif /* LINUX_MMC_CORE_H */

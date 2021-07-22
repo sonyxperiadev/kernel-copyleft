@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/bitmap.h>
 #include <linux/bitops.h>
@@ -2491,12 +2496,16 @@ static void msm_geni_serial_set_termios(struct uart_port *uport,
 	unsigned long desired_rate;
 	int uart_sampling;
 
+	if (!termios->c_cflag)
+		return;
+
 	/* QUP_2.5.0 and older RUMI has sampling rate as 32 */
 	if (port->rumi_platform && port->is_console) {
 		geni_write_reg_nolog(0x21, uport->membase, GENI_SER_M_CLK_CFG);
 		geni_write_reg_nolog(0x21, uport->membase, GENI_SER_S_CLK_CFG);
 		geni_read_reg_nolog(uport->membase, GENI_SER_M_CLK_CFG);
 	}
+
 	if (!uart_console(uport)) {
 		int ret = msm_geni_serial_power_on(uport);
 

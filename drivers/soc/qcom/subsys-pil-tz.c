@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/err.h>
@@ -867,6 +872,7 @@ static void log_failure_reason(const struct pil_tz_data *d)
 	}
 
 	strlcpy(reason, smem_reason, min(size, (size_t)MAX_SSR_REASON_LEN));
+	update_crash_reason(d->subsys, reason, size);
 	pr_err("%s subsystem failure reason: %s.\n", name, reason);
 }
 

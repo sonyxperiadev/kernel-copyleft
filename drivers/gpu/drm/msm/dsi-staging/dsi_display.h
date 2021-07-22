@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _DSI_DISPLAY_H_
 #define _DSI_DISPLAY_H_
@@ -711,5 +716,9 @@ int dsi_display_cont_splash_config(void *display);
  */
 int dsi_display_get_panel_vfp(void *display,
 	int h_active, int v_active);
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+struct dsi_display *dsi_display_get_main_display(void);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 #endif /* _DSI_DISPLAY_H_ */

@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "MSM-CPP %s:%d " fmt, __func__, __LINE__
 
@@ -1567,6 +1572,12 @@ static int cpp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x88));
 		pr_debug("DEBUG_R1: 0x%x\n",
 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x8C));
+
+		/* Update bandwidth usage to enable AXI/ABH clock,
+		 * which will help to reset CPP AXI.Bandwidth will be
+		 * made zero at cpp_release_hardware.
+		 */
+		msm_cpp_update_bandwidth(cpp_dev, 0x1000, 0x1000);
 
 		/* mask IRQ status */
 		msm_camera_io_w(0xB, cpp_dev->cpp_hw_base + 0xC);

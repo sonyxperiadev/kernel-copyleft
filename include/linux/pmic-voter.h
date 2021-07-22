@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __PMIC_VOTER_H
 #define __PMIC_VOTER_H
@@ -51,4 +56,8 @@ void destroy_votable(struct votable *votable);
 void lock_votable(struct votable *votable);
 void unlock_votable(struct votable *votable);
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+ssize_t somc_output_voter_param(struct votable *votable,
+						char *buf, size_t size);
+#endif
 #endif /* __PMIC_VOTER_H */

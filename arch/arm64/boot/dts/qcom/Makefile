@@ -349,6 +349,7 @@ dtb-$(CONFIG_ARCH_SDMMAGPIE)	+= sdmmagpie-rumi.dtb \
 	sdmmagpie-dual-display-idp.dtb
 endif
 
+ifneq ($(CONFIG_ARCH_SONY_SEINE),y)
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 	dtbo-$(CONFIG_ARCH_TRINKET) += \
 		trinket-rumi-overlay.dtbo \
@@ -404,6 +405,7 @@ dtb-$(CONFIG_ARCH_TRINKET)	+= trinket-rumi.dtb \
 	trinketp-iot-usbc-idp.dtb \
 	trinket-iot-dp-idp.dtb \
 	trinketp-iot-dp-idp.dtb
+endif
 endif
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)

@@ -1,6 +1,11 @@
 /*
  * umh - the kernel usermode helper
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2020 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/sched/task.h>

@@ -8,6 +8,11 @@
  * the Free Software Foundation; either version 2 of the License, or (at
  * your option) any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/export.h>
@@ -329,6 +334,13 @@ int mmc_send_csd(struct mmc_card *card, u32 *csd)
 	return mmc_send_cxd_native(card->host, card->rca << 16,	csd,
 				MMC_SEND_CSD);
 }
+
+int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd)
+{
+	return mmc_send_cxd_data(card, card->host, MMC_SEND_EXT_CSD,
+			ext_csd, 512);
+}
+EXPORT_SYMBOL_GPL(mmc_send_ext_csd);
 
 static int mmc_spi_send_cid(struct mmc_host *host, u32 *cid)
 {
@@ -912,6 +924,7 @@ int mmc_interrupt_hpi(struct mmc_card *card)
 		 */
 		goto out;
 	case R1_STATE_PRG:
+		pr_debug("%s: Sending HPI cmd\n", mmc_hostname(card->host));
 		break;
 	default:
 		/* In all other states, it's illegal to issue HPI */

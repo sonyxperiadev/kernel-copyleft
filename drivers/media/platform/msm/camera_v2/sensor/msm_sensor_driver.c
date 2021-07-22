@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2019 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define SENSOR_DRIVER_I2C "camera"
 /* Header file declaration */
@@ -24,6 +29,9 @@
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
 #define SENSOR_MAX_MOUNTANGLE (360)
+
+#define SONY_CAMERA_THERMAL_NAME_0		"sony_camera_0"
+#define SONY_CAMERA_THERMAL_NAME_1		"sony_camera_1"
 
 static struct v4l2_file_operations msm_sensor_v4l2_subdev_fops;
 static int32_t msm_sensor_driver_platform_probe(struct platform_device *pdev);
@@ -1556,9 +1564,48 @@ static struct i2c_driver msm_sensor_driver_i2c = {
 	},
 };
 
+static int get_camera_thermal(struct thermal_zone_device *thermal, int *temp)
+{
+	int id = 0;
+	int rc = 0;
+	if (!temp) {
+		pr_err("%s failed %d\n", __func__, __LINE__);
+		rc = -EPERM;
+		goto error;
+	}
+
+	if (!strncmp(thermal->type, SONY_CAMERA_THERMAL_NAME_0,
+		sizeof(SONY_CAMERA_THERMAL_NAME_0))) {
+		id = 0;
+	} else if (!strncmp(thermal->type, SONY_CAMERA_THERMAL_NAME_1,
+		sizeof(SONY_CAMERA_THERMAL_NAME_1))) {
+		id = 1;
+	} else {
+		rc = -EPERM;
+		goto error;
+	}
+
+	if (g_sctrl[id]->thermal_info.status == TRUE) {
+		*temp = g_sctrl[id]->thermal_info.thermal;
+		CDBG("thermal : %d", *temp);
+	} else {
+		rc = g_sctrl[id]->thermal_info.status;
+	}
+error:
+	return rc;
+}
+
+static struct thermal_zone_device_ops camera_thermal_ops = {
+	.get_temp = get_camera_thermal,
+};
 static int __init msm_sensor_driver_init(void)
 {
 	int32_t rc = 0;
+	int32_t i = 0;
+	char *thermal_name[MAX_CAMERAS] = {SONY_CAMERA_THERMAL_NAME_0,
+		SONY_CAMERA_THERMAL_NAME_1,
+		NULL,
+		NULL};
 
 	CDBG("%s Enter\n", __func__);
 	rc = platform_driver_register(&msm_sensor_platform_driver);
@@ -1569,12 +1616,34 @@ static int __init msm_sensor_driver_init(void)
 	if (rc)
 		pr_err("%s i2c_add_driver failed rc = %d",  __func__, rc);
 
+		for (i = 0; i < MAX_CAMERAS; i++) {
+			if (g_sctrl[i] && thermal_name[i]) {
+				g_sctrl[i]->thermal_zone_dev =
+					thermal_zone_device_register(thermal_name[i],
+					0, 0, 0, &camera_thermal_ops, 0, 0, 0);
+				if (IS_ERR(g_sctrl[i]->thermal_zone_dev)) {
+					pr_err("%s thermal_zone_device_register (%u) %d\n",
+						__func__, i, __LINE__);
+					rc = PTR_ERR(g_sctrl[i]->thermal_zone_dev);
+					break;
+				}
+			}
+		}
+
 	return rc;
 }
 
 static void __exit msm_sensor_driver_exit(void)
 {
+	int32_t i = 0;
 	CDBG("Enter");
+	for (i = 0; i < MAX_CAMERAS; i++) {
+		if (g_sctrl[i]) {
+			if (g_sctrl[i]->thermal_zone_dev)
+				thermal_zone_device_unregister(
+					g_sctrl[i]->thermal_zone_dev);
+		}
+	}
 	platform_driver_unregister(&msm_sensor_platform_driver);
 	i2c_del_driver(&msm_sensor_driver_i2c);
 }
