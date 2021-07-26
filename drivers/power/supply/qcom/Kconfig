@@ -145,4 +145,14 @@ config SMB1398_CHARGER
 	      wireless charger receiver and provide the input for downstream
 	      chargers.
 
+config SOMC_CHARGER_EXTENSION
+	bool "Charger driver extension"
+	help
+	  Say Y here to enable extensional function of charger driver.
+
+config SOMC_CHARGER_XFL
+	bool "XFL specific code in charger driver"
+	help
+	  Say Y here to enable specific code for XFL kernel.
+
 endmenu

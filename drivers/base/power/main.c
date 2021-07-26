@@ -1939,6 +1939,7 @@ int dpm_suspend(pm_message_t state)
 		error = async_error;
 	if (error) {
 		suspend_stats.failed_suspend++;
+		pr_err("PM: pm_suspend error=%d,failed_suspend=%d \n",error,suspend_stats.failed_suspend);//ghq add for debug PM
 		dpm_save_failed_step(SUSPEND_SUSPEND);
 	}
 	dpm_show_time(starttime, state, error, NULL);

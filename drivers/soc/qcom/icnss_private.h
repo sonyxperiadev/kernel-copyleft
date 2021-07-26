@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -11,6 +16,7 @@
 #include <asm/dma-iommu.h>
 #include <linux/kobject.h>
 #include <linux/power_supply.h>
+#include <soc/qcom/subsystem_restart.h>
 
 #define icnss_ipc_log_string(_x...) do {				\
 	if (icnss_ipc_log_context)					\
@@ -388,6 +394,9 @@ struct icnss_priv {
 	struct workqueue_struct *soc_update_wq;
 	bool is_chain1_supported;
 	bool chain_reg_info_updated;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
+	wait_queue_head_t wlan_pdr_debug_q;
+	int data_ready;
 };
 
 struct icnss_reg_info {

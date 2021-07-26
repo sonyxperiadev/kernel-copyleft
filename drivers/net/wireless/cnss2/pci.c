@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2019 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2016-2021, The Linux Foundation. All rights reserved. */
 
@@ -12,6 +17,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/memblock.h>
 #include <linux/completion.h>
+#include <soc/qcom/subsystem_restart.h>
 
 #include "main.h"
 #include "bus.h"
@@ -4564,6 +4570,7 @@ static void cnss_mhi_notify_status(struct mhi_controller *mhi_ctrl, void *priv,
 	struct cnss_pci_data *pci_priv = priv;
 	struct cnss_plat_data *plat_priv;
 	enum cnss_recovery_reason cnss_reason;
+	char msg[SUBSYS_CRASH_REASON_LEN];
 
 	if (!pci_priv) {
 		cnss_pr_err("pci_priv is NULL");
@@ -4619,6 +4626,11 @@ static void cnss_mhi_notify_status(struct mhi_controller *mhi_ctrl, void *priv,
 		cnss_pr_err("Unsupported MHI status cb reason: %d\n", reason);
 		return;
 	}
+
+	snprintf(msg, sizeof(msg),
+			"MHI status cb is called with reason %s(%d)\n",
+			cnss_mhi_notify_status_to_str(reason), reason);
+	subsystem_crash_reason("wlan", msg);
 
 	cnss_schedule_recovery(&pci_priv->pci_dev->dev, cnss_reason);
 }

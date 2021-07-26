@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2020 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0
 /*
  * xHCI host controller driver
@@ -2663,6 +2668,9 @@ static int xhci_handle_event(struct xhci_hcd *xhci)
 		break;
 	case TRB_TYPE(TRB_DEV_NOTE):
 		handle_device_notification(xhci, event);
+		break;
+	case TRB_TYPE(TRB_HC_EVENT):
+		/* no action to reduce error log */
 		break;
 	default:
 		if ((le32_to_cpu(event->event_cmd.flags) & TRB_TYPE_BITMASK) >=

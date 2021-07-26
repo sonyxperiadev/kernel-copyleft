@@ -79,8 +79,8 @@
 #define ATM_POISON		0xdeadbeef
 
 /********** kernel/mutexes **********/
-#define MUTEX_DEBUG_INIT	0x11
-#define MUTEX_DEBUG_FREE	0x22
+#define MUTEX_WAITER_DEBUG_INIT	0x11
+#define MUTEX_WAITER_DEBUG_FREE	0x22
 #define MUTEX_POISON_WW_CTX	((void *) 0x500 + POISON_POINTER_DELTA)
 
 /********** lib/flex_array.c **********/

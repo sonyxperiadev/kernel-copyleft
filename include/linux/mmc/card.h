@@ -7,6 +7,11 @@
  *
  *  Card driver specific definitions.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2015 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #ifndef LINUX_MMC_CARD_H
 #define LINUX_MMC_CARD_H
 
@@ -310,6 +315,25 @@ enum mmc_pon_type {
 
 #define mmc_card_strobe(c) (((c)->ext_csd).strobe_support & MMC_STROBE_SUPPORT)
 
+#ifdef CONFIG_MMC_CMD_DEBUG
+#define CMD_QUEUE_SIZE CONFIG_MMC_CMD_QUEUE_SIZE
+#endif
+
+#ifdef CONFIG_MMC_CMD_DEBUG
+struct mmc_cmdq {
+	u32		opcode;
+	u32		arg;
+	u32		flags;
+	u64		timestamp;
+};
+
+struct mmc_cmd_stats {
+	u32 next_idx;
+	u32 wrapped;
+	struct mmc_cmdq cmdq[CMD_QUEUE_SIZE];
+};
+#endif
+
 /*
  * MMC device
  */
@@ -401,6 +425,9 @@ struct mmc_card {
 	unsigned int		bouncesz;	/* Bounce buffer size */
 	struct notifier_block   reboot_notify;
 	enum mmc_pon_type	pon_type;
+#ifdef CONFIG_MMC_CMD_DEBUG
+	struct mmc_cmd_stats cmd_stats;
+#endif
 	struct mmc_bkops_info bkops;
 };
 

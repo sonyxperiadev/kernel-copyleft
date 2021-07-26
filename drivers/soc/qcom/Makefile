@@ -105,6 +105,7 @@ obj-$(CONFIG_QTI_L2_REUSE) += l2_reuse.o
 obj-$(CONFIG_ICNSS2) += icnss2/
 obj-$(CONFIG_QTI_CRYPTO_COMMON) += crypto-qti-common.o
 obj-$(CONFIG_QTI_CRYPTO_TZ) += crypto-qti-tz.o
+obj-$(CONFIG_ARCH_LITO) += console_setup.o
 obj-$(CONFIG_QTI_HW_KEY_MANAGER) += hwkm_qti.o
 hwkm_qti-y += hwkm.o
 obj-$(CONFIG_MSM_BAM_DMUX) += bam_dmux.o

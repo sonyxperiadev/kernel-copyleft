@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2020 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
@@ -353,7 +358,8 @@ static void *usbpd_ipc_log;
 
 #define PD_MIN_SINK_CURRENT	900
 
-static const u32 default_src_caps[] = { 0x36019096 };	/* VSafe5V @ 1.5A */
+static const u32 default_src_caps[] = { 0x3601905A };  /* VSafe5V @ 0.9A Lisa modify for PDO setting*/
+//static const u32 default_src_caps[] = { 0x36019096 };	/* VSafe5V @ 1.5A */
 static const u32 default_snk_caps[] = { 0x2601912C };	/* VSafe5V @ 3A */
 
 struct vdm_tx {
@@ -842,6 +848,13 @@ static int pd_select_pdo(struct usbpd *pd, int pdo_pos, int uv, int ua)
 		pd->rdo = PD_RDO_FIXED(pdo_pos, 0, mismatch, 1, 1, curr / 10,
 				max_current / 10);
 	} else if (type == PD_SRC_PDO_TYPE_AUGMENTED) {
+		/* Limit voltage 9.5V for preventing OVP */
+		if (uv > 9500000) {
+			usbpd_warn(&pd->dev,
+				"selected uv (%d) ua (%d). Limit Voltage to 9.5V\n",
+				uv, ua);
+			uv = 9500000;
+		}
 		if ((uv / 100000) > PD_APDO_MAX_VOLT(pdo) ||
 			(uv / 100000) < PD_APDO_MIN_VOLT(pdo) ||
 			(ua / 50000) > PD_APDO_MAX_CURR(pdo) || (ua < 0)) {

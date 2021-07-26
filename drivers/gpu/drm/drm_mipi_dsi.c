@@ -1058,8 +1058,14 @@ EXPORT_SYMBOL(mipi_dsi_dcs_set_tear_scanline);
 int mipi_dsi_dcs_set_display_brightness(struct mipi_dsi_device *dsi,
 					u16 brightness)
 {
-	u8 payload[2] = { brightness & 0xff, brightness >> 8 };
+	u8 payload[2] = {0};
 	ssize_t err;
+
+	if (brightness == 0x400){
+		brightness = 0x3FF;
+	}
+	 payload[0] = (brightness >> 8) & 0x03;
+	 payload[1] = brightness  & 0xFF;
 
 	err = mipi_dsi_dcs_write(dsi, MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
 				 payload, sizeof(payload));

@@ -9,6 +9,11 @@
  *		Changes to use preallocated sigqueue structures
  *		to allow signals to be sent reliably.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2018 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/export.h>
@@ -1390,7 +1395,7 @@ int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p,
 	if (!ret && sig) {
 		check_panic_on_foreground_kill(p);
 		ret = do_send_sig_info(sig, info, p, type);
-		if (capable(CAP_KILL) && sig == SIGKILL) {
+		if (sig == SIGKILL && capable(CAP_KILL)) {
 			if (!strcmp(current->comm, ULMK_MAGIC))
 				add_to_oom_reaper(p);
 			ulmk_update_last_kill();

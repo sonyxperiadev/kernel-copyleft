@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved. */
 
@@ -32,7 +37,7 @@
  * Define vibration periods: default(5sec), min(50ms), max(15sec) and
  * overdrive(30ms).
  */
-#define QPNP_VIB_MIN_PLAY_MS		50
+#define QPNP_VIB_MIN_PLAY_MS		10
 #define QPNP_VIB_PLAY_MS		5000
 #define QPNP_VIB_MAX_PLAY_MS		15000
 #define QPNP_VIB_OVERDRIVE_PLAY_MS	30

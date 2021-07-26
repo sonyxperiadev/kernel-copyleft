@@ -8,6 +8,11 @@
  * Software Foundation; either version 2 of the License, or (at your option)
  * any later version.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2020 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include "dm-verity-fec.h"
 #include <linux/math64.h>

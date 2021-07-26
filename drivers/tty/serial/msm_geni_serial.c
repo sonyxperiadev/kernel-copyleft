@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2018 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
@@ -2446,6 +2451,9 @@ static void msm_geni_serial_set_termios(struct uart_port *uport,
 	unsigned int clk_idx;
 	int uart_sampling;
 	int clk_freq_diff;
+
+	if (!termios->c_cflag)
+		return;
 
 	/* QUP_2.5.0 and older RUMI has sampling rate as 32 */
 	if (port->rumi_platform && port->is_console) {

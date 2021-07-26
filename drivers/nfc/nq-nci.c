@@ -23,6 +23,7 @@
 #endif
 #include <linux/jiffies.h>
 #include <linux/regulator/consumer.h>
+#include "linux/hardware_info.h"
 
 struct nqx_platform_data {
 	unsigned int irq_gpio;
@@ -1191,6 +1192,7 @@ static int nfcc_hw_check(struct i2c_client *client, struct nqx_dev *nqx_dev)
 
 	char *nci_get_version_cmd = NULL;
 	char *nci_get_version_rsp = NULL;
+	char *nfc_chip_id = "0xA4";
 
 	nci_reset_cmd = kzalloc(NCI_RESET_CMD_LEN + 1, GFP_DMA | GFP_KERNEL);
 	if (!nci_reset_cmd) {
@@ -1319,6 +1321,7 @@ static int nfcc_hw_check(struct i2c_client *client, struct nqx_dev *nqx_dev)
 	}
 
 
+	get_hardware_info_data(HWID_NFC,nfc_chip_id);
 	dev_dbg(&client->dev,
 		"%s: - nq - reset cmd answer : NfcNciRx %x %x %x\n",
 		__func__, nci_reset_rsp[0],
