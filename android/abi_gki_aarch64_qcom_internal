@@ -1,6 +1,7 @@
 # List of symbols exported by QCOM in-kernel drivers and used by external DLKMs
 # QCOM internal whitelist
 [abi_symbol_list]
+  request_any_context_irq
   cnss_lock_pm_sem
   cnss_release_pm_sem
   cnss_get_fw_files_for_target
@@ -88,7 +89,11 @@
   debugfs_print_regs32
   debugfs_remove
   debugfs_remove_recursive
+  down_timeout
+  devm_gpiod_unhinge
+  devm_gpiod_get_from_of_node
   drm_debugfs_create_files
+  find_vpid
   hdcp2_app_comm
   hdcp2_close_stream
   hdcp2_deinit
@@ -99,6 +104,9 @@
   ipa_register_rmnet_ctl_cb
   ipa_rmnet_ctl_xmit
   ipa_unregister_rmnet_ctl_cb
+  nr_irqs
+  pid_task
+  led_trigger_blink_oneshot
   qcom_clk_set_flags
   qcom_scm_assign_mem_regions
   qcom_scm_camera_protect_phy_lanes
@@ -147,6 +155,13 @@
   qtee_shmbridge_is_enabled
   qtee_shmbridge_query
   qtee_shmbridge_register
+  rdev_get_id
+  regulator_is_enabled_regmap
+  regulator_disable_regmap
+  regulator_enable_regmap
+  regulator_get_voltage_sel_regmap
+  regulator_set_voltage_sel_regmap
+  regulator_map_voltage_linear
   rmnet_ctl_if
   rmnet_deliver_skb
   rmnet_frag_deliver
@@ -166,6 +181,7 @@
   rmnet_shs_skb_entry
   socinfo_get_id
   socinfo_get_id_string
+  spi_bus_type
   subsys_bus_type
   synx_addrefcount
   synx_bind
@@ -184,6 +200,7 @@
   synx_signal
   synx_uninitialize
   synx_wait
+  thermal_zone_device_unregister
   __tracepoint_rmnet_freq_boost
   __tracepoint_rmnet_freq_reset
   __tracepoint_rmnet_perf_low
@@ -192,3 +209,4 @@
   __tracepoint_rmnet_shs_low
   __tracepoint_rmnet_shs_wq_high
   __tracepoint_rmnet_shs_wq_low
+  _brelse

@@ -1,0 +1,6 @@
+#
+# Kernel module make instructions go here.
+#
+obj-$(CONFIG_NFC_SN1X0_DEVICES) += sn1x0.o
+sn1x0-objs := pn553.o cold_reset.o
+#ccflags-$(CONFIG_NFC_SN1X0_DEVICES) := -DDEBUG
