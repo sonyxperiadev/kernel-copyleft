@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2016 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/kernel/printk.c
@@ -2319,6 +2324,13 @@ void suspend_console(void)
 	console_lock();
 	console_suspended = 1;
 	up_console_sem();
+}
+
+int is_console_suspended(void)
+{
+	if (!console_suspend_enabled)
+		return 0;
+	return console_suspended;
 }
 
 void resume_console(void)

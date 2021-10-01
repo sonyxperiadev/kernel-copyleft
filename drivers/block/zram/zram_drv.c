@@ -11,6 +11,11 @@
  * Released under the terms of GNU General Public License Version 2.0
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2019 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #define KMSG_COMPONENT "zram"
 #define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
@@ -1360,14 +1365,13 @@ compress_again:
 				__GFP_NOWARN |
 				__GFP_HIGHMEM |
 				__GFP_MOVABLE |
-				__GFP_CMA |
 				__GFP_OFFLINABLE);
 	if (!handle) {
 		zcomp_stream_put(zram->comp);
 		atomic64_inc(&zram->stats.writestall);
 		handle = zs_malloc(zram->mem_pool, comp_len,
 				GFP_NOIO | __GFP_HIGHMEM |
-				__GFP_MOVABLE | __GFP_CMA |
+				__GFP_MOVABLE |
 				__GFP_OFFLINABLE);
 		if (handle)
 			goto compress_again;

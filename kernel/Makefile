@@ -128,7 +128,7 @@ $(obj)/configs.o: $(obj)/config_data.gz
 
 targets += config_data.gz
 $(obj)/config_data.gz: $(KCONFIG_CONFIG) FORCE
-	$(call if_changed,gzip)
+	@grep -v "CONFIG_MACH_[^ ]\+ is not set" $< | gzip > $@
 
 $(obj)/kheaders.o: $(obj)/kheaders_data.tar.xz
 

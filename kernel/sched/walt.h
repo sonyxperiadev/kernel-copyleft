@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2017 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -99,6 +104,10 @@ static inline void dec_rq_walt_stats(struct rq *rq, struct task_struct *p)
 }
 
 extern void fixup_busy_time(struct task_struct *p, int new_cpu);
+extern void walt_prepare_migrate(struct task_struct *p,
+		int src_cpu, int new_cpu, bool locked);
+extern void walt_finish_migrate(struct task_struct *p,
+		int src_cpu, int new_cpu, bool locked);
 extern void init_new_task_load(struct task_struct *p);
 extern void mark_task_starting(struct task_struct *p);
 extern void set_window_start(struct rq *rq);
@@ -221,6 +230,10 @@ static inline void walt_dec_cumulative_runnable_avg(struct rq *rq,
 }
 
 static inline void fixup_busy_time(struct task_struct *p, int new_cpu) { }
+static inline void walt_prepare_migrate(struct task_struct *p,
+		int src_cpu, int new_cpu, bool locked) { }
+static inline void walt_finish_migrate(struct task_struct *p,
+		int src_cpu, int new_cpu, bool locked) { }
 static inline void init_new_task_load(struct task_struct *p)
 {
 }

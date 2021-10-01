@@ -516,6 +516,12 @@ config HISI_HIKEY_USB
 	help
 	  If you say yes here you get support for usb functionality of HiSilicon Hikey Platform.
 
+config SONY_EXT_UIM_CTRL
+	tristate "Sony External UIM Control Driver"
+	default n
+	help
+	  A misc driver related to UIM selector/enabler
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

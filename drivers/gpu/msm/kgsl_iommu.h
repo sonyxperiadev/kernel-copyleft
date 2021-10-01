@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2018 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  */
 #ifndef __KGSL_IOMMU_H
@@ -29,7 +34,7 @@
 	(test_bit(KGSL_MMU_64BIT, &(__mmu)->features) ? \
 		KGSL_IOMMU_GLOBAL_MEM_BASE64 : KGSL_IOMMU_GLOBAL_MEM_BASE32)
 
-#define KGSL_IOMMU_SECURE_SIZE SZ_256M
+#define KGSL_IOMMU_SECURE_SIZE (SZ_256M + SZ_32M)
 #define KGSL_IOMMU_SECURE_END(_mmu) KGSL_IOMMU_GLOBAL_MEM_BASE(_mmu)
 #define KGSL_IOMMU_SECURE_BASE(_mmu)	\
 	(KGSL_IOMMU_GLOBAL_MEM_BASE(_mmu) - KGSL_IOMMU_SECURE_SIZE)

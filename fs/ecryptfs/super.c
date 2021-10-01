@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2020 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-or-later
 /**
  * eCryptfs: Linux filesystem encryption layer
@@ -153,6 +158,10 @@ static int ecryptfs_show_options(struct seq_file *m, struct dentry *root)
 	if (mount_crypt_stat->global_default_cipher_key_size)
 		seq_printf(m, ",ecryptfs_key_bytes=%zd",
 			   mount_crypt_stat->global_default_cipher_key_size);
+#ifdef CONFIG_WTL_ENCRYPTION_FILTER
+	if (mount_crypt_stat->flags & ECRYPTFS_ENABLE_FILTERING)
+		seq_printf(m, ",ecryptfs_enable_filtering");
+#endif
 	if (mount_crypt_stat->flags & ECRYPTFS_PLAINTEXT_PASSTHROUGH_ENABLED)
 		seq_printf(m, ",ecryptfs_passthrough");
 	if (mount_crypt_stat->flags & ECRYPTFS_XATTR_METADATA_ENABLED)
