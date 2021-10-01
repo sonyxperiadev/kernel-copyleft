@@ -1,0 +1,9 @@
+	fs16xx@34 {
+		compatible = "foursemi,fs16xx";
+		reg = <0x34>;
+		status = "okay";
+		//fsm,channel = "mono";		// mono/left/right/top/bottom
+		//fsm,ras = false;		// true/false
+	        //DVDD-supply = <&vdd_1v8_reg>;	// vddd
+	};
+
