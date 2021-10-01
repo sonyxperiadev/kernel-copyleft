@@ -618,29 +618,23 @@ static int cs40l2x_delay_put(struct snd_kcontrol *kcontrol,
 		return ret;
 
 	usleep_range(3000, 3100);
-	if (core->a2h_enable) {
-		ret = regmap_write(regmap, reg_a2h, CS40L2X_A2H_ENABLE);
-		if (ret)
-			return ret;
+	ret = regmap_write(regmap, reg_a2h, CS40L2X_A2H_ENABLE);
+	if (ret)
+		return ret;
 
-		ret = regmap_write(regmap, CS40L2X_DSP_VIRT1_MBOX_5,
-					CS40L2X_A2H_I2S_START);
-		if (ret)
-			return ret;
+	ret = regmap_write(regmap, CS40L2X_DSP_VIRT1_MBOX_5,
+				CS40L2X_A2H_I2S_START);
+	if (ret)
+		return ret;
 
-		ret = regmap_write(regmap, CS40L2X_DSP1RX1_INPUT,
-					CS40L2X_ROUTE_ASPRX1);
-		if (ret)
-			return ret;
+	ret = regmap_write(regmap, CS40L2X_DSP1RX1_INPUT,
+				CS40L2X_ROUTE_ASPRX1);
+	if (ret)
+		return ret;
 
-		ret = regmap_write(regmap, CS40L2X_DSP1RX5_INPUT,
-					CS40L2X_ROUTE_ASPRX2);
-		if (ret)
-			return ret;
-
-	}
-
-	return 0;
+	ret = regmap_write(regmap, CS40L2X_DSP1RX5_INPUT,
+				CS40L2X_ROUTE_ASPRX2);
+	return ret;
 }
 
 static int cs40l2x_mute_get(struct snd_kcontrol *kcontrol,
