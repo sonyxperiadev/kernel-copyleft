@@ -1,0 +1,60 @@
+/* arch/arm64/boot/dts/somc/somc-kumano-sensor_adux1050.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/* I2C: QUP17 */
+&qupv3_se17_i2c {
+	adux1050@2c {
+		compatible = "adi,adux1050";
+		reg = <0x2c>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <24 2>;
+		interrupts-name = "adux1050_2c";
+		adi,adux1050_reg = [ 00010006 00020529 000301cc 00050f44 0006bf7e 00070190 0008012c 00091700 000a0004 000bbfe7 000c0190 000d012c 000e1000 000f0004 ];
+		adi,adux1050_irq_flags = [ 00000002 ];
+		adi,adux1050_irq_gpio_no = <24>;
+		adi,adux1050_intr_err = <0x30>;
+		adi,adux1050_proxy_enable = <1>;
+		adi,adux1050_allowed_proxy_time = <15>;
+		adi,adux1050_max_proxy_count = <4>;
+		adi,adux1050_device_identifier = <0>;
+	};
+	adux1050@2d {
+		compatible = "adi,adux1050";
+		reg = <0x2d>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <39 2>;
+		interrupts-name = "adux1050_2d";
+		adi,adux1050_reg = [ 00010006 00020529 000301cc 00050f44 0006bf7e 000703e8 0008012c 00093400 000a0004 000bbfe7 000c0096 000d012c 000e3900 000f0002 ];
+		adi,adux1050_irq_flags = [ 00000002 ];
+		adi,adux1050_irq_gpio_no = <39>;
+		adi,adux1050_intr_err = <0x30>;
+		adi,adux1050_proxy_enable = <1>;
+		adi,adux1050_allowed_proxy_time = <15>;
+		adi,adux1050_max_proxy_count = <4>;
+		adi,adux1050_device_identifier = <1>;
+	};
+	adux1050@2e {
+		compatible = "adi,adux1050";
+		reg = <0x2e>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <93 2>;
+		interrupts-name = "adux1050_2e";
+		adi,adux1050_reg = [ 00010002 00020529 000301ee 00050f44 0006bff6 00070064 0008012c 00095c00 000a0001 ];
+		adi,adux1050_irq_flags = [ 00000002 ];
+		adi,adux1050_irq_gpio_no = <93>;
+		adi,adux1050_intr_err = <0x10>;
+		adi,adux1050_proxy_enable = <1>;
+		adi,adux1050_allowed_proxy_time = <15>;
+		adi,adux1050_max_proxy_count = <4>;
+		adi,adux1050_device_identifier = <2>;
+	};
+};

@@ -19,6 +19,9 @@ struct security_class_mapping {
 };
 
 extern struct security_class_mapping secclass_map[];
+#ifdef CONFIG_SECURITY_SELINUX_TRAP
+extern const int secclass_map_size;
+#endif
 
 #endif /* _SELINUX_AVC_SS_H_ */
 

@@ -1,0 +1,40 @@
+/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&pm8150b_charger {
+	qcom,fv-max-uv = <4380000>;
+	qcom,chg-term-src = <1>;
+	qcom,chg-term-current-ma = <(-160)>;
+	somc,product-max-icl-ua = <2600000>;
+};
+
+&pm8150b_pdphy {
+};
+
+&vendor {
+	kumano_batterydata: qcom,battery-data {
+		qcom,batt-id-range-pct = <17>;
+		#include "fg-gen4-batterydata-kumano-reference.dtsi"
+	};
+	kumano_batterydata_al0: somc,battery-data-al0 {
+		qcom,batt-id-range-pct = <17>;
+		#include "fg-gen4-batterydata-kumano-reference.dtsi"
+	};
+};
+
+&pm8150b_fg {
+	qcom,battery-data = <&kumano_batterydata>;
+	somc,battery-data-al0 = <&kumano_batterydata_al0>;
+	somc,jeita-step-use-real-temp;
+	somc,jeita-batt-temp-correction = <0>;
+	qcom,fg-sys-term-current = <(-210)>;
+};

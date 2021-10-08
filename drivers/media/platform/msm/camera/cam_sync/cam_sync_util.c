@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -178,7 +178,7 @@ int cam_sync_deinit_object(struct sync_table_row *table, uint32_t idx)
 	}
 
 	if (row->state == CAM_SYNC_STATE_ACTIVE)
-		CAM_DBG(CAM_SYNC,
+		CAM_WARN(CAM_SYNC,
 			"Destroying an active sync object name:%s id:%i",
 			row->name, row->sync_id);
 
@@ -225,7 +225,7 @@ int cam_sync_deinit_object(struct sync_table_row *table, uint32_t idx)
 		}
 
 		if (child_row->state == CAM_SYNC_STATE_ACTIVE)
-			CAM_DBG(CAM_SYNC,
+			CAM_WARN(CAM_SYNC,
 				"Warning: destroying active child sync obj = %d",
 				child_info->sync_id);
 
@@ -254,7 +254,7 @@ int cam_sync_deinit_object(struct sync_table_row *table, uint32_t idx)
 		}
 
 		if (parent_row->state == CAM_SYNC_STATE_ACTIVE)
-			CAM_DBG(CAM_SYNC,
+			CAM_WARN(CAM_SYNC,
 				"Warning: destroying active parent sync obj = %d",
 				parent_info->sync_id);
 
@@ -368,7 +368,7 @@ void cam_sync_util_send_v4l2_event(uint32_t id,
 	void *payload,
 	int len)
 {
-	struct v4l2_event event = {0};
+	struct v4l2_event event;
 	__u64 *payload_data = NULL;
 	struct cam_sync_ev_header *ev_header = NULL;
 

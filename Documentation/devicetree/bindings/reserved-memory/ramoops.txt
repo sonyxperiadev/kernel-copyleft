@@ -41,6 +41,8 @@ Optional properties:
 
 - pmsg-size: size in bytes of log buffer reserved for userspace messages
   (defaults to 0: disabled)
+  Multiple pmsg's are supported. Previous pmsg size cannot be zero.
+  Example: If pmsg1 needs to be used. pmsg0 size should be non zero.
 
 - unbuffered: if present, use unbuffered mappings to map the reserved region
   (defaults to buffered mappings)

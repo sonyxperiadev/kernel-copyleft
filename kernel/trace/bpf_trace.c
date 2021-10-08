@@ -222,6 +222,7 @@ BPF_CALL_5(bpf_trace_printk, char *, fmt, u32, fmt_size, u64, arg1,
 /* Horrid workaround for getting va_list handling working with different
  * argument type combinations generically for 32 and 64 bit archs.
  */
+#ifdef CONFIG_TRACE_PRINTK
 #define __BPF_TP_EMIT()	__BPF_ARG3_TP()
 #define __BPF_TP(...)							\
 	__trace_printk(1 /* Fake ip will not be printed. */,		\
@@ -249,6 +250,9 @@ BPF_CALL_5(bpf_trace_printk, char *, fmt, u32, fmt_size, u64, arg1,
 	      : __BPF_ARG2_TP((u32)arg3, ##__VA_ARGS__)))
 
 	return __BPF_TP_EMIT();
+#else
+	return 0;
+#endif
 }
 
 static const struct bpf_func_proto bpf_trace_printk_proto = {

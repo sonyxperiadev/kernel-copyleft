@@ -202,6 +202,8 @@ struct subsys_device {
 	int restart_level;
 	int crash_count;
 	struct subsys_soc_restart_order *restart_order;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
+	int data_ready;
 	bool do_ramdump_on_put;
 	struct cdev char_dev;
 	dev_t dev_no;
@@ -386,10 +388,42 @@ void subsys_default_online(struct subsys_device *dev)
 }
 EXPORT_SYMBOL(subsys_default_online);
 
+void update_crash_reason(struct subsys_device *subsys,
+				char *smem_reason, int size)
+{
+	memcpy(subsys->crash_reason, smem_reason,
+		min((size_t)size, sizeof(subsys->crash_reason)));
+	subsys->data_ready = 1;
+}
+EXPORT_SYMBOL(update_crash_reason);
+
+static void subsys_notify_crash_reason(struct subsys_device *subsys)
+{
+	if (subsys->data_ready && subsys->restart_level != RESET_SOC) {
+		sysfs_notify(&subsys->dev.kobj, NULL, "crash_reason");
+	}
+}
+
+static ssize_t crash_reason_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int r = 0;
+	struct subsys_device *subsys = to_subsys(dev);
+
+	r = snprintf(buf, PAGE_SIZE, "%s\n", subsys->crash_reason);
+	subsys->data_ready = 0;
+	memset(subsys->crash_reason, 0, sizeof(subsys->crash_reason));
+
+	return r;
+}
+
+static DEVICE_ATTR_RO(crash_reason);
+
 static struct attribute *subsys_attrs[] = {
 	&dev_attr_name.attr,
 	&dev_attr_state.attr,
 	&dev_attr_crash_count.attr,
+	&dev_attr_crash_reason.attr,
 	&dev_attr_restart_level.attr,
 	&dev_attr_firmware_name.attr,
 	&dev_attr_system_debug.attr,
@@ -1161,6 +1195,7 @@ static void subsystem_restart_wq_func(struct work_struct *work)
 	track->p_state = SUBSYS_RESTARTING;
 	spin_unlock_irqrestore(&track->s_lock, flags);
 
+	subsys_notify_crash_reason(dev);
 	/* Collect ram dumps for all subsystems in order here */
 	for_each_subsys_device(list, count, NULL, subsystem_ramdump);
 
@@ -1262,7 +1297,7 @@ int subsystem_restart_dev(struct subsys_device *dev)
 		return -EBUSY;
 	}
 
-	pr_info("Restart sequence requested for %s, restart_level = %s.\n",
+	pr_warn("Restart sequence requested for %s, restart_level = %s.\n",
 		name, restart_levels[dev->restart_level]);
 
 	if (disable_restart_work == DISABLE_SSR) {
@@ -1331,6 +1366,18 @@ int subsystem_crashed(const char *name)
 	return 0;
 }
 EXPORT_SYMBOL(subsystem_crashed);
+
+int subsystem_crash_reason(const char *name, char *msg)
+{
+	struct subsys_device *dev = find_subsys_device(name);
+	if (!dev)
+		return -ENODEV;
+	update_crash_reason(dev, msg, SUBSYS_CRASH_REASON_LEN);
+	subsys_notify_crash_reason(dev);
+
+	return 0;
+}
+EXPORT_SYMBOL(subsystem_crash_reason);
 
 void subsys_set_crash_status(struct subsys_device *dev,
 				enum crash_status crashed)

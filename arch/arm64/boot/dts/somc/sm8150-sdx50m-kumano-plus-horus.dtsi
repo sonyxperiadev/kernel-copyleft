@@ -1,0 +1,466 @@
+/* arch/arm64/boot/dts/somc/sm8150-sdx50m-kumano-plus-horus.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "sm8150-sdx50m-kumano-plus-common.dtsi"
+
+&soc {
+	/* I2C: QUP17 */
+	i2c@89c000 {
+		status = "disabled";
+	};
+};
+
+&sony_camera_module_0 {
+	status = "disabled";
+};
+
+&sony_camera_module_1 {
+	status = "disabled";
+};
+
+&sony_camera_module_2 {
+	status = "disabled";
+};
+
+&sony_camera_module_3 {
+	status = "disabled";
+};
+
+&somc_pinctrl {
+	/* If variant specific default setting is needed,
+	fill pinctrl-2 value in <variant>.dtsi */
+	pinctrl-2 = <&sm_gpio_11 &sm_gpio_12 &sm_gpio_13 &sm_gpio_14
+		     &sm_gpio_15 &sm_gpio_17 &sm_gpio_18 &sm_gpio_19
+		     &sm_gpio_20 &sm_gpio_22 &sm_gpio_25 &sm_gpio_28
+		     &sm_gpio_29 &sm_gpio_30 &sm_gpio_31 &sm_gpio_32
+		     &sm_gpio_37 &sm_gpio_71 &sm_gpio_72 &sm_gpio_98
+		     &sm_gpio_99 &sm_gpio_121>;
+};
+
+&somc_pinctrl_pmic {
+	/* If variant specific default setting is needed,
+	fill pinctrl-2 value in <variant>.dtsi */
+	pinctrl-2 = <&pm8150b_gpio_1 &pm8150b_gpio_2 &pm8150b_gpio_7 &pm8150l_gpio_10>;
+};
+
+&usb0 {
+	dwc3@a600000 {
+		maximum-speed = "super-speed-plus";
+	};
+};
+
+/* Regulator config */
+&pm8150_l17 {
+	status = "disabled";
+};
+
+/* GPIO_1: NC */
+&pm8150b_gpio_1 {
+	pins = "gpio1";
+	function = "normal";
+	bias-high-impedance; /* DISABLE GPIO_1 */
+	/delete-property/ input-enable;
+	/delete-property/ bias-pull-up;
+	/delete-property/ power-source;
+};
+
+/* GPIO_2: NC */
+&pm8150b_gpio_2 {
+	pins = "gpio2";
+	function = "normal";
+	bias-high-impedance; /* DISABLE GPIO_2 */
+	/delete-property/ input-enable;
+	/delete-property/ bias-pull-up;
+	/delete-property/ power-source;
+};
+
+/* GPIO_7: NC (TS_VDDH_EN) */
+&pm8150b_gpio_7 {
+	pins = "gpio7";
+	function = "normal";
+	bias-high-impedance; /* DISABLE GPIO_7 */
+	/delete-property/ output-low;
+	/delete-property/ drive-push-pull;
+	/delete-property/ bias-disable;
+	/delete-property/ qcom,drive-strength;
+	/delete-property/ power-source;
+};
+
+/* GPIO_10: BL_THERM */
+&pm8150l_gpio_10 {
+	pins = "gpio10";
+	function = "normal";
+	bias-high-impedance; /* DISABLE GPIO_10 Analog PIN */
+};
+
+/* GPIO_11 : NC (CAM_SOF) */
+&sm_gpio_11 {
+	mux {
+		pins = "gpio11";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio11";
+		drive-strength = <2>;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+
+/* GPIO_12 : NC (CAM2_RST_N) */
+&sm_gpio_12 {
+	mux {
+		pins = "gpio12";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio12";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		/delete-property/ output-low;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_13 : NC (CAM_MCLK0) */
+&sm_gpio_13 {
+	mux {
+		pins = "gpio13";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio13";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_14 : NC (CAM_MCLK1) */
+&sm_gpio_14 {
+	mux {
+		pins = "gpio14";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio14";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_15 : NC (CAM_MCLK2) */
+&sm_gpio_15 {
+	mux {
+		pins = "gpio15";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio15";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_17 : NC (CCI_I2C_SDA0) */
+&sm_gpio_17 {
+	mux {
+		pins = "gpio17";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio17";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_18 : NC (CCI_I2C_SCL0) */
+&sm_gpio_18 {
+	mux {
+		pins = "gpio18";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio18";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_19 : NC (CCI_I2C_SDA1) */
+&sm_gpio_19 {
+	mux {
+		pins = "gpio19";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio19";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_20 : NC (CCI_I2C_SCL1) */
+&sm_gpio_20 {
+	mux {
+		pins = "gpio20";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio20";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_22 : NC (MAIN_CAM_PWR_EN) */
+&sm_gpio_22 {
+	mux {
+		pins = "gpio22";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio22";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		/delete-property/ output-low;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_25 : NC (CHAT_CAM_PWR_EN) */
+&sm_gpio_25 {
+	mux {
+		pins = "gpio25";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio25";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		/delete-property/ output-low;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_28 : NC (CAM0_RST_N) */
+&sm_gpio_28 {
+	mux {
+		pins = "gpio28";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio28";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		/delete-property/ output-low;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_29 : NC (RGBC_IR_PWR_EN) */
+&sm_gpio_29 {
+	mux {
+		pins = "gpio29";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio29";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		/delete-property/ output-low;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_30 : NC (CAM1_RST_N) */
+&sm_gpio_30 {
+	mux {
+		pins = "gpio30";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio30";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		/delete-property/ output-low;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_31 : NC (CCI_I2C_SDA2) */
+&sm_gpio_31 {
+	mux {
+		pins = "gpio31";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio31";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_32 : NC (CCI_I2C_SCL2) */
+&sm_gpio_32 {
+	mux {
+		pins = "gpio32";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio32";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_37 : NC (RGBC_IR_INT) */
+&sm_gpio_37 {
+	mux {
+		pins = "gpio37";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio37";
+		drive-strength = <2>;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+&tlmm {
+	/* GPIO_71 : NC (SDM_RFFE0_DATA) */
+	sm_gpio_71: sm_gpio_71 {
+		mux {
+			pins = "gpio71";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio71";
+			drive-strength = <2>;
+			bias-pull-down;
+			input-enable;
+		};
+	};
+
+	/* GPIO_72 : NC (SDM_RFFE0_CLK) */
+	sm_gpio_72: sm_gpio_72 {
+		mux {
+			pins = "gpio72";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio72";
+			drive-strength = <2>;
+			bias-pull-down;
+			input-enable;
+		};
+	};
+};
+
+/* GPIO_98 : NC (CAMSENSOR_I2C_SDA) */
+&sm_gpio_98 {
+	mux {
+		pins = "gpio98";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio98";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_99 : NC (CAMSENSOR_I2C_SCL) */
+&sm_gpio_99 {
+	mux {
+		pins = "gpio99";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio99";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_121 : NC */
+&sm_gpio_121 {
+	mux {
+		pins = "gpio121";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio121";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+#include "synaptics-tcm-i2c.dtsi"
+#include "somc-kumano-display.dtsi"
+#include "somc-kumano-plus-display-cdb.dtsi"
+#include "charger-kumano-common.dtsi"
+#include "charger-kumano-plus-horus.dtsi"

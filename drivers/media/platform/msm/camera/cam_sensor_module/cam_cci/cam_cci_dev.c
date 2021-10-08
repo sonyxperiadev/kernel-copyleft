@@ -25,6 +25,7 @@ struct v4l2_subdev *cam_cci_get_subdev(int cci_dev_index)
 		return g_cci_subdev[cci_dev_index];
 	return NULL;
 }
+EXPORT_SYMBOL(cam_cci_get_subdev);
 
 static long cam_cci_subdev_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)
@@ -60,8 +61,8 @@ static long cam_cci_subdev_compat_ioctl(struct v4l2_subdev *sd,
 
 irqreturn_t cam_cci_irq(int irq_num, void *data)
 {
-	uint32_t irq_status0, irq_status1, reg_bmsk;
-	uint32_t irq_update_rd_done = 0;
+	uint32_t irq_status0 = 0;
+	uint32_t irq_status1 = 0;
 	struct cci_device *cci_dev = data;
 	struct cam_hw_soc_info *soc_info =
 		&cci_dev->soc_info;
@@ -71,26 +72,20 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 
 	irq_status0 = cam_io_r_mb(base + CCI_IRQ_STATUS_0_ADDR);
 	irq_status1 = cam_io_r_mb(base + CCI_IRQ_STATUS_1_ADDR);
-	CAM_DBG(CAM_CCI, "BASE: %pK", base);
 	CAM_DBG(CAM_CCI, "irq0:%x irq1:%x", irq_status0, irq_status1);
 
 	if (irq_status0 & CCI_IRQ_STATUS_0_RST_DONE_ACK_BMSK) {
-		struct cam_cci_master_info *cci_master_info;
 		if (cci_dev->cci_master_info[MASTER_0].reset_pending == TRUE) {
-			cci_master_info = &cci_dev->cci_master_info[MASTER_0];
 			cci_dev->cci_master_info[MASTER_0].reset_pending =
 				FALSE;
-			if (!cci_master_info->status)
-				complete(&cci_master_info->reset_complete);
-			cci_master_info->status = 0;
+			complete(
+			&cci_dev->cci_master_info[MASTER_0].reset_complete);
 		}
 		if (cci_dev->cci_master_info[MASTER_1].reset_pending == TRUE) {
-			cci_master_info = &cci_dev->cci_master_info[MASTER_1];
 			cci_dev->cci_master_info[MASTER_1].reset_pending =
 				FALSE;
-			if (!cci_master_info->status)
-				complete(&cci_master_info->reset_complete);
-			cci_master_info->status = 0;
+			complete(
+			&cci_dev->cci_master_info[MASTER_1].reset_complete);
 		}
 	}
 
@@ -99,7 +94,7 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 		cci_dev->cci_master_info[MASTER_0].status = 0;
 		rd_done_th_assert = true;
 		complete(&cci_dev->cci_master_info[MASTER_0].th_complete);
-		complete(&cci_dev->cci_master_info[MASTER_0].rd_done);
+		complete(&cci_dev->cci_master_info[MASTER_0].reset_complete);
 	}
 	if ((irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_RD_DONE_BMSK) &&
 		(!rd_done_th_assert)) {
@@ -108,7 +103,7 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 		if (cci_dev->is_burst_read)
 			complete(
 			&cci_dev->cci_master_info[MASTER_0].th_complete);
-		complete(&cci_dev->cci_master_info[MASTER_0].rd_done);
+		complete(&cci_dev->cci_master_info[MASTER_0].reset_complete);
 	}
 	if ((irq_status1 & CCI_IRQ_STATUS_1_I2C_M0_RD_THRESHOLD) &&
 		(!rd_done_th_assert)) {
@@ -149,13 +144,12 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 			&cci_dev->cci_master_info[MASTER_0].lock_q[QUEUE_1],
 			flags);
 	}
-	rd_done_th_assert = false;
 	if ((irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_RD_DONE_BMSK) &&
 		(irq_status1 & CCI_IRQ_STATUS_1_I2C_M1_RD_THRESHOLD)) {
 		cci_dev->cci_master_info[MASTER_1].status = 0;
 		rd_done_th_assert = true;
 		complete(&cci_dev->cci_master_info[MASTER_1].th_complete);
-		complete(&cci_dev->cci_master_info[MASTER_1].rd_done);
+		complete(&cci_dev->cci_master_info[MASTER_1].reset_complete);
 	}
 	if ((irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_RD_DONE_BMSK) &&
 		(!rd_done_th_assert)) {
@@ -164,7 +158,7 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 		if (cci_dev->is_burst_read)
 			complete(
 			&cci_dev->cci_master_info[MASTER_1].th_complete);
-		complete(&cci_dev->cci_master_info[MASTER_1].rd_done);
+		complete(&cci_dev->cci_master_info[MASTER_1].reset_complete);
 	}
 	if ((irq_status1 & CCI_IRQ_STATUS_1_I2C_M1_RD_THRESHOLD) &&
 		(!rd_done_th_assert)) {
@@ -223,93 +217,28 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 	}
 	if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_ERROR_BMSK) {
 		cci_dev->cci_master_info[MASTER_0].status = -EINVAL;
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_NACK_ERROR_BMSK)
-			CAM_ERR(CAM_CCI, "Base:%pK, M0 NACK ERROR: 0x%x",
-				base, irq_status0);
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_Q0Q1_ERROR_BMSK)
-			CAM_ERR(CAM_CCI,
-			"Base:%pK, M0 QUEUE_OVER/UNDER_FLOW OR CMD ERR: 0x%x",
-				base, irq_status0);
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_RD_ERROR_BMSK)
-			CAM_ERR(CAM_CCI,
-				"Base: %pK, M0 RD_OVER/UNDER_FLOW ERROR: 0x%x",
-				base, irq_status0);
-		cam_io_w_mb(CCI_M0_HALT_REQ_RMSK, base + CCI_HALT_REQ_ADDR);
+		cam_io_w_mb(CCI_M0_HALT_REQ_RMSK,
+			base + CCI_HALT_REQ_ADDR);
+		CAM_DBG(CAM_CCI, "MASTER_0 error 0x%x", irq_status0);
 	}
 	if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_ERROR_BMSK) {
 		cci_dev->cci_master_info[MASTER_1].status = -EINVAL;
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_NACK_ERROR_BMSK)
-			CAM_ERR(CAM_CCI, "Base:%pK, M1 NACK ERROR: 0x%x",
-				base, irq_status0);
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_Q0Q1_ERROR_BMSK)
-			CAM_ERR(CAM_CCI,
-			"Base:%pK, M1 QUEUE_OVER_UNDER_FLOW OR CMD ERROR:0x%x",
-				base, irq_status0);
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_RD_ERROR_BMSK)
-			CAM_ERR(CAM_CCI,
-				"Base:%pK, M1 RD_OVER/UNDER_FLOW ERROR: 0x%x",
-				base, irq_status0);
-		cam_io_w_mb(CCI_M1_HALT_REQ_RMSK, base + CCI_HALT_REQ_ADDR);
+		cam_io_w_mb(CCI_M1_HALT_REQ_RMSK,
+			base + CCI_HALT_REQ_ADDR);
+		CAM_DBG(CAM_CCI, "MASTER_1 error 0x%x", irq_status0);
+	}
+
+	if ((rd_done_th_assert) || (!cci_dev->is_burst_read)) {
+		cam_io_w_mb(irq_status1, base + CCI_IRQ_CLEAR_1_ADDR);
+		CAM_DBG(CAM_CCI, "clear irq_status0:%x irq_status1:%x",
+			irq_status0, irq_status1);
+	} else {
+		spin_lock_irqsave(&cci_dev->lock_status, flags);
+		cci_dev->irq_status1 |= irq_status1;
+		spin_unlock_irqrestore(&cci_dev->lock_status, flags);
 	}
 
 	cam_io_w_mb(irq_status0, base + CCI_IRQ_CLEAR_0_ADDR);
-
-	reg_bmsk = CCI_IRQ_MASK_1_RMSK;
-	if ((irq_status1 & CCI_IRQ_STATUS_1_I2C_M1_RD_THRESHOLD) &&
-	!(irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_RD_DONE_BMSK)) {
-		reg_bmsk &= ~CCI_IRQ_STATUS_1_I2C_M1_RD_THRESHOLD;
-		spin_lock_irqsave(&cci_dev->lock_status, flags);
-		cci_dev->irqs_disabled |=
-			CCI_IRQ_STATUS_1_I2C_M1_RD_THRESHOLD;
-		spin_unlock_irqrestore(&cci_dev->lock_status, flags);
-	}
-
-	if ((irq_status1 & CCI_IRQ_STATUS_1_I2C_M0_RD_THRESHOLD) &&
-	!(irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_RD_DONE_BMSK)) {
-		reg_bmsk &= ~CCI_IRQ_STATUS_1_I2C_M0_RD_THRESHOLD;
-		spin_lock_irqsave(&cci_dev->lock_status, flags);
-		cci_dev->irqs_disabled |=
-			CCI_IRQ_STATUS_1_I2C_M0_RD_THRESHOLD;
-		spin_unlock_irqrestore(&cci_dev->lock_status, flags);
-	}
-
-	if (reg_bmsk != CCI_IRQ_MASK_1_RMSK) {
-		cam_io_w_mb(reg_bmsk, base + CCI_IRQ_MASK_1_ADDR);
-		CAM_DBG(CAM_CCI, "Updating the reg mask for irq1: 0x%x",
-			reg_bmsk);
-	} else if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_RD_DONE_BMSK ||
-		irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_RD_DONE_BMSK) {
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_RD_DONE_BMSK) {
-			spin_lock_irqsave(&cci_dev->lock_status, flags);
-			if (cci_dev->irqs_disabled &
-				CCI_IRQ_STATUS_1_I2C_M0_RD_THRESHOLD) {
-				irq_update_rd_done |=
-					CCI_IRQ_STATUS_1_I2C_M0_RD_THRESHOLD;
-				cci_dev->irqs_disabled &=
-					~CCI_IRQ_STATUS_1_I2C_M0_RD_THRESHOLD;
-			}
-			spin_unlock_irqrestore(&cci_dev->lock_status, flags);
-		}
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_RD_DONE_BMSK) {
-			spin_lock_irqsave(&cci_dev->lock_status, flags);
-			if (cci_dev->irqs_disabled &
-				CCI_IRQ_STATUS_1_I2C_M1_RD_THRESHOLD) {
-				irq_update_rd_done |=
-					CCI_IRQ_STATUS_1_I2C_M1_RD_THRESHOLD;
-				cci_dev->irqs_disabled &=
-					~CCI_IRQ_STATUS_1_I2C_M1_RD_THRESHOLD;
-			}
-			spin_unlock_irqrestore(&cci_dev->lock_status, flags);
-		}
-	}
-
-	if (irq_update_rd_done != 0) {
-		irq_update_rd_done |= cam_io_r_mb(base + CCI_IRQ_MASK_1_ADDR);
-		cam_io_w_mb(irq_update_rd_done, base + CCI_IRQ_MASK_1_ADDR);
-	}
-
-
-	cam_io_w_mb(irq_status1, base + CCI_IRQ_CLEAR_1_ADDR);
 	cam_io_w_mb(0x1, base + CCI_IRQ_GLOBAL_CLEAR_CMD_ADDR);
 	return IRQ_HANDLED;
 }
@@ -403,7 +332,8 @@ static int cam_cci_platform_probe(struct platform_device *pdev)
 		sizeof(new_cci_dev->device_name));
 	new_cci_dev->v4l2_dev_str.name =
 		new_cci_dev->device_name;
-	new_cci_dev->v4l2_dev_str.sd_flags = V4L2_SUBDEV_FL_HAS_EVENTS;
+	new_cci_dev->v4l2_dev_str.sd_flags =
+		V4L2_SUBDEV_FL_HAS_EVENTS;
 	new_cci_dev->v4l2_dev_str.ent_function =
 		CAM_CCI_DEVICE_TYPE;
 	new_cci_dev->v4l2_dev_str.token =
@@ -424,8 +354,7 @@ static int cam_cci_platform_probe(struct platform_device *pdev)
 	}
 
 	g_cci_subdev[soc_info->index] = &new_cci_dev->v4l2_dev_str.sd;
-	mutex_init(&(new_cci_dev->init_mutex));
-	CAM_INFO(CAM_CCI, "Device Type :%d", soc_info->index);
+	CAM_ERR(CAM_CCI, "Device Type :%d", soc_info->index);
 
 	cam_register_subdev_fops(&cci_v4l2_subdev_fops);
 	cci_v4l2_subdev_fops.unlocked_ioctl = cam_cci_subdev_fops_ioctl;
@@ -442,15 +371,13 @@ static int cam_cci_platform_probe(struct platform_device *pdev)
 	rc = cam_cpas_register_client(&cpas_parms);
 	if (rc) {
 		CAM_ERR(CAM_CCI, "CPAS registration failed");
-		goto cci_unregister_subdev;
+		goto cci_no_resource;
 	}
 	CAM_DBG(CAM_CCI, "CPAS registration successful handle=%d",
 		cpas_parms.client_handle);
 	new_cci_dev->cpas_handle = cpas_parms.client_handle;
 
 	return rc;
-cci_unregister_subdev:
-	cam_unregister_subdev(&(new_cci_dev->v4l2_dev_str));
 cci_no_resource:
 	kfree(new_cci_dev);
 	return rc;

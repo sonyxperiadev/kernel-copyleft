@@ -1390,7 +1390,7 @@ static int wq_select_unbound_cpu(int cpu)
 	return new_cpu;
 }
 
-static void __queue_work(int cpu, struct workqueue_struct *wq,
+void __queue_work(int cpu, struct workqueue_struct *wq,
 			 struct work_struct *work)
 {
 	struct pool_workqueue *pwq;

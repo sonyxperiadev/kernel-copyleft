@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,8 +21,6 @@ int32_t cam_context_release_dev_to_hw(struct cam_context *ctx,
 	struct cam_release_dev_cmd *cmd);
 int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 	struct cam_config_dev_cmd *cmd);
-int32_t cam_context_config_dev_to_hw(
-	struct cam_context *ctx, struct cam_config_dev_cmd *cmd);
 int32_t cam_context_acquire_dev_to_hw(struct cam_context *ctx,
 	struct cam_acquire_dev_cmd *cmd);
 int32_t cam_context_start_dev_to_hw(struct cam_context *ctx,
@@ -33,9 +31,5 @@ int32_t cam_context_flush_dev_to_hw(struct cam_context *ctx,
 int32_t cam_context_flush_ctx_to_hw(struct cam_context *ctx);
 int32_t cam_context_flush_req_to_hw(struct cam_context *ctx,
 	struct cam_flush_dev_cmd *cmd);
-int32_t cam_context_dump_pf_info_to_hw(struct cam_context *ctx,
-	struct cam_packet *packet, unsigned long iova, uint32_t buf_info,
-	bool *mem_found);
-int32_t cam_context_dump_dev_to_hw(struct cam_context *ctx,
-	struct cam_dump_req_cmd *cmd);
+
 #endif /* _CAM_CONTEXT_UTILS_H_ */

@@ -63,6 +63,23 @@
 #define USB2_SUSPEND_N				BIT(2)
 #define USB2_SUSPEND_N_SEL			BIT(3)
 
+#define USB2_PHY_USB_PHY_OVERRIDE_X0		(0x6c)
+#define USB2_PHY_SQRXTUNE			0xe0	/* OVERRIDE_X0 7:5 */
+#define USB2_PHY_COMPDISTUNE			0x07	/* OVERRIDE_X0 2:0 */
+
+#define USB2_PHY_USB_PHY_OVERRIDE_X1		(0x70)
+#define USB2_PHY_TXPREEMPAMPTUNE		0xc0	/* OVERRIDE_X1 7:6 */
+#define USB2_PHY_TXPREEMPPULSETUNE		0x20	/* OVERRIDE_X1 5   */
+#define USB2_PHY_TXVREFTUNE			0x0f	/* OVERRIDE_X1 3:0 */
+
+#define USB2_PHY_USB_PHY_OVERRIDE_X2		(0x74)
+#define USB2_PHY_TXRESTUNE			0x30	/* OVERRIDE_X2 5:4 */
+#define USB2_PHY_TXHSXVTUNE			0x0c	/* OVERRIDE_X2 3:2 */
+#define USB2_PHY_TXRISETUNE			0x03	/* OVERRIDE_X2 1:0 */
+
+#define USB2_PHY_USB_PHY_OVERRIDE_X3		(0x78)
+#define USB2_PHY_TXFSLSTUNE			0x0f	/* OVERRIDE_X3 3:0 */
+
 #define USB2_PHY_USB_PHY_CFG0			(0x94)
 #define UTMI_PHY_DATAPATH_CTRL_OVERRIDE_EN	BIT(0)
 #define UTMI_PHY_CMN_CTRL_OVERRIDE_EN		BIT(1)
@@ -93,6 +110,19 @@
 #define USB_HSPHY_1P8_HPM_LOAD			19000	/* uA */
 
 #define USB_HSPHY_VDD_HPM_LOAD			30000	/* uA */
+
+unsigned int hsphy_override_x0;
+unsigned int hsphy_override_x1;
+unsigned int hsphy_override_x2;
+unsigned int hsphy_override_x3;
+module_param(hsphy_override_x0, uint, 0644);
+module_param(hsphy_override_x1, uint, 0644);
+module_param(hsphy_override_x2, uint, 0644);
+module_param(hsphy_override_x3, uint, 0644);
+MODULE_PARM_DESC(hsphy_override_x0, "USB2_PHY_USB_PHY_PARAMETER_OVERRIDE_X0");
+MODULE_PARM_DESC(hsphy_override_x1, "USB2_PHY_USB_PHY_PARAMETER_OVERRIDE_X1");
+MODULE_PARM_DESC(hsphy_override_x2, "USB2_PHY_USB_PHY_PARAMETER_OVERRIDE_X2");
+MODULE_PARM_DESC(hsphy_override_x3, "USB2_PHY_USB_PHY_PARAMETER_OVERRIDE_X3");
 
 struct msm_hsphy {
 	struct usb_phy		phy;
@@ -377,6 +407,88 @@ static int msm_hsphy_emu_init(struct usb_phy *uphy)
 	return 0;
 }
 
+static inline u32 msm_hsphy_read_reg_field(void *base, u32 offset,
+							const u32 mask)
+{
+	u32 shift = find_first_bit((void *)&mask, 32);
+	u32 val = readb_relaxed(base + offset);
+
+	val &= mask;		/* clear other bits */
+	val >>= shift;
+	return val;
+}
+
+static void msm_hsphy_dynamically_change(struct usb_phy *uphy)
+{
+	struct msm_hsphy *phy = container_of(uphy, struct msm_hsphy, phy);
+
+	if (hsphy_override_x0)
+		writel_relaxed(hsphy_override_x0,
+			phy->base + USB2_PHY_USB_PHY_OVERRIDE_X0);
+
+	if (hsphy_override_x1)
+		writel_relaxed(hsphy_override_x1,
+			phy->base + USB2_PHY_USB_PHY_OVERRIDE_X1);
+
+	if (hsphy_override_x2)
+		writel_relaxed(hsphy_override_x2,
+			phy->base + USB2_PHY_USB_PHY_OVERRIDE_X2);
+
+	if (hsphy_override_x3)
+		writel_relaxed(hsphy_override_x3,
+			phy->base + USB2_PHY_USB_PHY_OVERRIDE_X3);
+}
+
+static void msm_hsphy_param_output(struct usb_phy *uphy)
+{
+	struct msm_hsphy *phy = container_of(uphy, struct msm_hsphy, phy);
+
+	/* USB2_PHY_USB_PHY_PARAMETER_OVERRIDE_X0 */
+	dev_dbg(uphy->dev, "USB2:OVERRIDE_X0:0x%02x\n",
+		readb_relaxed(phy->base + USB2_PHY_USB_PHY_OVERRIDE_X0));
+	dev_dbg(uphy->dev, "  :SQRXTUNE          \t0x%02x\n",
+		msm_hsphy_read_reg_field(phy->base,
+			USB2_PHY_USB_PHY_OVERRIDE_X0, USB2_PHY_SQRXTUNE));
+	dev_dbg(uphy->dev, "  :COMPDISTUNE       \t0x%02x\n",
+		msm_hsphy_read_reg_field(phy->base,
+			USB2_PHY_USB_PHY_OVERRIDE_X0, USB2_PHY_COMPDISTUNE));
+
+	/* USB2_PHY_USB_PHY_PARAMETER_OVERRIDE_X1 */
+	dev_dbg(uphy->dev, "USB2:OVERRIDE_X1:0x%02x\n",
+		readb_relaxed(phy->base + USB2_PHY_USB_PHY_OVERRIDE_X1));
+	dev_dbg(uphy->dev, "  :TXPREEMPAMPTUNE   \t0x%02x\n",
+		msm_hsphy_read_reg_field(phy->base,
+			USB2_PHY_USB_PHY_OVERRIDE_X1,
+						USB2_PHY_TXPREEMPAMPTUNE));
+	dev_dbg(uphy->dev, "  :TXPREEMPPULSETUNE \t0x%02x\n",
+		msm_hsphy_read_reg_field(phy->base,
+			USB2_PHY_USB_PHY_OVERRIDE_X1,
+						USB2_PHY_TXPREEMPPULSETUNE));
+	dev_dbg(uphy->dev, "  :TXVREFTUNE   \t0x%02x\n",
+		msm_hsphy_read_reg_field(phy->base,
+			USB2_PHY_USB_PHY_OVERRIDE_X1, USB2_PHY_TXVREFTUNE));
+
+	/* USB2_PHY_USB_PHY_PARAMETER_OVERRIDE_X2 */
+	dev_dbg(uphy->dev, "USB2:OVERRIDE_X2:0x%02x\n",
+		readb_relaxed(phy->base + USB2_PHY_USB_PHY_OVERRIDE_X2));
+	dev_dbg(uphy->dev, "  :TXRESTUNE         \t0x%02x\n",
+		msm_hsphy_read_reg_field(phy->base,
+			USB2_PHY_USB_PHY_OVERRIDE_X2, USB2_PHY_TXRESTUNE));
+	dev_dbg(uphy->dev, "  :TXHSXVTUNE        \t0x%02x\n",
+		msm_hsphy_read_reg_field(phy->base,
+			USB2_PHY_USB_PHY_OVERRIDE_X2, USB2_PHY_TXHSXVTUNE));
+	dev_dbg(uphy->dev, "  :TXRISETUNE        \t0x%02x\n",
+		msm_hsphy_read_reg_field(phy->base,
+			USB2_PHY_USB_PHY_OVERRIDE_X2, USB2_PHY_TXRISETUNE));
+
+	/* USB2_PHY_USB_PHY_PARAMETER_OVERRIDE_X3 */
+	dev_dbg(uphy->dev, "USB2:OVERRIDE_X3:0x%02x\n",
+		readb_relaxed(phy->base + USB2_PHY_USB_PHY_OVERRIDE_X3));
+	dev_dbg(uphy->dev, "  :TXFSLSTUNE        \t0x%02x\n",
+		msm_hsphy_read_reg_field(phy->base,
+			USB2_PHY_USB_PHY_OVERRIDE_X3, USB2_PHY_TXFSLSTUNE));
+}
+
 static int msm_hsphy_init(struct usb_phy *uphy)
 {
 	struct msm_hsphy *phy = container_of(uphy, struct msm_hsphy, phy);
@@ -418,6 +530,11 @@ static int msm_hsphy_init(struct usb_phy *uphy)
 	if (phy->param_override_seq)
 		hsusb_phy_write_seq(phy->base, phy->param_override_seq,
 				phy->param_override_seq_cnt, 0);
+
+	/* user dynamically change for debug */
+	msm_hsphy_dynamically_change(uphy);
+
+	msm_hsphy_param_output(uphy);
 
 	if (phy->pre_emphasis) {
 		u8 val = TXPREEMPAMPTUNE0(phy->pre_emphasis) &
@@ -515,13 +632,14 @@ static int msm_hsphy_set_suspend(struct usb_phy *uphy, int suspend)
 	}
 
 	if (suspend) { /* Bus suspend */
-		if (phy->cable_connected) {
-			/* Enable auto-resume functionality only during host
-			 * mode bus suspend with some peripheral connected.
+		if (phy->cable_connected ||
+			(phy->phy.flags & PHY_HOST_MODE)) {
+			/* Enable auto-resume functionality only when
+			 * there is some peripheral connected and real
+			 * bus suspend happened
 			 */
-			if ((phy->phy.flags & PHY_HOST_MODE) &&
-				((phy->phy.flags & PHY_HSFS_MODE) ||
-				(phy->phy.flags & PHY_LS_MODE))) {
+			if ((phy->phy.flags & PHY_HSFS_MODE) ||
+				(phy->phy.flags & PHY_LS_MODE)) {
 				/* Enable auto-resume functionality by pulsing
 				 * signal
 				 */
@@ -960,6 +1078,9 @@ static int msm_hsphy_probe(struct platform_device *pdev)
 		usb_remove_phy(&phy->phy);
 		return ret;
 	}
+
+	msm_hsphy_enable_power(phy, true);
+	msm_hsphy_enable_power(phy, false);
 
 	msm_hsphy_create_debugfs(phy);
 

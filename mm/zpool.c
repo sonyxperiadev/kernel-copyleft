@@ -196,6 +196,7 @@ struct zpool *zpool_create_pool(const char *type, const char *name, gfp_t gfp,
 
 	return zpool;
 }
+EXPORT_SYMBOL(zpool_create_pool);
 
 /**
  * zpool_destroy_pool() - Destroy a zpool
@@ -219,6 +220,7 @@ void zpool_destroy_pool(struct zpool *zpool)
 	zpool_put_driver(zpool->driver);
 	kfree(zpool);
 }
+EXPORT_SYMBOL(zpool_destroy_pool);
 
 /**
  * zpool_get_type() - Get the type of the zpool
@@ -256,6 +258,7 @@ int zpool_malloc(struct zpool *zpool, size_t size, gfp_t gfp,
 {
 	return zpool->driver->malloc(zpool->pool, size, gfp, handle);
 }
+EXPORT_SYMBOL(zpool_malloc);
 
 /**
  * zpool_free() - Free previously allocated memory
@@ -275,6 +278,7 @@ void zpool_free(struct zpool *zpool, unsigned long handle)
 {
 	zpool->driver->free(zpool->pool, handle);
 }
+EXPORT_SYMBOL(zpool_free);
 
 /**
  * zpool_shrink() - Shrink the pool size
@@ -326,6 +330,7 @@ void *zpool_map_handle(struct zpool *zpool, unsigned long handle,
 {
 	return zpool->driver->map(zpool->pool, handle, mapmode);
 }
+EXPORT_SYMBOL(zpool_map_handle);
 
 /**
  * zpool_unmap_handle() - Unmap a previously mapped handle
@@ -341,6 +346,34 @@ void zpool_unmap_handle(struct zpool *zpool, unsigned long handle)
 {
 	zpool->driver->unmap(zpool->pool, handle);
 }
+EXPORT_SYMBOL(zpool_unmap_handle);
+
+ /**
+ * zpool_compact() - try to run compaction over zpool
+ * @pool       The zpool to compact
+ *
+ * Returns: the number of migrated pages
+ */
+unsigned long zpool_compact(struct zpool *zpool)
+{
+	return zpool->driver->compact ?
+		zpool->driver->compact(zpool->pool) : 0;
+}
+EXPORT_SYMBOL(zpool_compact);
+
+
+/**
+ * zpool_get_num_compacted() - get the number of migrated/compacted pages
+ *
+ * Returns: the total number of compacted pages for the pool, or 0 if the
+ * backend doesn't provide get_num_compacted() callback
+ */
+unsigned long zpool_get_num_compacted(struct zpool *zpool)
+{
+	return zpool->driver->get_num_compacted ?
+		zpool->driver->get_num_compacted(zpool->pool) : 0;
+}
+EXPORT_SYMBOL(zpool_get_num_compacted);
 
 /**
  * zpool_get_total_size() - The total size of the pool
@@ -354,6 +387,20 @@ u64 zpool_get_total_size(struct zpool *zpool)
 {
 	return zpool->driver->total_size(zpool->pool);
 }
+EXPORT_SYMBOL(zpool_get_total_size);
+
+/**
+ * zpool_huge_class_size() - get size for the "huge" class
+ * @pool	The zpool to check
+ *
+ * Returns: size of the huge class
+ */
+size_t zpool_huge_class_size(struct zpool *zpool)
+{
+	return zpool->driver->huge_class_size ?
+		zpool->driver->huge_class_size(zpool->pool) : 0;
+}
+EXPORT_SYMBOL(zpool_huge_class_size);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Dan Streetman <ddstreet@ieee.org>");

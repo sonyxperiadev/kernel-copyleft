@@ -1,0 +1,152 @@
+/* Copyright (c) 2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+qcom,sphinx_horus_tmm_4250mv {
+	/* Added or Modified by SOMC */
+	qcom,battery-type = "1318-8877";
+	qcom,fastchg-current-ma = <3000>;
+	somc,initial-capacity-uah = <3329000>;
+	somc,step-cfg = <
+		(-2550) 50    0 4500    0 4250 1
+		   50  100    0 4500  950 4250 2
+		  100  450    0 4250 3000 4250 3
+		  100  450 4250 4300 1600 4250 3
+		  100  450 4300 4500  950 4250 3
+		  450  550    0 4500  950 4200 4
+		  550 2550    0 4500    0 4200 5
+	>;
+	somc,step-cell-impedance-mohm = <20>;
+
+	/* Prepared by Qualcomm */
+	qcom,profile-revision = <24>;
+	/* #3836805_SoMC_RenMurata_2874mAh_averaged_MasterSlave_Feb8th2019*/
+	qcom,max-voltage-uv = <4250000>;
+	qcom,fg-cc-cv-threshold-mv = <4240>;
+	qcom,nom-batt-capacity-mah = <2874>;
+	qcom,batt-id-kohm = <330>;
+	qcom,battery-beta = <4250>;
+	qcom,therm-room-temp = <100000>;
+	/* qcom,battery-type = "3836805_somc_renmurata_2874mah_averaged_masterslave_feb8th2019"; */
+	qcom,therm-coefficients = <0x2318 0xd0c 0xdaf7 0xc556 0x848d>;
+	qcom,therm-center-offset = <0x70>;
+	qcom,therm-pull-up = <100>;
+	qcom,rslow-normal-coeffs = <0xbb 0x05 0x09 0x0a>;
+	qcom,rslow-low-coeffs = <0x5c 0x05 0xe8 0x03>;
+	qcom,checksum = <0xEC2D>;
+	qcom,gui-version = "PM855GUI - 1.0.0.13";
+	qcom,fg-profile-data = [
+		 09 00 B3 EA
+		 99 E4 2B EB
+		 6E E4 00 00
+		 52 C5 0E 9A
+		 DD 87 CA A3
+		 55 A5 A7 87
+		 27 00 BB 05
+		 09 0A C5 04
+		 38 02 CE 07
+		 32 00 8B EB
+		 77 EC 32 DB
+		 15 02 4B BC
+		 13 B5 EB 0B
+		 02 D2 F3 C4
+		 60 00 41 00
+		 42 00 43 00
+		 42 00 3D 00
+		 3A 00 3E 00
+		 40 00 3C 00
+		 34 00 60 00
+		 40 00 47 00
+		 49 00 4C 00
+		 40 00 3E 00
+		 60 64 4F 00
+		 43 00 3C 08
+		 60 F8 54 00
+		 52 00 50 08
+		 6A 08 55 00
+		 55 20 80 40
+		 67 50 5A 14
+		 54 00 D8 00
+		 72 20 F4 04
+		 60 02 49 05
+		 1A 1C DE 0A
+		 02 0D 92 22
+		 89 16 71 43
+		 6F 55 A8 02
+		 8D 15 78 1F
+		 F3 05 AF 0B
+		 F5 FE 6A 1C
+		 87 FA 43 05
+		 89 02 15 17
+		 35 23 A9 45
+		 5E 52 80 15
+		 90 20 E0 EC
+		 8B D2 AF D4
+		 7F 1C F3 CB
+		 8D 04 1A C3
+		 1D 17 21 93
+		 C1 85 39 A2
+		 99 A0 09 80
+		 69 02 66 05
+		 ED 03 37 04
+		 00 F8 9A ED
+		 93 F3 E2 F7
+		 B3 DD BF C4
+		 57 01 24 F0
+		 D0 DE D9 02
+		 5F 05 BC 01
+		 CE 07 32 00
+		 27 03 0F 03
+		 66 05 63 02
+		 C2 02 69 02
+		 87 01 93 02
+		 8E 04 55 00
+		 31 00 3C 00
+		 44 64 4B 00
+		 4E F0 4D F8
+		 4C D0 4D 00
+		 4D 00 47 10
+		 48 10 35 00
+		 40 20 41 40
+		 47 50 4C 13
+		 51 00 41 00
+		 48 08 53 F8
+		 49 00 33 00
+		 34 08 41 08
+		 48 00 4D 20
+		 5B 40 63 50
+		 4A 14 51 00
+		 5A 00 48 08
+		 D8 F8 C6 1E
+		 A1 05 71 0A
+		 71 0A 5F 1C
+		 BD 23 B4 3D
+		 19 4A FC 17
+		 EF 02 C0 05
+		 6F 02 6A 16
+		 3F 0A 05 21
+		 79 04 DD 02
+		 01 04 81 1C
+		 F1 02 AF 04
+		 F0 02 57 18
+		 AF 02 FA 05
+		 24 02 86 00
+		 27 20 49 05
+		 60 02 CD 04
+		 8A 1C 86 02
+		 51 05 76 02
+		 72 18 65 02
+		 B6 04 29 03
+		 84 00 60 01
+		 C0 00 FA 00
+		 AC 0B 00 00
+	];
+};

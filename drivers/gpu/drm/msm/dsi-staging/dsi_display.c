@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,7 +31,10 @@
 #include "dsi_pwr.h"
 #include "sde_dbg.h"
 #include "dsi_parser.h"
-#include "dsi_phy.h"
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+#include "dsi_panel_driver.h"
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 #define to_dsi_display(x) container_of(x, struct dsi_display, host)
 #define INT_BASE_10 10
@@ -55,9 +58,20 @@ static struct dsi_display_boot_param boot_displays[MAX_DSI_ACTIVE_DISPLAY] = {
 };
 
 static const struct of_device_id dsi_display_dt_match[] = {
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	{.compatible = "somc,dsi-display"},
+#else
 	{.compatible = "qcom,dsi-display"},
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 	{}
 };
+
+static struct dsi_display *main_display;
+
+struct dsi_display *dsi_display_get_main_display(void)
+{
+	return main_display;
+}
 
 static void dsi_display_mask_ctrl_error_interrupts(struct dsi_display *display,
 			u32 mask, bool enable)
@@ -223,6 +237,9 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 		       dsi_display->name, rc);
 		goto error;
 	}
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	dsi_panel_driver_panel_update_area(panel, (u32)bl_temp);
+#endif  /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 	rc = dsi_panel_set_backlight(panel, (u32)bl_temp);
 	if (rc)
@@ -241,7 +258,11 @@ error:
 	return rc;
 }
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+int dsi_display_cmd_engine_enable(struct dsi_display *display)
+#else
 static int dsi_display_cmd_engine_enable(struct dsi_display *display)
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 {
 	int rc = 0;
 	int i;
@@ -285,7 +306,11 @@ done:
 	return rc;
 }
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+int dsi_display_cmd_engine_disable(struct dsi_display *display)
+#else
 static int dsi_display_cmd_engine_disable(struct dsi_display *display)
+#endif  /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 {
 	int rc = 0;
 	int i;
@@ -471,7 +496,11 @@ error:
 }
 
 /* Allocate memory for cmd dma tx buffer */
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+int dsi_host_alloc_cmd_tx_buffer(struct dsi_display *display)
+#else
 static int dsi_host_alloc_cmd_tx_buffer(struct dsi_display *display)
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 {
 	int rc = 0, cnt = 0;
 	struct dsi_display_ctrl *display_ctrl;
@@ -3725,6 +3754,14 @@ static int dsi_display_res_init(struct dsi_display *display)
 			goto error_ctrl_put;
 		}
 	}
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	rc = dsi_panel_driver_create_fs(display);
+	if (rc) {
+		pr_err("%s: failed dsi_panel_driver_create_fs rc=%d\n",
+				__func__, rc);
+		return rc;
+	}
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 	display->panel = dsi_panel_get(&display->pdev->dev,
 				display->panel_of,
@@ -4024,19 +4061,18 @@ static void _dsi_display_calc_pipe_delay(struct dsi_display *display,
 	struct dsi_display_ctrl *m_ctrl;
 	struct dsi_ctrl *dsi_ctrl;
 	struct dsi_phy_cfg *cfg;
-	int phy_ver;
 
 	m_ctrl = &display->ctrl[display->clk_master_idx];
 	dsi_ctrl = m_ctrl->ctrl;
 
 	cfg = &(m_ctrl->phy->cfg);
 
-	esc_clk_rate_hz = dsi_ctrl->clk_freq.esc_clk_rate;
-	pclk_to_esc_ratio = (dsi_ctrl->clk_freq.pix_clk_rate /
+	esc_clk_rate_hz = dsi_ctrl->clk_freq.esc_clk_rate * 1000;
+	pclk_to_esc_ratio = ((dsi_ctrl->clk_freq.pix_clk_rate * 1000) /
 			     esc_clk_rate_hz);
-	byte_to_esc_ratio = (dsi_ctrl->clk_freq.byte_clk_rate /
+	byte_to_esc_ratio = ((dsi_ctrl->clk_freq.byte_clk_rate * 1000) /
 			     esc_clk_rate_hz);
-	hr_bit_to_esc_ratio = ((dsi_ctrl->clk_freq.byte_clk_rate * 4) /
+	hr_bit_to_esc_ratio = ((dsi_ctrl->clk_freq.byte_clk_rate * 4 * 1000) /
 					esc_clk_rate_hz);
 
 	hsync_period = DSI_H_TOTAL_DSC(&mode->timing);
@@ -4062,17 +4098,8 @@ static void _dsi_display_calc_pipe_delay(struct dsi_display *display,
 			  ((cfg->timing.lane_v3[4] >> 1) + 1)) /
 			 hr_bit_to_esc_ratio);
 
-	/*
-	 *100us pll delay recommended for phy ver 2.0 and 3.0
-	 *25us pll delay recommended for phy ver 4.0
-	 */
-	phy_ver = dsi_phy_get_version(m_ctrl->phy);
-	if (phy_ver <= DSI_PHY_VERSION_3_0)
-		delay->pll_delay = 100;
-	else
-		delay->pll_delay = 25;
-
-	delay->pll_delay = (delay->pll_delay * esc_clk_rate_hz) / 1000000;
+	/* 130 us pll delay recommended by h/w doc */
+	delay->pll_delay = ((130 * esc_clk_rate_hz) / 1000000) * 2;
 }
 
 static int _dsi_display_dyn_update_clks(struct dsi_display *display,
@@ -5489,6 +5516,11 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 	display->boot_disp = boot_disp;
 	display->dsi_type = dsi_type;
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	main_display = display;
+	pr_notice("%s: Panel Name = %s\n", __func__, display->name);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+
 	dsi_display_parse_cmdline_topology(display, index);
 
 	platform_set_drvdata(pdev, display);
@@ -5496,6 +5528,15 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 	rc = dsi_display_init(display);
 	if (rc)
 		goto end;
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	if (display->panel->spec_pdata->oled_disp)
+		dsi_panel_driver_oled_short_det_init_works(display);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	dsi_panel_driver_init_area_count(display->panel);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 	return 0;
 end:
@@ -5519,6 +5560,10 @@ int dsi_display_dev_remove(struct platform_device *pdev)
 
 	/* decrement ref count */
 	of_node_put(display->disp_node);
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	dsi_panel_driver_deinit_area_count(display->panel);
+#endif  /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 	(void)_dsi_display_dev_deinit(display);
 
@@ -6590,13 +6635,6 @@ int dsi_display_validate_mode_change(struct dsi_display *display,
 					goto error;
 				}
 
-				if (cur_mode->timing.refresh_rate !=
-						adj_mode->timing.refresh_rate) {
-					pr_err("fps change along with dyn clk not supported\n");
-					rc = -ENOTSUPP;
-					goto error;
-				}
-
 				adj_mode->dsi_mode_flags |=
 						DSI_MODE_FLAG_DYN_CLK;
 				SDE_EVT32(cur_mode->pixel_clk_khz,
@@ -7617,10 +7655,19 @@ int dsi_display_post_enable(struct dsi_display *display)
 		if (display->config.panel_mode == DSI_OP_VIDEO_MODE)
 			dsi_panel_mode_switch_to_vid(display->panel);
 	} else {
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+		if (!display->panel->spec_pdata->display_onoff_state) {
+			rc = dsi_panel_post_enable(display->panel);
+			if (rc)
+				pr_err("[%s] panel post-enable failed, rc=%d\n",
+				       display->name, rc);
+		}
+#else
 		rc = dsi_panel_post_enable(display->panel);
 		if (rc)
 			pr_err("[%s] panel post-enable failed, rc=%d\n",
 			       display->name, rc);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 	}
 
 	/* remove the clk vote for CMD mode panels */

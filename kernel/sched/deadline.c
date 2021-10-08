@@ -525,7 +525,9 @@ static struct rq *dl_task_offline_migration(struct rq *rq, struct task_struct *p
 		double_lock_balance(rq, later_rq);
 	}
 
+	walt_prepare_migrate(p, cpu_of(rq), cpu_of(later_rq), true);
 	set_task_cpu(p, later_rq->cpu);
+	walt_finish_migrate(p, cpu_of(rq), cpu_of(later_rq), true);
 	double_unlock_balance(later_rq, rq);
 
 	return later_rq;
@@ -2027,7 +2029,9 @@ retry:
 	sub_running_bw(next_task->dl.dl_bw, &rq->dl);
 	sub_rq_bw(next_task->dl.dl_bw, &rq->dl);
 	next_task->on_rq = TASK_ON_RQ_MIGRATING;
+	walt_prepare_migrate(next_task, cpu_of(rq), cpu_of(later_rq), true);
 	set_task_cpu(next_task, later_rq->cpu);
+	walt_finish_migrate(next_task, cpu_of(rq), cpu_of(later_rq), true);
 	next_task->on_rq = TASK_ON_RQ_QUEUED;
 	add_rq_bw(next_task->dl.dl_bw, &later_rq->dl);
 	add_running_bw(next_task->dl.dl_bw, &later_rq->dl);
@@ -2121,7 +2125,9 @@ static void pull_dl_task(struct rq *this_rq)
 			sub_running_bw(p->dl.dl_bw, &src_rq->dl);
 			sub_rq_bw(p->dl.dl_bw, &src_rq->dl);
 			p->on_rq = TASK_ON_RQ_MIGRATING;
+			walt_prepare_migrate(p, cpu_of(src_rq), cpu_of(this_rq), true);
 			set_task_cpu(p, this_cpu);
+			walt_finish_migrate(p, cpu_of(src_rq), cpu_of(this_rq), true);
 			p->on_rq = TASK_ON_RQ_QUEUED;
 			add_rq_bw(p->dl.dl_bw, &this_rq->dl);
 			add_running_bw(p->dl.dl_bw, &this_rq->dl);

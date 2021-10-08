@@ -43,6 +43,7 @@
 #include <linux/mmu_notifier.h>
 #include <linux/memory_hotplug.h>
 #include <linux/show_mem_notifier.h>
+#include <uapi/linux/sched/types.h>
 
 #include <asm/tlb.h>
 #include "internal.h"
@@ -630,11 +631,16 @@ void wake_oom_reaper(struct task_struct *tsk)
 
 static int __init oom_init(void)
 {
+	struct sched_param param = { .sched_priority = 1 };
+
 	oom_reaper_th = kthread_run(oom_reaper, NULL, "oom_reaper");
 	if (IS_ERR(oom_reaper_th)) {
 		pr_err("Unable to start OOM reaper %ld. Continuing regardless\n",
 				PTR_ERR(oom_reaper_th));
 		oom_reaper_th = NULL;
+	} else {
+		sched_setscheduler_nocheck(oom_reaper_th, SCHED_FIFO,
+						 &param);
 	}
 	return 0;
 }
@@ -914,6 +920,11 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 	 * reserves from the user space under its control.
 	 */
 	do_send_sig_info(SIGKILL, SEND_SIG_FORCED, victim, true);
+	trace_oom_sigkill(victim->pid,  victim->comm,
+			  victim_points,
+			  get_mm_rss(victim->mm),
+			  oc->gfp_mask);
+
 	mark_oom_victim(victim);
 	pr_err("Killed process %d (%s) total-vm:%lukB, anon-rss:%lukB, file-rss:%lukB, shmem-rss:%lukB\n",
 		task_pid_nr(victim), victim->comm, K(victim->mm->total_vm),

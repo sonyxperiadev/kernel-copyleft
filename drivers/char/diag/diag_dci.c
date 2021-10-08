@@ -1658,7 +1658,10 @@ static int diag_send_dci_pkt(struct diag_cmd_reg_t *entry,
 #ifdef CONFIG_DIAGFWD_BRIDGE_CODE
 unsigned char *dci_get_buffer_from_bridge(int token)
 {
-	uint8_t retries = 0, max_retries = 50;
+/* SONY_BEGIN (FIX diag dci function error) */
+	/*uint8_t retries = 0, max_retries = 50;*/
+	uint8_t retries = 0, max_retries = 255;
+/* SONY_END (FIX diag dci function error) */
 	unsigned char *buf = NULL;
 	unsigned long flags;
 

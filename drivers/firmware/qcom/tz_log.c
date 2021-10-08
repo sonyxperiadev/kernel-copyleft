@@ -12,6 +12,7 @@
  */
 #include <linux/debugfs.h>
 #include <linux/errno.h>
+#include <linux/fs.h>
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/msm_ion.h>
@@ -26,6 +27,10 @@
 #include <linux/dma-buf.h>
 #include <linux/ion_kernel.h>
 #include <linux/pm.h>
+#ifdef CONFIG_TZ_LAST_LOGS
+#include <linux/last_logs.h>
+#include <soc/qcom/security_status.h>
+#endif
 
 #include <soc/qcom/scm.h>
 #include <soc/qcom/qseecomi.h>
@@ -292,6 +297,9 @@ enum tzdbg_stats_type {
 	TZDBG_QSEE_LOG,
 	TZDBG_HYP_GENERAL,
 	TZDBG_HYP_LOG,
+#ifdef CONFIG_TZ_LAST_LOGS
+	TZDBG_LAST_LOG,
+#endif
 	TZDBG_STATS_MAX
 };
 
@@ -323,12 +331,27 @@ static struct tzdbg tzdbg = {
 	.stat[TZDBG_QSEE_LOG].name = "qsee_log",
 	.stat[TZDBG_HYP_GENERAL].name = "hyp_general",
 	.stat[TZDBG_HYP_LOG].name = "hyp_log",
+#ifdef CONFIG_TZ_LAST_LOGS
+	.stat[TZDBG_LAST_LOG].name = "last_log",
+#endif
 };
 
 static struct tzdbg_log_t *g_qsee_log;
 static dma_addr_t coh_pmem;
 static uint32_t debug_rw_buf_size;
 static bool restore_from_hibernation;
+#ifdef CONFIG_TZ_LAST_LOGS
+static int tzbsp_len;
+static int tzdbg_get_tzbsp_log(void);
+static int (*disp_stat[TZDBG_STATS_MAX])(void);
+static char *merge_buf;
+static uint32_t merge_buf_len;
+#define TZBSP_DIAG_MAGIC 0x747a6461
+#define MAX_BANNER_LEN 1024
+#define TZDBG_STATS_COUNT (TZDBG_LOG + 1)
+#define STR_TZBSP_LOG "tzbsp_log"
+#endif
+
 
 /*
  * Debugfs data structure and functions
@@ -856,9 +879,20 @@ static ssize_t tzdbgfs_read(struct file *file, char __user *buf,
 		len = _disp_hyp_log_stats(count);
 		*offp = 0;
 		break;
+#ifdef CONFIG_TZ_LAST_LOGS
+	case TZDBG_LAST_LOG:
+		len = tzbsp_len;
+		break;
+#endif
 	default:
 		break;
 	}
+
+#ifdef CONFIG_TZ_LAST_LOGS
+	if (*tz_id == TZDBG_LAST_LOG)
+		return simple_read_from_buffer(buf, count, offp,
+				tzdbg.stat[(*tz_id)].data, len);
+#endif
 
 	if (len > count)
 		len = count;
@@ -1057,6 +1091,66 @@ static void tzdbg_get_tz_version(void)
 
 }
 
+#ifdef CONFIG_TZ_LAST_LOGS
+static const struct of_device_id last_log_dt[] = {
+		{ .compatible = "qcom,last_log_memory" },
+		{}
+};
+#endif
+
+static int tzdbg_open(struct inode *inode, struct file *filp)
+{
+	int minor;
+
+	minor = iminor(inode);
+	if (minor > TZDBG_STATS_MAX)
+		return -ENXIO;
+
+	filp->private_data = &tzdbg.debug_tz[minor-1];
+	return 0;
+}
+
+static const struct file_operations tz_fops = {
+	.owner   = THIS_MODULE,
+	.read    = tzdbgfs_read,
+	.open    = tzdbg_open,
+	.llseek  = noop_llseek,
+};
+
+static char *tzdbg_devnode(struct device *dev, umode_t *mode)
+{
+	if (mode)
+		*mode = 0440;
+	return NULL;
+}
+
+static struct class *tzdbg_class;
+
+static int chr_dev_init(void)
+{
+	int minor;
+	int major;
+	int i;
+
+	major = register_chrdev(0, "tzdbg", &tz_fops);
+	if (major < 0) {
+		printk("unable to get major for tzdbg devs = %d\n", major);
+		return major;
+	}
+	printk("tzdbg devs got major %d\n", major);
+
+	tzdbg_class = class_create(THIS_MODULE, "tzdbg");
+	if (IS_ERR(tzdbg_class))
+		return PTR_ERR(tzdbg_class);
+
+	tzdbg_class->devnode = tzdbg_devnode;
+
+	for (minor = 1, i = 0; i < TZDBG_STATS_MAX; i++, minor++)
+		device_create(tzdbg_class, NULL, MKDEV(major, minor),
+			      NULL, "tzdbg_%s", tzdbg.stat[i].name);
+	return 0;
+}
+
 /*
  * Driver functions
  */
@@ -1145,11 +1239,270 @@ static int tz_log_probe(struct platform_device *pdev)
 
 	tzdbg_get_tz_version();
 
+#ifdef CONFIG_TZ_LAST_LOGS
+	tzbsp_len = tzdbg_get_tzbsp_log();
+	if (tzbsp_len < 0) {
+		pr_err("Failed to get tz data from last_logs\n");
+		tzbsp_len = 0;
+	}
+#endif
+	chr_dev_init();
 	return 0;
 err:
 	kfree(tzdbg.diag_buf);
 	return -ENXIO;
 }
+
+#ifdef CONFIG_TZ_LAST_LOGS
+static int _tz_log_stats(void)
+{
+	static struct tzdbg_log_pos_t log_start = {0};
+	struct tzdbg_log_t *log_ptr;
+
+	log_ptr = (struct tzdbg_log_t *)((unsigned char *)tzdbg.diag_buf +
+			tzdbg.diag_buf->ring_off -
+			offsetof(struct tzdbg_log_t, log_buf));
+
+	/* No data in ring buffer, so no need to hang around */
+	if (log_ptr && log_ptr->log_pos.offset == 0 && log_ptr->log_pos.wrap == 0)
+		return 0;
+
+	return _disp_log_stats(log_ptr, &log_start,
+			tzdbg.diag_buf->ring_len, debug_rw_buf_size, TZDBG_LOG);
+}
+
+static void merge_buffers(void)
+{
+	int data_len = 0, len = 0, i, status = SECURITY_ON;
+
+	if (get_security_status(&status) < 0)
+		pr_warn("Unable to get security status.\n");
+
+	for (i = 0; i < TZDBG_STATS_COUNT; i++) {
+		if ((status == SECURITY_ON) && (i == TZDBG_LOG))
+			continue;
+
+		if ((len + MAX_BANNER_LEN + debug_rw_buf_size) <
+				merge_buf_len) {
+			len += snprintf(merge_buf + len,
+				MAX_BANNER_LEN, "\n\n--------%s--------\n\n",
+				tzdbg.stat[i].name);
+			data_len = disp_stat[i]();
+			memcpy(merge_buf + len, tzdbg.stat[i].data, data_len);
+			len += data_len;
+			memset(tzdbg.disp_buf, 0x0, debug_rw_buf_size);
+		}
+	}
+
+	merge_buf_len = len;
+	pr_info("Length of merged buffers %d\n", len);
+}
+
+static int format_tzbsp_log(void *src, size_t src_sz, void **dst, uint32_t *dst_sz)
+{
+	char *save_disp_buf_addr = NULL;
+	uint32_t save_debug_rw_buf_size = 0;
+	struct tzdbg_t *dbg = (struct tzdbg_t *)src;
+	int ret = 0;
+
+	if (debug_rw_buf_size != src_sz)
+		pr_warn("%s: Diag buffer size does not match - 0x%lx",
+			__func__, src_sz);
+
+	if (dbg == NULL || !src_sz || !tzdbg.diag_buf)
+		return -EINVAL;
+
+	/* validate tzdiag area w.r.t magic */
+	if (dbg->magic_num != TZBSP_DIAG_MAGIC) {
+		pr_err("No magic found, magic: 0x%x\n", dbg->magic_num);
+		return -ENXIO;
+	}
+
+	/* As we use the tzdbg.disp_buf pointer, backup tzdbg.disp_buf and
+	   restore it before returns */
+	save_disp_buf_addr = tzdbg.disp_buf;
+	save_debug_rw_buf_size = debug_rw_buf_size;
+
+	/* Debug buffer size increased to 48k (12K*4) size.
+	   Because, formatted output buffer size is more than the
+	   unformatted buffer size */
+	/* debug_rw_buf_size is modified and will be restored
+	   before the function returns*/
+	debug_rw_buf_size = src_sz * 4;
+
+	/* Merge buffer increased to 294k size */
+	merge_buf_len = (debug_rw_buf_size + MAX_BANNER_LEN) *
+				TZDBG_STATS_COUNT;
+
+	merge_buf = kzalloc(merge_buf_len, GFP_KERNEL);
+	if (merge_buf == NULL) {
+		pr_err("%s: Can't Allocate memory: merged_buf\n",
+		__func__);
+		ret = -ENOMEM;
+		goto exit;
+	}
+
+	tzdbg.disp_buf = kzalloc(debug_rw_buf_size, GFP_KERNEL);
+	if (tzdbg.disp_buf == NULL) {
+		pr_err("%s: Can't Allocate memory: disp_buf\n",
+		__func__);
+		ret = -ENOMEM;
+		goto exit1;
+	}
+
+	memcpy(tzdbg.diag_buf, src, src_sz);
+
+	disp_stat[TZDBG_BOOT] = _disp_tz_boot_stats;
+	disp_stat[TZDBG_RESET] = _disp_tz_reset_stats;
+	disp_stat[TZDBG_INTERRUPT] = _disp_tz_interrupt_stats;
+	disp_stat[TZDBG_VMID] = _disp_tz_vmid_stats;
+	disp_stat[TZDBG_GENERAL] = _disp_tz_general_stats;
+	if (TZBSP_DIAG_MAJOR_VERSION_LEGACY <
+			(tzdbg.diag_buf->version >> 16)) {
+		disp_stat[TZDBG_LOG] = _tz_log_stats;
+	} else {
+		disp_stat[TZDBG_LOG] = _disp_tz_log_stats_legacy;
+	}
+
+	merge_buffers();
+	/* Allocate required buffer to store the formatted logs */
+	*dst = kzalloc(merge_buf_len, GFP_KERNEL);
+	if (*dst == NULL) {
+		pr_err("%s: Can't Allocate memory: buffer\n",
+		__func__);
+		ret = -ENOMEM;
+		goto exit2;
+	}
+
+	*dst_sz = merge_buf_len;
+	memcpy(*dst, merge_buf, *dst_sz);
+
+exit2:
+	memset(tzdbg.diag_buf, 0x0, src_sz);
+	kzfree(tzdbg.disp_buf);
+exit1:
+	kzfree(merge_buf);
+exit:
+	/* Restore tzdbg.disp_buf pointer and debug_rw_buf_size */
+	tzdbg.disp_buf = save_disp_buf_addr;
+	debug_rw_buf_size = save_debug_rw_buf_size;
+	return ret;
+}
+
+static int tzdbg_get_tzbsp_log(void)
+{
+	struct device_node *node;
+	uint32_t *regs = NULL;
+	size_t cells;
+	static unsigned long last_log_base;
+	static unsigned long last_logs_size;
+	struct last_logs_data *priv_data;
+	void __iomem *last_logs_virt_iobase, *last_virt_iobase;
+	void *last_logs_addr = NULL;
+	last_logs_header last_logs_hdr;
+	last_logs_region region;
+	int i, ret = 0;
+
+	node = of_find_matching_node(NULL, last_log_dt);
+	if (!node) {
+		pr_err("last_log region node not found\n");
+		return -EINVAL;
+	}
+
+	cells = of_n_addr_cells(node) + of_n_size_cells(node);
+	regs = kcalloc(cells, sizeof(uint32_t), GFP_KERNEL);
+	if (!regs) {
+		pr_err("Failed to allocate memory for cells\n");
+		of_node_put(node);
+		return -ENOMEM;
+	}
+
+	if (of_property_read_u32_array(node, "reg", regs, cells)) {
+		pr_err("unable to find base address of node in dtb\n");
+		return -EINVAL;
+	}
+
+	if (cells == 4) {
+		last_log_base = (unsigned long)regs[0] << 32 | regs[1];
+		last_logs_size = (unsigned long)regs[2] << 32 | regs[3];
+	} else if (cells == 2) {
+		last_log_base = regs[0];
+		last_logs_size = regs[1];
+	} else {
+		pr_err("bad number of cells in the regs property\n");
+		return -EINVAL;
+	}
+
+	of_node_put(node);
+	kfree(regs);
+
+	last_logs_virt_iobase = ioremap(last_log_base, last_logs_size);
+	if (!last_logs_virt_iobase) {
+		pr_err("Failed to ioremap\n");
+		return -EINVAL;
+	}
+
+	memcpy_fromio((void *)&last_logs_hdr, last_logs_virt_iobase,
+			LAST_LOGS_HEADER_SIZE);
+	if (last_logs_hdr.version != LAST_LOGS_VERSION ||
+		last_logs_hdr.magic != LAST_LOGS_MAGIC) {
+		pr_err("ERROR: %s: magic = %x, version = 0x%x\n",
+			__func__, last_logs_hdr.magic,
+			last_logs_hdr.version);
+		goto exit;
+	}
+
+	if (last_logs_hdr.num_regions > MAX_LAST_LOGS_REGIONS)
+		goto exit;
+
+	for (i = 0; i < last_logs_hdr.num_regions; i++) {
+		memcpy_fromio((void *)&region, &last_logs_hdr.regions[i],
+					sizeof(last_logs_region));
+		if (!memcmp(region.name, STR_TZBSP_LOG, sizeof(STR_TZBSP_LOG)))
+			break;
+	}
+
+	last_virt_iobase = last_logs_virt_iobase + region.offset;
+	last_logs_addr = kzalloc(region.size, GFP_KERNEL);
+	if (!last_logs_addr) {
+		pr_err("ERROR: %s could not allocate memory",
+			__func__);
+		ret = -ENOMEM;
+		goto exit;
+	}
+
+	memcpy_fromio(last_logs_addr, last_virt_iobase, region.size);
+	/* clear & unmap TZ area in debug memory */
+	memset_io(last_virt_iobase, 0, region.size);
+
+	priv_data = kzalloc(sizeof(struct last_logs_data), GFP_KERNEL);
+	if (!priv_data) {
+		pr_err("ERROR: %s could not allocate memory",
+			__func__);
+		ret = -ENOMEM;
+		goto exit;
+	}
+
+	ret = format_tzbsp_log(last_logs_addr, region.size,
+		(void **)&(priv_data->addr), (uint32_t *)&(priv_data->size));
+	if (!ret) {
+		kzfree(last_logs_addr);
+		last_logs_addr = NULL;
+	} else if (ret) {
+		goto exit;
+	}
+
+	tzdbg.stat[TZDBG_LAST_LOG].data = priv_data->addr;
+
+	iounmap(last_logs_virt_iobase);
+	return priv_data->size;
+exit:
+	iounmap(last_logs_virt_iobase);
+	if (last_logs_addr)
+		kzfree(last_logs_addr);
+	return ret;
+}
+#endif
 
 static int tz_log_remove(struct platform_device *pdev)
 {

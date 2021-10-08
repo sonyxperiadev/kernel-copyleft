@@ -162,7 +162,6 @@ static int32_t cam_sensor_driver_i2c_probe(struct i2c_client *client,
 	s_ctrl->of_node = client->dev.of_node;
 	s_ctrl->io_master_info.master_type = I2C_MASTER;
 	s_ctrl->is_probe_succeed = 0;
-	s_ctrl->last_flush_req = 0;
 
 	rc = cam_sensor_parse_dt(s_ctrl);
 	if (rc < 0) {
@@ -192,14 +191,13 @@ static int32_t cam_sensor_driver_i2c_probe(struct i2c_client *client,
 		INIT_LIST_HEAD(&(s_ctrl->i2c_data.per_frame[i].list_head));
 
 	s_ctrl->bridge_intf.device_hdl = -1;
-	s_ctrl->bridge_intf.link_hdl = -1;
 	s_ctrl->bridge_intf.ops.get_dev_info = cam_sensor_publish_dev_info;
 	s_ctrl->bridge_intf.ops.link_setup = cam_sensor_establish_link;
 	s_ctrl->bridge_intf.ops.apply_req = cam_sensor_apply_request;
 	s_ctrl->bridge_intf.ops.flush_req = cam_sensor_flush_request;
 
 	s_ctrl->sensordata->power_info.dev = soc_info->dev;
-
+	v4l2_set_subdevdata(&(s_ctrl->v4l2_dev_str.sd), s_ctrl);
 	return rc;
 unreg_subdev:
 	cam_unregister_subdev(&(s_ctrl->v4l2_dev_str));
@@ -220,18 +218,11 @@ static int cam_sensor_platform_remove(struct platform_device *pdev)
 		return 0;
 	}
 
-	CAM_INFO(CAM_SENSOR, "platform remove invoked");
-	mutex_lock(&(s_ctrl->cam_sensor_mutex));
-	cam_sensor_shutdown(s_ctrl);
-	mutex_unlock(&(s_ctrl->cam_sensor_mutex));
-	cam_unregister_subdev(&(s_ctrl->v4l2_dev_str));
 	soc_info = &s_ctrl->soc_info;
 	for (i = 0; i < soc_info->num_clk; i++)
 		devm_clk_put(soc_info->dev, soc_info->clk[i]);
 
 	kfree(s_ctrl->i2c_data.per_frame);
-	platform_set_drvdata(pdev, NULL);
-	v4l2_set_subdevdata(&(s_ctrl->v4l2_dev_str.sd), NULL);
 	devm_kfree(&pdev->dev, s_ctrl);
 
 	return 0;
@@ -248,17 +239,11 @@ static int cam_sensor_driver_i2c_remove(struct i2c_client *client)
 		return 0;
 	}
 
-	CAM_INFO(CAM_SENSOR, "i2c remove invoked");
-	mutex_lock(&(s_ctrl->cam_sensor_mutex));
-	cam_sensor_shutdown(s_ctrl);
-	mutex_unlock(&(s_ctrl->cam_sensor_mutex));
-	cam_unregister_subdev(&(s_ctrl->v4l2_dev_str));
 	soc_info = &s_ctrl->soc_info;
 	for (i = 0; i < soc_info->num_clk; i++)
 		devm_clk_put(soc_info->dev, soc_info->clk[i]);
 
 	kfree(s_ctrl->i2c_data.per_frame);
-	v4l2_set_subdevdata(&(s_ctrl->v4l2_dev_str.sd), NULL);
 	kfree(s_ctrl);
 
 	return 0;
@@ -290,7 +275,6 @@ static int32_t cam_sensor_driver_platform_probe(
 	/* Initialize sensor device type */
 	s_ctrl->of_node = pdev->dev.of_node;
 	s_ctrl->is_probe_succeed = 0;
-	s_ctrl->last_flush_req = 0;
 
 	/*fill in platform device*/
 	s_ctrl->pdev = pdev;
@@ -328,7 +312,6 @@ static int32_t cam_sensor_driver_platform_probe(
 		INIT_LIST_HEAD(&(s_ctrl->i2c_data.per_frame[i].list_head));
 
 	s_ctrl->bridge_intf.device_hdl = -1;
-	s_ctrl->bridge_intf.link_hdl = -1;
 	s_ctrl->bridge_intf.ops.get_dev_info = cam_sensor_publish_dev_info;
 	s_ctrl->bridge_intf.ops.link_setup = cam_sensor_establish_link;
 	s_ctrl->bridge_intf.ops.apply_req = cam_sensor_apply_request;
@@ -336,6 +319,8 @@ static int32_t cam_sensor_driver_platform_probe(
 
 	s_ctrl->sensordata->power_info.dev = &pdev->dev;
 	platform_set_drvdata(pdev, s_ctrl);
+	v4l2_set_subdevdata(&(s_ctrl->v4l2_dev_str.sd), s_ctrl);
+
 	s_ctrl->sensor_state = CAM_SENSOR_INIT;
 
 	return rc;

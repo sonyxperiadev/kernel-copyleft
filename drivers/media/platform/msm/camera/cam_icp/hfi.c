@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -42,9 +42,6 @@
 
 #define HFI_MAX_POLL_TRY 5
 
-#define HFI_MAX_PC_POLL_TRY 150
-#define HFI_POLL_TRY_SLEEP 1
-
 static struct hfi_info *g_hfi;
 unsigned int g_icp_mmu_hdl;
 static DEFINE_MUTEX(hfi_cmd_q_mutex);
@@ -73,28 +70,24 @@ void cam_hfi_queue_dump(void)
 		qtbl_hdr->qtbl_num_q, qtbl_hdr->qtbl_qhdr_size);
 
 	cmd_q_hdr = &qtbl->q_hdr[Q_CMD];
-	CAM_INFO(CAM_HFI, "cmd: size = %u r_idx = %u w_idx = %u addr = %x",
+	CAM_DBG(CAM_HFI, "cmd: size = %u r_idx = %u w_idx = %u addr = %x",
 		cmd_q_hdr->qhdr_q_size, cmd_q_hdr->qhdr_read_idx,
 		cmd_q_hdr->qhdr_write_idx, hfi_mem->cmd_q.iova);
 	read_q = (uint32_t *)g_hfi->map.cmd_q.kva;
 	read_ptr = (uint32_t *)(read_q + 0);
-	CAM_INFO(CAM_HFI, "CMD Q %p", read_q);
 	CAM_DBG(CAM_HFI, "CMD Q START");
 	for (i = 0; i < ICP_CMD_Q_SIZE_IN_BYTES >> BYTE_WORD_SHIFT; i++)
 		CAM_DBG(CAM_HFI, "Word: %d Data: 0x%08x ", i, read_ptr[i]);
-	CAM_DBG(CAM_HFI, "CMD Q END");
 
 	msg_q_hdr = &qtbl->q_hdr[Q_MSG];
-	CAM_INFO(CAM_HFI, "msg: size = %u r_idx = %u w_idx = %u addr = %x",
+	CAM_DBG(CAM_HFI, "msg: size = %u r_idx = %u w_idx = %u addr = %x",
 		msg_q_hdr->qhdr_q_size, msg_q_hdr->qhdr_read_idx,
 		msg_q_hdr->qhdr_write_idx, hfi_mem->msg_q.iova);
 	read_q = (uint32_t *)g_hfi->map.msg_q.kva;
 	read_ptr = (uint32_t *)(read_q + 0);
-	CAM_INFO(CAM_HFI, "MSG Q %p", read_ptr);
 	CAM_DBG(CAM_HFI, "MSG Q START");
 	for (i = 0; i < ICP_MSG_Q_SIZE_IN_BYTES >> BYTE_WORD_SHIFT; i++)
 		CAM_DBG(CAM_HFI, "Word: %d Data: 0x%08x ", i, read_ptr[i]);
-	CAM_DBG(CAM_HFI, "MSG Q END");
 }
 
 int hfi_write_cmd(void *cmd_ptr)
@@ -520,8 +513,14 @@ void cam_hfi_disable_cpu(void __iomem *icp_base)
 	uint32_t val;
 	uint32_t try = 0;
 
-	while (try < HFI_MAX_PC_POLL_TRY) {
-		data = cam_io_r_mb(icp_base + HFI_REG_A5_CSR_A5_STATUS);
+/* sony extension begin */
+#if 1
+	while (try < 500) {
+#else
+	while (try < HFI_MAX_POLL_TRY) {
+#endif
+/* sony extension end */
+		data = cam_io_r(icp_base + HFI_REG_A5_CSR_A5_STATUS);
 		CAM_DBG(CAM_HFI, "wfi status = %x\n", (int)data);
 
 		if (data & ICP_CSR_A5_STATUS_WFI)
@@ -530,8 +529,13 @@ void cam_hfi_disable_cpu(void __iomem *icp_base)
 		 * and Host can the proceed. No interrupt is expected from FW
 		 * at this time.
 		 */
-		usleep_range(HFI_POLL_TRY_SLEEP * 1000,
-			(HFI_POLL_TRY_SLEEP * 1000) + 1000);
+/* sony extension begin */
+#if 1
+		usleep_range(1000, 2000);
+#else
+		msleep(100);
+#endif
+/* sony extension end */
 		try++;
 	}
 
@@ -541,11 +545,6 @@ void cam_hfi_disable_cpu(void __iomem *icp_base)
 
 	val = cam_io_r(icp_base + HFI_REG_A5_CSR_NSEC_RESET);
 	cam_io_w_mb(val, icp_base + HFI_REG_A5_CSR_NSEC_RESET);
-
-	cam_io_w_mb((uint32_t)ICP_INIT_REQUEST_RESET,
-		icp_base + HFI_REG_HOST_ICP_INIT_REQUEST);
-	cam_io_w_mb((uint32_t)INTR_DISABLE,
-		icp_base + HFI_REG_A5_CSR_A2HOSTINTEN);
 }
 
 void cam_hfi_enable_cpu(void __iomem *icp_base)
@@ -637,10 +636,6 @@ int cam_hfi_resume(struct hfi_mem_info *hfi_mem,
 		icp_base + HFI_REG_QDSS_IOVA);
 	cam_io_w_mb((uint32_t)hfi_mem->qdss.len,
 		icp_base + HFI_REG_QDSS_IOVA_SIZE);
-	cam_io_w_mb((uint32_t)hfi_mem->io_mem.iova,
-		icp_base + HFI_REG_IO_REGION_IOVA);
-	cam_io_w_mb((uint32_t)hfi_mem->io_mem.len,
-		icp_base + HFI_REG_IO_REGION_SIZE);
 
 	return rc;
 }
@@ -829,10 +824,6 @@ int cam_hfi_init(uint8_t event_driven_mode, struct hfi_mem_info *hfi_mem,
 		icp_base + HFI_REG_QDSS_IOVA);
 	cam_io_w_mb((uint32_t)hfi_mem->qdss.len,
 		icp_base + HFI_REG_QDSS_IOVA_SIZE);
-	cam_io_w_mb((uint32_t)hfi_mem->io_mem.iova,
-		icp_base + HFI_REG_IO_REGION_IOVA);
-	cam_io_w_mb((uint32_t)hfi_mem->io_mem.len,
-		icp_base + HFI_REG_IO_REGION_SIZE);
 
 	hw_version = cam_io_r(icp_base + HFI_REG_A5_HW_VERSION);
 
@@ -904,6 +895,11 @@ void cam_hfi_deinit(void __iomem *icp_base)
 	g_hfi->cmd_q_state = false;
 	g_hfi->msg_q_state = false;
 
+	cam_io_w_mb((uint32_t)ICP_INIT_REQUEST_RESET,
+		icp_base + HFI_REG_HOST_ICP_INIT_REQUEST);
+
+	cam_io_w_mb((uint32_t)INTR_DISABLE,
+		g_hfi->csr_base + HFI_REG_A5_CSR_A2HOSTINTEN);
 	kzfree(g_hfi);
 	g_hfi = NULL;
 

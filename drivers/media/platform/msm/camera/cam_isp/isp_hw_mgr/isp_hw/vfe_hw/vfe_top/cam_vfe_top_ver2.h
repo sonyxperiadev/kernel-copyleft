@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,13 +16,8 @@
 #include "cam_vfe_camif_ver2.h"
 #include "cam_vfe_camif_lite_ver2.h"
 #include "cam_vfe_rdi.h"
-#include "cam_vfe_fe_ver1.h"
 
-#define CAM_VFE_TOP_VER2_MUX_MAX     6
-
-#define CAM_VFE_MAX_REG_DUMP_ENTRIES 5
-
-#define CAM_VFE_MAX_LUT_DUMP_ENTRIES 6
+#define CAM_VFE_TOP_VER2_MUX_MAX     5
 
 enum cam_vfe_top_ver2_module_type {
 	CAM_VFE_TOP_VER2_MODULE_LENS,
@@ -36,30 +31,6 @@ struct cam_vfe_top_ver2_reg_offset_module_ctrl {
 	uint32_t reset;
 	uint32_t cgc_ovd;
 	uint32_t enable;
-};
-
-struct cam_vfe_top_reg_dump_entry {
-	uint32_t reg_dump_start;
-	uint32_t reg_dump_end;
-};
-
-struct cam_vfe_top_lut_dump_entry {
-	uint32_t lut_word_size;
-	uint32_t lut_bank_sel;
-	uint32_t lut_addr_size;
-};
-
-struct cam_vfe_top_dump_data {
-	uint32_t num_reg_dump_entries;
-	uint32_t num_lut_dump_entries;
-	uint32_t dmi_cfg;
-	uint32_t dmi_addr;
-	uint32_t dmi_data_path_hi;
-	uint32_t dmi_data_path_lo;
-	struct cam_vfe_top_reg_dump_entry
-	    reg_entry[CAM_VFE_MAX_REG_DUMP_ENTRIES];
-	struct cam_vfe_top_lut_dump_entry
-	    lut_entry[CAM_VFE_MAX_LUT_DUMP_ENTRIES];
 };
 
 struct cam_vfe_top_ver2_reg_offset_common {
@@ -84,8 +55,6 @@ struct cam_vfe_top_ver2_hw_info {
 	struct cam_vfe_camif_ver2_hw_info           camif_hw_info;
 	struct cam_vfe_camif_lite_ver2_hw_info      camif_lite_hw_info;
 	struct cam_vfe_rdi_ver2_hw_info             rdi_hw_info;
-	struct cam_vfe_fe_ver1_hw_info              fe_hw_info;
-	struct cam_vfe_top_dump_data                dump_data;
 	uint32_t mux_type[CAM_VFE_TOP_VER2_MUX_MAX];
 };
 

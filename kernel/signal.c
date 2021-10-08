@@ -1346,7 +1346,7 @@ int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 
 	if (!ret && sig) {
 		ret = do_send_sig_info(sig, info, p, true);
-		if (capable(CAP_KILL) && sig == SIGKILL)
+		if (sig == SIGKILL && capable(CAP_KILL))
 			add_to_oom_reaper(p);
 	}
 

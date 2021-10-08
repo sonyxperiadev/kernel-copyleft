@@ -2080,7 +2080,9 @@ retry:
 
 	deactivate_task(rq, next_task, 0);
 	next_task->on_rq = TASK_ON_RQ_MIGRATING;
+	walt_prepare_migrate(next_task, cpu_of(rq), cpu_of(lowest_rq), true);
 	set_task_cpu(next_task, lowest_rq->cpu);
+	walt_finish_migrate(next_task, cpu_of(rq), cpu_of(lowest_rq), true);
 	next_task->on_rq = TASK_ON_RQ_QUEUED;
 	activate_task(lowest_rq, next_task, 0);
 	ret = 1;
@@ -2354,7 +2356,9 @@ static void pull_rt_task(struct rq *this_rq)
 
 			deactivate_task(src_rq, p, 0);
 			p->on_rq = TASK_ON_RQ_MIGRATING;
+			walt_prepare_migrate(p, cpu_of(src_rq), this_cpu, true);
 			set_task_cpu(p, this_cpu);
+			walt_finish_migrate(p, cpu_of(src_rq), this_cpu, true);
 			p->on_rq = TASK_ON_RQ_QUEUED;
 			activate_task(this_rq, p, 0);
 			/*

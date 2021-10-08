@@ -3971,8 +3971,14 @@ exit:
 				put_task_struct(task_s);
 				put_pid(pid_struct);
 				mutex_lock(&driver->diagchar_mutex);
+/* SONY_BEGIN (Workaround for unable to receive log packet at the same time on SM8150 and SDX50M) */
+				if (driver->data_ready[index] & DCI_DATA_TYPE) {
+/* SONY_END (Workaround for unable to receive log packet at the same time on SM8150 and SDX50M) */
 				driver->data_ready[index] ^= DCI_DATA_TYPE;
 				atomic_dec(&driver->data_ready_notif[index]);
+/* SONY_BEGIN (Workaround for unable to receive log packet at the same time on SM8150 and SDX50M) */
+				}
+/* SONY_END (Workaround for unable to receive log packet at the same time on SM8150 and SDX50M) */
 				mutex_unlock(&driver->diagchar_mutex);
 				mutex_unlock(&driver->dci_mutex);
 				goto end;

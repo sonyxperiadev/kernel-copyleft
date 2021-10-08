@@ -5,6 +5,8 @@
  *
  * Copyright (C) 2017-2019 Scott Lin <scott.lin@tw.synaptics.com>
  *
+ * Copyright (C) 2017, 2018 Sony Mobile Communications Inc.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -33,8 +35,14 @@
 #ifndef _SYNAPTICS_TCM_H_
 #define _SYNAPTICS_TCM_H_
 
+/* Necessary in version after kernel/msm-4.14 */
+#include <uapi/linux/sched/types.h>
+
 #define I2C_MODULE_NAME "synaptics_tcm_i2c"
 #define SPI_MODULE_NAME "synaptics_tcm_spi"
+
+/* Somc bringup Trigger */
+#define SOMC_TOUCH_BRINGUP
 
 struct syna_tcm_board_data {
 	bool x_flip;

@@ -1238,14 +1238,20 @@ static int pidff_check_autocenter(struct pidff_device *pidff,
 int hid_pidff_init(struct hid_device *hid)
 {
 	struct pidff_device *pidff;
-	struct hid_input *hidinput = list_entry(hid->inputs.next,
-						struct hid_input, list);
-	struct input_dev *dev = hidinput->input;
+	struct hid_input *hidinput;
+	struct input_dev *dev;
 	struct ff_device *ff;
 	int max_effects;
 	int error;
 
 	hid_dbg(hid, "starting pid init\n");
+
+	if (list_empty(&hid->inputs)) {
+		hid_err(hid, "no inputs found\n");
+		return -ENODEV;
+	}
+	hidinput = list_first_entry(&hid->inputs, struct hid_input, list);
+	dev = hidinput->input;
 
 	if (list_empty(&hid->report_enum[HID_OUTPUT_REPORT].report_list)) {
 		hid_dbg(hid, "not a PID device, no output report\n");

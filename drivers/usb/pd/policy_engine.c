@@ -353,6 +353,12 @@ static void *usbpd_ipc_log;
 #define ID_HDR_PRODUCT_PER	2
 #define ID_HDR_PRODUCT_AMA	5
 #define ID_HDR_PRODUCT_VPD	6
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#undef ID_HDR_VID
+#undef PROD_VDO_PID
+#define ID_HDR_VID		0x0FCE /* Sony Mobile Communications */
+#define PROD_VDO_PID		0x0205
+#endif
 
 static bool check_vsafe0v = true;
 module_param(check_vsafe0v, bool, 0600);
@@ -360,7 +366,14 @@ module_param(check_vsafe0v, bool, 0600);
 static int min_sink_current = 900;
 module_param(min_sink_current, int, 0600);
 
-static const u32 default_src_caps[] = { 0x36019096 };	/* VSafe5V @ 1.5A */
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+static const u32 default_src_caps[] = { 0x3601905A };	/* VSafe5V @ 0.9A */
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+static const u32 somc_default_src_caps[] = { 0x3601905A }; /* 5V @ 0.9A */
+static const u32 somc_minimum_src_caps[] = { 0x3601900A }; /* 5V @ 0.1A */
+static u32 default_src_caps[] = { 0x3601905A };	/* VSafe5V @ 0.9A */
+#endif
 static const u32 default_snk_caps[] = { 0x2601912C };	/* VSafe5V @ 3A */
 
 struct vdm_tx {
@@ -417,7 +430,6 @@ struct usbpd {
 	bool			peer_pr_swap;
 	bool			peer_dr_swap;
 	bool			no_usb3dp_concurrency;
-	bool			pd20_source_only;
 
 	u32			sink_caps[7];
 	int			num_sink_caps;
@@ -1271,6 +1283,9 @@ static bool in_src_ams(struct usbpd *pd)
 	if (pd->spec_rev != USBPD_REV_30)
 		return true;
 
+	if (!pd->in_explicit_contract)
+		return true;
+
 	power_supply_get_property(pd->usb_psy, POWER_SUPPLY_PROP_TYPEC_SRC_RP,
 			&val);
 
@@ -1385,7 +1400,16 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 
 		dual_role_instance_changed(pd->dual_role);
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		val.intval = 1; /* Rp-1.5A; SinkTxNG for PD 3.0 */
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		if (pd->in_explicit_contract) {
+			val.intval = 1; /* Rp-1.5A; SinkTxNG for PD 3.0 */
+		} else {
+			val.intval = 0; /* Rp-Default; */
+		}
+#endif
 		power_supply_set_property(pd->usb_psy,
 				POWER_SUPPLY_PROP_TYPEC_SRC_RP, &val);
 
@@ -1401,10 +1425,7 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 			 * support up to PD 3.0; if peer is 2.0
 			 * phy_msg_received() will handle the downgrade.
 			 */
-			if (pd->pd20_source_only)
-				pd->spec_rev = USBPD_REV_20;
-			else
-				pd->spec_rev = USBPD_REV_30;
+			pd->spec_rev = USBPD_REV_30;
 
 			if (pd->pd_phy_opened) {
 				pd_phy_close();
@@ -2219,6 +2240,34 @@ static void handle_vdm_tx(struct usbpd *pd, enum pd_sop_type sop_type)
 	pd->vdm_tx = NULL;
 }
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+/*
+ * Set minimum src capability.
+ */
+void usbpd_set_min_src_caps(struct usbpd *pd, const bool set)
+{
+	bool change = false;
+
+	if (set && memcmp(default_src_caps, somc_minimum_src_caps,
+			sizeof(default_src_caps))) {
+		memcpy(default_src_caps, somc_minimum_src_caps,
+			sizeof(default_src_caps));
+		change = true;
+	} else if (!set && memcmp(default_src_caps, somc_default_src_caps,
+			sizeof(default_src_caps))) {
+		memcpy(default_src_caps, somc_default_src_caps,
+			sizeof(default_src_caps));
+		change = true;
+	}
+
+	if (change && pd && pd->current_pr == PR_SRC) {
+		usbpd_dbg(&pd->dev, "set ERROR_RECOVERY\n");
+		usbpd_set_state(pd, PE_ERROR_RECOVERY);
+	}
+}
+EXPORT_SYMBOL(usbpd_set_min_src_caps);
+
+#endif
 static void handle_get_src_cap_extended(struct usbpd *pd)
 {
 	int ret;
@@ -2704,10 +2753,7 @@ static void usbpd_sm(struct work_struct *w)
 		 * Emarker may have negotiated down to rev 2.0.
 		 * Reset to 3.0 to begin SOP communication with sink
 		 */
-		if (pd->pd20_source_only)
-			pd->spec_rev = USBPD_REV_20;
-		else
-			pd->spec_rev = USBPD_REV_30;
+		pd->spec_rev = USBPD_REV_30;
 
 		pd->current_state = PE_SRC_SEND_CAPABILITIES;
 		kick_sm(pd, ms);
@@ -3547,9 +3593,16 @@ static int psy_changed(struct notifier_block *nb, unsigned long evt, void *ptr)
 
 	pd->typec_mode = typec_mode;
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	usbpd_dbg(&pd->dev, "typec mode:%d present:%d orientation:%d\n",
 			typec_mode, pd->vbus_present,
 			usbpd_get_plug_orientation(pd));
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	usbpd_info(&pd->dev, "typec mode:%d present:%d orientation:%d\n",
+			typec_mode, pd->vbus_present,
+			usbpd_get_plug_orientation(pd));
+#endif
 
 	switch (typec_mode) {
 	/* Disconnect */
@@ -3614,6 +3667,9 @@ static int psy_changed(struct notifier_block *nb, unsigned long evt, void *ptr)
 		break;
 	case POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER:
 		usbpd_info(&pd->dev, "Type-C Analog Audio Adapter connected\n");
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		kobject_uevent(&pd->dev.kobj, KOBJ_CHANGE);
+#endif
 		break;
 	default:
 		usbpd_warn(&pd->dev, "Unsupported typec mode:%d\n",
@@ -3892,6 +3948,11 @@ static int usbpd_uevent(struct device *dev, struct kobj_uevent_env *env)
 			add_uevent_var(env, "PDO%d=%08x", i,
 					default_src_caps[i]);
 	}
+
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	if (pd->typec_mode == POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER)
+		add_uevent_var(env, "TYPEC_MODE=AAA");
+#endif
 
 	add_uevent_var(env, "RDO=%08x", pd->rdo);
 	add_uevent_var(env, "CONTRACT=%s", pd->in_explicit_contract ?
@@ -4410,6 +4471,78 @@ static ssize_t get_battery_status_show(struct device *dev,
 }
 static DEVICE_ATTR_RW(get_battery_status);
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+static ssize_t pdo_summary_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct usbpd *pd = dev_get_drvdata(dev);
+	int i;
+	int max_voltage = 0;
+	int min_voltage = 0;
+	int max_current = 0;
+	int max_power = 0;
+	ssize_t cnt = 0;
+
+	for (i = 0; i < ARRAY_SIZE(pd->received_pdos); i++) {
+		u32 pdo = pd->received_pdos[i];
+
+		if (pdo == 0)
+			break;
+
+		if (PD_SRC_PDO_TYPE(pdo) == PD_SRC_PDO_TYPE_FIXED) {
+			max_voltage = PD_SRC_PDO_FIXED_VOLTAGE(pdo) * 50;
+			max_current = PD_SRC_PDO_FIXED_MAX_CURR(pdo) * 10;
+			cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt,
+					"PDO%d:%dmV/%dmA;",
+					i + 1,
+					max_voltage,
+					max_current);
+		} else if (PD_SRC_PDO_TYPE(pdo) == PD_SRC_PDO_TYPE_BATTERY) {
+			max_voltage = PD_SRC_PDO_VAR_BATT_MAX_VOLT(pdo) * 50;
+			min_voltage = PD_SRC_PDO_VAR_BATT_MIN_VOLT(pdo) * 50;
+			max_power = PD_SRC_PDO_VAR_BATT_MAX(pdo) * 250;
+			cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt,
+					"PDO%d:Max%dmV/Min%dmV/Max%dmW;",
+					i + 1,
+					max_voltage,
+					min_voltage,
+					max_power);
+		} else if (PD_SRC_PDO_TYPE(pdo) == PD_SRC_PDO_TYPE_VARIABLE) {
+			max_voltage = PD_SRC_PDO_VAR_BATT_MAX_VOLT(pdo) * 50;
+			min_voltage = PD_SRC_PDO_VAR_BATT_MIN_VOLT(pdo) * 50;
+			max_current = PD_SRC_PDO_VAR_BATT_MAX(pdo) * 10;
+			cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt,
+					"PDO%d:Max%dmV/Min%dmV/Max%dmA;",
+					i + 1,
+					max_voltage,
+					min_voltage,
+					max_current);
+		} else if (PD_SRC_PDO_TYPE(pdo) == PD_SRC_PDO_TYPE_AUGMENTED) {
+			max_voltage = PD_APDO_MAX_VOLT(pdo) * 100;
+			min_voltage = PD_APDO_MIN_VOLT(pdo) * 100;
+			max_current = PD_APDO_MAX_CURR(pdo) * 50;
+			cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt,
+					"PDO%d:Max%dmV/Min%dmV/Max%dmA;",
+					i + 1,
+					max_voltage,
+					min_voltage,
+					max_current);
+		} else {
+			cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt,
+					"PDO%d:invalidate;", i + 1);
+		}
+	}
+
+	if (cnt > 0)
+		cnt += scnprintf(&buf[cnt], PAGE_SIZE - cnt, "\n");
+	else
+		cnt = scnprintf(buf, PAGE_SIZE, "<no available pdos>\n");
+
+	return cnt;
+}
+static DEVICE_ATTR_RO(pdo_summary);
+
+#endif
 static struct attribute *usbpd_attrs[] = {
 	&dev_attr_contract.attr,
 	&dev_attr_initial_pr.attr,
@@ -4434,6 +4567,9 @@ static struct attribute *usbpd_attrs[] = {
 	&dev_attr_get_pps_status.attr,
 	&dev_attr_get_battery_cap.attr,
 	&dev_attr_get_battery_status.attr,
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	&dev_attr_pdo_summary.attr,
+#endif
 	NULL,
 };
 ATTRIBUTE_GROUPS(usbpd);
@@ -4654,10 +4790,6 @@ struct usbpd *usbpd_create(struct device *parent)
 
 	if (device_property_read_bool(parent, "qcom,no-usb3-dp-concurrency"))
 		pd->no_usb3dp_concurrency = true;
-
-	if (device_property_read_bool(parent, "qcom,pd-20-source-only"))
-		pd->pd20_source_only = true;
-
 	/*
 	 * Register the Android dual-role class (/sys/class/dual_role_usb/).
 	 * The first instance should be named "otg_default" as that's what

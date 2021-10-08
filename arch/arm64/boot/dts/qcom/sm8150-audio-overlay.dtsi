@@ -95,8 +95,8 @@
 		"SpkrLeft IN", "SPK1 OUT",
 		"SpkrRight IN", "SPK2 OUT";
 
-	qcom,msm-mbhc-hphl-swh = <1>;
-	qcom,msm-mbhc-gnd-swh = <1>;
+	qcom,msm-mbhc-hphl-swh = <0>;
+	qcom,msm-mbhc-gnd-swh = <0>;
 	qcom,msm-mbhc-hs-mic-max-threshold-mv = <1700>;
 	qcom,msm-mbhc-hs-mic-min-threshold-mv = <50>;
 	qcom,hph-en0-gpio = <&tavil_hph_en0>;
@@ -209,11 +209,11 @@
 		qcom,cdc-vdd-px-current = <15000>;
 
 		cdc-vdd-mic-bias-supply = <&pm8150l_bob>;
-		qcom,cdc-vdd-mic-bias-voltage = <3300000 3300000>;
+		qcom,cdc-vdd-mic-bias-voltage = <3350000 3350000>;
 		qcom,cdc-vdd-mic-bias-current = <16800>;
 
 		cdc-vdd-pa-supply = <&pm8150l_bob>;
-		qcom,cdc-vdd-pa-voltage = <3300000 3300000>;
+		qcom,cdc-vdd-pa-voltage = <3350000 3350000>;
 		qcom,cdc-vdd-pa-current = <1000000>;
 
 		qcom,cdc-static-supplies = "cdc-vdd-buck-sido",
@@ -280,7 +280,7 @@
 		qcom,cdc-vddpx-1-current = <10000>;
 
 		cdc-vdd-3v3-supply = <&pm8150l_bob>;
-		qcom,cdc-vdd-3v3-voltage = <3300000 3300000>;
+		qcom,cdc-vdd-3v3-voltage = <3350000 3350000>;
 		qcom,cdc-vdd-3v3-current = <16800>;
 
 		qcom,cdc-static-supplies = "cdc-vdd-buck",
@@ -341,7 +341,7 @@
 		qcom,cdc-vdd-buck-current = <650000>;
 
 		cdc-vdd-vbat-supply = <&pm8150l_bob>;
-		qcom,cdc-vdd-vbat-voltage = <3300000 3300000>;
+		qcom,cdc-vdd-vbat-voltage = <3350000 3350000>;
 		qcom,cdc-vdd-vbat-current = <5000>;
 
 		qcom,cdc-static-supplies = "cdc-vdd-rxtx",

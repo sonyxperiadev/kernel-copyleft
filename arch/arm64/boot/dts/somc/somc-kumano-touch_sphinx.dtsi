@@ -1,0 +1,23 @@
+/* arch/arm64/boot/dts/somc/somc-kumano-touch_sphinx.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&qupv3_se10_i2c {
+	touchscreen@48 {
+		/* override parameter */
+		sec,side_touch_supported = <0>;
+		sec,glove_mode_supported = <0>;
+		sec,cover_mode_supported = <0>;
+		sec,aod_mode_supported = <0>;
+		sec,sod_mode_supported = <0>;
+		sec,stamina_mode_supported = <0>;
+	};
+};

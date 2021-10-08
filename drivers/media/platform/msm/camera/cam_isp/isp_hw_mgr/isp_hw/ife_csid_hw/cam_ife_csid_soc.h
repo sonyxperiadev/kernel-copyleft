@@ -68,11 +68,9 @@ int cam_ife_csid_deinit_soc_resources(struct cam_hw_soc_info *soc_info);
  * @brief:                 csid soc resource enable function
  *
  * @soc_info:              soc info structure pointer
- * @clk_lvl:               vote level to start with
  *
  */
-int cam_ife_csid_enable_soc_resources(struct cam_hw_soc_info  *soc_info,
-	uint32_t clk_lvl);
+int cam_ife_csid_enable_soc_resources(struct cam_hw_soc_info  *soc_info);
 
 /**
  * cam_ife_csid_disable_soc_resources()
@@ -111,16 +109,6 @@ int cam_ife_csid_enable_ife_force_clock_on(struct cam_hw_soc_info  *soc_info,
 int cam_ife_csid_disable_ife_force_clock_on(struct cam_hw_soc_info *soc_info,
 	uint32_t cpas_ife_base_offset);
 
-/**
- * cam_ife_csid_get_vote_level()
- *
- * @brief:                 get the vote level from clock rate
- *
- * @soc_info:              soc info structure pointer
- * @clock_rate             clock rate
- *
- */
-uint32_t cam_ife_csid_get_vote_level(struct cam_hw_soc_info *soc_info,
-	uint64_t clock_rate);
+
 
 #endif

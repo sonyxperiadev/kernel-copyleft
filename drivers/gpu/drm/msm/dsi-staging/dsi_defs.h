@@ -308,6 +308,17 @@ enum dsi_cmd_set_type {
 	DSI_CMD_SET_POST_TIMING_SWITCH,
 	DSI_CMD_SET_QSYNC_ON,
 	DSI_CMD_SET_QSYNC_OFF,
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	DSI_CMD_SET_AOD_ON,
+	DSI_CMD_SET_AOD_LOW,
+	DSI_CMD_SET_AOD_HIGH,
+	DSI_CMD_SET_AOD_OFF,
+	DSI_CMD_GET_UV_DATA,
+	DSI_CMD_SET_HBM_ON,
+	DSI_CMD_SET_HBM_OFF,
+	DSI_CMD_SET_FLM2_ON,
+	DSI_CMD_SET_FLM2_OFF,
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 	DSI_CMD_SET_MAX
 };
 
@@ -562,7 +573,7 @@ struct dsi_cmd_engine_cfg {
  * @common_config:         Host configuration common to both Video and Cmd mode.
  * @video_engine:          Video engine configuration if panel is in video mode.
  * @cmd_engine:            Cmd engine configuration if panel is in cmd mode.
- * @esc_clk_rate_hz:      Esc clock frequency in Hz.
+ * @esc_clk_rate_khz:      Esc clock frequency in Hz.
  * @bit_clk_rate_hz:       Bit clock frequency in Hz.
  * @bit_clk_rate_hz_override: DSI bit clk rate override from dt/sysfs.
  * @video_timing:          Video timing information of a frame.
@@ -632,6 +643,9 @@ struct dsi_display_mode {
 	enum dsi_op_mode panel_mode;
 	u32 dsi_mode_flags;
 	struct dsi_display_mode_priv_info *priv_info;
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	bool default_timing;
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 };
 
 /**

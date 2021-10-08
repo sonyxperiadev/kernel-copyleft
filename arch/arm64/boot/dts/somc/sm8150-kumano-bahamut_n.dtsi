@@ -1,0 +1,35 @@
+/* arch/arm64/boot/dts/somc/sm8150-kumano-bahamut_n.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "sm8150-kumano-bahamut_jp-common.dtsi"
+
+&soc {
+	/* SPI: QUP8 */
+	spi@a80000 {
+		status = "okay";
+		tmm3spi@0 {
+			compatible = "socionext,mn553-spi";
+			reg = <0>;
+			spi-max-frequency = <25000000>;
+			spi-mode = <0>;
+		};
+	};
+
+	dtv_tuner: mn88553 {
+		compatible = "socionext,mn88553";
+		interrupt-parent = <&tlmm>;
+		interrupts = <26 0>;
+		gpios = <&pm8150l_gpios 11 0>,         /* DTV_PWR_EN */
+				<&tlmm 35 0>,          /* DTV_RST_N  */
+				<&tlmm 26 0>;          /* DTV_INT    */
+	};
+};

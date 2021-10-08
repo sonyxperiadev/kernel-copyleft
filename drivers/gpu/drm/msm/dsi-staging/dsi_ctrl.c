@@ -1012,6 +1012,12 @@ static int dsi_ctrl_copy_and_pad_cmd(struct dsi_ctrl *dsi_ctrl,
 	    (cmd_type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM))
 		buf[3] |= BIT(5);
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	if (((buf[2] & 0x3f) == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) ||
+		((buf[2] & 0x3f) == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) ||
+		((buf[2] & 0x3f) == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM))
+		buf[3] |= BIT(5);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 	*buffer = buf;
 	*size = len;
 
@@ -1921,6 +1927,7 @@ static struct platform_driver dsi_ctrl_driver = {
 	},
 };
 
+#if defined(CONFIG_DEBUG_FS)
 
 void dsi_ctrl_debug_dump(u32 *entries, u32 size)
 {
@@ -1942,6 +1949,7 @@ void dsi_ctrl_debug_dump(u32 *entries, u32 size)
 	mutex_unlock(&dsi_ctrl_list_lock);
 }
 
+#endif
 /**
  * dsi_ctrl_get() - get a dsi_ctrl handle from an of_node
  * @of_node:    of_node of the DSI controller.

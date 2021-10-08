@@ -20,9 +20,17 @@
 #include <linux/sort.h>
 #include "fg-alg.h"
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define fg_alg_somc_cl_dbg(fmt, ...) pr_info("[SOMC CL]"fmt, ##__VA_ARGS__)
+
+#endif
 #define FULL_SOC_RAW		255
-#define CAPACITY_DELTA_DECIPCT	500
-#define CENTI_FULL_SOC		10000
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define CAPACITY_DELTA_DECIPCT  500
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define CAPACITY_DELTA_DECIPCT  400
+#endif
 
 #define CENTI_ICORRECT_C0	105
 #define CENTI_ICORRECT_C1	20
@@ -36,6 +44,19 @@
 #define DEFAULT_TTF_RUN_PERIOD_MS	10000
 #define DEFAULT_TTF_ITERM_DELTA_MA	200
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define CL_LOWER_LIMIT_PCT		98 /* 98 percent */
+#define CL_ABORT_BSOC_100PCT		200 /* 2.00 percent */
+#define CL_ABORT_CCSOC_100PCT		50 /* 0.50 percent */
+#define CL_ABORT_KEEP_TIMEOUT_MS	(7 * 60 * 60 * 1000)
+#define CL_ABORT_SLOW_TIMEOUT_MS	(10 * 60 * 60 * 1000)
+
+#define BSOC_RANGE	GENMASK(31, 0)
+#define CCSOC_RANGE	GENMASK(29, 0)
+#define BSOC_100P(soc)	(int)(div64_s64((int64_t)soc * 10000, BSOC_RANGE))
+#define CCSOC_100P(soc)	(int)(div64_s64((int64_t)soc * 10000, CCSOC_RANGE))
+
+#endif
 static const struct ttf_pt ttf_ln_table[] = {
 	{ 1000,		0 },
 	{ 2000,		693 },
@@ -313,6 +334,7 @@ int cycle_count_init(struct cycle_counter *counter)
  */
 static void cap_learning_post_process(struct cap_learning *cl)
 {
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int64_t max_inc_val, min_dec_val, old_cap;
 	int rc;
 
@@ -368,25 +390,61 @@ static void cap_learning_post_process(struct cap_learning *cl)
 
 	pr_debug("final cap_uah = %lld, learned capacity %lld -> %lld uah\n",
 		cl->final_cap_uah, old_cap, cl->learned_cap_uah);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int rc;
+	int64_t lower_cap_uah, store_cap_uah;
+
+	if (!cl->store_learned_capacity)
+		return;
+
+	store_cap_uah = cl->final_cap_uah;
+	if (cl->final_cap_uah > cl->nom_cap_uah) {
+		fg_alg_somc_cl_dbg("learning capacity %lld goes above nom_cap %lld\n",
+					cl->final_cap_uah, cl->nom_cap_uah);
+		store_cap_uah = cl->nom_cap_uah;
+	}
+
+	lower_cap_uah = div64_u64(cl->learned_cap_uah * CL_LOWER_LIMIT_PCT,
+									100);
+	if (cl->final_cap_uah < lower_cap_uah) {
+		fg_alg_somc_cl_dbg("learning capacity %lld goes below lower limited cap %lld\n",
+					cl->final_cap_uah, lower_cap_uah);
+		store_cap_uah = lower_cap_uah;
+	}
+
+	if (cl->learned_cap_uah != store_cap_uah) {
+		fg_alg_somc_cl_dbg("store learning capacity %lld\n",
+								store_cap_uah);
+		rc = cl->store_learned_capacity(cl->data, store_cap_uah);
+		if (rc < 0) {
+			pr_err("Error in storing learned_cap_uah, rc=%d\n", rc);
+			return;
+		}
+	}
+	cl->learned_cap_uah = store_cap_uah;
+	cl->learning_counter++;
+#endif
 }
 
 /**
  * cap_wt_learning_process_full_data -
  * @cl: Capacity learning object
  * @delta_batt_soc_pct: percentage change in battery State of Charge
- * @batt_soc_cp: Battery State of Charge in centi-percentage
+ * @batt_soc_msb: MSB of battery State of Charge
  *
  * Calculates the final learnt capacity when
  * weighted capacity learning is enabled.
  *
  */
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 static int cap_wt_learning_process_full_data(struct cap_learning *cl,
 					int delta_batt_soc_pct,
-					int batt_soc_cp)
+					int batt_soc_msb)
 {
 	int64_t del_cap_uah, total_cap_uah,
 		res_cap_uah, wt_learnt_cap_uah;
-	int delta_batt_soc_cp, res_batt_soc_cp;
+	int delta_batt_soc_msb, res_batt_soc_msb;
 
 	/* If the delta is < 10%, then skip processing full data */
 	if (delta_batt_soc_pct < cl->dt.min_delta_batt_soc) {
@@ -394,11 +452,11 @@ static int cap_wt_learning_process_full_data(struct cap_learning *cl,
 		return -ERANGE;
 	}
 
-	delta_batt_soc_cp = batt_soc_cp - cl->init_batt_soc_cp;
-	res_batt_soc_cp = CENTI_FULL_SOC - batt_soc_cp;
-	/* Learnt Capacity from end Battery SOC to CENTI_FULL_SOC */
+	delta_batt_soc_msb = batt_soc_msb - cl->init_batt_soc_msb;
+	res_batt_soc_msb = FULL_SOC_RAW - batt_soc_msb;
+	/* Learnt Capacity from end Battery SOC MSB to FULL_SOC_RAW */
 	res_cap_uah = div64_s64(cl->learned_cap_uah *
-				res_batt_soc_cp, CENTI_FULL_SOC);
+				res_batt_soc_msb, FULL_SOC_RAW);
 	total_cap_uah = cl->init_cap_uah + cl->delta_cap_uah + res_cap_uah;
 	/*
 	 * difference in capacity learnt in this
@@ -406,8 +464,8 @@ static int cap_wt_learning_process_full_data(struct cap_learning *cl,
 	 */
 	del_cap_uah = total_cap_uah - cl->learned_cap_uah;
 	/* Applying weight based on change in battery SOC MSB */
-	wt_learnt_cap_uah = div64_s64(del_cap_uah * delta_batt_soc_cp,
-					CENTI_FULL_SOC);
+	wt_learnt_cap_uah = div64_s64(del_cap_uah * delta_batt_soc_msb,
+					FULL_SOC_RAW);
 	cl->final_cap_uah = cl->learned_cap_uah + wt_learnt_cap_uah;
 
 	pr_debug("wt_learnt_cap_uah=%lld, del_cap_uah=%lld\n",
@@ -417,19 +475,21 @@ static int cap_wt_learning_process_full_data(struct cap_learning *cl,
 			res_cap_uah, cl->delta_cap_uah);
 	return 0;
 }
+#endif
 
 /**
  * cap_learning_process_full_data -
  * @cl: Capacity learning object
- * @batt_soc_cp: Battery State of Charge in centi-percentage
+ * @batt_soc_msb: Most significant byte of Battery State of Charge
  *
  * Processes the coulomb counter during charge termination and calculates the
  * delta w.r.to the coulomb counter obtained earlier when the learning begun.
  *
  */
 static int cap_learning_process_full_data(struct cap_learning *cl,
-					int batt_soc_cp)
+					int batt_soc_msb)
 {
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int rc, cc_soc_sw, cc_soc_delta_pct, delta_batt_soc_pct, batt_soc_pct,
 		cc_soc_fraction;
 	int64_t cc_soc_cap_uah, cc_soc_fraction_uah;
@@ -440,7 +500,7 @@ static int cap_learning_process_full_data(struct cap_learning *cl,
 		return rc;
 	}
 
-	batt_soc_pct = DIV_ROUND_CLOSEST(batt_soc_cp, 100);
+	batt_soc_pct = DIV_ROUND_CLOSEST(batt_soc_msb * 100, FULL_SOC_RAW);
 	delta_batt_soc_pct = batt_soc_pct - cl->init_batt_soc;
 	cc_soc_delta_pct =
 		div_s64_rem((int64_t)(cc_soc_sw - cl->init_cc_soc_sw) * 100,
@@ -454,7 +514,7 @@ static int cap_learning_process_full_data(struct cap_learning *cl,
 
 	if (cl->dt.cl_wt_enable) {
 		rc = cap_wt_learning_process_full_data(cl, delta_batt_soc_pct,
-							batt_soc_cp);
+							batt_soc_msb);
 		return rc;
 	}
 
@@ -468,30 +528,49 @@ static int cap_learning_process_full_data(struct cap_learning *cl,
 	pr_debug("Current cc_soc=%d cc_soc_delta_pct=%d total_cap_uah=%lld\n",
 		cc_soc_sw, cc_soc_delta_pct, cl->final_cap_uah);
 	return 0;
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int rc, cc_soc_sw, cc_delta;
+	int64_t cc_delta_100pct, cc_delta_uah;
+
+	rc = cl->get_cc_soc(cl->data, &cc_soc_sw);
+	if (rc < 0) {
+		pr_err("Error in getting CC_SOC_SW, rc=%d\n", rc);
+		return rc;
+	}
+
+	cc_delta = cc_soc_sw - cl->init_cc_soc_sw;
+	cc_delta_100pct = CCSOC_100P(cc_delta);
+	cc_delta_uah = div64_s64(cl->learned_cap_uah * cc_delta_100pct, 10000);
+	cl->final_cap_uah = cl->init_cap_uah + cc_delta_uah;
+	fg_alg_somc_cl_dbg("cc_delta_100pct:%d cc_delta_uah:%d init_cap_uah:%d final_cap_uah:%d\n",
+					cc_delta_100pct, cc_delta_uah,
+					cl->init_cap_uah, cl->final_cap_uah);
+	return 0;
+#endif
 }
 
 /**
  * cap_learning_begin -
  * @cl: Capacity learning object
- * @batt_soc_cp: Battery State of Charge in centi-percentage
+ * @batt_soc: Battery State of Charge (SOC)
  *
  * Gets the coulomb counter from FG/QG when the conditions are suitable for
  * beginning capacity learning. Also, primes the coulomb counter based on
  * battery SOC if required.
  *
  */
-#define BATT_SOC_32BIT	GENMASK(31, 0)
-static int cap_learning_begin(struct cap_learning *cl, u32 batt_soc_cp)
+static int cap_learning_begin(struct cap_learning *cl, u32 batt_soc)
 {
-	int rc, cc_soc_sw, batt_soc_pct;
-	u32 batt_soc_prime;
+	int rc, cc_soc_sw, batt_soc_msb, batt_soc_pct;
 
 	if (cl->ok_to_begin && !cl->ok_to_begin(cl->data)) {
 		pr_debug("Not OK to begin\n");
 		return -EINVAL;
 	}
 
-	batt_soc_pct = DIV_ROUND_CLOSEST(batt_soc_cp, 100);
+	batt_soc_msb = batt_soc >> 24;
+	batt_soc_pct = DIV_ROUND_CLOSEST(batt_soc_msb * 100, FULL_SOC_RAW);
 
 	if ((cl->dt.max_start_soc != -EINVAL &&
 			batt_soc_pct > cl->dt.max_start_soc) ||
@@ -502,18 +581,15 @@ static int cap_learning_begin(struct cap_learning *cl, u32 batt_soc_cp)
 		return -EINVAL;
 	}
 
-	cl->init_cap_uah = div64_s64(cl->learned_cap_uah * batt_soc_cp,
-					CENTI_FULL_SOC);
+	cl->init_cap_uah = div64_s64(cl->learned_cap_uah * batt_soc_msb,
+					FULL_SOC_RAW);
 
 	if (cl->prime_cc_soc) {
 		/*
 		 * Prime cc_soc_sw with battery SOC when capacity learning
 		 * begins.
 		 */
-		batt_soc_prime = div64_u64(
-				(uint64_t)batt_soc_cp * BATT_SOC_32BIT,
-							CENTI_FULL_SOC);
-		rc = cl->prime_cc_soc(cl->data, batt_soc_prime);
+		rc = cl->prime_cc_soc(cl->data, batt_soc);
 		if (rc < 0) {
 			pr_err("Error in writing cc_soc_sw, rc=%d\n", rc);
 			goto out;
@@ -528,9 +604,12 @@ static int cap_learning_begin(struct cap_learning *cl, u32 batt_soc_cp)
 
 	cl->init_cc_soc_sw = cc_soc_sw;
 	cl->init_batt_soc = batt_soc_pct;
-	cl->init_batt_soc_cp = batt_soc_cp;
+	cl->init_batt_soc_msb = batt_soc_msb;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	cl->learning_trial_counter++;
+#endif
 	pr_debug("Capacity learning started @ battery SOC %d init_cc_soc_sw:%d\n",
-		batt_soc_cp, cl->init_cc_soc_sw);
+		batt_soc_msb, cl->init_cc_soc_sw);
 out:
 	return rc;
 }
@@ -538,17 +617,17 @@ out:
 /**
  * cap_learning_done -
  * @cl: Capacity learning object
- * @batt_soc_cp: Battery State of Charge in centi-percentage
+ * @batt_soc_msb: Most significant byte of battery State of Charge
  *
  * Top level function for getting coulomb counter and post processing the
  * data once the capacity learning is complete after charge termination.
  *
  */
-static int cap_learning_done(struct cap_learning *cl, int batt_soc_cp)
+static int cap_learning_done(struct cap_learning *cl, int batt_soc_msb)
 {
 	int rc;
 
-	rc = cap_learning_process_full_data(cl, batt_soc_cp);
+	rc = cap_learning_process_full_data(cl, batt_soc_msb);
 	if (rc < 0) {
 		pr_debug("Error in processing cap learning full data, rc=%d\n",
 			rc);
@@ -572,19 +651,20 @@ out:
 /**
  * cap_wt_learning_update -
  * @cl: Capacity learning object
- * @batt_soc_cp: Battery State of Charge in centi-percentage
+ * @batt_soc_msb: Most significant byte of battery State of Charge
  * @input_present: Indicator for input presence
  *
  * Called by cap_learning_update when weighted learning is enabled
  *
  */
-static void cap_wt_learning_update(struct cap_learning *cl, int batt_soc_cp,
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+static void cap_wt_learning_update(struct cap_learning *cl, int batt_soc_msb,
 					bool input_present)
 {
 	int rc;
 
 	if (!input_present) {
-		rc = cap_learning_done(cl, batt_soc_cp);
+		rc = cap_learning_done(cl, batt_soc_msb);
 		if (rc < 0)
 			pr_debug("Error in completing capacity learning, rc=%d\n",
 				rc);
@@ -592,6 +672,7 @@ static void cap_wt_learning_update(struct cap_learning *cl, int batt_soc_cp,
 		cl->init_cap_uah = 0;
 	}
 }
+#endif
 
 /**
  * cap_learning_update -
@@ -607,18 +688,28 @@ static void cap_wt_learning_update(struct cap_learning *cl, int batt_soc_cp,
  *
  */
 void cap_learning_update(struct cap_learning *cl, int batt_temp,
-			int batt_soc_cp, int charge_status, bool charge_done,
+			int batt_soc, int charge_status, bool charge_done,
 			bool input_present, bool qnovo_en)
 {
-	int rc;
-	u32 batt_soc_prime;
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int rc, batt_soc_msb, batt_soc_prime;
 	bool prime_cc = false;
-
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int rc, batt_soc_prime;
+	int msoc, cc_soc_sw;
+	int bsoc_100p, ccsoc_100p;
+	int bsoc_drop_100p, ccsoc_drop_100p, max_bsoc_100p, max_ccsoc_100p;
+	bool prime_cc = false;
+	bool deactive = false;
+	ktime_t ktime;
+#endif
 	if (!cl)
 		return;
 
 	mutex_lock(&cl->lock);
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	if (batt_temp > cl->dt.max_temp || batt_temp < cl->dt.min_temp ||
 		!cl->learned_cap_uah) {
 		cl->active = false;
@@ -626,16 +717,18 @@ void cap_learning_update(struct cap_learning *cl, int batt_temp,
 		goto out;
 	}
 
+	batt_soc_msb = (u32)batt_soc >> 24;
 	pr_debug("Charge_status: %d active: %d batt_soc: %d\n",
-		charge_status, cl->active, batt_soc_cp);
+		charge_status, cl->active, batt_soc_msb);
 
 	if (cl->active && cl->dt.cl_wt_enable)
-		cap_wt_learning_update(cl, batt_soc_cp, input_present);
+		cap_wt_learning_update(cl, batt_soc_msb,
+					input_present);
 
 	/* Initialize the starting point of learning capacity */
 	if (!cl->active) {
 		if (charge_status == POWER_SUPPLY_STATUS_CHARGING) {
-			rc = cap_learning_begin(cl, batt_soc_cp);
+			rc = cap_learning_begin(cl, batt_soc);
 			cl->active = (rc == 0);
 		} else {
 			if (charge_status == POWER_SUPPLY_STATUS_DISCHARGING ||
@@ -644,7 +737,7 @@ void cap_learning_update(struct cap_learning *cl, int batt_temp,
 		}
 	} else {
 		if (charge_done) {
-			rc = cap_learning_done(cl, batt_soc_cp);
+			rc = cap_learning_done(cl, batt_soc_msb);
 			if (rc < 0)
 				pr_err("Error in completing capacity learning, rc=%d\n",
 					rc);
@@ -656,7 +749,7 @@ void cap_learning_update(struct cap_learning *cl, int batt_temp,
 		if (charge_status == POWER_SUPPLY_STATUS_DISCHARGING &&
 				!input_present) {
 			pr_debug("Capacity learning aborted @ battery SOC %d\n",
-				 batt_soc_cp);
+				 batt_soc_msb);
 			cl->active = false;
 			cl->init_cap_uah = 0;
 			prime_cc = true;
@@ -673,27 +766,163 @@ void cap_learning_update(struct cap_learning *cl, int batt_temp,
 				 */
 			} else {
 				pr_debug("Capacity learning aborted @ battery SOC %d\n",
-					batt_soc_cp);
+					batt_soc_msb);
 				cl->active = false;
 				cl->init_cap_uah = 0;
 				prime_cc = true;
 			}
 		}
 	}
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	if (cl->get_monotonic_soc) {
+		rc = cl->get_monotonic_soc(cl->data, &msoc);
+		if (rc < 0) {
+			pr_err("Error in getting msoc, rc=%d\n", rc);
+			goto out;
+		}
+	} else {
+		goto out;
+	}
 
+	if (cl->get_cc_soc) {
+		rc = cl->get_cc_soc(cl->data, &cc_soc_sw);
+		if (rc < 0) {
+			pr_err("Error in getting CC_SOC_SW, rc=%d\n", rc);
+			goto out;
+		}
+	} else {
+		goto out;
+	}
+
+	ktime = ktime_get_boottime();
+
+	if (!cl->learned_cap_uah) {
+		pr_err("Error in getting learned_cap_uah, rc=%d\n");
+		goto out;
+	}
+
+	bsoc_100p = BSOC_100P((u32)batt_soc);
+	ccsoc_100p = CCSOC_100P(cc_soc_sw);
+	fg_alg_somc_cl_dbg("[%s] charge_status:%d bsoc:%d\n",
+					cl->active ? "LERANING" : "OFF",
+					charge_status, bsoc_100p);
+
+	if (!cl->active) {
+		if (batt_temp > cl->dt.max_temp ||
+			batt_temp < cl->dt.min_temp) {
+			fg_alg_somc_cl_dbg("CL couldn't start because batt_temp is out of range %d\n",
+								batt_temp);
+			goto out;
+		}
+
+		if (charge_status == POWER_SUPPLY_STATUS_CHARGING) {
+			rc = cap_learning_begin(cl, batt_soc);
+			if (rc == 0) {
+				cl->active = true;
+				cl->max_ccsoc_during_active =
+							cl->init_cc_soc_sw;
+				cl->max_bsoc_during_active = batt_soc;
+				cl->max_bsoc_time_ms = ktime_to_ms(ktime);
+				cl->start_time_ms = cl->max_bsoc_time_ms;
+				fg_alg_somc_cl_dbg("CL started. bsoc:%d init_cc_soc_sw:%d time:%lld\n",
+						bsoc_100p,
+						CCSOC_100P(cl->init_cc_soc_sw),
+						cl->start_time_ms);
+			} else {
+				fg_alg_somc_cl_dbg("CL couldn't start. bsoc:%d\n",
+								bsoc_100p);
+			}
+		} else {
+			if (charge_status == POWER_SUPPLY_STATUS_DISCHARGING ||
+								charge_done)
+				prime_cc = true;
+		}
+	} else {
+		if (batt_temp > cl->dt.max_temp ||
+			batt_temp < cl->dt.min_temp) {
+			fg_alg_somc_cl_dbg("CL aborted because batt_temp is out of range %d\n",
+								batt_temp);
+			goto cl_deactive;
+		}
+
+		if (charge_done) {
+			if (msoc < 100) {
+				fg_alg_somc_cl_dbg("CL aborted due to not 100pct. msoc:%d\n",
+									msoc);
+			} else {
+				fg_alg_somc_cl_dbg("CL done\n");
+				rc = cap_learning_done(cl,(u32)batt_soc >> 24);
+				if (rc < 0)
+					pr_err("Error in completing capacity learning, rc=%d\n",
+						rc);
+			}
+			deactive = true;
+			goto cl_deactive;
+		}
+
+		cl->batt_soc_drop = cl->max_bsoc_during_active - batt_soc;
+		cl->cc_soc_drop = cl->max_ccsoc_during_active - cc_soc_sw;
+		bsoc_drop_100p = BSOC_100P(cl->batt_soc_drop);
+		ccsoc_drop_100p = CCSOC_100P(cl->cc_soc_drop);
+		max_bsoc_100p = BSOC_100P((u32)cl->max_bsoc_during_active);
+		max_ccsoc_100p = CCSOC_100P(cl->max_ccsoc_during_active);
+		cl->hold_time = ktime_to_ms(ktime) - cl->max_bsoc_time_ms;
+		cl->total_time = ktime_to_ms(ktime) - cl->start_time_ms;
+
+		fg_alg_somc_cl_dbg("msoc:%d bsoc_drop:%d cc_soc_drop:%d hold_time:%lld total_time:%lld\n",
+					msoc, bsoc_drop_100p, ccsoc_drop_100p,
+					cl->hold_time, cl->total_time);
+
+		if (ccsoc_drop_100p > CL_ABORT_CCSOC_100PCT) {
+			fg_alg_somc_cl_dbg("CL aborted due to cc_soc_sw drop from %d to %d",
+						max_ccsoc_100p, ccsoc_100p);
+			deactive = true;
+			goto cl_deactive;
+		} else if (bsoc_drop_100p > CL_ABORT_BSOC_100PCT) {
+			fg_alg_somc_cl_dbg("CL aborted due to bsoc drop from %d to %d",
+						max_bsoc_100p, bsoc_100p);
+			deactive = true;
+			goto cl_deactive;
+		} else if (cl->hold_time > CL_ABORT_KEEP_TIMEOUT_MS) {
+			fg_alg_somc_cl_dbg("CL aborted due to soc holding for long hours");
+			deactive = true;
+			goto cl_deactive;
+		} else if (cl->total_time > CL_ABORT_SLOW_TIMEOUT_MS) {
+			fg_alg_somc_cl_dbg("CL aborted due to slow charging");
+			deactive = true;
+			goto cl_deactive;
+		}
+
+		/* reset params if increasing */
+		if (cl->batt_soc_drop < 0 || cl->cc_soc_drop < 0) {
+			cl->max_ccsoc_during_active = cc_soc_sw;
+			cl->max_bsoc_during_active = batt_soc;
+			cl->max_bsoc_time_ms = ktime_to_ms(ktime);
+			cl->cc_soc_drop = 0;
+			cl->batt_soc_drop = 0;
+			fg_alg_somc_cl_dbg("max bsoc/ccsoc updated. bsoc:%d ccsoc:%d\n",
+							bsoc_100p, ccsoc_100p);
+		}
+		goto out;
+	}
+cl_deactive:
+	if (deactive) {
+		cl->active = false;
+		cl->init_cap_uah = 0;
+		prime_cc = true;
+	}
+#endif
 	/*
 	 * Prime CC_SOC_SW when the device is not charging or during charge
 	 * termination when the capacity learning is not active.
 	 */
 
 	if (prime_cc && cl->prime_cc_soc) {
-		/* pass 32-bit batt_soc to the priming logic */
 		if (charge_done)
 			batt_soc_prime = cl->cc_soc_max;
 		else
-			batt_soc_prime = div64_u64(
-				(uint64_t)batt_soc_cp * BATT_SOC_32BIT,
-							CENTI_FULL_SOC);
+			batt_soc_prime = batt_soc;
 
 		rc = cl->prime_cc_soc(cl->data, batt_soc_prime);
 		if (rc < 0)
@@ -718,12 +947,46 @@ void cap_learning_abort(struct cap_learning *cl)
 		return;
 
 	mutex_lock(&cl->lock);
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	pr_debug("Aborting cap_learning\n");
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	fg_alg_somc_cl_dbg("Aborting cap_learning\n");
+#endif
 	cl->active = false;
 	cl->init_cap_uah = 0;
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	mutex_lock(&cl->lock);
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	mutex_unlock(&cl->lock);
+#endif
 }
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+void cap_learning_somc_limit_learned_cap(struct cap_learning *cl)
+{
+	int64_t pct_nom_cap_uah;
+
+	if (cl->learned_cap_uah > cl->nom_cap_uah) {
+		fg_alg_somc_cl_dbg("learned_cap_uah: %lld is higher than expected, capping it to nom_cap_uah: %lld\n",
+			cl->learned_cap_uah, cl->nom_cap_uah);
+		cl->learned_cap_uah = cl->nom_cap_uah;
+	} else {
+		pct_nom_cap_uah =
+			div64_s64((int64_t)cl->nom_cap_uah *
+			CAPACITY_DELTA_DECIPCT, 1000);
+		if (cl->learned_cap_uah < pct_nom_cap_uah) {
+			fg_alg_somc_cl_dbg("learned_cap_uah: %lld is lower than expected, capping it to %d%% of nom_cap_uah: %lld\n",
+				cl->learned_cap_uah,
+				CAPACITY_DELTA_DECIPCT / 10,
+				pct_nom_cap_uah);
+			cl->learned_cap_uah = pct_nom_cap_uah;
+		}
+	}
+}
+
+#endif
 /**
  * cap_learning_post_profile_init -
  * @cl: Capacity learning object
@@ -736,7 +999,9 @@ void cap_learning_abort(struct cap_learning *cl)
  */
 int cap_learning_post_profile_init(struct cap_learning *cl, int64_t nom_cap_uah)
 {
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	int64_t delta_cap_uah, pct_nom_cap_uah;
+#endif
 	int rc;
 
 	if (!cl || !cl->data)
@@ -754,6 +1019,7 @@ int cap_learning_post_profile_init(struct cap_learning *cl, int64_t nom_cap_uah)
 		if (cl->learned_cap_uah == 0)
 			cl->learned_cap_uah = cl->nom_cap_uah;
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 		delta_cap_uah = abs(cl->learned_cap_uah - cl->nom_cap_uah);
 		pct_nom_cap_uah = div64_s64((int64_t)cl->nom_cap_uah *
 				CAPACITY_DELTA_DECIPCT, 1000);
@@ -767,6 +1033,10 @@ int cap_learning_post_profile_init(struct cap_learning *cl, int64_t nom_cap_uah)
 				cl->learned_cap_uah, cl->nom_cap_uah);
 			cl->learned_cap_uah = cl->nom_cap_uah;
 		}
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+		cap_learning_somc_limit_learned_cap(cl);
+#endif
 
 		rc = cl->store_learned_capacity(cl->data, cl->learned_cap_uah);
 		if (rc < 0)

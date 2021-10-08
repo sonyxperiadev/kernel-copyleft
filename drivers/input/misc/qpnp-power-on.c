@@ -138,6 +138,8 @@
 #define QPNP_PON_UVLO_DLOAD_EN			BIT(7)
 #define QPNP_PON_SMPL_EN			BIT(7)
 
+#define QPNP_PON_DVDD_HARD_RESET_SET		0x08
+
 /* Limits */
 #define QPNP_PON_S1_TIMER_MAX			10256
 #define QPNP_PON_S2_TIMER_MAX			2000
@@ -151,10 +153,14 @@
 #define QPNP_PON_GEN2_MAX_DBC_US		(USEC_PER_SEC / 4)
 
 #define QPNP_KEY_STATUS_DELAY			msecs_to_jiffies(250)
+#define QPNP_RESIN_STATUS_DELAY			msecs_to_jiffies(1500)
 
 #define QPNP_PON_BUFFER_SIZE			9
 
 #define QPNP_POFF_REASON_UVLO			13
+
+#define PON_S2RESET_MASK \
+	(QPNP_PON_KPDPWR_N_SET | QPNP_PON_RESIN_N_SET)
 
 enum qpnp_pon_version {
 	QPNP_PON_GEN1_V1,
@@ -211,6 +217,7 @@ struct qpnp_pon {
 	struct list_head	list;
 	struct mutex		restore_lock;
 	struct delayed_work	bark_work;
+	struct delayed_work	resin_status_work;
 	struct dentry		*debugfs;
 	struct device_node	*pbs_dev_node;
 	u16			base;
@@ -251,6 +258,7 @@ module_param_named(
 );
 
 static struct qpnp_pon *sys_reset_dev;
+static struct qpnp_pon *sys_reset_dev_2;
 static DEFINE_SPINLOCK(spon_list_slock);
 static LIST_HEAD(spon_dev_list);
 
@@ -737,6 +745,7 @@ int qpnp_pon_system_pwr_off(enum pon_power_off_type type)
 	union power_supply_propval val;
 	unsigned long flags;
 	int rc;
+	struct device *dev = pon->dev;
 
 	if (!sys_reset_dev)
 		return -ENODEV;
@@ -759,7 +768,7 @@ int qpnp_pon_system_pwr_off(enum pon_power_off_type type)
 
 	list_for_each_entry_safe(pon, tmp, &spon_dev_list, list) {
 		dev_emerg(pon->dev, "PMIC@SID%d: configuring PON for reset\n",
-			  to_spmi_device(pon->dev->parent)->usid);
+			  to_spmi_device(dev->parent)->usid);
 		rc = qpnp_pon_reset_config(pon, type);
 		if (rc) {
 			dev_err(pon->dev, "Error configuring secondary PON, rc=%d\n",
@@ -995,6 +1004,13 @@ static int qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 		pon_rt_sts);
 	key_status = pon_rt_sts & pon_rt_bit;
 
+	if ((cfg->pon_type == PON_RESIN) || (cfg->pon_type == PON_KPDPWR)) {
+		if ((pon_rt_sts & PON_S2RESET_MASK) == PON_S2RESET_MASK)
+			schedule_delayed_work(&pon->resin_status_work, QPNP_RESIN_STATUS_DELAY);
+		else
+			cancel_delayed_work_sync(&pon->resin_status_work);
+	}
+
 	if (pon->kpdpwr_dbc_enable && cfg->pon_type == PON_KPDPWR) {
 		if (!key_status)
 			pon->kpdpwr_last_release_time = ktime_get();
@@ -1115,6 +1131,11 @@ static irqreturn_t qpnp_pmic_wd_bark_irq(int irq, void *_pon)
 	panic("PMIC Watch Dog Triggered");
 
 	return IRQ_HANDLED;
+}
+
+static void resin_status_work_func(struct work_struct *work)
+{
+	pr_err("$$$$ Stage 2 reset (RESIN) $$$$\n");
 }
 
 static void bark_work_func(struct work_struct *work)
@@ -1915,6 +1936,141 @@ module_param_cb(smpl_en, &smpl_en_ops, &smpl_en, 0600);
 
 static bool dload_on_uvlo;
 
+static bool resin_n_reset;
+
+static int qpnp_pon_debugfs_resin_n_get(char *buf,
+					const struct kernel_param *kp)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	int rc = 0;
+	uint reg;
+        struct device *dev = pon->dev;
+
+	if (!pon)
+		return -ENODEV;
+
+	rc = regmap_read(pon->regmap, QPNP_PON_KPDPWR_RESIN_S2_CNTL(pon), &reg);
+	if (rc) {
+		dev_err(pon->dev,
+			"Unable to read addr=%x, rc(%d)\n",
+			QPNP_PON_KPDPWR_RESIN_S2_CNTL(pon), rc);
+		return rc;
+	}
+	pr_debug("ctrl:%p add:%x sid:%u reg:0x%02x\n",
+		 to_spmi_device(dev->parent)->ctrl, QPNP_PON_KPDPWR_RESIN_S2_CNTL(pon),
+		 to_spmi_device(dev->parent)->usid, reg);
+
+	return snprintf(buf, PAGE_SIZE, "Address 0x%03x:0x%02x",
+			QPNP_PON_KPDPWR_RESIN_S2_CNTL(pon), reg);
+}
+
+static int qpnp_pon_debugfs_resin_n_set(const char *val,
+					const struct kernel_param *kp)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	int rc = 0;
+	u8 reg = PON_POWER_OFF_WARM_RESET;
+
+	if (!pon)
+		return -ENODEV;
+
+	rc = param_set_bool(val, kp);
+	if (rc) {
+		pr_err("Unable to set bms_reset: %d\n", rc);
+		return rc;
+	}
+
+	if (!*(bool *)kp->arg)
+		reg = QPNP_PON_DVDD_HARD_RESET_SET;
+
+	rc = regmap_write(pon->regmap, QPNP_PON_KPDPWR_RESIN_S2_CNTL(pon), reg);
+	if (rc) {
+		dev_err(pon->dev,
+			"Unable to write to addr=%hx, rc(%d)\n",
+			QPNP_PON_KPDPWR_RESIN_S2_CNTL(pon), rc);
+		return rc;
+	}
+
+	return 0;
+}
+
+static struct kernel_param_ops resin_n_ops = {
+	.set = qpnp_pon_debugfs_resin_n_set,
+	.get = qpnp_pon_debugfs_resin_n_get,
+};
+
+module_param_cb(resin_n_reset, &resin_n_ops, &resin_n_reset, 0644);
+
+static bool s3_timer;
+
+static int qpnp_pon_debugfs_s3_timer_get(char *buf,
+					const struct kernel_param *kp)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	int rc = 0;
+	uint reg;
+	struct device *dev = pon->dev;
+
+	if (!pon)
+		return -ENODEV;
+
+	rc = regmap_read(pon->regmap, QPNP_PON_S3_DBC_CTL(pon), &reg);
+	if (rc) {
+		dev_err(pon->dev,
+			"Unable to read addr=%x, rc(%d)\n",
+			QPNP_PON_S3_DBC_CTL(pon), rc);
+		return rc;
+	}
+	pr_debug("ctrl:%p add:%x sid:%u reg:0x%02x\n",
+		 to_spmi_device(dev->parent)->ctrl, QPNP_PON_S3_DBC_CTL(pon),
+		 to_spmi_device(dev->parent)->usid, reg);
+
+	return snprintf(buf, PAGE_SIZE, "Address 0x875:0x%02x", reg);
+}
+
+static int qpnp_pon_debugfs_s3_timer_set(const char *val,
+					const struct kernel_param *kp)
+{
+	struct qpnp_pon *pon = sys_reset_dev;
+	int rc = 0;
+
+	if (!pon)
+		return -ENODEV;
+
+	rc = param_set_byte(val, kp);
+
+	if (rc) {
+		pr_err("Unable to set bms_reset: %d\n", rc);
+		return rc;
+	}
+
+	/* s3 debounce is SEC_ACCESS register */
+	rc = qpnp_pon_masked_write(pon, QPNP_PON_SEC_ACCESS(pon),
+				0xFF, QPNP_PON_SEC_UNLOCK);
+	if (rc) {
+		dev_err(pon->dev, "Unable to do SEC_ACCESS rc:%d\n",
+			rc);
+		return rc;
+	}
+
+	rc = qpnp_pon_masked_write(pon, QPNP_PON_S3_DBC_CTL(pon),
+			QPNP_PON_S3_DBC_DELAY_MASK, *(unsigned char *)kp->arg);
+	if (rc) {
+		dev_err(pon->dev, "Unable to set S3 debounce rc:%d\n",
+			rc);
+		return rc;
+	}
+
+	return 0;
+}
+
+static struct kernel_param_ops s3_timer_ops = {
+	.set = qpnp_pon_debugfs_s3_timer_set,
+	.get = qpnp_pon_debugfs_s3_timer_get,
+};
+
+module_param_cb(s3_timer, &s3_timer_ops, &s3_timer, 0644);
+
 static int
 qpnp_pon_uvlo_dload_get(char *buf, const struct kernel_param *kp)
 {
@@ -2203,12 +2359,16 @@ static int qpnp_pon_read_hardware_info(struct qpnp_pon *pon, bool sys_reset)
 		dev_info(dev, "PMIC@SID%d Power-on reason: Unknown and '%s' boot\n",
 			 to_spmi_device(dev->parent)->usid,
 			 cold_boot ? "cold" : "warm");
+		if (to_spmi_device(dev->parent)->usid == 2)
+			sys_reset_dev_2 = pon;
 	} else {
 		pon->pon_trigger_reason = index;
 		dev_info(dev, "PMIC@SID%d Power-on reason: %s and '%s' boot\n",
 			 to_spmi_device(dev->parent)->usid,
 			 qpnp_pon_reason[index],
 			 cold_boot ? "cold" : "warm");
+		if (to_spmi_device(dev->parent)->usid == 2)
+			sys_reset_dev_2 = pon;
 	}
 
 	/* POFF reason */
@@ -2406,6 +2566,7 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 	dev_set_drvdata(dev, pon);
 
 	INIT_DELAYED_WORK(&pon->bark_work, bark_work_func);
+        INIT_DELAYED_WORK(&pon->resin_status_work, resin_status_work_func);
 
 	rc = qpnp_pon_parse_dt_power_off_config(pon);
 	if (rc)

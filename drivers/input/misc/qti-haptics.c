@@ -236,6 +236,7 @@ struct qti_hap_chip {
 	bool				vdd_enabled;
 	bool				twm_state;
 	bool				haptics_ext_pin_twm;
+	int				play_mode;
 };
 
 struct hap_addr_val {
@@ -434,6 +435,8 @@ static int qti_haptics_config_wf_buffer(struct qti_hap_chip *chip)
 	int rc = 0;
 	size_t len;
 
+	chip->play_mode = 0;
+
 	if (play->playing_pos == effect->pattern_length) {
 		dev_dbg(chip->dev, "pattern playing done\n");
 		return 0;
@@ -612,6 +615,39 @@ static int qti_haptics_lra_auto_res_enable(struct qti_hap_chip *chip, bool en)
 	return rc;
 }
 
+static int qti_haptics_default_mode(struct qti_hap_chip *chip)
+{
+	u8 addr, mask, val = 0;
+	int rc;
+	struct qti_hap_config *config = &chip->config;
+
+	addr = REG_HAP_SEL;
+	mask = HAP_WF_SOURCE_MASK;
+	val = 0x20;
+	rc = qti_haptics_masked_write(chip, addr, mask, val);
+	if (rc < 0) {
+		dev_err(chip->dev, "set HAP_SEL failed, rc=%d\n", rc);
+		goto err;
+	} else {
+		chip->play_mode = 1;
+	}
+
+	rc = qti_haptics_config_vmax(chip, config->vmax_mv);
+	if (rc < 0) {
+		dev_err(chip->dev, "write VMAX_CFG failed in default, rc=%d\n", rc);
+		goto err;
+	}
+
+	rc = qti_haptics_config_play_rate_us(chip, config->play_rate_us);
+	if (rc < 0) {
+		dev_err(chip->dev, "write play_rate failed in default, rc=%d\n", rc);
+		goto err;
+	}
+
+err:
+	return rc;
+}
+
 #define HAP_CLEAR_PLAYING_RATE_US	15
 static int qti_haptics_clear_settings(struct qti_hap_chip *chip)
 {
@@ -642,6 +678,12 @@ static int qti_haptics_clear_settings(struct qti_hap_chip *chip)
 	rc = qti_haptics_play(chip, false);
 	if (rc < 0)
 		return rc;
+
+	rc = qti_haptics_default_mode(chip);
+	if (rc < 0) {
+		dev_err(chip->dev, "set default mode failed, rc=%d\n", rc);
+		return rc;
+	}
 
 	return 0;
 }
@@ -1191,6 +1233,12 @@ static int qti_haptics_hw_init(struct qti_hap_chip *chip)
 	if (rc < 0) {
 		dev_err(chip->dev, "set AUTO_RES_CTRL failed, rc=%d\n",
 				rc);
+		return rc;
+	}
+
+	rc = qti_haptics_default_mode(chip);
+	if (rc < 0) {
+		dev_err(chip->dev, "set default mode failed, rc=%d\n", rc);
 		return rc;
 	}
 
@@ -1916,12 +1964,72 @@ cleanup:
 }
 #endif
 
+#if 0
+static ssize_t qti_haptics_show_activate(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	/* For now nothing to show */
+	return 0;
+}
+#endif
+
+static ssize_t qpnp_haptics_show_play_mode(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct qti_hap_chip *chip;
+	char *str;
+
+	chip = dev_get_drvdata(dev);
+	if (chip == NULL) {
+		return -EINVAL;
+	}
+
+	if (chip->play_mode == 1)
+		str = "audio";
+	else if (chip->play_mode == 0)
+		str = "buffer";
+	else
+		return -EINVAL;
+
+	return snprintf(buf, PAGE_SIZE, "%s\n", str);
+}
+
+static ssize_t qti_haptics_store_activate(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct qti_hap_chip *chip = dev_get_drvdata(dev);
+	u32 val;
+	int rc;
+
+	rc = kstrtouint(buf, 0, &val);
+
+	if (rc < 0)
+		return rc;
+
+	if (val != 0 && val != 1)
+		return count;
+
+	if (val)
+	qti_haptics_module_en(chip, true);
+	else
+	qti_haptics_module_en(chip, false);
+
+	return count;
+}
+
+static struct device_attribute qti_haptics_attrs[] = {
+	__ATTR(play_mode, 0664, qpnp_haptics_show_play_mode,
+		NULL),
+	__ATTR(activate, 0664, NULL,
+		qti_haptics_store_activate),
+};
+
 static int qti_haptics_probe(struct platform_device *pdev)
 {
 	struct qti_hap_chip *chip;
 	struct input_dev *input_dev;
 	struct ff_device *ff;
-	int rc = 0, effect_count_max;
+	int rc = 0, effect_count_max, i;
 
 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
@@ -2023,7 +2131,23 @@ static int qti_haptics_probe(struct platform_device *pdev)
 	if (rc < 0)
 		dev_dbg(chip->dev, "create debugfs failed, rc=%d\n", rc);
 #endif
+
+		for (i = 0; i < ARRAY_SIZE(qti_haptics_attrs); i++) {
+		rc = sysfs_create_file(&chip->dev->kobj,
+				&qti_haptics_attrs[i].attr);
+		if (rc < 0) {
+			dev_err(chip->dev, "Error in creating sysfs file, rc=%d\n",
+				rc);
+			goto sysfs_fail;
+		}
+	}
+
 	return 0;
+
+sysfs_fail:
+	for (--i; i >= 0; i--)
+		sysfs_remove_file(&chip->dev->kobj,
+				&qti_haptics_attrs[i].attr);
 
 destroy_ff:
 	input_ff_destroy(chip->input_dev);

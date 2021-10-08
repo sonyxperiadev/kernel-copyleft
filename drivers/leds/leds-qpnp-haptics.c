@@ -24,6 +24,7 @@
 #include <linux/platform_device.h>
 #include <linux/pwm.h>
 #include <linux/regmap.h>
+#include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/qpnp/qpnp-misc.h>
 #include <linux/qpnp/qpnp-revid.h>
@@ -49,7 +50,13 @@
 
 #define HAP_AUTO_RES_CTRL_REG(chip)	(chip->base + 0x4B)
 #define AUTO_RES_EN_BIT			BIT(7)
+#define SEL_AUTO_RES_PERIOD		BIT(6)
+#define AUTO_RES_CNT_ERR_DELTA_MASK	GENMASK(5, 4)
+#define AUTO_RES_CNT_ERR_DELTA_SHIFT	4
 #define AUTO_RES_ERR_RECOVERY_BIT	BIT(3)
+#define AUTO_RES_EN_DLY_MASK		GENMASK(2, 0)
+#define AUTO_RES_CNT_ERR_DELTA(x)	(x << AUTO_RES_CNT_ERR_DELTA_SHIFT)
+#define AUTO_RES_EN_DLY(x)		x
 
 #define HAP_CFG1_REG(chip)		(chip->base + 0x4C)
 #define HAP_ACT_TYPE_MASK		BIT(0)
@@ -74,6 +81,20 @@
 #define LRA_RES_CAL_MASK		GENMASK(1, 0)
 #define HAP_RES_CAL_PERIOD_MIN		4
 #define HAP_RES_CAL_PERIOD_MAX		32
+
+#define HAP_AUTO_RES_MODE_BIT		BIT(7)
+#define HAP_AUTO_RES_MODE_SHIFT		7
+#define HAP_AUTO_RES_MODE_QWD		1
+#define HAP_CAL_DURATION_MASK		GENMASK(6, 5)
+#define HAP_CAL_DUTATION_SHIFT		5
+#define HAP_CAL_DURATION_1		1
+#define HAP_QWD_DRIVE_DURATION_BIT	BIT(4)
+#define HAP_QWD_DRIVE_DURATION_SHIFT	4
+#define HAP_QWD_DRIVE_DURATION_1	1
+#define HAP_CAL_EOP_BIT			BIT(3)
+#define HAP_CAL_PERIOD_MASK		GENMASK(2, 0)
+#define HAP_CAL_PERIOD_OPT6		5
+
 /* For pm660 */
 #define PM660_AUTO_RES_MODE_BIT		BIT(7)
 #define PM660_AUTO_RES_MODE_SHIFT	7
@@ -167,7 +188,7 @@
 /* Other definitions */
 #define HAP_BRAKE_PAT_LEN		4
 #define HAP_WAVE_SAMP_LEN		8
-#define NUM_WF_SET			4
+#define NUM_WF_SET			10
 #define HAP_WAVE_SAMP_SET_LEN		(HAP_WAVE_SAMP_LEN * NUM_WF_SET)
 #define HAP_RATE_CFG_STEP_US		5
 #define HAP_WAVE_PLAY_RATE_US_MIN	0
@@ -321,6 +342,7 @@ struct hap_chip {
 	int				sc_irq;
 	struct pwm_param		pwm_data;
 	struct hap_lra_ares_param	ares_cfg;
+	struct regulator		*vcc_pon;
 	u32				play_time_ms;
 	u32				max_play_time_ms;
 	u32				vmax_mv;
@@ -355,6 +377,7 @@ struct hap_chip {
 	bool				lra_auto_mode;
 	bool				play_irq_en;
 	bool				auto_res_err_recovery_hw;
+	bool				vcc_pon_enabled;
 };
 
 static int qpnp_haptics_parse_buffer_dt(struct hap_chip *chip);
@@ -801,10 +824,29 @@ static void qpnp_haptics_work(struct work_struct *work)
 
 	enable = atomic_read(&chip->state);
 	pr_debug("state: %d\n", enable);
+
+	if (chip->vcc_pon && enable && !chip->vcc_pon_enabled) {
+		rc = regulator_enable(chip->vcc_pon);
+		if (rc < 0)
+			pr_err("%s: could not enable vcc_pon regulator rc=%d\n",
+				 __func__, rc);
+		else
+			chip->vcc_pon_enabled = true;
+	}
+
 	rc = qpnp_haptics_play(chip, enable);
 	if (rc < 0)
 		pr_err("Error in %sing haptics, rc=%d\n",
 			enable ? "play" : "stopp", rc);
+
+	if (chip->vcc_pon && !enable && chip->vcc_pon_enabled) {
+		rc = regulator_disable(chip->vcc_pon);
+		if (rc)
+			pr_err("%s: could not disable vcc_pon regulator rc=%d\n",
+				 __func__, rc);
+		else
+			chip->vcc_pon_enabled = false;
+	}
 }
 
 static enum hrtimer_restart hap_stop_timer(struct hrtimer *timer)
@@ -975,6 +1017,7 @@ static int qpnp_haptics_lra_auto_res_config(struct hap_chip *chip,
 	struct hap_lra_ares_param *ares_cfg;
 	int rc;
 	u8 val = 0, mask = 0;
+	u8 val_pm8150b = 0, mask_pm8150b = 0;
 
 	/* disable auto resonance for ERM */
 	if (chip->act_type == HAP_ERM) {
@@ -982,6 +1025,20 @@ static int qpnp_haptics_lra_auto_res_config(struct hap_chip *chip,
 		rc = qpnp_haptics_write_reg(chip, HAP_LRA_AUTO_RES_REG(chip),
 					&val, 1);
 		return rc;
+	}
+
+	if (chip->revid->pmic_subtype == PM8150B_SUBTYPE) {
+		val_pm8150b = AUTO_RES_EN_BIT | SEL_AUTO_RES_PERIOD |
+			AUTO_RES_CNT_ERR_DELTA(3) | AUTO_RES_ERR_RECOVERY_BIT |
+			AUTO_RES_EN_DLY(4);
+		mask_pm8150b = AUTO_RES_EN_BIT | SEL_AUTO_RES_PERIOD |
+			AUTO_RES_CNT_ERR_DELTA_MASK |
+			AUTO_RES_ERR_RECOVERY_BIT | AUTO_RES_EN_DLY_MASK;
+		rc = qpnp_haptics_masked_write_reg(chip,
+			HAP_AUTO_RES_CTRL_REG(chip), mask_pm8150b,
+			val_pm8150b);
+		if (rc < 0)
+			return rc;
 	}
 
 	if (chip->auto_res_err_recovery_hw) {
@@ -1038,6 +1095,15 @@ static int qpnp_haptics_lra_auto_res_config(struct hap_chip *chip,
 			mask |= PM660_CAL_EOP_BIT;
 		}
 		mask |= PM660_LRA_RES_CAL_MASK;
+	} else if (chip->revid->pmic_subtype == PM8150B_SUBTYPE) {
+		val = HAP_AUTO_RES_MODE_QWD << HAP_AUTO_RES_MODE_SHIFT;
+		val |= HAP_CAL_DURATION_1 << HAP_CAL_DUTATION_SHIFT;
+		val |= HAP_QWD_DRIVE_DURATION_1 <<
+			HAP_QWD_DRIVE_DURATION_SHIFT;
+		val |= HAP_CAL_PERIOD_OPT6;
+		mask = HAP_AUTO_RES_MODE_BIT | HAP_CAL_DURATION_MASK |
+			HAP_QWD_DRIVE_DURATION_BIT | HAP_CAL_EOP_BIT |
+			HAP_CAL_PERIOD_MASK;
 	} else {
 		val |= (ares_cfg->auto_res_mode << LRA_AUTO_RES_MODE_SHIFT);
 		val |= (ares_cfg->lra_high_z << LRA_HIGH_Z_SHIFT);
@@ -1313,24 +1379,25 @@ static irqreturn_t qpnp_haptics_play_irq_handler(int irq, void *data)
 	struct hap_chip *chip = data;
 	int rc;
 
+	if (chip->module_en == 0)
+		goto irq_handled;
+
 	if (chip->play_mode != HAP_BUFFER)
 		goto irq_handled;
 
-	if (chip->wave_samp[chip->wave_samp_idx + HAP_WAVE_SAMP_LEN] > 0) {
-		chip->wave_samp_idx += HAP_WAVE_SAMP_LEN;
-		if (chip->wave_samp_idx >= ARRAY_SIZE(chip->wave_samp)) {
-			pr_debug("Samples over\n");
-		} else {
-			pr_debug("moving to next sample set %d\n",
-				chip->wave_samp_idx);
+	chip->wave_samp_idx += HAP_WAVE_SAMP_LEN;
+	if (chip->wave_samp_idx >= ARRAY_SIZE(chip->wave_samp)) {
+		pr_debug("Samples over\n");
+	} else {
+		pr_debug("moving to next sample set %d\n",
+			chip->wave_samp_idx);
 
-			/* Moving to next set of wave sample */
-			rc = qpnp_haptics_buffer_config(chip, NULL, false);
-			if (rc < 0) {
-				pr_err("Error in configuring buffer, rc=%d\n",
-					rc);
-				goto irq_handled;
-			}
+		/* Moving to next set of wave sample */
+		rc = qpnp_haptics_buffer_config(chip, NULL, false);
+		if (rc < 0) {
+			pr_err("Error in configuring buffer, rc=%d\n",
+				rc);
+			goto irq_handled;
 		}
 	}
 
@@ -1545,6 +1612,7 @@ static ssize_t qpnp_haptics_store_play_mode(struct device *dev,
 	struct hap_chip *chip = container_of(cdev, struct hap_chip, cdev);
 	char str[HAP_STR_SIZE + 1];
 	int rc = 0, temp, old_mode;
+	u8 val = 0;
 
 	rc = parse_string(buf, str);
 	if (rc < 0)
@@ -1561,6 +1629,8 @@ static ssize_t qpnp_haptics_store_play_mode(struct device *dev,
 	else
 		return -EINVAL;
 
+	rc = qpnp_haptics_write_reg(chip, HAP_BRAKE_REG(chip), &val, 1);
+
 	if (temp == chip->play_mode)
 		return count;
 
@@ -1576,7 +1646,7 @@ static ssize_t qpnp_haptics_store_play_mode(struct device *dev,
 			}
 		}
 
-		rc = qpnp_haptics_buffer_config(chip, NULL, true);
+		rc = qpnp_haptics_buffer_config(chip, NULL, false);
 	} else if (temp == HAP_PWM) {
 		rc = qpnp_haptics_parse_pwm_dt(chip);
 		if (!rc)
@@ -1646,6 +1716,8 @@ static ssize_t qpnp_haptics_store_wf_samp(struct device *dev,
 	chip->wf_samp_len = i;
 	for (i = 0; i < ARRAY_SIZE(chip->wave_samp); i++)
 		chip->wave_samp[i] = samp[i];
+
+	chip->wave_samp_idx = 0;
 
 	rc = qpnp_haptics_buffer_config(chip, NULL, false);
 	if (rc < 0) {
@@ -1949,7 +2021,10 @@ static int qpnp_haptics_parse_buffer_dt(struct hap_chip *chip)
 {
 	struct device_node *node = chip->pdev->dev.of_node;
 	u32 temp;
+	/*
 	int rc, i, wf_samp_len;
+	*/
+	int rc, wf_samp_len;
 
 	if (chip->wave_rep_cnt > 0 || chip->wave_s_rep_cnt > 0)
 		return 0;
@@ -1990,8 +2065,10 @@ static int qpnp_haptics_parse_buffer_dt(struct hap_chip *chip)
 		}
 	} else {
 		/* Use default values */
+		/*
 		for (i = 0; i < HAP_WAVE_SAMP_LEN; i++)
 			chip->wave_samp[i] = HAP_WF_SAMP_MAX;
+		*/
 
 		wf_samp_len = HAP_WAVE_SAMP_LEN;
 	}
@@ -2054,6 +2131,7 @@ static int qpnp_haptics_parse_dt(struct hap_chip *chip)
 	struct device_node *revid_node, *misc_node;
 	const char *temp_str;
 	int rc, temp;
+	struct regulator *vcc_pon;
 
 	rc = of_property_read_u32(node, "reg", &temp);
 	if (rc < 0) {
@@ -2381,6 +2459,16 @@ static int qpnp_haptics_parse_dt(struct hap_chip *chip)
 	else if (chip->play_mode == HAP_PWM)
 		rc = qpnp_haptics_parse_pwm_dt(chip);
 
+	if (of_find_property(node, "vcc_pon-supply", NULL)) {
+		vcc_pon = regulator_get(&chip->pdev->dev, "vcc_pon");
+		if (IS_ERR(vcc_pon)) {
+			rc = PTR_ERR(vcc_pon);
+			dev_err(&chip->pdev->dev,
+				"regulator get failed vcc_pon rc=%d\n", rc);
+		}
+		chip->vcc_pon = vcc_pon;
+	}
+
 	return rc;
 }
 
@@ -2482,6 +2570,16 @@ static int qpnp_haptics_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void qpnp_haptics_shutdown(struct platform_device *pdev)
+{
+	struct hap_chip *chip = dev_get_drvdata(&pdev->dev);
+
+	cancel_work_sync(&chip->haptics_work);
+
+	/* disable haptics */
+	qpnp_haptics_mod_enable(chip, false);
+}
+
 static const struct dev_pm_ops qpnp_haptics_pm_ops = {
 	.suspend	= qpnp_haptics_suspend,
 };
@@ -2499,6 +2597,7 @@ static struct platform_driver qpnp_haptics_driver = {
 	},
 	.probe		= qpnp_haptics_probe,
 	.remove		= qpnp_haptics_remove,
+	.shutdown	= qpnp_haptics_shutdown,
 };
 module_platform_driver(qpnp_haptics_driver);
 

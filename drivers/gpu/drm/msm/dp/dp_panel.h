@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -152,7 +152,7 @@ struct dp_panel {
 	int (*get_modes)(struct dp_panel *dp_panel,
 		struct drm_connector *connector, struct dp_display_mode *mode);
 	void (*handle_sink_request)(struct dp_panel *dp_panel);
-	int (*set_edid)(struct dp_panel *dp_panel, u8 *edid, size_t edid_size);
+	int (*set_edid)(struct dp_panel *dp_panel, u8 *edid);
 	int (*set_dpcd)(struct dp_panel *dp_panel, u8 *dpcd);
 	int (*setup_hdr)(struct dp_panel *dp_panel,
 		struct drm_msm_ext_hdr_metadata *hdr_meta);
@@ -212,8 +212,7 @@ static inline bool is_link_rate_valid(u32 bw_code)
 {
 	return ((bw_code == DP_LINK_BW_1_62) ||
 		(bw_code == DP_LINK_BW_2_7) ||
-		(bw_code == DP_LINK_BW_5_4) ||
-		(bw_code == DP_LINK_BW_8_1));
+		(bw_code == DP_LINK_BW_5_4));
 }
 
 /**

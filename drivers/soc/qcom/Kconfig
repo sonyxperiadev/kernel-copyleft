@@ -750,6 +750,13 @@ config MSM_JTAGV8
 	  If unsure, say 'N' here to avoid potential power, performance and
 	  memory penalty.
 
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on QCOM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
+
 config QCOM_QDSS_BRIDGE
 	bool "Configure bridge driver for QTI/Qualcomm Technologies, Inc. MDM"
 	depends on MHI_BUS
@@ -1067,6 +1074,12 @@ config QCOM_SOC_INFO
 	  as the chip ID and revision. Information includes decoding the chip name
 	  based on the chip ID and querying the SoC revision. This information is
 	  loaded by the bootloader into SMEM during the boot up process.
+
+config SECURITY_STATUS
+	bool "Get security_status"
+	help
+	  Gets security status by checking oemandroidboot.securityflags
+	  parameter.
 
 config QTI_CRYPTO_COMMON
 	tristate "Enable common crypto functionality used for FBE"

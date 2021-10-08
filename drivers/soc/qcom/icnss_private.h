@@ -17,6 +17,7 @@
 #include <linux/iio/consumer.h>
 #include <linux/kobject.h>
 #include <linux/esoc_client.h>
+#include <soc/qcom/subsystem_restart.h>
 
 #define icnss_ipc_log_string(_x...) do {				\
 	if (icnss_ipc_log_context)					\
@@ -380,6 +381,9 @@ struct icnss_priv {
 	struct kobject *icnss_kobject;
 	atomic_t is_shutdown;
 	bool is_ssr;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
+	wait_queue_head_t wlan_pdr_debug_q;
+	int data_ready;
 	bool clk_monitor_enable;
 	void *ext_modem_notify_handler;
 	struct notifier_block ext_modem_ssr_nb;

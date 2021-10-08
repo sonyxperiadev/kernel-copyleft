@@ -94,6 +94,7 @@
 #include <linux/sched/clock.h>
 #include <linux/flex_array.h>
 #include <linux/posix-timers.h>
+#include <linux/oom_score_notifier.h>
 #include <linux/cpufreq_times.h>
 #ifdef CONFIG_HARDWALL
 #include <asm/hardwall.h>
@@ -239,6 +240,10 @@ static ssize_t get_mm_cmdline(struct mm_struct *mm, char __user *buf,
 	if (env_start != arg_end || env_start >= env_end)
 		env_start = env_end = arg_end;
 
+	/* .. and limit it to a maximum of one page of slop */
+	if (env_end >= arg_end + PAGE_SIZE)
+		env_end = arg_end + PAGE_SIZE - 1;
+
 	/* We're not going to care if "*ppos" has high bits set */
 	pos = arg_start + *ppos;
 
@@ -258,10 +263,19 @@ static ssize_t get_mm_cmdline(struct mm_struct *mm, char __user *buf,
 	while (count) {
 		int got;
 		size_t size = min_t(size_t, PAGE_SIZE, count);
+		long offset;
 
-		got = access_remote_vm(mm, pos, page, size, FOLL_ANON);
-		if (got <= 0)
+		/*
+		 * Are we already starting past the official end?
+		 * We always include the last byte that is *supposed*
+		 * to be NUL
+		 */
+		offset = (pos >= arg_end) ? pos - arg_end + 1 : 0;
+
+		got = access_remote_vm(mm, pos - offset, page, size + offset, FOLL_ANON);
+		if (got <= offset)
 			break;
+		got -= offset;
 
 		/* Don't walk past a NUL character once you hit arg_end */
 		if (pos + got >= arg_end) {
@@ -280,12 +294,17 @@ static ssize_t get_mm_cmdline(struct mm_struct *mm, char __user *buf,
 				n = arg_end - pos - 1;
 
 			/* Cut off at first NUL after 'n' */
-			got = n + strnlen(page+n, got-n);
-			if (!got)
+			got = n + strnlen(page+n, offset+got-n);
+			if (got < offset)
 				break;
+			got -= offset;
+
+			/* Include the NUL if it existed */
+			if (got < size)
+				got++;
 		}
 
-		got -= copy_to_user(buf, page, got);
+		got -= copy_to_user(buf, page+offset, got);
 		if (unlikely(!got)) {
 			if (!len)
 				len = -EFAULT;
@@ -1004,6 +1023,7 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 	static DEFINE_MUTEX(oom_adj_mutex);
 	struct mm_struct *mm = NULL;
 	struct task_struct *task;
+	int old_oom_score_adj;
 	int err = 0;
 
 	task = get_proc_task(file_inode(file));
@@ -1049,9 +1069,21 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 		}
 	}
 
+	old_oom_score_adj = task->signal->oom_score_adj;
 	task->signal->oom_score_adj = oom_adj;
 	if (!legacy && has_capability_noaudit(current, CAP_SYS_RESOURCE))
 		task->signal->oom_score_adj_min = (short)oom_adj;
+
+#ifdef CONFIG_OOM_SCORE_NOTIFIER
+	err = oom_score_notify_update(task, old_oom_score_adj);
+	if (err) {
+		/* rollback and error handle. */
+		task->signal->oom_score_adj = old_oom_score_adj;
+		goto err_unlock;
+	}
+#endif
+
+
 	trace_oom_score_adj_update(task);
 
 	if (mm) {

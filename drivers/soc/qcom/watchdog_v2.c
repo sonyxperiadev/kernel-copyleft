@@ -544,6 +544,10 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 			(unsigned long) wdog_dd->last_pet, nanosec_rem / 1000);
 	if (wdog_dd->do_ipi_ping)
 		dump_cpu_alive_mask(wdog_dd);
+#ifdef CONFIG_MSM_FORCE_PANIC_ON_WDOG_BARK
+	/*Causing a panic instead of a watchdog bite */
+	panic("Watchdog bark triggered!");
+#endif
 	msm_trigger_wdog_bite();
 	panic("Failed to cause a watchdog bite! - Falling back to kernel panic!");
 	return IRQ_HANDLED;
@@ -563,13 +567,15 @@ static void configure_bark_dump(struct msm_watchdog_data *wdog_dd)
 	struct msm_dump_data *cpu_data;
 	int cpu;
 	void *cpu_buf;
+	bool one_success = false;
 
-	cpu_data = kcalloc(num_present_cpus(), sizeof(struct msm_dump_data),
-								GFP_KERNEL);
+	cpu_data = devm_kcalloc(wdog_dd->dev, num_present_cpus(),
+			sizeof(struct msm_dump_data), GFP_KERNEL);
 	if (!cpu_data)
 		goto out0;
 
-	cpu_buf = kcalloc(num_present_cpus(), MAX_CPU_CTX_SIZE, GFP_KERNEL);
+	cpu_buf = devm_kcalloc(wdog_dd->dev, num_present_cpus(),
+			MAX_CPU_CTX_SIZE, GFP_KERNEL);
 	if (!cpu_buf)
 		goto out1;
 
@@ -584,16 +590,21 @@ static void configure_bark_dump(struct msm_watchdog_data *wdog_dd)
 		ret = msm_dump_data_register(MSM_DUMP_TABLE_APPS,
 					     &dump_entry);
 		/*
-		 * Don't free the buffers in case of error since
-		 * registration may have succeeded for some cpus.
+		 * Don't free the buffers in case of error if
+		 * registration is successful for at least one cpu.
 		 */
 		if (ret)
 			pr_err("cpu %d reg dump setup failed\n", cpu);
+		else
+			one_success = true;
 	}
-
+	if (!one_success)
+		goto out2;
 	return;
+out2:
+	devm_kfree(wdog_dd->dev, cpu_buf);
 out1:
-	kfree(cpu_data);
+	devm_kfree(wdog_dd->dev, cpu_data);
 out0:
 	return;
 }
@@ -605,10 +616,12 @@ static void register_scan_dump(struct msm_watchdog_data *wdog_dd)
 	struct msm_dump_entry dump_entry;
 	struct msm_dump_data *dump_data;
 
-	dump_data = kzalloc(sizeof(struct msm_dump_data), GFP_KERNEL);
+	dump_data = devm_kzalloc(wdog_dd->dev, sizeof(struct msm_dump_data),
+			GFP_KERNEL);
 	if (!dump_data)
 		return;
-	dump_addr = kzalloc(wdog_dd->scandump_size, GFP_KERNEL);
+	dump_addr = devm_kzalloc(wdog_dd->dev, wdog_dd->scandump_size,
+			GFP_KERNEL);
 	if (!dump_addr)
 		goto err0;
 
@@ -625,9 +638,9 @@ static void register_scan_dump(struct msm_watchdog_data *wdog_dd)
 	}
 	return;
 err1:
-	kfree(dump_addr);
+	devm_kfree(wdog_dd->dev, dump_addr);
 err0:
-	kfree(dump_data);
+	devm_kfree(wdog_dd->dev, dump_data);
 }
 
 static void configure_scandump(struct msm_watchdog_data *wdog_dd)
@@ -659,6 +672,7 @@ static void configure_scandump(struct msm_watchdog_data *wdog_dd)
 							 GFP_KERNEL);
 		if (!dump_vaddr) {
 			dev_err(wdog_dd->dev, "Couldn't get memory for dump\n");
+			devm_kfree(wdog_dd->dev, cpu_data);
 			continue;
 		}
 		memset(dump_vaddr, 0x0, scandump_size);

@@ -108,6 +108,13 @@ int usbpd_send_svdm(struct usbpd *pd, u16 svid, u8 cmd,
 enum plug_orientation usbpd_get_plug_orientation(struct usbpd *pd);
 
 void usbpd_vdm_in_suspend(struct usbpd *pd, bool in_suspend);
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+
+/*
+ * Set minimum src capability.
+ */
+void usbpd_set_min_src_caps(struct usbpd *pd, const bool set);
+#endif
 #else
 static inline struct usbpd *devm_usbpd_get_by_phandle(struct device *dev,
 		const char *phandle)
@@ -145,6 +152,12 @@ static inline enum plug_orientation usbpd_get_plug_orientation(struct usbpd *pd)
 }
 
 static inline void usbpd_vdm_in_suspend(struct usbpd *pd, bool in_suspend) { }
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+
+static inline void usbpd_set_min_src_caps(struct usbpd *pd, const bool set)
+{
+}
+#endif
 #endif /* IS_ENABLED(CONFIG_USB_PD_POLICY) */
 
 /*

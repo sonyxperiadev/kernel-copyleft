@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -42,13 +42,11 @@ enum cam_cpas_reg_base {
 enum cam_cpas_hw_version {
 	CAM_CPAS_TITAN_NONE = 0,
 	CAM_CPAS_TITAN_150_V100 = 0x150100,
-	CAM_CPAS_TITAN_150_V110 = 0x150110,
 	CAM_CPAS_TITAN_170_V100 = 0x170100,
 	CAM_CPAS_TITAN_170_V110 = 0x170110,
 	CAM_CPAS_TITAN_170_V120 = 0x170120,
 	CAM_CPAS_TITAN_175_V100 = 0x175100,
 	CAM_CPAS_TITAN_175_V101 = 0x175101,
-	CAM_CPAS_TITAN_175_V120 = 0x175120,
 	CAM_CPAS_TITAN_MAX
 };
 
@@ -66,11 +64,6 @@ enum cam_cpas_hw_version {
  * @CAM_CAMNOC_IRQ_IFE13_UBWC_ENCODE_ERROR  : Triggered if any error detected
  *                                            in the IFE1 or IFE3 UBWC encoder
  *                                            instance
- * @CAM_CAMNOC_IRQ_IFE0_UBWC_ENCODE_ERROR   : Triggered if any error detected
- *                                            in the IFE0 UBWC encoder instance
- * @CAM_CAMNOC_IRQ_IFE1_WR_UBWC_ENCODE_ERROR  : Triggered if any error detected
- *                                            in the IFE1 UBWC encoder
- *                                            instance
  * @CAM_CAMNOC_IRQ_IPE_BPS_UBWC_DECODE_ERROR: Triggered if any error detected
  *                                            in the IPE/BPS UBWC decoder
  *                                            instance
@@ -84,8 +77,6 @@ enum cam_camnoc_irq_type {
 	CAM_CAMNOC_IRQ_SLAVE_ERROR,
 	CAM_CAMNOC_IRQ_IFE02_UBWC_ENCODE_ERROR,
 	CAM_CAMNOC_IRQ_IFE13_UBWC_ENCODE_ERROR,
-	CAM_CAMNOC_IRQ_IFE0_UBWC_ENCODE_ERROR,
-	CAM_CAMNOC_IRQ_IFE1_WRITE_UBWC_ENCODE_ERROR,
 	CAM_CAMNOC_IRQ_IPE_BPS_UBWC_DECODE_ERROR,
 	CAM_CAMNOC_IRQ_IPE_BPS_UBWC_ENCODE_ERROR,
 	CAM_CAMNOC_IRQ_AHB_TIMEOUT,
@@ -348,7 +339,6 @@ struct cam_ahb_vote {
 struct cam_axi_vote {
 	uint64_t   uncompressed_bw;
 	uint64_t   compressed_bw;
-	uint64_t   compressed_bw_ab;
 };
 
 /**

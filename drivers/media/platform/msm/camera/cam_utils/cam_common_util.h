@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,13 +13,7 @@
 #ifndef _CAM_COMMON_UTIL_H_
 #define _CAM_COMMON_UTIL_H_
 
-#include <linux/types.h>
-#include <linux/kernel.h>
-
 #define CAM_BITS_MASK_SHIFT(x, mask, shift) (((x) & (mask)) >> shift)
-
-#define PTR_TO_U64(ptr) ((uint64_t)(uintptr_t)ptr)
-#define U64_TO_PTR(ptr) ((void *)(uintptr_t)ptr)
 
 /**
  * cam_common_util_get_string_index()
@@ -52,26 +46,4 @@ int cam_common_util_get_string_index(const char **strings,
 uint32_t cam_common_util_remove_duplicate_arr(int32_t *array,
 	uint32_t num);
 
-/**
- * cam_common_util_get_time_diff()
- *
- * @brief                  Get the time difference between 2 timestamps in usecs
- *
- * @t1:                    Pointer to the later time
- * @t2:                    Pointer to the prev
- *
- * @return:                differnce in usecs
- */
-uint64_t cam_common_util_get_time_diff(struct timeval *t1, struct timeval *t2);
-
-/**
- * cam_comomon_util_get_curr_timestamp()
- *
- * @brief                 Get the current timestamp
- *
- * @time:                 Pointer to the time
- *
- * @return:               void
- */
-void cam_common_util_get_curr_timestamp(struct timeval *time_stamp);
 #endif /* _CAM_COMMON_UTIL_H_ */

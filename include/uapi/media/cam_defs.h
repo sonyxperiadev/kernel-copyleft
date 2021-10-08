@@ -18,11 +18,6 @@
 #define CAM_FLUSH_REQ                           (CAM_COMMON_OPCODE_BASE + 0x8)
 #define CAM_COMMON_OPCODE_MAX                   (CAM_COMMON_OPCODE_BASE + 0x9)
 
-#define CAM_COMMON_OPCODE_BASE_v2           0x150
-#define CAM_ACQUIRE_HW                      (CAM_COMMON_OPCODE_BASE_v2 + 0x1)
-#define CAM_RELEASE_HW                      (CAM_COMMON_OPCODE_BASE_v2 + 0x2)
-#define CAM_DUMP_REQ                        (CAM_COMMON_OPCODE_BASE_v2 + 0x3)
-
 #define CAM_EXT_OPCODE_BASE                     0x200
 #define CAM_CONFIG_DEV_EXTERNAL                 (CAM_EXT_OPCODE_BASE + 0x1)
 
@@ -164,8 +159,7 @@ struct cam_iommu_handle {
 #define CAM_FORMAT_PLAIN8_10_SWAP               43
 #define CAM_FORMAT_YV12                         44
 #define CAM_FORMAT_Y_ONLY                       45
-#define CAM_FORMAT_DPCM_12_10_12                46
-#define CAM_FORMAT_MAX                          47
+#define CAM_FORMAT_MAX                          46
 
 /* camera rotaion */
 #define CAM_ROTATE_CW_0_DEGREE                  0
@@ -489,73 +483,6 @@ struct cam_acquire_dev_cmd {
 	uint64_t        resource_hdl;
 };
 
-/*
- * In old version, while acquiring device the num_resources in
- * struct cam_acquire_dev_cmd will be a valid value. During ACQUIRE_DEV
- * KMD driver will return dev_handle as well as associate HW to handle.
- * If num_resources is set to the constant below, we are using
- * the new version and we do not acquire HW in ACQUIRE_DEV IOCTL.
- * ACQUIRE_DEV will only return handle and we should receive
- * ACQUIRE_HW IOCTL after ACQUIRE_DEV and that is when the HW
- * is associated with the dev_handle.
- *
- * (Data type): uint32_t
- */
-#define CAM_API_COMPAT_CONSTANT                   0xFEFEFEFE
-
-#define CAM_ACQUIRE_HW_STRUCT_VERSION_1           1
-
-/**
- * struct cam_acquire_hw_cmd_v1 - Control payload for acquire HW IOCTL (Ver 1)
- *
- * @struct_version:     = CAM_ACQUIRE_HW_STRUCT_VERSION_1 for this struct
- *                      This value should be the first 32-bits in any structure
- *                      related to this IOCTL. So that if the struct needs to
- *                      change, we can first read the starting 32-bits, get the
- *                      version number and then typecast the data to struct
- *                      accordingly.
- * @reserved:           Reserved field for 64-bit alignment
- * @session_handle:     Session handle for the acquire command
- * @dev_handle:         Device handle to be returned
- * @handle_type:        Tells you how to interpret the variable resource_hdl-
- *                      1 = user pointer, 2 = mem handle
- * @data_size:          Total size of data contained in memory pointed
- *                      to by resource_hdl
- * @resource_hdl:       Resource handle that refers to the actual
- *                      resource data.
- */
-struct cam_acquire_hw_cmd_v1 {
-	uint32_t        struct_version;
-	uint32_t        reserved;
-	int32_t         session_handle;
-	int32_t         dev_handle;
-	uint32_t        handle_type;
-	uint32_t        data_size;
-	uint64_t        resource_hdl;
-};
-
-#define CAM_RELEASE_HW_STRUCT_VERSION_1           1
-
-/**
- * struct cam_release_hw_cmd_v1 - Control payload for release HW IOCTL (Ver 1)
- *
- * @struct_version:     = CAM_RELEASE_HW_STRUCT_VERSION_1 for this struct
- *                      This value should be the first 32-bits in any structure
- *                      related to this IOCTL. So that if the struct needs to
- *                      change, we can first read the starting 32-bits, get the
- *                      version number and then typecast the data to struct
- *                      accordingly.
- * @reserved:           Reserved field for 64-bit alignment
- * @session_handle:     Session handle for the release
- * @dev_handle:         Device handle for the release
- */
-struct cam_release_hw_cmd_v1 {
-	uint32_t                struct_version;
-	uint32_t                reserved;
-	int32_t                 session_handle;
-	int32_t                 dev_handle;
-};
-
 /**
  * struct cam_flush_dev_cmd - Control payload for flush devices
  *
@@ -595,61 +522,5 @@ struct cam_ubwc_config {
 	struct cam_ubwc_plane_cfg_v1
 		   ubwc_plane_cfg[1][CAM_PACKET_MAX_PLANES - 1];
 };
-
-/**
- * struct cam_cmd_mem_region_info -
- *              Cmd buffer region info
- *
- * @mem_handle : Memory handle of the region
- * @offset     : Offset if any
- * @size       : Size of the region
- * @flags      : Flags if any
- */
-struct cam_cmd_mem_region_info {
-	int32_t   mem_handle;
-	uint32_t  offset;
-	uint32_t  size;
-	uint32_t  flags;
-};
-
-/**
- * struct cam_cmd_mem_regions -
- *        List of multiple memory descriptors of
- *        of different regions
- *
- * @version        : Version number
- * @num_regions    : Number of regions
- * @map_info_array : Array of all the regions
- */
-struct cam_cmd_mem_regions {
-	uint32_t version;
-	uint32_t num_regions;
-	struct cam_cmd_mem_region_info map_info_array[1];
-};
-
-/**
- * struct cam_dump_req_cmd -
- *        Dump the information of issue req id
- *
- * @issue_req_id   : Issue Request Id
- * @session_handle : Session Handle
- * @link_hdl       : link handle
- * @dev_handle     : Device Handle
- * @error_type     : Error Type
- * @buf_handle     : Buffer Handle
- * @offset         : offset for the buffer
- * @reserved       : Reserved
- */
-struct cam_dump_req_cmd {
-	int64_t        issue_req_id;
-	int32_t        session_handle;
-	int32_t        link_hdl;
-	int32_t        dev_handle;
-	int32_t        error_type;
-	uint32_t       buf_handle;
-	int32_t        offset;
-	uint32_t       reserved;
-};
-
 
 #endif /* __UAPI_CAM_DEFS_H__ */

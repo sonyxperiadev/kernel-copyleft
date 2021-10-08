@@ -82,17 +82,6 @@
 		label = "gpio-keys";
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&key_vol_up_default>;
-
-		vol_up {
-			label = "volume_up";
-			gpios = <&pm8150_gpios 6 GPIO_ACTIVE_LOW>;
-			linux,input-type = <1>;
-			linux,code = <KEY_VOLUMEUP>;
-			gpio-key,wakeup;
-			debounce-interval = <15>;
-			linux,can-disable;
-		};
 	};
 
 	qcom,qbt1000 {
@@ -326,7 +315,7 @@
 	qcom,hold-soc-while-full;
 	qcom,linearize-soc;
 	qcom,five-pin-battery;
-	qcom,cl-wt-enable;
+	/delete-property/ qcom,cl-wt-enable;
 	/* ESR fast calibration */
 	qcom,fg-esr-timer-chg-fast = <0 7>;
 	qcom,fg-esr-timer-dischg-fast = <0 7>;
@@ -679,15 +668,6 @@
 
 &usb1 {
 	extcon = <&extcon_usb1>;
-	status = "ok";
-};
-
-&usb2_phy1 {
-	status = "ok";
-};
-
-&usb_qmp_phy {
-	status = "ok";
 };
 
 &smb1355 {

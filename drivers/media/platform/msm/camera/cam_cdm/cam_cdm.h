@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -195,11 +195,11 @@ struct cam_cdm_hw_intf_cmd_submit_bl {
 	struct cam_cdm_bl_request *data;
 };
 
-/* struct cam_cdm_hw_mem - CDM hw memory struct */
+/* struct cam_cdm_hw_mem - CDM hw memory.struct */
 struct cam_cdm_hw_mem {
 	int32_t handle;
 	uint32_t vaddr;
-	uintptr_t kmdvaddr;
+	uint64_t kmdvaddr;
 	size_t size;
 };
 
@@ -249,17 +249,6 @@ struct cam_cdm_intf_mgr {
 	uint32_t cdm_count;
 	uint32_t dt_supported_hw_cdm;
 	int32_t refcount;
-};
-
-/**
- * struct cam_cdm_debugfs_entry : debugfs entry struct
- *
- * @dentry                       : entry of debugfs
- * @dump_register                : flag to dump registers
- */
-struct cam_cdm_debugfs_entry {
-	struct dentry   *dentry;
-	bool             dump_register;
 };
 
 int cam_cdm_intf_register_hw_cdm(struct cam_hw_intf *hw,

@@ -806,6 +806,9 @@ static int psy_register_cooler(struct device *dev, struct power_supply *psy)
 {
 	int i;
 
+	pr_warn("%s: Don't register psy cooling device\n", __func__);
+	return 0;
+
 	/* Register for cooling device if psy can control charging */
 	for (i = 0; i < psy->desc->num_properties; i++) {
 		if (psy->desc->properties[i] ==

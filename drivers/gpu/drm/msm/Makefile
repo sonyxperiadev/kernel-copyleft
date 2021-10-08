@@ -53,8 +53,9 @@ msm_drm-y := \
 	sde/sde_hw_ad4.o \
 	sde_edid_parser.o \
 	sde_hdcp_1x.o \
-	sde_hdcp_2x.o \
-	sde_dbg.o \
+	sde_hdcp_2x.o
+
+msm_drm-$(CONFIG_DEBUG_FS) += sde_dbg.o \
 	sde_dbg_evtlog.o \
 
 msm_drm-$(CONFIG_DRM_MSM_HDMI) += hdmi/hdmi.o \
@@ -162,6 +163,11 @@ msm_drm-$(CONFIG_DRM_MSM_DSI_STAGING) += dsi-staging/dsi_phy.o \
 				dsi-staging/dsi_display_test.o
 
 msm_drm-$(CONFIG_DSI_PARSER) += dsi-staging/dsi_parser.o
+
+ifeq ($(CONFIG_DRM_SDE_SPECIFIC_PANEL),y)
+msm_drm-$(CONFIG_DRM_MSM_DSI_STAGING) += dsi-staging/dsi_panel_driver.o \
+					dsi-staging/incell.o
+endif
 
 msm_drm-$(CONFIG_DRM_MSM_DSI_PLL) += dsi/pll/dsi_pll.o \
 				dsi/pll/dsi_pll_28nm.o

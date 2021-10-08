@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,16 +32,7 @@
 
 #define MAX_SYNC_COUNT 65535
 
-/* Default frame rate is 30 */
-#define DEFAULT_FRAME_DURATION 33333333
-#define TIMESTAMP_DIFF_THRESHOLD 10000000
-
 #define SYNC_LINK_SOF_CNT_MAX_LMT 1
-
-#define MAXIMUM_LINKS_PER_SESSION  4
-
-#define VERSION_1  1
-#define VERSION_2  2
 
 /**
  * enum crm_workq_task_type
@@ -57,7 +48,6 @@ enum crm_workq_task_type {
 	CRM_WORKQ_TASK_NOTIFY_FREEZE,
 	CRM_WORKQ_TASK_SCHED_REQ,
 	CRM_WORKQ_TASK_FLUSH_REQ,
-	CRM_WORKQ_TASK_DUMP_REQ,
 	CRM_WORKQ_TASK_INVALID,
 };
 
@@ -143,6 +133,9 @@ enum cam_req_mgr_link_state {
  * @apply_data       : pointer which various tables will update during traverse
  * @in_q             : input request queue pointer
  * @validate_only    : Whether to validate only and/or update settings
+ * @self_link        : To indicate whether the check is for the given link or
+ *                     the other sync link
+ * @inject_delay_chk : if inject delay has been validated for all pd devices
  * @open_req_cnt     : Count of open requests yet to be serviced in the kernel.
  */
 struct cam_req_mgr_traverse {
@@ -152,6 +145,8 @@ struct cam_req_mgr_traverse {
 	struct cam_req_mgr_apply     *apply_data;
 	struct cam_req_mgr_req_queue *in_q;
 	bool                          validate_only;
+	bool                          self_link;
+	bool                          inject_delay_chk;
 	int32_t                       open_req_cnt;
 };
 
@@ -171,23 +166,16 @@ struct cam_req_mgr_apply {
 
 /**
  * struct cam_req_mgr_tbl_slot
- * @idx             : slot index
- * @req_ready_map   : mask tracking which all devices have request ready
- * @state           : state machine for life cycle of a slot
- * @inject_delay    : insert extra bubbling for flash type of use cases
- * @dev_hdl         : stores the dev_hdl, who is having higher inject delay
- * @skip_next_frame : flag to drop the frame after skip_before_apply frame
- * @is_applied      : flag to identify if request is already applied to
- *                    device.
+ * @idx           : slot index
+ * @req_ready_map : mask tracking which all devices have request ready
+ * @state         : state machine for life cycle of a slot
+ * @inject_delay  : insert extra bubbling for flash type of use cases
  */
 struct cam_req_mgr_tbl_slot {
 	int32_t             idx;
 	uint32_t            req_ready_map;
 	enum crm_req_state  state;
 	uint32_t            inject_delay;
-	int32_t             dev_hdl;
-	bool                skip_next_frame;
-	bool                is_applied;
 };
 
 /**
@@ -241,14 +229,12 @@ struct cam_req_mgr_slot {
  * @slot        : request slot holding incoming request id and bubble info.
  * @rd_idx      : indicates slot index currently in process.
  * @wr_idx      : indicates slot index to hold new upcoming req.
- * @last_applied_idx : indicates slot index last applied successfully.
  */
 struct cam_req_mgr_req_queue {
 	int32_t                     num_slots;
 	struct cam_req_mgr_slot     slot[MAX_REQ_SLOTS];
 	int32_t                     rd_idx;
 	int32_t                     wr_idx;
-	int32_t                     last_applied_idx;
 };
 
 /**
@@ -287,19 +273,6 @@ struct cam_req_mgr_connected_device {
 	void                           *parent;
 };
 
-/* *
- * struct cam_req_mgr_ife_sof_evt
- * - Track SOF Events from IFE
- * @ dev_hdl  : device handle
- * @ sof_done : tracks sof for individual IFE
- */
-struct cam_req_mgr_dev_sof_evt {
-	uint64_t timestamp;
-	int32_t  dev_hdl;
-	int32_t  frame_id;
-	bool     sof_done;
-};
-
 /**
  * struct cam_req_mgr_core_link
  * -  Link Properties
@@ -326,6 +299,10 @@ struct cam_req_mgr_dev_sof_evt {
  *                         notification to CRM at those hw events.
  * @trigger_mask         : mask on which irq the req is already applied
  * @sync_link            : pointer to the sync link for synchronization
+ * @sof_counter          : sof counter during sync_mode
+ * @sync_self_ref        : reference sync count against which the difference
+ *                         between sync_counts for a given link is checked
+ * @frame_skip_flag      : flag that determines if a frame needs to be skipped
  * @sync_link_sof_skip   : flag determines if a pkt is not available for a given
  *                         frame in a particular link skip corresponding
  *                         frame in sync link as well.
@@ -333,16 +310,7 @@ struct cam_req_mgr_dev_sof_evt {
  *                         to be serviced in the kernel.
  * @last_flush_id        : Last request to flush
  * @is_used              : 1 if link is in use else 0
- * @is_master            : Based on pd among links, the link with the highest pd
- *                         is assigned as master
- * @initial_skip         : Flag to determine if slave has started streaming in
- *                         master-slave sync
- * @in_msync_mode        : Flag to determine if a link is in master-slave mode
- * @initial_sync_req     : The initial req which is required to sync with the
- *                         other link, it means current hasn't receive any
- *                         stream after streamon if it is true
- * @sof_timestamp_value  : SOF timestamp value
- * @prev_sof_timestamp   : Previous SOF timestamp value
+ *
  */
 struct cam_req_mgr_core_link {
 	int32_t                              link_hdl;
@@ -361,18 +329,13 @@ struct cam_req_mgr_core_link {
 	uint32_t                             subscribe_event;
 	uint32_t                             trigger_mask;
 	struct cam_req_mgr_core_link        *sync_link;
+	int64_t                              sof_counter;
+	int64_t                              sync_self_ref;
+	bool                                 frame_skip_flag;
 	bool                                 sync_link_sof_skip;
 	int32_t                              open_req_cnt;
 	uint32_t                             last_flush_id;
-	int32_t                              num_sof_src;
-	struct cam_req_mgr_dev_sof_evt       dev_sof_evt[3];
 	atomic_t                             is_used;
-	bool                                 is_master;
-	bool                                 initial_skip;
-	bool                                 in_msync_mode;
-	int64_t                              initial_sync_req;
-	uint64_t                             sof_timestamp;
-	uint64_t                             prev_sof_timestamp;
 };
 
 /**
@@ -394,7 +357,7 @@ struct cam_req_mgr_core_link {
 struct cam_req_mgr_core_session {
 	int32_t                       session_hdl;
 	uint32_t                      num_links;
-	struct cam_req_mgr_core_link *links[MAXIMUM_LINKS_PER_SESSION];
+	struct cam_req_mgr_core_link *links[MAX_LINKS_PER_SESSION];
 	struct list_head              entry;
 	struct mutex                  lock;
 	int32_t                       force_err_recovery;
@@ -440,9 +403,7 @@ int cam_req_mgr_destroy_session(struct cam_req_mgr_session_info *ses_info);
  * a unique link handle for the link and is specific to a
  * session. Returns link handle
  */
-int cam_req_mgr_link(struct cam_req_mgr_ver_info *link_info);
-int cam_req_mgr_link_v2(struct cam_req_mgr_ver_info *link_info);
-
+int cam_req_mgr_link(struct cam_req_mgr_link_info *link_info);
 
 /**
  * cam_req_mgr_unlink()
@@ -500,13 +461,6 @@ void cam_req_mgr_handle_core_shutdown(void);
  * @control: Link control command
  */
 int cam_req_mgr_link_control(struct cam_req_mgr_link_control *control);
-
-/**
- * cam_req_mgr_dump_request()
- * @brief:   Dumps the request information
- * @dump_req: Dump request
- */
-int cam_req_mgr_dump_request(struct cam_dump_req_cmd *dump_req);
 
 #endif
 

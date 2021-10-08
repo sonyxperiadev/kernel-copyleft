@@ -40,6 +40,21 @@ static unsigned dm_verity_prefetch_cluster = DM_VERITY_DEFAULT_PREFETCH_SIZE;
 
 module_param_named(prefetch_cluster, dm_verity_prefetch_cluster, uint, S_IRUGO | S_IWUSR);
 
+#ifdef CONFIG_PANIC_ON_DM_VERITY_ERRORS
+static unsigned dm_verity_panic_on_err;
+static int __init get_verity_panic_value(char *str)
+{
+	int val = 0;
+	if (get_option(&str, &val)) {
+		if (val < 0)
+			return -EINVAL;
+		dm_verity_panic_on_err = val;
+	}
+	return 0;
+}
+early_param("panic_on_err", get_verity_panic_value);
+#endif
+
 struct dm_verity_prefetch_work {
 	struct work_struct work;
 	struct dm_verity *v;
@@ -277,8 +292,14 @@ static int verity_handle_err(struct dm_verity *v, enum verity_block_type type,
 		BUG();
 	}
 
-	DMERR_LIMIT("%s: %s block %llu is corrupted", v->data_dev->name,
-		    type_str, block);
+#ifdef CONFIG_PANIC_ON_DM_VERITY_ERRORS
+	if (dm_verity_panic_on_err)
+		panic("%s: %s block %llu is corrupted",
+			v->data_dev->name, type_str, block);
+#endif
+
+	DMERR("%s: %s block %llu is corrupted", v->data_dev->name, type_str,
+		block);
 
 	if (v->corrupted_errs == DM_VERITY_MAX_CORRUPTED_ERRS)
 		DMERR("%s: reached maximum errors", v->data_dev->name);

@@ -30,3 +30,5 @@ obj-$(CONFIG_PINCTRL_SLPI) 	+= pinctrl-slpi.o
 obj-$(CONFIG_PINCTRL_MDM9607)   += pinctrl-mdm9607.o
 obj-$(CONFIG_PINCTRL_SDM660)	+= pinctrl-sdm660.o
 obj-$(CONFIG_PINCTRL_SDM429W)    += pinctrl-sdm429w.o
+obj-$(CONFIG_PINCTRL_SOMC) += pinctrl-somc.o
+obj-$(CONFIG_PINCTRL_SOMC_PMIC) += pinctrl-somc-pmic.o

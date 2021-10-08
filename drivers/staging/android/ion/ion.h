@@ -432,6 +432,7 @@ struct ion_heap *ion_secure_carveout_heap_create(
  * @order:		order of pages in the pool
  * @list:		plist node for list of pools
  * @cached:		it's cached pool or not
+ * @inode:		inode for ion_pool pseudo filesystem
  *
  * Allows you to keep a pool of pre allocated pages to use from your heap.
  * Keeping a pool of pages that is ready for dma, ie any cached mapping have
@@ -449,10 +450,11 @@ struct ion_page_pool {
 	gfp_t gfp_mask;
 	unsigned int order;
 	struct plist_node list;
+	struct inode *inode;
 };
 
 struct ion_page_pool *ion_page_pool_create(gfp_t gfp_mask, unsigned int order,
-					   bool cached);
+					   bool cached, bool movable);
 void ion_page_pool_destroy(struct ion_page_pool *pool);
 struct page *ion_page_pool_alloc(struct ion_page_pool *a, bool *from_pool);
 void ion_page_pool_free(struct ion_page_pool *pool, struct page *page);

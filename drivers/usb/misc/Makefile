@@ -35,3 +35,4 @@ obj-$(CONFIG_USB_REDRIVER_NB7VPQ904M)	+= ssusb-redriver-nb7vpq904m.o
 obj-$(CONFIG_USB_QTI_DIAG_BRIDGE)	+= diag_bridge.o
 obj-$(CONFIG_USB_QTI_MDM_DATA_BRIDGE)	+= mdm_data_bridge.o
 obj-$(CONFIG_USB_QTI_KS_BRIDGE)		+= ks_bridge.o
+obj-$(CONFIG_USB_SOMC_SLG4R41505)	+= slg4r41505.o

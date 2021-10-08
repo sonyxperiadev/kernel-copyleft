@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,7 +26,6 @@ enum cam_ife_hw_mgr_res_type {
 	CAM_IFE_HW_MGR_RES_CID,
 	CAM_IFE_HW_MGR_RES_CSID,
 	CAM_IFE_HW_MGR_RES_IFE_SRC,
-	CAM_IFE_HW_MGR_RES_IFE_IN_RD,
 	CAM_IFE_HW_MGR_RES_IFE_OUT,
 };
 
@@ -51,7 +50,6 @@ enum cam_ife_hw_mgr_res_type {
  * @parent:              point to the parent resource node.
  * @children:            point to the children resource nodes
  * @child_num:           numbe of the child resource node.
- * @is_secure            informs whether the resource is in secure mode or not
  *
  */
 struct cam_ife_hw_mgr_res {
@@ -65,7 +63,6 @@ struct cam_ife_hw_mgr_res {
 	struct cam_ife_hw_mgr_res       *parent;
 	struct cam_ife_hw_mgr_res       *child[CAM_IFE_HW_OUT_RES_MAX];
 	uint32_t                         num_children;
-	uint32_t                         is_secure;
 };
 
 
@@ -84,62 +81,49 @@ struct ctx_base_info {
 /**
  * struct cam_ife_hw_mgr_debug - contain the debug information
  *
- * @dentry:                    Debugfs entry
- * @csid_debug:                csid debug information
- * @enable_recovery:           enable recovery
- * @enable_diag_sensor_status: enable sensor diagnosis status
- * @enable_reg_dump:           enable register dump on error
- * @enable_dmi_dump:           enable stats dmi and cfg reg dump
+ * @dentry:              Debugfs entry
+ * @csid_debug:          csid debug information
+ * @enable_recovery      enable recovery
  *
  */
 struct cam_ife_hw_mgr_debug {
 	struct dentry  *dentry;
 	uint64_t       csid_debug;
 	uint32_t       enable_recovery;
-	uint32_t       camif_debug;
-	uint32_t       enable_reg_dump;
-	uint32_t       enable_dmi_dump;
 };
 
 /**
  * struct cam_vfe_hw_mgr_ctx - IFE HW manager Context object
  *
- * @list:                       used by the ctx list.
- * @common:                     common acquired context data
- * @ctx_index:                  acquired context id.
- * @hw_mgr:                     IFE hw mgr which owns this context
- * @ctx_in_use:                 flag to tell whether context is active
- * @res_list_ife_in:            Starting resource(TPG,PHY0, PHY1...) Can only be
- *                              one.
- * @res_list_csid:              CSID resource list
- * @res_list_ife_src:           IFE input resource list
- * @res_list_ife_in_rd          IFE input resource list for read path
- * @res_list_ife_out:           IFE output resoruces array
- * @free_res_list:              Free resources list for the branch node
- * @res_pool:                   memory storage for the free resource list
- * @irq_status0_mask:           irq_status0_mask for the context
- * @irq_status1_mask:           irq_status1_mask for the context
- * @base                        device base index array contain the all IFE HW
- *                              instance associated with this context.
- * @num_base                    number of valid base data in the base array
- * @cdm_handle                  cdm hw acquire handle
- * @cdm_ops                     cdm util operation pointer for building
- *                              cdm commands
- * @cdm_cmd                     cdm base and length request pointer
- * @sof_cnt                     sof count value per core, used for dual VFE
- * @epoch_cnt                   epoch count value per core, used for dual VFE
- * @eof_cnt                     eof count value per core, used for dual VFE
- * @overflow_pending            flat to specify the overflow is pending
- *                              for the context
- * @is_rdi_only_context         flag to specify the context has only rdi
- *                              resource
- * @config_done_complete        indicator for configuration complete
- * @init_done                   indicate whether init hw is done
- * @is_fe_enable                indicate whether fetch engine\read path
- *                              is enabled
- * @res_bitmap                  fill resource bitmap for which rup to be set
- * @dual_ife_irq_mismatch_cnt   irq mismatch count value per core, used for
- *                              dual VFE
+ * @list:                   used by the ctx list.
+ * @common:                 common acquired context data
+ * @ctx_index:              acquired context id.
+ * @hw_mgr:                 IFE hw mgr which owns this context
+ * @ctx_in_use:             flag to tell whether context is active
+ * @res_list_ife_in:        Starting resource(TPG,PHY0, PHY1...) Can only be
+ *                          one.
+ * @res_list_csid:          CSID resource list
+ * @res_list_ife_src:       IFE input resource list
+ * @res_list_ife_out:       IFE output resoruces array
+ * @free_res_list:          Free resources list for the branch node
+ * @res_pool:               memory storage for the free resource list
+ * @irq_status0_mask:       irq_status0_mask for the context
+ * @irq_status1_mask:       irq_status1_mask for the context
+ * @base                    device base index array contain the all IFE HW
+ *                          instance associated with this context.
+ * @num_base                number of valid base data in the base array
+ * @cdm_handle              cdm hw acquire handle
+ * @cdm_ops                 cdm util operation pointer for building
+ *                          cdm commands
+ * @cdm_cmd                 cdm base and length request pointer
+ * @sof_cnt                 sof count value per core, used for dual VFE
+ * @epoch_cnt               epoch count value per core, used for dual VFE
+ * @eof_cnt                 eof count value per core, used for dual VFE
+ * @overflow_pending        flat to specify the overflow is pending for the
+ *                          context
+ * @is_rdi_only_context     flag to specify the context has only rdi resource
+ * @config_done_complete    indicator for configuration complete
+ * @init_done               indicate whether init hw is done
  */
 struct cam_ife_hw_mgr_ctx {
 	struct list_head                list;
@@ -153,7 +137,6 @@ struct cam_ife_hw_mgr_ctx {
 	struct list_head                res_list_ife_cid;
 	struct list_head                res_list_ife_csid;
 	struct list_head                res_list_ife_src;
-	struct list_head                res_list_ife_in_rd;
 	struct cam_ife_hw_mgr_res       res_list_ife_out[
 						CAM_IFE_HW_OUT_RES_MAX];
 
@@ -175,9 +158,6 @@ struct cam_ife_hw_mgr_ctx {
 	uint32_t                        is_rdi_only_context;
 	struct completion               config_done_complete;
 	bool                            init_done;
-	bool                            is_fe_enable;
-	unsigned long                   res_bitmap;
-	uint32_t                        dual_ife_irq_mismatch_cnt;
 };
 
 /**
@@ -223,10 +203,9 @@ struct cam_ife_hw_mgr {
  *                      etnry functinon for the IFE HW manager.
  *
  * @hw_mgr_intf:        IFE hardware manager object returned
- * @iommu_hdl:          Iommu handle to be returned
  *
  */
-int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl);
+int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf);
 
 /**
  * cam_ife_mgr_do_tasklet_buf_done()

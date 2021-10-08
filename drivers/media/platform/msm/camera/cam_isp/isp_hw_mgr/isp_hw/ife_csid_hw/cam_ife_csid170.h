@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -52,7 +52,6 @@ static struct cam_ife_csid_pxl_reg_offset  cam_ife_csid_170_ipp_reg_offset = {
 	.csid_pxl_timestamp_perv1_eof_addr   = 0x2ac,
 	/* configurations */
 	.pix_store_en_shift_val              = 7,
-	.early_eof_en_shift_val              = 29,
 };
 
 static struct cam_ife_csid_rdi_reg_offset cam_ife_csid_170_rdi_0_reg_offset = {
@@ -222,7 +221,6 @@ static struct cam_ife_csid_csi2_rx_reg_offset
 	.csi2_capture_short_pkt_vc_shift              = 15,
 	.csi2_capture_cphy_pkt_dt_shift               = 20,
 	.csi2_capture_cphy_pkt_vc_shift               = 26,
-	.csi2_rx_phy_num_mask                         = 0x3,
 };
 
 static struct cam_ife_csid_csi2_tpg_reg_offset
@@ -274,7 +272,6 @@ static struct cam_ife_csid_common_reg_offset
 	.num_rdis                                     = 3,
 	.num_pix                                      = 1,
 	.num_ppp                                      = 0,
-	.csid_reg_rst_stb                             = 1,
 	.csid_rst_stb                                 = 0x1e,
 	.csid_rst_stb_sw_all                          = 0x1f,
 	.path_rst_stb_all                             = 0x7f,
@@ -291,12 +288,6 @@ static struct cam_ife_csid_common_reg_offset
 	.ipp_irq_mask_all                             = 0x7FFF,
 	.rdi_irq_mask_all                             = 0x7FFF,
 	.ppp_irq_mask_all                             = 0x0,
-	.measure_en_hbi_vbi_cnt_mask                  = 0xC,
-	.format_measure_en_val                        = 1,
-	.format_measure_height_mask_val               = 0xFFFF,
-	.format_measure_height_shift_val              = 0x10,
-	.format_measure_width_mask_val                = 0xFFFF,
-	.format_measure_width_shift_val               = 0x0,
 };
 
 static struct cam_ife_csid_reg_offset cam_ife_csid_170_reg_offset = {

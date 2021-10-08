@@ -208,7 +208,7 @@ extern void coresight_csr_set_byte_cntr(struct coresight_csr *csr,
 extern struct coresight_csr *coresight_csr_get(const char *name);
 #else
 static inline void msm_qdss_csr_enable_bam_to_usb(struct coresight_csr *csr) {}
-extern void msm_qdss_csr_enable_flush(struct coresight_csr *csr) {}
+static inline void msm_qdss_csr_enable_flush(struct coresight_csr *csr) {}
 static inline void msm_qdss_csr_disable_bam_to_usb(struct coresight_csr *csr) {}
 static inline void msm_qdss_csr_disable_flush(struct coresight_csr *csr) {}
 static inline int coresight_csr_hwctrl_set(struct coresight_csr *csr,

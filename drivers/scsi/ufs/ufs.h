@@ -205,6 +205,14 @@ enum device_desc_param {
 	DEVICE_DESC_PARAM_UD_LEN		= 0x1B,
 	DEVICE_DESC_PARAM_RTT_CAP		= 0x1C,
 	DEVICE_DESC_PARAM_FRQ_RTC		= 0x1D,
+	DEVICE_DESC_PARAM_FFU_SUPPORT		= 0x1F,
+	DEVICE_DESC_PARAM_FFU_TIMEOUT		= 0x20,
+	DEVICE_DESC_PARAM_QUEUE_DEPTH		= 0x21,
+	DEVICE_DESC_PARAM_DEVICE_VER		= 0x22,
+	DEVICE_DESC_PARAM_NUM_SEC_WP_AREA	= 0x24,
+	DEVICE_DESC_PARAM_PSM_MAX_DATA_SIZE	= 0x25,
+	DEVICE_DESC_PARAM_PSA_STATE_TIMEOUT	= 0x29,
+	DEVICE_DESC_PARAM_PRODUCT_REVISION	= 0x2A,
 };
 
 /* Health descriptor parameters offsets in bytes*/
@@ -517,6 +525,7 @@ struct ufs_dev_info {
 	u16	w_manufacturer_id;
 	u8	i_product_name;
 	u16	w_spec_version;
+	u8	revision;
 
 	/* query flags */
 	bool f_power_on_wp_en;
@@ -531,6 +540,7 @@ struct ufs_dev_info {
 };
 
 #define MAX_MODEL_LEN 16
+#define MAX_REVISION_LEN 8
 /**
  * ufs_dev_desc - ufs device details from the device descriptor
  *
@@ -541,6 +551,7 @@ struct ufs_dev_desc {
 	u16 wmanufacturerid;
 	char model[MAX_MODEL_LEN + 1];
 	u16 wspecversion;
+	char fw_revision[MAX_REVISION_LEN+1];
 };
 
 #endif /* End of Header */

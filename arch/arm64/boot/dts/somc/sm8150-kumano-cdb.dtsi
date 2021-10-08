@@ -1,0 +1,597 @@
+/* arch/arm64/boot/dts/somc/sm8150-kumano-cdb.dtsi
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "sm8150-kumano-common.dtsi"
+
+&somc_pinctrl {
+	/* If variant specific default setting is needed,
+	fill pinctrl-2 value in <variant>.dtsi */
+	pinctrl-2 = <&sm_gpio_0 &sm_gpio_3 &sm_gpio_16 &sm_gpio_23 &sm_gpio_26 &sm_gpio_27
+		     &sm_gpio_33 &sm_gpio_34 &sm_gpio_35 &sm_gpio_55 &sm_gpio_56
+		     &sm_gpio_88 &sm_gpio_89 &sm_gpio_90 &sm_gpio_91 &sm_gpio_115
+		     /*&sm_gpio_122*/ &sm_gpio_130 &sm_gpio_133 &sm_gpio_137 &sm_gpio_138
+		     &sm_gpio_140>;
+};
+
+&somc_pinctrl_pmic {
+	/* If variant specific default setting is needed,
+	fill pinctrl-2 value in <variant>.dtsi */
+	pinctrl-2 = <&pm8150_gpio_10 &pm8150b_gpio_1 &pm8150b_gpio_2 &pm8150b_gpio_10 &pm8150l_gpio_11>;
+};
+
+&soc {
+	/* SPI: QUP8 */
+	spi@a80000 {
+		pinctrl-0 = <&sm_gpio_88 &sm_gpio_89 &sm_gpio_90 &sm_gpio_91>;
+		pinctrl-1 = <&sm_gpio_88_suspend &sm_gpio_89_suspend &sm_gpio_90_suspend &sm_gpio_91_suspend>;
+		spi-max-frequency = <25000000>;
+		status = "okay";
+	};
+
+	/* I2C: QUP17 */
+	i2c@0xc80000 {
+		pinctrl-0 = <&sm_gpio_55 &sm_gpio_56>;
+		pinctrl-1 = <&sm_gpio_55_suspend &sm_gpio_56_suspend>;
+		qcom,clk-freq-out = <400000>;
+		status = "okay";
+	};
+
+	gpio_keys {
+		pinctrl-0 = <&key_vol_dn_default
+			     &key_cam_focus_default
+			     &key_cam_snapshot_default>;
+
+		cam_focus {
+			label = "cam_focus";
+			gpios = <&pm8150b_gpios 1 GPIO_ACTIVE_LOW>;
+			linux,input-type = <1>;
+			linux,code = <KEY_CAMERA_FOCUS>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+			linux,can-disable;
+		};
+
+		cam_snapshot {
+			label = "cam_snapshot";
+			gpios = <&pm8150b_gpios 2 GPIO_ACTIVE_LOW>;
+			linux,input-type = <1>;
+			linux,code = <766>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+			linux,can-disable;
+		};
+	};
+};
+
+/* Regulator config */
+&pm8150_l13 {
+	status = "disabled";
+};
+
+&pm8150_l17 {
+	status = "disabled";
+};
+
+/* GPIO_7: SUPWC_PWR_EN */
+&pm8150_gpio_7 {
+	pins = "gpio7";
+	function = "normal";
+	/delete-property/ bias-high-impedance;
+	output-low;
+	drive-push-pull;
+	qcom,drive-strength = <3>;
+	power-source = <1>;
+};
+
+/* GPIO_10: VIB_LDO_EN */
+&pm8150_gpio_10 {
+	pins = "gpio10";
+	function = "normal";
+	/delete-property/ bias-high-impedance;
+	output-low;
+	drive-push-pull;
+	qcom,drive-strength = <1>; /* Low */
+	power-source = <1>;
+};
+
+/* GPIO_1: FOCUS_N */
+&pm8150b_gpio_1 {
+	pins = "gpio1";
+	function = "normal";
+	input-enable;
+	bias-pull-up;
+	power-source = <0>;
+};
+
+/* GPIO_2: SNAPSHOT_N */
+&pm8150b_gpio_2 {
+	pins = "gpio2";
+	function = "normal";
+	input-enable;
+	bias-pull-up;
+	power-source = <0>;
+};
+
+/* GPIO_10: WLC_EN_N */
+&pm8150b_gpio_10 {
+	pins = "gpio10";
+	function = "normal";
+	/delete-property/ bias-high-impedance;
+	output-low;
+	drive-push-pull;
+	qcom,drive-strength = <1>; /* Low */
+	power-source = <0>;
+};
+
+/* GPIO_11: DTV_PWR_EN */
+&pm8150l_gpio_11 {
+	pins = "gpio11";
+	function = "normal";
+	/delete-property/ bias-high-impedance;
+	output-low;
+	drive-push-pull;
+	qcom,drive-strength = <1>; /* Low */
+	power-source = <1>;
+};
+
+/* GPIO_0 : NFC_ESE_SPI_MISO */
+&sm_gpio_0 {
+	mux {
+		pins = "gpio0";
+		function = "qup0";
+	};
+
+	config {
+		pins = "gpio0";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+	};
+};
+
+/* GPIO_3 : NFC_ESE_SPI_CS_N */
+&sm_gpio_3 {
+	mux {
+		pins = "gpio3";
+		function = "qup0";
+	};
+
+	config {
+		pins = "gpio3";
+		drive-strength = <2>;
+		/delete-property/ bias-disable;
+		bias-pull-down;
+		/delete-property/ output-low;
+	};
+};
+
+/* GPIO_16 : CAM_MCLK3 */
+&sm_gpio_16 {
+	mux {
+		pins = "gpio16";
+		function = "cam_mclk";
+	};
+
+	config {
+		pins = "gpio16";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+	};
+};
+
+/* GPIO_23 : CAM3_RST_N */
+&sm_gpio_23 {
+	mux {
+		pins = "gpio23";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio23";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+		output-low;
+	};
+};
+
+/* GPIO_26 : DTV_INT */
+&sm_gpio_26 {
+	mux {
+		pins = "gpio26";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio26";
+		drive-strength = <2>;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_27 : HAP_INT */
+&sm_gpio_27 {
+	mux {
+		pins = "gpio27";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio27";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		input-enable;
+	};
+};
+
+/* GPIO_33 : CCI_I2C_SDA3 */
+&sm_gpio_33 {
+	mux {
+		pins = "gpio33";
+		function = "cci_i2c";
+	};
+
+	config {
+		pins = "gpio33";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+	};
+};
+
+/* GPIO_34 : CCI_I2C_SCL3 */
+&sm_gpio_34 {
+	mux {
+		pins = "gpio34";
+		function = "cci_i2c";
+	};
+
+	config {
+		pins = "gpio34";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+	};
+};
+
+/* GPIO_35 : DTV_RST_N */
+&sm_gpio_35 {
+	mux {
+		pins = "gpio35";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio35";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+		output-low;
+	};
+};
+
+/* GPIO_55 : HAP_I2C_SDA */
+&sm_gpio_55 {
+	mux {
+		pins = "gpio55";
+		function = "qup17";
+	};
+
+	config {
+		pins = "gpio55";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+	};
+};
+
+&tlmm {
+	/* GPIO_55 : HAP_I2C_SDA (Suspend) */
+	sm_gpio_55_suspend: sm_gpio_55_suspend {
+		mux {
+			pins = "gpio55";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio55";
+			drive-strength = <2>;
+			bias-disable;
+			input-enable;
+		};
+	};
+};
+
+/* GPIO_56 : HAP_I2C_SCL */
+&sm_gpio_56 {
+	mux {
+		pins = "gpio56";
+		function = "qup17";
+	};
+
+	config {
+		pins = "gpio56";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+	};
+};
+
+&tlmm {
+	/* GPIO_56 : HAP_I2C_SCL (Suspend) */
+	sm_gpio_56_suspend: sm_gpio_56_suspend {
+		mux {
+			pins = "gpio56";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio56";
+			drive-strength = <2>;
+			bias-disable;
+			input-enable;
+		};
+	};
+};
+
+/* GPIO_88 : DTV_SPI_MISO */
+&sm_gpio_88 {
+	mux {
+		pins = "gpio88";
+		function = "qup8";
+	};
+
+	config {
+		pins = "gpio88";
+		drive-strength = <2>;
+		bias-pull-down;
+		/delete-property/ input-enable;
+	};
+};
+
+/* GPIO_89 : DTV_SPI_MOSI */
+&sm_gpio_89 {
+	mux {
+		pins = "gpio89";
+		function = "qup8";
+	};
+
+	config {
+		pins = "gpio89";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+	};
+};
+
+/* GPIO_90 : DTV_SPI_CLK */
+&sm_gpio_90 {
+	mux {
+		pins = "gpio90";
+		function = "qup8";
+	};
+
+	config {
+		pins = "gpio90";
+		drive-strength = <6>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+	};
+};
+
+/* GPIO_91 : DTV_SPI_CS_N */
+&sm_gpio_91 {
+	mux {
+		pins = "gpio91";
+		function = "qup8";
+	};
+
+	config {
+		pins = "gpio91";
+		drive-strength = <2>;
+		bias-pull-down;
+		/delete-property/ input-enable;
+	};
+};
+
+&tlmm {
+	/* GPIO_88 : DTV_SPI_MISO (suspend) */
+	sm_gpio_88_suspend: sm_gpio_88_suspend {
+		mux {
+			pins = "gpio88";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio88";
+			drive-strength = <2>;
+			bias-pull-down;
+			input-enable;
+		};
+	};
+
+	/* GPIO_89 : DTV_SPI_MOSI (suspend) */
+	sm_gpio_89_suspend: sm_gpio_89_suspend {
+		mux {
+			pins = "gpio89";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio89";
+			drive-strength = <2>;
+			bias-pull-down;
+			input-enable;
+		};
+	};
+
+	/* GPIO_90 : DTV_SPI_CLK (suspend) */
+	sm_gpio_90_suspend: sm_gpio_90_suspend {
+		mux {
+			pins = "gpio90";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio90";
+			drive-strength = <2>;
+			bias-pull-down;
+			input-enable;
+		};
+	};
+
+	/* GPIO_91 : DTV_SPI_CS_N (suspend)*/
+	sm_gpio_91_suspend: sm_gpio_91_suspend {
+		mux {
+			pins = "gpio91";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio91";
+			drive-strength = <2>;
+			bias-pull-down;
+			input-enable;
+		};
+	};
+};
+
+/* GPIO_115 : HAP_TRG1 */
+&sm_gpio_115 {
+	mux {
+		pins = "gpio115";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio115";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+		output-low;
+	};
+};
+
+/* GPIO_122 : TS_INT_N */
+&sm_gpio_122 {
+	mux {
+		pins = "gpio122";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio122";
+		drive-strength = <2>;
+		bias-disable;
+		input-enable;
+	};
+};
+
+/* GPIO_130: HAP_RST */
+&sm_gpio_130 {
+	mux {
+		pins = "gpio130";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio130";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+		output-low;
+	};
+};
+
+/* GPIO_133: WLC_INT_N */
+&sm_gpio_133 {
+	mux {
+		pins = "gpio133";
+		function = "gpio";
+	};
+
+	config {
+		pins = "gpio133";
+		drive-strength = <2>;
+		bias-pull-down;
+		input-enable;
+	};
+};
+
+/* GPIO_137 : HAP_CLK */
+&sm_gpio_137 {
+	mux {
+		pins = "gpio137";
+		function = "qua_mi2s";
+	};
+
+	config {
+		pins = "gpio137";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+	};
+};
+
+/* GPIO_138 : HAP_SYNC */
+&sm_gpio_138 {
+	mux {
+		pins = "gpio138";
+		function = "qua_mi2s";
+	};
+
+	config {
+		pins = "gpio138";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+	};
+};
+
+/* GPIO_140 : HAP_DOUT */
+&sm_gpio_140 {
+	mux {
+		pins = "gpio140";
+		function = "qua_mi2s";
+	};
+
+	config {
+		pins = "gpio140";
+		drive-strength = <2>;
+		/delete-property/ bias-pull-down;
+		bias-disable;
+		/delete-property/ input-enable;
+	};
+};
+
+#include "synaptics-tcm-i2c.dtsi"
+#include "somc-kumano-display.dtsi"
+#include "somc-kumano-display-cdb.dtsi"
+#include "charger-kumano-common.dtsi"
+#include "charger-kumano-cdb.dtsi"
+#include "somc-kumano-nfc_pn81t.dtsi"

@@ -123,6 +123,17 @@ config SCSI_UFSHCD_CMD_LOGGING
 	  Select this if you want above mentioned debug information captured.
 	  If unsure, say N.
 
+config UFS_WRITE_ERASE_COUNT
+	tristate "UFS write erase count"
+	depends on DEBUG_FS && SCSI_UFSHCD
+	default n
+	help
+	  This enables to read write and erase count of ufs via debugfs.
+	  Only Toshiba ufs supports it.
+
+	  Select this if you want above mentioned debug information captured.
+	  If unsure, say N.
+
 config SCSI_UFS_CRYPTO
 	bool "UFS Crypto Engine Support"
 	depends on SCSI_UFSHCD && BLK_INLINE_ENCRYPTION

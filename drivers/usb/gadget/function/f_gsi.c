@@ -2981,6 +2981,17 @@ static int gsi_bind(struct usb_configuration *c, struct usb_function *f)
 
 	switch (gsi->prot_id) {
 	case USB_PROT_RNDIS_IPA:
+		/* "Wireless" RNDIS6; auto-detected by Windows */
+		pr_debug("%s: linux_support=%d\n",  __func__,
+							gsi->linux_support);
+		if (gsi->linux_support) {
+			pr_info("%s: RNDIS5\n",  __func__);
+			gsi->rndis_id = WIRELESS_CONTROLLER_REMOTE_NDIS;
+		} else {
+			pr_info("%s: RNDIS6\n",  __func__);
+			gsi->rndis_id = MISC_RNDIS_OVER_ETHERNET;
+		}
+
 		info.string_defs = rndis_gsi_string_defs;
 		info.ctrl_desc = &rndis_gsi_control_intf;
 		info.ctrl_str_idx = 0;
@@ -3509,6 +3520,8 @@ static struct f_gsi *gsi_function_init(void)
 
 	gsi->d_port.ipa_usb_wq = ipa_usb_wq;
 
+	gsi->linux_support = false;
+
 	gsi->gsi_rw_timer_interval = DEFAULT_RW_TIMER_INTERVAL;
 	setup_timer(&gsi->gsi_rw_timer, gsi_rw_timer_func, (unsigned long) gsi);
 
@@ -3673,6 +3686,51 @@ static ssize_t gsi_info_show(struct config_item *item, char *page)
 	return ret;
 }
 
+static ssize_t gsi_linux_support_show(struct config_item *item, char *page)
+{
+	struct f_gsi *gsi = to_gsi_opts(item)->gsi;
+	int ret;
+
+	switch (gsi->prot_id) {
+	case IPA_USB_RNDIS:
+		/* "Y\n\0" 3characters */
+		ret = snprintf(page, 3, "%c\n", gsi->linux_support ? 'Y' : 'N');
+		break;
+	default:
+		ret = EBADR;
+		break;
+	}
+
+	return ret;
+}
+
+static ssize_t gsi_linux_support_store(struct config_item *item,
+						 const char *page, size_t len)
+{
+	struct f_gsi *gsi = to_gsi_opts(item)->gsi;
+	bool val;
+	int ret = 0;
+
+	switch (gsi->prot_id) {
+	case IPA_USB_RNDIS:
+		ret = strtobool(page, &val);
+		if (ret)
+			break;
+		gsi->linux_support = val;
+		pr_info("%s: set linux_support=%d.\n",  __func__,
+							gsi->linux_support);
+		break;
+	default:
+		ret = -EBADR;
+		break;
+	}
+
+	if (ret)
+		len = ret;
+	return len;
+}
+
+CONFIGFS_ATTR(gsi_, linux_support);
 CONFIGFS_ATTR_RO(gsi_, info);
 
 static struct configfs_attribute *gsi_attrs[] = {
@@ -3713,6 +3771,7 @@ CONFIGFS_ATTR(gsi_, rndis_class_id);
 
 static struct configfs_attribute *gsi_rndis_attrs[] = {
 	&gsi_attr_info,
+	&gsi_attr_linux_support,
 	&gsi_attr_rndis_class_id,
 	NULL,
 };

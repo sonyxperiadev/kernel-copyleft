@@ -80,4 +80,8 @@ struct dp_hpd *dp_usbpd_init(struct device *dev, struct usbpd *pd,
  * This function will cleanup the usbpd module
  */
 void dp_usbpd_deinit(struct dp_hpd *pd);
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+
+void dp_usbpd_set_min_src_caps(struct dp_hpd *dp_hpd, const bool set);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 #endif /* _DP_USBPD_H_ */

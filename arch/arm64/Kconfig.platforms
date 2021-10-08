@@ -161,6 +161,132 @@ config ARCH_SM8150
 	  This enables support for the SM8150 chipset. If you do not
 	  wish to build a kernel that runs on this chipset, say 'N' here.
 
+config ARCH_SONY_KUMANO
+	bool "Sony Mobile Kumano platform"
+	depends on ARCH_SM8150
+	help
+	Support for the SONY Mobile Kumano platform
+	which is based on QCOM SM8150 chipset.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_KUMANO_CDB
+	bool "Sony Mobile Kumano CDB"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Kumano CDB board
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_GRIFFIN
+	bool "Sony Mobile Griffin"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Griffin device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_GRIFFIN_K
+	bool "Sony Mobile Griffin K"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Griffin K device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_GRIFFIN_N
+	bool "Sony Mobile Griffin N"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Griffin N device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_GRIFFIN_S
+	bool "Sony Mobile Griffin S"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Griffin S device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_GRIFFIN_P
+	bool "Sony Mobile Griffin P"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Griffin P device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_SPHINX
+	bool "Sony Mobile Sphinx"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Sphinx device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_HORUS
+	bool "Sony Mobile Horus"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Horus device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_BAHAMUT
+	bool "Sony Mobile Bahamut"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Bahamut device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_BAHAMUT_K
+	bool "Sony Mobile Bahamut K"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Bahamut K device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_BAHAMUT_M
+	bool "Sony Mobile Bahamut M"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Bahamut M device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_BAHAMUT_N
+	bool "Sony Mobile Bahamut N"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Bahamut N device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
+config MACH_SONY_BAHAMUT_S
+	bool "Sony Mobile Bahamut S"
+	depends on ARCH_SONY_KUMANO
+	help
+	Support for the SONY Mobile Bahamut S device
+	which is based on SONY Kumano platform.
+	If you enable this config,
+	please use SONY Mobile device tree.
+
 config ARCH_SDMSHRIKE
 	bool "Enable Support for Qualcomm Technologies, Inc. SDMSHRIKE"
 	depends on ARCH_QCOM

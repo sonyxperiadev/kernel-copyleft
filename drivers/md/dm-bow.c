@@ -447,7 +447,6 @@ static int prepare_log(struct bow_context *bc)
 	ret = split_range(bc, &free_br, &bi_iter);
 	if (ret)
 		return ret;
-	free_br->type = SECTOR0_CURRENT;
 
 	/* Copy data */
 	ret = copy_data(bc, first_br, free_br, NULL);
@@ -455,6 +454,8 @@ static int prepare_log(struct bow_context *bc)
 		return ret;
 
 	bc->log_sector->sector0 = free_br->sector;
+
+	set_type(bc, &free_br, SECTOR0_CURRENT);
 
 	/* Find free sector to back up original sector zero */
 	free_br = find_free_range(bc);
@@ -600,13 +601,6 @@ static void dm_bow_dtr(struct dm_target *ti)
 	struct bow_context *bc = (struct bow_context *) ti->private;
 	struct kobject *kobj;
 
-	while (rb_first(&bc->ranges)) {
-		struct bow_range *br = container_of(rb_first(&bc->ranges),
-						    struct bow_range, node);
-
-		rb_erase(&br->node, &bc->ranges);
-		kfree(br);
-	}
 	if (bc->workqueue)
 		destroy_workqueue(bc->workqueue);
 	if (bc->bufio)
@@ -618,6 +612,15 @@ static void dm_bow_dtr(struct dm_target *ti)
 		wait_for_completion(dm_get_completion_from_kobject(kobj));
 	}
 
+	while (rb_first(&bc->ranges)) {
+		struct bow_range *br = container_of(rb_first(&bc->ranges),
+					      struct bow_range, node);
+
+		rb_erase(&br->node, &bc->ranges);
+		kfree(br);
+	}
+
+	mutex_destroy(&bc->ranges_lock);
 	kfree(bc->log_sector);
 	kfree(bc);
 }

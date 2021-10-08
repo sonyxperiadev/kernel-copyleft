@@ -712,4 +712,8 @@ int dsi_display_cont_splash_config(void *display);
 int dsi_display_get_panel_vfp(void *display,
 	int h_active, int v_active);
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+struct dsi_display *dsi_display_get_main_display(void);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+
 #endif /* _DSI_DISPLAY_H_ */

@@ -796,6 +796,7 @@ struct rq {
 #endif
 	#define CPU_LOAD_IDX_MAX 5
 	unsigned long cpu_load[CPU_LOAD_IDX_MAX];
+	unsigned int nr_pinned_tasks;
 #ifdef CONFIG_NO_HZ_COMMON
 #ifdef CONFIG_SMP
 	unsigned long last_load_update_tick;
@@ -904,8 +905,6 @@ struct rq {
 	int prev_top;
 	int curr_top;
 	bool notif_pending;
-	u64 last_cc_update;
-	u64 cycles;
 #endif /* CONFIG_SCHED_WALT */
 
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
@@ -2413,6 +2412,7 @@ enum rq_nohz_flag_bits {
 
 #define nohz_flags(cpu)	(&cpu_rq(cpu)->nohz_flags)
 
+DECLARE_PER_CPU(atomic_t, claim_wake_up_cpu);
 extern void nohz_balance_exit_idle(unsigned int cpu);
 #else
 static inline void nohz_balance_exit_idle(unsigned int cpu) { }

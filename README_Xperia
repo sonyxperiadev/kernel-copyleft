@@ -1,0 +1,88 @@
+Configuration files can be found in arch/arm64/configs.
+
+  defconfig using in common:
+    sm8150-perf_defconfig
+
+  diffconfigs for each product:
+    Xperia XZn Hnnnn/Hnnnn => griffin_diffconfig
+    Xperia XZn SO-nnX      => griffin_n_diffconfig
+    Xperia XZn SOVnn       => griffin_k_diffconfig
+    Xperia XZn nnnSO       => griffin_s_diffconfig
+    Xperia XZn Hnnnn/Hnnnn => bahamut_diffconfig
+    Xperia XZn SO-nnX      => bahamut_n_diffconfig
+    Xperia XZn SOVnn       => bahamut_k_diffconfig
+    Xperia XZn nnnSO       => bahamut_s_diffconfig
+    Xperia XZn Hnnnn/Hnnnn => horus_diffconfig
+    Xperia XZn Hnnnn/Hnnnn => sphinx_diffconfig
+
+How to build your kernel:
+
+  Prerequisites:
+
+    * mkbootimg - boot.img generator
+      Reference)
+      https://android.googlesource.com/platform/system/core/+/master/mkbootimg/
+
+    * dtc - Device Tree Compiler, called from make
+      This tool can be available from AOSP prebuilts/misc repository.
+      Reference)
+      https://android.googlesource.com/platform/prebuilts/misc/+/master/linux-x86/dtc/
+
+    * mkdtimg - dtbo.img generator
+      This tool can be available from AOSP prebuilts/misc repository.
+      Reference)
+      https://android.googlesource.com/platform/prebuilts/misc/+/master/linux-x86/libufdt/
+
+    * Qualcomm Snapdragon LLVM Compiler (clang)
+      You can obtain SD clang from below URL. clang-6.0 based one will be better.
+      Reference)
+      https://developer.qualcomm.com/software/snapdragon-llvm-compiler-android
+
+    * The ARM cross-compiler (gcc)
+      The current build system is still depend on gcc related tools such as linker.
+      Reference)
+      https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+/master
+
+  Step 1: Build Your Kernel
+    $ export PATH=<path-to-gcc-executables>:$PATH
+      NOTE: Please set the location of the gcc cross-compiler.
+    $ export PATH=<path-to-dtc-executables>:$PATH
+      NOTE: Please set the location of dtc (in prebuilt/misc repository).
+    $ export PATH=<path-to-mkdtimg-executables>:$PATH
+      NOTE: Please set the location of mkdtimg (in prebuilt/misc repository).
+    $ export KBUILD_DIFFCONFIG=griffin_diffconfig
+      NOTE: Please set a configuration file you want to build.
+
+    $ cd kernel/msm-4.14
+    $ make O=../../out CONFIG_BUILD_ARM64_DT_OVERLAY=y ARCH=arm64 DTC_EXT=dtc \
+           CROSS_COMPILE=aarch64-linux-android- REAL_CC=<full-path-to-sdclang-6.0>/clang \
+           CLANG_TRIPLE=aarch64-linux-gnu- vendor/sm8150-perf_defconfig
+    $ make O=../../out CONFIG_BUILD_ARM64_DT_OVERLAY=y ARCH=arm64 DTC_EXT=dtc \
+           CROSS_COMPILE=aarch64-linux-android- REAL_CC=<full-path-to-sdclang-6.0>/clang \
+           CLANG_TRIPLE=aarch64-linux-gnu- -j12
+    $ cd ../..
+
+    You can see out/arch/arm64/boot/Image-dtb if you succeed in building kernel.
+      NOTE: Since this sm8150 based products, the kernel image doesn't compress with gzip because of performance matter.
+
+  Step 2: Assembling the boot.img
+    $ mkbootimg \
+        --kernel out/arch/arm64/boot/Image-dtb \
+        --cmdline "androidboot.hardware=qcom androidboot.memcg=1 \
+                   lpm_levels.sleep_disabled=1 video=vfb:640x400,bpp=32,memsize=3072000 \
+                   msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 \
+                   firmware_class.path=/vendor/firmware_mnt/image loop.max_part=7 \
+                   androidboot.usbcontroller=a600000.dwc3 panic_on_err=1 \
+                   printk.devkmsg=on buildvariant=userdebug" \
+        --base 0x00000000 \
+        --pagesize 4096 \
+        --os_version 9 \
+        --os_patch_level 2018-08-05 \
+        --header_version 1 \
+        --output out/boot.img
+
+      NOTE: Since Android O, you need to set 'os_version' and 'os_patch_level'
+            parameters for mkbootimg according to your base Android system image.
+
+  Step 3: Assembling the dtbo.img
+    $ mkdtimg create out/dtbo.img --page_size=4096 `find out/arch/arm64/boot/dts -name "*.dtbo"`

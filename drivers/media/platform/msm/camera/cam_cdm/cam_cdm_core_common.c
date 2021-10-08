@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -118,11 +118,28 @@ struct cam_cdm_bl_cb_request_entry *cam_cdm_find_request_by_bl_tag(
 	uint32_t tag, struct list_head *bl_list)
 {
 	struct cam_cdm_bl_cb_request_entry *node;
+/* sony extension begin */
+#if 1
+	struct cam_cdm_bl_cb_request_entry *node_next;
 
+	list_for_each_entry_safe(node, node_next, bl_list, entry) {
+		if (node->bl_tag == tag) {
+			return node;
+		} else {
+			CAM_ERR(CAM_CDM, "No IRQ took place for bl_tag=%x cookie=%d."
+				" Remove corresponding request from bl_list.",
+				node->bl_tag, node->cookie);
+			list_del_init(&node->entry);
+			kfree(node);
+		}
+	}
+#else
 	list_for_each_entry(node, bl_list, entry) {
 		if (node->bl_tag == tag)
 			return node;
 	}
+#endif
+/* sony extension end */
 	CAM_ERR(CAM_CDM, "Could not find the bl request for tag=%x", tag);
 
 	return NULL;
@@ -280,7 +297,6 @@ int cam_cdm_stream_ops_internal(void *hw_priv,
 			ahb_vote.type = CAM_VOTE_ABSOLUTE;
 			ahb_vote.vote.level = CAM_SVS_VOTE;
 			axi_vote.compressed_bw = CAM_CPAS_DEFAULT_AXI_BW;
-			axi_vote.compressed_bw_ab = CAM_CPAS_DEFAULT_AXI_BW;
 			axi_vote.uncompressed_bw = CAM_CPAS_DEFAULT_AXI_BW;
 
 			rc = cam_cpas_start(core->cpas_handle,

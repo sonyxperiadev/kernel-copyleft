@@ -949,10 +949,7 @@ static int __ipa_finish_flt_rule_add(struct ipa3_flt_tbl *tbl,
 {
 	int id;
 
-	if (tbl->rule_cnt < IPA_RULE_CNT_MAX)
-		tbl->rule_cnt++;
-	else
-		return -EINVAL;
+	tbl->rule_cnt++;
 	if (entry->rt_tbl)
 		entry->rt_tbl->ref_cnt++;
 	id = ipa3_id_alloc(entry);
