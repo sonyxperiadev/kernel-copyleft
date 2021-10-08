@@ -76,7 +76,7 @@
 #define BCL_8998_VBAT_SCALING   39000
 #define BCL_8998_IBAT_SCALING   80000
 #define BCL_VBAT_LOW_THRESHOLD  0x7 /* 3.1V */
-#define BCL_VBAT_TLOW_THRESHOLD 0x5 /* 2.9v */
+#define BCL_VBAT_TLOW_THRESHOLD 0x0 /* 2.4v */
 #define BCL_IBAT_HIGH_THRESH_UA 4300000
 #define BCL_LMH_CFG_VAL         0x3
 #define BCL_CFG_VAL             0x81

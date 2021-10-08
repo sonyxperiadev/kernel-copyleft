@@ -11,6 +11,7 @@ dts-dirs += marvell
 dts-dirs += mediatek
 dts-dirs += qcom
 dts-dirs += rockchip
+dts-dirs += somc
 dts-dirs += sprd
 dts-dirs += xilinx
 

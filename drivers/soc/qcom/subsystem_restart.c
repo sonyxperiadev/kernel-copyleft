@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -170,6 +170,8 @@ struct subsys_device {
 	int id;
 	int restart_level;
 	int crash_count;
+	int data_ready;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
 	struct subsys_soc_restart_order *restart_order;
 	bool do_ramdump_on_put;
 	struct cdev char_dev;
@@ -345,6 +347,63 @@ void subsys_default_online(struct subsys_device *dev)
 }
 EXPORT_SYMBOL(subsys_default_online);
 
+static int __find_subsys(struct device *dev, void *data)
+{
+        struct subsys_device *subsys = to_subsys(dev);
+        return !strcmp(subsys->desc->name, data);
+}
+
+static struct subsys_device *find_subsys(const char *str)
+{
+        struct device *dev;
+
+        if (!str)
+                return NULL;
+
+        dev = bus_find_device(&subsys_bus_type, NULL, (void *)str,
+                        __find_subsys);
+        return dev ? to_subsys(dev) : NULL;
+}
+
+void update_crash_reason(struct subsys_device *subsys,
+				char *smem_reason, int size)
+{
+	memcpy(subsys->crash_reason, smem_reason, size);
+	subsys->data_ready = 1;
+}
+
+static void subsys_notify_crash_reason(struct subsys_device *subsys)
+{
+	if (subsys->data_ready && subsys->restart_level != RESET_SOC)
+		sysfs_notify(&subsys->dev.kobj, NULL, "crash_reason");
+}
+
+static ssize_t crash_reason_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int r = 0;
+	struct subsys_device *subsys = to_subsys(dev);
+
+	r = snprintf(buf, PAGE_SIZE, "%s\n", subsys->crash_reason);
+	subsys->data_ready = 0;
+	memset(subsys->crash_reason, 0, sizeof(subsys->crash_reason));
+
+	return r;
+}
+
+int subsystem_crash_reason(const char *name, char *msg)
+{
+	struct subsys_device *dev = find_subsys(name);
+
+	if (!dev)
+		return -ENODEV;
+	update_crash_reason(dev, msg, SUBSYS_CRASH_REASON_LEN);
+	subsys_notify_crash_reason(dev);
+
+	return 0;
+}
+EXPORT_SYMBOL(subsystem_crash_reason);
+
 static struct device_attribute subsys_attrs[] = {
 	__ATTR_RO(name),
 	__ATTR_RO(state),
@@ -353,6 +412,7 @@ static struct device_attribute subsys_attrs[] = {
 	__ATTR(restart_level, 0644, restart_level_show, restart_level_store),
 	__ATTR(firmware_name, 0644, firmware_name_show, firmware_name_store),
 	__ATTR(system_debug, 0644, system_debug_show, system_debug_store),
+	__ATTR(crash_reason, 0444, crash_reason_show, NULL),
 	__ATTR_NULL,
 };
 
@@ -686,24 +746,6 @@ static int subsystem_powerup(struct subsys_device *dev, void *data)
 	return 0;
 }
 
-static int __find_subsys(struct device *dev, void *data)
-{
-	struct subsys_device *subsys = to_subsys(dev);
-	return !strcmp(subsys->desc->name, data);
-}
-
-static struct subsys_device *find_subsys(const char *str)
-{
-	struct device *dev;
-
-	if (!str)
-		return NULL;
-
-	dev = bus_find_device(&subsys_bus_type, NULL, (void *)str,
-			__find_subsys);
-	return dev ? to_subsys(dev) : NULL;
-}
-
 static int subsys_start(struct subsys_device *subsys)
 {
 	int ret;
@@ -1005,6 +1047,8 @@ static void subsystem_restart_wq_func(struct work_struct *work)
 	track->p_state = SUBSYS_RESTARTING;
 	spin_unlock_irqrestore(&track->s_lock, flags);
 
+	subsys_notify_crash_reason(dev);
+
 	/* Collect ram dumps for all subsystems in order here */
 	for_each_subsys_device(list, count, NULL, subsystem_ramdump);
 
@@ -1083,7 +1127,7 @@ int subsystem_restart_dev(struct subsys_device *dev)
 {
 	const char *name;
 
-	if (!get_device(&dev->dev))
+	if ((!dev) || !get_device(&dev->dev))
 		return -ENODEV;
 
 	if (!try_module_get(dev->owner)) {
@@ -1104,7 +1148,7 @@ int subsystem_restart_dev(struct subsys_device *dev)
 		return -EBUSY;
 	}
 
-	pr_info("Restart sequence requested for %s, restart_level = %s.\n",
+	pr_warn("Restart sequence requested for %s, restart_level = %s.\n",
 		name, restart_levels[dev->restart_level]);
 
 	if (disable_restart_work == DISABLE_SSR) {
@@ -1177,11 +1221,21 @@ EXPORT_SYMBOL(subsystem_crashed);
 void subsys_set_crash_status(struct subsys_device *dev,
 				enum crash_status crashed)
 {
+	if (!dev) {
+		pr_err("Invalid subsystem device\n");
+		return;
+	}
+
 	dev->crashed = crashed;
 }
 
 enum crash_status subsys_get_crash_status(struct subsys_device *dev)
 {
+	if (!dev) {
+		pr_err("Invalid subsystem device\n");
+		return CRASH_STATUS_NO_CRASH;
+	}
+
 	return dev->crashed;
 }
 

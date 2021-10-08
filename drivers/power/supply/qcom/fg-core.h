@@ -13,6 +13,7 @@
 #ifndef __FG_CORE_H__
 #define __FG_CORE_H__
 
+#include <linux/alarmtimer.h>
 #include <linux/atomic.h>
 #include <linux/bitops.h>
 #include <linux/debugfs.h>
@@ -94,6 +95,10 @@ enum fg_debug_flag {
 	FG_BUS_READ		= BIT(6), /* Show REGMAP reads */
 	FG_CAP_LEARN		= BIT(7), /* Show capacity learning */
 	FG_TTF			= BIT(8), /* Show time to full */
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	FG_STEP			= BIT(14),
+	FG_SOMC			= BIT(15),
+#endif
 };
 
 /* SRAM access */
@@ -104,7 +109,7 @@ enum sram_access_flags {
 };
 
 /* JEITA */
-enum {
+enum jeita_levels {
 	JEITA_COLD = 0,
 	JEITA_COOL,
 	JEITA_WARM,
@@ -167,6 +172,7 @@ enum fg_sram_param_id {
 	FG_SRAM_SYS_TERM_CURR,
 	FG_SRAM_CHG_TERM_CURR,
 	FG_SRAM_CHG_TERM_BASE_CURR,
+	FG_SRAM_CUTOFF_CURR,
 	FG_SRAM_DELTA_MSOC_THR,
 	FG_SRAM_DELTA_BSOC_THR,
 	FG_SRAM_RECHARGE_SOC_THR,
@@ -177,6 +183,12 @@ enum fg_sram_param_id {
 	FG_SRAM_ESR_TIGHT_FILTER,
 	FG_SRAM_ESR_BROAD_FILTER,
 	FG_SRAM_SLOPE_LIMIT,
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	FG_SRAM_SOC_SYSTEM,
+	FG_SRAM_SOC_MONOTONIC,
+	FG_SRAM_SOC_CUTOFF,
+	FG_SRAM_SOC_FULL,
+#endif
 	FG_SRAM_MAX,
 };
 
@@ -224,6 +236,12 @@ enum slope_limit_status {
 	SLOPE_LIMIT_NUM_COEFFS,
 };
 
+enum esr_filter_status {
+	ROOM_TEMP = 1,
+	LOW_TEMP,
+	RELAX_TEMP,
+};
+
 enum esr_timer_config {
 	TIMER_RETRY = 0,
 	TIMER_MAX,
@@ -239,6 +257,7 @@ enum ttf_mode {
 struct fg_dt_props {
 	bool	force_load_profile;
 	bool	hold_soc_while_full;
+	bool	linearize_soc;
 	bool	auto_recharge_soc;
 	int	cutoff_volt_mv;
 	int	empty_volt_mv;
@@ -246,6 +265,7 @@ struct fg_dt_props {
 	int	chg_term_curr_ma;
 	int	chg_term_base_curr_ma;
 	int	sys_term_curr_ma;
+	int	cutoff_curr_ma;
 	int	delta_soc_thr;
 	int	recharge_soc_thr;
 	int	recharge_volt_thr_mv;
@@ -269,9 +289,13 @@ struct fg_dt_props {
 	int	esr_broad_flt_upct;
 	int	esr_tight_lt_flt_upct;
 	int	esr_broad_lt_flt_upct;
+	int	esr_flt_rt_switch_temp;
+	int	esr_tight_rt_flt_upct;
+	int	esr_broad_rt_flt_upct;
 	int	slope_limit_temp;
 	int	esr_pulse_thresh_ma;
 	int	esr_meas_curr_ma;
+	int	ki_coeff_full_soc_dischg;
 	int	jeita_thresholds[NUM_JEITA_LEVELS];
 	int	ki_coeff_soc[KI_COEFF_SOC_LEVELS];
 	int	ki_coeff_med_dischg[KI_COEFF_SOC_LEVELS];
@@ -287,6 +311,9 @@ struct fg_batt_props {
 	int		float_volt_uv;
 	int		vbatt_full_mv;
 	int		fastchg_curr_ma;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int		initial_capacity;
+#endif
 };
 
 struct fg_cyc_ctr_data {
@@ -306,6 +333,18 @@ struct fg_cap_learning {
 	int64_t		final_cc_uah;
 	int64_t		learned_cc_uah;
 	struct mutex	lock;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	int64_t		charge_full_raw;
+	int		learning_counter;
+	int		batt_soc_drop;
+	int		cc_soc_drop;
+	int		max_bsoc_during_active;
+	int		max_ccsoc_during_active;
+	s64		max_bsoc_time_ms;
+	s64		start_time_ms;
+	s64		hold_time;
+	s64		total_time;
+#endif
 };
 
 struct fg_irq_info {
@@ -341,6 +380,30 @@ struct ttf {
 	s64			last_ms;
 };
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define STEP_DATA_MAX_CFG_NUM	30
+#define STEP_DATA_RAW		7
+#define STEP_DATA_DT_MAX_NUM	(STEP_DATA_MAX_CFG_NUM * STEP_DATA_RAW)
+struct fg_dt_step_data {
+	int	data_num;
+	int	temp_low[STEP_DATA_MAX_CFG_NUM];
+	int	temp_high[STEP_DATA_MAX_CFG_NUM];
+	int	voltage_low[STEP_DATA_MAX_CFG_NUM];
+	int	voltage_high[STEP_DATA_MAX_CFG_NUM];
+	int	target_current[STEP_DATA_MAX_CFG_NUM];
+	int	target_voltage[STEP_DATA_MAX_CFG_NUM];
+	int	condition[STEP_DATA_MAX_CFG_NUM];
+};
+
+#define STEP_INPUT_BUF_NUM 3
+struct fg_step_input {
+	int	temp;
+	int	current_now;
+	int	voltage_now;
+	s64	stored_ktime_ms;
+};
+
+#endif
 static const struct fg_pt fg_ln_table[] = {
 	{ 1000,		0 },
 	{ 2000,		693 },
@@ -369,6 +432,15 @@ static const struct fg_pt fg_tsmc_osc_table[] = {
 	{  80,		439475 },
 	{  90,		444992 },
 };
+
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define ORG_BATT_TYPE_SIZE	9
+#define BATT_TYPE_SIZE		(ORG_BATT_TYPE_SIZE + 2)
+#define BATT_TYPE_FIRST_HYPHEN	4
+#define BATT_TYPE_SECOND_HYPHEN	9
+#define BATT_TYPE_AGING_LEVEL	10
+
+#endif
 
 struct fg_chip {
 	struct device		*dev;
@@ -401,6 +473,8 @@ struct fg_chip {
 	struct mutex		bus_lock;
 	struct mutex		sram_rw_lock;
 	struct mutex		charge_full_lock;
+	struct mutex		qnovo_esr_ctrl_lock;
+	spinlock_t		suspend_lock;
 	u32			batt_soc_base;
 	u32			batt_info_base;
 	u32			mem_if_base;
@@ -420,8 +494,10 @@ struct fg_chip {
 	int			delta_soc;
 	int			last_msoc;
 	int			last_recharge_volt_mv;
+	int			delta_temp_irq_count;
 	int			esr_timer_charging_default[NUM_ESR_TIMERS];
 	enum slope_limit_status	slope_limit_sts;
+	enum esr_filter_status	esr_flt_sts;
 	bool			profile_available;
 	bool			profile_loaded;
 	bool			battery_missing;
@@ -434,12 +510,52 @@ struct fg_chip {
 	bool			esr_flt_cold_temp_en;
 	bool			slope_limit_en;
 	bool			use_ima_single_mode;
+	bool			qnovo_enable;
+	bool			suspended;
 	struct completion	soc_update;
 	struct completion	soc_ready;
 	struct delayed_work	profile_load_work;
 	struct work_struct	status_change_work;
 	struct delayed_work	ttf_work;
 	struct delayed_work	sram_dump_work;
+	struct work_struct	esr_filter_work;
+	struct alarm		esr_filter_alarm;
+	ktime_t			last_delta_temp_time;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	/* Learning */
+	int			rated_capacity;
+
+	/* Soft Charge */
+	int			batt_aging_level;
+	int			saved_batt_aging_level;
+	char			org_batt_type_str[ORG_BATT_TYPE_SIZE + 1];
+
+	/* Recharge */
+	bool			recharge_starting;
+	bool			full_delay;
+	int			recharge_voltage_mv;
+	int			recharge_counter;
+	int			full_counter;
+	struct delayed_work	full_delay_work;
+
+	/* JEITA/Step charge */
+	struct delayed_work	somc_jeita_step_charge_work;
+	struct wakeup_source 	step_ws;
+	struct mutex		step_lock;
+	bool			step_lock_en;
+	bool			step_en;
+	struct fg_dt_step_data	step_data;
+	int			cell_impedance_mohm;
+	int			vcell_max_mv;
+	struct fg_step_input	step_input_data[STEP_INPUT_BUF_NUM];
+	bool			use_real_temp;
+	bool			real_temp_use_aux;
+	int			batt_temp_correctton;
+	int			aux_temp_correctton;
+	int			real_temp_debug;
+	bool			real_temp_restriction_cool;
+	int			real_temp_restriction_cool_thresh;
+#endif
 };
 
 /* Debugfs data structures are below */

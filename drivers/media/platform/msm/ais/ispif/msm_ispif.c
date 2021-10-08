@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,6 +29,7 @@
 #include "msm_camera_io_util.h"
 #include "cam_hw_ops.h"
 #include "cam_soc_api.h"
+#include "msm_camera_diag_util.h"
 
 #ifdef CONFIG_AIS_MSM_ISPIF_V1
 #include "msm_ispif_hwreg_v1.h"
@@ -46,7 +47,7 @@
 #define ISPIF_INTF_CMD_DISABLE_IMMEDIATELY    0x02
 
 #define ISPIF_TIMEOUT_SLEEP_US                1000
-#define ISPIF_TIMEOUT_ALL_US               1000000
+#define ISPIF_TIMEOUT_ALL_US                200000
 #define ISPIF_SOF_DEBUG_COUNT                    0
 
 #undef CDBG
@@ -1437,13 +1438,6 @@ static int msm_ispif_init(struct ispif_device *ispif,
 			return -ENOMEM;
 	}
 
-	rc = cam_config_ahb_clk(NULL, 0,
-			CAM_AHB_CLIENT_ISPIF, CAM_AHB_SVS_VOTE);
-	if (rc < 0) {
-		pr_err("%s: failed to vote for AHB\n", __func__);
-		return rc;
-	}
-
 	rc = msm_ispif_reset_hw(ispif);
 	if (rc)
 		goto error_ahb;
@@ -1533,6 +1527,22 @@ static long msm_ispif_cmd(struct v4l2_subdev *sd, void *arg)
 	case ISPIF_SET_VFE_INFO:
 		rc = msm_ispif_set_vfe_info(ispif, &pcdata->vfe_info);
 		break;
+	case ISPIF_READ_REG_LIST_CMD:
+	{
+		struct msm_camera_reg_list_cmd reg_list_cmd;
+
+		if (copy_from_user(&reg_list_cmd,
+				(void __user *)pcdata->reg_list,
+				sizeof(struct msm_camera_reg_list_cmd))) {
+			pr_err("%s: %d failed\n", __func__, __LINE__);
+			rc = -EFAULT;
+			break;
+		}
+		rc = msm_camera_get_reg_list(ispif->base, &reg_list_cmd);
+		break;
+	}
+	case ISPIF_WRITE_REG_LIST_CMD:
+		break;
 	default:
 		pr_err("%s: invalid cfg_type\n", __func__);
 		rc = -EINVAL;
@@ -1608,6 +1618,11 @@ static int ispif_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 		rc = msm_camera_enable_irq(ispif->irq, 1);
 		if (rc)
 			goto irq_enable_fail;
+
+		/* Disable ispif clk and allow device to go XO shutdown */
+		msm_ispif_clk_ahb_enable(ispif, 0);
+		msm_ispif_set_regulators(ispif->ispif_vdd,
+					ispif->ispif_vdd_count, 0);
 	}
 	/* mem remap is done in init when the clock is on */
 	ispif->open_cnt++;
@@ -1640,6 +1655,10 @@ static int ispif_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	}
 	ispif->open_cnt--;
 	if (ispif->open_cnt == 0) {
+		/* Enable ispif clk to wake up from XO shutdown mode */
+		msm_ispif_clk_ahb_enable(ispif, 1);
+		msm_ispif_set_regulators(ispif->ispif_vdd,
+					ispif->ispif_vdd_count, 1);
 		msm_ispif_release(ispif);
 		/* disable clocks and regulator on last close */
 		msm_ispif_clk_ahb_enable(ispif, 0);

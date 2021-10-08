@@ -24,6 +24,7 @@
 #include <linux/pci.h>
 #include <linux/uuid.h>
 #include <linux/time.h>
+#include <linux/inetdevice.h>
 #include <soc/qcom/socinfo.h>
 
 #include "htt.h"
@@ -173,6 +174,10 @@ struct ath10k_wmi {
 	const struct wmi_ops *ops;
 	const struct wmi_peer_flags_map *peer_flags;
 
+	u32 mgmt_max_num_pending_tx;
+	struct idr mgmt_pending_tx;
+	/* Protects access to mgmt_pending_tx, mgmt_max_num_pending_tx */
+	spinlock_t mgmt_tx_lock;
 	u32 num_mem_chunks;
 	u32 rx_decap_mode;
 	struct ath10k_mem_chunk mem_chunks[WMI_MAX_MEM_REQS];
@@ -430,6 +435,9 @@ struct ath10k_vif {
 	struct work_struct ap_csa_work;
 	struct delayed_work connection_loss_work;
 	struct cfg80211_bitrate_mask bitrate_mask;
+	struct wmi_ns_arp_offload_req arp_offload;
+	struct wmi_ns_arp_offload_req ns_offload;
+	struct wmi_gtk_rekey_data gtk_rekey_data;
 };
 
 struct ath10k_vif_iter {
@@ -963,6 +971,7 @@ struct ath10k {
 	struct completion peer_delete_done;
 	bool is_bmi;
 	enum ieee80211_sta_state sta_state;
+	bool rri_on_ddr;
 	/* must be last */
 	u8 drv_priv[0] __aligned(sizeof(void *));
 };

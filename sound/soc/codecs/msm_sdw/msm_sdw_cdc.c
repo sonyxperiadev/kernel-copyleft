@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -82,8 +82,8 @@ static const struct msm_sdw_reg_mask_val msm_sdw_spkr_default[] = {
 	{MSM_SDW_COMPANDER8_CTL3, 0x80, 0x80},
 	{MSM_SDW_COMPANDER7_CTL7, 0x01, 0x01},
 	{MSM_SDW_COMPANDER8_CTL7, 0x01, 0x01},
-	{MSM_SDW_BOOST0_BOOST_CTL, 0x7C, 0x50},
-	{MSM_SDW_BOOST1_BOOST_CTL, 0x7C, 0x50},
+	{MSM_SDW_BOOST0_BOOST_CTL, 0x7C, 0x58},
+	{MSM_SDW_BOOST1_BOOST_CTL, 0x7C, 0x58},
 };
 
 static const struct msm_sdw_reg_mask_val msm_sdw_spkr_mode1[] = {
@@ -471,9 +471,9 @@ static int msm_sdw_codec_enable_vi_feedback(struct snd_soc_dapm_widget *w,
 				MSM_SDW_TX10_SPKR_PROT_PATH_CTL, 0x20,
 				0x20);
 			snd_soc_update_bits(codec,
-				MSM_SDW_TX9_SPKR_PROT_PATH_CTL, 0x0F, 0x04);
+				MSM_SDW_TX9_SPKR_PROT_PATH_CTL, 0x0F, 0x00);
 			snd_soc_update_bits(codec,
-				MSM_SDW_TX10_SPKR_PROT_PATH_CTL, 0x0F, 0x04);
+				MSM_SDW_TX10_SPKR_PROT_PATH_CTL, 0x0F, 0x00);
 			snd_soc_update_bits(codec,
 				MSM_SDW_TX9_SPKR_PROT_PATH_CTL, 0x10, 0x10);
 			snd_soc_update_bits(codec,
@@ -496,10 +496,10 @@ static int msm_sdw_codec_enable_vi_feedback(struct snd_soc_dapm_widget *w,
 				0x20);
 			snd_soc_update_bits(codec,
 				MSM_SDW_TX11_SPKR_PROT_PATH_CTL, 0x0F,
-				0x04);
+				0x00);
 			snd_soc_update_bits(codec,
 				MSM_SDW_TX12_SPKR_PROT_PATH_CTL, 0x0F,
-				0x04);
+				0x00);
 			snd_soc_update_bits(codec,
 				MSM_SDW_TX11_SPKR_PROT_PATH_CTL, 0x10,
 				0x10);
@@ -930,6 +930,66 @@ static int msm_sdw_ear_spkr_pa_gain_put(struct snd_kcontrol *kcontrol,
 
 	dev_dbg(codec->dev, "%s: gain = %d\n", __func__,
 		msm_sdw->ear_spkr_gain);
+
+	return 0;
+}
+
+static int msm_sdw_spkr_left_boost_stage_get(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	u8 bst_state_max = 0;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	bst_state_max = snd_soc_read(codec, MSM_SDW_BOOST0_BOOST_CTL);
+	bst_state_max = (bst_state_max & 0x0c) >> 2;
+	ucontrol->value.integer.value[0] = bst_state_max;
+	dev_dbg(codec->dev, "%s: ucontrol->value.integer.value[0]  = %ld\n",
+		__func__, ucontrol->value.integer.value[0]);
+
+	return 0;
+}
+
+static int msm_sdw_spkr_left_boost_stage_put(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	u8 bst_state_max;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	dev_dbg(codec->dev, "%s: ucontrol->value.integer.value[0]  = %ld\n",
+		__func__, ucontrol->value.integer.value[0]);
+	bst_state_max =  ucontrol->value.integer.value[0] << 2;
+	snd_soc_update_bits(codec, MSM_SDW_BOOST0_BOOST_CTL,
+		0x0c, bst_state_max);
+
+	return 0;
+}
+
+static int msm_sdw_spkr_right_boost_stage_get(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	u8 bst_state_max = 0;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	bst_state_max = snd_soc_read(codec, MSM_SDW_BOOST1_BOOST_CTL);
+	bst_state_max = (bst_state_max & 0x0c) >> 2;
+	ucontrol->value.integer.value[0] = bst_state_max;
+	dev_dbg(codec->dev, "%s: ucontrol->value.integer.value[0]  = %ld\n",
+		__func__, ucontrol->value.integer.value[0]);
+
+	return 0;
+}
+
+static int msm_sdw_spkr_right_boost_stage_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	u8 bst_state_max;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	dev_dbg(codec->dev, "%s: ucontrol->value.integer.value[0]  = %ld\n",
+		__func__, ucontrol->value.integer.value[0]);
+	bst_state_max =  ucontrol->value.integer.value[0] << 2;
+	snd_soc_update_bits(codec, MSM_SDW_BOOST1_BOOST_CTL,
+		0x0c, bst_state_max);
 
 	return 0;
 }
@@ -1463,8 +1523,15 @@ static const char * const msm_sdw_ear_spkr_pa_gain_text[] = {
 	"G_4_DB", "G_5_DB", "G_6_DB"
 };
 
+static const char * const msm_sdw_speaker_boost_stage_text[] = {
+	"NO_MAX_STATE", "MAX_STATE_1", "MAX_STATE_2"
+};
+
 static SOC_ENUM_SINGLE_EXT_DECL(msm_sdw_ear_spkr_pa_gain_enum,
 				msm_sdw_ear_spkr_pa_gain_text);
+static SOC_ENUM_SINGLE_EXT_DECL(msm_sdw_spkr_boost_stage_enum,
+			msm_sdw_speaker_boost_stage_text);
+
 /* RX4 MIX1 */
 static const struct soc_enum rx4_mix1_inp1_chain_enum =
 	SOC_ENUM_SINGLE(MSM_SDW_TOP_RX7_PATH_INPUT0_MUX,
@@ -1566,6 +1633,14 @@ static const struct snd_kcontrol_new msm_sdw_snd_controls[] = {
 	SOC_ENUM_EXT("EAR SPKR PA Gain", msm_sdw_ear_spkr_pa_gain_enum,
 		     msm_sdw_ear_spkr_pa_gain_get,
 		     msm_sdw_ear_spkr_pa_gain_put),
+	SOC_ENUM_EXT("SPKR Left Boost Max State",
+		msm_sdw_spkr_boost_stage_enum,
+		msm_sdw_spkr_left_boost_stage_get,
+		msm_sdw_spkr_left_boost_stage_put),
+	SOC_ENUM_EXT("SPKR Right Boost Max State",
+		msm_sdw_spkr_boost_stage_enum,
+		msm_sdw_spkr_right_boost_stage_get,
+		msm_sdw_spkr_right_boost_stage_put),
 	SOC_SINGLE_SX_TLV("RX4 Digital Volume", MSM_SDW_RX7_RX_VOL_CTL,
 		0, -84, 40, digital_gain),
 	SOC_SINGLE_SX_TLV("RX5 Digital Volume", MSM_SDW_RX8_RX_VOL_CTL,

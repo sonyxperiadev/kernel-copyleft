@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1190,12 +1190,22 @@ int mdss_dsi_reg_status_check(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	int ret = 0;
 	struct mdss_dsi_ctrl_pdata *sctrl_pdata = NULL;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct mipi_panel_info *mipi = NULL;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	if (ctrl_pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return 0;
 	}
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	mipi = &ctrl_pdata->panel_data.panel_info.mipi;
+	if (mipi->switch_mode_pending == true) {
+		pr_err("%s: Skip status check, Pending switch mode\n", __func__);
+		return 0;
+	}
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	pr_debug("%s: Checking Register status\n", __func__);
 
 	mdss_dsi_clk_ctrl(ctrl_pdata, ctrl_pdata->dsi_clk_handle,
@@ -1488,10 +1498,14 @@ static int mdss_dsi_wait4video_eng_busy(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	int ret = 0;
 	u32 v_total = 0, v_blank = 0, sleep_ms = 0, fps = 0;
-	struct mdss_panel_info *pinfo = &ctrl->panel_data.panel_info;
+	struct mdss_panel_info *pinfo;
 
-	if (ctrl->panel_mode == DSI_CMD_MODE)
+	/* for dsi 2.1 and above dma scheduling is used */
+	if ((!ctrl) || (ctrl->panel_mode == DSI_CMD_MODE) ||
+		(ctrl->shared_data->hw_rev > MDSS_DSI_HW_REV_200))
 		return ret;
+
+	pinfo = &ctrl->panel_data.panel_info;
 
 	if (ctrl->ctrl_state & CTRL_STATE_MDP_ACTIVE) {
 		mdss_dsi_wait4video_done(ctrl);
@@ -1512,12 +1526,39 @@ static int mdss_dsi_wait4video_eng_busy(struct mdss_dsi_ctrl_pdata *ctrl)
 	return ret;
 }
 
+static void mdss_dsi_schedule_dma_cmd(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	u32 v_blank, val = 0x0;
+	struct mdss_panel_info *pinfo;
+
+	/* for dsi 2.0 and below dma scheduling is not supported */
+	if ((!ctrl) || (ctrl->panel_mode == DSI_CMD_MODE) ||
+		(ctrl->shared_data->hw_rev < MDSS_DSI_HW_REV_201))
+		return;
+
+	pinfo = &ctrl->panel_data.panel_info;
+	v_blank = pinfo->lcdc.v_back_porch + pinfo->lcdc.v_pulse_width;
+
+	/* DMA_SCHEDULE_CTRL */
+	val = MIPI_INP(ctrl->ctrl_io.base + 0x100);
+	val = val | (1 << 28); /* DMA_SCHEDULE_EN */
+	MIPI_OUTP(ctrl->ctrl_io.base + 0x100, val);
+	val |= (pinfo->yres + v_blank);
+	MIPI_OUTP(ctrl->ctrl_io.base + 0x100, val); /* DMA_SCHEDULE_LINE */
+	wmb();
+
+	pr_debug("%s schedule at line %x", __func__, val);
+	MDSS_XLOG(ctrl->ndx, val);
+}
+
 static void mdss_dsi_wait4active_region(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	int in_blanking = 0;
 	int retry_count = 0;
 
-	if (ctrl->panel_mode != DSI_VIDEO_MODE)
+	/* for dsi 2.1 and above dma scheduling is used */
+	if ((!ctrl) || (ctrl->panel_mode != DSI_VIDEO_MODE) ||
+		(ctrl->shared_data->hw_rev > MDSS_DSI_HW_REV_200))
 		return;
 
 	while (retry_count != MAX_BTA_WAIT_RETRY) {
@@ -2204,6 +2245,10 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 	MIPI_OUTP((ctrl->ctrl_base) + 0x04c, len);
 	wmb();
 
+	/* schedule dma cmds at start of blanking region */
+	mdss_dsi_schedule_dma_cmd(ctrl);
+
+	/* DSI_CMD_MODE_DMA_SW_TRIGGER */
 	MIPI_OUTP((ctrl->ctrl_base) + 0x090, 0x01);
 	wmb();
 	MDSS_XLOG(ctrl->dma_addr, len);
@@ -2228,7 +2273,7 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 			/* clear CMD DMA and BTA_DONE isr only */
 			reg_val |= (DSI_INTR_CMD_DMA_DONE | DSI_INTR_BTA_DONE);
 			MIPI_OUTP(ctrl->ctrl_base + 0x0110, reg_val);
-			mdss_dsi_disable_irq_nosync(ctrl, DSI_CMD_TERM);
+			mdss_dsi_disable_irq(ctrl, DSI_CMD_TERM);
 			complete(&ctrl->dma_comp);
 
 			pr_warn("%s: dma tx done but irq not triggered\n",
@@ -2582,8 +2627,19 @@ void mdss_dsi_cmd_mdp_busy(struct mdss_dsi_ctrl_pdata *ctrl)
 		if (!ctrl->mdp_busy)
 			rc = 1;
 		spin_unlock_irqrestore(&ctrl->mdp_lock, flags);
-		if (!rc && mdss_dsi_mdp_busy_tout_check(ctrl))
-			pr_err("%s: timeout error\n", __func__);
+		if (!rc) {
+			if (mdss_dsi_mdp_busy_tout_check(ctrl)) {
+				pr_err("%s: timeout error\n", __func__);
+				MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0_ctrl",
+					"dsi0_phy", "dsi1_ctrl", "dsi1_phy",
+					"vbif", "vbif_nrt", "dbg_bus",
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+					"vbif_dbg_bus");
+#else
+					"vbif_dbg_bus", "panic");
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+			}
+		}
 	}
 	pr_debug("%s: done pid=%d\n", __func__, current->pid);
 	MDSS_XLOG(ctrl->ndx, ctrl->mdp_busy, current->pid, XLOG_FUNC_EXIT);
@@ -2685,6 +2741,9 @@ int mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 	int rc = 0;
 	bool hs_req = false;
 	bool cmd_mutex_acquired = false;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	bool cmdlist_mutex_acquired = false;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	if (from_mdp) {	/* from mdp kickoff */
 		if (!ctrl->burst_mode_enabled) {
@@ -2700,6 +2759,11 @@ int mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 	if (req && from_mdp && ctrl->burst_mode_enabled) {
 		mutex_lock(&ctrl->cmd_mutex);
 		cmd_mutex_acquired = true;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	} else if (!from_mdp) {
+		mutex_lock(&ctrl->cmdlist_mutex);
+		cmdlist_mutex_acquired = true;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	}
 
 	MDSS_XLOG(ctrl->ndx, from_mdp, ctrl->mdp_busy, current->pid,
@@ -2724,6 +2788,10 @@ int mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 		} else {
 			if (cmd_mutex_acquired)
 				mutex_unlock(&ctrl->cmd_mutex);
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			if (cmdlist_mutex_acquired)
+				mutex_unlock(&ctrl->cmdlist_mutex);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 			return -EPERM;
 		}
 	}
@@ -2772,6 +2840,10 @@ int mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 			pr_err("%s: Bus bw vote failed\n", __func__);
 			if (from_mdp)
 				mutex_unlock(&ctrl->cmd_mutex);
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			if (cmdlist_mutex_acquired)
+				mutex_unlock(&ctrl->cmdlist_mutex);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 			return rc;
 		}
 
@@ -2780,6 +2852,10 @@ int mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp)
 			if (IS_ERR_VALUE(rc)) {
 				pr_err("IOMMU attach failed\n");
 				mutex_unlock(&ctrl->cmd_mutex);
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+				if (cmdlist_mutex_acquired)
+					mutex_unlock(&ctrl->cmdlist_mutex);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 				return rc;
 			}
 			use_iommu = true;
@@ -2843,6 +2919,11 @@ need_lock:
 				ctrl->panel_mode == DSI_CMD_MODE &&
 				(req && (req->flags & CMD_REQ_HS_MODE)))
 			mdss_dsi_cmd_stop_hs_clk_lane(ctrl);
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		if (cmdlist_mutex_acquired)
+			mutex_unlock(&ctrl->cmdlist_mutex);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	}
 
 	return ret;

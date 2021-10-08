@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -33,17 +34,33 @@ static int msm_framebuffer_create_handle(struct drm_framebuffer *fb,
 		struct drm_file *file_priv,
 		unsigned int *handle)
 {
-	struct msm_framebuffer *msm_fb = to_msm_framebuffer(fb);
+	struct msm_framebuffer *msm_fb;
+
+	if (!fb) {
+		DRM_ERROR("from:%pS null fb\n", __builtin_return_address(0));
+		return -EINVAL;
+	}
+
+	msm_fb = to_msm_framebuffer(fb);
+
 	return drm_gem_handle_create(file_priv,
 			msm_fb->planes[0], handle);
 }
 
 static void msm_framebuffer_destroy(struct drm_framebuffer *fb)
 {
-	struct msm_framebuffer *msm_fb = to_msm_framebuffer(fb);
-	int i, n = drm_format_num_planes(fb->pixel_format);
+	struct msm_framebuffer *msm_fb;
+	int i, n;
 
-	DBG("destroy: FB ID: %d (%p)", fb->base.id, fb);
+	if (!fb) {
+		DRM_ERROR("from:%pS null fb\n", __builtin_return_address(0));
+		return;
+	}
+
+	msm_fb = to_msm_framebuffer(fb);
+	n = drm_format_num_planes(fb->pixel_format);
+
+	DBG("destroy: FB ID: %d (%pK)", fb->base.id, fb);
 
 	drm_framebuffer_cleanup(fb);
 
@@ -72,9 +89,16 @@ static const struct drm_framebuffer_funcs msm_framebuffer_funcs = {
 #ifdef CONFIG_DEBUG_FS
 void msm_framebuffer_describe(struct drm_framebuffer *fb, struct seq_file *m)
 {
-	struct msm_framebuffer *msm_fb = to_msm_framebuffer(fb);
-	int i, n = drm_format_num_planes(fb->pixel_format);
+	struct msm_framebuffer *msm_fb;
+	int i, n;
 
+	if (!fb) {
+		DRM_ERROR("from:%pS null fb\n", __builtin_return_address(0));
+		return;
+	}
+
+	msm_fb = to_msm_framebuffer(fb);
+	n = drm_format_num_planes(fb->pixel_format);
 	seq_printf(m, "fb: %dx%d@%4.4s (%2d, ID:%d)\n",
 			fb->width, fb->height, (char *)&fb->pixel_format,
 			fb->refcount.refcount.counter, fb->base.id);
@@ -95,10 +119,17 @@ void msm_framebuffer_describe(struct drm_framebuffer *fb, struct seq_file *m)
 int msm_framebuffer_prepare(struct drm_framebuffer *fb,
 		struct msm_gem_address_space *aspace)
 {
-	struct msm_framebuffer *msm_fb = to_msm_framebuffer(fb);
-	int ret, i, n = drm_format_num_planes(fb->pixel_format);
+	struct msm_framebuffer *msm_fb;
+	int ret, i, n;
 	uint64_t iova;
 
+	if (!fb) {
+		DRM_ERROR("from:%pS null fb\n", __builtin_return_address(0));
+		return -EINVAL;
+	}
+
+	msm_fb = to_msm_framebuffer(fb);
+	n = drm_format_num_planes(fb->pixel_format);
 	for (i = 0; i < n; i++) {
 		ret = msm_gem_get_iova(msm_fb->planes[i], aspace, &iova);
 		DBG("FB[%u]: iova[%d]: %08llx (%d)", fb->base.id, i, iova, ret);
@@ -112,8 +143,16 @@ int msm_framebuffer_prepare(struct drm_framebuffer *fb,
 void msm_framebuffer_cleanup(struct drm_framebuffer *fb,
 		struct msm_gem_address_space *aspace)
 {
-	struct msm_framebuffer *msm_fb = to_msm_framebuffer(fb);
-	int i, n = drm_format_num_planes(fb->pixel_format);
+	struct msm_framebuffer *msm_fb;
+	int i, n;
+
+	if (fb == NULL) {
+		DRM_ERROR("from:%pS null fb\n", __builtin_return_address(0));
+		return;
+	}
+
+	msm_fb = to_msm_framebuffer(fb);
+	n = drm_format_num_planes(fb->pixel_format);
 
 	for (i = 0; i < n; i++)
 		msm_gem_put_iova(msm_fb->planes[i], aspace);
@@ -123,9 +162,15 @@ void msm_framebuffer_cleanup(struct drm_framebuffer *fb,
 uint32_t msm_framebuffer_iova(struct drm_framebuffer *fb,
 		struct msm_gem_address_space *aspace, int plane)
 {
-	struct msm_framebuffer *msm_fb = to_msm_framebuffer(fb);
+	struct msm_framebuffer *msm_fb;
 	uint64_t iova;
 
+	if (!fb) {
+		DRM_ERROR("from:%pS null fb\n", __builtin_return_address(0));
+		return -EINVAL;
+	}
+
+	msm_fb = to_msm_framebuffer(fb);
 	if (!msm_fb->planes[plane])
 		return 0;
 
@@ -137,7 +182,14 @@ uint32_t msm_framebuffer_iova(struct drm_framebuffer *fb,
 
 struct drm_gem_object *msm_framebuffer_bo(struct drm_framebuffer *fb, int plane)
 {
-	struct msm_framebuffer *msm_fb = to_msm_framebuffer(fb);
+	struct msm_framebuffer *msm_fb;
+
+	if (!fb) {
+		DRM_ERROR("from:%pS null fb\n", __builtin_return_address(0));
+		return ERR_PTR(-EINVAL);
+	}
+
+	msm_fb = to_msm_framebuffer(fb);
 	return msm_fb->planes[plane];
 }
 
@@ -188,7 +240,7 @@ struct drm_framebuffer *msm_framebuffer_init(struct drm_device *dev,
 	unsigned int hsub, vsub;
 	bool is_modified = false;
 
-	DBG("create framebuffer: dev=%p, mode_cmd=%p (%dx%d@%4.4s)",
+	DBG("create framebuffer: dev=%pK, mode_cmd=%pK (%dx%d@%4.4s)",
 			dev, mode_cmd, mode_cmd->width, mode_cmd->height,
 			(char *)&mode_cmd->pixel_format);
 
@@ -271,7 +323,7 @@ struct drm_framebuffer *msm_framebuffer_init(struct drm_device *dev,
 		goto fail;
 	}
 
-	DBG("create: FB ID: %d (%p)", fb->base.id, fb);
+	DBG("create: FB ID: %d (%pK)", fb->base.id, fb);
 
 	return fb;
 

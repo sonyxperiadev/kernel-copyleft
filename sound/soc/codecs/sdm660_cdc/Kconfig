@@ -1,3 +1,6 @@
 
 config SND_SOC_SDM660_CDC
 	tristate "MSM Internal PMIC based codec"
+
+config HIGH_VOL_MIC
+	tristate "Config 2.7v microphone"

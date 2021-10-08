@@ -81,7 +81,7 @@ static ssize_t power_supply_show_property(struct device *dev,
 		"Non compliant",
 	};
 	static char *typec_pr_text[] = {
-		"none", "dual power role", "sink", "source"
+		"none", "dual power role", "sink", "source", "sink_delay"
 	};
 	ssize_t ret = 0;
 	struct power_supply *psy = dev_get_drvdata(dev);
@@ -247,6 +247,8 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(low_power),
 	POWER_SUPPLY_ATTR(temp_cool),
 	POWER_SUPPLY_ATTR(temp_warm),
+	POWER_SUPPLY_ATTR(temp_cold),
+	POWER_SUPPLY_ATTR(temp_hot),
 	POWER_SUPPLY_ATTR(system_temp_level),
 	POWER_SUPPLY_ATTR(resistance),
 	POWER_SUPPLY_ATTR(resistance_capacitive),
@@ -303,6 +305,32 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(pd_voltage_max),
 	POWER_SUPPLY_ATTR(pd_voltage_min),
 	POWER_SUPPLY_ATTR(sdp_current_max),
+	POWER_SUPPLY_ATTR(skin_temp),
+	POWER_SUPPLY_ATTR(smart_charging_activation),
+	POWER_SUPPLY_ATTR(smart_charging_interruption),
+	POWER_SUPPLY_ATTR(smart_charging_status),
+	POWER_SUPPLY_ATTR(lrc_enable),
+	POWER_SUPPLY_ATTR(lrc_socmax),
+	POWER_SUPPLY_ATTR(lrc_socmin),
+	POWER_SUPPLY_ATTR(lrc_not_startup),
+	POWER_SUPPLY_ATTR(max_charge_current),
+	POWER_SUPPLY_ATTR(charge_full_raw),
+	POWER_SUPPLY_ATTR(time_to_cap_learning),
+	POWER_SUPPLY_ATTR(int_cld),
+	POWER_SUPPLY_ATTR(monotonic_soc),
+	POWER_SUPPLY_ATTR(real_temp),
+	POWER_SUPPLY_ATTR(jeita_step_fcc),
+	POWER_SUPPLY_ATTR(jeita_step_fv),
+	POWER_SUPPLY_ATTR(jeita_condition),
+	POWER_SUPPLY_ATTR(learning_counter),
+	POWER_SUPPLY_ATTR(recharge_counter),
+	POWER_SUPPLY_ATTR(full_counter),
+	POWER_SUPPLY_ATTR(legacy_cable_status),
+	POWER_SUPPLY_ATTR(running_status),
+	POWER_SUPPLY_ATTR(charger_type_determined),
+	POWER_SUPPLY_ATTR(batt_aging_level),
+	POWER_SUPPLY_ATTR(fcc_stepper_enable),
+	POWER_SUPPLY_ATTR(recharge_voltage), //SMx2, soft charge feature
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_ATTR(charge_counter_ext),
 	/* Properties of type `const char *' */
@@ -310,6 +338,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(manufacturer),
 	POWER_SUPPLY_ATTR(serial_number),
 	POWER_SUPPLY_ATTR(battery_type),
+	POWER_SUPPLY_ATTR(charger_type),
 };
 
 static struct attribute *

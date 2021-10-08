@@ -357,7 +357,7 @@ static int cmdq_host_alloc_tdl(struct cmdq_host *cq_host)
 	if (!cq_host->desc_base || !cq_host->trans_desc_base)
 		return -ENOMEM;
 
-	pr_info("desc-base: 0x%p trans-base: 0x%p\n desc_dma 0x%llx trans_dma: 0x%llx\n",
+	pr_debug("desc-base: 0x%pK trans-base: 0x%pK\n desc_dma 0x%llx trans_dma: 0x%llx\n",
 		 cq_host->desc_base, cq_host->trans_desc_base,
 		(unsigned long long)cq_host->desc_dma_base,
 		(unsigned long long) cq_host->trans_desc_dma_base);
@@ -797,6 +797,10 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		cq_host->mrq_slot[DCMD_SLOT] = mrq;
 		/* DCMD's are always issued on a fixed slot */
 		tag = DCMD_SLOT;
+		if(cmdq_readl(cq_host, CQTDBR)) {
+			pr_err("mmc0: DCMD request, door bell is non zero = 0x%08x\n",
+					cmdq_readl(cq_host, CQTDBR));
+		}
 		goto ring_doorbell;
 	}
 
@@ -805,7 +809,7 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		if (err) {
 			pr_err("%s: failed to configure crypto: err %d tag %d\n",
 					mmc_hostname(mmc), err, tag);
-			goto out;
+			goto ice_err;
 		}
 	}
 
@@ -823,7 +827,7 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	if (err) {
 		pr_err("%s: %s: failed to setup tx desc: %d\n",
 		       mmc_hostname(mmc), __func__, err);
-		goto out;
+		goto desc_err;
 	}
 
 	cq_host->mrq_slot[tag] = mrq;
@@ -843,6 +847,22 @@ ring_doorbell:
 	/* Commit the doorbell write immediately */
 	wmb();
 
+	return err;
+
+desc_err:
+	if (cq_host->ops->crypto_cfg_end) {
+		err = cq_host->ops->crypto_cfg_end(mmc, mrq);
+		if (err) {
+			pr_err("%s: failed to end ice config: err %d tag %d\n",
+					mmc_hostname(mmc), err, tag);
+		}
+	}
+	if (!(cq_host->caps & CMDQ_CAP_CRYPTO_SUPPORT) &&
+			cq_host->ops->crypto_cfg_reset)
+		cq_host->ops->crypto_cfg_reset(mmc, tag);
+ice_err:
+	if (err)
+		cmdq_runtime_pm_put(cq_host);
 out:
 	return err;
 }
@@ -900,6 +920,10 @@ irqreturn_t cmdq_irq(struct mmc_host *mmc, int err)
 		__func__, status, err);
 
 	stat_err = status & (CQIS_RED | CQIS_GCE | CQIS_ICCE);
+
+	if (CMDQ_QUIRK_PANIC_ON_ERROR_ENABLED &&
+	    (status & CQIS_RED) && (cmdq_readl(cq_host, CQCRA) & R1_ERROR))
+		panic("MMC Generic Error in CMDQ: Panic as not sure what else to do!");
 
 	if (err || stat_err) {
 		err_info = cmdq_readl(cq_host, CQTERRI);

@@ -108,6 +108,105 @@ config ARCH_SDM630
 	  If you do not wish to build a kernel that runs
 	  on this chipset,say 'N' here.
 
+config ARCH_SONY_GANGES
+    bool "Sony Mobile Ganges platform"
+    depends on ARCH_SDM630
+    help
+    Support for the SONY Mobile Ganges platform
+    which is based on QCOM SDM630 chipset.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_PIONEER
+    bool "Sony Mobile Pioneer"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Pioneer device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_PIONEER_DSDS
+    bool "Sony Mobile Pioneer Dsds"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Pioneer DS device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_DISCOVERY
+    bool "Sony Mobile Discovery"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Discovery device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_DISCOVERY_DSDS
+    bool "Sony Mobile Discovery Dsds"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Discovery DS device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_VOYAGER
+    bool "Sony Mobile Voyager"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Voyager device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_VOYAGER_DSDS
+    bool "Sony Mobile Voyager Dsds"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Voyager DS device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_KIRIN
+    bool "Sony Mobile Kirin"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Kirin device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_KIRIN_DSDS
+    bool "Sony Mobile Kirin Dsds"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Kirin DS device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_MERMAID
+    bool "Sony Mobile Mermaid"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Mermaid device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
+config MACH_SONY_MERMAID_DSDS
+    bool "Sony Mobile Mermaid Dsds"
+    depends on ARCH_SONY_GANGES
+    help
+    Support for the SONY Mobile Mermaid DS device
+    which is based on SONY Ganges platform.
+    If you enable this config,
+    please use SONY Mobile device tree.
+
 config ARCH_ROCKCHIP
 	bool "Rockchip Platforms"
 	select ARCH_HAS_RESET_CONTROLLER
@@ -146,8 +245,6 @@ config ARCH_TEGRA_132_SOC
 	bool "NVIDIA Tegra132 SoC"
 	depends on ARCH_TEGRA
 	select PINCTRL_TEGRA124
-	select USB_ULPI if USB_PHY
-	select USB_ULPI_VIEWPORT if USB_PHY
 	help
 	  Enable support for NVIDIA Tegra132 SoC, based on the Denver
 	  ARMv8 CPU.  The Tegra132 SoC is similar to the Tegra124 SoC,

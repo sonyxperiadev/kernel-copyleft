@@ -108,6 +108,14 @@ struct msm_actuator_ctrl_t {
 	struct msm_camera_gpio_conf *gconf;
 	struct msm_pinctrl_info pinctrl_info;
 	uint8_t cam_pinctrl_status;
+#if defined(CONFIG_MACH_SONY_PIONEER) || \
+	defined(CONFIG_MACH_SONY_PIONEER_DSDS) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY_DSDS) || \
+	defined(CONFIG_MACH_SONY_VOYAGER) || \
+	defined(CONFIG_MACH_SONY_VOYAGER_DSDS)
+	struct msm_actuator_board_info *oboard_info;
+#endif
 };
 
 #endif

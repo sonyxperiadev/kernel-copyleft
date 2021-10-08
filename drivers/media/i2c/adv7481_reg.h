@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -73,6 +73,10 @@
 #define IO_CTRL_MASTER_PWDN_REG_VALUE           0x01
 
 /* Interrupts */
+#define IO_HDMI_LVL_RAW_STATUS_1_ADDR           0x67
+#define IO_AVI_INFO_RAW_BMSK                    0x0001
+#define IO_AVI_INFO_RAW_SHFT                    0
+
 #define IO_HDMI_LVL_INT_CLEAR_1_ADDR            0x69
 
 #define IO_HDMI_LVL_INT_MASKB_1_ADDR            0x6B
@@ -342,6 +346,12 @@
 #define HDMI_EDID_A_ENABLE_BMSK                 0x0001
 #define HDMI_EDID_A_ENABLE_SHFT                 0
 
+/* HDMI RX INFOFRAME Map Registers (Read Only) */
+#define HDMI_REG_AVI_INF_PB_ADDR                0x00
+#define HDMI_REG_AVI_PACKET_ID_ADDR             0xE0
+#define HDMI_REG_AVI_INF_VERS_ADDR              0xE1
+#define HDMI_REG_AVI_INF_LEN_ADDR               0xE2
+
 /* CEC Map Registers */
 #define CEC_REG_LOG_ADDR_MASK_ADDR              0x27
 #define CEC_REG_LOG_ADDR_MASK2_BMSK             0x0040
@@ -410,6 +420,18 @@
 #define SDP_RO_MAIN_LOST_LOCK_SHFT              1
 #define SDP_RO_MAIN_IN_LOCK_BMSK                0x0001
 #define SDP_RO_MAIN_IN_LOCK_SHFT                0
+#define SDP_RO_MAIN_INTERLACE_STATE_ADDR	0x13
+#define SDP_RO_MAIN_INTERLACE_STATE_BMSK	0x0040
+#define SDP_RO_MAIN_INTERLACE_STATE_SHFT	6
+#define SDP_RO_MAIN_FIELD_LEN_BMSK		0x0020
+#define SDP_RO_MAIN_FIELD_LEN_SHFT		5
+#define SDP_RO_MAIN_SD_FIELD_RATE_BMSK		0x0004
+#define SDP_RO_MAIN_SD_FIELD_RATE_SHFT		2
+
+/* SDP R/O Map 1 Registers */
+#define SDP_RO_MAP_1_FIELD_ADDR                 0x45
+#define SDP_RO_MAP_1_EVEN_FIELD_BMSK            0x10
+#define SDP_RO_MAP_1_EVEN_FIELD_SHFT            4
 
 
 /*

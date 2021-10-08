@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,7 +23,7 @@
 
 #define MSM_VDEC_DVC_NAME "msm_vdec_8974"
 #define MIN_NUM_OUTPUT_BUFFERS 4
-#define MIN_NUM_OUTPUT_BUFFERS_VP9 6
+#define MIN_NUM_OUTPUT_BUFFERS_HEVC 5
 #define MIN_NUM_CAPTURE_BUFFERS 6
 #define MIN_NUM_THUMBNAIL_MODE_CAPTURE_BUFFERS 1
 #define MAX_NUM_OUTPUT_BUFFERS VB2_MAX_FRAME
@@ -605,6 +605,9 @@ static struct msm_vidc_ctrl msm_vdec_ctrls[] = {
 #define NUM_CTRLS ARRAY_SIZE(msm_vdec_ctrls)
 
 static int vdec_hal_to_v4l2(int id, int value);
+
+static int try_set_ext_ctrl(struct msm_vidc_inst *inst,
+	struct v4l2_ext_controls *ctrl);
 
 static u32 get_frame_size_nv12(int plane,
 					u32 height, u32 width)
@@ -1469,16 +1472,11 @@ static int msm_vdec_queue_setup(struct vb2_queue *q,
 		if (*num_buffers < MIN_NUM_OUTPUT_BUFFERS ||
 				*num_buffers > MAX_NUM_OUTPUT_BUFFERS)
 			*num_buffers = MIN_NUM_OUTPUT_BUFFERS;
-		/*
-		 * Increase input buffer count to 6 as for some
-		 * vp9 clips which have superframes with more
-		 * than 4 subframes requires more than 4
-		 * reference frames to decode.
-		 */
+
 		if (inst->fmts[OUTPUT_PORT].fourcc ==
-				V4L2_PIX_FMT_VP9 &&
-				*num_buffers < MIN_NUM_OUTPUT_BUFFERS_VP9)
-			*num_buffers = MIN_NUM_OUTPUT_BUFFERS_VP9;
+				V4L2_PIX_FMT_HEVC &&
+				*num_buffers < MIN_NUM_OUTPUT_BUFFERS_HEVC)
+			*num_buffers = MIN_NUM_OUTPUT_BUFFERS_HEVC;
 
 		for (i = 0; i < *num_planes; i++) {
 			sizes[i] = get_frame_size(inst,
@@ -1595,6 +1593,11 @@ static int set_max_internal_buffers_size(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	struct msm_vidc_list *buf_list = &inst->scratchbufs;
+	enum multi_stream stream_mode;
+	struct hfi_device *hdev;
+	struct hal_buffer_requirements *output_buf;
+	u32 output_count_actual;
+
 	struct {
 		enum hal_buffer type;
 		struct hal_buffer_requirements *req;
@@ -1606,6 +1609,10 @@ static int set_max_internal_buffers_size(struct msm_vidc_inst *inst)
 
 	struct hal_frame_size frame_sz;
 	int i;
+	struct v4l2_ext_controls ext_ctrls;
+	struct v4l2_ext_control controls[2];
+
+	hdev = inst->core->device;
 	mutex_lock(&buf_list->lock);
 	if (!list_empty(&buf_list->list)) {
 		dprintk(VIDC_DBG, "Scratch list already has allocated buf\n");
@@ -1625,6 +1632,36 @@ static int set_max_internal_buffers_size(struct msm_vidc_inst *inst)
 		frame_sz.buffer_type, frame_sz.width,
 		frame_sz.height, inst->capability.mbs_per_frame.max);
 
+	stream_mode = msm_comm_get_stream_output_mode(inst);
+
+	if (stream_mode == HAL_VIDEO_DECODER_PRIMARY) {
+		output_buf = get_buff_req_buffer(inst, HAL_BUFFER_OUTPUT);
+		if (!output_buf) {
+			dprintk(VIDC_ERR,
+				"No buffer requirement for buffer type %x\n",
+				HAL_BUFFER_OUTPUT);
+			rc = -EINVAL;
+			goto alloc_fail;
+		}
+		output_count_actual = output_buf->buffer_count_actual;
+		ext_ctrls.count = 2;
+		ext_ctrls.controls = controls;
+		controls[0].id = V4L2_CID_MPEG_VIDC_VIDEO_STREAM_OUTPUT_MODE;
+		controls[0].value =
+			V4L2_CID_MPEG_VIDC_VIDEO_STREAM_OUTPUT_SECONDARY;
+		controls[1].id = V4L2_CID_MPEG_VIDC_VIDEO_DPB_COLOR_FORMAT;
+		controls[1].value = V4L2_MPEG_VIDC_VIDEO_DPB_COLOR_FMT_UBWC;
+		rc = try_set_ext_ctrl(inst, &ext_ctrls);
+		if (rc) {
+			dprintk(VIDC_ERR,
+				"%s Failed to move to split mode %d\n",
+				__func__, rc);
+			goto alloc_fail;
+		}
+	}
+
+	msm_comm_try_set_prop(inst, HAL_PARAM_FRAME_SIZE, &frame_sz);
+	frame_sz.buffer_type = HAL_BUFFER_OUTPUT2;
 	msm_comm_try_set_prop(inst, HAL_PARAM_FRAME_SIZE, &frame_sz);
 	rc = msm_comm_try_get_bufreqs(inst);
 	if (rc) {
@@ -1638,6 +1675,8 @@ static int set_max_internal_buffers_size(struct msm_vidc_inst *inst)
 			get_buff_req_buffer(inst, internal_buffers[i].type);
 		internal_buffers[i].size = internal_buffers[i].req ?
 			internal_buffers[i].req->buffer_size : 0;
+		if (internal_buffers[i].req == NULL)
+			continue;
 
 		rc = allocate_and_set_internal_bufs(inst,
 					internal_buffers[i].req,
@@ -1647,6 +1686,31 @@ static int set_max_internal_buffers_size(struct msm_vidc_inst *inst)
 		dprintk(VIDC_DBG,
 			"Allocated scratch type : %d size to : %zd\n",
 			internal_buffers[i].type, internal_buffers[i].size);
+	}
+
+	if (stream_mode == HAL_VIDEO_DECODER_PRIMARY) {
+		ext_ctrls.count = 2;
+		ext_ctrls.controls = controls;
+		controls[0].id = V4L2_CID_MPEG_VIDC_VIDEO_STREAM_OUTPUT_MODE;
+		controls[0].value =
+			V4L2_CID_MPEG_VIDC_VIDEO_STREAM_OUTPUT_PRIMARY;
+		controls[1].id = V4L2_CID_MPEG_VIDC_VIDEO_DPB_COLOR_FORMAT;
+		controls[1].value = V4L2_MPEG_VIDC_VIDEO_DPB_COLOR_FMT_NONE;
+		rc = try_set_ext_ctrl(inst, &ext_ctrls);
+		if (rc) {
+			dprintk(VIDC_ERR,
+				"Failed to move to split mode %d\n",
+				rc);
+			goto alloc_fail;
+		}
+		rc = set_actual_buffer_count(inst, output_count_actual,
+			HAL_BUFFER_OUTPUT);
+		if (rc) {
+			dprintk(VIDC_ERR,
+				"Failed to set output buffer count(%u): %d\n",
+				output_count_actual, rc);
+			goto alloc_fail;
+		}
 	}
 
 	frame_sz.buffer_type = HAL_BUFFER_INPUT;
@@ -1967,6 +2031,8 @@ const struct vb2_ops *msm_vdec_get_vb2q_ops(void)
 int msm_vdec_inst_init(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
+	struct msm_vidc_format *fmt = NULL;
+
 	if (!inst) {
 		dprintk(VIDC_ERR, "Invalid input = %pK\n", inst);
 		return -EINVAL;
@@ -1974,12 +2040,34 @@ int msm_vdec_inst_init(struct msm_vidc_inst *inst)
 	inst->prop.height[CAPTURE_PORT] = DEFAULT_HEIGHT;
 	inst->prop.width[CAPTURE_PORT] = DEFAULT_WIDTH;
 	inst->prop.num_planes[CAPTURE_PORT] = 2;
-	inst->fmts[CAPTURE_PORT] = vdec_formats[0];
+
+	/* By default, initialize CAPTURE port to NV12 format */
+	fmt = msm_comm_get_pixel_fmt_fourcc(vdec_formats,
+		ARRAY_SIZE(vdec_formats), V4L2_PIX_FMT_NV12,
+			CAPTURE_PORT);
+	if (!fmt || fmt->type != CAPTURE_PORT) {
+		dprintk(VIDC_ERR,
+			"vdec_formats corrupted\n");
+		return -EINVAL;
+	}
+	memcpy(&inst->fmts[fmt->type], fmt,
+			sizeof(struct msm_vidc_format));
 
 	inst->prop.height[OUTPUT_PORT] = DEFAULT_HEIGHT;
 	inst->prop.width[OUTPUT_PORT] = DEFAULT_WIDTH;
 	inst->prop.num_planes[OUTPUT_PORT] = 1;
-	inst->fmts[OUTPUT_PORT] = vdec_formats[2];
+
+	/* By default, initialize OUTPUT port to H264 decoder */
+	fmt = msm_comm_get_pixel_fmt_fourcc(vdec_formats,
+			ARRAY_SIZE(vdec_formats), V4L2_PIX_FMT_H264,
+				OUTPUT_PORT);
+	if (!fmt || fmt->type != OUTPUT_PORT) {
+		dprintk(VIDC_ERR,
+			"vdec_formats corrupted\n");
+		return -EINVAL;
+	}
+	memcpy(&inst->fmts[fmt->type], fmt,
+			sizeof(struct msm_vidc_format));
 
 	inst->capability.height.min = MIN_SUPPORTED_HEIGHT;
 	inst->capability.height.max = DEFAULT_HEIGHT;

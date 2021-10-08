@@ -161,6 +161,14 @@ struct msm_actuator_params_t32 {
 	compat_uptr_t reg_tbl_params;
 	compat_uptr_t init_settings;
 	struct park_lens_data_t park_lens;
+#if defined(CONFIG_MACH_SONY_PIONEER) || \
+	defined(CONFIG_MACH_SONY_PIONEER_DSDS) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY_DSDS) || \
+	defined(CONFIG_MACH_SONY_VOYAGER) || \
+	defined(CONFIG_MACH_SONY_VOYAGER_DSDS)
+	struct msm_actuator_board_info board_info;
+#endif
 };
 
 struct msm_actuator_set_info_t32 {

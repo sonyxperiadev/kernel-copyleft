@@ -46,6 +46,10 @@ struct msm_mmu_funcs {
 	void (*destroy)(struct msm_mmu *mmu);
 	void (*enable)(struct msm_mmu *mmu);
 	void (*disable)(struct msm_mmu *mmu);
+	int (*early_splash_map)(struct msm_mmu *mmu, uint64_t iova,
+			struct sg_table *sgt, u32 flags);
+	void (*early_splash_unmap)(struct msm_mmu *mmu, uint64_t iova,
+			struct sg_table *sgt);
 	int (*set_property)(struct msm_mmu *mmu,
 				enum iommu_attr attr, void *data);
 };
@@ -88,5 +92,9 @@ static inline void msm_mmu_disable(struct msm_mmu *mmu)
 /* SDE smmu driver initialize and cleanup functions */
 int __init msm_smmu_driver_init(void);
 void __exit msm_smmu_driver_cleanup(void);
+
+/* register custom fault handler for a specific domain */
+void msm_smmu_register_fault_handler(struct msm_mmu *mmu,
+	iommu_fault_handler_t handler);
 
 #endif /* __MSM_MMU_H__ */

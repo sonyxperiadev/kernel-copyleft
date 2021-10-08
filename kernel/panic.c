@@ -29,6 +29,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/exception.h>
 
+#include <linux/crash_notes.h>
+
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
 
@@ -127,6 +129,9 @@ void panic(const char *fmt, ...)
 	 */
 	if (!crash_kexec_post_notifiers)
 		crash_kexec(NULL);
+
+	/* Store crash context for all other no panic cpus */
+		crash_notes_save_cpus();
 
 	/*
 	 * Note smp_send_stop is the usual smp shutdown function, which

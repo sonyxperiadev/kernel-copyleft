@@ -239,7 +239,11 @@ static struct xfrm_algo_desc aalg_list[] = {
 
 	.uinfo = {
 		.auth = {
+#ifdef CONFIG_XFRM_RFC_4868_TRUNCATION
 			.icv_truncbits = 128,
+#else
+			.icv_truncbits = 96,
+#endif
 			.icv_fullbits = 256,
 		}
 	},

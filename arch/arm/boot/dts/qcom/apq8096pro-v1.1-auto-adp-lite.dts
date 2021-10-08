@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,10 +30,6 @@
 };
 
 &soc {
-	qcom,msm-ssc-sensors {
-		status = "disabled";
-	};
-
 	qcom,msm-thermal {
 		qcom,hotplug-temp = <115>;
 		qcom,hotplug-temp-hysteresis = <25>;
@@ -54,10 +50,18 @@
 	qcom,msm-ba {
 		status = "disabled";
 	};
+
+	qcom,tv-tuner {
+		status = "disabled";
+	};
 };
 
 &dsi_adv_7533_2 {
 	/delete-property/ qcom,dsi-display-active;
+};
+
+&sde_kms {
+	connectors = <&sde_hdmi_tx &sde_hdmi &dsi_adv_7533_1>;
 };
 
 &pil_modem {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -70,6 +70,19 @@ void kgsl_snapshot_push_object(struct kgsl_process_private *process,
 	for (index = 0; index < objbufptr; index++) {
 		if (objbuf[index].gpuaddr == gpuaddr &&
 			objbuf[index].entry->priv == process) {
+			/*
+			 * Check if newly requested size is within the
+			 * allocated range or not, otherwise continue
+			 * with previous size.
+			 */
+			if (!kgsl_gpuaddr_in_memdesc(
+				&objbuf[index].entry->memdesc,
+				gpuaddr, dwords << 2)) {
+				KGSL_CORE_ERR(
+					"snapshot: IB 0x%016llx size is not within the memdesc range\n",
+					gpuaddr);
+				return;
+			}
 
 			objbuf[index].size = max_t(uint64_t,
 						objbuf[index].size,
@@ -400,6 +413,8 @@ static void snapshot_rb_ibs(struct kgsl_device *device,
 				ibsize = rbptr[index + 3];
 			}
 
+			index = (index + 1) % KGSL_RB_DWORDS;
+
 			/* Don't parse known global IBs */
 			if (iommu_is_setstate_addr(device, ibaddr, ibsize))
 				continue;
@@ -410,9 +425,8 @@ static void snapshot_rb_ibs(struct kgsl_device *device,
 
 			parse_ib(device, snapshot, snapshot->process,
 				ibaddr, ibsize);
-		}
-
-		index = (index + 1) % KGSL_RB_DWORDS;
+		} else
+			index = (index + 1) % KGSL_RB_DWORDS;
 	}
 
 }

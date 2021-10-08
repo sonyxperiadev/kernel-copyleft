@@ -6,7 +6,7 @@
  * Copyright (C) 2008 Nokia Corporation
  * Copyright (C) 2009 Samsung Electronics
  *			Author: Michal Nazarewicz (mina86@mina86.com)
- * Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2
@@ -106,6 +106,8 @@ struct f_rndis_qc {
 	u8				port_num;
 	u16				cdc_filter;
 	bool				net_ready_trigger;
+	bool				use_wceis;
+	bool				linux_support;
 };
 
 static struct ipa_usb_init_params rndis_ipa_params;
@@ -161,9 +163,9 @@ static struct usb_interface_descriptor rndis_qc_control_intf = {
 	/* .bInterfaceNumber = DYNAMIC */
 	/* status endpoint is optional; this could be patched later */
 	.bNumEndpoints =	1,
-	.bInterfaceClass =	USB_CLASS_WIRELESS_CONTROLLER,
-	.bInterfaceSubClass =   0x01,
-	.bInterfaceProtocol =   0x03,
+	.bInterfaceClass =	USB_CLASS_MISC,
+	.bInterfaceSubClass =   0x04,
+	.bInterfaceProtocol =   0x01, /* RNDIS over ethernet */
 	/* .iInterface = DYNAMIC */
 };
 
@@ -222,9 +224,9 @@ rndis_qc_iad_descriptor = {
 	.bDescriptorType =	USB_DT_INTERFACE_ASSOCIATION,
 	.bFirstInterface =	0, /* XXX, hardcoded */
 	.bInterfaceCount =	2, /* control + data */
-	.bFunctionClass =	USB_CLASS_WIRELESS_CONTROLLER,
-	.bFunctionSubClass =	0x01,
-	.bFunctionProtocol =	0x03,
+	.bFunctionClass =	USB_CLASS_MISC,
+	.bFunctionSubClass =	0x04,
+	.bFunctionProtocol =	0x01, /* RNDIS over ethernet */
 	/* .iFunction = DYNAMIC */
 };
 
@@ -910,6 +912,13 @@ rndis_qc_bind(struct usb_configuration *c, struct usb_function *f)
 	int			status;
 	struct usb_ep		*ep;
 
+	status = rndis_ipa_init(&rndis_ipa_params);
+	if (status) {
+		pr_err("%s: failed to init rndis_ipa\n", __func__);
+		return status;
+	}
+
+	rndis_ipa_supported = true;
 	/* maybe allocate device-global string IDs */
 	if (rndis_qc_string_defs[0].id == 0) {
 
@@ -933,6 +942,17 @@ rndis_qc_bind(struct usb_configuration *c, struct usb_function *f)
 			return status;
 		rndis_qc_string_defs[2].id = status;
 		rndis_qc_iad_descriptor.iFunction = status;
+	}
+
+	if (rndis->use_wceis) {
+		rndis_qc_iad_descriptor.bFunctionClass =
+				USB_CLASS_WIRELESS_CONTROLLER;
+		rndis_qc_iad_descriptor.bFunctionSubClass = 0x01;
+		rndis_qc_iad_descriptor.bFunctionProtocol = 0x03;
+		rndis_qc_control_intf.bInterfaceClass =
+				USB_CLASS_WIRELESS_CONTROLLER;
+		rndis_qc_control_intf.bInterfaceSubClass = 0x1;
+		rndis_qc_control_intf.bInterfaceProtocol = 0x03;
 	}
 
 	/* allocate instance-specific interface IDs */
@@ -1191,11 +1211,8 @@ usb_function *rndis_qc_bind_config_vendor(struct usb_function_instance *fi,
 	struct f_rndis_qc_opts *opts = container_of(fi,
 				struct f_rndis_qc_opts, func_inst);
 	struct f_rndis_qc	*rndis;
-	int		status;
 
 	/* allocate and initialize one new instance */
-	status = -ENOMEM;
-
 	opts = container_of(fi, struct f_rndis_qc_opts, func_inst);
 
 	opts->refcnt++;
@@ -1209,7 +1226,6 @@ usb_function *rndis_qc_bind_config_vendor(struct usb_function_instance *fi,
 	pr_debug("setting host_ethaddr=%pM, device_ethaddr=%pM\n",
 		rndis_ipa_params.host_ethaddr,
 		rndis_ipa_params.device_ethaddr);
-	rndis_ipa_supported = true;
 	ether_addr_copy(rndis->ethaddr, rndis_ipa_params.host_ethaddr);
 	rndis_ipa_params.device_ready_notify = rndis_net_ready_notify;
 
@@ -1251,19 +1267,9 @@ usb_function *rndis_qc_bind_config_vendor(struct usb_function_instance *fi,
 	rndis->func.resume = rndis_qc_resume;
 	rndis->func.free_func = rndis_qc_free;
 
-	status = rndis_ipa_init(&rndis_ipa_params);
-	if (status) {
-		pr_err("%s: failed to init rndis_ipa\n", __func__);
-		goto fail;
-	}
-
 	_rndis_qc = rndis;
 
 	return &rndis->func;
-fail:
-	kfree(rndis);
-	_rndis_qc = NULL;
-	return ERR_PTR(status);
 }
 
 static struct usb_function *qcrndis_alloc(struct usb_function_instance *fi)
@@ -1470,8 +1476,62 @@ static struct configfs_item_operations qcrndis_item_ops = {
 	.release        = qcrndis_attr_release,
 };
 
+
+static ssize_t qcrndis_wceis_show(struct config_item *item, char *page)
+{
+	struct f_rndis_qc	*rndis = to_f_qc_rndis_opts(item)->rndis;
+
+	return snprintf(page, PAGE_SIZE, "%d\n", rndis->use_wceis);
+}
+
+static ssize_t qcrndis_wceis_store(struct config_item *item,
+			const char *page, size_t len)
+{
+	struct f_rndis_qc	*rndis = to_f_qc_rndis_opts(item)->rndis;
+	bool val;
+
+	if (kstrtobool(page, &val))
+		return -EINVAL;
+
+	rndis->use_wceis = val;
+
+	return len;
+}
+
+static ssize_t qcrndis_linux_support_show(struct config_item *item, char *page)
+{
+	struct f_rndis_qc	*rndis = to_f_qc_rndis_opts(item)->rndis;
+
+	return snprintf(page, PAGE_SIZE, "%d\n", rndis->linux_support);
+}
+
+static ssize_t qcrndis_linux_support_store(struct config_item *item,
+			const char *page, size_t len)
+{
+	struct f_rndis_qc	*rndis = to_f_qc_rndis_opts(item)->rndis;
+	bool val;
+
+	if (kstrtobool(page, &val))
+		return -EINVAL;
+
+	rndis->linux_support = val;
+	rndis->use_wceis = rndis->linux_support;
+
+	return len;
+}
+
+CONFIGFS_ATTR(qcrndis_, wceis);
+CONFIGFS_ATTR(qcrndis_, linux_support);
+
+static struct configfs_attribute *qcrndis_attrs[] = {
+	&qcrndis_attr_wceis,
+	&qcrndis_attr_linux_support,
+	NULL,
+};
+
 static struct config_item_type qcrndis_func_type = {
 	.ct_item_ops    = &qcrndis_item_ops,
+	.ct_attrs	= qcrndis_attrs,
 	.ct_owner       = THIS_MODULE,
 };
 

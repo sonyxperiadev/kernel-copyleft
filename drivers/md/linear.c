@@ -68,7 +68,7 @@ static int linear_congested(struct mddev *mddev, int bits)
 
 	for (i = 0; i < conf->raid_disks && !ret ; i++) {
 		struct request_queue *q = bdev_get_queue(conf->disks[i].rdev->bdev);
-		ret |= bdi_congested(&q->backing_dev_info, bits);
+		ret |= bdi_congested(q->backing_dev_info, bits);
 	}
 
 	rcu_read_unlock();
@@ -223,7 +223,8 @@ static int linear_add(struct mddev *mddev, struct md_rdev *rdev)
 	 * oldconf until no one uses it anymore.
 	 */
 	mddev_suspend(mddev);
-	oldconf = rcu_dereference(mddev->private);
+	oldconf = rcu_dereference_protected(mddev->private,
+			lockdep_is_held(&mddev->reconfig_mutex));
 	mddev->raid_disks++;
 	WARN_ONCE(mddev->raid_disks != newconf->raid_disks,
 		"copied raid_disks doesn't match mddev->raid_disks");

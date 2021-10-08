@@ -1,6 +1,15 @@
 #
 # QCOM Soc drivers
 #
+source "drivers/soc/qcom/hab/Kconfig"
+config MSM_PASR
+	bool "MSM DDR Partial Array Self-Refresh Driver"
+	help
+	  RPM controls DDR functionaliy. This driver
+	  is an interface for linux memory hotplug to RPM
+	  for start/stop self-refresh of hot added or removed
+	  memory in DDR.
+
 config MSM_INRUSH_CURRENT_MITIGATION
 	bool "Inrush-current mitigation Driver"
 	help
@@ -428,6 +437,13 @@ config QCOM_WATCHDOG_V2
 	  deadlocks. It does not run during the bootup process, so it will
 	  not catch any early lockups.
 
+config MSM_FORCE_PANIC_ON_WDOG_BARK
+	bool "Force Panic on watchdog bark"
+	depends on QCOM_WATCHDOG_V2
+	help
+	  Triggers a kernel panic for watchdog bark. This will print more
+	  information about the current running tasks on all the cpus.
+
 config QCOM_IRQ_HELPER
 	bool "QCOM Irq Helper"
 	help
@@ -614,6 +630,15 @@ config MSM_QDSP6_APRV2
           used by audio driver to configure QDSP6's
           ASM, ADM and AFE.
 
+config MSM_QDSP6_APRV2_VM
+        bool "Audio QDSP6 APRv2 virtualization support"
+        depends on MSM_HAB
+        help
+          Enable APRv2 IPC protocol support over
+          HAB between application processor and
+          QDSP6. APR is used by audio driver to
+          configure QDSP6's ASM, ADM and AFE.
+
 config MSM_QDSP6_APRV3
 	bool "Audio QDSP6 APRv3 support"
 	depends on MSM_SMD
@@ -692,6 +717,18 @@ config MSM_CDSP_LOADER
 	  Enable CDSP image loader.
 	  The CDSP loader brings CDSP out of reset
 	  during boot.
+	  Say M if you want to enable this module.
+
+config MSM_LPASS_RESOURCE_MANAGER
+	tristate "LPASS Resource Manager support"
+	select SND_SOC_MSM_APRV2_INTF
+	depends on MSM_QDSP6_APRV2 || MSM_QDSP6_APRV3 || \
+		MSM_QDSP6_APRV2_GLINK || MSM_QDSP6_APRV3_GLINK
+	help
+	  Manages the allocation of LPASS resources. It also
+	  can check LPAIF for Early Audio playback progress.
+	  To check early audio playback, PCM registers are read.
+	  If register is enabled, playback is on-going.
 	  Say M if you want to enable this module.
 
 config MSM_PERFORMANCE
@@ -798,7 +835,8 @@ config MSM_EVENT_TIMER
 
 config MSM_AVTIMER
 	tristate "Avtimer Driver"
-	depends on MSM_QDSP6_APRV2 || MSM_QDSP6_APRV3 || MSM_QDSP6_APRV2_GLINK
+	depends on MSM_QDSP6_APRV2 || MSM_QDSP6_APRV3 || MSM_QDSP6_APRV2_GLINK || \
+		MSM_QDSP6_APRV2_VM
 	help
 		This driver gets the Q6 out of power collapsed state and
 		exposes ioctl control to read avtimer tick.
@@ -946,5 +984,43 @@ config MSM_CACHE_M4M_ERP64_PANIC_ON_UE
        help
          Say 'Y' here to cause kernel panic when uncorrectable cache/M4M errors
          are detected.
+
+config QCOM_QDSS_BRIDGE
+	bool "Configure bridge driver for QTI/Qualcomm Technologies, Inc. MDM"
+	depends on MSM_MHI
+	help
+	  The driver will help route diag traffic from modem side over the QDSS
+	  sub-system to USB on APSS side. The driver acts as a bridge between the
+	  MHI and USB interface. If unsure, say N.
+
+config SUBSYS_LAST_ERR_LOG
+	bool "support last error log for subsystems"
+	help
+	  When a fatal error is encountered, few subsystems export the
+	  error log into SMEM. This driver supports the mechanism to read
+	  these logs and exports them to user via procfs.
+	  If unsure, say N
+
+config LAST_LOGS
+	bool "support last logs for system"
+	depends on DEBUG_FS
+	select SECURITY_STATUS
+	help
+	  When a fatal error is encountered on system, system reboots and
+	  saves the logs in last logs memory. This driver supports the mechanism
+	  to read these logs and exports them via debugfs.
+
+config SECURITY_STATUS
+	bool "Get security_status"
+	help
+	  Gets security status by checking oemandroidboot.securityflags
+	  parameter.
+
+config EXT_ANC
+	bool "Enable External ANC"
+	depends on MSM_QDSP6_APRV2 || MSM_QDSP6_APRV3
+	help
+	 This option enables support for anti-noise cnacellation
+	 on Sensor DSP.
 
 source "drivers/soc/qcom/memshare/Kconfig"

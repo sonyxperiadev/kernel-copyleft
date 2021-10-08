@@ -43,6 +43,7 @@ struct ovl_readdir_data {
 	struct ovl_cache_entry *first_maybe_whiteout;
 	int count;
 	int err;
+	bool d_type_supported;
 };
 
 struct ovl_dir_file {
@@ -441,10 +442,14 @@ static int ovl_dir_fsync(struct file *file, loff_t start, loff_t end,
 	struct dentry *dentry = file->f_path.dentry;
 	struct file *realfile = od->realfile;
 
+	/* Nothing to sync for lower */
+	if (!OVL_TYPE_UPPER(ovl_path_type(dentry)))
+		return 0;
+
 	/*
 	 * Need to check if we started out being a lower dir, but got copied up
 	 */
-	if (!od->is_upper && OVL_TYPE_UPPER(ovl_path_type(dentry))) {
+	if (!od->is_upper) {
 		struct inode *inode = file_inode(file);
 
 		realfile = lockless_dereference(od->upperfile);
@@ -576,4 +581,40 @@ void ovl_cleanup_whiteouts(struct dentry *upper, struct list_head *list)
 		dput(dentry);
 	}
 	mutex_unlock(&upper->d_inode->i_mutex);
+}
+
+static int ovl_check_d_type(struct dir_context *ctx, const char *name,
+			  int namelen, loff_t offset, u64 ino,
+			  unsigned int d_type)
+{
+	struct ovl_readdir_data *rdd =
+		container_of(ctx, struct ovl_readdir_data, ctx);
+
+	/* Even if d_type is not supported, DT_DIR is returned for . and .. */
+	if (!strncmp(name, ".", namelen) || !strncmp(name, "..", namelen))
+		return 0;
+
+	if (d_type != DT_UNKNOWN)
+		rdd->d_type_supported = true;
+
+	return 0;
+}
+
+/*
+ * Returns 1 if d_type is supported, 0 not supported/unknown. Negative values
+ * if error is encountered.
+ */
+int ovl_check_d_type_supported(struct path *realpath)
+{
+	int err;
+	struct ovl_readdir_data rdd = {
+		.ctx.actor = ovl_check_d_type,
+		.d_type_supported = false,
+	};
+
+	err = ovl_dir_read(realpath, &rdd);
+	if (err)
+		return err;
+
+	return rdd.d_type_supported;
 }

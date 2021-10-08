@@ -57,6 +57,13 @@
 #define MDP_PP_AD_BL_LINEAR	0x0
 #define MDP_PP_AD_BL_LINEAR_INV	0x1
 
+/* Enables Sonys feature Early Unblank for quick wakeup */
+#define SOMC_FEATURE_EARLY_UNBLANK
+
+#ifdef SOMC_FEATURE_EARLY_UNBLANK
+#include <linux/workqueue.h>
+#endif /* SOMC_FEATURE_EARLY_UNBLANK */
+
 /**
  * enum mdp_notify_event - Different frame events to indicate frame update state
  *
@@ -234,6 +241,8 @@ struct msm_mdp_interface {
 	int (*input_event_handler)(struct msm_fb_data_type *mfd);
 	void (*footswitch_ctrl)(bool on);
 	int (*pp_release_fnc)(struct msm_fb_data_type *mfd);
+	void (*signal_retire_fence)(struct msm_fb_data_type *mfd,
+					int retire_cnt);
 	void *private1;
 };
 
@@ -263,6 +272,12 @@ struct msm_fb_fps_info {
 	ktime_t last_sampled_time_us;
 	u32 measured_fps;
 };
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+struct fb_specific_data {
+	bool off_sts;
+};
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 struct msm_fb_data_type {
 	u32 key;
@@ -372,6 +387,19 @@ struct msm_fb_data_type {
 	bool pending_switch;
 	struct mutex switch_lock;
 	struct input_handler *input_handler;
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct fb_specific_data spec_mfd;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+#ifdef SOMC_FEATURE_EARLY_UNBLANK
+	/* speed up wakeup */
+	/* do unblank (>150ms) on own kworker
+	 * so we don't starve other works
+	 */
+	struct workqueue_struct *unblank_kworker;
+	struct work_struct unblank_work;
+	bool early_unblank_completed;
+#endif /* SOMC_FEATURE_EARLY_UNBLANK */
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)

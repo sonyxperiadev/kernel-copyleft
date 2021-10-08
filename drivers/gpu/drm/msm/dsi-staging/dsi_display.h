@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -121,6 +121,8 @@ struct dsi_display_clk_info {
  * @bridge:           Pointer to DRM bridge object.
  * @cmd_engine_refcount:  Reference count enforcing single instance of cmd eng
  * @root:                 Debugfs root directory
+ * @cont_splash_enabled:  Early splash status.
+ * @dsi_split_swap:       Swap dsi output in split mode.
  */
 struct dsi_display {
 	struct platform_device *pdev;
@@ -158,6 +160,9 @@ struct dsi_display {
 
 	/* DEBUG FS */
 	struct dentry *root;
+
+	bool cont_splash_enabled;
+	bool dsi_split_swap;
 };
 
 int dsi_display_dev_probe(struct platform_device *pdev);
@@ -338,4 +343,15 @@ int dsi_display_clock_gate(struct dsi_display *display, bool enable);
 int dsi_dispaly_static_frame(struct dsi_display *display, bool enable);
 
 int dsi_display_set_backlight(void *display, u32 bl_lvl);
+
+/**
+ * dsi_dsiplay_setup_splash_resource
+ * @display:            Handle to display.
+ *
+ * Setup DSI splash resource to avoid reset and glitch if DSI is enabled
+ * in bootloder.
+ *
+ * Return: error code.
+ */
+int dsi_dsiplay_setup_splash_resource(struct dsi_display *display);
 #endif /* _DSI_DISPLAY_H_ */

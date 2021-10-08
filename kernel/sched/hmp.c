@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1526,6 +1526,10 @@ unsigned int cpu_temp(int cpu)
 		return 0;
 }
 
+/*
+ * kfree() may wakeup kswapd. So this function should NOT be called
+ * with any CPU's rq->lock acquired.
+ */
 void free_task_load_ptrs(struct task_struct *p)
 {
 	kfree(p->ravg.curr_window_cpu);
@@ -2077,14 +2081,11 @@ static u32  top_task_load(struct rq *rq)
 	}
 }
 
-static int load_to_index(u32 load)
+static u32 load_to_index(u32 load)
 {
-	if (load < sched_load_granule)
-		return 0;
-	else if (load >= sched_ravg_window)
-		return NUM_LOAD_INDICES - 1;
-	else
-		return load / sched_load_granule;
+	u32 index = load / sched_load_granule;
+
+	return min(index, (u32)(NUM_LOAD_INDICES - 1));
 }
 
 static void update_top_tasks(struct task_struct *p, struct rq *rq,
@@ -2608,7 +2609,8 @@ update_task_rq_cpu_cycles(struct task_struct *p, struct rq *rq, int event,
 
 	p->cpu_cycles = cur_cycles;
 
-	trace_sched_get_task_cpu_cycles(cpu, event, rq->cc.cycles, rq->cc.time);
+	trace_sched_get_task_cpu_cycles(cpu, event, rq->cc.cycles,
+					rq->cc.time, p);
 }
 
 static int
@@ -2876,11 +2878,15 @@ void update_task_ravg(struct task_struct *p, struct rq *rq, int event,
 		update_task_burst(p, rq, event, runtime);
 	update_cpu_busy_time(p, rq, event, wallclock, irqtime);
 	update_task_pred_demand(rq, p, event);
-done:
+
+	if (exiting_task(p))
+		goto done;
+
 	trace_sched_update_task_ravg(p, rq, event, wallclock, irqtime,
 				     rq->cc.cycles, rq->cc.time,
 				     p->grp ? &rq->grp_time : NULL);
 
+done:
 	p->ravg.mark_start = wallclock;
 }
 

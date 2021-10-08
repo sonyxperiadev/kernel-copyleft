@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -368,6 +368,9 @@ int ipa3_nat_init_cmd(struct ipa_ioc_v4_nat_init *init)
 		IPAERR_RL("Detected overflow\n");
 		return -EPERM;
 	}
+
+	mutex_lock(&ipa3_ctx->nat_mem.lock);
+
 	/* Check Table Entry offset is not
 	   beyond allocated size */
 	tmp = init->ipv4_rules_offset +
@@ -377,6 +380,7 @@ int ipa3_nat_init_cmd(struct ipa_ioc_v4_nat_init *init)
 		IPAERR_RL("offset:%d entrys:%d size:%zu mem_size:%zu\n",
 			init->ipv4_rules_offset, (init->table_entries + 1),
 			tmp, ipa3_ctx->nat_mem.size);
+		mutex_unlock(&ipa3_ctx->nat_mem.lock);
 		return -EPERM;
 	}
 
@@ -384,6 +388,7 @@ int ipa3_nat_init_cmd(struct ipa_ioc_v4_nat_init *init)
 	if (init->expn_rules_offset >
 		(UINT_MAX - (TBL_ENTRY_SIZE * init->expn_table_entries))) {
 		IPAERR_RL("Detected overflow\n");
+		mutex_unlock(&ipa3_ctx->nat_mem.lock);
 		return -EPERM;
 	}
 	/* Check Expn Table Entry offset is not
@@ -395,6 +400,7 @@ int ipa3_nat_init_cmd(struct ipa_ioc_v4_nat_init *init)
 		IPAERR_RL("offset:%d entrys:%d size:%zu mem_size:%zu\n",
 			init->expn_rules_offset, init->expn_table_entries,
 			tmp, ipa3_ctx->nat_mem.size);
+		mutex_unlock(&ipa3_ctx->nat_mem.lock);
 		return -EPERM;
 	}
 
@@ -402,6 +408,7 @@ int ipa3_nat_init_cmd(struct ipa_ioc_v4_nat_init *init)
 	if (init->index_offset >
 		UINT_MAX - (INDX_TBL_ENTRY_SIZE * (init->table_entries + 1))) {
 		IPAERR_RL("Detected overflow\n");
+		mutex_unlock(&ipa3_ctx->nat_mem.lock);
 		return -EPERM;
 	}
 	/* Check Indx Table Entry offset is not
@@ -413,6 +420,7 @@ int ipa3_nat_init_cmd(struct ipa_ioc_v4_nat_init *init)
 		IPAERR_RL("offset:%d entrys:%d size:%zu mem_size:%zu\n",
 			init->index_offset, (init->table_entries + 1),
 			tmp, ipa3_ctx->nat_mem.size);
+		mutex_unlock(&ipa3_ctx->nat_mem.lock);
 		return -EPERM;
 	}
 
@@ -420,6 +428,7 @@ int ipa3_nat_init_cmd(struct ipa_ioc_v4_nat_init *init)
 	if (init->index_expn_offset >
 		UINT_MAX - (INDX_TBL_ENTRY_SIZE * init->expn_table_entries)) {
 		IPAERR_RL("Detected overflow\n");
+		mutex_unlock(&ipa3_ctx->nat_mem.lock);
 		return -EPERM;
 	}
 	/* Check Expn Table entry offset is not
@@ -431,6 +440,7 @@ int ipa3_nat_init_cmd(struct ipa_ioc_v4_nat_init *init)
 		IPAERR_RL("offset:%d entrys:%d size:%zu mem_size:%zu\n",
 			init->index_expn_offset, init->expn_table_entries,
 			tmp, ipa3_ctx->nat_mem.size);
+		mutex_unlock(&ipa3_ctx->nat_mem.lock);
 		return -EPERM;
 	}
 
@@ -580,6 +590,7 @@ destroy_imm_cmd:
 free_nop:
 	ipahal_destroy_imm_cmd(nop_cmd_pyld);
 bail:
+	mutex_unlock(&ipa3_ctx->nat_mem.lock);
 	return result;
 }
 
@@ -793,6 +804,12 @@ int ipa3_nat_del_cmd(struct ipa_ioc_v4_nat_del *del)
 	}
 
 	memset(&desc, 0, sizeof(desc));
+
+	if (!ipa3_ctx->nat_mem.is_dev_init) {
+		IPAERR_RL("NAT hasn't been initialized\n");
+		return -EPERM;
+	}
+
 	/* NO-OP IC for ensuring that IPA pipeline is empty */
 	nop_cmd_pyld =
 		ipahal_construct_nop_imm_cmd(false, IPAHAL_HPS_CLEAR, false);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,6 +29,9 @@
 #include <linux/string.h>
 #include <linux/types.h>
 
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
 #include <asm/system_misc.h>
 
 #include <soc/qcom/socinfo.h>
@@ -47,6 +50,18 @@
 #define SMEM_IMAGE_VERSION_PARTITION_APPS 10
 
 static DECLARE_RWSEM(current_image_rwsem);
+
+#ifdef CONFIG_RAMDUMP_TAGS
+#define RDT_ADD_UINT(func, name) \
+	do { \
+		res = func(); \
+		if (res != 0) { \
+			snprintf(buf, sizeof(buf), "%u (0x%.8X)", res, res); \
+			rdtags_add_tag(name, buf, strnlen(buf, sizeof(buf))); \
+		} \
+	} while (0)
+#endif
+
 enum {
 	HW_PLATFORM_UNKNOWN = 0,
 	HW_PLATFORM_SURF    = 1,
@@ -570,6 +585,9 @@ static struct msm_soc_info cpu_of_id[] = {
 	[345] = {MSM_CPU_636, "SDM636"},
 	[346] = {MSM_CPU_636, "SDA636"},
 
+	/* 455 ID */
+	[385] = {MSM_CPU_455, "SDM455"},
+
 	/* Uninitialized IDs are not known to run Linux.
 	   MSM_CPU_UNKNOWN is set to 0 to ensure these IDs are
 	   considered as unknown CPU. */
@@ -780,10 +798,8 @@ msm_get_build_id(struct device *dev,
 		   struct device_attribute *attr,
 		   char *buf)
 {
-	if (socinfo_get_build_id())
-		return snprintf(buf, PAGE_SIZE, "%-.32s\n",
-				socinfo_get_build_id());
-	return 0;
+	return snprintf(buf, PAGE_SIZE, "%-.32s\n",
+			socinfo_get_build_id());
 }
 
 static ssize_t
@@ -1279,6 +1295,10 @@ static void * __init setup_dummy_socinfo(void)
 		dummy_socinfo.id = 324;
 		strlcpy(dummy_socinfo.build_id, "sda660 - ",
 			sizeof(dummy_socinfo.build_id));
+	}  else if (early_machine_is_sdm455()) {
+		dummy_socinfo.id = 385;
+		strlcpy(dummy_socinfo.build_id, "sdm455 - ",
+			sizeof(dummy_socinfo.build_id));
 	} else if (early_machine_is_sdm658()) {
 		dummy_socinfo.id = 325;
 		strlcpy(dummy_socinfo.build_id, "sdm658 - ",
@@ -1573,6 +1593,34 @@ static void socinfo_select_format(void)
 	}
 }
 
+#ifdef CONFIG_RAMDUMP_TAGS
+/* Extracts information from QC:s socinfo to get
+ * information about the hardware revisions of main soc
+ */
+static void add_socinfo_tags(void)
+{
+	uint32_t res;
+	char buf[64];
+	char *str;
+
+	RDT_ADD_UINT(read_cpuid_id, "cpuid_id");
+	RDT_ADD_UINT(socinfo_get_platform_version, "socinfo_platform_version");
+	RDT_ADD_UINT(socinfo_get_platform_subtype, "socinfo_platform_subtype");
+	RDT_ADD_UINT(socinfo_get_platform_type, "socinfo_platform_type");
+	RDT_ADD_UINT(socinfo_get_raw_id, "socinfo_raw_id");
+	RDT_ADD_UINT(socinfo_get_id, "socinfo_id");
+
+	res = socinfo_get_version();
+	snprintf(buf, sizeof(buf), "%u.%u", SOCINFO_VERSION_MAJOR(res),
+						SOCINFO_VERSION_MINOR(res));
+	rdtags_add_tag("socinfo_version", buf, strnlen(buf, sizeof(buf)));
+
+	str = socinfo_get_build_id();
+	if (str)
+		rdtags_add_tag("socinfo_build_id", str, strlen(str));
+}
+#endif
+
 int __init socinfo_init(void)
 {
 	static bool socinfo_init_done;
@@ -1601,6 +1649,9 @@ int __init socinfo_init(void)
 	socinfo_print();
 	arch_read_hardware_id = msm_read_hardware_id;
 	socinfo_init_done = true;
+#ifdef CONFIG_RAMDUMP_TAGS
+	add_socinfo_tags();
+#endif
 
 	return 0;
 }

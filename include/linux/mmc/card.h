@@ -87,6 +87,8 @@ struct mmc_ext_csd {
 	bool			hpi_en;			/* HPI enablebit */
 	bool			hpi;			/* HPI support bit */
 	unsigned int		hpi_cmd;		/* cmd used as HPI */
+	bool			ffu_capable;		/* FFU support */
+	bool			ffu_mode_op;		/* FFU mode operation */
 	bool			bkops;		/* background support bit */
 	u8			bkops_en;	/* bkops enable */
 	unsigned int            data_sector_size;       /* 512 bytes or 4KB */
@@ -95,7 +97,7 @@ struct mmc_ext_csd {
 	bool			boot_ro_lockable;
 	u8			raw_ext_csd_cmdq;	/* 15 */
 	u8			raw_ext_csd_cache_ctrl;	/* 33 */
-	bool			ffu_capable;	/* Firmware upgrade support */
+
 #define MMC_FIRMWARE_LEN 8
 	u8			fwrev[MMC_FIRMWARE_LEN];  /* FW version */
 	u8			raw_exception_status;	/* 54 */
@@ -238,6 +240,7 @@ enum mmc_blk_status {
 	MMC_BLK_ECC_ERR,
 	MMC_BLK_NOMEDIUM,
 	MMC_BLK_NEW_REQUEST,
+	MMC_BLK_RETRY_SINGLE,
 };
 
 enum mmc_packed_stop_reasons {
@@ -342,6 +345,25 @@ enum mmc_pon_type {
 
 #define MMC_QUIRK_CMDQ_DELAY_BEFORE_DCMD 6 /* microseconds */
 
+#ifdef CONFIG_MMC_CMD_DEBUG
+#define CMD_QUEUE_SIZE CONFIG_MMC_CMD_QUEUE_SIZE
+#endif
+
+#ifdef CONFIG_MMC_CMD_DEBUG
+struct mmc_cmdq {
+	u32		opcode;
+	u32		arg;
+	u32		flags;
+	u64		timestamp;
+};
+
+struct mmc_cmd_stats {
+	u32 next_idx;
+	u32 wrapped;
+	struct mmc_cmdq cmdq[CMD_QUEUE_SIZE];
+};
+#endif
+
 /*
  * MMC device
  */
@@ -436,6 +458,9 @@ struct mmc_card {
 	struct notifier_block        reboot_notify;
 	enum mmc_pon_type pon_type;
 	bool cmdq_init;
+#ifdef CONFIG_MMC_CMD_DEBUG
+	struct mmc_cmd_stats cmd_stats;
+#endif
 	struct mmc_bkops_info bkops;
 	bool err_in_sdr104;
 	bool sdr104_blocked;
@@ -622,6 +647,13 @@ static inline void __maybe_unused remove_quirk_mmc(struct mmc_card *card,
 {
 	if (mmc_card_mmc(card))
 		card->quirks &= ~data;
+}
+
+extern int CMDQ_QUIRK_PANIC_ON_ERROR_ENABLED;
+static inline void add_panic_on_gen_error_behavior(struct mmc_card *card,
+						   int data)
+{
+	CMDQ_QUIRK_PANIC_ON_ERROR_ENABLED = data;
 }
 
 /*

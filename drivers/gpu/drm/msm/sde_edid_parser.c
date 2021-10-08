@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -252,12 +252,13 @@ static void sde_edid_parse_Y420CMDB(
 struct drm_connector *connector, struct sde_edid_ctrl *edid_ctrl,
 const u8 *db)
 {
-	u32 offset = 0;
 	u8 cmdb_len = 0;
 	u8 svd_len = 0;
 	const u8 *svd = NULL;
-	u32 i = 0, j = 0;
+	u32 i = 0;
 	u32 video_format = 0;
+	u32 num_cmdb_svd = 0;
+	const u32 mult = 8;
 
 	if (!edid_ctrl) {
 		DEV_ERR("%s: edid_ctrl is NULL\n", __func__);
@@ -271,8 +272,8 @@ const u8 *db)
 	SDE_EDID_DEBUG("%s +\n", __func__);
 	cmdb_len = db[0] & 0x1f;
 
-	/* Byte 3 to L+1 contain SVDs */
-	offset += 2;
+	if (cmdb_len < 1)
+		return;
 
 	svd = sde_edid_find_block(edid_ctrl->edid, VIDEO_DATA_BLOCK);
 
@@ -282,21 +283,26 @@ const u8 *db)
 		++svd;
 	}
 
-	for (i = 0; i < svd_len; i++, j++) {
-		video_format = *(svd + i) & 0x7F;
-		if (cmdb_len == 1) {
-			/* If cmdb_len is 1, it means all SVDs support YUV */
-			sde_edid_set_y420_support(connector, video_format);
-		} else if (db[offset] & (1 << j)) {
-			sde_edid_set_y420_support(connector, video_format);
+	if (cmdb_len == 1)
+		num_cmdb_svd = svd_len;
+	else {
+		num_cmdb_svd = (cmdb_len - 1) * mult;
+		if (num_cmdb_svd > svd_len)
+			num_cmdb_svd = svd_len;
+	}
 
-			if (j & 0x80) {
-				j = j/8;
-				offset++;
-				if (offset >= cmdb_len)
-					break;
-			}
-		}
+	for (i = 0; i < num_cmdb_svd; i++) {
+		video_format = *(svd + i) & 0x7F;
+		/*
+		 * If cmdb_len is 1, it means all SVDs support YUV
+		 * Else, we check each byte of the cmdb bitmap bitwise
+		 * and match those bits with the formats populated
+		 * during the parsing of the Video Data Blocks.
+		 * Refer to CTA 861-F section 7.5.11 YCBCR 4:2:0 Capability
+		 * Map Data Block for more details on this.
+		 */
+		if (cmdb_len == 1 || (db[2 + i / mult] & (1 << (i % mult))))
+			sde_edid_set_y420_support(connector, video_format);
 	}
 
 	SDE_EDID_DEBUG("%s -\n", __func__);
@@ -359,6 +365,33 @@ struct drm_connector *connector, struct sde_edid_ctrl *edid_ctrl)
 		sde_edid_parse_Y420CMDB(connector, edid_ctrl, db);
 	else
 		SDE_EDID_DEBUG("YCbCr420 CMDB is not present\n");
+
+	/*
+	 * As per HDMI 2.0 spec, a sink supporting any modes
+	 * requiring more than 340Mhz clock rate should support
+	 * SCDC as well. This is required because we need the SCDC
+	 * channel to set the TMDS clock ratio. However in cases
+	 * where the TV publishes such a mode in its list of modes
+	 * but does not have SCDC support as per HDMI HFVSDB block
+	 * remove RGB mode support from the flags. Currently, in
+	 * the list of modes not having deep color support only RGB
+	 * modes shall requre a clock of 340Mhz and above such as the
+	 * 4K@60fps case. All other modes shall be YUV.
+	 * Deep color case is handled separately while choosing the
+	 * best mode in the _sde_hdmi_choose_best_format API where
+	 * we enable deep color only if it satisfies both source and
+	 * sink requirements. However, that API assumes that at least
+	 * RGB mode is supported on the mode. Hence, it would be better
+	 * to remove the format support flags while parsing the EDID
+	 * itself if it doesn't satisfy the HDMI spec requirement.
+	 */
+
+	list_for_each_entry(mode, &connector->probed_modes, head) {
+		if ((mode->clock > MIN_SCRAMBLER_REQ_RATE) &&
+			!connector->scdc_present) {
+			mode->flags &= ~DRM_MODE_FLAG_SUPPORTS_RGB;
+		}
+	}
 
 	SDE_EDID_DEBUG("%s -\n", __func__);
 }

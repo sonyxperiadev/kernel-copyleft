@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,9 @@
 #include "msm_prop.h"
 #include "sde_kms.h"
 #include "sde_fence.h"
+
+#define SDE_MODE_HPD_ON        0
+#define SDE_MODE_HPD_OFF       1
 
 #define SDE_CONNECTOR_NAME_SIZE	16
 
@@ -207,6 +210,7 @@ struct sde_connector {
 	struct sde_fence retire_fence;
 	struct sde_connector_ops ops;
 	int dpms_mode;
+	u64 hpd_mode;
 	int lp_mode;
 	int last_panel_power_mode;
 
@@ -229,7 +233,7 @@ struct sde_connector {
  * Returns: Pointer to associated private display structure
  */
 #define sde_connector_get_display(C) \
-	((C) ? to_sde_connector((C))->display : 0)
+	((C) ? to_sde_connector((C))->display : NULL)
 
 /**
  * sde_connector_get_panel - get sde connector's private panel pointer
@@ -237,7 +241,7 @@ struct sde_connector {
  * Returns: Pointer to associated private display structure
  */
 #define sde_connector_get_panel(C) \
-	((C) ? to_sde_connector((C))->panel : 0)
+	((C) ? to_sde_connector((C))->panel : NULL)
 
 /**
  * sde_connector_get_encoder - get sde connector's private encoder pointer
@@ -245,7 +249,7 @@ struct sde_connector {
  * Returns: Pointer to associated private encoder structure
  */
 #define sde_connector_get_encoder(C) \
-	((C) ? to_sde_connector((C))->encoder : 0)
+	((C) ? to_sde_connector((C))->encoder : NULL)
 
 /**
  * sde_connector_get_propinfo - get sde connector's property info pointer
@@ -253,7 +257,7 @@ struct sde_connector {
  * Returns: Pointer to associated private property info structure
  */
 #define sde_connector_get_propinfo(C) \
-	((C) ? &to_sde_connector((C))->property_info : 0)
+	((C) ? &to_sde_connector((C))->property_info : NULL)
 
 /**
  * struct sde_connector_state - private connector status structure
@@ -296,7 +300,7 @@ struct sde_connector_state {
  * Returns: Integer value of requested property
  */
 #define sde_connector_get_property_values(S) \
-	((S) ? (to_sde_connector_state((S))->property_values) : 0)
+	((S) ? (to_sde_connector_state((S))->property_values) : NULL)
 
 /**
  * sde_connector_get_out_fb - query out_fb value from sde connector state
@@ -304,7 +308,7 @@ struct sde_connector_state {
  * Returns: Output fb associated with specified connector state
  */
 #define sde_connector_get_out_fb(S) \
-	((S) ? to_sde_connector_state((S))->out_fb : 0)
+	((S) ? to_sde_connector_state((S))->out_fb : NULL)
 
 /**
  * sde_connector_get_topology_name - helper accessor to retrieve topology_name
@@ -389,6 +393,23 @@ enum sde_csc_type sde_connector_get_csc_type(struct drm_connector *conn);
  * Returns: Current DPMS setting for connector
  */
 int sde_connector_get_dpms(struct drm_connector *connector);
+
+/**
+ * sde_connector_needs_offset - adjust the output fence offset based on
+ *                              display type
+ * @connector: Pointer to drm connector object
+ * Returns: true if offset is required, false for all other cases.
+ */
+static inline bool sde_connector_needs_offset(struct drm_connector *connector)
+{
+	struct sde_connector *c_conn;
+
+	if (!connector)
+		return false;
+
+	c_conn = to_sde_connector(connector);
+	return (c_conn->connector_type != DRM_MODE_CONNECTOR_VIRTUAL);
+}
 
 #endif /* _SDE_CONNECTOR_H_ */
 

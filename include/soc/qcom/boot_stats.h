@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014,2016 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014,2016,2018 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,9 +31,14 @@ struct boot_stats {
 int boot_stats_init(void);
 int boot_stats_exit(void);
 unsigned long long int msm_timer_get_sclk_ticks(void);
+phys_addr_t msm_timer_get_pa(void);
 #else
 static inline int boot_stats_init(void) { return 0; }
-unsigned long long int msm_timer_get_sclk_ticks(void) { return 0; }
+static inline unsigned long long int msm_timer_get_sclk_ticks(void)
+{
+	return 0;
+}
+static inline phys_addr_t msm_timer_get_pa(void) { return 0; }
 #endif
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
@@ -41,6 +46,6 @@ unsigned long long int msm_timer_get_sclk_ticks(void) { return 0; }
 static inline int boot_marker_enabled(void) { return 1; }
 void place_marker(const char *name);
 #else
-inline void place_marker(char *name);
+static inline void place_marker(char *name) { };
 static inline int boot_marker_enabled(void) { return 0; }
 #endif

@@ -7,6 +7,10 @@
 #include <linux/pm.h>
 #include <linux/mm.h>
 #include <linux/freezer.h>
+#ifdef CONFIG_PM_WAKEUP_TIMES
+#include <linux/ktime.h>
+#include <linux/wait.h>
+#endif
 #include <asm/errno.h>
 
 #ifdef CONFIG_VT
@@ -51,6 +55,20 @@ enum suspend_stat_step {
 	SUSPEND_RESUME
 };
 
+#ifdef CONFIG_PM_WAKEUP_TIMES
+struct stats_wakeup_time {
+	ktime_t start;
+	ktime_t end;
+};
+
+struct suspend_stats_queue {
+	int resume_done;
+	wait_queue_head_t wait_queue;
+};
+
+extern struct suspend_stats_queue suspend_stats_queue;
+#endif
+
 struct suspend_stats {
 	int	success;
 	int	fail;
@@ -69,6 +87,16 @@ struct suspend_stats {
 	int	errno[REC_FAILED_NUM];
 	int	last_failed_step;
 	enum suspend_stat_step	failed_steps[REC_FAILED_NUM];
+#ifdef CONFIG_PM_WAKEUP_TIMES
+	struct stats_wakeup_time suspend_min_time;
+	struct stats_wakeup_time suspend_max_time;
+	struct stats_wakeup_time suspend_last_time;
+	ktime_t suspend_avg_time;
+	struct stats_wakeup_time resume_min_time;
+	struct stats_wakeup_time resume_max_time;
+	struct stats_wakeup_time resume_last_time;
+	ktime_t resume_avg_time;
+#endif
 };
 
 extern struct suspend_stats suspend_stats;
@@ -377,6 +405,8 @@ extern int swsusp_page_is_forbidden(struct page *);
 extern void swsusp_set_page_free(struct page *);
 extern void swsusp_unset_page_free(struct page *);
 extern unsigned long get_safe_page(gfp_t gfp_mask);
+extern asmlinkage int swsusp_arch_suspend(void);
+extern asmlinkage int swsusp_arch_resume(void);
 
 extern void hibernation_set_ops(const struct platform_hibernation_ops *ops);
 extern int hibernate(void);

@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,9 +22,15 @@
 #include "mdss_mdp_trace.h"
 #include "mdss_dsi_clk.h"
 #include <linux/interrupt.h>
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+#include "mdss_dsi_panel_driver.h"
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 #define MAX_RECOVERY_TRIALS 10
 #define MAX_SESSIONS 2
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+#define MAX_RECOVERY_TRIALS_FOR_ESD 2400
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 #define SPLIT_MIXER_OFFSET 0x800
 
@@ -406,7 +412,7 @@ static void mdss_mdp_cmd_wait4_autorefresh_pp(struct mdss_mdp_ctl *ctl)
 		return;
 	}
 
-	if (line_out < ctl->mixer_left->roi.h) {
+	if ((line_out < ctl->mixer_left->roi.h) && (line_out)) {
 		reinit_completion(&ctx->autorefresh_ppdone);
 
 		/* enable ping pong done */
@@ -1999,6 +2005,11 @@ static int mdss_mdp_cmd_remove_vsync_handler(struct mdss_mdp_ctl *ctl,
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
 
 	if (disable_vsync_irq) {
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		if (ctx->vsync_irq_cnt == 0)
+			return 0;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+
 		/* disable rd_ptr interrupt and clocks */
 		mdss_mdp_setup_vsync(ctx, false);
 		complete(&ctx->stop_comp);
@@ -2092,6 +2103,10 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 	struct mdss_panel_data *pdata;
 	unsigned long flags;
 	int rc = 0, te_irq;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct incell_ctrl *incell = incell_get_info();
+	struct mdss_panel_specific_pdata *spec_pdata;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	ctx = (struct mdss_mdp_cmd_ctx *) ctl->intf_ctx[MASTER_CTX];
 	if (!ctx) {
@@ -2114,6 +2129,12 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 
 	if (rc <= 0) {
 		u32 status, mask;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		spec_pdata = mdss_panel2spec_pdata(pdata);
+		if (spec_pdata->blackscreen_det)
+			spec_pdata->blackscreen_det();
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+
 		mask = mdss_mdp_get_irq_mask(MDSS_MDP_IRQ_TYPE_PING_PONG_COMP,
 				ctx->current_pp_num);
 		status = mask & readl_relaxed(ctl->mdata->mdp_base +
@@ -2160,18 +2181,40 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 			MDSS_XLOG(0xbac);
 			mdss_fb_report_panel_dead(ctl->mfd);
 		} else if (ctx->pp_timeout_report_cnt == 0) {
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			if (!incell)
+				pr_err("%s: Invalid incell data\n", __func__);
+			else
+				mdss_dsi_panel_driver_dump_incell_sts(incell);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 			MDSS_XLOG(0xbad);
-			MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0_ctrl", "dsi0_phy",
-				"dsi1_ctrl", "dsi1_phy", "vbif", "vbif_nrt",
-				"dbg_bus", "vbif_dbg_bus",
-				"dsi_dbg_bus", "panic");
 		} else if (ctx->pp_timeout_report_cnt == MAX_RECOVERY_TRIALS) {
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			if (spec_pdata->esd_enable_without_xlog
+				== ESD_WITHOUT_XLOG_DISABLE_VALUE) {
+				MDSS_XLOG(0xbad2);
+				MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0_ctrl",
+					"dsi0_phy",
+					"dsi1_ctrl", "dsi1_phy", "vbif",
+					"vbif_nrt",
+					"dbg_bus", "vbif_dbg_bus", "panic");
+				mdss_fb_report_panel_dead(ctl->mfd);
+			}
+		} else if (ctx->pp_timeout_report_cnt
+					== MAX_RECOVERY_TRIALS_FOR_ESD) {
 			MDSS_XLOG(0xbad2);
 			MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0_ctrl", "dsi0_phy",
 				"dsi1_ctrl", "dsi1_phy", "vbif", "vbif_nrt",
 				"dbg_bus", "vbif_dbg_bus",
 				"dsi_dbg_bus", "panic");
 			mdss_fb_report_panel_dead(ctl->mfd);
+#else
+			MDSS_XLOG(0xbad2);
+			MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0_ctrl", "dsi0_phy",
+				"dsi1_ctrl", "dsi1_phy", "vbif", "vbif_nrt",
+				"dbg_bus", "vbif_dbg_bus", "panic");
+			mdss_fb_report_panel_dead(ctl->mfd);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 		}
 
 		/* disable te irq */
@@ -2332,6 +2375,12 @@ static int mdss_mdp_cmd_panel_on(struct mdss_mdp_ctl *ctl,
 			WARN(rc, "intf %d panel on error (%d)\n",
 					ctl->intf_num, rc);
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+			rc = mdss_mdp_ctl_intf_event(ctl,
+					MDSS_EVENT_POST_PANEL_ON, NULL, false);
+			WARN(rc, "intf %d post panel on error (%d)\n",
+					ctl->intf_num, rc);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 		}
 
 		rc = mdss_mdp_tearcheck_enable(ctl, true);
@@ -2510,6 +2559,7 @@ int mdss_mdp_cmd_set_autorefresh_mode(struct mdss_mdp_ctl *mctl, int frame_cnt)
 		 */
 		ctx->autorefresh_state = MDP_AUTOREFRESH_ON_REQUESTED;
 		ctx->autorefresh_frame_cnt = frame_cnt;
+		mctl->mdata->serialize_wait4pp = true;
 
 		/* Cancel GATE Work Item */
 		if (cancel_work_sync(&ctx->gate_clk_work))
@@ -2523,8 +2573,10 @@ int mdss_mdp_cmd_set_autorefresh_mode(struct mdss_mdp_ctl *mctl, int frame_cnt)
 		if (frame_cnt == 0) {
 			ctx->autorefresh_state = MDP_AUTOREFRESH_OFF;
 			ctx->autorefresh_frame_cnt = 0;
+			mctl->mdata->serialize_wait4pp = false;
 		} else {
 			ctx->autorefresh_frame_cnt = frame_cnt;
+			mctl->mdata->serialize_wait4pp = true;
 		}
 		break;
 	case MDP_AUTOREFRESH_ON:
@@ -2536,6 +2588,7 @@ int mdss_mdp_cmd_set_autorefresh_mode(struct mdss_mdp_ctl *mctl, int frame_cnt)
 			ctx->autorefresh_state = MDP_AUTOREFRESH_OFF_REQUESTED;
 		} else {
 			ctx->autorefresh_frame_cnt = frame_cnt;
+			mctl->mdata->serialize_wait4pp = true;
 		}
 		break;
 	case MDP_AUTOREFRESH_OFF_REQUESTED:
@@ -2545,6 +2598,7 @@ int mdss_mdp_cmd_set_autorefresh_mode(struct mdss_mdp_ctl *mctl, int frame_cnt)
 			pr_debug("cancelling autorefresh off request\n");
 			ctx->autorefresh_state = MDP_AUTOREFRESH_ON;
 			ctx->autorefresh_frame_cnt = frame_cnt;
+			mctl->mdata->serialize_wait4pp = true;
 		}
 		break;
 	default:
@@ -2873,6 +2927,7 @@ static int mdss_mdp_disable_autorefresh(struct mdss_mdp_ctl *ctl,
 	cfg |= BIT(20);
 	mdss_mdp_pingpong_write(pp_base,
 				MDSS_MDP_REG_PP_SYNC_CONFIG_VSYNC, cfg);
+	ctl->mdata->serialize_wait4pp = false;
 
 	return 0;
 }
@@ -2910,6 +2965,9 @@ static void __mdss_mdp_kickoff(struct mdss_mdp_ctl *ctl,
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 	bool is_pp_split = is_pingpong_split(ctl->mfd);
 	struct mdss_panel_info *pinfo = NULL;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct mdss_panel_timing *timing = NULL;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	if (ctl->panel_data)
 		pinfo = &ctl->panel_data->panel_info;
@@ -2948,7 +3006,12 @@ static void __mdss_mdp_kickoff(struct mdss_mdp_ctl *ctl,
 		 * is maintained, so we can have the less time possible
 		 * between the check of the scanline and the kickoff.
 		 */
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		timing = ctl->panel_data->current_timing;
+		if (pinfo && pinfo->mdp_koff_thshold && timing->koff_thshold_enable) {
+#else
 		if (pinfo && pinfo->mdp_koff_thshold) {
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 			spin_lock(&ctx->ctlstart_lock);
 			if (wait_for_read_ptr_if_late(ctl, sctl, pinfo)) {
 				spin_unlock(&ctx->ctlstart_lock);
@@ -2962,7 +3025,11 @@ static void __mdss_mdp_kickoff(struct mdss_mdp_ctl *ctl,
 		mdss_mdp_ctl_write(ctl, MDSS_MDP_REG_CTL_START, 1);
 		MDSS_XLOG(0x11, ctx->autorefresh_state);
 
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		if (pinfo && pinfo->mdp_koff_thshold && timing->koff_thshold_enable)
+#else
 		if (pinfo && pinfo->mdp_koff_thshold)
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 			spin_unlock(&ctx->ctlstart_lock);
 	}
 }
@@ -3019,6 +3086,10 @@ static int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 	struct mdss_mdp_ctl *sctl = NULL, *mctl = ctl;
 	struct mdss_mdp_cmd_ctx *ctx, *sctx = NULL;
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct mdss_panel_data *pdata = NULL;
+	struct mipi_panel_info *mipi = NULL;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	ctx = (struct mdss_mdp_cmd_ctx *) ctl->intf_ctx[MASTER_CTX];
 	if (!ctx) {
@@ -3030,6 +3101,15 @@ static int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 		pr_err("ctx=%d stopped already\n", ctx->current_pp_num);
 		return -EPERM;
 	}
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	if (IS_ERR_OR_NULL(ctl->panel_data)) {
+		pr_warn("%s: no panel data\n", __func__);
+	} else {
+		pdata = ctl->panel_data;
+		mipi  = &pdata->panel_info.mipi;
+	}
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	if (!ctl->is_master) {
 		mctl = mdss_mdp_get_main_ctl(ctl);
@@ -3091,6 +3171,25 @@ static int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 	/*
 	 * tx dcs command if had any
 	 */
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	if (ctl->panel_data && mipi &&
+		mipi->dms_mode == DYNAMIC_MODE_RESOLUTION_SWITCH_IMMEDIATE &&
+		mipi->switch_mode_pending == true) {
+		/* enable clks and rd_ptr interrupt */
+		mdss_mdp_setup_vsync(ctx, true);
+
+		atomic_inc(&ctx->rdptr_cnt);
+		MDSS_XLOG(atomic_read(&ctx->rdptr_cnt));
+		mdss_mdp_cmd_wait4readptr(ctx);
+		MDSS_XLOG(atomic_read(&ctx->rdptr_cnt));
+
+		/* disable clks and rd_ptr interrupt */
+		mdss_mdp_setup_vsync(ctx, false);
+
+		mipi->switch_mode_pending = false;
+	}
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+
 	mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_DSI_CMDLIST_KOFF, NULL,
 		CTL_INTF_EVENT_FLAG_DEFAULT);
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -392,9 +392,10 @@ static int msm_isp_start_fetch_engine_multi_pass(struct vfe_device *vfe_dev,
 		vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev,
 			0, 1);
 		msm_isp_reset_framedrop(vfe_dev, stream_info);
-
+		mutex_lock(&vfe_dev->buf_mgr->lock);
 		rc = msm_isp_cfg_offline_ping_pong_address(vfe_dev, stream_info,
 			VFE_PING_FLAG, fe_cfg->output_buf_idx);
+		mutex_unlock(&vfe_dev->buf_mgr->lock);
 		if (rc < 0) {
 			pr_err("%s: Fetch engine config failed\n", __func__);
 			return -EINVAL;
@@ -846,11 +847,30 @@ static int msm_isp_proc_cmd_list(struct vfe_device *vfe_dev, void *arg)
 }
 #endif /* CONFIG_COMPAT */
 
+static int process_isp_cmd_ext(struct vfe_device *vfe_dev, void *arg)
+{
+	int rc = 0;
+	struct msm_vfe_cmd_ext *cmd = (struct msm_vfe_cmd_ext *)arg;
+
+	switch (cmd->type) {
+		case VFE_GET_BUFQ_STATE: {
+			mutex_lock(&vfe_dev->buf_mgr->lock);
+			rc = msm_isp_proc_buf_cmd(vfe_dev->buf_mgr,
+					VIDIOC_MSM_ISP_CMD_EXT, arg);
+			mutex_unlock(&vfe_dev->buf_mgr->lock);
+			break;
+		}
+	}
+
+	return rc;
+}
+
 static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)
 {
 	long rc = 0;
 	long rc2 = 0;
+	unsigned long flags;
 	struct vfe_device *vfe_dev = v4l2_get_subdevdata(sd);
 
 	if (!vfe_dev || !vfe_dev->vfe_base) {
@@ -947,6 +967,7 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 		break;
 	case VIDIOC_MSM_ISP_AXI_RESTART:
 		mutex_lock(&vfe_dev->core_mutex);
+		mutex_lock(&vfe_dev->buf_mgr->lock);
 		if (atomic_read(&vfe_dev->error_info.overflow_state)
 			!= HALT_ENFORCED) {
 			rc = msm_isp_stats_restart(vfe_dev);
@@ -957,6 +978,7 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 			pr_err_ratelimited("%s: no AXI restart, halt enforced.\n",
 				__func__);
 		}
+		mutex_unlock(&vfe_dev->buf_mgr->lock);
 		mutex_unlock(&vfe_dev->core_mutex);
 		break;
 	case VIDIOC_MSM_ISP_INPUT_CFG:
@@ -979,12 +1001,14 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 		mutex_unlock(&vfe_dev->core_mutex);
 		break;
 	case VIDIOC_MSM_ISP_FETCH_ENG_START:
-	case VIDIOC_MSM_ISP_MAP_BUF_START_FE:
 		mutex_lock(&vfe_dev->core_mutex);
 		rc = msm_isp_start_fetch_engine(vfe_dev, arg);
 		mutex_unlock(&vfe_dev->core_mutex);
 		break;
 
+	case VIDIOC_MSM_ISP_CMD_EXT:
+		process_isp_cmd_ext(vfe_dev, arg);
+		break;
 	case VIDIOC_MSM_ISP_FETCH_ENG_MULTI_PASS_START:
 	case VIDIOC_MSM_ISP_MAP_BUF_START_MULTI_PASS_FE:
 		mutex_lock(&vfe_dev->core_mutex);
@@ -1049,6 +1073,11 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 		rc = msm_isp_camif_cfg(vfe_dev, arg);
 		mutex_unlock(&vfe_dev->core_mutex);
 		break;
+	case VIDIOC_MSM_ISP_FRAMEDROP_UPDATE:
+		mutex_lock(&vfe_dev->core_mutex);
+		msm_isp_framedrop_update(vfe_dev, arg);
+		mutex_unlock(&vfe_dev->core_mutex);
+		break;
 	case MSM_SD_NOTIFY_FREEZE:
 		vfe_dev->isp_sof_debug = 0;
 		vfe_dev->isp_raw0_debug = 0;
@@ -1060,6 +1089,11 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 	case MSM_SD_SHUTDOWN:
 		while (vfe_dev->vfe_open_cnt != 0)
 			msm_isp_close_node(sd, NULL);
+		break;
+	case VIDIOC_MSM_ISP_SET_CLK_STATUS:
+		spin_lock_irqsave(&vfe_dev->tasklet_lock, flags);
+		vfe_dev->clk_enabled = *((unsigned int *)arg);
+		spin_unlock_irqrestore(&vfe_dev->tasklet_lock, flags);
 		break;
 
 	default:
@@ -1999,7 +2033,7 @@ static void msm_isp_enqueue_tasklet_cmd(struct vfe_device *vfe_dev,
 		MSM_VFE_TASKLETQ_SIZE;
 	list_add_tail(&queue_cmd->list, &vfe_dev->tasklet_q);
 	spin_unlock_irqrestore(&vfe_dev->tasklet_lock, flags);
-	tasklet_schedule(&vfe_dev->vfe_tasklet);
+	tasklet_hi_schedule(&vfe_dev->vfe_tasklet);
 }
 
 irqreturn_t msm_isp_process_irq(int irq_num, void *data)
@@ -2114,10 +2148,20 @@ void msm_isp_do_tasklet(unsigned long data)
 		atomic_sub(1, &vfe_dev->irq_cnt);
 		list_del(&queue_cmd->list);
 		queue_cmd->cmd_used = 0;
+
+		if (!vfe_dev->clk_enabled) {
+			/* client closed, delayed task should exit directly */
+			spin_unlock_irqrestore(&vfe_dev->tasklet_lock, flags);
+			return;
+		}
+
 		irq_status0 = queue_cmd->vfeInterruptStatus0;
 		irq_status1 = queue_cmd->vfeInterruptStatus1;
 		pingpong_status = queue_cmd->vfePingPongStatus;
 		ts = queue_cmd->ts;
+		/* related to rw reg, need to be protected */
+		irq_ops->process_halt_irq(vfe_dev,
+			irq_status0, irq_status1);
 		spin_unlock_irqrestore(&vfe_dev->tasklet_lock, flags);
 		ISP_DBG("%s: vfe_id %d status0: 0x%x status1: 0x%x\n",
 			__func__, vfe_dev->pdev->id, irq_status0, irq_status1);
@@ -2141,8 +2185,6 @@ void msm_isp_do_tasklet(unsigned long data)
 		}
 		irq_ops->process_reset_irq(vfe_dev,
 			irq_status0, irq_status1);
-		irq_ops->process_halt_irq(vfe_dev,
-			irq_status0, irq_status1);
 		if (atomic_read(&vfe_dev->error_info.overflow_state)
 			!= NO_OVERFLOW) {
 			ISP_DBG("%s: Recovery in processing, Ignore IRQs!!!\n",
@@ -2159,6 +2201,8 @@ void msm_isp_do_tasklet(unsigned long data)
 		irq_ops->process_camif_irq(vfe_dev,
 			irq_status0, irq_status1, &ts);
 		irq_ops->process_reg_update(vfe_dev,
+			irq_status0, irq_status1, &ts);
+		irq_ops->process_sof_irq(vfe_dev,
 			irq_status0, irq_status1, &ts);
 		irq_ops->process_epoch_irq(vfe_dev,
 			irq_status0, irq_status1, &ts);
@@ -2217,6 +2261,7 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct vfe_device *vfe_dev = v4l2_get_subdevdata(sd);
 	long rc = 0;
+	enum cam_ahb_clk_client id;
 
 	ISP_DBG("%s open_cnt %u\n", __func__, vfe_dev->vfe_open_cnt);
 
@@ -2291,6 +2336,17 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	cam_smmu_reg_client_page_fault_handler(
 			vfe_dev->buf_mgr->iommu_hdl,
 			msm_vfe_iommu_fault_handler, vfe_dev);
+
+	/* Disable vfe clks and allow device to go XO shutdown mode */
+	if (vfe_dev->pdev->id == 0)
+		id = CAM_AHB_CLIENT_VFE0;
+	else
+		id = CAM_AHB_CLIENT_VFE1;
+	if (cam_config_ahb_clk(NULL, 0, id, CAM_AHB_SUSPEND_VOTE) < 0)
+		pr_err("%s: failed to remove vote for AHB\n", __func__);
+	vfe_dev->hw_info->vfe_ops.platform_ops.enable_clks(vfe_dev, 0);
+	vfe_dev->hw_info->vfe_ops.platform_ops.enable_regulators(vfe_dev, 0);
+
 	mutex_unlock(&vfe_dev->core_mutex);
 	mutex_unlock(&vfe_dev->realtime_mutex);
 	return 0;
@@ -2313,6 +2369,7 @@ int msm_isp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	long rc = 0;
 	int wm;
 	struct vfe_device *vfe_dev = v4l2_get_subdevdata(sd);
+	enum cam_ahb_clk_client id;
 
 	ISP_DBG("%s E open_cnt %u\n", __func__, vfe_dev->vfe_open_cnt);
 	mutex_lock(&vfe_dev->realtime_mutex);
@@ -2332,6 +2389,17 @@ int msm_isp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 		mutex_unlock(&vfe_dev->realtime_mutex);
 		return 0;
 	}
+
+	/* Enable vfe clks to wake up from XO shutdown mode */
+	if (vfe_dev->pdev->id == 0)
+		id = CAM_AHB_CLIENT_VFE0;
+	else
+		id = CAM_AHB_CLIENT_VFE1;
+	if (cam_config_ahb_clk(NULL, 0, id, CAM_AHB_SVS_VOTE) < 0)
+		pr_err("%s: failed to vote for AHB\n", __func__);
+	vfe_dev->hw_info->vfe_ops.platform_ops.enable_clks(vfe_dev, 1);
+	vfe_dev->hw_info->vfe_ops.platform_ops.enable_regulators(vfe_dev, 1);
+
 	/* Unregister page fault handler */
 	cam_smmu_reg_client_page_fault_handler(
 		vfe_dev->buf_mgr->iommu_hdl,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -174,6 +174,11 @@ static int dsi_display_ctrl_power_on(struct dsi_display *display)
 	int i;
 	struct dsi_display_ctrl *ctrl;
 
+	if (display->cont_splash_enabled) {
+		pr_debug("skip ctrl power on\n");
+		return rc;
+	}
+
 	/* Sequence does not matter for split dsi usecases */
 
 	for (i = 0; i < display->ctrl_count; i++) {
@@ -231,6 +236,12 @@ static int dsi_display_phy_power_on(struct dsi_display *display)
 	int i;
 	struct dsi_display_ctrl *ctrl;
 
+	/* early return for splash enabled case */
+	if (display->cont_splash_enabled) {
+		pr_debug("skip phy power on\n");
+		return rc;
+	}
+
 	/* Sequence does not matter for split dsi usecases */
 
 	for (i = 0; i < display->ctrl_count; i++) {
@@ -287,12 +298,17 @@ static int dsi_display_ctrl_core_clk_on(struct dsi_display *display)
 	int i;
 	struct dsi_display_ctrl *m_ctrl, *ctrl;
 
+	/* early return for splash enabled case */
+	if (display->cont_splash_enabled) {
+		pr_debug("skip core clk on calling\n");
+		return rc;
+	}
+
 	/*
 	 * In case of split DSI usecases, the clock for master controller should
 	 * be enabled before the other controller. Master controller in the
 	 * clock context refers to the controller that sources the clock.
 	 */
-
 	m_ctrl = &display->ctrl[display->clk_master_idx];
 
 	rc = dsi_ctrl_set_power_state(m_ctrl->ctrl, DSI_CTRL_POWER_CORE_CLK_ON);
@@ -329,12 +345,17 @@ static int dsi_display_ctrl_link_clk_on(struct dsi_display *display)
 	int i;
 	struct dsi_display_ctrl *m_ctrl, *ctrl;
 
+	/* early return for splash enabled case */
+	if (display->cont_splash_enabled) {
+		pr_debug("skip ctrl link clk on calling\n");
+		return rc;
+	}
+
 	/*
 	 * In case of split DSI usecases, the clock for master controller should
 	 * be enabled before the other controller. Master controller in the
 	 * clock context refers to the controller that sources the clock.
 	 */
-
 	m_ctrl = &display->ctrl[display->clk_master_idx];
 
 	rc = dsi_ctrl_set_clock_source(m_ctrl->ctrl,
@@ -460,7 +481,8 @@ static int dsi_display_ctrl_init(struct dsi_display *display)
 
 	for (i = 0 ; i < display->ctrl_count; i++) {
 		ctrl = &display->ctrl[i];
-		rc = dsi_ctrl_host_init(ctrl->ctrl);
+		rc = dsi_ctrl_host_init(ctrl->ctrl,
+					display->cont_splash_enabled);
 		if (rc) {
 			pr_err("[%s] failed to init host_%d, rc=%d\n",
 			       display->name, i, rc);
@@ -720,7 +742,7 @@ static int dsi_display_phy_enable(struct dsi_display *display)
 	rc = dsi_phy_enable(m_ctrl->phy,
 			    &display->config,
 			    m_src,
-			    true);
+			    true, display->cont_splash_enabled);
 	if (rc) {
 		pr_err("[%s] failed to enable DSI PHY, rc=%d\n",
 		       display->name, rc);
@@ -735,7 +757,7 @@ static int dsi_display_phy_enable(struct dsi_display *display)
 		rc = dsi_phy_enable(ctrl->phy,
 				    &display->config,
 				    DSI_PLL_SOURCE_NON_NATIVE,
-				    true);
+				    true, display->cont_splash_enabled);
 		if (rc) {
 			pr_err("[%s] failed to enable DSI PHY, rc=%d\n",
 			       display->name, rc);
@@ -847,6 +869,11 @@ static int dsi_display_phy_sw_reset(struct dsi_display *display)
 	int rc = 0;
 	int i;
 	struct dsi_display_ctrl *m_ctrl, *ctrl;
+
+	if (display->cont_splash_enabled) {
+		pr_debug("skip phy sw reset\n");
+		return 0;
+	}
 
 	m_ctrl = &display->ctrl[display->cmd_master_idx];
 
@@ -1153,6 +1180,13 @@ static int dsi_display_parse_dt(struct dsi_display *display)
 		pr_err("Number of controllers does not match PHYs\n");
 		rc = -ENODEV;
 		goto error;
+	}
+
+	/* Only read swap property in split case */
+	if (display->ctrl_count > 1) {
+		display->dsi_split_swap =
+			of_property_read_bool(display->pdev->dev.of_node,
+					"qcom,dsi-split-swap");
 	}
 
 	if (of_get_property(display->pdev->dev.of_node, "qcom,dsi-panel",
@@ -1481,8 +1515,8 @@ static int dsi_display_dfps_update(struct dsi_display *display,
 	m_ctrl = &display->ctrl[display->clk_master_idx];
 	rc = dsi_ctrl_async_timing_update(m_ctrl->ctrl, timing);
 	if (rc) {
-		pr_err("[%s] failed to dfps update host_%d, rc=%d\n",
-				display->name, i, rc);
+		pr_err("[%s] failed to dfps update clock master, rc=%d\n",
+				display->name, rc);
 		goto error;
 	}
 
@@ -1745,6 +1779,45 @@ static int _dsi_display_dev_deinit(struct dsi_display *display)
 
 	mutex_unlock(&display->display_lock);
 
+	return rc;
+}
+
+/*
+ * _dsi_display_config_ctrl_for_splash
+ *
+ * Config ctrl engine for DSI display.
+ * @display:        Handle to the display
+ * Returns:         Zero on success
+ */
+static int _dsi_display_config_ctrl_for_splash(struct dsi_display *display)
+{
+	int rc = 0;
+
+	if (!display) {
+		pr_err("Invalid params\n");
+		return -EINVAL;
+	}
+
+	if (display->config.panel_mode == DSI_OP_VIDEO_MODE) {
+		rc = dsi_display_vid_engine_enable(display);
+		if (rc) {
+			pr_err("[%s]failed to enable video engine, rc=%d\n",
+					display->name, rc);
+			goto error_out;
+		}
+	} else if (display->config.panel_mode == DSI_OP_CMD_MODE) {
+		rc = dsi_display_cmd_engine_enable(display);
+		if (rc) {
+			pr_err("[%s]failed to enable cmd engine, rc=%d\n",
+					display->name, rc);
+			goto error_out;
+		}
+	} else {
+		pr_err("[%s] Invalid configuration\n", display->name);
+		rc = -EINVAL;
+	}
+
+error_out:
 	return rc;
 }
 
@@ -2141,6 +2214,8 @@ int dsi_display_drm_bridge_init(struct dsi_display *display,
 			init_data.num_of_input_lanes = num_of_lanes;
 			init_data.precede_bridge = precede_bridge;
 			init_data.panel_count = display->panel_count;
+			init_data.cont_splash_enabled =
+						display->cont_splash_enabled;
 			dba_bridge = dba_bridge_init(display->drm_dev, enc,
 							&init_data);
 			if (IS_ERR_OR_NULL(dba_bridge)) {
@@ -2228,6 +2303,14 @@ int dsi_display_get_info(struct msm_display_info *info, void *disp)
 	info->num_of_h_tiles = display->ctrl_count;
 	for (i = 0; i < info->num_of_h_tiles; i++)
 		info->h_tile_instance[i] = display->ctrl[i].ctrl->index;
+
+	/*
+	 * h_tile_instance[2] = {0, 1} means DSI0 left(master), DSI1 right
+	 * h_tile_instance[2] = {1, 0} means DSI1 left(master), DSI0 right
+	 * So in case of split case and swap property is set, swap two DSIs.
+	 */
+	if (info->num_of_h_tiles > 1 && display->dsi_split_swap)
+		swap(info->h_tile_instance[0], info->h_tile_instance[1]);
 
 	info->is_connected = true;
 	info->width_mm = phy_props.panel_width_mm;
@@ -2442,7 +2525,7 @@ error:
 
 int dsi_display_prepare(struct dsi_display *display)
 {
-	int rc = 0, i, j;
+	int rc = 0, i = 0, j = 0;
 
 	if (!display) {
 		pr_err("Invalid params\n");
@@ -2451,26 +2534,28 @@ int dsi_display_prepare(struct dsi_display *display)
 
 	mutex_lock(&display->display_lock);
 
-	for (i = 0; i < display->panel_count; i++) {
-		rc = dsi_panel_pre_prepare(display->panel[i]);
-		if (rc) {
-			SDE_ERROR("[%s] panel pre-prepare failed, rc=%d\n",
-					display->name, rc);
-			goto error_panel_post_unprep;
+	if (!display->cont_splash_enabled) {
+		for (i = 0; i < display->panel_count; i++) {
+			rc = dsi_panel_pre_prepare(display->panel[i]);
+			if (rc) {
+				SDE_ERROR("[%s]pre-prepare failed, rc=%d\n",
+						display->name, rc);
+				goto error_panel_post_unprep;
+			}
 		}
 	}
 
 	rc = dsi_display_ctrl_power_on(display);
 	if (rc) {
 		pr_err("[%s] failed to power on dsi controllers, rc=%d\n",
-		       display->name, rc);
+			display->name, rc);
 		goto error_panel_post_unprep;
 	}
 
 	rc = dsi_display_phy_power_on(display);
 	if (rc) {
 		pr_err("[%s] failed to power on dsi phy, rc = %d\n",
-		       display->name, rc);
+			display->name, rc);
 		goto error_ctrl_pwr_off;
 	}
 
@@ -2497,21 +2582,21 @@ int dsi_display_prepare(struct dsi_display *display)
 	rc = dsi_display_ctrl_init(display);
 	if (rc) {
 		pr_err("[%s] failed to setup DSI controller, rc=%d\n",
-		       display->name, rc);
+			display->name, rc);
 		goto error_phy_disable;
 	}
 
 	rc = dsi_display_ctrl_link_clk_on(display);
 	if (rc) {
 		pr_err("[%s] failed to enable DSI link clocks, rc=%d\n",
-		       display->name, rc);
+			display->name, rc);
 		goto error_ctrl_deinit;
 	}
 
 	rc = dsi_display_ctrl_host_enable(display);
 	if (rc) {
 		pr_err("[%s] failed to enable DSI host, rc=%d\n",
-		       display->name, rc);
+			display->name, rc);
 		goto error_ctrl_link_off;
 	}
 
@@ -2519,11 +2604,10 @@ int dsi_display_prepare(struct dsi_display *display)
 		rc = dsi_panel_prepare(display->panel[j]);
 		if (rc) {
 			SDE_ERROR("[%s] panel prepare failed, rc=%d\n",
-					display->name, rc);
+				display->name, rc);
 			goto error_panel_unprep;
 		}
 	}
-
 	goto error;
 
 error_panel_unprep:
@@ -2557,6 +2641,12 @@ int dsi_display_enable(struct dsi_display *display)
 	if (!display) {
 		pr_err("Invalid params\n");
 		return -EINVAL;
+	}
+
+	if (display->cont_splash_enabled) {
+		_dsi_display_config_ctrl_for_splash(display);
+		display->cont_splash_enabled = false;
+		return 0;
 	}
 
 	mutex_lock(&display->display_lock);
@@ -2753,6 +2843,40 @@ int dsi_display_unprepare(struct dsi_display *display)
 
 	mutex_unlock(&display->display_lock);
 	return rc;
+}
+
+int dsi_dsiplay_setup_splash_resource(struct dsi_display *display)
+{
+	int ret = 0, i = 0;
+	struct dsi_display_ctrl *ctrl;
+
+	if (!display)
+		return -EINVAL;
+
+	for (i = 0; i < display->ctrl_count; i++) {
+		ctrl = &display->ctrl[i];
+		if (!ctrl)
+			return -EINVAL;
+
+		/* set dsi ctrl power state */
+		ret = dsi_ctrl_set_power_state(ctrl->ctrl,
+					DSI_CTRL_POWER_LINK_CLK_ON);
+		if (ret) {
+			pr_err("%s:fail to call dsi_ctrl_set_power_state\n",
+					__func__);
+			return ret;
+		}
+
+		/* set dsi phy power state */
+		ret = dsi_phy_set_power_state(ctrl->phy, true);
+		if (ret) {
+			pr_err("%s:fail to call dsi_phy_set_power_state\n",
+					 __func__);
+			return ret;
+		}
+	}
+
+	return ret;
 }
 
 static int __init dsi_display_register(void)

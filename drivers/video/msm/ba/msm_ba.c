@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,7 @@
 #include <linux/videodev2.h>
 #include <media/v4l2-device.h>
 #include <media/msm_ba.h>
+#include <media/adv7481.h>
 
 #include "msm_ba_internal.h"
 #include "msm_ba_debug.h"
@@ -346,6 +347,7 @@ int msm_ba_g_fmt(void *instance, struct v4l2_format *f)
 	} else {
 		f->fmt.pix.height = sd_fmt.format.height;
 		f->fmt.pix.width = sd_fmt.format.width;
+		f->fmt.pix.field = sd_fmt.format.field;
 		switch (sd_fmt.format.code) {
 		case MEDIA_BUS_FMT_YUYV8_2X8:
 			f->fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
@@ -549,6 +551,60 @@ long msm_ba_private_ioctl(void *instance, int cmd, void *arg)
 			if (rc)
 				dprintk(BA_ERR, "%s failed: %ld on cmd: 0x%x",
 					__func__, rc, cmd);
+		} else {
+			dprintk(BA_ERR, "%s: NULL argument provided", __func__);
+			rc = -EINVAL;
+		}
+	}
+		break;
+	case VIDIOC_G_CSI_PARAMS: {
+		dprintk(BA_DBG, "VIDIOC_G_CSI_PARAMS");
+		sd = inst->sd;
+		if (!sd) {
+			dprintk(BA_ERR, "No sd registered");
+			return -EINVAL;
+		}
+		if (arg) {
+			rc = v4l2_subdev_call(sd, core, ioctl, cmd, arg);
+			if (rc)
+				dprintk(BA_ERR, "%s failed: %ld on cmd: 0x%x",
+					__func__, rc, cmd);
+		} else {
+			dprintk(BA_ERR, "%s: NULL argument provided", __func__);
+			rc = -EINVAL;
+		}
+	}
+		break;
+	case VIDIOC_G_AVI_INFOFRAME: {
+		dprintk(BA_DBG, "VIDIOC_G_AVI_INFOFRAME\n");
+		sd = inst->sd;
+		if (!sd) {
+			dprintk(BA_ERR, "No sd registered");
+			return -EINVAL;
+		}
+		if (arg) {
+			rc = v4l2_subdev_call(sd, core, ioctl, cmd, arg);
+			if (rc)
+				dprintk(BA_ERR, "%s failed: %ld on cmd: 0x%x",
+					__func__, rc, cmd);
+		} else {
+			dprintk(BA_ERR, "%s: NULL argument provided", __func__);
+			rc = -EINVAL;
+		}
+	}
+		break;
+	case VIDIOC_G_FIELD_INFO: {
+		dprintk(BA_DBG, "VIDIOC_G_FIELD_INFO");
+		sd = inst->sd;
+		if (!sd) {
+			dprintk(BA_ERR, "No sd registered");
+			return -EINVAL;
+		}
+		if (arg) {
+			rc = v4l2_subdev_call(sd, core, ioctl, cmd, arg);
+			if (rc)
+				dprintk(BA_ERR, "%s failed: %ld on cmd: 0x%x",
+					 __func__, rc, cmd);
 		} else {
 			dprintk(BA_ERR, "%s: NULL argument provided", __func__);
 			rc = -EINVAL;
@@ -811,6 +867,11 @@ void *msm_ba_open(const struct msm_ba_ext_ops *ext_ops)
 	int rc = 0;
 
 	dev_ctxt = get_ba_dev();
+
+	if (!dev_ctxt) {
+		dprintk(BA_ERR, "Failed to get ba dev");
+		return NULL;
+	}
 
 	inst = kzalloc(sizeof(*inst), GFP_KERNEL);
 

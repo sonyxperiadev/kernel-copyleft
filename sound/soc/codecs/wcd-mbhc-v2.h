@@ -22,7 +22,7 @@
 #define WCD_MBHC_DEF_BUTTONS 8
 #define WCD_MBHC_KEYCODE_NUM 8
 #define WCD_MBHC_USLEEP_RANGE_MARGIN_US 100
-#define WCD_MBHC_THR_HS_MICB_MV  2700
+#define WCD_MBHC_THR_HS_MICB_MV  2450
 /* z value defined in Ohms */
 #define WCD_MONO_HS_MIN_THR	2
 #define WCD_MBHC_STRINGIFY(s)  __stringify(s)
@@ -82,6 +82,7 @@ enum wcd_mbhc_plug_type {
 	MBHC_PLUG_TYPE_HIGH_HPH,
 	MBHC_PLUG_TYPE_GND_MIC_SWAP,
 	MBHC_PLUG_TYPE_ANC_HEADPHONE,
+	MBHC_PLUG_TYPE_STEREO_MICROPHONE,
 };
 
 enum pa_dac_ack_flags {
@@ -117,6 +118,9 @@ enum {
 	MBHC_COMMON_MICB_PRECHARGE,
 	MBHC_COMMON_MICB_SET_VAL,
 	MBHC_COMMON_MICB_TAIL_CURR,
+#ifdef CONFIG_HIGH_VOL_MIC
+	MBHC_COMMON_MICB_SET_18_VAL,
+#endif
 };
 
 enum wcd_notify_event {
@@ -423,6 +427,7 @@ struct wcd_mbhc {
 	bool btn_press_intr;
 	bool is_hs_recording;
 	bool is_extn_cable;
+	bool extn_cable_inserted;
 	bool skip_imped_detection;
 	bool is_btn_already_regd;
 

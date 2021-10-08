@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -154,6 +154,7 @@ struct sde_hdmi {
 	struct sde_edid_ctrl *edid_ctrl;
 
 	bool non_pluggable;
+	bool skip_ddc;
 	u32 num_of_modes;
 	struct list_head mode_list;
 	struct drm_display_mode mode;
@@ -196,6 +197,8 @@ struct sde_hdmi {
 	struct dss_io_data io[HDMI_TX_MAX_IO];
 	/* DEBUG FS */
 	struct dentry *root;
+
+	bool cont_splash_enabled;
 };
 
 /**
@@ -300,6 +303,22 @@ enum drm_connector_status
 sde_hdmi_connector_detect(struct drm_connector *connector,
 		bool force,
 		void *display);
+
+/**
+ * sde_hdmi_core_enable()- turn on clk and pwr for hdmi core
+ * @sde_hdmi: Pointer to sde_hdmi structure
+ *
+ * Return: error code
+ */
+int sde_hdmi_core_enable(struct sde_hdmi *sde_hdmi);
+
+/**
+ * sde_hdmi_core_disable()- turn off clk and pwr for hdmi core
+ * @sde_hdmi: Pointer to sde_hdmi structure
+ *
+ * Return: none
+ */
+void sde_hdmi_core_disable(struct sde_hdmi *sde_hdmi);
 
 /**
  * sde_hdmi_connector_get_modes - add drm modes via drm_mode_probed_add()
@@ -415,10 +434,12 @@ int sde_hdmi_get_property(struct drm_connector *connector,
 /**
  * sde_hdmi_bridge_init() - init sde hdmi bridge
  * @hdmi:          Handle to the hdmi.
+ * @display:       Handle to the sde_hdmi
  *
  * Return: struct drm_bridge *.
  */
-struct drm_bridge *sde_hdmi_bridge_init(struct hdmi *hdmi);
+struct drm_bridge *sde_hdmi_bridge_init(struct hdmi *hdmi,
+			struct sde_hdmi *display);
 
 /**
  * sde_hdmi_set_mode() - Set HDMI mode API.

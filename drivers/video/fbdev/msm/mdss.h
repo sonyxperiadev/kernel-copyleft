@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,6 +37,10 @@
 
 #define MDSS_PINCTRL_STATE_DEFAULT "mdss_default"
 #define MDSS_PINCTRL_STATE_SLEEP  "mdss_sleep"
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+#define MDSS_PINCTRL_STATE_TOUCH_ACTIVE "mdss_touch_active"
+#define MDSS_PINCTRL_STATE_TOUCH_SUSPEND  "mdss_touch_suspend"
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 enum mdss_mdp_clk_type {
 	MDSS_CLK_AHB,
@@ -255,6 +259,13 @@ struct mdss_scaler_block {
 	u32 *dest_scaler_off;
 	u32 *dest_scaler_lut_off;
 	struct mdss_mdp_qseed3_lut_tbl lut_tbl;
+
+	/*
+	 * Lock is mainly to serialize access to LUT.
+	 * LUT values come asynchronously from userspace
+	 * via ioctl.
+	 */
+	struct mutex scaler_lock;
 };
 
 struct mdss_data_type;

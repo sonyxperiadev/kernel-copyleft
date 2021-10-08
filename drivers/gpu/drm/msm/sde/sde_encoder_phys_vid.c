@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,7 @@
  */
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
+#include "sde_recovery_manager.h"
 #include "sde_encoder_phys.h"
 #include "sde_hw_interrupts.h"
 #include "sde_core_irq.h"
@@ -281,22 +282,39 @@ static void sde_encoder_phys_vid_vblank_irq(void *arg, int irq_idx)
 {
 	struct sde_encoder_phys_vid *vid_enc = arg;
 	struct sde_encoder_phys *phys_enc;
+	struct sde_hw_ctl *hw_ctl;
 	unsigned long lock_flags;
-	int new_cnt;
+	u32 flush_register = 0;
+	int new_cnt = -1, old_cnt = -1;
 
 	if (!vid_enc)
 		return;
 
 	phys_enc = &vid_enc->base;
+	hw_ctl = phys_enc->hw_ctl;
+
 	if (phys_enc->parent_ops.handle_vblank_virt)
 		phys_enc->parent_ops.handle_vblank_virt(phys_enc->parent,
 				phys_enc);
 
+	old_cnt  = atomic_read(&phys_enc->pending_kickoff_cnt);
+
+	/*
+	 * only decrement the pending flush count if we've actually flushed
+	 * hardware. due to sw irq latency, vblank may have already happened
+	 * so we need to double-check with hw that it accepted the flush bits
+	 */
 	spin_lock_irqsave(phys_enc->enc_spinlock, lock_flags);
-	new_cnt = atomic_add_unless(&phys_enc->pending_kickoff_cnt, -1, 0);
-	SDE_EVT32_IRQ(DRMID(phys_enc->parent), vid_enc->hw_intf->idx - INTF_0,
-			new_cnt);
+	if (hw_ctl && hw_ctl->ops.get_flush_register)
+		flush_register = hw_ctl->ops.get_flush_register(hw_ctl);
+
+	if (flush_register == 0)
+		new_cnt = atomic_add_unless(&phys_enc->pending_kickoff_cnt,
+				-1, 0);
 	spin_unlock_irqrestore(phys_enc->enc_spinlock, lock_flags);
+
+	SDE_EVT32_IRQ(DRMID(phys_enc->parent), vid_enc->hw_intf->idx - INTF_0,
+			old_cnt, new_cnt, flush_register);
 
 	/* Signal any waiting atomic commit thread */
 	wake_up_all(&phys_enc->pending_kickoff_wq);
@@ -316,10 +334,24 @@ static void sde_encoder_phys_vid_underrun_irq(void *arg, int irq_idx)
 			phys_enc);
 }
 
+static bool _sde_encoder_phys_is_ppsplit(struct sde_encoder_phys *phys_enc)
+{
+	enum sde_rm_topology_name topology;
+
+	if (!phys_enc)
+		return false;
+
+	topology = sde_connector_get_topology_name(phys_enc->connector);
+	if (topology == SDE_RM_TOPOLOGY_PPSPLIT)
+		return true;
+
+	return false;
+}
+
 static bool sde_encoder_phys_vid_needs_single_flush(
 		struct sde_encoder_phys *phys_enc)
 {
-	return phys_enc && phys_enc->split_role != ENC_ROLE_SOLO;
+	return phys_enc && _sde_encoder_phys_is_ppsplit(phys_enc);
 }
 
 static int sde_encoder_phys_vid_register_irq(struct sde_encoder_phys *phys_enc,
@@ -657,7 +689,7 @@ static int sde_encoder_phys_vid_wait_for_vblank(
 			KICKOFF_TIMEOUT_MS);
 	if (ret <= 0) {
 		irq_status = sde_core_irq_read(phys_enc->sde_kms,
-				INTR_IDX_VSYNC, true);
+				vid_enc->irq_idx[INTR_IDX_VSYNC], true);
 		if (irq_status) {
 			SDE_EVT32(DRMID(phys_enc->parent),
 					vid_enc->hw_intf->idx - INTF_0);
@@ -673,6 +705,7 @@ static int sde_encoder_phys_vid_wait_for_vblank(
 			SDE_EVT32(DRMID(phys_enc->parent),
 					vid_enc->hw_intf->idx - INTF_0);
 			SDE_ERROR_VIDENC(vid_enc, "kickoff timed out\n");
+			sde_recovery_set_events(SDE_VSYNC_MISS);
 			if (notify && phys_enc->parent_ops.handle_frame_done)
 				phys_enc->parent_ops.handle_frame_done(
 						phys_enc->parent, phys_enc,
@@ -698,6 +731,35 @@ static int sde_encoder_phys_vid_wait_for_commit_done(
 	ret = sde_encoder_phys_vid_wait_for_vblank(phys_enc, true);
 
 	return ret;
+}
+
+static void sde_encoder_phys_vid_prepare_for_kickoff(
+		struct sde_encoder_phys *phys_enc)
+{
+	struct sde_encoder_phys_vid *vid_enc;
+	struct sde_hw_ctl *ctl;
+	int rc;
+
+	if (!phys_enc) {
+		SDE_ERROR("invalid encoder\n");
+		return;
+	}
+	vid_enc = to_sde_encoder_phys_vid(phys_enc);
+
+	ctl = phys_enc->hw_ctl;
+	if (!ctl || !ctl->ops.wait_reset_status)
+		return;
+
+	/*
+	 * hw supports hardware initiated ctl reset, so before we kickoff a new
+	 * frame, need to check and wait for hw initiated ctl reset completion
+	 */
+	rc = ctl->ops.wait_reset_status(ctl);
+	if (rc) {
+		SDE_ERROR_VIDENC(vid_enc, "ctl %d reset failure: %d\n",
+				ctl->idx, rc);
+		SDE_DBG_DUMP("panic");
+	}
 }
 
 static void sde_encoder_phys_vid_disable(struct sde_encoder_phys *phys_enc)
@@ -832,6 +894,7 @@ static void sde_encoder_phys_vid_init_ops(struct sde_encoder_phys_ops *ops)
 	ops->get_hw_resources = sde_encoder_phys_vid_get_hw_resources;
 	ops->control_vblank_irq = sde_encoder_phys_vid_control_vblank_irq;
 	ops->wait_for_commit_done = sde_encoder_phys_vid_wait_for_commit_done;
+	ops->prepare_for_kickoff = sde_encoder_phys_vid_prepare_for_kickoff;
 	ops->handle_post_kickoff = sde_encoder_phys_vid_handle_post_kickoff;
 	ops->needs_single_flush = sde_encoder_phys_vid_needs_single_flush;
 	ops->setup_misr = sde_encoder_phys_vid_setup_misr;

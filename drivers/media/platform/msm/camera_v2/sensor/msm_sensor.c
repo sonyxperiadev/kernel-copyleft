@@ -17,12 +17,45 @@
 #include "msm_camera_i2c_mux.h"
 #include <linux/regulator/rpm-smd-regulator.h>
 #include <linux/regulator/consumer.h>
+#if defined(CONFIG_MACH_SONY_KIRIN) || \
+	defined(CONFIG_MACH_SONY_KIRIN_DSDS) || \
+	defined(CONFIG_MACH_SONY_MERMAID) || \
+	defined(CONFIG_MACH_SONY_MERMAID_DSDS) || \
+	defined(CONFIG_MACH_SONY_PIONEER) || \
+	defined(CONFIG_MACH_SONY_PIONEER_DSDS) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY_DSDS) || \
+	defined(CONFIG_MACH_SONY_VOYAGER) || \
+	defined(CONFIG_MACH_SONY_VOYAGER_DSDS)
+#include <linux/proc_fs.h>
+#endif //#if defined(CONFIG_MACH_SONY_KIRIN) || defined(CONFIG_MACH_SONY_KIRIN_DSDS) || defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
 
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
 static struct msm_camera_i2c_fn_t msm_sensor_cci_func_tbl;
 static struct msm_camera_i2c_fn_t msm_sensor_secure_func_tbl;
+
+
+#if defined(CONFIG_MACH_SONY_KIRIN) || \
+	defined(CONFIG_MACH_SONY_KIRIN_DSDS) || \
+	defined(CONFIG_MACH_SONY_MERMAID) || \
+	defined(CONFIG_MACH_SONY_MERMAID_DSDS) || \
+	defined(CONFIG_MACH_SONY_PIONEER) || \
+	defined(CONFIG_MACH_SONY_PIONEER_DSDS) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY_DSDS) || \
+	defined(CONFIG_MACH_SONY_VOYAGER) || \
+	defined(CONFIG_MACH_SONY_VOYAGER_DSDS)
+#define GPIO_CAMERA_ID_8M  49
+#define camera_info_size 64
+#define sensor_main_source 1
+#define sensor_2nd_source 2
+char cei_cid_name[camera_info_size];
+char cei_cid_node[3][64] = {""};
+bool initCamIdNode = FALSE;
+#endif //#if defined(CONFIG_MACH_SONY_KIRIN) || defined(CONFIG_MACH_SONY_KIRIN_DSDS) || defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
+
 
 static void msm_sensor_adjust_mclk(struct msm_camera_power_ctrl_t *ctrl)
 {
@@ -201,6 +234,9 @@ int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 		}
 		rc = msm_camera_power_up(power_info, s_ctrl->sensor_device_type,
 			sensor_i2c_client);
+#if defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
+		if (!strcmp(s_ctrl->sensordata->sensor_name, "s5k4h8")) msleep(50);
+#endif
 		if (rc < 0)
 			return rc;
 		rc = msm_sensor_check_id(s_ctrl);
@@ -238,6 +274,18 @@ static uint16_t msm_sensor_id_by_mask(struct msm_sensor_ctrl_t *s_ctrl,
 
 int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 {
+#if defined(CONFIG_MACH_SONY_KIRIN) || \
+	defined(CONFIG_MACH_SONY_KIRIN_DSDS) || \
+	defined(CONFIG_MACH_SONY_MERMAID) || \
+	defined(CONFIG_MACH_SONY_MERMAID_DSDS) || \
+	defined(CONFIG_MACH_SONY_PIONEER) || \
+	defined(CONFIG_MACH_SONY_PIONEER_DSDS) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY_DSDS) || \
+	defined(CONFIG_MACH_SONY_VOYAGER) || \
+	defined(CONFIG_MACH_SONY_VOYAGER_DSDS)
+	int CAM_ID = 0;
+#endif //#if defined(CONFIG_MACH_SONY_KIRIN) || defined(CONFIG_MACH_SONY_KIRIN_DSDS) || defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
 	int rc = 0;
 	uint16_t chipid = 0;
 	struct msm_camera_i2c_client *sensor_i2c_client;
@@ -270,11 +318,50 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 
 	pr_debug("%s: read id: 0x%x expected id 0x%x:\n",
 			__func__, chipid, slave_info->sensor_id);
+#if defined(CONFIG_MACH_SONY_PIONEER) || \
+	defined(CONFIG_MACH_SONY_PIONEER_DSDS) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY_DSDS) || \
+	defined(CONFIG_MACH_SONY_VOYAGER) || \
+	defined(CONFIG_MACH_SONY_VOYAGER_DSDS)
+	if (chipid == 0x219) {
+		int CAM_ID_8M;
+		CAM_ID_8M = gpio_get_value(GPIO_CAMERA_ID_8M);
+		snprintf(cei_cid_name, sizeof(cei_cid_name), "%d", CAM_ID_8M);
+		pr_err("%s CAM_ID_8M: %d", __func__, CAM_ID_8M);
+
+		if (CAM_ID_8M == 1) {
+			chipid = 0x221;
+			snprintf(cei_cid_name, sizeof(cei_cid_name), "%d", CAM_ID_8M);
+			pr_debug("%s 8M camera id %x change read id: 0x%x\n",
+				__func__, CAM_ID_8M, chipid);
+		}
+	}
+#endif
+
 	if (msm_sensor_id_by_mask(s_ctrl, chipid) != slave_info->sensor_id) {
 		pr_err("%s chip id %x does not match %x\n",
 				__func__, chipid, slave_info->sensor_id);
 		return -ENODEV;
 	}
+
+#if defined(CONFIG_MACH_SONY_KIRIN) || \
+	defined(CONFIG_MACH_SONY_KIRIN_DSDS) || \
+	defined(CONFIG_MACH_SONY_MERMAID) || \
+	defined(CONFIG_MACH_SONY_MERMAID_DSDS) || \
+	defined(CONFIG_MACH_SONY_PIONEER) || \
+	defined(CONFIG_MACH_SONY_PIONEER_DSDS) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY_DSDS) || \
+	defined(CONFIG_MACH_SONY_VOYAGER) || \
+	defined(CONFIG_MACH_SONY_VOYAGER_DSDS)
+	if (CAM_ID == 0) {
+		snprintf(cei_cid_node[s_ctrl->id],sizeof(cei_cid_node[s_ctrl->id]),"%d", sensor_main_source);
+	} else {
+		snprintf(cei_cid_node[s_ctrl->id],sizeof(cei_cid_node[s_ctrl->id]),"%d", sensor_2nd_source);
+	}
+#endif //#if defined(CONFIG_MACH_SONY_KIRIN) || defined(CONFIG_MACH_SONY_KIRIN_DSDS) || defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
+
 	return rc;
 }
 
@@ -1486,6 +1573,54 @@ static struct msm_camera_i2c_fn_t msm_sensor_secure_func_tbl = {
 	.i2c_write_table_sync_block = msm_camera_tz_i2c_write_table_sync_block,
 };
 
+#if defined(CONFIG_MACH_SONY_KIRIN) || \
+	defined(CONFIG_MACH_SONY_KIRIN_DSDS) || \
+	defined(CONFIG_MACH_SONY_MERMAID) || \
+	defined(CONFIG_MACH_SONY_MERMAID_DSDS) || \
+	defined(CONFIG_MACH_SONY_PIONEER) || \
+	defined(CONFIG_MACH_SONY_PIONEER_DSDS) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY_DSDS) || \
+	defined(CONFIG_MACH_SONY_VOYAGER) || \
+	defined(CONFIG_MACH_SONY_VOYAGER_DSDS)
+static int subsys_camera_id_read(struct seq_file *m, void *v)
+{
+#if defined(CONFIG_MACH_SONY_KIRIN) || \
+	defined(CONFIG_MACH_SONY_KIRIN_DSDS) || \
+	defined(CONFIG_MACH_SONY_MERMAID) || \
+	defined(CONFIG_MACH_SONY_MERMAID_DSDS)
+	int i = 0;
+	for(i = 0; i < 3; i++)
+		pr_err("subsys_camera_id_read cam_%d source: %s (main: 1, 2nd: 2)",
+			i, cei_cid_node[i]);
+
+	seq_printf(m, "main-rear: %s\nsub-rear: %s\nfront: %s\n",
+		cei_cid_node[0], cei_cid_node[1],cei_cid_node[2]);
+
+#elif defined(CONFIG_MACH_SONY_PIONEER) || \
+	defined(CONFIG_MACH_SONY_PIONEER_DSDS) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY_DSDS) || \
+	defined(CONFIG_MACH_SONY_VOYAGER) || \
+	defined(CONFIG_MACH_SONY_VOYAGER_DSDS)
+	pr_err("subsys_camera_id_read %s\n", cei_cid_name);
+	seq_printf(m, "%s\n", cei_cid_name);
+#endif
+	return 0;
+};
+
+static int proc_cameraId_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, subsys_camera_id_read, NULL);
+};
+
+static  struct file_operations fcamera_proc_fopsReturnId = {
+	.owner = THIS_MODULE,
+	.open  = proc_cameraId_open,
+	.read  = seq_read,
+};
+#endif //#if defined(CONFIG_MACH_SONY_KIRIN) || defined(CONFIG_MACH_SONY_KIRIN_DSDS) || defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
+
 int32_t msm_sensor_init_default_params(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	struct msm_camera_cci_client *cci_client = NULL;
@@ -1547,6 +1682,24 @@ int32_t msm_sensor_init_default_params(struct msm_sensor_ctrl_t *s_ctrl)
 	mount_pos = mount_pos | ((s_ctrl->sensordata->sensor_info->
 					sensor_mount_angle / 90) << 8);
 	s_ctrl->msm_sd.sd.entity.flags = mount_pos | MEDIA_ENT_FL_DEFAULT;
+
+#if defined(CONFIG_MACH_SONY_KIRIN) || \
+	defined(CONFIG_MACH_SONY_KIRIN_DSDS) || \
+	defined(CONFIG_MACH_SONY_MERMAID) || \
+	defined(CONFIG_MACH_SONY_MERMAID_DSDS) || \
+	defined(CONFIG_MACH_SONY_PIONEER) || \
+	defined(CONFIG_MACH_SONY_PIONEER_DSDS) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY) || \
+	defined(CONFIG_MACH_SONY_DISCOVERY_DSDS) || \
+	defined(CONFIG_MACH_SONY_VOYAGER) || \
+	defined(CONFIG_MACH_SONY_VOYAGER_DSDS)
+	memset(cei_cid_name, 0, camera_info_size);
+	if (!initCamIdNode) {
+		proc_create("driver/camsensorid", 0, NULL, &fcamera_proc_fopsReturnId);
+		initCamIdNode = TRUE;
+	}
+
+#endif //#if defined(CONFIG_MACH_SONY_KIRIN) || defined(CONFIG_MACH_SONY_KIRIN_DSDS) || defined(CONFIG_MACH_SONY_MERMAID) || defined(CONFIG_MACH_SONY_MERMAID_DSDS)
 
 	return 0;
 }
