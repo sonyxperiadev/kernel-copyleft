@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
@@ -1699,7 +1704,12 @@ static int qpnp_adc_tm_get_trip_temp(struct thermal_zone_device *thermal,
 		return -EINVAL;
 	}
 
-	rc = qpnp_adc_tm_scale_voltage_therm_pu2(chip->vadc_dev,
+	if (adc_tm_sensor->btm_channel_num == QPNP_ADC_TM_M1_ADC_CH_SEL_CTL ||
+	    adc_tm_sensor->btm_channel_num == QPNP_ADC_TM_M2_ADC_CH_SEL_CTL)
+		rc = qpnp_adc_tm_scale_voltage_therm_pu2_decidegc(chip->vadc_dev,
+					chip->adc->adc_prop, reg, &result);
+	else
+		rc = qpnp_adc_tm_scale_voltage_therm_pu2(chip->vadc_dev,
 					chip->adc->adc_prop, reg, &result);
 	if (rc < 0) {
 		pr_err("Failed to lookup the therm thresholds\n");
@@ -1744,8 +1754,13 @@ static int qpnp_adc_tm_set_trip_temp(struct thermal_zone_device *thermal,
 
 	pr_debug("requested a high - %d and low - %d with trip - %d\n",
 			tm_config.high_thr_temp, tm_config.low_thr_temp, trip);
-	rc = qpnp_adc_tm_scale_therm_voltage_pu2(chip->vadc_dev,
-				chip->adc->adc_prop, &tm_config);
+	if (adc_tm->btm_channel_num == QPNP_ADC_TM_M1_ADC_CH_SEL_CTL ||
+	    adc_tm->btm_channel_num == QPNP_ADC_TM_M2_ADC_CH_SEL_CTL)
+		rc = qpnp_adc_tm_scale_therm_voltage_pu2_decidegc(chip->vadc_dev,
+					chip->adc->adc_prop, &tm_config);
+	else
+		rc = qpnp_adc_tm_scale_therm_voltage_pu2(chip->vadc_dev,
+					chip->adc->adc_prop, &tm_config);
 	if (rc < 0) {
 		pr_err("Failed to lookup the adc-tm thresholds\n");
 		return rc;

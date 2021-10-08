@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef UFS_QCOM_H_
 #define UFS_QCOM_H_
@@ -21,6 +26,7 @@
 #define MAX_UFS_QCOM_HOSTS	1
 #define MAX_U32                 (~(u32)0)
 #define MPHY_TX_FSM_STATE       0x41
+#define MPHY_RX_FSM_STATE       0xC1
 #define TX_FSM_HIBERN8          0x1
 #define HBRN8_POLL_TOUT_MS      100
 #define DEFAULT_CLK_RATE_HZ     1000000
@@ -38,7 +44,12 @@
 #define FAST 2
 
 #define UFS_QCOM_LIMIT_NUM_LANES_RX	2
+#ifdef CONFIG_SCSI_UFS_RESTRICT_TX_LANES
+#define UFS_QCOM_LIMIT_NUM_LANES_TX	1
+#else
 #define UFS_QCOM_LIMIT_NUM_LANES_TX	2
+#endif
+
 #define UFS_QCOM_LIMIT_HSGEAR_RX	UFS_HS_G3
 #define UFS_QCOM_LIMIT_HSGEAR_TX	UFS_HS_G3
 #define UFS_QCOM_LIMIT_PWMGEAR_RX	UFS_PWM_G4
@@ -99,7 +110,7 @@ enum {
 /* bit definitions for REG_UFS_CFG1 register */
 #define QUNIPRO_SEL	UFS_BIT(0)
 #define TEST_BUS_EN		BIT(18)
-#define TEST_BUS_SEL		GENMASK(22, 19)
+#define TEST_BUS_SEL		0x780000
 #define UFS_REG_TEST_BUS_EN	BIT(30)
 
 /* bit definitions for REG_UFS_CFG2 register */
@@ -390,6 +401,8 @@ ufs_qcom_get_debug_reg_offset(struct ufs_qcom_host *host, u32 reg)
 #define ufs_qcom_is_link_active(hba) ufshcd_is_link_active(hba)
 #define ufs_qcom_is_link_hibern8(hba) ufshcd_is_link_hibern8(hba)
 
+bool ufs_qcom_testbus_cfg_is_ok(struct ufs_qcom_host *host, u8 select_major,
+		u8 select_minor);
 int ufs_qcom_testbus_config(struct ufs_qcom_host *host);
 void ufs_qcom_print_hw_debug_reg_all(struct ufs_hba *hba, void *priv,
 		void (*print_fn)(struct ufs_hba *hba, int offset, int num_regs,

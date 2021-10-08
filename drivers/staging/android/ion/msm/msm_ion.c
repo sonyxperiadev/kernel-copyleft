@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -352,7 +352,7 @@ int ion_do_cache_op(struct ion_client *client, struct ion_handle *handle,
 	if (!ION_IS_CACHED(flags))
 		return 0;
 
-	if (flags & ION_FLAG_SECURE)
+	if (get_secure_vmid(flags) > 0)
 		return 0;
 
 	table = ion_sg_table(client, handle);
@@ -652,7 +652,8 @@ bool is_secure_vmid_valid(int vmid)
 		vmid == VMID_CP_CAMERA ||
 		vmid == VMID_CP_SEC_DISPLAY ||
 		vmid == VMID_CP_APP ||
-		vmid == VMID_CP_CAMERA_PREVIEW);
+		vmid == VMID_CP_CAMERA_PREVIEW ||
+		vmid == VMID_CP_SPSS_SP_SHARED);
 }
 
 int get_secure_vmid(unsigned long flags)
@@ -673,6 +674,8 @@ int get_secure_vmid(unsigned long flags)
 		return VMID_CP_APP;
 	if (flags & ION_FLAG_CP_CAMERA_PREVIEW)
 		return VMID_CP_CAMERA_PREVIEW;
+	if (flags & ION_FLAG_CP_SPSS_SP_SHARED)
+		return VMID_CP_SPSS_SP_SHARED;
 	return -EINVAL;
 }
 /* fix up the cases where the ioctl direction bits are incorrect */
@@ -738,9 +741,9 @@ long msm_ion_custom_ioctl(struct ion_client *client,
 
 		down_read(&mm->mmap_sem);
 
-		start = (unsigned long) data.flush_data.vaddr;
-		end = (unsigned long) data.flush_data.vaddr
-			+ data.flush_data.length;
+		start = (unsigned long)data.flush_data.vaddr +
+			data.flush_data.offset;
+		end = start + data.flush_data.length;
 
 		if (start && check_vaddr_bounds(start, end)) {
 			pr_err("%s: virtual address %pK is out of bounds\n",

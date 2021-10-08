@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015,2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015,2017-2018 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +9,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/clk.h>
@@ -898,7 +903,7 @@ static int dsi_cmd_dma_add(struct drm_gem_object *tx_gem,
 
 	data = msm_gem_vaddr(tx_gem);
 
-	if (IS_ERR(data)) {
+	if (IS_ERR_OR_NULL(data)) {
 		ret = PTR_ERR(data);
 		pr_err("%s: get vaddr failed, %d\n", __func__, ret);
 		return ret;
@@ -1006,7 +1011,7 @@ static int dsi_cmd_dma_rx(struct msm_dsi_host *msm_host,
 	u32 *lp, *temp, data;
 	int i, j = 0, cnt;
 	u32 read_cnt;
-	u8 reg[16];
+	u8 reg[16] = {0};
 	int repeated_bytes = 0;
 	int buf_offset = buf - msm_host->rx_buf;
 

@@ -1,4 +1,5 @@
-/* Copyright (c) 2010-2014, 2016 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2014, 2016, 2018 The Linux Foundation.
+ * All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -44,7 +45,8 @@ static void *apr_pkt_ctx;
 static wait_queue_head_t dsp_wait;
 static wait_queue_head_t modem_wait;
 static bool is_modem_up;
-static bool is_initial_boot;
+static bool is_initial_modem_boot;
+static bool is_initial_adsp_boot;
 /* Subsystem restart: QDSP6 data, functions */
 static struct workqueue_struct *apr_reset_workqueue;
 static void apr_reset_deregister(struct work_struct *work);
@@ -206,6 +208,16 @@ static struct apr_svc_table svc_tbl_voice[] = {
 		.idx = 7,
 		.id = APR_SVC_TEST_CLIENT,
 		.client_id = APR_CLIENT_VOICE,
+	},
+};
+
+static const struct apr_svc_table svc_tbl_sdsp[] = {
+	{
+		/* Micro Audio Service */
+		.name = "MAS",
+		.idx = 0,
+		.id = APR_SVC_MAS,
+		.client_id = APR_CLIENT_AUDIO,
 	},
 };
 
@@ -444,6 +456,9 @@ struct apr_svc *apr_register(char *dest, char *svc_name, apr_fn svc_fn,
 		 */
 		can_open_channel = false;
 		domain_id = APR_DOMAIN_MODEM;
+	} else if (!strcmp(dest, "SDSP")) {
+		domain_id = APR_DOMAIN_SDSP;
+		pr_debug("APR: SDSP DOMAIN_ID %d\n", domain_id);
 	} else {
 		pr_err("APR: wrong destination\n");
 		goto done;
@@ -472,6 +487,8 @@ struct apr_svc *apr_register(char *dest, char *svc_name, apr_fn svc_fn,
 			}
 		}
 		pr_debug("%s: modem Up\n", __func__);
+	} else if (dest_id == APR_DEST_DSPS) {
+		pr_debug("%s: Sensor DSP Up\n", __func__);
 	}
 
 	if (apr_get_svc(svc_name, domain_id, &client_id, &svc_idx, &svc_id)) {
@@ -624,6 +641,8 @@ void apr_cb_func(void *buf, int len, void *priv)
 			pr_err("APR: Wrong svc :%d\n", svc);
 			return;
 		}
+	} else if (hdr->src_domain == APR_DOMAIN_SDSP) {
+		clnt = APR_CLIENT_AUDIO;
 	} else {
 		pr_err("APR: Pkt from wrong source: %d\n", hdr->src_domain);
 		return;
@@ -679,9 +698,10 @@ void apr_cb_func(void *buf, int len, void *priv)
 	}
 
 	temp_port = ((data.dest_port >> 8) * 8) + (data.dest_port & 0xFF);
-	pr_debug("port = %d t_port = %d\n", data.src_port, temp_port);
-	if (c_svc->port_cnt && c_svc->port_fn[temp_port])
-		c_svc->port_fn[temp_port](&data,  c_svc->port_priv[temp_port]);
+	if (((temp_port >= 0) && (temp_port < APR_MAX_PORTS))
+		&& (c_svc->port_cnt && c_svc->port_fn[temp_port]))
+		c_svc->port_fn[temp_port](&data,
+			c_svc->port_priv[temp_port]);
 	else if (c_svc->fn)
 		c_svc->fn(&data, c_svc->priv);
 	else
@@ -699,6 +719,9 @@ int apr_get_svc(const char *svc_name, int domain_id, int *client_id,
 	if ((domain_id == APR_DOMAIN_ADSP)) {
 		tbl = (struct apr_svc_table *)&svc_tbl_qdsp6;
 		size = ARRAY_SIZE(svc_tbl_qdsp6);
+	} else if (domain_id == APR_DOMAIN_SDSP) {
+		tbl = (struct apr_svc_table *)&svc_tbl_sdsp;
+		size = ARRAY_SIZE(svc_tbl_sdsp);
 	} else {
 		tbl = (struct apr_svc_table *)&svc_tbl_voice;
 		size = ARRAY_SIZE(svc_tbl_voice);
@@ -820,6 +843,7 @@ static void dispatch_event(unsigned long code, uint16_t proc)
 	uint16_t clnt;
 	int i, j;
 
+	memset(&data, 0, sizeof(data));
 	data.opcode = RESET_EVENTS;
 	data.reset_event = code;
 
@@ -886,21 +910,28 @@ static int apr_notifier_service_cb(struct notifier_block *this,
 		 * recovery notifications during initial boot
 		 * up since everything is expected to be down.
 		 */
-		if (is_initial_boot) {
-			is_initial_boot = false;
-			break;
-		}
-		if (cb_data->domain == AUDIO_NOTIFIER_MODEM_DOMAIN)
+		if (cb_data->domain == AUDIO_NOTIFIER_MODEM_DOMAIN) {
+			if (is_initial_modem_boot) {
+				is_initial_modem_boot = false;
+				break;
+			}
 			apr_modem_down(opcode);
-		else
+		} else {
+			if (is_initial_adsp_boot) {
+				is_initial_adsp_boot = false;
+				break;
+			}
 			apr_adsp_down(opcode);
+		}
 		break;
 	case AUDIO_NOTIFIER_SERVICE_UP:
-		is_initial_boot = false;
-		if (cb_data->domain == AUDIO_NOTIFIER_MODEM_DOMAIN)
+		if (cb_data->domain == AUDIO_NOTIFIER_MODEM_DOMAIN) {
+			is_initial_modem_boot = false;
 			apr_modem_up();
-		else
+		} else {
+			is_initial_adsp_boot = false;
 			apr_adsp_up();
+		}
 		break;
 	default:
 		break;
@@ -942,7 +973,8 @@ static int __init apr_init(void)
 	if (!apr_pkt_ctx)
 		pr_err("%s: Unable to create ipc log context\n", __func__);
 
-	is_initial_boot = true;
+	is_initial_modem_boot = true;
+	is_initial_adsp_boot = true;
 	subsys_notif_register("apr_adsp", AUDIO_NOTIFIER_ADSP_DOMAIN,
 			      &adsp_service_nb);
 	subsys_notif_register("apr_modem", AUDIO_NOTIFIER_MODEM_DOMAIN,

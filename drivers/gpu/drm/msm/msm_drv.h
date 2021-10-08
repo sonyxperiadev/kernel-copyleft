@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -158,10 +158,13 @@ enum msm_mdp_conn_property {
 	CONNECTOR_PROP_DST_H,
 	CONNECTOR_PROP_PLL_DELTA,
 	CONNECTOR_PROP_PLL_ENABLE,
+	CONNECTOR_PROP_HDCP_VERSION,
 
 	/* enum/bitmask properties */
 	CONNECTOR_PROP_TOPOLOGY_NAME,
 	CONNECTOR_PROP_TOPOLOGY_CONTROL,
+	CONNECTOR_PROP_LP,
+	CONNECTOR_PROP_HPD_OFF,
 
 	/* total # of properties */
 	CONNECTOR_PROP_COUNT
@@ -372,6 +375,9 @@ struct msm_drm_private {
 
 	/* list of clients waiting for events */
 	struct list_head client_event_list;
+
+	/* update the flag when msm driver receives shutdown notification */
+	bool shutdown_in_progress;
 };
 
 struct msm_format {

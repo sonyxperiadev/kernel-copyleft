@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/irq.h>
 #include <linux/kernel.h>
@@ -397,11 +402,17 @@ static int swrm_clk_request(struct swr_mstr_ctrl *swrm, bool enable)
 		return -EINVAL;
 
 	if (enable) {
-		swrm->clk(swrm->handle, true);
-		swrm->state = SWR_MSTR_UP;
-	} else {
+		swrm->clk_ref_count++;
+		if (swrm->clk_ref_count == 1) {
+			swrm->clk(swrm->handle, true);
+			swrm->state = SWR_MSTR_UP;
+		}
+	} else if (--swrm->clk_ref_count == 0) {
 		swrm->clk(swrm->handle, false);
 		swrm->state = SWR_MSTR_DOWN;
+	} else if (swrm->clk_ref_count < 0) {
+		pr_err("%s: swrm clk count mismatch\n", __func__);
+		swrm->clk_ref_count = 0;
 	}
 	return 0;
 }
@@ -1169,7 +1180,10 @@ static irqreturn_t swr_mstr_interrupt(int irq, void *dev)
 	u8 devnum = 0;
 	int ret = IRQ_HANDLED;
 
-	pm_runtime_get_sync(&swrm->pdev->dev);
+	mutex_lock(&swrm->reslock);
+	swrm_clk_request(swrm, true);
+	mutex_unlock(&swrm->reslock);
+
 	intr_sts = swrm->read(swrm->handle, SWRM_INTERRUPT_STATUS);
 	intr_sts &= SWRM_INTERRUPT_STATUS_RMSK;
 	for (i = 0; i < SWRM_INTERRUPT_MAX; i++) {
@@ -1257,8 +1271,10 @@ static irqreturn_t swr_mstr_interrupt(int irq, void *dev)
 			break;
 		}
 	}
-	pm_runtime_mark_last_busy(&swrm->pdev->dev);
-	pm_runtime_put_autosuspend(&swrm->pdev->dev);
+
+	mutex_lock(&swrm->reslock);
+	swrm_clk_request(swrm, false);
+	mutex_unlock(&swrm->reslock);
 	return ret;
 }
 
@@ -1448,6 +1464,7 @@ static int swrm_probe(struct platform_device *pdev)
 	swrm->wcmd_id = 0;
 	swrm->slave_status = 0;
 	swrm->num_rx_chs = 0;
+	swrm->clk_ref_count = 0;
 	swrm->state = SWR_MSTR_RESUME;
 	init_completion(&swrm->reset);
 	init_completion(&swrm->broadcast);
@@ -1715,6 +1732,8 @@ int swrm_wcd_notify(struct platform_device *pdev, u32 id, void *data)
 		    (swrm->state == SWR_MSTR_UP)) {
 			dev_dbg(swrm->dev, "%s: SWR master is already UP: %d\n",
 				__func__, swrm->state);
+			list_for_each_entry(swr_dev, &mstr->devices, dev_list)
+				ret = swr_reset_device(swr_dev);
 		} else {
 			pm_runtime_mark_last_busy(&pdev->dev);
 			mutex_unlock(&swrm->reslock);

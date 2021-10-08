@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -56,6 +56,12 @@ static unsigned long tx_digital_gain_reg[] = {
 	MSM89XX_CDC_CORE_TX5_VOL_CTL_GAIN,
 };
 
+#define SDM660_TX_UNMUTE_DELAY_MS 40
+static int tx_unmute_delay = SDM660_TX_UNMUTE_DELAY_MS;
+module_param(tx_unmute_delay, int,
+	S_IRUGO | S_IWUSR | S_IWGRP);
+MODULE_PARM_DESC(tx_unmute_delay, "delay to unmute the tx path");
+
 static const DECLARE_TLV_DB_SCALE(digital_gain, 0, 1, 0);
 
 struct snd_soc_codec *registered_digcodec;
@@ -80,6 +86,14 @@ static int msm_digcdc_clock_control(bool flag)
 	if (flag) {
 		mutex_lock(&pdata->cdc_int_mclk0_mutex);
 		if (atomic_read(&pdata->int_mclk0_enabled) == false) {
+			if (msm_dig_cdc->regmap->cache_only == true)
+				return ret;
+			if (pdata->native_clk_set)
+				pdata->digital_cdc_core_clk.clk_freq_in_hz =
+							NATIVE_MCLK_RATE;
+			else
+				pdata->digital_cdc_core_clk.clk_freq_in_hz =
+							DEFAULT_MCLK_RATE;
 			pdata->digital_cdc_core_clk.enable = 1;
 			ret = afe_set_lpass_clock_v2(
 						AFE_PORT_ID_INT0_MI2S_RX,
@@ -91,8 +105,7 @@ static int msm_digcdc_clock_control(bool flag)
 				 * Avoid access to lpass register
 				 * as clock enable failed during SSR.
 				 */
-				if (ret == -ENODEV)
-					msm_dig_cdc->regmap->cache_only = true;
+				msm_dig_cdc->regmap->cache_only = true;
 				return ret;
 			}
 			pr_debug("enabled digital codec core clk\n");
@@ -214,60 +227,92 @@ static int msm_dig_cdc_codec_config_compander(struct snd_soc_codec *codec,
 					      int interp_n, int event)
 {
 	struct msm_dig_priv *dig_cdc = snd_soc_codec_get_drvdata(codec);
+	int comp_ch_bits_set = 0x03;
+	int comp_ch_value;
 
 	dev_dbg(codec->dev, "%s: event %d shift %d, enabled %d\n",
 		__func__, event, interp_n,
 		dig_cdc->comp_enabled[interp_n]);
 
-	/* compander is not enabled */
-	if (!dig_cdc->comp_enabled[interp_n])
+	/* compander is invalid */
+	if (dig_cdc->comp_enabled[interp_n] != COMPANDER_1 &&
+	    dig_cdc->comp_enabled[interp_n]) {
+		dev_dbg(codec->dev, "%s: Invalid compander %d\n", __func__,
+			dig_cdc->comp_enabled[interp_n]);
 		return 0;
+	}
 
-	switch (dig_cdc->comp_enabled[interp_n]) {
-	case COMPANDER_1:
-		if (SND_SOC_DAPM_EVENT_ON(event)) {
-			/* Enable Compander Clock */
-			snd_soc_update_bits(codec,
-				MSM89XX_CDC_CORE_COMP0_B2_CTL, 0x0F, 0x09);
-			snd_soc_update_bits(codec,
-				MSM89XX_CDC_CORE_CLK_RX_B2_CTL, 0x01, 0x01);
+	if (SND_SOC_DAPM_EVENT_ON(event)) {
+		/* compander is not enabled */
+		if (!dig_cdc->comp_enabled[interp_n]) {
+			dig_cdc->set_compander_mode(dig_cdc->handle, 0x00);
+			return 0;
+		};
+		comp_ch_value = snd_soc_read(codec,
+					     MSM89XX_CDC_CORE_COMP0_B1_CTL);
+		if (interp_n == 0) {
+			if ((comp_ch_value & 0x02) == 0x02) {
+				dev_dbg(codec->dev,
+					"%s comp ch already enabled\n",
+					__func__);
+				return 0;
+			}
+		}
+		if (interp_n == 1) {
+			if ((comp_ch_value & 0x01) == 0x01) {
+				dev_dbg(codec->dev,
+					"%s comp ch already enabled\n",
+					__func__);
+				return 0;
+			}
+		}
+		dig_cdc->set_compander_mode(dig_cdc->handle, 0x08);
+		/* Enable Compander Clock */
+		snd_soc_update_bits(codec,
+			MSM89XX_CDC_CORE_COMP0_B2_CTL, 0x0F, 0x09);
+		snd_soc_update_bits(codec,
+			MSM89XX_CDC_CORE_CLK_RX_B2_CTL, 0x01, 0x01);
+		if (dig_cdc->comp_enabled[MSM89XX_RX1]) {
 			snd_soc_update_bits(codec,
 				MSM89XX_CDC_CORE_COMP0_B1_CTL,
-				1 << interp_n, 1 << interp_n);
+				0x02, 0x02);
+		}
+		if (dig_cdc->comp_enabled[MSM89XX_RX2]) {
 			snd_soc_update_bits(codec,
-				MSM89XX_CDC_CORE_COMP0_B3_CTL, 0xFF, 0x01);
-			snd_soc_update_bits(codec,
-				MSM89XX_CDC_CORE_COMP0_B2_CTL, 0xF0, 0x50);
-			/* add sleep for compander to settle */
-			usleep_range(1000, 1100);
-			snd_soc_update_bits(codec,
-				MSM89XX_CDC_CORE_COMP0_B3_CTL, 0xFF, 0x28);
-			snd_soc_update_bits(codec,
-				MSM89XX_CDC_CORE_COMP0_B2_CTL, 0xF0, 0xB0);
+				MSM89XX_CDC_CORE_COMP0_B1_CTL,
+				0x01, 0x01);
+		}
+		snd_soc_update_bits(codec,
+			MSM89XX_CDC_CORE_COMP0_B3_CTL, 0xFF, 0x01);
+		snd_soc_update_bits(codec,
+			MSM89XX_CDC_CORE_COMP0_B2_CTL, 0xF0, 0x50);
+		/* add sleep for compander to settle */
+		usleep_range(1000, 1100);
+		snd_soc_update_bits(codec,
+			MSM89XX_CDC_CORE_COMP0_B3_CTL, 0xFF, 0x28);
+		snd_soc_update_bits(codec,
+			MSM89XX_CDC_CORE_COMP0_B2_CTL, 0xF0, 0xB0);
 
-			/* Enable Compander GPIO */
-			if (dig_cdc->codec_hph_comp_gpio)
-				dig_cdc->codec_hph_comp_gpio(1, codec);
-		} else if (SND_SOC_DAPM_EVENT_OFF(event)) {
-			/* Disable Compander GPIO */
-			if (dig_cdc->codec_hph_comp_gpio)
-				dig_cdc->codec_hph_comp_gpio(0, codec);
+		/* Enable Compander GPIO */
+		if (dig_cdc->codec_hph_comp_gpio)
+			dig_cdc->codec_hph_comp_gpio(1, codec);
+	} else if (SND_SOC_DAPM_EVENT_OFF(event)) {
+		/* Disable Compander GPIO */
+		if (dig_cdc->codec_hph_comp_gpio)
+			dig_cdc->codec_hph_comp_gpio(0, codec);
 
+		snd_soc_update_bits(codec,
+			MSM89XX_CDC_CORE_COMP0_B1_CTL,
+			1 << interp_n, 0);
+		comp_ch_bits_set = snd_soc_read(codec,
+					 MSM89XX_CDC_CORE_COMP0_B1_CTL);
+		if ((comp_ch_bits_set & 0x03) == 0x00) {
 			snd_soc_update_bits(codec,
 				MSM89XX_CDC_CORE_COMP0_B2_CTL, 0x0F, 0x05);
-			snd_soc_update_bits(codec,
-				MSM89XX_CDC_CORE_COMP0_B1_CTL,
-				1 << interp_n, 0);
-			snd_soc_update_bits(codec,
+			 snd_soc_update_bits(codec,
 				MSM89XX_CDC_CORE_CLK_RX_B2_CTL, 0x01, 0x00);
 		}
-		break;
-	default:
-		dev_dbg(codec->dev, "%s: Invalid compander %d\n", __func__,
-				dig_cdc->comp_enabled[interp_n]);
-		break;
-	};
-
+	}
 	return 0;
 }
 
@@ -927,6 +972,9 @@ static int msm_dig_cdc_codec_enable_dec(struct snd_soc_dapm_widget *w,
 		/* enable HPF */
 		snd_soc_update_bits(codec, tx_mux_ctl_reg, 0x08, 0x00);
 
+		schedule_delayed_work(
+			    &msm_dig_cdc->tx_mute_dwork[decimator - 1].dwork,
+			    msecs_to_jiffies(tx_unmute_delay));
 		if (tx_hpf_work[decimator - 1].tx_hpf_cut_of_freq !=
 				CF_MIN_3DB_150HZ) {
 
@@ -940,20 +988,14 @@ static int msm_dig_cdc_codec_enable_dec(struct snd_soc_dapm_widget *w,
 				  snd_soc_read(codec,
 				  tx_digital_gain_reg[w->shift + offset])
 				  );
-		if (pdata->lb_mode) {
-			pr_debug("%s: loopback mode unmute the DEC\n",
-							__func__);
-			snd_soc_update_bits(codec, tx_vol_ctl_reg, 0x01, 0x00);
-		}
-				snd_soc_update_bits(codec, tx_vol_ctl_reg,
-						0x01, 0x00);
-
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		snd_soc_update_bits(codec, tx_vol_ctl_reg, 0x01, 0x01);
 		msleep(20);
 		snd_soc_update_bits(codec, tx_mux_ctl_reg, 0x08, 0x08);
 		cancel_delayed_work_sync(&tx_hpf_work[decimator - 1].dwork);
+		cancel_delayed_work_sync(
+			&msm_dig_cdc->tx_mute_dwork[decimator - 1].dwork);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		snd_soc_update_bits(codec, dec_reset_reg, 1 << w->shift,
@@ -1194,6 +1236,35 @@ int msm_dig_codec_info_create_codec_entry(struct snd_info_entry *codec_root,
 }
 EXPORT_SYMBOL(msm_dig_codec_info_create_codec_entry);
 
+static void sdm660_tx_mute_update_callback(struct work_struct *work)
+{
+	struct tx_mute_work *tx_mute_dwork;
+	struct snd_soc_codec *codec = NULL;
+	struct msm_dig_priv *dig_cdc;
+	struct delayed_work *delayed_work;
+	u16 tx_vol_ctl_reg = 0;
+	u8 decimator = 0, i;
+
+	delayed_work = to_delayed_work(work);
+	tx_mute_dwork = container_of(delayed_work, struct tx_mute_work, dwork);
+	dig_cdc = tx_mute_dwork->dig_cdc;
+	codec = dig_cdc->codec;
+
+	for (i = 0; i < (NUM_DECIMATORS - 1); i++) {
+		if (dig_cdc->dec_active[i])
+			decimator = i + 1;
+		if (decimator && decimator < NUM_DECIMATORS) {
+			/* unmute decimators corresponding to Tx DAI's*/
+			tx_vol_ctl_reg =
+				MSM89XX_CDC_CORE_TX1_VOL_CTL_CFG +
+					32 * (decimator - 1);
+				snd_soc_update_bits(codec, tx_vol_ctl_reg,
+					0x01, 0x00);
+		}
+		decimator = 0;
+	}
+}
+
 static int msm_dig_cdc_soc_probe(struct snd_soc_codec *codec)
 {
 	struct msm_dig_priv *msm_dig_cdc = dev_get_drvdata(codec->dev);
@@ -1210,6 +1281,10 @@ static int msm_dig_cdc_soc_probe(struct snd_soc_codec *codec)
 		tx_hpf_work[i].decimator = i + 1;
 		INIT_DELAYED_WORK(&tx_hpf_work[i].dwork,
 			tx_hpf_corner_freq_callback);
+		msm_dig_cdc->tx_mute_dwork[i].dig_cdc = msm_dig_cdc;
+		msm_dig_cdc->tx_mute_dwork[i].decimator = i + 1;
+		INIT_DELAYED_WORK(&msm_dig_cdc->tx_mute_dwork[i].dwork,
+			sdm660_tx_mute_update_callback);
 	}
 
 	for (i = 0; i < MSM89XX_RX_MAX; i++)
@@ -1327,6 +1402,9 @@ static const struct snd_soc_dapm_route audio_dig_map[] = {
 	{"RX2 MIX1 INP2", "RX3", "I2S RX3"},
 	{"RX2 MIX1 INP2", "IIR1", "IIR1"},
 	{"RX2 MIX1 INP2", "IIR2", "IIR2"},
+	{"RX2 MIX1 INP3", "RX1", "I2S RX1"},
+	{"RX2 MIX1 INP3", "RX2", "I2S RX2"},
+	{"RX2 MIX1 INP3", "RX3", "I2S RX3"},
 
 	{"RX3 MIX1 INP1", "RX1", "I2S RX1"},
 	{"RX3 MIX1 INP1", "RX2", "I2S RX2"},
@@ -1338,6 +1416,9 @@ static const struct snd_soc_dapm_route audio_dig_map[] = {
 	{"RX3 MIX1 INP2", "RX3", "I2S RX3"},
 	{"RX3 MIX1 INP2", "IIR1", "IIR1"},
 	{"RX3 MIX1 INP2", "IIR2", "IIR2"},
+	{"RX3 MIX1 INP3", "RX1", "I2S RX1"},
+	{"RX3 MIX1 INP3", "RX2", "I2S RX2"},
+	{"RX3 MIX1 INP3", "RX3", "I2S RX3"},
 
 	{"RX1 MIX2 INP1", "IIR1", "IIR1"},
 	{"RX2 MIX2 INP1", "IIR1", "IIR1"},
@@ -1894,63 +1975,8 @@ static const struct snd_kcontrol_new msm_dig_snd_controls[] = {
 		MSM89XX_CDC_CORE_TX5_MUX_CTL, 3, 1, 0),
 };
 
-static int msm_dig_cdc_digital_mute(struct snd_soc_dai *dai, int mute)
-{
-	struct snd_soc_codec *codec = NULL;
-	u16 tx_vol_ctl_reg = 0;
-	u8 decimator = 0, i;
-	struct msm_dig_priv *dig_cdc;
-
-	pr_debug("%s: Digital Mute val = %d\n", __func__, mute);
-
-	if (!dai || !dai->codec) {
-		pr_err("%s: Invalid params\n", __func__);
-		return -EINVAL;
-	}
-	codec = dai->codec;
-	dig_cdc = snd_soc_codec_get_drvdata(codec);
-
-	if (dai->id == AIF1_PB) {
-		dev_dbg(codec->dev, "%s: Not capture use case skip\n",
-			__func__);
-		return 0;
-	}
-
-	mute = (mute) ? 1 : 0;
-	if (!mute) {
-		/*
-		 * 15 ms is an emperical value for the mute time
-		 * that was arrived by checking the pop level
-		 * to be inaudible
-		 */
-		usleep_range(15000, 15010);
-	}
-
-	if (dai->id == AIF3_SVA) {
-		snd_soc_update_bits(codec,
-			MSM89XX_CDC_CORE_TX5_VOL_CTL_CFG, 0x01, mute);
-		goto ret;
-	}
-	for (i = 0; i < (NUM_DECIMATORS - 1); i++) {
-		if (dig_cdc->dec_active[i])
-			decimator = i + 1;
-		if (decimator && decimator < NUM_DECIMATORS) {
-			/* mute/unmute decimators corresponding to Tx DAI's */
-			tx_vol_ctl_reg =
-			MSM89XX_CDC_CORE_TX1_VOL_CTL_CFG +
-					32 * (decimator - 1);
-			snd_soc_update_bits(codec, tx_vol_ctl_reg,
-					    0x01, mute);
-		}
-		decimator = 0;
-	}
-ret:
-	return 0;
-}
-
 static struct snd_soc_dai_ops msm_dig_dai_ops = {
 	.hw_params = msm_dig_cdc_hw_params,
-	.digital_mute = msm_dig_cdc_digital_mute,
 };
 
 
@@ -2101,6 +2127,7 @@ static int msm_dig_cdc_probe(struct platform_device *pdev)
 			msm_dig_cdc->dig_base, &msm_digital_regmap_config);
 
 	msm_dig_cdc->update_clkdiv = pdata->update_clkdiv;
+	msm_dig_cdc->set_compander_mode = pdata->set_compander_mode;
 	msm_dig_cdc->get_cdc_version = pdata->get_cdc_version;
 	msm_dig_cdc->handle = pdata->handle;
 	msm_dig_cdc->register_notifier = pdata->register_notifier;
@@ -2128,6 +2155,10 @@ static int msm_dig_suspend(struct device *dev)
 
 	if (!registered_digcodec || !msm_dig_cdc) {
 		pr_debug("%s:digcodec not initialized, return\n", __func__);
+		return 0;
+	}
+	if (!registered_digcodec->component.card) {
+		pr_debug("%s:component not initialized, return\n", __func__);
 		return 0;
 	}
 	pdata = snd_soc_card_get_drvdata(registered_digcodec->component.card);

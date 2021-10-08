@@ -1375,9 +1375,11 @@ static int gfar_probe(struct platform_device *ofdev)
 
 	gfar_init_addr_hash_table(priv);
 
-	/* Insert receive time stamps into padding alignment bytes */
+	/* Insert receive time stamps into padding alignment bytes, and
+	 * plus 2 bytes padding to ensure the cpu alignment.
+	 */
 	if (priv->device_flags & FSL_GIANFAR_DEV_HAS_TIMER)
-		priv->padding = 8;
+		priv->padding = 8 + DEFAULT_PADDING;
 
 	if (dev->features & NETIF_F_IP_CSUM ||
 	    priv->device_flags & FSL_GIANFAR_DEV_HAS_TIMER)
@@ -3051,9 +3053,6 @@ static void gfar_process_frame(struct net_device *ndev, struct sk_buff *skb)
 	if (ndev->features & NETIF_F_RXCSUM)
 		gfar_rx_checksum(skb, fcb);
 
-	/* Tell the skb what kind of packet this is */
-	skb->protocol = eth_type_trans(skb, ndev);
-
 	/* There's need to check for NETIF_F_HW_VLAN_CTAG_RX here.
 	 * Even if vlan rx accel is disabled, on some chips
 	 * RXFCB_VLN is pseudo randomly set.
@@ -3124,13 +3123,15 @@ int gfar_clean_rx_ring(struct gfar_priv_rx_q *rx_queue, int rx_work_limit)
 			continue;
 		}
 
+		gfar_process_frame(ndev, skb);
+
 		/* Increment the number of packets */
 		total_pkts++;
 		total_bytes += skb->len;
 
 		skb_record_rx_queue(skb, rx_queue->qindex);
 
-		gfar_process_frame(ndev, skb);
+		skb->protocol = eth_type_trans(skb, ndev);
 
 		/* Send the packet up the stack */
 		napi_gro_receive(&rx_queue->grp->napi_rx, skb);
@@ -3676,7 +3677,7 @@ static noinline void gfar_update_link_state(struct gfar_private *priv)
 		u32 tempval1 = gfar_read(&regs->maccfg1);
 		u32 tempval = gfar_read(&regs->maccfg2);
 		u32 ecntrl = gfar_read(&regs->ecntrl);
-		u32 tx_flow_oldval = (tempval & MACCFG1_TX_FLOW);
+		u32 tx_flow_oldval = (tempval1 & MACCFG1_TX_FLOW);
 
 		if (phydev->duplex != priv->oldduplex) {
 			if (!(phydev->duplex))

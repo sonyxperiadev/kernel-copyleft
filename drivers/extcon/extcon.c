@@ -23,6 +23,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -80,6 +85,8 @@ static const char *extcon_name[] =  {
 	[EXTCON_JIG]			= "JIG",
 	[EXTCON_MECHANICAL]		= "MECHANICAL",
 
+	/* Somc Extention */
+	[EXTCON_VBUS_DROP]		= "VBUS-DROP",
 	NULL,
 };
 

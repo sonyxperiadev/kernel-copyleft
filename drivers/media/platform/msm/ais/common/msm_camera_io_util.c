@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,6 +19,7 @@
 #include <soc/qcom/ais.h>
 #include <linux/msm-bus.h>
 #include "msm_camera_io_util.h"
+#include "msm_camera_diag_util.h"
 
 #define BUFF_SIZE_128 128
 
@@ -365,6 +366,8 @@ int msm_cam_clk_enable(struct device *dev, struct msm_cam_clk_info *clk_info,
 			}
 		}
 	}
+
+	msm_camera_diag_update_clklist(clk_info, clk_ptr, num_clk, enable);
 	return rc;
 
 
@@ -501,6 +504,7 @@ vreg_get_fail:
 	}
 	return -ENODEV;
 }
+EXPORT_SYMBOL(msm_camera_config_vreg);
 
 int msm_camera_enable_vreg(struct device *dev, struct camera_vreg_t *cam_vreg,
 		int num_vreg, enum msm_camera_vreg_name_t *vreg_seq,
@@ -574,6 +578,7 @@ disable_vreg:
 	}
 	return rc;
 }
+EXPORT_SYMBOL(msm_camera_enable_vreg);
 
 void msm_camera_bus_scale_cfg(uint32_t bus_perf_client,
 		enum msm_bus_perf_setting perf_setting)

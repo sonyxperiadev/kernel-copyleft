@@ -232,6 +232,8 @@
 #define DWC3_GUSB3PIPECTL_ELASTIC_BUF_MODE	(1 << 0)
 
 /* Global TX Fifo Size Register */
+#define DWC31_GTXFIFOSIZ_TXFRAMNUM	BIT(15)		/* DWC_usb31 only */
+#define DWC31_GTXFIFOSIZ_TXFDEF(n)	((n) & 0x7fff)	/* DWC_usb31 only */
 #define DWC3_GTXFIFOSIZ_TXFDEF(n)	((n) & 0xffff)
 #define DWC3_GTXFIFOSIZ_TXFSTADDR(n)	((n) & 0xffff0000)
 
@@ -850,6 +852,7 @@ struct dwc3_scratchpad_array {
  * @vbus_draw: current to be drawn from USB
  * @imod_interval: set the interrupt moderation interval in 250ns
  *			increments or 0 to disable.
+ * @create_reg_debugfs: create debugfs entry to allow dwc3 register dump
  */
 struct dwc3 {
 	struct usb_ctrlrequest	*ctrl_req;
@@ -1046,6 +1049,7 @@ struct dwc3 {
 	unsigned long		l1_remote_wakeup_cnt;
 
 	wait_queue_head_t	wait_linkstate;
+	bool			create_reg_debugfs;
 };
 
 /* -------------------------------------------------------------------------- */

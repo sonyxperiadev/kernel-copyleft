@@ -74,6 +74,34 @@ struct pil_image_info {
 	__le32 size;
 } __attribute__((__packed__));
 
+#define MAX_NUM_OF_SS 3
+
+/**
+ * struct md_ssr_ss_info - Info in imem about smem ToC
+ * @md_ss_smem_regions_baseptr: Start physical address of SMEM TOC
+ * @md_ss_num_of_regions: number of segments that need to be dumped
+ * @md_ss_encryption_status: status of encryption of segments
+ * @md_ss_ssr_cause: ssr cause enum
+ */
+struct md_ssr_ss_info {
+	u32 md_ss_smem_regions_baseptr;
+	u8 md_ss_num_of_regions;
+	u8 md_ss_encryption_status;
+	u8 md_ss_ssr_cause;
+	u8 reserved;
+};
+
+/**
+ * struct md_ssr_toc - Wrapper of struct md_ssr_ss_info
+ * @md_ssr_toc_init: flag to indicate to MSS SW about imem init done
+ * @md_ssr_ss: Instance of struct md_ssr_ss_info for a subsystem
+ */
+struct md_ssr_toc /* Shared IMEM ToC struct */
+{
+	u32 md_ssr_toc_init;
+	struct md_ssr_ss_info	md_ssr_ss[MAX_NUM_OF_SS];
+};
+
 /**
  * struct pil_reset_ops - PIL operations
  * @init_image: prepare an image for authentication
@@ -106,7 +134,8 @@ extern void pil_shutdown(struct pil_desc *desc);
 extern void pil_free_memory(struct pil_desc *desc);
 extern void pil_desc_release(struct pil_desc *desc);
 extern phys_addr_t pil_get_entry_addr(struct pil_desc *desc);
-extern int pil_do_ramdump(struct pil_desc *desc, void *ramdump_dev);
+extern int pil_do_ramdump(struct pil_desc *desc, void *ramdump_dev,
+			  void *minidump_dev);
 extern int pil_assign_mem_to_subsys(struct pil_desc *desc, phys_addr_t addr,
 						size_t size);
 extern int pil_assign_mem_to_linux(struct pil_desc *desc, phys_addr_t addr,
@@ -126,7 +155,8 @@ static inline phys_addr_t pil_get_entry_addr(struct pil_desc *desc)
 {
 	return 0;
 }
-static inline int pil_do_ramdump(struct pil_desc *desc, void *ramdump_dev)
+static inline int pil_do_ramdump(struct pil_desc *desc,
+		void *ramdump_dev, void *minidump_dev)
 {
 	return 0;
 }

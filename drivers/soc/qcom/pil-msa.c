@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -78,7 +78,8 @@
 #define MSS_MAGIC			0XAABADEAD
 /* CX_IPEAK Parameters */
 #define CX_IPEAK_MSS			BIT(5)
-
+/* Timeout value for MBA boot when minidump is enabled */
+#define MBA_ENCRYPTION_TIMEOUT	5000
 enum scm_cmd {
 	PAS_MEM_SETUP_CMD = 2,
 };
@@ -244,7 +245,12 @@ static int pil_msa_wait_for_mba_ready(struct q6v5_data *drv)
 	struct device *dev = drv->desc.dev;
 	int ret;
 	u32 status;
-	u64 val = is_timeout_disabled() ? 0 : pbl_mba_boot_timeout_ms * 1000;
+	u64 val;
+
+	if (of_property_read_bool(dev->of_node, "qcom,minidump-id"))
+		pbl_mba_boot_timeout_ms = MBA_ENCRYPTION_TIMEOUT;
+
+	val = is_timeout_disabled() ? 0 : pbl_mba_boot_timeout_ms * 1000;
 
 	/* Wait for PBL completion. */
 	ret = readl_poll_timeout(drv->rmb_base + RMB_PBL_STATUS, status,
@@ -324,6 +330,9 @@ int pil_mss_shutdown(struct pil_desc *pil)
 		pil_mss_power_down(drv);
 		drv->is_booted = false;
 	}
+
+	if (drv->mx_spike_wa && drv->ahb_clk_vote)
+		clk_disable_unprepare(drv->ahb_clk);
 
 	return ret;
 }
@@ -553,7 +562,7 @@ int pil_mss_reset_load_mba(struct pil_desc *pil)
 	char *fw_name_p;
 	void *mba_dp_virt;
 	dma_addr_t mba_dp_phys, mba_dp_phys_end;
-	int ret, count;
+	int ret;
 	const u8 *data;
 	struct device *dma_dev = md->mba_mem_dev_fixed ?: &md->mba_mem_dev;
 
@@ -577,7 +586,7 @@ int pil_mss_reset_load_mba(struct pil_desc *pil)
 
 	arch_setup_dma_ops(dma_dev, 0, 0, NULL, 0);
 
-	dma_dev->coherent_dma_mask = DMA_BIT_MASK(sizeof(dma_addr_t) * 8);
+	dma_dev->coherent_dma_mask = DMA_BIT_MASK(32);
 
 	init_dma_attrs(&md->attrs_dma);
 	dma_set_attr(DMA_ATTR_SKIP_ZEROING, &md->attrs_dma);
@@ -595,6 +604,7 @@ int pil_mss_reset_load_mba(struct pil_desc *pil)
 		}
 		drv->dp_size = dp_fw->size;
 		drv->mba_dp_size += drv->dp_size;
+		drv->mba_dp_size = ALIGN(drv->mba_dp_size, SZ_4K);
 	}
 
 	mba_dp_virt = dma_alloc_attrs(dma_dev, drv->mba_dp_size, &mba_dp_phys,
@@ -618,10 +628,9 @@ int pil_mss_reset_load_mba(struct pil_desc *pil)
 			&mba_dp_phys, &mba_dp_phys_end, drv->mba_dp_size);
 
 	/* Load the MBA image into memory */
-	count = fw->size;
-	if (count <= SZ_1M) {
+	if (fw->size <= SZ_1M) {
 		/* Ensures memcpy is done for max 1MB fw size */
-		memcpy(mba_dp_virt, data, count);
+		memcpy(mba_dp_virt, data, fw->size);
 	} else {
 		dev_err(pil->dev, "%s fw image loading into memory is failed due to fw size overflow\n",
 			__func__);
@@ -689,7 +698,7 @@ static int pil_msa_auth_modem_mdt(struct pil_desc *pil, const u8 *metadata,
 
 
 	trace_pil_func(__func__);
-	dma_dev->coherent_dma_mask = DMA_BIT_MASK(sizeof(dma_addr_t) * 8);
+	dma_dev->coherent_dma_mask = DMA_BIT_MASK(32);
 	dma_set_attr(DMA_ATTR_SKIP_ZEROING, &attrs);
 	dma_set_attr(DMA_ATTR_STRONGLY_ORDERED, &attrs);
 	/* Make metadata physically contiguous and 4K aligned. */

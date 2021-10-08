@@ -19,6 +19,11 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/pci.h>
 #include <linux/irq.h>
@@ -763,6 +768,10 @@ void xhci_shutdown(struct usb_hcd *hcd)
 		usb_disable_xhci_ports(to_pci_dev(hcd->self.controller));
 
 	spin_lock_irq(&xhci->lock);
+	if (!HCD_HW_ACCESSIBLE(hcd)) {
+		spin_unlock_irq(&xhci->lock);
+		return;
+	}
 	xhci_halt(xhci);
 	/* Workaround for spurious wakeups at shutdown with HSW */
 	if (xhci->quirks & XHCI_SPURIOUS_WAKEUP)
@@ -905,6 +914,41 @@ static void xhci_disable_port_wake_on_bits(struct xhci_hcd *xhci)
 	spin_unlock_irqrestore(&xhci->lock, flags);
 }
 
+static bool xhci_pending_portevent(struct xhci_hcd *xhci)
+{
+	__le32 __iomem		**port_array;
+	int			port_index;
+	u32			status;
+	u32			portsc;
+
+	status = readl(&xhci->op_regs->status);
+	if (status & STS_EINT)
+		return true;
+	/*
+	 * Checking STS_EINT is not enough as there is a lag between a change
+	 * bit being set and the Port Status Change Event that it generated
+	 * being written to the Event Ring. See note in xhci 1.1 section 4.19.2.
+	 */
+
+	port_index = xhci->num_usb2_ports;
+	port_array = xhci->usb2_ports;
+	while (port_index--) {
+		portsc = readl(port_array[port_index]);
+		if (portsc & PORT_CHANGE_MASK ||
+		    (portsc & PORT_PLS_MASK) == XDEV_RESUME)
+			return true;
+	}
+	port_index = xhci->num_usb3_ports;
+	port_array = xhci->usb3_ports;
+	while (port_index--) {
+		portsc = readl(port_array[port_index]);
+		if (portsc & PORT_CHANGE_MASK ||
+		    (portsc & PORT_PLS_MASK) == XDEV_RESUME)
+			return true;
+	}
+	return false;
+}
+
 /*
  * Stop HC (not bus-specific)
  *
@@ -918,7 +962,7 @@ int xhci_suspend(struct xhci_hcd *xhci, bool do_wakeup)
 	struct usb_hcd		*hcd = xhci_to_hcd(xhci);
 	u32			command;
 
-	if (!hcd->state)
+	if (!hcd->state || xhci->suspended)
 		return 0;
 
 	if (hcd->state != HC_STATE_SUSPENDED ||
@@ -988,6 +1032,7 @@ int xhci_suspend(struct xhci_hcd *xhci, bool do_wakeup)
 	/* step 5: remove core well power */
 	/* synchronize irq when using MSI-X */
 	xhci_msix_sync_irqs(xhci);
+	xhci->suspended = true;
 
 	return rc;
 }
@@ -1001,13 +1046,13 @@ EXPORT_SYMBOL_GPL(xhci_suspend);
  */
 int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 {
-	u32			command, temp = 0, status;
+	u32			command, temp = 0;
 	struct usb_hcd		*hcd = xhci_to_hcd(xhci);
 	struct usb_hcd		*secondary_hcd;
 	int			retval = 0;
 	bool			comp_timer_running = false;
 
-	if (!hcd->state)
+	if (!hcd->state || !xhci->suspended)
 		return 0;
 
 	/* Wait a bit if either of the roothubs need to settle from the
@@ -1123,8 +1168,7 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
  done:
 	if (retval == 0) {
 		/* Resume root hubs only when have pending events. */
-		status = readl(&xhci->op_regs->status);
-		if (status & STS_EINT) {
+		if (xhci_pending_portevent(xhci)) {
 			usb_hcd_resume_root_hub(xhci->shared_hcd);
 			usb_hcd_resume_root_hub(hcd);
 		}
@@ -1141,6 +1185,7 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 
 	/* Re-enable port polling. */
 	xhci_dbg(xhci, "%s: starting port polling.\n", __func__);
+	xhci->suspended = false;
 	set_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
 	usb_hcd_poll_rh_status(xhci->shared_hcd);
 	set_bit(HCD_FLAG_POLL_RH, &hcd->flags);
@@ -3653,6 +3698,7 @@ void xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 		del_timer_sync(&virt_dev->eps[i].stop_cmd_timer);
 	}
 
+	virt_dev->udev = NULL;
 	spin_lock_irqsave(&xhci->lock, flags);
 	/* Don't disable the slot if the host controller is dead. */
 	state = readl(&xhci->op_regs->status);
@@ -4993,7 +5039,7 @@ dma_addr_t xhci_get_sec_event_ring_dma_addr(struct usb_hcd *hcd,
 	return 0;
 }
 
-dma_addr_t xhci_get_dcba_dma_addr(struct usb_hcd *hcd,
+static dma_addr_t xhci_get_dcba_dma_addr(struct usb_hcd *hcd,
 	struct usb_device *udev)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);

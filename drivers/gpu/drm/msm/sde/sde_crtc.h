@@ -81,8 +81,11 @@ struct sde_crtc_frame_event {
  * @debugfs_root  : Parent of debugfs node
  * @vblank_cb_count : count of vblank callback since last reset
  * @vblank_cb_time  : ktime at vblank count reset
- * @vblank_refcount : reference count for vblank enable request
+ * @vblank_requested : whether the user has requested vblank events
  * @suspend         : whether or not a suspend operation is in progress
+ * @enabled       : whether the SDE CRTC is currently enabled. updated in the
+ *                  commit-thread, not state-swap time which is earlier, so
+ *                  safe to make decisions on during VBLANK on/off work
  * @feature_list  : list of color processing features supported on a crtc
  * @active_list   : list of color processing features are active
  * @dirty_list    : list of color processing features are dirty
@@ -92,6 +95,8 @@ struct sde_crtc_frame_event {
  * @frame_event_list : available frame event list
  * @pending       : Whether any page-flip events are pending signal
  * @spin_lock     : spin lock for frame event, transaction status, etc...
+ * @cur_perf      : current performance committed to clock/bandwidth driver
+ * @new_perf      : new performance committed to clock/bandwidth driver
  */
 struct sde_crtc {
 	struct drm_crtc base;
@@ -117,8 +122,9 @@ struct sde_crtc {
 
 	u32 vblank_cb_count;
 	ktime_t vblank_cb_time;
-	atomic_t vblank_refcount;
+	bool vblank_requested;
 	bool suspend;
+	bool enabled;
 
 	struct list_head feature_list;
 	struct list_head active_list;
@@ -130,6 +136,9 @@ struct sde_crtc {
 	struct sde_crtc_frame_event frame_events[SDE_CRTC_FRAME_EVENT_SIZE];
 	struct list_head frame_event_list;
 	spinlock_t spin_lock;
+
+	struct sde_core_perf_params cur_perf;
+	struct sde_core_perf_params new_perf;
 };
 
 #define to_sde_crtc(x) container_of(x, struct sde_crtc, base)
@@ -144,6 +153,7 @@ struct sde_crtc {
  * @property_values: Current crtc property values
  * @input_fence_timeout_ns : Cached input fence timeout, in ns
  * @property_blobs: Reference pointers for blob properties
+ * @new_perf: new performance state being requested
  */
 struct sde_crtc_state {
 	struct drm_crtc_state base;
@@ -157,7 +167,6 @@ struct sde_crtc_state {
 	uint64_t input_fence_timeout_ns;
 	struct drm_property_blob *property_blobs[CRTC_PROP_COUNT];
 
-	struct sde_core_perf_params cur_perf;
 	struct sde_core_perf_params new_perf;
 };
 

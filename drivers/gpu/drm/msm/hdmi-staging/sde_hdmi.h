@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -108,14 +108,34 @@ enum hdmi_tx_feature_type {
  * @mode:             Current display mode.
  * @connected:        If HDMI display is connected.
  * @is_tpg_enabled:   TPG state.
+ * @hdmi_tx_version:  HDMI TX version
+ * @hdmi_tx_major_version: HDMI TX major version
+ * @max_pclk_khz: Max pixel clock supported
+ * @hdcp1_use_sw_keys: If HDCP1 engine uses SW keys
+ * @hdcp14_present: If the sink supports HDCP 1.4
+ * @hdcp22_present: If the sink supports HDCP 2.2
+ * @hdcp_status: Current HDCP status
+ * @sink_hdcp_ver: HDCP version of the sink
+ * @enc_lvl: Current encryption level
+ * @curr_hdr_state: Current HDR state of the HDMI connector
+ * @auth_state: Current authentication state of HDCP
+ * @sink_hdcp22_support: If the sink supports HDCP 2.2
+ * @src_hdcp22_support: If the source supports HDCP 2.2
+ * @hdcp_data: Call back data registered by the client with HDCP lib
+ * @hdcp_feat_data: Handle to HDCP feature data
+ * @hdcp_ops: Function ops registered by the client with the HDCP lib
+ * @ddc_ctrl: Handle to HDMI DDC Controller
  * @hpd_work:         HPD work structure.
  * @codec_ready:      If audio codec is ready.
  * @client_notify_pending: If there is client notification pending.
  * @irq_domain:       IRQ domain structure.
+ * @notifier:         CEC notifider to convey physical address information.
  * @pll_update_enable: if it's allowed to update HDMI PLL ppm.
  * @dc_enable:        If deep color is enabled. Only DC_30 so far.
  * @dc_feature_supported: If deep color feature is supported.
- * @notifier:         CEC notifider to convey physical address information.
+ * @bt2020_colorimetry: If BT2020 colorimetry is supported by sink
+ * @hdcp_cb_work: Callback function for HDCP
+ * @io: Handle to IO base addresses for HDMI
  * @root:             Debug fs root entry.
  */
 struct sde_hdmi {
@@ -134,6 +154,7 @@ struct sde_hdmi {
 	struct sde_edid_ctrl *edid_ctrl;
 
 	bool non_pluggable;
+	bool skip_ddc;
 	u32 num_of_modes;
 	struct list_head mode_list;
 	struct drm_display_mode mode;
@@ -146,6 +167,7 @@ struct sde_hdmi {
 	u32 hdcp14_present;
 	u32 hdcp22_present;
 	u8 hdcp_status;
+	u8 sink_hdcp_ver;
 	u32 enc_lvl;
 	u8 curr_hdr_state;
 	bool auth_state;
@@ -175,6 +197,8 @@ struct sde_hdmi {
 	struct dss_io_data io[HDMI_TX_MAX_IO];
 	/* DEBUG FS */
 	struct dentry *root;
+
+	bool cont_splash_enabled;
 };
 
 /**
@@ -279,6 +303,22 @@ enum drm_connector_status
 sde_hdmi_connector_detect(struct drm_connector *connector,
 		bool force,
 		void *display);
+
+/**
+ * sde_hdmi_core_enable()- turn on clk and pwr for hdmi core
+ * @sde_hdmi: Pointer to sde_hdmi structure
+ *
+ * Return: error code
+ */
+int sde_hdmi_core_enable(struct sde_hdmi *sde_hdmi);
+
+/**
+ * sde_hdmi_core_disable()- turn off clk and pwr for hdmi core
+ * @sde_hdmi: Pointer to sde_hdmi structure
+ *
+ * Return: none
+ */
+void sde_hdmi_core_disable(struct sde_hdmi *sde_hdmi);
 
 /**
  * sde_hdmi_connector_get_modes - add drm modes via drm_mode_probed_add()
@@ -394,10 +434,12 @@ int sde_hdmi_get_property(struct drm_connector *connector,
 /**
  * sde_hdmi_bridge_init() - init sde hdmi bridge
  * @hdmi:          Handle to the hdmi.
+ * @display:       Handle to the sde_hdmi
  *
  * Return: struct drm_bridge *.
  */
-struct drm_bridge *sde_hdmi_bridge_init(struct hdmi *hdmi);
+struct drm_bridge *sde_hdmi_bridge_init(struct hdmi *hdmi,
+			struct sde_hdmi *display);
 
 /**
  * sde_hdmi_set_mode() - Set HDMI mode API.

@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #include <linux/configfs.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -87,6 +92,7 @@ struct gadget_info {
 	struct usb_composite_driver composite;
 	struct usb_composite_dev cdev;
 	bool use_os_desc;
+	bool unbinding;
 	char b_vendor_code;
 	char qw_sign[OS_STRING_QW_SIGN_LEN];
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
@@ -95,6 +101,7 @@ struct gadget_info {
 	struct work_struct work;
 	struct device *dev;
 #endif
+	bool isMSOSDesc;
 };
 
 static inline struct gadget_info *to_gadget_info(struct config_item *item)
@@ -144,6 +151,10 @@ struct gadget_config_name {
 
 #define MAX_USB_STRING_LEN	126
 #define MAX_USB_STRING_WITH_NULL_LEN	(MAX_USB_STRING_LEN+1)
+
+/* vendor code */
+#define MSOS_VENDOR_CODE	0x08
+#define MSOS_GOOGLE_VENDOR_CODE	0x01
 
 static int usb_string_copy(const char *s, char **s_copy)
 {
@@ -283,9 +294,11 @@ static int unregister_gadget(struct gadget_info *gi)
 	if (!gi->udc_name)
 		return -ENODEV;
 
+	gi->unbinding = true;
 	ret = usb_gadget_unregister_driver(&gi->composite.gadget_driver);
 	if (ret)
 		return ret;
+	gi->unbinding = false;
 	kfree(gi->udc_name);
 	gi->udc_name = NULL;
 	return 0;
@@ -310,6 +323,7 @@ static ssize_t gadget_dev_desc_UDC_store(struct config_item *item,
 		ret = unregister_gadget(gi);
 		if (ret)
 			goto err;
+		kfree(name);
 	} else {
 		if (gi->udc_name) {
 			ret = -EBUSY;
@@ -328,6 +342,14 @@ err:
 	return ret;
 }
 
+static ssize_t gadget_dev_desc_isMSOSDesc_show(struct config_item *item,
+		char *page)
+{
+	struct gadget_info *gi = to_gadget_info(item);
+
+	return snprintf(page, 3, "%s\n", gi->isMSOSDesc ? "Y" : "N");
+}
+
 CONFIGFS_ATTR(gadget_dev_desc_, bDeviceClass);
 CONFIGFS_ATTR(gadget_dev_desc_, bDeviceSubClass);
 CONFIGFS_ATTR(gadget_dev_desc_, bDeviceProtocol);
@@ -337,6 +359,7 @@ CONFIGFS_ATTR(gadget_dev_desc_, idProduct);
 CONFIGFS_ATTR(gadget_dev_desc_, bcdDevice);
 CONFIGFS_ATTR(gadget_dev_desc_, bcdUSB);
 CONFIGFS_ATTR(gadget_dev_desc_, UDC);
+CONFIGFS_ATTR_RO(gadget_dev_desc_, isMSOSDesc);
 
 static struct configfs_attribute *gadget_root_attrs[] = {
 	&gadget_dev_desc_attr_bDeviceClass,
@@ -348,6 +371,7 @@ static struct configfs_attribute *gadget_root_attrs[] = {
 	&gadget_dev_desc_attr_bcdDevice,
 	&gadget_dev_desc_attr_bcdUSB,
 	&gadget_dev_desc_attr_UDC,
+	&gadget_dev_desc_attr_isMSOSDesc,
 	NULL,
 };
 
@@ -1255,9 +1279,9 @@ static void purge_configs_funcs(struct gadget_info *gi)
 
 		cfg = container_of(c, struct config_usb_cfg, c);
 
-		list_for_each_entry_safe(f, tmp, &c->functions, list) {
+		list_for_each_entry_safe_reverse(f, tmp, &c->functions, list) {
 
-			list_move_tail(&f->list, &cfg->func_list);
+			list_move(&f->list, &cfg->func_list);
 			if (f->unbind) {
 				dev_err(&gi->cdev.gadget->dev, "unbind function"
 						" '%s'/%pK\n", f->name, f);
@@ -1337,7 +1361,12 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 
 		gi->cdev.desc.iManufacturer = s[USB_GADGET_MANUFACTURER_IDX].id;
 		gi->cdev.desc.iProduct = s[USB_GADGET_PRODUCT_IDX].id;
+#ifdef CONFIG_USB_ANDROID_PRODUCTION
+		/* Set id to 0 to comply with Sony production tools */
+		gi->cdev.desc.iSerialNumber = 0;
+#else
 		gi->cdev.desc.iSerialNumber = s[USB_GADGET_SERIAL_IDX].id;
+#endif
 	}
 
 	if (gi->use_os_desc) {
@@ -1518,6 +1547,14 @@ static int android_setup(struct usb_gadget *gadget,
 	if (value < 0)
 		value = composite_setup(gadget, c);
 
+	if ((c->bRequestType & USB_TYPE_MASK) == USB_TYPE_VENDOR) {
+		if (((c->bRequest == MSOS_GOOGLE_VENDOR_CODE) ||
+			(c->bRequest == MSOS_VENDOR_CODE)) &&
+			(c->bRequestType & USB_DIR_IN) && le16_to_cpu(c->wIndex == 4)) {
+			gi->isMSOSDesc = true;
+		}
+	}
+
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (c->bRequest == USB_REQ_SET_CONFIGURATION &&
 						cdev->config) {
@@ -1540,6 +1577,18 @@ static void android_disconnect(struct usb_gadget *gadget)
 
 	gi = container_of(cdev, struct gadget_info, cdev);
 
+	/* FIXME: There's a race between usb_gadget_udc_stop() which is likely
+	 * to set the gadget driver to NULL in the udc driver and this drivers
+	 * gadget disconnect fn which likely checks for the gadget driver to
+	 * be a null ptr. It happens that unbind (doing set_gadget_data(NULL))
+	 * is called before the gadget driver is set to NULL and the udc driver
+	 * calls disconnect fn which results in cdev being a null ptr.
+	 */
+	if (cdev == NULL) {
+		WARN(1, "%s: gadget driver already disconnected\n", __func__);
+		return;
+	}
+
 	/* accessory HID support can be active while the
 		accessory function is not actually enabled,
 		so we need to inform it when we are disconnected.
@@ -1549,8 +1598,10 @@ static void android_disconnect(struct usb_gadget *gadget)
 	acc_disconnect();
 #endif
 	gi->connected = 0;
-	schedule_work(&gi->work);
+	if (!gi->unbinding)
+		schedule_work(&gi->work);
 	composite_disconnect(gadget);
+	gi->isMSOSDesc = false;
 }
 #endif
 

@@ -1174,10 +1174,6 @@ static int a5xx_pm_resume(struct msm_gpu *gpu)
 	if (ret)
 		return ret;
 
-	/* If we are already up, don't mess with what works */
-	if (gpu->active_cnt > 1)
-		return 0;
-
 	/* Turn the RBCCU domain first to limit the chances of voltage droop */
 	gpu_write(gpu, REG_A5XX_GPMU_RBCCU_POWER_CNTL, 0x778000);
 
@@ -1201,6 +1197,8 @@ static int a5xx_pm_resume(struct msm_gpu *gpu)
 		DRM_ERROR("%s: timeout waiting for SP GDSC enable\n",
 			gpu->name);
 
+	a5xx_counters_restore(gpu);
+
 	return ret;
 }
 
@@ -1208,27 +1206,26 @@ static int a5xx_pm_suspend(struct msm_gpu *gpu)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
 
-	/* Only do this next bit if we are about to go down */
-	if (gpu->active_cnt == 1) {
-		/* Clear the VBIF pipe before shutting down */
-
-		gpu_write(gpu, REG_A5XX_VBIF_XIN_HALT_CTRL0, 0xF);
-		spin_until((gpu_read(gpu, REG_A5XX_VBIF_XIN_HALT_CTRL1) & 0xF)
+	/* Clear the VBIF pipe before shutting down */
+	gpu_write(gpu, REG_A5XX_VBIF_XIN_HALT_CTRL0, 0xF);
+	spin_until((gpu_read(gpu, REG_A5XX_VBIF_XIN_HALT_CTRL1) & 0xF)
 			== 0xF);
 
-		gpu_write(gpu, REG_A5XX_VBIF_XIN_HALT_CTRL0, 0);
+	gpu_write(gpu, REG_A5XX_VBIF_XIN_HALT_CTRL0, 0);
 
-		/*
-		 * Reset the VBIF before power collapse to avoid issue with FIFO
-		* entries
-		*/
-		if (adreno_is_a530(adreno_gpu)) {
-			/* These only need to be done for A530 */
-			gpu_write(gpu, REG_A5XX_RBBM_BLOCK_SW_RESET_CMD,
+	/* Save the counters before going down */
+	a5xx_counters_save(gpu);
+
+	/*
+	 * Reset the VBIF before power collapse to avoid issue with FIFO
+	 * entries
+	 */
+	if (adreno_is_a530(adreno_gpu)) {
+		/* These only need to be done for A530 */
+		gpu_write(gpu, REG_A5XX_RBBM_BLOCK_SW_RESET_CMD,
 				0x003C0000);
-			gpu_write(gpu, REG_A5XX_RBBM_BLOCK_SW_RESET_CMD,
+		gpu_write(gpu, REG_A5XX_RBBM_BLOCK_SW_RESET_CMD,
 				0x00000000);
-		}
 	}
 
 	return msm_gpu_pm_suspend(gpu);
@@ -1248,29 +1245,10 @@ static int a5xx_get_timestamp(struct msm_gpu *gpu, uint64_t *value)
 #ifdef CONFIG_DEBUG_FS
 static void a5xx_show(struct msm_gpu *gpu, struct seq_file *m)
 {
-	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
-	struct a5xx_gpu *a5xx_gpu = to_a5xx_gpu(adreno_gpu);
-	bool enabled = test_bit(A5XX_HWCG_ENABLED, &a5xx_gpu->flags);
-
-	gpu->funcs->pm_resume(gpu);
-
 	seq_printf(m, "status:   %08x\n",
 			gpu_read(gpu, REG_A5XX_RBBM_STATUS));
-
-	/*
-	 * Temporarily disable hardware clock gating before going into
-	 * adreno_show to avoid issues while reading the registers
-	 */
-
-	if (enabled)
-		a5xx_set_hwcg(gpu, false);
-
 	adreno_show(gpu, m);
 
-	if (enabled)
-		a5xx_set_hwcg(gpu, true);
-
-	gpu->funcs->pm_suspend(gpu);
 }
 #endif
 

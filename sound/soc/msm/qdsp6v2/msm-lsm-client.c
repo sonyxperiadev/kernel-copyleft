@@ -570,7 +570,7 @@ static int msm_lsm_reg_model(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	int rc = 0;
 	u8 *snd_model_ptr;
-	size_t offset;
+	size_t offset = 0;
 
 	rc = q6lsm_snd_model_buf_alloc(prtd->lsm_client,
 				       p_info->param_size,
@@ -1167,7 +1167,7 @@ static int msm_lsm_ioctl_shared(struct snd_pcm_substream *substream,
 	case SNDRV_LSM_SET_FWK_MODE_CONFIG: {
 		u32 mode;
 
-		if (copy_from_user(&mode, arg, sizeof(mode))) {
+		if (copy_from_user(&mode, (void __user *) arg, sizeof(mode))) {
 			dev_err(rtd->dev, "%s: %s: copy_frm_user failed\n",
 				__func__, "LSM_SET_FWK_MODE_CONFIG");
 			return -EFAULT;

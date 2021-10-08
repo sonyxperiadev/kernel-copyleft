@@ -33,6 +33,11 @@
  * any damages of any kind arising from your use or distribution of
  * this program.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _UFSHCD_H
 #define _UFSHCD_H
@@ -559,6 +564,9 @@ struct debugfs_files {
 	struct fault_attr fail_attr;
 #endif
 	bool is_sys_suspended;
+	struct dentry *dump_dev_health_desc;
+	struct dentry *fw_revision;
+	struct dentry *serial;
 };
 
 /* tag stats statistics types */
@@ -638,6 +646,7 @@ struct ufs_stats {
 	struct ufshcd_clk_ctx clk_rel;
 	u32 hibern8_exit_cnt;
 	ktime_t last_hibern8_exit_tstamp;
+	u32 power_mode_change_cnt;
 	struct ufs_uic_err_reg_hist pa_err;
 	struct ufs_uic_err_reg_hist dl_err;
 	struct ufs_uic_err_reg_hist nl_err;
@@ -854,6 +863,7 @@ struct ufs_hba {
 	/* Work Queues */
 	struct work_struct eh_work;
 	struct work_struct eeh_work;
+	struct work_struct rls_work;
 
 	/* HBA Errors */
 	u32 errors;
@@ -950,9 +960,11 @@ struct ufs_hba {
 
 	bool full_init_linereset;
 	struct pinctrl *pctrl;
-	
+
 	int			latency_hist_enabled;
-	struct io_latency_state io_lat_s;
+	struct io_latency_state io_lat_read;
+	struct io_latency_state io_lat_write;
+	bool restore_needed;
 };
 
 static inline void ufshcd_mark_shutdown_ongoing(struct ufs_hba *hba)
@@ -1071,7 +1083,6 @@ static inline void *ufshcd_get_variant(struct ufs_hba *hba)
 	BUG_ON(!hba);
 	return hba->priv;
 }
-
 extern int ufshcd_runtime_suspend(struct ufs_hba *hba);
 extern int ufshcd_runtime_resume(struct ufs_hba *hba);
 extern int ufshcd_runtime_idle(struct ufs_hba *hba);
@@ -1156,6 +1167,7 @@ out:
 }
 
 int ufshcd_read_device_desc(struct ufs_hba *hba, u8 *buf, u32 size);
+int ufshcd_read_device_health_desc(struct ufs_hba *hba, u8 *buf, u32 size);
 
 static inline bool ufshcd_is_hs_mode(struct ufs_pa_layer_attr *pwr_info)
 {

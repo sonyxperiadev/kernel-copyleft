@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <asm/dma-iommu.h>
@@ -328,7 +333,7 @@ static int __write_queue(struct vidc_iface_q_info *qinfo, u8 *packet,
 {
 	struct hfi_queue_header *queue;
 	u32 packet_size_in_words, new_write_idx;
-	u32 empty_space, read_idx;
+	u32 empty_space, read_idx, write_idx;
 	u32 *write_ptr;
 
 	if (!qinfo || !packet) {
@@ -351,16 +356,18 @@ static int __write_queue(struct vidc_iface_q_info *qinfo, u8 *packet,
 	}
 
 	packet_size_in_words = (*(u32 *)packet) >> 2;
-	if (!packet_size_in_words) {
-		dprintk(VIDC_ERR, "Zero packet size\n");
+	if (!packet_size_in_words || packet_size_in_words >
+		qinfo->q_array.mem_size>>2) {
+		dprintk(VIDC_ERR, "Invalid packet size\n");
 		return -ENODATA;
 	}
 
 	read_idx = queue->qhdr_read_idx;
+	write_idx = queue->qhdr_write_idx;
 
-	empty_space = (queue->qhdr_write_idx >=  read_idx) ?
-		(queue->qhdr_q_size - (queue->qhdr_write_idx -  read_idx)) :
-		(read_idx - queue->qhdr_write_idx);
+	empty_space = (write_idx >=  read_idx) ?
+		((qinfo->q_array.mem_size>>2) - (write_idx -  read_idx)) :
+		(read_idx - write_idx);
 	if (empty_space <= packet_size_in_words) {
 		queue->qhdr_tx_req =  1;
 		dprintk(VIDC_ERR, "Insufficient size (%d) to write (%d)\n",
@@ -370,13 +377,20 @@ static int __write_queue(struct vidc_iface_q_info *qinfo, u8 *packet,
 
 	queue->qhdr_tx_req =  0;
 
-	new_write_idx = (queue->qhdr_write_idx + packet_size_in_words);
+	new_write_idx = write_idx + packet_size_in_words;
 	write_ptr = (u32 *)((qinfo->q_array.align_virtual_addr) +
-		(queue->qhdr_write_idx << 2));
-	if (new_write_idx < queue->qhdr_q_size) {
+			(write_idx << 2));
+	if (write_ptr < (u32 *)qinfo->q_array.align_virtual_addr ||
+	    write_ptr > (u32 *)(qinfo->q_array.align_virtual_addr +
+	    qinfo->q_array.mem_size)) {
+		dprintk(VIDC_ERR, "Invalid write index");
+		return -ENODATA;
+	}
+
+	if (new_write_idx < (qinfo->q_array.mem_size >> 2)) {
 		memcpy(write_ptr, packet, packet_size_in_words << 2);
 	} else {
-		new_write_idx -= queue->qhdr_q_size;
+		new_write_idx -= qinfo->q_array.mem_size >> 2;
 		memcpy(write_ptr, packet, (packet_size_in_words -
 			new_write_idx) << 2);
 		memcpy((void *)qinfo->q_array.align_virtual_addr,
@@ -468,7 +482,8 @@ static int __read_queue(struct vidc_iface_q_info *qinfo, u8 *packet,
 	u32 packet_size_in_words, new_read_idx;
 	u32 *read_ptr;
 	u32 receive_request = 0;
-		int rc = 0;
+	u32 read_idx, write_idx;
+	int rc = 0;
 
 	if (!qinfo || !packet || !pb_tx_req_is_set) {
 		dprintk(VIDC_ERR, "Invalid Params\n");
@@ -499,7 +514,10 @@ static int __read_queue(struct vidc_iface_q_info *qinfo, u8 *packet,
 	if (queue->qhdr_type & HFI_Q_ID_CTRL_TO_HOST_MSG_Q)
 		receive_request = 1;
 
-	if (queue->qhdr_read_idx == queue->qhdr_write_idx) {
+	read_idx = queue->qhdr_read_idx;
+	write_idx = queue->qhdr_write_idx;
+
+	if (read_idx == write_idx) {
 		queue->qhdr_rx_req = receive_request;
 		*pb_tx_req_is_set = 0;
 		dprintk(VIDC_DBG,
@@ -511,21 +529,28 @@ static int __read_queue(struct vidc_iface_q_info *qinfo, u8 *packet,
 	}
 
 	read_ptr = (u32 *)((qinfo->q_array.align_virtual_addr) +
-				(queue->qhdr_read_idx << 2));
+				(read_idx << 2));
+	if (read_ptr < (u32 *)qinfo->q_array.align_virtual_addr ||
+	    read_ptr > (u32 *)(qinfo->q_array.align_virtual_addr +
+	    qinfo->q_array.mem_size - sizeof(*read_ptr))) {
+		dprintk(VIDC_ERR, "Invalid read index\n");
+		return -ENODATA;
+	}
+
 	packet_size_in_words = (*read_ptr) >> 2;
 	if (!packet_size_in_words) {
 		dprintk(VIDC_ERR, "Zero packet size\n");
 		return -ENODATA;
 	}
 
-	new_read_idx = queue->qhdr_read_idx + packet_size_in_words;
-	if (((packet_size_in_words << 2) <= VIDC_IFACEQ_VAR_HUGE_PKT_SIZE)
-			&& queue->qhdr_read_idx <= queue->qhdr_q_size) {
-		if (new_read_idx < queue->qhdr_q_size) {
+	new_read_idx = read_idx + packet_size_in_words;
+	if (((packet_size_in_words << 2) <= VIDC_IFACEQ_VAR_HUGE_PKT_SIZE) &&
+		read_idx <= (qinfo->q_array.mem_size >> 2)) {
+		if (new_read_idx < (qinfo->q_array.mem_size >> 2)) {
 			memcpy(packet, read_ptr,
 					packet_size_in_words << 2);
 		} else {
-			new_read_idx -= queue->qhdr_q_size;
+			new_read_idx -= (qinfo->q_array.mem_size >> 2);
 			memcpy(packet, read_ptr,
 			(packet_size_in_words - new_read_idx) << 2);
 			memcpy(packet + ((packet_size_in_words -
@@ -536,18 +561,18 @@ static int __read_queue(struct vidc_iface_q_info *qinfo, u8 *packet,
 	} else {
 		dprintk(VIDC_WARN,
 			"BAD packet received, read_idx: %#x, pkt_size: %d\n",
-			queue->qhdr_read_idx, packet_size_in_words << 2);
+			read_idx, packet_size_in_words << 2);
 		dprintk(VIDC_WARN, "Dropping this packet\n");
-		new_read_idx = queue->qhdr_write_idx;
+		new_read_idx = write_idx;
 		rc = -ENODATA;
 	}
 
-	queue->qhdr_read_idx = new_read_idx;
-
-	if (queue->qhdr_read_idx != queue->qhdr_write_idx)
+	if (new_read_idx != write_idx)
 		queue->qhdr_rx_req = 0;
 	else
 		queue->qhdr_rx_req = receive_request;
+
+	queue->qhdr_read_idx = new_read_idx;
 
 	*pb_tx_req_is_set = (1 == queue->qhdr_tx_req) ? 1 : 0;
 
@@ -1652,7 +1677,7 @@ static int __iface_cmdq_write_relaxed(struct venus_hfi_device *device,
 	__strict_check(device);
 
 	if (!__core_in_valid_state(device)) {
-		dprintk(VIDC_DBG, "%s - fw not in init state\n", __func__);
+		dprintk(VIDC_ERR, "%s - fw not in init state\n", __func__);
 		result = -EINVAL;
 		goto err_q_null;
 	}
@@ -3283,6 +3308,8 @@ static void venus_hfi_pm_handler(struct work_struct *work)
 	const int max_tries = 5;
 	struct venus_hfi_device *device = list_first_entry(
 			&hal_ctxt.dev_head, struct venus_hfi_device, list);
+	char msg[SUBSYS_CRASH_REASON_LEN];
+
 	if (!device) {
 		dprintk(VIDC_ERR, "%s: NULL device\n", __func__);
 		return;
@@ -3296,6 +3323,9 @@ static void venus_hfi_pm_handler(struct work_struct *work)
 		dprintk(VIDC_WARN, "Failed to PC for %d times\n",
 				device->skip_pc_count);
 		device->skip_pc_count = 0;
+		snprintf(msg, sizeof(msg),
+			"Failed to prepare for PC, rc : %d\n", rc);
+		subsystem_crash_reason("venus", msg);
 		__process_fatal_error(device);
 		return;
 	}
@@ -3374,11 +3404,18 @@ exit:
 	return;
 }
 
+static void venus_hfi_crash_reason(struct hfi_sfr_struct *vsfr)
+{
+	char msg[SUBSYS_CRASH_REASON_LEN];
+
+	snprintf(msg, sizeof(msg), "SFR Message from FW : %s",
+						vsfr->rg_data);
+	subsystem_crash_reason("venus", msg);
+}
+
 static void __process_sys_error(struct venus_hfi_device *device)
 {
 	struct hfi_sfr_struct *vsfr = NULL;
-
-	__set_state(device, VENUS_STATE_DEINIT);
 
 	/* Once SYS_ERROR received from HW, it is safe to halt the AXI.
 	 * With SYS_ERROR, Venus FW may have crashed and HW might be
@@ -3398,6 +3435,7 @@ static void __process_sys_error(struct venus_hfi_device *device)
 
 		dprintk(VIDC_ERR, "SFR Message from FW: %s\n",
 				vsfr->rg_data);
+		venus_hfi_crash_reason(vsfr);
 	}
 }
 
@@ -3495,9 +3533,11 @@ static int __response_handler(struct venus_hfi_device *device)
 			}
 		};
 
-		if (vsfr)
+		if (vsfr) {
 			dprintk(VIDC_ERR, "SFR Message from FW: %s\n",
 					vsfr->rg_data);
+			venus_hfi_crash_reason(vsfr);
+		}
 
 		dprintk(VIDC_ERR, "Received watchdog timeout\n");
 		packets[packet_count++] = info;
@@ -3626,6 +3666,10 @@ static int __response_handler(struct venus_hfi_device *device)
 					"Too many packets in message queue to handle at once, deferring read\n");
 			break;
 		}
+
+		/* do not read packets after sys error packet */
+		if (info->response_type == HAL_SYS_ERROR)
+			break;
 	}
 
 	if (requeue_pm_work && device->res->sw_power_collapsible) {
@@ -3688,6 +3732,12 @@ err_no_work:
 		i < num_responses; ++i) {
 		struct msm_vidc_cb_info *r = &device->response_pkt[i];
 
+		if (!__core_in_valid_state(device)) {
+			dprintk(VIDC_ERR,
+				"Ignore responses from %d to %d as device is in invalid state",
+				(i + 1), num_responses);
+			break;
+		}
 		device->callback(r->response_type, &r->response);
 	}
 

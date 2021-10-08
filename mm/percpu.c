@@ -68,6 +68,7 @@
 #include <linux/vmalloc.h>
 #include <linux/workqueue.h>
 #include <linux/kmemleak.h>
+#include <linux/sched.h>
 
 #include <asm/cacheflush.h>
 #include <asm/sections.h>
@@ -889,8 +890,8 @@ static void __percpu *pcpu_alloc(size_t size, size_t align, bool reserved,
 	size = ALIGN(size, 2);
 
 	if (unlikely(!size || size > PCPU_MIN_UNIT_SIZE || align > PAGE_SIZE)) {
-		WARN(true, "illegal size (%zu) or align (%zu) for "
-		     "percpu allocation\n", size, align);
+		WARN(true, "illegal size (%zu) or align (%zu) for percpu allocation\n",
+		     size, align);
 		return NULL;
 	}
 

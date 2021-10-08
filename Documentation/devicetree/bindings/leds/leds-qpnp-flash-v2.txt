@@ -78,6 +78,7 @@ Optional properties:
 - qcom,thermal-derate-current	: Array of currrent limits for thermal mitigation. Required if
 				  qcom,thermal-derate-en is specified. Unit is mA. Format is
 				  qcom,thermal-derate-current = <OTST1_LIMIT, OTST2_LIMIT, OTST3_LIMIT>.
+				  0, 15, 30, 45 for pmi8998.
 - qcom,otst-ramp-back-up-dis	: Boolean property to disable current ramp
 				  backup after thermal derate trigger is
 				  deasserted.

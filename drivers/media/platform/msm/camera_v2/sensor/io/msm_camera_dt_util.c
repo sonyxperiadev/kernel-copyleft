@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "msm_camera_dt_util.h"
 #include "msm_camera_io_util.h"
@@ -769,6 +774,92 @@ ERROR1:
 	return rc;
 }
 
+#if defined(CONFIG_SONY_CAM_V4L2)
+int msm_camera_get_dt_gpio_set_tbl(struct device_node *of_node,
+	struct msm_camera_gpio_conf *gconf, uint16_t *gpio_array,
+	uint16_t gpio_array_size)
+{
+	int rc = 0, i = 0;
+	uint32_t count = 0;
+	uint32_t *val_array = NULL;
+
+	if (!of_get_property(of_node, "qcom,gpio-set-tbl-num", &count))
+		return 0;
+
+	count /= sizeof(uint32_t);
+	if (!count) {
+		pr_err("%s qcom,gpio-set-tbl-num 0\n", __func__);
+		return 0;
+	}
+
+	val_array = kzalloc(sizeof(uint32_t) * count, GFP_KERNEL);
+	if (!val_array) {
+		pr_err("%s failed %d\n", __func__, __LINE__);
+		return -ENOMEM;
+	}
+
+	gconf->cam_gpio_set_tbl = kzalloc(sizeof(struct msm_gpio_set_tbl) *
+		count, GFP_KERNEL);
+	if (!gconf->cam_gpio_set_tbl) {
+		pr_err("%s failed %d\n", __func__, __LINE__);
+		rc = -ENOMEM;
+		goto ERROR1;
+	}
+	gconf->cam_gpio_set_tbl_size = count;
+
+	rc = of_property_read_u32_array(of_node, "qcom,gpio-set-tbl-num",
+		val_array, count);
+	if (rc < 0) {
+		pr_err("%s failed %d\n", __func__, __LINE__);
+		goto ERROR2;
+	}
+	for (i = 0; i < count; i++) {
+		if (val_array[i] >= gpio_array_size) {
+			pr_err("%s gpio set tbl index %d invalid\n",
+				__func__, val_array[i]);
+			return -EINVAL;
+		}
+		gconf->cam_gpio_set_tbl[i].gpio = gpio_array[val_array[i]];
+		CDBG("%s cam_gpio_set_tbl[%d].gpio = %d\n", __func__, i,
+			gconf->cam_gpio_set_tbl[i].gpio);
+	}
+
+	rc = of_property_read_u32_array(of_node, "qcom,gpio-set-tbl-flags",
+		val_array, count);
+	if (rc < 0) {
+		pr_err("%s failed %d\n", __func__, __LINE__);
+		goto ERROR2;
+	}
+	for (i = 0; i < count; i++) {
+		gconf->cam_gpio_set_tbl[i].flags = val_array[i];
+		CDBG("%s cam_gpio_set_tbl[%d].flags = %ld\n", __func__, i,
+			gconf->cam_gpio_set_tbl[i].flags);
+	}
+
+	rc = of_property_read_u32_array(of_node, "qcom,gpio-set-tbl-delay",
+		val_array, count);
+	if (rc < 0) {
+		pr_err("%s failed %d\n", __func__, __LINE__);
+		goto ERROR2;
+	}
+	for (i = 0; i < count; i++) {
+		gconf->cam_gpio_set_tbl[i].delay = val_array[i];
+		CDBG("%s cam_gpio_set_tbl[%d].delay = %d\n", __func__, i,
+			gconf->cam_gpio_set_tbl[i].delay);
+	}
+
+	kfree(val_array);
+	return rc;
+
+ERROR2:
+	kfree(gconf->cam_gpio_set_tbl);
+ERROR1:
+	kfree(val_array);
+	gconf->cam_gpio_set_tbl_size = 0;
+	return rc;
+}
+#endif
+
 int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 	struct msm_camera_gpio_conf *gconf, uint16_t *gpio_array,
 	uint16_t gpio_array_size)
@@ -1464,7 +1555,7 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 		switch (power_setting->seq_type) {
 		case SENSOR_CLK:
 			if (power_setting->seq_val >= ctrl->clk_info_size) {
-				pr_err_ratelimited("%s clk index %d >= max %zu\n", __func__,
+				pr_err("%s clk index %d >= max %zu\n", __func__,
 					power_setting->seq_val,
 					ctrl->clk_info_size);
 				goto power_up_failed;
@@ -1476,7 +1567,7 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 				ctrl->clk_info, ctrl->clk_ptr,
 				ctrl->clk_info_size, true);
 			if (rc < 0) {
-				pr_err_ratelimited("%s: clk enable failed\n", __func__);
+				pr_err("%s: clk enable failed\n", __func__);
 				goto power_up_failed;
 			}
 			break;
@@ -1559,7 +1650,7 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 	CDBG("%s exit\n", __func__);
 	return 0;
 power_up_failed:
-	pr_err_ratelimited("%s:%d failed\n", __func__, __LINE__);
+	pr_err("%s:%d failed\n", __func__, __LINE__);
 	for (index--; index >= 0; index--) {
 		CDBG("%s index %d\n", __func__, index);
 		power_setting = &ctrl->power_setting[index];

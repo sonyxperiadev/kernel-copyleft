@@ -203,6 +203,23 @@ config OV12830
 		snapshot config = 4224 * 3000 at 15 fps.
 		2 lanes max fps is 18, 4 lanes max fps is 24.
 
+config SONY_CAM_V4L2
+	bool "SONY specific camera"
+	depends on MSMB_CAMERA
+	default n
+	---help---
+	  SONY specific camera module
+
+config FRONT_CAMERA_LED_SCALE
+	int "Reduce RGB LED brightness when front camera is active"
+	depends on SONY_CAM_V4L2 && LEDS_QPNP_RGB_SCALE
+	range 0 99
+	default 0
+	---help---
+	  Reduce the brightness of front RGB LED by specified percentage
+	  when front camera sensor is powered on. Set it to zero to disable
+	  the feature.
+
 config MSM_V4L2_VIDEO_OVERLAY_DEVICE
 	tristate "QTI MSM V4l2 video overlay device"
 	---help---

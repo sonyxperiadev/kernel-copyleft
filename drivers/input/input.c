@@ -3,6 +3,11 @@
  *
  * Copyright (c) 1999-2002 Vojtech Pavlik
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 /*
  * This program is free software; you can redistribute it and/or modify it

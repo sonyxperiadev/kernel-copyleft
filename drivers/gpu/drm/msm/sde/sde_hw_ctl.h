@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -94,6 +94,13 @@ struct sde_hw_ctl_ops {
 	void (*trigger_flush)(struct sde_hw_ctl *ctx);
 
 	/**
+	 * Read the value of the flush register
+	 * @ctx       : ctl path ctx pointer
+	 * @Return: value of the ctl flush register.
+	 */
+	u32 (*get_flush_register)(struct sde_hw_ctl *ctx);
+
+	/**
 	 * Setup ctl_path interface config
 	 * @ctx
 	 * @cfg    : interface config structure pointer
@@ -102,6 +109,17 @@ struct sde_hw_ctl_ops {
 		struct sde_hw_intf_cfg *cfg);
 
 	int (*reset)(struct sde_hw_ctl *c);
+
+	/*
+	 * wait_reset_status - checks ctl reset status
+	 * @ctx       : ctl path ctx pointer
+	 *
+	 * This function checks the ctl reset status bit.
+	 * If the reset bit is set, it keeps polling the status till the hw
+	 * reset is complete.
+	 * Returns: 0 on success or -error if reset incomplete within interval
+	 */
+	int (*wait_reset_status)(struct sde_hw_ctl *ctx);
 
 	uint32_t (*get_bitmask_sspp)(struct sde_hw_ctl *ctx,
 		enum sde_sspp blk);
@@ -128,17 +146,40 @@ struct sde_hw_ctl_ops {
 	/**
 	 * Set all blend stages to disabled
 	 * @ctx       : ctl path ctx pointer
+	 * @handoff   : handoff flag
+	 * @resv_pipes  : reserved pipes in DT
+	 * @resv_pipes_length:    array size of array reserved_pipes
 	 */
-	void (*clear_all_blendstages)(struct sde_hw_ctl *ctx);
+	void (*clear_all_blendstages)(struct sde_hw_ctl *ctx,
+		bool handoff, const u32 *resv_pipes, u32 resv_pipes_length);
 
 	/**
 	 * Configure layer mixer to pipe configuration
 	 * @ctx       : ctl path ctx pointer
 	 * @lm        : layer mixer enumeration
 	 * @cfg       : blend stage configuration
+	 * @handoff   : handoff flag
+	 * @resv_pipes  : reserved pipes in DT
+	 * @resv_pipes_length:   array size of array reserved_pipes
 	 */
 	void (*setup_blendstage)(struct sde_hw_ctl *ctx,
-		enum sde_lm lm, struct sde_hw_stage_cfg *cfg, u32 index);
+		enum sde_lm lm, struct sde_hw_stage_cfg *cfg, u32 index,
+		bool handoff, const u32 *resv_pipes, u32 resv_pipes_length);
+
+	/**
+	 * read CTL_TOP register value for splash case
+	 * @ctx       : ctl path ctx pointer
+	 * @Return    : CTL top register value
+	 */
+	u32 (*read_ctl_top_for_splash)(struct sde_hw_ctl *ctx);
+
+	/**
+	 * read CTL layers register value for splash case
+	 * @ctx       : ctl path ctx pointer
+	 * @index     : layer index for this ctl path
+	 * @Return    : CTL layers register value
+	 */
+	u32 (*read_ctl_layers_for_splash)(struct sde_hw_ctl *ctx, int index);
 };
 
 /**

@@ -86,9 +86,6 @@ SoCs:
 - MSM8998
   compatible = "qcom,msm8998"
 
-- MSM8998_9x55
-  compatible = "qcom,msm8998-9x55"
-
 - MSMHAMSTER
   compatible = "qcom,msmhamster"
 
@@ -109,6 +106,12 @@ SoCs:
 
 - SDA630
   compatible = "qcom,sda630"
+
+- SDM636
+  compatible = "qcom,sdm636"
+
+- SDA636
+  compatible = "qcom,sda636"
 
 - MSM8952
   compatible = "qcom,msm8952"
@@ -277,8 +280,6 @@ compatible = "qcom,msm8998-rumi"
 compatible = "qcom,msm8998-cdp"
 compatible = "qcom,msm8998-mtp"
 compatible = "qcom,msm8998-qrd"
-compatible = "qcom,msm8998-9x55-cdp"
-compatible = "qcom,msm8998-9x55-mtp"
 compatible = "qcom,msmhamster-rumi"
 compatible = "qcom,msmhamster-cdp"
 compatible = "qcom,msmhamster-mtp"
@@ -295,6 +296,12 @@ compatible = "qcom,sda658-mtp"
 compatible = "qcom,sda658-cdp"
 compatible = "qcom,sda660-mtp"
 compatible = "qcom,sda660-cdp"
+compatible = "qcom,sdm636-cdp"
+compatible = "qcom,sdm636-mtp"
+compatible = "qcom,sdm636-qrd"
+compatible = "qcom,sda636-qrd"
+compatible = "qcom,sda636-mtp"
+compatible = "qcom,sda636-cdp"
 compatible = "qcom,sdm630-rumi"
 compatible = "qcom,sdm630-mtp"
 compatible = "qcom,sdm630-cdp"

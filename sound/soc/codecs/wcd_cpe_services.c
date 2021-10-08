@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, 2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/module.h>
@@ -615,8 +620,10 @@ static enum cpe_svc_result cpe_deregister_generic(struct cpe_info *t_info,
 		return CPE_SVC_INVALID_HANDLE;
 	}
 
+	CPE_SVC_GRAB_LOCK(&cpe_d.cpe_svc_lock, "cpe_svc");
 	list_del(&(n->list));
 	kfree(reg_handle);
+	CPE_SVC_REL_LOCK(&cpe_d.cpe_svc_lock, "cpe_svc");
 
 	return CPE_SVC_SUCCESS;
 }
@@ -2863,8 +2870,19 @@ static enum cpe_svc_result cpe_tgt_wcd9335_write_RAM(struct cpe_info *t_info,
 			return CPE_SVC_FAILED;
 		}
 
+#if 0
 		cpe_register_write_repeat(WCD9335_CPE_SS_MEM_BANK_0,
 			temp_ptr, to_write);
+#else
+		rc = cpe_register_write_repeat(WCD9335_CPE_SS_MEM_BANK_0,
+			temp_ptr, to_write);
+		if (rc) {
+			pr_err("%s: cpe_register_write_repeat error rc=%d\n", __func__, rc);
+			cpe_register_write(WCD9335_CPE_SS_MEM_CTRL, 0);
+			return rc;
+		}
+#endif
+
 		temp_size += CHUNK_SIZE;
 		temp_ptr += CHUNK_SIZE;
 	}

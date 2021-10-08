@@ -244,6 +244,11 @@
  *
  *	TCP_CLOSE		socket is finished
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "TCP: " fmt
 
@@ -269,6 +274,7 @@
 #include <linux/crypto.h>
 #include <linux/time.h>
 #include <linux/slab.h>
+#include <linux/uid_stat.h>
 
 #include <net/icmp.h>
 #include <net/inet_common.h>
@@ -1114,7 +1120,7 @@ int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	lock_sock(sk);
 
 	flags = msg->msg_flags;
-	if (flags & MSG_FASTOPEN) {
+	if ((flags & MSG_FASTOPEN) && !tp->repair) {
 		err = tcp_sendmsg_fastopen(sk, msg, &copied_syn, size);
 		if (err == -EINPROGRESS && copied_syn > 0)
 			goto out;
@@ -1299,6 +1305,10 @@ out:
 		tcp_push(sk, flags, mss_now, tp->nonagle, size_goal);
 out_nopush:
 	release_sock(sk);
+
+	if (copied + copied_syn)
+		uid_stat_tcp_snd(from_kuid(&init_user_ns, current_uid()),
+				 copied + copied_syn);
 	return copied + copied_syn;
 
 do_fault:
@@ -1576,6 +1586,8 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	if (copied > 0) {
 		tcp_recv_skb(sk, seq, &offset);
 		tcp_cleanup_rbuf(sk, copied);
+		uid_stat_tcp_rcv(from_kuid(&init_user_ns, current_uid()),
+				 copied);
 	}
 	return copied;
 }
@@ -1909,6 +1921,10 @@ skip_copy:
 	tcp_cleanup_rbuf(sk, copied);
 
 	release_sock(sk);
+
+	if (copied > 0)
+		uid_stat_tcp_rcv(from_kuid(&init_user_ns, current_uid()),
+				 copied);
 	return copied;
 
 out:
@@ -1917,6 +1933,9 @@ out:
 
 recv_urg:
 	err = tcp_recv_urg(sk, msg, len, flags);
+	if (err > 0)
+		uid_stat_tcp_rcv(from_kuid(&init_user_ns, current_uid()),
+				 err);
 	goto out;
 
 recv_sndq:
@@ -2185,6 +2204,9 @@ adjudge_to_death:
 			tcp_send_active_reset(sk, GFP_ATOMIC);
 			NET_INC_STATS_BH(sock_net(sk),
 					LINUX_MIB_TCPABORTONMEMORY);
+		} else if (!check_net(sock_net(sk))) {
+			/* Not possible to send reset; just close */
+			tcp_set_state(sk, TCP_CLOSE);
 		}
 	}
 
@@ -2269,6 +2291,10 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tcp_set_ca_state(sk, TCP_CA_Open);
 	tcp_clear_retrans(tp);
 	inet_csk_delack_init(sk);
+	/* Initialize rcv_mss to TCP_MIN_MSS to avoid division by 0
+	 * issue in __tcp_select_window()
+	 */
+	icsk->icsk_ack.rcv_mss = TCP_MIN_MSS;
 	tcp_init_send_head(sk);
 	memset(&tp->rx_opt, 0, sizeof(tp->rx_opt));
 	__sk_dst_reset(sk);
@@ -2277,6 +2303,12 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tcp_saved_syn_free(tp);
 
 	WARN_ON(inet->inet_num && !icsk->icsk_bind_hash);
+
+	if (sk->sk_frag.page) {
+		put_page(sk->sk_frag.page);
+		sk->sk_frag.page = NULL;
+		sk->sk_frag.offset = 0;
+	}
 
 	sk->sk_error_report(sk);
 	return err;
@@ -2446,7 +2478,7 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 	case TCP_REPAIR_QUEUE:
 		if (!tp->repair)
 			err = -EPERM;
-		else if (val < TCP_QUEUES_NR)
+		else if ((unsigned int)val < TCP_QUEUES_NR)
 			tp->repair_queue = val;
 		else
 			err = -EINVAL;
@@ -2585,8 +2617,10 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 
 #ifdef CONFIG_TCP_MD5SIG
 	case TCP_MD5SIG:
-		/* Read the IP->Key mappings from userspace */
-		err = tp->af_specific->md5_parse(sk, optval, optlen);
+		if ((1 << sk->sk_state) & (TCPF_CLOSE | TCPF_LISTEN))
+			err = tp->af_specific->md5_parse(sk, optval, optlen);
+		else
+			err = -EINVAL;
 		break;
 #endif
 	case TCP_USER_TIMEOUT:

@@ -459,7 +459,9 @@ static int camera_v4l2_subscribe_event(struct v4l2_fh *fh,
 	int rc = 0;
 	struct camera_v4l2_private *sp = fh_to_private(fh);
 
+	mutex_lock(&sp->lock);
 	rc = v4l2_event_subscribe(&sp->fh, sub, 5, NULL);
+	mutex_unlock(&sp->lock);
 
 	return rc;
 }
@@ -470,7 +472,9 @@ static int camera_v4l2_unsubscribe_event(struct v4l2_fh *fh,
 	int rc = 0;
 	struct camera_v4l2_private *sp = fh_to_private(fh);
 
+	mutex_lock(&sp->lock);
 	rc = v4l2_event_unsubscribe(&sp->fh, sub);
+	mutex_unlock(&sp->lock);
 
 	return rc;
 }
@@ -623,6 +627,7 @@ static int camera_v4l2_open(struct file *filep)
 	unsigned long opn_idx, idx;
 	BUG_ON(!pvdev);
 
+	mutex_lock(&pvdev->video_drvdata_mutex);
 	rc = camera_v4l2_fh_open(filep);
 	if (rc < 0) {
 		pr_err("%s : camera_v4l2_fh_open failed Line %d rc %d\n",
@@ -693,6 +698,7 @@ static int camera_v4l2_open(struct file *filep)
 	idx |= (1 << find_first_zero_bit((const unsigned long *)&opn_idx,
 				MSM_CAMERA_STREAM_CNT_BITS));
 	atomic_cmpxchg(&pvdev->opened, opn_idx, idx);
+	mutex_unlock(&pvdev->video_drvdata_mutex);
 
 	return rc;
 
@@ -707,6 +713,7 @@ stream_fail:
 vb2_q_fail:
 	camera_v4l2_fh_release(filep);
 fh_open_fail:
+	mutex_unlock(&pvdev->video_drvdata_mutex);
 	return rc;
 }
 
@@ -737,6 +744,7 @@ static int camera_v4l2_close(struct file *filep)
 	if (WARN_ON(!session))
 		return -EIO;
 
+	mutex_lock(&pvdev->video_drvdata_mutex);
 	mutex_lock(&session->close_lock);
 	opn_idx = atomic_read(&pvdev->opened);
 	mask = (1 << sp->stream_id);
@@ -778,6 +786,7 @@ static int camera_v4l2_close(struct file *filep)
 	}
 
 	camera_v4l2_fh_release(filep);
+	mutex_unlock(&pvdev->video_drvdata_mutex);
 
 	return 0;
 }
@@ -924,6 +933,7 @@ int camera_init_v4l2(struct device *dev, unsigned int *session)
 
 	*session = pvdev->vdev->num;
 	atomic_set(&pvdev->opened, 0);
+	mutex_init(&pvdev->video_drvdata_mutex);
 	video_set_drvdata(pvdev->vdev, pvdev);
 	device_init_wakeup(&pvdev->vdev->dev, 1);
 	goto init_end;

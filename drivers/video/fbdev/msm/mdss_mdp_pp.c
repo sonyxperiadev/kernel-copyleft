@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
@@ -452,6 +457,13 @@ static u32 igc_limited[IGC_LUT_ENTRIES] = {
 #define PP_FLAGS_DIRTY_PGC	0x100
 #define PP_FLAGS_DIRTY_SHARP	0x200
 #define PP_FLAGS_DIRTY_PA_DITHER 0x400
+
+#define PP_EARLY_PROGRAM_DIRTY_MASK (PP_FLAGS_DIRTY_PCC | \
+		PP_FLAGS_DIRTY_ENHIST | PP_FLAGS_DIRTY_HIST_COL)
+#define PP_DEFERRED_PROGRAM_DIRTY_MASK (PP_FLAGS_DIRTY_IGC | \
+		PP_FLAGS_DIRTY_PGC | PP_FLAGS_DIRTY_ARGC | \
+		PP_FLAGS_DIRTY_GAMUT | PP_FLAGS_DIRTY_PA | \
+		PP_FLAGS_DIRTY_DITHER | PP_FLAGS_DIRTY_PA_DITHER)
 
 /* Leave space for future features */
 #define PP_FLAGS_RESUME_COMMIT	0x10000000
@@ -1604,11 +1616,16 @@ int mdss_mdp_scaler_lut_cfg(struct mdp_scale_data_v2 *scaler,
 	};
 
 	mdata = mdss_mdp_get_mdata();
+
+	mutex_lock(&mdata->scaler_off->scaler_lock);
+
 	lut_tbl = &mdata->scaler_off->lut_tbl;
 	if ((!lut_tbl) || (!lut_tbl->valid)) {
+		mutex_unlock(&mdata->scaler_off->scaler_lock);
 		pr_err("%s:Invalid QSEED3 LUT TABLE\n", __func__);
 		return -EINVAL;
 	}
+
 	if ((scaler->lut_flag & SCALER_LUT_DIR_WR) ||
 		(scaler->lut_flag & SCALER_LUT_Y_CIR_WR) ||
 		(scaler->lut_flag & SCALER_LUT_UV_CIR_WR) ||
@@ -1655,6 +1672,8 @@ int mdss_mdp_scaler_lut_cfg(struct mdp_scale_data_v2 *scaler,
 				}
 		}
 	}
+
+	mutex_unlock(&mdata->scaler_off->scaler_lock);
 
 	return 0;
 }
@@ -2853,10 +2872,15 @@ int mdss_mdp_pp_setup_locked(struct mdss_mdp_ctl *ctl,
 		}
 	}
 
+	if (info->pp_program_mask & PP_NORMAL_PROGRAM_MASK) {
+		mdss_pp_res->pp_disp_flags[disp_num] &=
+				~PP_EARLY_PROGRAM_DIRTY_MASK;
+	}
 	if (info->pp_program_mask & PP_DEFER_PROGRAM_MASK) {
 		/* clear dirty flag */
 		if (disp_num < MDSS_BLOCK_DISP_NUM) {
-			mdss_pp_res->pp_disp_flags[disp_num] = 0;
+			mdss_pp_res->pp_disp_flags[disp_num] &=
+				~PP_DEFERRED_PROGRAM_DIRTY_MASK;
 			if (disp_num < mdata->nad_cfgs)
 				mdata->ad_cfgs[disp_num].reg_sts = 0;
 		}
@@ -6646,7 +6670,12 @@ static void pp_ad_calc_worker(struct work_struct *work)
 	sysfs_notify_dirent(mdp5_data->ad_event_sd);
 	if (!ad->calc_itr) {
 		ad->state &= ~PP_AD_STATE_VSYNC;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+		if (ctl->ops.remove_vsync_handler)
+			ctl->ops.remove_vsync_handler(ctl, &ad->handle);
+#else
 		ctl->ops.remove_vsync_handler(ctl, &ad->handle);
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	}
 	mutex_unlock(&ad->lock);
 

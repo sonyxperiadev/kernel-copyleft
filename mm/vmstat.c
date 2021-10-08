@@ -738,6 +738,7 @@ const char * const vmstat_text[] = {
 	"nr_slab_unreclaimable",
 	"nr_page_table_pages",
 	"nr_kernel_stack",
+	"nr_overhead",
 	"nr_unstable",
 	"nr_bounce",
 	"nr_vmscan_write",
@@ -764,6 +765,7 @@ const char * const vmstat_text[] = {
 	"nr_anon_transparent_hugepages",
 	"nr_free_cma",
 	"nr_swapcache",
+	"nr_indirectly_reclaimable",
 
 	/* enum writeback_stat_item counters */
 	"nr_dirty_threshold",
@@ -870,7 +872,6 @@ const char * const vmstat_text[] = {
 #ifdef CONFIG_DEBUG_VM_VMACACHE
 	"vmacache_find_calls",
 	"vmacache_find_hits",
-	"vmacache_full_flushes",
 #endif
 #endif /* CONFIG_VM_EVENTS_COUNTERS */
 };
@@ -1349,7 +1350,9 @@ static int vmstat_show(struct seq_file *m, void *arg)
 	unsigned long *l = arg;
 	unsigned long off = l - (unsigned long *)m->private;
 
-	seq_printf(m, "%s %lu\n", vmstat_text[off], *l);
+	seq_puts(m, vmstat_text[off]);
+	seq_put_decimal_ull(m, ' ', *l);
+	seq_putc(m, '\n');
 	return 0;
 }
 

@@ -2014,6 +2014,8 @@ static int tavil_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec, WCD934X_ANA_RX_SUPPLIES,
 					    0x02, 0x02);
 		}
+		if (!(strcmp(w->name, "HPHR PA")))
+			snd_soc_update_bits(codec, WCD934X_ANA_HPH, 0x40, 0x40);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		if ((!(strcmp(w->name, "ANC HPHR PA")))) {
@@ -2112,6 +2114,8 @@ static int tavil_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 				    0x10, 0x10);
 		if (!(strcmp(w->name, "ANC HPHR PA")))
 			snd_soc_update_bits(codec, WCD934X_ANA_HPH, 0x40, 0x00);
+		if (!(strcmp(w->name, "HPHR PA")))
+			snd_soc_update_bits(codec, WCD934X_ANA_HPH, 0x40, 0x00);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		/*
@@ -2161,6 +2165,8 @@ static int tavil_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 		    (test_bit(HPH_PA_DELAY, &tavil->status_mask)))
 			snd_soc_update_bits(codec, WCD934X_ANA_HPH,
 					    0xC0, 0xC0);
+		if (!(strcmp(w->name, "HPHL PA")))
+			snd_soc_update_bits(codec, WCD934X_ANA_HPH, 0x80, 0x80);
 		set_bit(HPH_PA_DELAY, &tavil->status_mask);
 		if (dsd_conf &&
 		    (snd_soc_read(codec, WCD934X_CDC_DSD0_PATH_CTL) & 0x01)) {
@@ -2266,6 +2272,8 @@ static int tavil_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 		if (!(strcmp(w->name, "ANC HPHL PA")))
 			snd_soc_update_bits(codec, WCD934X_ANA_HPH,
 					    0x80, 0x00);
+		if (!(strcmp(w->name, "HPHL PA")))
+			snd_soc_update_bits(codec, WCD934X_ANA_HPH, 0x80, 0x00);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		/*
@@ -2418,6 +2426,10 @@ static int tavil_codec_hphr_dac_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
+		if (!(strcmp(w->name, "RX INT2 DAC"))) {
+			snd_soc_update_bits(codec, WCD934X_ANA_HPH, 0x20, 0x20);
+			snd_soc_update_bits(codec, WCD934X_ANA_HPH, 0x10, 0x10);
+		}
 		if (tavil->anc_func) {
 			ret = tavil_codec_enable_anc(w, kcontrol, event);
 			/* 40 msec delay is needed to avoid click and pop */
@@ -2457,6 +2469,10 @@ static int tavil_codec_hphr_dac_event(struct snd_soc_dapm_widget *w,
 			snd_soc_update_bits(codec,
 					    WCD934X_CDC_RX2_RX_PATH_CFG0,
 					    0x10, 0x10);
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		if (!(strcmp(w->name, "RX INT2 DAC")))
+			snd_soc_update_bits(codec, WCD934X_ANA_HPH, 0x30, 0x00);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		/* 1000us required as per HW requirement */
@@ -2980,7 +2996,7 @@ static int tavil_codec_enable_asrc(struct snd_soc_codec *codec,
 				   int asrc_in, int event)
 {
 	struct tavil_priv *tavil = snd_soc_codec_get_drvdata(codec);
-	u16 cfg_reg, ctl_reg, clk_reg, asrc_ctl, mix_ctl_reg;
+	u16 cfg_reg, ctl_reg, clk_reg, asrc_ctl, mix_ctl_reg, paired_reg;
 	int asrc, ret = 0;
 	u8 main_sr, mix_sr, asrc_mode = 0;
 
@@ -2989,6 +3005,7 @@ static int tavil_codec_enable_asrc(struct snd_soc_codec *codec,
 		cfg_reg = WCD934X_CDC_RX1_RX_PATH_CFG0;
 		ctl_reg = WCD934X_CDC_RX1_RX_PATH_CTL;
 		clk_reg = WCD934X_MIXING_ASRC0_CLK_RST_CTL;
+		paired_reg = WCD934X_MIXING_ASRC1_CLK_RST_CTL;
 		asrc_ctl = WCD934X_MIXING_ASRC0_CTL1;
 		asrc = ASRC0;
 		break;
@@ -2996,6 +3013,7 @@ static int tavil_codec_enable_asrc(struct snd_soc_codec *codec,
 		cfg_reg = WCD934X_CDC_RX3_RX_PATH_CFG0;
 		ctl_reg = WCD934X_CDC_RX3_RX_PATH_CTL;
 		clk_reg = WCD934X_MIXING_ASRC0_CLK_RST_CTL;
+		paired_reg = WCD934X_MIXING_ASRC1_CLK_RST_CTL;
 		asrc_ctl = WCD934X_MIXING_ASRC0_CTL1;
 		asrc = ASRC0;
 		break;
@@ -3003,6 +3021,7 @@ static int tavil_codec_enable_asrc(struct snd_soc_codec *codec,
 		cfg_reg = WCD934X_CDC_RX2_RX_PATH_CFG0;
 		ctl_reg = WCD934X_CDC_RX2_RX_PATH_CTL;
 		clk_reg = WCD934X_MIXING_ASRC1_CLK_RST_CTL;
+		paired_reg = WCD934X_MIXING_ASRC0_CLK_RST_CTL;
 		asrc_ctl = WCD934X_MIXING_ASRC1_CTL1;
 		asrc = ASRC1;
 		break;
@@ -3010,6 +3029,7 @@ static int tavil_codec_enable_asrc(struct snd_soc_codec *codec,
 		cfg_reg = WCD934X_CDC_RX4_RX_PATH_CFG0;
 		ctl_reg = WCD934X_CDC_RX4_RX_PATH_CTL;
 		clk_reg = WCD934X_MIXING_ASRC1_CLK_RST_CTL;
+		paired_reg = WCD934X_MIXING_ASRC0_CLK_RST_CTL;
 		asrc_ctl = WCD934X_MIXING_ASRC1_CTL1;
 		asrc = ASRC1;
 		break;
@@ -3017,6 +3037,7 @@ static int tavil_codec_enable_asrc(struct snd_soc_codec *codec,
 		cfg_reg = WCD934X_CDC_RX7_RX_PATH_CFG0;
 		ctl_reg = WCD934X_CDC_RX7_RX_PATH_CTL;
 		clk_reg = WCD934X_MIXING_ASRC2_CLK_RST_CTL;
+		paired_reg = WCD934X_MIXING_ASRC3_CLK_RST_CTL;
 		asrc_ctl = WCD934X_MIXING_ASRC2_CTL1;
 		asrc = ASRC2;
 		break;
@@ -3024,6 +3045,7 @@ static int tavil_codec_enable_asrc(struct snd_soc_codec *codec,
 		cfg_reg = WCD934X_CDC_RX8_RX_PATH_CFG0;
 		ctl_reg = WCD934X_CDC_RX8_RX_PATH_CTL;
 		clk_reg = WCD934X_MIXING_ASRC3_CLK_RST_CTL;
+		paired_reg = WCD934X_MIXING_ASRC2_CLK_RST_CTL;
 		asrc_ctl = WCD934X_MIXING_ASRC3_CTL1;
 		asrc = ASRC3;
 		break;
@@ -3037,6 +3059,13 @@ static int tavil_codec_enable_asrc(struct snd_soc_codec *codec,
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		if (tavil->asrc_users[asrc] == 0) {
+			if ((snd_soc_read(codec, clk_reg) & 0x02) ||
+			    (snd_soc_read(codec, paired_reg) & 0x02)) {
+				snd_soc_update_bits(codec, clk_reg,
+						    0x02, 0x00);
+				snd_soc_update_bits(codec, paired_reg,
+						    0x02, 0x00);
+			}
 			snd_soc_update_bits(codec, cfg_reg, 0x80, 0x80);
 			snd_soc_update_bits(codec, clk_reg, 0x01, 0x01);
 			main_sr = snd_soc_read(codec, ctl_reg) & 0x0F;
@@ -3056,7 +3085,7 @@ static int tavil_codec_enable_asrc(struct snd_soc_codec *codec,
 			tavil->asrc_users[asrc] = 0;
 			snd_soc_update_bits(codec, asrc_ctl, 0x07, 0x00);
 			snd_soc_update_bits(codec, cfg_reg, 0x80, 0x00);
-			snd_soc_update_bits(codec, clk_reg, 0x01, 0x00);
+			snd_soc_update_bits(codec, clk_reg, 0x03, 0x02);
 		}
 		break;
 	};
@@ -7365,12 +7394,12 @@ static const struct snd_soc_dapm_widget tavil_dapm_widgets[] = {
 		0, 0, tavil_codec_ear_dac_event,
 		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 		SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_DAC_E("RX INT1 DAC", NULL, WCD934X_ANA_HPH,
-		5, 0, tavil_codec_hphl_dac_event,
+	SND_SOC_DAPM_DAC_E("RX INT1 DAC", NULL, SND_SOC_NOPM,
+		0, 0, tavil_codec_hphl_dac_event,
 		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 		SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_DAC_E("RX INT2 DAC", NULL, WCD934X_ANA_HPH,
-		4, 0, tavil_codec_hphr_dac_event,
+	SND_SOC_DAPM_DAC_E("RX INT2 DAC", NULL, SND_SOC_NOPM,
+		0, 0, tavil_codec_hphr_dac_event,
 		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 		SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_DAC_E("RX INT3 DAC", NULL, SND_SOC_NOPM,
@@ -7383,11 +7412,11 @@ static const struct snd_soc_dapm_widget tavil_dapm_widgets[] = {
 	SND_SOC_DAPM_PGA_E("EAR PA", WCD934X_ANA_EAR, 7, 0, NULL, 0,
 		tavil_codec_enable_ear_pa,
 		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_PGA_E("HPHL PA", WCD934X_ANA_HPH, 7, 0, NULL, 0,
+	SND_SOC_DAPM_PGA_E("HPHL PA", SND_SOC_NOPM, 0, 0, NULL, 0,
 		tavil_codec_enable_hphl_pa,
 		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 		SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_PGA_E("HPHR PA", WCD934X_ANA_HPH, 6, 0, NULL, 0,
+	SND_SOC_DAPM_PGA_E("HPHR PA", SND_SOC_NOPM, 0, 0, NULL, 0,
 		tavil_codec_enable_hphr_pa,
 		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 		SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMD),

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,9 +9,15 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _MSM_PCM_ROUTING_H
 #define _MSM_PCM_ROUTING_H
 #include <sound/apr_audio-v2.h>
+#include <sound/q6adm-v2.h>
 
 /*
  * These names are used by HAL to specify the BE. If any changes are
@@ -200,6 +206,8 @@ enum {
 	MSM_FRONTEND_DAI_MULTIMEDIA25,
 	MSM_FRONTEND_DAI_MULTIMEDIA26,
 	MSM_FRONTEND_DAI_MULTIMEDIA27,
+	MSM_FRONTEND_DAI_MULTIMEDIA28,
+	MSM_FRONTEND_DAI_MULTIMEDIA29,
 	MSM_FRONTEND_DAI_CS_VOICE,
 	MSM_FRONTEND_DAI_VOIP,
 	MSM_FRONTEND_DAI_AFE_RX,
@@ -225,8 +233,8 @@ enum {
 	MSM_FRONTEND_DAI_MAX,
 };
 
-#define MSM_FRONTEND_DAI_MM_SIZE (MSM_FRONTEND_DAI_MULTIMEDIA27 + 1)
-#define MSM_FRONTEND_DAI_MM_MAX_ID MSM_FRONTEND_DAI_MULTIMEDIA27
+#define MSM_FRONTEND_DAI_MM_SIZE (MSM_FRONTEND_DAI_MULTIMEDIA29 + 1)
+#define MSM_FRONTEND_DAI_MM_MAX_ID MSM_FRONTEND_DAI_MULTIMEDIA29
 
 enum {
 	MSM_BACKEND_DAI_PRI_I2S_RX = 0,
@@ -389,6 +397,13 @@ enum {
 	EXT_EC_REF_SLIM_1_TX,
 };
 
+enum {
+	SONY_CUSTOM_STEREO_NORMAL = 0,
+	SONY_CUSTOM_STEREO_MIX,
+	SONY_CUSTOM_STEREO_SWAP,
+	SONY_CUSTOM_STEREO_MAX,
+};
+
 #define INVALID_SESSION -1
 #define SESSION_TYPE_RX 0
 #define SESSION_TYPE_TX 1
@@ -462,6 +477,7 @@ struct msm_pcm_stream_app_type_cfg {
 	int app_type;
 	int acdb_dev_id;
 	int sample_rate;
+	u32 copp_token;
 };
 
 /* dai_id: front-end ID,
@@ -500,4 +516,12 @@ int msm_pcm_routing_get_stream_app_type_cfg(
 	struct msm_pcm_stream_app_type_cfg *cfg_data);
 int msm_routing_set_downmix_control_data(int be_id, int session_id,
 				 struct asm_stream_pan_ctrl_params *pan_param);
+int msm_pcm_routing_set_channel_mixer_runtime(
+	int be_id, int session_id,
+	int session_type,
+	struct msm_pcm_channel_mixer *params);
+
+int msm_pcm_routing_set_channel_mixer_cfg(
+	int fe_id, int session_type,
+	struct msm_pcm_channel_mixer *params);
 #endif /*_MSM_PCM_H*/

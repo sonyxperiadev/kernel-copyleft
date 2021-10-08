@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1394,7 +1394,7 @@ static struct msm_vidc_ctrl msm_venc_ctrls[] = {
 		.name = "Set Color space transfer characterstics",
 		.type = V4L2_CTRL_TYPE_INTEGER,
 		.minimum = MSM_VIDC_TRANSFER_BT709_5,
-		.maximum = MSM_VIDC_TRANSFER_BT_2020_12,
+		.maximum = MSM_VIDC_TRANSFER_HLG,
 		.default_value = MSM_VIDC_TRANSFER_601_6_625,
 		.step = 1,
 		.qmenu = NULL,
@@ -1423,7 +1423,16 @@ static struct msm_vidc_ctrl msm_venc_ctrls[] = {
 			(1 << V4L2_CID_MPEG_VIDC_VIDEO_IFRAME_SIZE_UNLIMITED)),
 		.qmenu = iframe_sizes,
 	},
-
+	{
+		.id = V4L2_CID_MPEG_VIDC_VIDEO_SEND_SKIPPED_FRAME,
+		.name = "Send encoder output buffer for skipped frames",
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.minimum = V4L2_MPEG_VIDC_VIDEO_SEND_SKIPPED_FRAME_DISABLE,
+		.maximum = V4L2_MPEG_VIDC_VIDEO_SEND_SKIPPED_FRAME_ENABLE,
+		.default_value =
+			V4L2_MPEG_VIDC_VIDEO_SEND_SKIPPED_FRAME_DISABLE,
+		.step = 1,
+	}
 };
 
 #define NUM_CTRLS ARRAY_SIZE(msm_venc_ctrls)
@@ -3712,6 +3721,25 @@ static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 				ctrl->val);
 		pdata = &iframesize_type;
 		break;
+	case V4L2_CID_MPEG_VIDC_VIDEO_SEND_SKIPPED_FRAME:
+		property_id = HAL_PARAM_VENC_SEND_OUTPUT_FOR_SKIPPED_FRAME;
+		switch (ctrl->val) {
+		case V4L2_MPEG_VIDC_VIDEO_SEND_SKIPPED_FRAME_ENABLE:
+			enable.enable = 1;
+			break;
+		case V4L2_MPEG_VIDC_VIDEO_SEND_SKIPPED_FRAME_DISABLE:
+			enable.enable = 0;
+			break;
+		default:
+			dprintk(VIDC_ERR,
+				"Invalid send skipped frames control value %d\n",
+				ctrl->val);
+			rc = -ENOTSUPP;
+			break;
+		}
+		pdata = &enable;
+		break;
+
 	default:
 		dprintk(VIDC_ERR, "Unsupported index: %x\n", ctrl->id);
 		rc = -ENOTSUPP;
@@ -4068,6 +4096,8 @@ const struct v4l2_ctrl_ops *msm_venc_get_ctrl_ops(void)
 int msm_venc_inst_init(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
+	struct msm_vidc_format *fmt = NULL;
+
 	if (!inst) {
 		dprintk(VIDC_ERR, "Invalid input = %pK\n", inst);
 		return -EINVAL;
@@ -4075,12 +4105,34 @@ int msm_venc_inst_init(struct msm_vidc_inst *inst)
 	inst->prop.height[CAPTURE_PORT] = DEFAULT_HEIGHT;
 	inst->prop.width[CAPTURE_PORT] = DEFAULT_WIDTH;
 	inst->prop.num_planes[CAPTURE_PORT] = 1;
-	inst->fmts[CAPTURE_PORT] = venc_formats[4];
+
+	/* By default, initialize CAPTURE port to H264 encoder */
+	fmt = msm_comm_get_pixel_fmt_fourcc(venc_formats,
+		ARRAY_SIZE(venc_formats), V4L2_PIX_FMT_H264,
+			CAPTURE_PORT);
+	if (!fmt || fmt->type != CAPTURE_PORT) {
+		dprintk(VIDC_ERR,
+			"venc_formats corrupted\n");
+		return -EINVAL;
+	}
+	memcpy(&inst->fmts[fmt->type], fmt,
+			sizeof(struct msm_vidc_format));
 
 	inst->prop.height[OUTPUT_PORT] = DEFAULT_HEIGHT;
 	inst->prop.width[OUTPUT_PORT] = DEFAULT_WIDTH;
 	inst->prop.num_planes[OUTPUT_PORT] = 1;
-	inst->fmts[OUTPUT_PORT] = venc_formats[0];
+
+	/* By default, initialize OUTPUT port to NV12 format */
+	fmt = msm_comm_get_pixel_fmt_fourcc(venc_formats,
+		ARRAY_SIZE(venc_formats), V4L2_PIX_FMT_NV12,
+			OUTPUT_PORT);
+	if (!fmt || fmt->type != OUTPUT_PORT) {
+		dprintk(VIDC_ERR,
+			"venc_formats corrupted\n");
+		return -EINVAL;
+	}
+	memcpy(&inst->fmts[fmt->type], fmt,
+			sizeof(struct msm_vidc_format));
 
 	inst->capability.height.min = MIN_SUPPORTED_HEIGHT;
 	inst->capability.height.max = DEFAULT_HEIGHT;
@@ -4620,6 +4672,12 @@ int msm_venc_streamoff(struct msm_vidc_inst *inst, enum v4l2_buf_type i)
 		return -EINVAL;
 	}
 	dprintk(VIDC_DBG, "Calling streamoff on port: %d\n", i);
+
+	rc = msm_comm_try_state(inst, MSM_VIDC_RELEASE_RESOURCES_DONE);
+	if (rc)
+		dprintk(VIDC_ERR,
+			"Failed to move inst: %pK to res done state\n", inst);
+
 	mutex_lock(&q->lock);
 	rc = vb2_streamoff(&q->vb2_bufq, i);
 	mutex_unlock(&q->lock);

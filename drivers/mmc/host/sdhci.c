@@ -1702,7 +1702,8 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	sdhci_runtime_pm_get(host);
 	if (sdhci_check_state(host)) {
 		sdhci_dump_state(host);
-		WARN(1, "sdhci in bad state");
+		pr_err("%s: sdhci in bad state\n",
+			mmc_hostname(host->mmc));
 		mrq->cmd->error = -EIO;
 		if (mrq->data)
 			mrq->data->error = -EIO;
@@ -2993,13 +2994,13 @@ static void sdhci_adma_show_error(struct sdhci_host *host)
 		struct sdhci_adma2_64_desc *dma_desc = desc;
 
 		if (host->flags & SDHCI_USE_64_BIT_DMA)
-			DBG("%s: %p: DMA 0x%08x%08x, LEN 0x%04x, Attr=0x%02x\n",
+			DBG("%s: %pK: DMA 0x%08x%08x, LEN 0x%04x,Attr=0x%02x\n",
 			    name, desc, le32_to_cpu(dma_desc->addr_hi),
 			    le32_to_cpu(dma_desc->addr_lo),
 			    le16_to_cpu(dma_desc->len),
 			    le16_to_cpu(dma_desc->cmd));
 		else
-			DBG("%s: %p: DMA 0x%08x, LEN 0x%04x, Attr=0x%02x\n",
+			DBG("%s: %pK: DMA 0x%08x, LEN 0x%04x, Attr=0x%02x\n",
 			    name, desc, le32_to_cpu(dma_desc->addr_lo),
 			    le16_to_cpu(dma_desc->len),
 			    le16_to_cpu(dma_desc->cmd));
@@ -3041,11 +3042,6 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 		 * above in sdhci_cmd_irq().
 		 */
 		if (host->cmd && (host->cmd->flags & MMC_RSP_BUSY)) {
-			if (intmask & SDHCI_INT_DATA_TIMEOUT) {
-				host->cmd->error = -ETIMEDOUT;
-				tasklet_schedule(&host->finish_tasklet);
-				return;
-			}
 			if (intmask & SDHCI_INT_DATA_END) {
 				/*
 				 * Some cards handle busy-end interrupt
@@ -3059,8 +3055,20 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 				return;
 			}
 			if (host->quirks2 &
-				SDHCI_QUIRK2_IGNORE_DATATOUT_FOR_R1BCMD)
+				SDHCI_QUIRK2_IGNORE_DATATOUT_FOR_R1BCMD) {
+				pr_err_ratelimited("%s: %s: ignoring interrupt: 0x%08x due to DATATOUT_FOR_R1B quirk\n",
+						mmc_hostname(host->mmc),
+						__func__, intmask);
+				MMC_TRACE(host->mmc,
+					"%s: Quirk ignoring intr: 0x%08x\n",
+						__func__, intmask);
 				return;
+			}
+			if (intmask & SDHCI_INT_DATA_TIMEOUT) {
+				host->cmd->error = -ETIMEDOUT;
+				tasklet_schedule(&host->finish_tasklet);
+				return;
+			}
 		}
 
 		pr_err("%s: Got data interrupt 0x%08x even "

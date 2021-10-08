@@ -356,11 +356,21 @@ static void status_change_work(struct work_struct *work)
 	int reschedule_us;
 	int reschedule_jeita_work_us = 0;
 	int reschedule_step_work_us = 0;
+	union power_supply_propval pval = {0, };
 
-	if (!is_batt_available(chip))
+	if (!is_batt_available(chip)) {
+		__pm_relax(chip->step_chg_ws);
 		return;
+	}
 
-	/* skip elapsed_us debounce for handling battery temperature */
+	/* skip jeita and step if not charging */
+	rc = power_supply_get_property(chip->batt_psy,
+		POWER_SUPPLY_PROP_STATUS, &pval);
+	if (pval.intval != POWER_SUPPLY_STATUS_CHARGING) {
+		__pm_relax(chip->step_chg_ws);
+		return;
+	}
+
 	rc = handle_jeita(chip);
 	if (rc > 0)
 		reschedule_jeita_work_us = rc;
@@ -443,21 +453,24 @@ int qcom_step_chg_init(bool step_chg_enable, bool sw_jeita_enable)
 				!step_chg_config.prop_name)) {
 		/* fail if step-chg configuration is invalid */
 		pr_err("Step-chg configuration not defined - fail\n");
-		return -ENODATA;
+		rc = -ENODATA;
+		goto release_wakeup_source;
 	}
 
 	if (sw_jeita_enable && (!jeita_fcc_config.psy_prop ||
 				!jeita_fcc_config.prop_name)) {
 		/* fail if step-chg configuration is invalid */
 		pr_err("Jeita TEMP configuration not defined - fail\n");
-		return -ENODATA;
+		rc = -ENODATA;
+		goto release_wakeup_source;
 	}
 
 	if (sw_jeita_enable && (!jeita_fv_config.psy_prop ||
 				!jeita_fv_config.prop_name)) {
 		/* fail if step-chg configuration is invalid */
 		pr_err("Jeita TEMP configuration not defined - fail\n");
-		return -ENODATA;
+		rc = -ENODATA;
+		goto release_wakeup_source;
 	}
 
 	INIT_DELAYED_WORK(&chip->status_change_work, status_change_work);

@@ -34,6 +34,7 @@
 #include <asm/pgtable-hwdef.h>
 #include <asm/sections.h>
 #include <asm/suspend.h>
+#include <asm/sysreg.h>
 #include <asm/virt.h>
 
 /*
@@ -51,12 +52,6 @@ extern int in_suspend;
 
 /* Do we need to reset el2? */
 #define el2_reset_needed() (is_hyp_mode_available() && !is_kernel_in_hyp_mode())
-
-/*
- * Start/end of the hibernate exit code, this must be copied to a 'safe'
- * location in memory, and executed from there.
- */
-extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
 
 /* temporary el2 vectors in the __hibernate_exit_text section. */
 extern char hibernate_el2_vectors[];
@@ -216,12 +211,22 @@ static int create_safe_exec_page(void *src_start, size_t length,
 	set_pte(pte, __pte(virt_to_phys((void *)dst) |
 			 pgprot_val(PAGE_KERNEL_EXEC)));
 
-	/* Load our new page tables */
-	asm volatile("msr	ttbr0_el1, %0;"
-		     "isb;"
-		     "tlbi	vmalle1is;"
-		     "dsb	ish;"
-		     "isb" : : "r"(virt_to_phys(pgd)));
+	/*
+	 * Load our new page tables. A strict BBM approach requires that we
+	 * ensure that TLBs are free of any entries that may overlap with the
+	 * global mappings we are about to install.
+	 *
+	 * For a real hibernate/resume cycle TTBR0 currently points to a zero
+	 * page, but TLBs may contain stale ASID-tagged entries (e.g. for EFI
+	 * runtime services), while for a userspace-driven test_resume cycle it
+	 * points to userspace page tables (and we must point it at a zero page
+	 * ourselves). Elsewhere we only (un)install the idmap with preemption
+	 * disabled, so T0SZ should be as required regardless.
+	 */
+	cpu_set_reserved_ttbr0();
+	local_flush_tlb_all();
+	write_sysreg(virt_to_phys(pgd), ttbr0_el1);
+	isb();
 
 	*phys_dst_addr = virt_to_phys((void *)dst);
 
@@ -229,6 +234,7 @@ out:
 	return rc;
 }
 
+#define dcache_clean_range(start, end)	__flush_dcache_area(start, (end - start))
 
 int swsusp_arch_suspend(void)
 {
@@ -241,8 +247,9 @@ int swsusp_arch_suspend(void)
 	if (__cpu_suspend_enter(&state)) {
 		ret = swsusp_save();
 	} else {
-		/* Clean kernel to PoC for secondary core startup */
-		__flush_dcache_area(LMADDR(KERNEL_START), KERNEL_END - KERNEL_START);
+		/* Clean kernel core startup/idle code to PoC*/
+		dcache_clean_range(__mmuoff_data_start, __mmuoff_data_end);
+		dcache_clean_range(__idmap_text_start, __idmap_text_end);
 
 		/*
 		 * Tell the hibernation core that we've just restored
@@ -256,6 +263,33 @@ int swsusp_arch_suspend(void)
 	local_dbg_restore(flags);
 
 	return ret;
+}
+
+static void _copy_pte(pte_t *dst_pte, pte_t *src_pte, unsigned long addr)
+{
+	pte_t pte = *src_pte;
+
+	if (pte_valid(pte)) {
+		/*
+		 * Resume will overwrite areas that may be marked
+		 * read only (code, rodata). Clear the RDONLY bit from
+		 * the temporary mappings we use during restore.
+		 */
+		set_pte(dst_pte, pte_clear_rdonly(pte));
+	} else if (debug_pagealloc_enabled() && !pte_none(pte)) {
+		/*
+		 * debug_pagealloc will removed the PTE_VALID bit if
+		 * the page isn't in use by the resume kernel. It may have
+		 * been in use by the original kernel, in which case we need
+		 * to put it back in our copy to do the restore.
+		 *
+		 * Before marking this entry valid, check the pfn should
+		 * be mapped.
+		 */
+		BUG_ON(!pfn_valid(pte_pfn(pte)));
+
+		set_pte(dst_pte, pte_mkpresent(pte_clear_rdonly(pte)));
+	}
 }
 
 static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
@@ -273,13 +307,7 @@ static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
 
 	src_pte = pte_offset_kernel(src_pmd, start);
 	do {
-		if (!pte_none(*src_pte))
-			/*
-			 * Resume will overwrite areas that may be marked
-			 * read only (code, rodata). Clear the RDONLY bit from
-			 * the temporary mappings we use during restore.
-			 */
-			set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
+		_copy_pte(dst_pte, src_pte, addr);
 	} while (dst_pte++, src_pte++, addr += PAGE_SIZE, addr != end);
 
 	return 0;
@@ -388,6 +416,38 @@ int swsusp_arch_resume(void)
 					  void *, phys_addr_t, phys_addr_t);
 
 	/*
+	 * Restoring the memory image will overwrite the ttbr1 page tables.
+	 * Create a second copy of just the linear map, and use this when
+	 * restoring.
+	 */
+	tmp_pg_dir = (pgd_t *)get_safe_page(GFP_ATOMIC);
+	if (!tmp_pg_dir) {
+		pr_err("Failed to allocate memory for temporary page tables.");
+		rc = -ENOMEM;
+		goto out;
+	}
+	rc = copy_page_tables(tmp_pg_dir, PAGE_OFFSET, 0);
+	if (rc)
+		goto out;
+
+	/*
+	 * Since we only copied the linear map, we need to find restore_pblist's
+	 * linear map address.
+	 */
+	lm_restore_pblist = LMADDR(restore_pblist);
+
+	/*
+	 * We need a zero page that is zero before & after resume in order to
+	 * to break before make on the ttbr1 page tables.
+	 */
+	zero_page = (void *)get_safe_page(GFP_ATOMIC);
+	if (!zero_page) {
+		pr_err("Failed to allocate zero page.");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	/*
 	 * Locate the exit code in the bottom-but-one page, so that *NULL
 	 * still has disastrous affects.
 	 */
@@ -413,27 +473,6 @@ int swsusp_arch_resume(void)
 	__flush_dcache_area(hibernate_exit, exit_size);
 
 	/*
-	 * Restoring the memory image will overwrite the ttbr1 page tables.
-	 * Create a second copy of just the linear map, and use this when
-	 * restoring.
-	 */
-	tmp_pg_dir = (pgd_t *)get_safe_page(GFP_ATOMIC);
-	if (!tmp_pg_dir) {
-		pr_err("Failed to allocate memory for temporary page tables.");
-		rc = -ENOMEM;
-		goto out;
-	}
-	rc = copy_page_tables(tmp_pg_dir, PAGE_OFFSET, 0);
-	if (rc)
-		goto out;
-
-	/*
-	 * Since we only copied the linear map, we need to find restore_pblist's
-	 * linear map address.
-	 */
-	lm_restore_pblist = LMADDR(restore_pblist);
-
-	/*
 	 * KASLR will cause the el2 vectors to be in a different location in
 	 * the resumed kernel. Load hibernate's temporary copy into el2.
 	 *
@@ -446,12 +485,6 @@ int swsusp_arch_resume(void)
 
 		__hyp_set_vectors(el2_vectors);
 	}
-
-	/*
-	 * We need a zero page that is zero before & after resume in order to
-	 * to break before make on the ttbr1 page tables.
-	 */
-	zero_page = (void *)get_safe_page(GFP_ATOMIC);
 
 	hibernate_exit(virt_to_phys(tmp_pg_dir), resume_hdr.ttbr1_el1,
 		       resume_hdr.reenter_kernel, lm_restore_pblist,

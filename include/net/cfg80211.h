@@ -79,6 +79,12 @@ struct wiphy;
 /* Indicate backport support for FILS SK offload in cfg80211 */
 #define CFG80211_FILS_SK_OFFLOAD_SUPPORT 1
 
+/* Indicate support for including KEK length in rekey data */
+#define CFG80211_REKEY_DATA_KEK_LEN 1
+
+/* Indicate backport support for processing user cell base hint */
+#define CFG80211_USER_HINT_CELL_BASE_SELF_MANAGED 1
+
 /*
  * wireless hardware capability structures
  */
@@ -990,9 +996,9 @@ enum rate_info_flags {
  * @RATE_INFO_BW_160: 160 MHz bandwidth
  */
 enum rate_info_bw {
+	RATE_INFO_BW_20 = 0,
 	RATE_INFO_BW_5,
 	RATE_INFO_BW_10,
-	RATE_INFO_BW_20,
 	RATE_INFO_BW_40,
 	RATE_INFO_BW_80,
 	RATE_INFO_BW_160,
@@ -2059,9 +2065,14 @@ struct cfg80211_connect_params {
  * have to be updated as part of update_connect_params() call.
  *
  * @UPDATE_ASSOC_IES: Indicates whether association request IEs are updated
+ * @UPDATE_FILS_ERP_INFO: Indicates that FILS connection parameters (realm,
+ *	username, erp sequence number and rrk) are updated
+ * @UPDATE_AUTH_TYPE: Indicates that Authentication type is updated
  */
 enum cfg80211_connect_params_changed {
 	UPDATE_ASSOC_IES		= BIT(0),
+	UPDATE_FILS_ERP_INFO		= BIT(1),
+	UPDATE_AUTH_TYPE		= BIT(2),
 };
 
 /**
@@ -2283,12 +2294,14 @@ struct cfg80211_wowlan_wakeup {
 
 /**
  * struct cfg80211_gtk_rekey_data - rekey data
- * @kek: key encryption key (NL80211_KEK_LEN bytes)
+ * @kek: key encryption key
  * @kck: key confirmation key (NL80211_KCK_LEN bytes)
  * @replay_ctr: replay counter (NL80211_REPLAY_CTR_LEN bytes)
+ * @kek_len: Length of @kek in octets
  */
 struct cfg80211_gtk_rekey_data {
 	const u8 *kek, *kck, *replay_ctr;
+	size_t kek_len;
 };
 
 /**

@@ -974,7 +974,8 @@ static void dec_pending(struct dm_io *io, int error)
 		} else {
 			/* done with normal IO or empty flush */
 			trace_block_bio_complete(md->queue, bio, io_error);
-			bio->bi_error = io_error;
+			if (io_error)
+				bio->bi_error = io_error;
 			bio_endio(bio);
 		}
 	}
@@ -2220,7 +2221,7 @@ static int dm_any_congested(void *congested_data, int bdi_bits)
 			 * the query about congestion status of request_queue
 			 */
 			if (dm_request_based(md))
-				r = md->queue->backing_dev_info.wb.state &
+				r = md->queue->backing_dev_info->wb.state &
 				    bdi_bits;
 			else
 				r = dm_table_any_congested(map, bdi_bits);
@@ -2302,7 +2303,7 @@ static void dm_init_md_queue(struct mapped_device *md)
 	 * - must do so here (in alloc_dev callchain) before queue is used
 	 */
 	md->queue->queuedata = md;
-	md->queue->backing_dev_info.congested_data = md;
+	md->queue->backing_dev_info->congested_data = md;
 }
 
 static void dm_init_old_md_queue(struct mapped_device *md)
@@ -2313,7 +2314,7 @@ static void dm_init_old_md_queue(struct mapped_device *md)
 	/*
 	 * Initialize aspects of queue that aren't relevant for blk-mq
 	 */
-	md->queue->backing_dev_info.congested_fn = dm_any_congested;
+	md->queue->backing_dev_info->congested_fn = dm_any_congested;
 	blk_queue_bounce_limit(md->queue, BLK_BOUNCE_ANY);
 }
 
@@ -3517,11 +3518,15 @@ struct mapped_device *dm_get_from_kobject(struct kobject *kobj)
 
 	md = container_of(kobj, struct mapped_device, kobj_holder.kobj);
 
-	if (test_bit(DMF_FREEING, &md->flags) ||
-	    dm_deleting_md(md))
-		return NULL;
-
+	spin_lock(&_minor_lock);
+	if (test_bit(DMF_FREEING, &md->flags) || dm_deleting_md(md)) {
+		md = NULL;
+		goto out;
+	}
 	dm_get(md);
+out:
+	spin_unlock(&_minor_lock);
+
 	return md;
 }
 

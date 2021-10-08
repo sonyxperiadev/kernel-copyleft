@@ -111,7 +111,7 @@ module_param_named(
 	debug_mask, __debug_mask, int, S_IRUSR | S_IWUSR
 );
 
-irqreturn_t smb138x_handle_slave_chg_state_change(int irq, void *data)
+static irqreturn_t smb138x_handle_slave_chg_state_change(int irq, void *data)
 {
 	struct smb_irq_data *irq_data = data;
 	struct smb138x *chip = irq_data->parent_data;
@@ -727,7 +727,7 @@ static int smb138x_init_parallel_psy(struct smb138x *chip)
  * VBUS REGULATOR REGISTRATION *
  ******************************/
 
-struct regulator_ops smb138x_vbus_reg_ops = {
+static struct regulator_ops smb138x_vbus_reg_ops = {
 	.enable		= smblib_vbus_regulator_enable,
 	.disable	= smblib_vbus_regulator_disable,
 	.is_enabled	= smblib_vbus_regulator_is_enabled,
@@ -769,7 +769,7 @@ static int smb138x_init_vbus_regulator(struct smb138x *chip)
  * VCONN REGULATOR REGISTRATION *
  ******************************/
 
-struct regulator_ops smb138x_vconn_reg_ops = {
+static struct regulator_ops smb138x_vconn_reg_ops = {
 	.enable		= smblib_vconn_regulator_enable,
 	.disable	= smblib_vconn_regulator_disable,
 	.is_enabled	= smblib_vconn_regulator_is_enabled,
@@ -860,6 +860,13 @@ static int smb138x_init_slave_hw(struct smb138x *chip)
 				 BITE_WDOG_DISABLE_CHARGING_CFG_BIT);
 	if (rc < 0) {
 		pr_err("Couldn't configure the watchdog bite rc=%d\n", rc);
+		return rc;
+	}
+
+	/* Disable OTG */
+	rc = smblib_masked_write(chg, CMD_OTG_REG, OTG_EN_BIT, 0);
+	if (rc < 0) {
+		pr_err("Couldn't disable OTG rc=%d\n", rc);
 		return rc;
 	}
 
@@ -959,6 +966,20 @@ static int smb138x_init_hw(struct smb138x *chip)
 		DEFAULT_VOTER, true, chip->dt.dc_icl_ua);
 
 	chg->dcp_icl_ua = chip->dt.usb_icl_ua;
+
+	/* Disable OTG */
+	rc = smblib_masked_write(chg, CMD_OTG_REG, OTG_EN_BIT, 0);
+	if (rc < 0) {
+		pr_err("Couldn't disable OTG rc=%d\n", rc);
+		return rc;
+	}
+
+	/* Unsuspend USB input */
+	rc = smblib_masked_write(chg, USBIN_CMD_IL_REG, USBIN_SUSPEND_BIT, 0);
+	if (rc < 0) {
+		pr_err("Couldn't unsuspend USB, rc=%d\n", rc);
+		return rc;
+	}
 
 	/* configure to a fixed 700khz freq to avoid tdie errors */
 	rc = smblib_set_charge_param(chg, &chg->param.freq_buck, 700);
@@ -1600,14 +1621,33 @@ static int smb138x_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void smb138x_shutdown(struct platform_device *pdev)
+{
+	struct smb138x *chip = platform_get_drvdata(pdev);
+	struct smb_charger *chg = &chip->chg;
+	int rc;
+
+	/* Suspend charging */
+	rc = smb138x_set_parallel_suspend(chip, true);
+	if (rc < 0)
+		pr_err("Couldn't suspend charging rc=%d\n", rc);
+
+	/* Disable OTG */
+	rc = smblib_masked_write(chg, CMD_OTG_REG, OTG_EN_BIT, 0);
+	if (rc < 0)
+		pr_err("Couldn't disable OTG rc=%d\n", rc);
+
+}
+
 static struct platform_driver smb138x_driver = {
 	.driver	= {
 		.name		= "qcom,smb138x-charger",
 		.owner		= THIS_MODULE,
 		.of_match_table	= match_table,
 	},
-	.probe	= smb138x_probe,
-	.remove	= smb138x_remove,
+	.probe		= smb138x_probe,
+	.remove		= smb138x_remove,
+	.shutdown	= smb138x_shutdown,
 };
 module_platform_driver(smb138x_driver);
 

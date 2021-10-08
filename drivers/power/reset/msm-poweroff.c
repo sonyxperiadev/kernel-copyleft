@@ -10,6 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -157,6 +162,7 @@ static bool get_dload_mode(void)
 	return dload_mode_enabled;
 }
 
+#if 0
 static void enable_emergency_dload_mode(void)
 {
 	int ret;
@@ -181,6 +187,7 @@ static void enable_emergency_dload_mode(void)
 	if (ret)
 		pr_err("Failed to set secure EDLOAD mode: %d\n", ret);
 }
+#endif
 
 static int dload_set(const char *val, struct kernel_param *kp)
 {
@@ -294,6 +301,9 @@ static void msm_restart_prepare(const char *cmd)
 				(cmd != NULL && cmd[0] != '\0'));
 	}
 
+	if (in_panic)
+		need_warm_reset = true;
+
 	/* Hard reset the PMIC unless memory contents must be maintained. */
 	if (need_warm_reset) {
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
@@ -301,7 +311,15 @@ static void msm_restart_prepare(const char *cmd)
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
 	}
 
-	if (cmd != NULL) {
+	if (in_panic) {
+		u32 prev_reason;
+
+		prev_reason = __raw_readl(restart_reason);
+		if (prev_reason != 0xABADF00D) {
+			__raw_writel(0xC0DEDEAD, restart_reason);
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_KERNEL_PANIC);
+		}
+	} else if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_BOOTLOADER);
@@ -328,16 +346,52 @@ static void msm_restart_prepare(const char *cmd)
 			__raw_writel(0x7766550a, restart_reason);
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned long code;
+			unsigned long reset_reason;
 			int ret;
 			ret = kstrtoul(cmd + 4, 16, &code);
-			if (!ret)
-				__raw_writel(0x6f656d00 | (code & 0xff),
-					     restart_reason);
+			if (!ret) {
+				/* Bit-2 to bit-7 of SOFT_RB_SPARE for hard
+				 * reset reason:
+				 * Value 0 to 31 for common defined features
+				 * Value 32 to 63 for oem specific features
+				 */
+				reset_reason = code +
+						PON_RESTART_REASON_OEM_MIN;
+				if (reset_reason > PON_RESTART_REASON_OEM_MAX ||
+				   reset_reason < PON_RESTART_REASON_OEM_MIN) {
+					pr_err("Invalid oem reset reason: %lx\n",
+						reset_reason);
+				} else {
+					qpnp_pon_set_restart_reason(
+						reset_reason);
+					if ((code & 0xff) == 'N') {
+						qpnp_pon_set_restart_reason(
+							PON_RESTART_REASON_SYSTEM);
+					} else if ((code & 0xff) == 'S') {
+						qpnp_pon_set_restart_reason(
+						PON_RESTART_REASON_XFL);
+					} else if ((code & 0xff) == 'F') {
+						qpnp_pon_set_restart_reason(
+							PON_RESTART_REASON_OEM_F);
+					} else if ((code & 0xff) == 'P') {
+						qpnp_pon_set_restart_reason(
+						PON_RESTART_REASON_OEM_P);
+					}
+					__raw_writel(0x6f656d00 | (code & 0xff),
+						     restart_reason);
+				}
+			}
+#if 0
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
+#endif
 		} else {
 			__raw_writel(0x77665501, restart_reason);
+			qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
 		}
+	} else {
+		__raw_writel(0x77665501, restart_reason);
+		qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
 	}
 
 	flush_cache_all();
@@ -403,6 +457,7 @@ static void do_msm_poweroff(void)
 	set_dload_mode(0);
 	scm_disable_sdi();
 	qpnp_pon_system_pwr_off(PON_POWER_OFF_SHUTDOWN);
+	qpnp_pon_set_restart_reason(PON_RESTART_REASON_NONE);
 
 	halt_spmi_pmic_arbiter();
 	deassert_ps_hold();
@@ -658,6 +713,7 @@ skip_sysfs_create:
 	if (!download_mode)
 		scm_disable_sdi();
 #endif
+
 	return 0;
 
 err_restart_reason:

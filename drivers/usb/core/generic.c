@@ -16,12 +16,21 @@
  *	(C) Copyright Greg Kroah-Hartman 2002-2003
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2013 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/usb/audio.h>
 #include <linux/usb/audio-v3.h>
 #include "usb.h"
+
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+#include <linux/usb/host_ext_event.h>
+#endif
 
 static inline const char *plural(int n)
 {
@@ -168,10 +177,14 @@ int usb_choose_configuration(struct usb_device *udev)
 			best = c;
 	}
 
-	if (insufficient_power > 0)
+	if (insufficient_power > 0) {
 		dev_info(&udev->dev, "rejected %d configuration%s "
 			"due to insufficient available bus power\n",
 			insufficient_power, plural(insufficient_power));
+#ifdef CONFIG_USB_HOST_EXTRA_NOTIFICATION
+		host_send_uevent(USB_HOST_EXT_EVENT_INSUFFICIENT_POWER);
+#endif
+	}
 
 	if (best) {
 		/* choose usb audio class preferred config if available */
@@ -242,8 +255,13 @@ static int generic_suspend(struct usb_device *udev, pm_message_t msg)
 	if (!udev->parent)
 		rc = hcd_bus_suspend(udev, msg);
 
-	/* Non-root devices don't need to do anything for FREEZE or PRETHAW */
-	else if (msg.event == PM_EVENT_FREEZE || msg.event == PM_EVENT_PRETHAW)
+	/*
+	 * Non-root USB2 devices don't need to do anything for FREEZE
+	 * or PRETHAW. USB3 devices don't support global suspend and
+	 * needs to be selectively suspended.
+	 */
+	else if ((msg.event == PM_EVENT_FREEZE || msg.event == PM_EVENT_PRETHAW)
+		 && (udev->speed < USB_SPEED_SUPER))
 		rc = 0;
 	else
 		rc = usb_port_suspend(udev, msg);

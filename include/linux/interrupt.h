@@ -1,4 +1,9 @@
 /* interrupt.h */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _LINUX_INTERRUPT_H
 #define _LINUX_INTERRUPT_H
 
@@ -18,6 +23,7 @@
 #include <linux/atomic.h>
 #include <asm/ptrace.h>
 #include <asm/irq.h>
+#include <asm/sections.h>
 
 /*
  * These correspond to the IORESOURCE_IRQ_* defines in
@@ -62,6 +68,9 @@
  *                wakeup devices users need to implement wakeup detection in
  *                their interrupt handlers.
  */
+#ifdef CONFIG_SOMC_LCD_OCP_ENABLED
+#define IRQF_DISABLED		0x00000020
+#endif /* CONFIG_SOMC_LCD_OCP_ENABLED */
 #define IRQF_SHARED		0x00000080
 #define IRQF_PROBE_SHARED	0x00000100
 #define __IRQF_TIMER		0x00000200
@@ -678,5 +687,12 @@ int arch_show_interrupts(struct seq_file *p, int prec);
 extern int early_irq_init(void);
 extern int arch_probe_nr_irqs(void);
 extern int arch_early_irq_init(void);
+
+/*
+ * We want to know which function is an entrypoint of a hardirq or a softirq.
+ */
+#define __irq_entry		 __attribute__((__section__(".irqentry.text")))
+#define __softirq_entry  \
+	__attribute__((__section__(".softirqentry.text")))
 
 #endif

@@ -640,6 +640,11 @@ int fib_nh_match(struct fib_config *cfg, struct fib_info *fi)
 					    fi->fib_nh, cfg))
 			    return 1;
 		}
+#ifdef CONFIG_IP_ROUTE_CLASSID
+		if (cfg->fc_flow &&
+		    cfg->fc_flow != fi->fib_nh->nh_tclassid)
+			return 1;
+#endif
 		if ((!cfg->fc_oif || cfg->fc_oif == fi->fib_nh->nh_oif) &&
 		    (!cfg->fc_gw  || cfg->fc_gw == fi->fib_nh->nh_gw))
 			return 0;
@@ -974,6 +979,8 @@ fib_convert_metrics(struct fib_info *fi, const struct fib_config *cfg)
 			if (val == TCP_CA_UNSPEC)
 				return -EINVAL;
 		} else {
+			if (nla_len(nla) != sizeof(u32))
+				return -EINVAL;
 			val = nla_get_u32(nla);
 		}
 		if (type == RTAX_ADVMSS && val > 65535 - 40)
@@ -1044,15 +1051,17 @@ struct fib_info *fib_create_info(struct fib_config *cfg)
 	fi = kzalloc(sizeof(*fi)+nhs*sizeof(struct fib_nh), GFP_KERNEL);
 	if (!fi)
 		goto failure;
-	fib_info_cnt++;
 	if (cfg->fc_mx) {
 		fi->fib_metrics = kzalloc(sizeof(*fi->fib_metrics), GFP_KERNEL);
-		if (!fi->fib_metrics)
-			goto failure;
+		if (unlikely(!fi->fib_metrics)) {
+			kfree(fi);
+			return ERR_PTR(err);
+		}
 		atomic_set(&fi->fib_metrics->refcnt, 1);
-	} else
+	} else {
 		fi->fib_metrics = (struct dst_metrics *)&dst_default_metrics;
-
+	}
+	fib_info_cnt++;
 	fi->fib_net = net;
 	fi->fib_protocol = cfg->fc_protocol;
 	fi->fib_scope = cfg->fc_scope;

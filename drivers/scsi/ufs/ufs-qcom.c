@@ -11,6 +11,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/time.h>
 #include <linux/of.h>
@@ -161,10 +166,12 @@ static int ufs_qcom_enable_lane_clks(struct ufs_qcom_host *host)
 		if (err)
 			goto disable_tx_l0;
 
+#ifndef CONFIG_SCSI_UFS_RESTRICT_TX_LANES
 		/* The tx lane1 clk could be muxed, hence keep this optional */
 		if (host->tx_l1_sync_clk)
 			ufs_qcom_host_clk_enable(dev, "tx_lane1_sync_clk",
 						 host->tx_l1_sync_clk);
+#endif
 	}
 	host->is_lane_clks_enabled = true;
 	goto out;
@@ -208,9 +215,11 @@ static int ufs_qcom_init_lane_clks(struct ufs_qcom_host *host)
 			goto out;
 		}
 
+#ifndef CONFIG_SCSI_UFS_RESTRICT_TX_LANES
 		/* The tx lane1 clk could be muxed, hence keep this optional */
 		ufs_qcom_host_clk_get(dev, "tx_lane1_sync_clk",
 					&host->tx_l1_sync_clk);
+#endif
 	}
 out:
 	return err;
@@ -1270,7 +1279,7 @@ static int ufs_qcom_update_bus_bw_vote(struct ufs_qcom_host *host)
 	return 0;
 }
 
-static int ufs_qcom_set_bus_vote(struct ufs_qcom_host *host, int vote)
+static int ufs_qcom_set_bus_vote(struct ufs_hba *hba, bool on)
 {
 	return 0;
 }
@@ -1507,8 +1516,7 @@ static void ufs_qcom_advertise_quirks(struct ufs_hba *hba)
 				| UFSHCD_QUIRK_BROKEN_PA_RXHSUNTERMCAP);
 	}
 
-	if (host->disable_lpm)
-		hba->quirks |= UFSHCD_QUIRK_BROKEN_AUTO_HIBERN8;
+	hba->quirks |= UFSHCD_QUIRK_BROKEN_AUTO_HIBERN8;
 }
 
 static void ufs_qcom_set_caps(struct ufs_hba *hba)
@@ -2563,12 +2571,13 @@ static void ufs_qcom_get_default_testbus_cfg(struct ufs_qcom_host *host)
 	host->testbus.select_minor = 37;
 }
 
-static bool ufs_qcom_testbus_cfg_is_ok(struct ufs_qcom_host *host)
+bool ufs_qcom_testbus_cfg_is_ok(struct ufs_qcom_host *host,
+		u8 select_major, u8 select_minor)
 {
-	if (host->testbus.select_major >= TSTBUS_MAX) {
+	if (select_major >= TSTBUS_MAX) {
 		dev_err(host->hba->dev,
 			"%s: UFS_CFG1[TEST_BUS_SEL} may not equal 0x%05X\n",
-			__func__, host->testbus.select_major);
+			__func__, select_major);
 		return false;
 	}
 
@@ -2577,10 +2586,10 @@ static bool ufs_qcom_testbus_cfg_is_ok(struct ufs_qcom_host *host)
 	 * mappings of select_minor, since there is no harm in
 	 * configuring a non-existent select_minor
 	 */
-	if (host->testbus.select_minor > 0xFF) {
+	if (select_minor > 0xFF) {
 		dev_err(host->hba->dev,
 			"%s: 0x%05X is not a legal testbus option\n",
-			__func__, host->testbus.select_minor);
+			__func__, select_minor);
 		return false;
 	}
 
@@ -2594,16 +2603,16 @@ static bool ufs_qcom_testbus_cfg_is_ok(struct ufs_qcom_host *host)
  */
 int ufs_qcom_testbus_config(struct ufs_qcom_host *host)
 {
-	int reg;
-	int offset;
+	int reg = 0;
+	int offset = 0, ret = 0, testbus_sel_offset = 19;
 	u32 mask = TEST_BUS_SUB_SEL_MASK;
+	unsigned long flags;
+	struct ufs_hba *hba;
 
 	if (!host)
 		return -EINVAL;
-
-	if (!ufs_qcom_testbus_cfg_is_ok(host))
-		return -EPERM;
-
+	hba = host->hba;
+	spin_lock_irqsave(hba->host->host_lock, flags);
 	switch (host->testbus.select_major) {
 	case TSTBUS_UAWM:
 		reg = UFS_TEST_BUS_CTRL_0;
@@ -2661,21 +2670,27 @@ int ufs_qcom_testbus_config(struct ufs_qcom_host *host)
 	 */
 	}
 	mask <<= offset;
-
-	ufshcd_rmwl(host->hba, TEST_BUS_SEL,
-		    (u32)host->testbus.select_major << 19,
+	spin_unlock_irqrestore(hba->host->host_lock, flags);
+	if (reg) {
+		ufshcd_rmwl(host->hba, TEST_BUS_SEL,
+		    (u32)host->testbus.select_major << testbus_sel_offset,
 		    REG_UFS_CFG1);
-	ufshcd_rmwl(host->hba, mask,
+		ufshcd_rmwl(host->hba, mask,
 		    (u32)host->testbus.select_minor << offset,
 		    reg);
+	} else {
+		dev_err(hba->dev, "%s: Problem setting minor\n", __func__);
+		ret = -EINVAL;
+		goto out;
+	}
 	ufs_qcom_enable_test_bus(host);
 	/*
 	 * Make sure the test bus configuration is
 	 * committed before returning.
 	 */
 	mb();
-
-	return 0;
+out:
+	return ret;
 }
 
 static void ufs_qcom_testbus_read(struct ufs_hba *hba)
@@ -2704,6 +2719,27 @@ static void ufs_qcom_print_unipro_testbus(struct ufs_hba *hba)
 	kfree(testbus);
 }
 
+static void ufs_qcom_print_utp_hci_testbus(struct ufs_hba *hba)
+{
+	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
+	u32 *testbus = NULL;
+	int i, nminor = 32, testbus_len = nminor * sizeof(u32);
+
+	testbus = kmalloc(testbus_len, GFP_KERNEL);
+	if (!testbus)
+		return;
+
+	host->testbus.select_major = TSTBUS_UTP_HCI;
+	for (i = 0; i < nminor; i++) {
+		host->testbus.select_minor = i;
+		ufs_qcom_testbus_config(host);
+		testbus[i] = ufshcd_readl(hba, UFS_TEST_BUS);
+	}
+	print_hex_dump(KERN_ERR, "UTP_HCI_TEST_BUS ", DUMP_PREFIX_OFFSET,
+			16, 4, testbus, testbus_len, false);
+	kfree(testbus);
+}
+
 static void ufs_qcom_dump_dbg_regs(struct ufs_hba *hba, bool no_sleep)
 {
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
@@ -2721,6 +2757,8 @@ static void ufs_qcom_dump_dbg_regs(struct ufs_hba *hba, bool no_sleep)
 	ufs_qcom_testbus_read(hba);
 	usleep_range(1000, 1100);
 	ufs_qcom_print_unipro_testbus(hba);
+	usleep_range(1000, 1100);
+	ufs_qcom_print_utp_hci_testbus(hba);
 	usleep_range(1000, 1100);
 	ufs_qcom_phy_dbg_register_dump(phy);
 	usleep_range(1000, 1100);
@@ -2831,6 +2869,7 @@ static const struct of_device_id ufs_qcom_of_match[] = {
 	{ .compatible = "qcom,ufshc"},
 	{},
 };
+MODULE_DEVICE_TABLE(of, ufs_qcom_of_match);
 
 static const struct dev_pm_ops ufs_qcom_pm_ops = {
 	.suspend	= ufshcd_pltfrm_suspend,

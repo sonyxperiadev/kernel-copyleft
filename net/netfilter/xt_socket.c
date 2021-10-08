@@ -158,10 +158,13 @@ struct sock *xt_socket_lookup_slow_v4(struct net *net,
 #endif
 
 	if (iph->protocol == IPPROTO_UDP || iph->protocol == IPPROTO_TCP) {
-		struct udphdr _hdr, *hp;
+		struct udphdr *hp;
+		struct tcphdr _hdr;
 
 		hp = skb_header_pointer(skb, ip_hdrlen(skb),
-					sizeof(_hdr), &_hdr);
+					iph->protocol == IPPROTO_UDP ?
+					sizeof(*hp) : sizeof(_hdr),
+					&_hdr);
 		if (hp == NULL)
 			return NULL;
 
@@ -237,7 +240,7 @@ socket_match(const struct sk_buff *skb, struct xt_action_param *par,
 			transparent = xt_socket_sk_is_transparent(sk);
 
 		if (info->flags & XT_SOCKET_RESTORESKMARK && !wildcard &&
-		    transparent)
+		    transparent && sk_fullsock(sk))
 			pskb->mark = sk->sk_mark;
 
 		sock_gen_put(sk);
@@ -360,9 +363,11 @@ struct sock *xt_socket_lookup_slow_v6(struct net *net,
 	}
 
 	if (tproto == IPPROTO_UDP || tproto == IPPROTO_TCP) {
-		struct udphdr _hdr, *hp;
+		struct udphdr *hp;
+		struct tcphdr _hdr;
 
-		hp = skb_header_pointer(skb, thoff, sizeof(_hdr), &_hdr);
+		hp = skb_header_pointer(skb, thoff, tproto == IPPROTO_UDP ?
+					sizeof(*hp) : sizeof(_hdr), &_hdr);
 		if (hp == NULL)
 			return NULL;
 
@@ -419,7 +424,7 @@ socket_mt6_v1_v2_v3(const struct sk_buff *skb, struct xt_action_param *par)
 			transparent = xt_socket_sk_is_transparent(sk);
 
 		if (info->flags & XT_SOCKET_RESTORESKMARK && !wildcard &&
-		    transparent)
+		    transparent && sk_fullsock(sk))
 			pskb->mark = sk->sk_mark;
 
 		if (sk != skb->sk)

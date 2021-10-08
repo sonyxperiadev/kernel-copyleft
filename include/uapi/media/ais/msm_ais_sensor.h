@@ -3,7 +3,7 @@
 
 #include <linux/v4l2-mediabus.h>
 #include <media/ais/msm_ais_sensor_sdk.h>
-
+#include <media/ais/msm_ais_mgr.h>
 #include <linux/types.h>
 #include <linux/i2c.h>
 
@@ -152,6 +152,8 @@ enum csid_cfg_type_t {
 	CSID_START,
 	CSID_STOP,
 	CSID_RELEASE,
+	CSID_READ_REG_LIST_CMD,
+	CSID_WRITE_REG_LIST_CMD,
 };
 
 enum csiphy_cfg_type_t {
@@ -160,6 +162,8 @@ enum csiphy_cfg_type_t {
 	CSIPHY_START,
 	CSIPHY_STOP,
 	CSIPHY_RELEASE,
+	CSIPHY_READ_REG_LIST_CMD,
+	CSIPHY_WRITE_REG_LIST_CMD,
 };
 
 enum camera_vreg_type {
@@ -177,6 +181,49 @@ enum cci_i2c_master_t {
 	MASTER_1,
 	MASTER_MAX,
 };
+
+struct msm_sensor_event_data {
+	uint16_t sensor_slave_addr;
+};
+
+enum msm_sensor_event_mask_index {
+	SENSOR_EVENT_MASK_INDEX_SIGNAL_STATUS	= 2,
+};
+
+#define SENSOR_EVENT_SUBS_MASK_NONE			0
+
+#define SENSOR_EVENT_SUBS_MASK_SIGNAL_STATUS \
+			(1 << SENSOR_EVENT_MASK_INDEX_SIGNAL_STATUS)
+
+enum msm_sensor_event_idx {
+	SENSOR_SIGNAL_STATUS      = 2,
+	SENSOR_EVENT_MAX          = 15
+};
+
+#define SENSOR_EVENT_BASE            (V4L2_EVENT_PRIVATE_START)
+#define SENSOR_EVENT_SIGNAL_STATUS   (SENSOR_EVENT_BASE + SENSOR_SIGNAL_STATUS)
+
+struct msm_csid_event_data {
+	uint8_t  csid_id;
+	uint32_t error_status;
+};
+
+enum msm_csid_event_mask_index {
+	CSID_EVENT_MASK_INDEX_SIGNAL_ERROR	= 2,
+};
+
+#define CSID_EVENT_SUBS_MASK_NONE			0
+
+#define CSID_EVENT_SUBS_MASK_SIGNAL_ERROR \
+			(1 << CSID_EVENT_MASK_INDEX_SIGNAL_ERROR)
+
+enum msm_csid_event_idx {
+	CSID_SIGNAL_ERROR      = 2,
+	CSID_EVENT_MAX         = 15
+};
+
+#define CSID_EVENT_BASE           (V4L2_EVENT_PRIVATE_START + SENSOR_EVENT_MAX)
+#define CSID_EVENT_SIGNAL_ERROR   (CSID_EVENT_BASE + CSID_SIGNAL_ERROR)
 
 struct msm_camera_i2c_array_write_config {
 	struct msm_camera_i2c_reg_setting conf_array;
@@ -248,6 +295,7 @@ struct csid_cfg_data {
 		struct msm_camera_csid_params *csid_params;
 		struct msm_camera_csid_testmode_parms *csid_testmode_params;
 		uint32_t csid_cidmask;
+		struct msm_camera_reg_list_cmd *csid_reg_list_cmd;
 	} cfg;
 };
 
@@ -256,6 +304,7 @@ struct csiphy_cfg_data {
 	union {
 		struct msm_camera_csiphy_params *csiphy_params;
 		struct msm_camera_csi_lane_params *csi_lane_params;
+		struct msm_camera_reg_list_cmd *csiphy_reg_list_cmd;
 	} cfg;
 };
 
@@ -348,7 +397,12 @@ enum msm_sensor_cfg_type_t {
 	CFG_WRITE_I2C_ARRAY_ASYNC,
 	CFG_WRITE_I2C_ARRAY_SYNC,
 	CFG_WRITE_I2C_ARRAY_SYNC_BLOCK,
+	CFG_CCI_POWER_UP,
+	CFG_CCI_POWER_DOWN,
 };
+
+#define CFG_CCI_POWER_UP CFG_CCI_POWER_UP
+#define CFG_CCI_POWER_DOWN CFG_CCI_POWER_DOWN
 
 enum msm_actuator_cfg_type_t {
 	CFG_GET_ACTUATOR_INFO,
@@ -564,6 +618,8 @@ struct sensor_init_cfg_data {
 		void *setting;
 	} cfg;
 };
+
+#define CSI_RW_REG_LIST_SUPPORT
 
 #define VIDIOC_MSM_SENSOR_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 1, struct sensorb_cfg_data)

@@ -20,6 +20,11 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __LINUX_XHCI_HCD_H
 #define __LINUX_XHCI_HCD_H
@@ -382,6 +387,10 @@ struct xhci_op_regs {
 #define PORT_PLC	(1 << 22)
 /* port configure error change - port failed to configure its link partner */
 #define PORT_CEC	(1 << 23)
+#define PORT_CHANGE_MASK	(PORT_CSC | PORT_PEC | PORT_WRC | PORT_OCC | \
+				 PORT_RC | PORT_PLC | PORT_CEC)
+
+
 /* Cold Attach Status - xHC can set this bit to report device attached during
  * Sx state. Warm port reset should be perfomed to clear this bit and move port
  * to connected state.
@@ -1490,7 +1499,7 @@ struct xhci_bus_state {
 
 static inline unsigned int hcd_index(struct usb_hcd *hcd)
 {
-	if (hcd->speed == HCD_USB3)
+	if (hcd->speed >= HCD_USB3)
 		return 0;
 	else
 		return 1;
@@ -1667,6 +1676,7 @@ struct xhci_hcd {
 	/* Compliance Mode Recovery Data */
 	struct timer_list	comp_mode_recovery_timer;
 	u32			port_status_u0;
+	bool			suspended;
 /* Compliance Mode Timer Triggered every 2 seconds */
 #define COMP_MODE_RCVRY_MSECS 2000
 };

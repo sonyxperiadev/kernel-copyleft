@@ -17,6 +17,11 @@
  * under the terms of the Apache 2.0 License OR version 2 of the GNU
  * General Public License.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include "sdcardfs.h"
 #include <linux/module.h>
@@ -32,6 +37,9 @@ enum {
 	Opt_multiuser,
 	Opt_userid,
 	Opt_reserved_mb,
+	Opt_gid_derivation,
+	Opt_default_normal,
+	Opt_nocache,
 	Opt_err,
 };
 
@@ -43,7 +51,10 @@ static const match_table_t sdcardfs_tokens = {
 	{Opt_mask, "mask=%u"},
 	{Opt_userid, "userid=%d"},
 	{Opt_multiuser, "multiuser"},
+	{Opt_gid_derivation, "derive_gid"},
+	{Opt_default_normal, "default_normal"},
 	{Opt_reserved_mb, "reserved_mb=%u"},
+	{Opt_nocache, "nocache"},
 	{Opt_err, NULL}
 };
 
@@ -64,6 +75,10 @@ static int parse_options(struct super_block *sb, char *options, int silent,
 	vfsopts->gid = 0;
 	/* by default, 0MB is reserved */
 	opts->reserved_mb = 0;
+	/* by default, gid derivation is off */
+	opts->gid_derivation = false;
+	opts->default_normal = false;
+	opts->nocache = false;
 
 	*debug = 0;
 
@@ -114,6 +129,15 @@ static int parse_options(struct super_block *sb, char *options, int silent,
 			if (match_int(&args[0], &option))
 				return 0;
 			opts->reserved_mb = option;
+			break;
+		case Opt_gid_derivation:
+			opts->gid_derivation = true;
+			break;
+		case Opt_default_normal:
+			opts->default_normal = true;
+			break;
+		case Opt_nocache:
+			opts->nocache = true;
 			break;
 		/* unknown option */
 		default:
@@ -168,6 +192,7 @@ int parse_options_remount(struct super_block *sb, char *options, int silent,
 				return 0;
 			vfsopts->mask = option;
 			break;
+		case Opt_default_normal:
 		case Opt_multiuser:
 		case Opt_userid:
 		case Opt_fsuid:
@@ -281,6 +306,13 @@ static int sdcardfs_read_super(struct vfsmount *mnt, struct super_block *sb,
 	atomic_inc(&lower_sb->s_active);
 	sdcardfs_set_lower_super(sb, lower_sb);
 
+	sb->s_stack_depth = lower_sb->s_stack_depth + 1;
+	if (sb->s_stack_depth > FILESYSTEM_MAX_STACK_DEPTH) {
+		pr_err("sdcardfs: maximum fs stacking depth exceeded\n");
+		err = -EINVAL;
+		goto out_sput;
+	}
+
 	/* inherit maxbytes from lower file system */
 	sb->s_maxbytes = lower_sb->s_maxbytes;
 
@@ -302,7 +334,7 @@ static int sdcardfs_read_super(struct vfsmount *mnt, struct super_block *sb,
 	sb->s_root = d_make_root(inode);
 	if (!sb->s_root) {
 		err = -ENOMEM;
-		goto out_iput;
+		goto out_sput;
 	}
 	d_set_d_op(sb->s_root, &sdcardfs_ci_dops);
 
@@ -327,13 +359,11 @@ static int sdcardfs_read_super(struct vfsmount *mnt, struct super_block *sb,
 	mutex_lock(&sdcardfs_super_list_lock);
 	if (sb_info->options.multiuser) {
 		setup_derived_state(d_inode(sb->s_root), PERM_PRE_ROOT,
-				sb_info->options.fs_user_id, AID_ROOT,
-				false, SDCARDFS_I(d_inode(sb->s_root))->data);
+				sb_info->options.fs_user_id, AID_ROOT);
 		snprintf(sb_info->obbpath_s, PATH_MAX, "%s/obb", dev_name);
 	} else {
 		setup_derived_state(d_inode(sb->s_root), PERM_ROOT,
-				sb_info->options.fs_user_id, AID_ROOT,
-				false, SDCARDFS_I(d_inode(sb->s_root))->data);
+				sb_info->options.fs_user_id, AID_ROOT);
 		snprintf(sb_info->obbpath_s, PATH_MAX, "%s/Android/obb", dev_name);
 	}
 	fixup_tmp_permissions(d_inode(sb->s_root));
@@ -349,8 +379,7 @@ static int sdcardfs_read_super(struct vfsmount *mnt, struct super_block *sb,
 	/* no longer needed: free_dentry_private_data(sb->s_root); */
 out_freeroot:
 	dput(sb->s_root);
-out_iput:
-	iput(inode);
+	sb->s_root = NULL;
 out_sput:
 	/* drop refs we took earlier */
 	atomic_dec(&lower_sb->s_active);
@@ -410,7 +439,7 @@ void sdcardfs_kill_sb(struct super_block *sb)
 {
 	struct sdcardfs_sb_info *sbi;
 
-	if (sb->s_magic == SDCARDFS_SUPER_MAGIC) {
+	if (sb->s_magic == SDCARDFS_SUPER_MAGIC && sb->s_fs_info) {
 		sbi = SDCARDFS_SB(sb);
 		mutex_lock(&sdcardfs_super_list_lock);
 		list_del(&sbi->list);

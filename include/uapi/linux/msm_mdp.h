@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _UAPI_MSM_MDP_H_
 #define _UAPI_MSM_MDP_H_
 
@@ -1120,7 +1125,7 @@ enum {
 #define MDSS_PP_SPLIT_RIGHT_ONLY	0x20000000
 #define MDSS_PP_SPLIT_MASK		0x30000000
 
-#define MDSS_MAX_BL_BRIGHTNESS 255
+#define MDSS_MAX_BL_BRIGHTNESS 4095
 #define AD_BL_LIN_LEN 256
 #define AD_BL_ATT_LUT_LEN 33
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,6 +31,7 @@
 #include "msm_sd.h"
 #include "cam_hw_ops.h"
 #include <media/ais/msm_ais_buf_mgr.h>
+#include "msm_camera_diag_util.h"
 
 
 static struct v4l2_device *msm_v4l2_dev;
@@ -292,6 +293,7 @@ void msm_delete_stream(unsigned int session_id, unsigned int stream_id)
 		return;
 
 	while (1) {
+		unsigned long wl_flags;
 
 		if (try_count > 5) {
 			pr_err("%s : not able to delete stream %d\n",
@@ -299,18 +301,20 @@ void msm_delete_stream(unsigned int session_id, unsigned int stream_id)
 			break;
 		}
 
-		write_lock(&session->stream_rwlock);
+		write_lock_irqsave(&session->stream_rwlock, wl_flags);
 		try_count++;
 		stream = msm_queue_find(&session->stream_q, struct msm_stream,
 			list, __msm_queue_find_stream, &stream_id);
 
 		if (!stream) {
-			write_unlock(&session->stream_rwlock);
+			write_unlock_irqrestore(&session->stream_rwlock,
+				wl_flags);
 			return;
 		}
 
 		if (msm_vb2_get_stream_state(stream) != 1) {
-			write_unlock(&session->stream_rwlock);
+			write_unlock_irqrestore(&session->stream_rwlock,
+				wl_flags);
 			continue;
 		}
 
@@ -320,7 +324,7 @@ void msm_delete_stream(unsigned int session_id, unsigned int stream_id)
 		kfree(stream);
 		stream = NULL;
 		spin_unlock_irqrestore(&(session->stream_q.lock), flags);
-		write_unlock(&session->stream_rwlock);
+		write_unlock_irqrestore(&session->stream_rwlock, wl_flags);
 		break;
 	}
 
@@ -730,6 +734,16 @@ static long msm_private_ioctl(struct file *file, void *fh,
 
 	if (!event_data)
 		return -EINVAL;
+
+	switch (cmd) {
+	case MSM_CAM_V4L2_IOCTL_NOTIFY:
+	case MSM_CAM_V4L2_IOCTL_CMD_ACK:
+	case MSM_CAM_V4L2_IOCTL_NOTIFY_DEBUG:
+	case MSM_CAM_V4L2_IOCTL_NOTIFY_ERROR:
+		break;
+	default:
+		return -ENOTTY;
+	}
 
 	memset(&event, 0, sizeof(struct v4l2_event));
 	session_id = event_data->session_id;
@@ -1371,6 +1385,12 @@ static int msm_probe(struct platform_device *pdev)
 		goto v4l2_fail;
 	}
 
+	rc = msm_camera_diag_init();
+	if (rc < 0) {
+		pr_err("%s: failed to init diag clk list\n", __func__);
+		goto v4l2_fail;
+	}
+
 	goto probe_end;
 
 v4l2_fail:
@@ -1415,6 +1435,7 @@ static int __init msm_init(void)
 
 static void __exit msm_exit(void)
 {
+	msm_camera_diag_uninit();
 	platform_driver_unregister(&msm_driver);
 }
 

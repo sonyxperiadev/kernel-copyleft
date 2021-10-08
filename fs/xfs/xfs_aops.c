@@ -310,7 +310,7 @@ xfs_map_blocks(
 	       (ip->i_df.if_flags & XFS_IFEXTENTS));
 	ASSERT(offset <= mp->m_super->s_maxbytes);
 
-	if (offset + count > mp->m_super->s_maxbytes)
+	if ((xfs_ufsize_t)offset + count > mp->m_super->s_maxbytes)
 		count = mp->m_super->s_maxbytes - offset;
 	end_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
@@ -1360,7 +1360,7 @@ xfs_map_trim_size(
 	if (mapping_size > size)
 		mapping_size = size;
 	if (offset < i_size_read(inode) &&
-	    offset + mapping_size >= i_size_read(inode)) {
+	    (xfs_ufsize_t)offset + mapping_size >= i_size_read(inode)) {
 		/* limit mapping to block that spans EOF */
 		mapping_size = roundup_64(i_size_read(inode) - offset,
 					  i_blocksize(inode));
@@ -1416,7 +1416,7 @@ __xfs_get_blocks(
 	}
 
 	ASSERT(offset <= mp->m_super->s_maxbytes);
-	if (offset + size > mp->m_super->s_maxbytes)
+	if ((xfs_ufsize_t)offset + size > mp->m_super->s_maxbytes)
 		size = mp->m_super->s_maxbytes - offset;
 	end_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + size);
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
@@ -1425,6 +1425,26 @@ __xfs_get_blocks(
 				&imap, &nimaps, XFS_BMAPI_ENTIRE);
 	if (error)
 		goto out_unlock;
+
+	/*
+	 * The only time we can ever safely find delalloc blocks on direct I/O
+	 * is a dio write to post-eof speculative preallocation. All other
+	 * scenarios are indicative of a problem or misuse (such as mixing
+	 * direct and mapped I/O).
+	 *
+	 * The file may be unmapped by the time we get here so we cannot
+	 * reliably fail the I/O based on mapping. Instead, fail the I/O if this
+	 * is a read or a write within eof. Otherwise, carry on but warn as a
+	 * precuation if the file happens to be mapped.
+	 */
+	if (direct && imap.br_startblock == DELAYSTARTBLOCK) {
+	        if (!create || offset < i_size_read(VFS_I(ip))) {
+	                WARN_ON_ONCE(1);
+	                error = -EIO;
+	                goto out_unlock;
+	        }
+	        WARN_ON_ONCE(mapping_mapped(VFS_I(ip)->i_mapping));
+	}
 
 	/* for DAX, we convert unwritten extents directly */
 	if (create &&
@@ -1525,7 +1545,6 @@ __xfs_get_blocks(
 		set_buffer_new(bh_result);
 
 	if (imap.br_startblock == DELAYSTARTBLOCK) {
-		BUG_ON(direct);
 		if (create) {
 			set_buffer_uptodate(bh_result);
 			set_buffer_mapped(bh_result);

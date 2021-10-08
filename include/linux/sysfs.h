@@ -116,6 +116,12 @@ struct attribute_group {
 	.show	= _name##_show,						\
 }
 
+#define __ATTR_RO_MODE(_name, _mode) {					\
+	.attr	= { .name = __stringify(_name),				\
+		    .mode = VERIFY_OCTAL_PERMISSIONS(_mode) },		\
+	.show	= _name##_show,						\
+}
+
 #define __ATTR_WO(_name) {						\
 	.attr	= { .name = __stringify(_name), .mode = S_IWUSR },	\
 	.store	= _name##_store,					\
@@ -512,7 +518,7 @@ static inline void sysfs_notify_dirent(struct kernfs_node *kn)
 }
 
 static inline struct kernfs_node *sysfs_get_dirent(struct kernfs_node *parent,
-						   const unsigned char *name)
+						   const char *name)
 {
 	return kernfs_find_and_get(parent, name);
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -52,6 +52,8 @@ struct msm_sensor_ctrl_t;
 enum msm_sensor_state_t {
 	MSM_SENSOR_POWER_DOWN,
 	MSM_SENSOR_POWER_UP,
+	MSM_SENSOR_CCI_DOWN,
+	MSM_SENSOR_CCI_UP,
 };
 
 struct msm_sensor_fn_t {
@@ -90,9 +92,17 @@ struct msm_sensor_ctrl_t {
 	uint32_t set_mclk_23880000;
 	uint8_t is_csid_tg_mode;
 	uint32_t is_secure;
-
+	/* Interrupt GPIOs */
+	struct gpio gpio_array[1];
+	/* device status and Flags */
+	int irq;
 	struct msm_sensor_init_t s_init;
+	/* worker to handle interrupts */
+	struct delayed_work irq_delayed_work;
 };
+
+int msm_sensor_send_event(struct msm_sensor_ctrl_t *s_ctrl,
+	uint32_t event_type, struct msm_sensor_event_data *event_data);
 
 int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void *argp);
 
@@ -126,4 +136,6 @@ long msm_sensor_subdev_fops_ioctl(struct file *file,
 	unsigned int cmd,
 	unsigned long arg);
 #endif
+void msm_sensor_misc_regulator(
+	struct msm_sensor_ctrl_t *sctrl, uint32_t enable);
 #endif

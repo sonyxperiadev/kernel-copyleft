@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,6 +8,11 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2014 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 
@@ -46,6 +51,8 @@
 #include <sound/msm-audio-effects-q6-v2.h>
 #include "msm-pcm-routing-v2.h"
 #include "msm-qti-pp-config.h"
+#include "msm-sony-hweffect.h"
+#include "sound/sony-hweffect-params.h"
 
 #define DSP_PP_BUFFERING_IN_MSEC	25
 #define PARTIAL_DRAIN_ACK_EARLY_BY_MSEC	150
@@ -100,11 +107,13 @@ struct msm_compr_pdata {
 	struct snd_compr_stream *cstream[MSM_FRONTEND_DAI_MAX];
 	uint32_t volume[MSM_FRONTEND_DAI_MAX][2]; /* For both L & R */
 	struct msm_compr_audio_effects *audio_effects[MSM_FRONTEND_DAI_MAX];
+	struct msm_compr_sony_hweffect *sony_hweffect[MSM_FRONTEND_DAI_MAX];
 	bool use_dsp_gapless_mode;
 	bool use_legacy_api; /* indicates use older asm apis*/
 	struct msm_compr_dec_params *dec_params[MSM_FRONTEND_DAI_MAX];
 	struct msm_compr_ch_map *ch_map[MSM_FRONTEND_DAI_MAX];
 	int32_t ion_fd[MSM_FRONTEND_DAI_MAX];
+	bool is_in_use[MSM_FRONTEND_DAI_MAX];
 };
 
 struct msm_compr_audio {
@@ -159,6 +168,10 @@ struct msm_compr_audio {
 	uint32_t start_delay_msw;
 
 	int32_t shm_ion_fd;
+	struct ion_client *lib_ion_client;
+	struct ion_client *shm_ion_client;
+	struct ion_handle *lib_ion_handle;
+	struct ion_handle *shm_ion_handle;
 
 	uint64_t marker_timestamp;
 
@@ -200,6 +213,10 @@ struct msm_compr_audio_effects {
 	struct eq_params equalizer;
 	struct soft_volume_params volume;
 	struct query_audio_effect query;
+};
+
+struct msm_compr_sony_hweffect {
+	struct sonybundle_params sonybundle;
 };
 
 struct msm_compr_dec_params {
@@ -393,12 +410,9 @@ static int msm_compr_set_volume(struct snd_compr_stream *cstream,
 	} else {
 		gain_list[0] = volume_l;
 		gain_list[1] = volume_r;
-		/* force sending FR/FL/FC volume for mono */
-		if (prtd->num_channels == 1) {
-			gain_list[2] = volume_l;
-			num_channels = 3;
-			use_default = true;
-		}
+		gain_list[2] = volume_l;
+		num_channels = 3;
+		use_default = true;
 		rc = q6asm_set_multich_gain(prtd->audio_client, num_channels,
 					gain_list, chmap, use_default);
 	}
@@ -1510,20 +1524,16 @@ static int msm_compr_configure_dsp_for_capture(struct snd_compr_stream *cstream)
 	return ret;
 }
 
-static int msm_compr_map_unmap_fd(int fd, bool add_pages)
+static int msm_compr_map_ion_fd(struct msm_compr_audio *prtd, int fd)
 {
 	ion_phys_addr_t paddr;
 	size_t pa_len = 0;
 	int ret = 0;
-	u8 assign_type;
 
-	if (add_pages)
-		assign_type = HLOS_TO_ADSP;
-	else
-		assign_type = ADSP_TO_HLOS;
-
-	ret = msm_audio_ion_phys_assign("audio_lib_mem_client", fd,
-					&paddr, &pa_len, assign_type);
+	ret = msm_audio_ion_phys_assign("audio_lib_mem_client",
+					&prtd->lib_ion_client,
+					&prtd->lib_ion_handle,
+					fd, &paddr, &pa_len, HLOS_TO_ADSP);
 	if (ret) {
 		pr_err("%s: audio lib ION phys failed, rc = %d\n",
 			__func__, ret);
@@ -1531,14 +1541,43 @@ static int msm_compr_map_unmap_fd(int fd, bool add_pages)
 	}
 
 	ret = q6core_add_remove_pool_pages(paddr, pa_len,
-				 ADSP_MEMORY_MAP_HLOS_PHYSPOOL, add_pages);
+				 ADSP_MEMORY_MAP_HLOS_PHYSPOOL, true);
 	if (ret) {
 		pr_err("%s: add remove pages failed, rc = %d\n", __func__, ret);
 		/* Assign back to HLOS if add pages cmd failed */
-		if (add_pages)
-			msm_audio_ion_phys_assign("audio_lib_mem_client", fd,
-						&paddr, &pa_len, ADSP_TO_HLOS);
+		msm_audio_ion_phys_free(prtd->lib_ion_client,
+					prtd->lib_ion_handle,
+					&paddr, &pa_len, ADSP_TO_HLOS);
 	}
+
+done:
+	return ret;
+}
+
+static int msm_compr_unmap_ion_fd(struct msm_compr_audio *prtd)
+{
+	ion_phys_addr_t paddr;
+	size_t pa_len = 0;
+	int ret = 0;
+
+	if (!prtd->lib_ion_client || !prtd->lib_ion_handle) {
+		pr_err("%s: ion_client or ion_handle is NULL", __func__);
+		return -EINVAL;
+	}
+
+	ret = msm_audio_ion_phys_free(prtd->lib_ion_client,
+				      prtd->lib_ion_handle,
+				      &paddr, &pa_len, ADSP_TO_HLOS);
+	if (ret) {
+		pr_err("%s: audio lib ION phys failed, rc = %d\n",
+			__func__, ret);
+		goto done;
+	}
+
+	ret = q6core_add_remove_pool_pages(paddr, pa_len,
+				 ADSP_MEMORY_MAP_HLOS_PHYSPOOL, false);
+	if (ret)
+		pr_err("%s: add remove pages failed, rc = %d\n", __func__, ret);
 
 done:
 	return ret;
@@ -1548,12 +1587,17 @@ static int msm_compr_playback_open(struct snd_compr_stream *cstream)
 {
 	struct snd_compr_runtime *runtime = cstream->runtime;
 	struct snd_soc_pcm_runtime *rtd = cstream->private_data;
-	struct msm_compr_audio *prtd;
+	struct msm_compr_audio *prtd = NULL;
 	struct msm_compr_pdata *pdata =
 			snd_soc_platform_get_drvdata(rtd->platform);
 	int ret = 0;
 
 	pr_debug("%s\n", __func__);
+	if (pdata->is_in_use[rtd->dai_link->be_id] == true) {
+		pr_err("%s: %s is already in use,err: %d ",
+			__func__, rtd->dai_link->cpu_dai_name, -EBUSY);
+		return -EBUSY;
+	}
 	prtd = kzalloc(sizeof(struct msm_compr_audio), GFP_KERNEL);
 	if (prtd == NULL) {
 		pr_err("Failed to allocate memory for msm_compr_audio\n");
@@ -1565,18 +1609,28 @@ static int msm_compr_playback_open(struct snd_compr_stream *cstream)
 	pdata->cstream[rtd->dai_link->be_id] = cstream;
 	pdata->audio_effects[rtd->dai_link->be_id] =
 		 kzalloc(sizeof(struct msm_compr_audio_effects), GFP_KERNEL);
-	if (!pdata->audio_effects[rtd->dai_link->be_id]) {
+	if (pdata->audio_effects[rtd->dai_link->be_id] == NULL) {
 		pr_err("%s: Could not allocate memory for effects\n", __func__);
 		ret = -ENOMEM;
 		goto effect_err;
 	}
+	pdata->sony_hweffect[rtd->dai_link->be_id] =
+		 kzalloc(sizeof(struct msm_compr_sony_hweffect), GFP_KERNEL);
+	if (pdata->sony_hweffect[rtd->dai_link->be_id]== NULL) {
+		pr_err("%s: Could not allocate memory for effects\n", __func__);
+		goto param_err;
+	}
+
+	init_sonybundle_params(
+		&(pdata->sony_hweffect[rtd->dai_link->be_id]->sonybundle));
+
 	pdata->dec_params[rtd->dai_link->be_id] =
 		 kzalloc(sizeof(struct msm_compr_dec_params), GFP_KERNEL);
-	if (!pdata->dec_params[rtd->dai_link->be_id]) {
+	if (pdata->dec_params[rtd->dai_link->be_id] == NULL) {
 		pr_err("%s: Could not allocate memory for dec params\n",
 			__func__);
 		ret = -ENOMEM;
-		goto param_err;
+		goto param_err2;
 	}
 	prtd->codec = FORMAT_MP3;
 	prtd->bytes_received = 0;
@@ -1628,19 +1682,25 @@ static int msm_compr_playback_open(struct snd_compr_stream *cstream)
 	prtd->session_id = prtd->audio_client->session;
 	msm_adsp_init_mixer_ctl_pp_event_queue(rtd);
 	if (pdata->ion_fd[rtd->dai_link->be_id] > 0) {
-		ret = msm_compr_map_unmap_fd(
-				pdata->ion_fd[rtd->dai_link->be_id], true);
+		ret = msm_compr_map_ion_fd(prtd,
+					pdata->ion_fd[rtd->dai_link->be_id]);
 		if (ret < 0)
 			goto map_err;
 	}
+	pdata->is_in_use[rtd->dai_link->be_id] = true;
 	return 0;
 
 map_err:
 	q6asm_audio_client_free(prtd->audio_client);
 ac_err:
 	kfree(pdata->dec_params[rtd->dai_link->be_id]);
+	pdata->dec_params[rtd->dai_link->be_id] = NULL;
+param_err2:
+	kfree(pdata->sony_hweffect[rtd->dai_link->be_id]);
+	pdata->sony_hweffect[rtd->dai_link->be_id] = NULL;
 param_err:
 	kfree(pdata->audio_effects[rtd->dai_link->be_id]);
+	pdata->audio_effects[rtd->dai_link->be_id] = NULL;
 effect_err:
 	pdata->cstream[rtd->dai_link->be_id] = NULL;
 	runtime->private_data = NULL;
@@ -1800,21 +1860,29 @@ static int msm_compr_playback_free(struct snd_compr_stream *cstream)
 
 	q6asm_audio_client_buf_free_contiguous(dir, ac);
 	if (prtd->shm_ion_fd > 0)
-		msm_audio_ion_phys_assign("audio_shm_mem_client",
-					  prtd->shm_ion_fd,
-					  &paddr, &pa_len, ADSP_TO_HLOS);
+		msm_audio_ion_phys_free(prtd->shm_ion_client,
+					prtd->shm_ion_handle,
+					&paddr, &pa_len, ADSP_TO_HLOS);
 	if (pdata->ion_fd[soc_prtd->dai_link->be_id] > 0) {
-		msm_compr_map_unmap_fd(pdata->ion_fd[soc_prtd->dai_link->be_id],
-					false);
+		msm_compr_unmap_ion_fd(prtd);
 		pdata->ion_fd[soc_prtd->dai_link->be_id] = 0;
 	}
 
 	q6asm_audio_client_free(ac);
 	msm_adsp_clean_mixer_ctl_pp_event_queue(soc_prtd);
-	kfree(pdata->audio_effects[soc_prtd->dai_link->be_id]);
-	pdata->audio_effects[soc_prtd->dai_link->be_id] = NULL;
-	kfree(pdata->dec_params[soc_prtd->dai_link->be_id]);
-	pdata->dec_params[soc_prtd->dai_link->be_id] = NULL;
+	if (pdata->audio_effects[soc_prtd->dai_link->be_id] != NULL) {
+		kfree(pdata->audio_effects[soc_prtd->dai_link->be_id]);
+		pdata->audio_effects[soc_prtd->dai_link->be_id] = NULL;
+	}
+	if (pdata->sony_hweffect[soc_prtd->dai_link->be_id] != NULL) {
+		kfree(pdata->sony_hweffect[soc_prtd->dai_link->be_id]);
+		pdata->sony_hweffect[soc_prtd->dai_link->be_id] = NULL;
+	}
+	if (pdata->dec_params[soc_prtd->dai_link->be_id] != NULL) {
+		kfree(pdata->dec_params[soc_prtd->dai_link->be_id]);
+		pdata->dec_params[soc_prtd->dai_link->be_id] = NULL;
+	}
+	pdata->is_in_use[soc_prtd->dai_link->be_id] = false;
 	kfree(prtd);
 	runtime->private_data = NULL;
 
@@ -2647,8 +2715,8 @@ static int msm_compr_pointer(struct snd_compr_stream *cstream,
 		tstamp.copied_total = prtd->received_total;
 	first_buffer = prtd->first_buffer;
 	if (atomic_read(&prtd->error)) {
-		pr_err("%s Got RESET EVENTS notification, return error\n",
-			__func__);
+		pr_err_ratelimited("%s Got RESET EVENTS notification, return error\n",
+				   __func__);
 		if (cstream->direction == SND_COMPRESS_PLAYBACK)
 			runtime->total_bytes_transferred = tstamp.copied_total;
 		else
@@ -3270,6 +3338,92 @@ static int msm_compr_audio_effects_config_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+
+static int msm_compr_sony_hweffect_config_put(struct snd_kcontrol *kcontrol,
+					   struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *comp = snd_kcontrol_chip(kcontrol);
+	unsigned long fe_id = kcontrol->private_value;
+	struct msm_compr_pdata *pdata = (struct msm_compr_pdata *)
+			snd_soc_component_get_drvdata(comp);
+	struct msm_compr_sony_hweffect *sony_hweffect = NULL;
+	struct snd_compr_stream *cstream = NULL;
+	struct msm_compr_audio *prtd = NULL;
+	long *values = &(ucontrol->value.integer.value[0]);
+	int effects_module;
+	uint16_t bits_per_sample;
+
+	pr_debug("%s\n", __func__);
+	if (fe_id >= MSM_FRONTEND_DAI_MAX) {
+		pr_err("%s Received out of bounds fe_id %lu\n",
+			__func__, fe_id);
+		return -EINVAL;
+	}
+	cstream = pdata->cstream[fe_id];
+	sony_hweffect = pdata->sony_hweffect[fe_id];
+	if (!cstream || !sony_hweffect) {
+		pr_err("%s: stream or effects inactive\n", __func__);
+		return -EINVAL;
+	}
+	prtd = cstream->runtime->private_data;
+	if (!prtd) {
+		pr_err("%s: cannot set audio effects\n", __func__);
+		return -EINVAL;
+	}
+	effects_module = *values++;
+	switch (effects_module) {
+	case SONYBUNDLE_MODULE:
+		pr_debug("%s: SONYBUNDLE_MODULE\n", __func__);
+
+		if ((prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S24_LE) ||
+			(prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S24_3LE))
+			bits_per_sample = 24;
+		else if (prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S32_LE)
+			bits_per_sample = 32;
+		else
+			bits_per_sample = 16;
+
+		msm_sony_hweffect_sonybundle_handler(prtd->audio_client,
+						&(sony_hweffect->sonybundle),
+						values,
+						prtd->sample_rate,
+						bits_per_sample,
+						prtd->num_channels);
+		break;
+	default:
+		pr_err("%s Invalid effects config module\n", __func__);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int msm_compr_sony_hweffect_config_get(struct snd_kcontrol *kcontrol,
+					   struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *comp = snd_kcontrol_chip(kcontrol);
+	unsigned long fe_id = kcontrol->private_value;
+	struct msm_compr_pdata *pdata = (struct msm_compr_pdata *)
+			snd_soc_component_get_drvdata(comp);
+	struct msm_compr_sony_hweffect *sony_hweffect = NULL;
+	long *values = &(ucontrol->value.integer.value[0]);
+
+	pr_debug("%s\n", __func__);
+	if (fe_id >= MSM_FRONTEND_DAI_MAX) {
+		pr_err("%s Received out of bounds fe_id %lu\n",
+			__func__, fe_id);
+		return -EINVAL;
+	}
+	sony_hweffect = pdata->sony_hweffect[fe_id];
+	if (!sony_hweffect) {
+		pr_err("%s: effects inactive\n", __func__);
+		return -EINVAL;
+	}
+	*values++ = SONYBUNDLE_MODULE;
+	msm_sony_hweffect_sonybundle_get(&(sony_hweffect->sonybundle),
+					values);
+	return 0;
+}
+
 static int msm_compr_query_audio_effect_put(struct snd_kcontrol *kcontrol,
 					   struct snd_ctl_elem_value *ucontrol)
 {
@@ -3662,6 +3816,7 @@ static int msm_compr_adsp_stream_cmd_put(struct snd_kcontrol *kcontrol,
 	struct msm_compr_audio *prtd;
 	int ret = 0;
 	struct msm_adsp_event_data *event_data = NULL;
+	uint64_t actual_payload_len = 0;
 
 	if (fe_id >= MSM_FRONTEND_DAI_MAX) {
 		pr_err("%s Received invalid fe_id %lu\n",
@@ -3699,8 +3854,17 @@ static int msm_compr_adsp_stream_cmd_put(struct snd_kcontrol *kcontrol,
 		goto done;
 	}
 
-	if ((sizeof(struct msm_adsp_event_data) + event_data->payload_len) >=
-					sizeof(ucontrol->value.bytes.data)) {
+	actual_payload_len = sizeof(struct msm_adsp_event_data) +
+					event_data->payload_len;
+	if (actual_payload_len >= U32_MAX) {
+		pr_err("%s payload length 0x%X  exceeds limit",
+				__func__, event_data->payload_len);
+		ret = -EINVAL;
+		goto done;
+	}
+
+	if (event_data->payload_len > sizeof(ucontrol->value.bytes.data)
+			 - sizeof(struct msm_adsp_event_data)) {
 		pr_err("%s param length=%d  exceeds limit",
 			__func__, event_data->payload_len);
 		ret = -EINVAL;
@@ -3711,6 +3875,119 @@ static int msm_compr_adsp_stream_cmd_put(struct snd_kcontrol *kcontrol,
 	if (ret < 0)
 		pr_err("%s: failed to send stream event cmd, err = %d\n",
 			__func__, ret);
+done:
+	return ret;
+}
+
+static int msm_compr_playback_dnmix_ctl_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	int ret = 0;
+	int len = 0;
+	int i = 0;
+	struct snd_soc_component *comp = snd_kcontrol_chip(kcontrol);
+	unsigned long fe_id = kcontrol->private_value;
+	struct msm_compr_pdata *pdata = (struct msm_compr_pdata *)
+					snd_soc_component_get_drvdata(comp);
+	struct snd_compr_stream *cstream = NULL;
+	struct msm_compr_audio *prtd;
+	struct asm_stream_pan_ctrl_params dnmix_param;
+	int be_id = ucontrol->value.integer.value[len++];
+	int stream_id = 0;
+	/*
+	 * Max index for this mixer control includes below
+	 * be_id			(1)
+	 * num_output_channels		(1)
+	 * num_input_channels		(1)
+	 * output ch map (max)		(8)
+	 * input ch map (max)		(8)
+	 * mix matrix coefficients (max)(64)
+	 */
+	int max_index = 0;
+	int max_mixer_ctrl_value_size = 128;
+
+	if (fe_id >= MSM_FRONTEND_DAI_MAX) {
+		pr_err("%s Received out of bounds invalid fe_id %lu\n",
+			__func__, fe_id);
+		ret = -EINVAL;
+		goto done;
+	}
+
+	cstream = pdata->cstream[fe_id];
+	if (cstream == NULL) {
+		pr_err("%s cstream is null\n", __func__);
+		ret = -EINVAL;
+		goto done;
+	}
+
+	prtd = cstream->runtime->private_data;
+	if (!prtd) {
+		pr_err("%s: prtd is null\n", __func__);
+		ret = -EINVAL;
+		goto done;
+	}
+
+	if (prtd->audio_client == NULL) {
+		pr_err("%s: audio_client is null\n", __func__);
+		ret = -EINVAL;
+		goto done;
+	}
+
+	stream_id = prtd->audio_client->session;
+	if (len >= max_mixer_ctrl_value_size) {
+		ret = -EINVAL;
+		goto done;
+	}
+	dnmix_param.num_output_channels =
+				ucontrol->value.integer.value[len++];
+	if (dnmix_param.num_output_channels >
+		PCM_FORMAT_MAX_NUM_CHANNEL) {
+		ret = -EINVAL;
+		goto done;
+	}
+	if (len >= max_mixer_ctrl_value_size) {
+		ret = -EINVAL;
+		goto done;
+	}
+	dnmix_param.num_input_channels =
+				ucontrol->value.integer.value[len++];
+	if (dnmix_param.num_input_channels >
+		PCM_FORMAT_MAX_NUM_CHANNEL) {
+		ret = -EINVAL;
+		goto done;
+	}
+	max_index = len + dnmix_param.num_output_channels +
+			dnmix_param.num_input_channels +
+			dnmix_param.num_output_channels *
+			dnmix_param.num_input_channels;
+	if (max_index >= max_mixer_ctrl_value_size) {
+		ret = -EINVAL;
+		goto done;
+	}
+
+	if (ucontrol->value.integer.value[len++]) {
+		for (i = 0; i < dnmix_param.num_output_channels; i++) {
+			dnmix_param.output_channel_map[i] =
+				ucontrol->value.integer.value[len++];
+		}
+	}
+	if (ucontrol->value.integer.value[len++]) {
+		for (i = 0; i < dnmix_param.num_input_channels; i++) {
+			dnmix_param.input_channel_map[i] =
+				ucontrol->value.integer.value[len++];
+		}
+	}
+	if (ucontrol->value.integer.value[len++]) {
+		for (i = 0; i < dnmix_param.num_output_channels *
+				dnmix_param.num_input_channels; i++) {
+			dnmix_param.gain[i] =
+					ucontrol->value.integer.value[len++];
+		}
+	}
+	msm_routing_set_downmix_control_data(be_id,
+						stream_id,
+						&dnmix_param);
+
 done:
 	return ret;
 }
@@ -3755,7 +4032,9 @@ static int msm_compr_shm_ion_fd_map_put(struct snd_kcontrol *kcontrol,
 
 	memcpy(&prtd->shm_ion_fd, ucontrol->value.bytes.data,
 		sizeof(prtd->shm_ion_fd));
-	ret = q6asm_audio_map_shm_fd(prtd->audio_client, prtd->shm_ion_fd);
+	ret = q6asm_audio_map_shm_fd(prtd->audio_client,
+				&prtd->shm_ion_client,
+				&prtd->shm_ion_handle, prtd->shm_ion_fd);
 	if (ret < 0)
 		pr_err("%s: failed to map shm mem\n", __func__);
 done:
@@ -3876,6 +4155,35 @@ static const struct snd_kcontrol_new msm_compr_gapless_controls[] = {
 			msm_compr_gapless_put),
 };
 
+static int sony_hweffect_put_params_size(
+			struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s\n", __func__);
+
+	return 0;
+}
+
+static int sony_hweffect_get_params_size(
+			struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	long *values = &(ucontrol->value.integer.value[0]);
+
+	pr_debug("%s\n", __func__);
+
+	sony_hweffect_params_getparam_size(values);
+
+	return 0;
+}
+
+static const struct snd_kcontrol_new sony_hweffect_params_controls[] = {
+	SOC_SINGLE_MULTI_EXT("Sony Audio Effect Param Size",
+		SND_SOC_NOPM, 0, 0xFFFFFFFF, 0, 4,
+		sony_hweffect_get_params_size,
+		sony_hweffect_put_params_size)
+};
+
 static int msm_compr_probe(struct snd_soc_platform *platform)
 {
 	struct msm_compr_pdata *pdata;
@@ -3895,13 +4203,18 @@ static int msm_compr_probe(struct snd_soc_platform *platform)
 		pdata->volume[i][0] = COMPRESSED_LR_VOL_MAX_STEPS;
 		pdata->volume[i][1] = COMPRESSED_LR_VOL_MAX_STEPS;
 		pdata->audio_effects[i] = NULL;
+		pdata->sony_hweffect[i] = NULL;
 		pdata->dec_params[i] = NULL;
 		pdata->cstream[i] = NULL;
 		pdata->ch_map[i] = NULL;
+		pdata->is_in_use[i] = false;
 	}
 
 	snd_soc_add_platform_controls(platform, msm_compr_gapless_controls,
 				      ARRAY_SIZE(msm_compr_gapless_controls));
+
+	snd_soc_add_platform_controls(platform, sony_hweffect_params_controls,
+				      ARRAY_SIZE(sony_hweffect_params_controls));
 
 	rc =  of_property_read_string(platform->dev->of_node,
 		"qcom,adsp-version", &qdsp_version);
@@ -3979,6 +4292,16 @@ static int msm_compr_channel_map_info(struct snd_kcontrol *kcontrol,
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 8;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 0xFFFFFFFF;
+	return 0;
+}
+
+static int msm_compr_device_downmix_info(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 128;
 	uinfo->value.integer.min = 0;
 	uinfo->value.integer.max = 0xFFFFFFFF;
 	return 0;
@@ -4074,6 +4397,51 @@ static int msm_compr_add_audio_effects_control(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_add_platform_controls(rtd->platform,
 				fe_audio_effects_config_control,
 				ARRAY_SIZE(fe_audio_effects_config_control));
+	kfree(mixer_str);
+	return 0;
+}
+
+static int msm_compr_add_sony_hweffect_control(struct snd_soc_pcm_runtime *rtd)
+{
+	const char *mixer_ctl_name = "Sony Audio Effects Config";
+	char *mixer_str = NULL;
+	int ctl_len = 64;
+	struct snd_kcontrol_new fe_sony_hweffect_config_control[1] = {
+		{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "?",
+		.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
+		.info = msm_compr_audio_effects_config_info,
+		.get = msm_compr_sony_hweffect_config_get,
+		.put = msm_compr_sony_hweffect_config_put,
+		.private_value = 0,
+		}
+	};
+
+	if (!rtd) {
+		pr_err("%s NULL rtd\n", __func__);
+		return 0;
+	}
+
+	pr_debug("%s: added new compr FE with name %s, id %d, cpu dai %s, device no %d\n",
+		 __func__, rtd->dai_link->name, rtd->dai_link->be_id,
+		 rtd->dai_link->cpu_dai_name, rtd->pcm->device);
+
+	mixer_str = kzalloc(ctl_len, GFP_KERNEL);
+
+	if (!mixer_str) {
+		pr_err("failed to allocate mixer ctrl str of len %d", ctl_len);
+		return 0;
+	}
+
+	snprintf(mixer_str, ctl_len, "%s %d", mixer_ctl_name, rtd->pcm->device);
+
+	fe_sony_hweffect_config_control[0].name = mixer_str;
+	fe_sony_hweffect_config_control[0].private_value = rtd->dai_link->be_id;
+	pr_debug("Registering new mixer ctl %s\n", mixer_str);
+	snd_soc_add_platform_controls(rtd->platform,
+				fe_sony_hweffect_config_control,
+				ARRAY_SIZE(fe_sony_hweffect_config_control));
 	kfree(mixer_str);
 	return 0;
 }
@@ -4280,6 +4648,53 @@ static int msm_compr_add_dec_runtime_params_control(
 				      ARRAY_SIZE(fe_dec_params_control));
 	kfree(mixer_str);
 	return 0;
+}
+
+static int msm_compr_add_device_down_mix_controls(
+					struct snd_soc_pcm_runtime *rtd)
+{
+	const char *playback_mixer_ctl_name = "Audio Device";
+	const char *deviceNo = "NN";
+	const char *suffix = "Downmix Control";
+	char *mixer_str = NULL;
+	int ctl_len = 0, ret = 0;
+	struct snd_kcontrol_new device_downmix_control[1] = {
+		{
+			.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+			.name = "?",
+			.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
+			.info = msm_compr_device_downmix_info,
+			.put = msm_compr_playback_dnmix_ctl_put,
+			.private_value = 0,
+		}
+	};
+
+	if (!rtd) {
+		pr_err("%s NULL rtd\n", __func__);
+		ret = -EINVAL;
+		goto done;
+	}
+	ctl_len = strlen(playback_mixer_ctl_name) + 1 +
+			strlen(deviceNo) + 1 + strlen(suffix) + 1;
+	mixer_str = kzalloc(ctl_len, GFP_KERNEL);
+	if (!mixer_str) {
+		ret = -ENOMEM;
+		goto done;
+	}
+
+	snprintf(mixer_str, ctl_len, "%s %d %s",
+		playback_mixer_ctl_name, rtd->pcm->device, suffix);
+	device_downmix_control[0].name = mixer_str;
+	device_downmix_control[0].private_value = rtd->dai_link->be_id;
+	ret = snd_soc_add_platform_controls(rtd->platform,
+					device_downmix_control,
+					ARRAY_SIZE(device_downmix_control));
+	if (ret < 0)
+		pr_err("%s: failed to add ctl %s\n", __func__, mixer_str);
+
+	kfree(mixer_str);
+done:
+	return ret;
 }
 
 static int msm_compr_add_app_type_cfg_control(struct snd_soc_pcm_runtime *rtd)
@@ -4585,9 +5000,19 @@ static int msm_compr_new(struct snd_soc_pcm_runtime *rtd)
 		pr_err("%s: Could not add Compr event ack Control\n",
 			__func__);
 
+	rc = msm_compr_add_device_down_mix_controls(rtd);
+	if (rc)
+		pr_err("%s: Could not add Compr downmix Control\n",
+			__func__);
+
 	rc = msm_compr_add_query_audio_effect_control(rtd);
 	if (rc)
 		pr_err("%s: Could not add Compr Query Audio Effect Control\n",
+			__func__);
+
+	rc = msm_compr_add_sony_hweffect_control(rtd);
+	if (rc)
+		pr_err("%s: Could not add Compr Sony H/W Effects Control\n",
 			__func__);
 
 	rc = msm_compr_add_dec_runtime_params_control(rtd);

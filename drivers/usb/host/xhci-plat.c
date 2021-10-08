@@ -10,6 +10,11 @@
  * modify it under the terms of the GNU General Public License
  * version 2 as published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/clk.h>
 #include <linux/dma-mapping.h>
@@ -325,6 +330,34 @@ static int xhci_plat_remove(struct platform_device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int xhci_plat_suspend(struct device *dev)
+{
+	struct usb_hcd *hcd = dev_get_drvdata(dev);
+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+
+	if (!xhci)
+		return 0;
+
+	dev_dbg(dev, "xhci-plat PM suspend\n");
+
+	return xhci_suspend(xhci, true);
+}
+
+static int xhci_plat_resume(struct device *dev)
+{
+	struct usb_hcd *hcd = dev_get_drvdata(dev);
+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+
+	if (!xhci)
+		return 0;
+
+	dev_dbg(dev, "xhci-plat PM resume\n");
+
+	return (!hcd_to_bus(hcd)->skip_resume) ? xhci_resume(xhci, false) : 0;
+}
+#endif
+
 #ifdef CONFIG_PM
 static int xhci_plat_runtime_idle(struct device *dev)
 {
@@ -340,6 +373,39 @@ static int xhci_plat_runtime_idle(struct device *dev)
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_autosuspend(dev);
 	return -EBUSY;
+}
+
+static int xhci_plat_pm_freeze(struct device *dev)
+{
+	struct usb_hcd *hcd = dev_get_drvdata(dev);
+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+
+	if (!xhci)
+		return 0;
+
+	dev_dbg(dev, "xhci-plat freeze\n");
+
+	return xhci_suspend(xhci, false);
+}
+
+static int xhci_plat_pm_restore(struct device *dev)
+{
+	struct usb_hcd *hcd = dev_get_drvdata(dev);
+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+	int ret;
+
+	if (!xhci)
+		return 0;
+
+	dev_dbg(dev, "xhci-plat restore\n");
+
+	ret = xhci_resume(xhci, true);
+	pm_runtime_disable(dev);
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+	pm_runtime_mark_last_busy(dev);
+
+	return ret;
 }
 
 static int xhci_plat_runtime_suspend(struct device *dev)
@@ -373,7 +439,11 @@ static int xhci_plat_runtime_resume(struct device *dev)
 }
 
 static const struct dev_pm_ops xhci_plat_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(NULL, NULL)
+	.suspend	= xhci_plat_suspend,
+	.resume		= xhci_plat_resume,
+	.freeze		= xhci_plat_pm_freeze,
+	.restore	= xhci_plat_pm_restore,
+	.thaw		= xhci_plat_pm_restore,
 	SET_RUNTIME_PM_OPS(xhci_plat_runtime_suspend, xhci_plat_runtime_resume,
 			   xhci_plat_runtime_idle)
 };

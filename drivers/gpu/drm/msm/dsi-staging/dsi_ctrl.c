@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -484,7 +484,7 @@ static int dsi_ctrl_init_regmap(struct platform_device *pdev,
 	}
 
 	ctrl->hw.base = ptr;
-	pr_debug("[%s] map dsi_ctrl registers to %p\n", ctrl->name,
+	pr_debug("[%s] map dsi_ctrl registers to %pK\n", ctrl->name,
 		 ctrl->hw.base);
 
 	ptr = msm_ioremap(pdev, "mmss_misc", ctrl->name);
@@ -1089,7 +1089,7 @@ error:
 static int dsi_enable_ulps(struct dsi_ctrl *dsi_ctrl)
 {
 	int rc = 0;
-	u32 lanes;
+	u32 lanes = 0;
 	u32 ulps_lanes;
 
 	if (dsi_ctrl->host_config.panel_mode == DSI_OP_CMD_MODE)
@@ -1598,7 +1598,7 @@ exit:
  *
  * Return: error code.
  */
-int dsi_ctrl_host_init(struct dsi_ctrl *dsi_ctrl)
+int dsi_ctrl_host_init(struct dsi_ctrl *dsi_ctrl, bool cont_splash_enabled)
 {
 	int rc = 0;
 
@@ -1608,44 +1608,48 @@ int dsi_ctrl_host_init(struct dsi_ctrl *dsi_ctrl)
 	}
 
 	mutex_lock(&dsi_ctrl->ctrl_lock);
-	rc = dsi_ctrl_check_state(dsi_ctrl, DSI_CTRL_OP_HOST_INIT, 0x1);
-	if (rc) {
-		pr_err("[DSI_%d] Controller state check failed, rc=%d\n",
-		       dsi_ctrl->index, rc);
-		goto error;
-	}
+	if (!cont_splash_enabled) {
+		rc = dsi_ctrl_check_state(
+				dsi_ctrl, DSI_CTRL_OP_HOST_INIT, 0x1);
+		if (rc) {
+			pr_err("[DSI_%d] Ctrl state check failed, rc=%d\n",
+			dsi_ctrl->index, rc);
+			goto error;
+		}
 
-	dsi_ctrl->hw.ops.setup_lane_map(&dsi_ctrl->hw,
+		dsi_ctrl->hw.ops.setup_lane_map(&dsi_ctrl->hw,
 					&dsi_ctrl->host_config.lane_map);
 
-	dsi_ctrl->hw.ops.host_setup(&dsi_ctrl->hw,
+		dsi_ctrl->hw.ops.host_setup(&dsi_ctrl->hw,
 				    &dsi_ctrl->host_config.common_config);
 
-	if (dsi_ctrl->host_config.panel_mode == DSI_OP_CMD_MODE) {
-		dsi_ctrl->hw.ops.cmd_engine_setup(&dsi_ctrl->hw,
+		if (dsi_ctrl->host_config.panel_mode == DSI_OP_CMD_MODE) {
+			dsi_ctrl->hw.ops.cmd_engine_setup(&dsi_ctrl->hw,
 					&dsi_ctrl->host_config.common_config,
 					&dsi_ctrl->host_config.u.cmd_engine);
 
-		dsi_ctrl->hw.ops.setup_cmd_stream(&dsi_ctrl->hw,
+			dsi_ctrl->hw.ops.setup_cmd_stream(&dsi_ctrl->hw,
 				dsi_ctrl->host_config.video_timing.h_active,
 				dsi_ctrl->host_config.video_timing.h_active * 3,
 				dsi_ctrl->host_config.video_timing.v_active,
 				0x0);
-	} else {
-		dsi_ctrl->hw.ops.video_engine_setup(&dsi_ctrl->hw,
+		} else {
+			dsi_ctrl->hw.ops.video_engine_setup(&dsi_ctrl->hw,
 					&dsi_ctrl->host_config.common_config,
 					&dsi_ctrl->host_config.u.video_engine);
-		dsi_ctrl->hw.ops.set_video_timing(&dsi_ctrl->hw,
+			dsi_ctrl->hw.ops.set_video_timing(&dsi_ctrl->hw,
 					  &dsi_ctrl->host_config.video_timing);
+		}
 	}
-
-
 
 	dsi_ctrl->hw.ops.enable_status_interrupts(&dsi_ctrl->hw, 0x0);
 	dsi_ctrl->hw.ops.enable_error_interrupts(&dsi_ctrl->hw, 0x0);
 
-	/* Perform a soft reset before enabling dsi controller */
-	dsi_ctrl->hw.ops.soft_reset(&dsi_ctrl->hw);
+	/* Perform a soft reset before enabling dsi controller
+	 * But skip the reset if dsi is enabled in bootloader.
+	 */
+	if (!cont_splash_enabled)
+		dsi_ctrl->hw.ops.soft_reset(&dsi_ctrl->hw);
 	pr_debug("[DSI_%d]Host initialization complete\n", dsi_ctrl->index);
 	dsi_ctrl_update_state(dsi_ctrl, DSI_CTRL_OP_HOST_INIT, 0x1);
 error:

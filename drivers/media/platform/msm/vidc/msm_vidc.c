@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -516,7 +516,6 @@ static inline bool is_dynamic_output_buffer_mode(struct v4l2_buffer *b,
 		inst->buffer_mode_set[CAPTURE_PORT] == HAL_BUFFER_MODE_DYNAMIC;
 }
 
-
 static inline void save_v4l2_buffer(struct v4l2_buffer *b,
 						struct buffer_info *binfo)
 {
@@ -529,54 +528,13 @@ static inline void save_v4l2_buffer(struct v4l2_buffer *b,
 		}
 		populate_buf_info(binfo, b, i);
 	}
-}
-
-static int __map_and_update_binfo(struct msm_vidc_inst *inst,
-					struct buffer_info *binfo,
-					struct v4l2_buffer *b, int i)
-{
-	int rc = 0;
-	struct msm_smem *same_fd_handle = NULL;
-
-	same_fd_handle = get_same_fd_buffer(
-			inst, b->m.planes[i].reserved[0]);
-
-	if (same_fd_handle) {
-		binfo->device_addr[i] =
-		same_fd_handle->device_addr + binfo->buff_off[i];
-		b->m.planes[i].m.userptr = binfo->device_addr[i];
-		binfo->handle[i] = same_fd_handle;
-	} else {
-		binfo->handle[i] = map_buffer(inst, &b->m.planes[i],
-				get_hal_buffer_type(inst, b));
-		if (!binfo->handle[i])
-			return -EINVAL;
-
-		binfo->mapped[i] = true;
-		binfo->device_addr[i] = binfo->handle[i]->device_addr +
-			binfo->buff_off[i];
-		b->m.planes[i].m.userptr = binfo->device_addr[i];
-	}
-
-	return rc;
-}
-
-static int __handle_fw_referenced_buffers(struct msm_vidc_inst *inst,
-					struct buffer_info *binfo,
-					struct v4l2_buffer *b)
-{
-	int i = 0, rc = 0;
 
 	if (EXTRADATA_IDX(b->length)) {
 		i = EXTRADATA_IDX(b->length);
 		if (b->m.planes[i].length)
-			rc = __map_and_update_binfo(inst, binfo, b, i);
+			binfo->device_addr[i] = binfo->handle[i]->device_addr +
+				binfo->buff_off[i];
 	}
-
-	if (rc)
-		dprintk(VIDC_ERR, "%s: Failed to map extradata\n", __func__);
-
-	return rc;
 }
 
 int map_and_register_buf(struct msm_vidc_inst *inst, struct v4l2_buffer *b)
@@ -585,6 +543,7 @@ int map_and_register_buf(struct msm_vidc_inst *inst, struct v4l2_buffer *b)
 	struct buffer_info *temp = NULL, *iterator = NULL;
 	int plane = 0;
 	int i = 0, rc = 0;
+	struct msm_smem *same_fd_handle = NULL;
 
 	if (!b || !inst) {
 		dprintk(VIDC_ERR, "%s: invalid input\n", __func__);
@@ -660,23 +619,39 @@ int map_and_register_buf(struct msm_vidc_inst *inst, struct v4l2_buffer *b)
 			rc = 0;
 			goto exit;
 		} else if (rc == 2) {
-			rc = __handle_fw_referenced_buffers(inst, temp, b);
-			if (!rc)
-				rc = -EEXIST;
+			rc = -EEXIST;
 			goto exit;
 		}
 
-		populate_buf_info(binfo, b, i);
+		same_fd_handle = get_same_fd_buffer(
+				inst, b->m.planes[i].reserved[0]);
 
-		rc = __map_and_update_binfo(inst, binfo, b, i);
-		if (rc)
-			goto map_err;
+		populate_buf_info(binfo, b, i);
+		if (same_fd_handle) {
+			binfo->device_addr[i] =
+			same_fd_handle->device_addr + binfo->buff_off[i];
+			b->m.planes[i].m.userptr = binfo->device_addr[i];
+			binfo->mapped[i] = false;
+			binfo->handle[i] = same_fd_handle;
+		} else {
+			binfo->handle[i] = map_buffer(inst, &b->m.planes[i],
+					get_hal_buffer_type(inst, b));
+			if (!binfo->handle[i]) {
+				rc = -EINVAL;
+				goto exit;
+			}
+
+			binfo->mapped[i] = true;
+			binfo->device_addr[i] = binfo->handle[i]->device_addr +
+				binfo->buff_off[i];
+			b->m.planes[i].m.userptr = binfo->device_addr[i];
+		}
 
 		/* We maintain one ref count for all planes*/
 		if (!i && is_dynamic_output_buffer_mode(b, inst)) {
 			rc = buf_ref_get(inst, binfo);
 			if (rc < 0)
-				goto map_err;
+				goto exit;
 		}
 		dprintk(VIDC_DBG,
 			"%s: [MAP] binfo = %pK, handle[%d] = %pK, device_addr = %pa, fd = %d, offset = %d, mapped = %d\n",
@@ -690,9 +665,6 @@ int map_and_register_buf(struct msm_vidc_inst *inst, struct v4l2_buffer *b)
 	mutex_unlock(&inst->registeredbufs.lock);
 	return 0;
 
-map_err:
-	if (binfo->handle[0] && binfo->mapped[0])
-		msm_comm_smem_free(inst, binfo->handle[0]);
 exit:
 	kfree(binfo);
 	return rc;
@@ -762,7 +734,6 @@ int unmap_and_deregister_buf(struct msm_vidc_inst *inst,
 			temp->handle[i] = 0;
 			temp->device_addr[i] = 0;
 			temp->uvaddr[i] = 0;
-			temp->mapped[i] = false;
 		}
 	}
 	if (!keep_node) {
@@ -776,7 +747,6 @@ int unmap_and_deregister_buf(struct msm_vidc_inst *inst,
 exit:
 	return 0;
 }
-
 
 int qbuf_dynamic_buf(struct msm_vidc_inst *inst,
 			struct buffer_info *binfo)
@@ -1189,6 +1159,8 @@ int msm_vidc_enum_framesizes(void *instance, struct v4l2_frmsizeenum *fsize)
 {
 	struct msm_vidc_inst *inst = instance;
 	struct msm_vidc_capability *capability = NULL;
+	enum hal_video_codec codec;
+	int i;
 
 	if (!inst || !fsize) {
 		dprintk(VIDC_ERR, "%s: invalid parameter: %pK %pK\n",
@@ -1197,15 +1169,33 @@ int msm_vidc_enum_framesizes(void *instance, struct v4l2_frmsizeenum *fsize)
 	}
 	if (!inst->core)
 		return -EINVAL;
+	if (fsize->index != 0)
+		return -EINVAL;
 
-	capability = &inst->capability;
-	fsize->type = V4L2_FRMSIZE_TYPE_STEPWISE;
-	fsize->stepwise.min_width = capability->width.min;
-	fsize->stepwise.max_width = capability->width.max;
-	fsize->stepwise.step_width = capability->width.step_size;
-	fsize->stepwise.min_height = capability->height.min;
-	fsize->stepwise.max_height = capability->height.max;
-	fsize->stepwise.step_height = capability->height.step_size;
+	codec = get_hal_codec(fsize->pixel_format);
+	if (codec == HAL_UNUSED_CODEC)
+		return -EINVAL;
+
+	for (i = 0; i < VIDC_MAX_SESSIONS; i++) {
+		if (inst->core->capabilities[i].codec == codec) {
+			capability = &inst->core->capabilities[i];
+			break;
+		}
+	}
+
+	if (capability) {
+		fsize->type = V4L2_FRMSIZE_TYPE_STEPWISE;
+		fsize->stepwise.min_width = capability->width.min;
+		fsize->stepwise.max_width = capability->width.max;
+		fsize->stepwise.step_width = capability->width.step_size;
+		fsize->stepwise.min_height = capability->height.min;
+		fsize->stepwise.max_height = capability->height.max;
+		fsize->stepwise.step_height = capability->height.step_size;
+	} else {
+		dprintk(VIDC_ERR, "%s: Invalid Pixel Fmt %#x\n",
+				__func__, fsize->pixel_format);
+		return -EINVAL;
+	}
 	return 0;
 }
 EXPORT_SYMBOL(msm_vidc_enum_framesizes);
@@ -1416,10 +1406,6 @@ void *msm_vidc_open(int core_id, int session_type)
 
 	setup_event_queue(inst, &core->vdev[session_type].vdev);
 
-	mutex_lock(&core->lock);
-	list_add_tail(&inst->list, &core->instances);
-	mutex_unlock(&core->lock);
-
 	rc = msm_comm_try_state(inst, MSM_VIDC_CORE_INIT_DONE);
 	if (rc) {
 		dprintk(VIDC_ERR,
@@ -1433,15 +1419,15 @@ void *msm_vidc_open(int core_id, int session_type)
 		goto fail_init;
 	}
 
+	mutex_lock(&core->lock);
+	list_add_tail(&inst->list, &core->instances);
+	mutex_unlock(&core->lock);
+
 	inst->debugfs_root =
 		msm_vidc_debugfs_init_inst(inst, core->debugfs_root);
 
 	return inst;
 fail_init:
-	mutex_lock(&core->lock);
-	list_del(&inst->list);
-	mutex_unlock(&core->lock);
-
 	v4l2_fh_del(&inst->event_handler);
 	v4l2_fh_exit(&inst->event_handler);
 	vb2_queue_release(&inst->bufq[OUTPUT_PORT].vb2_bufq);

@@ -15,6 +15,11 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc.,  51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef __XFS_SUPPORT_KMEM_H__
 #define __XFS_SUPPORT_KMEM_H__
 
@@ -68,8 +73,6 @@ static inline void  kmem_free(const void *ptr)
 	kvfree(ptr);
 }
 
-
-extern void *kmem_zalloc_greedy(size_t *, size_t, size_t);
 
 static inline void *
 kmem_zalloc(size_t size, xfs_km_flags_t flags)

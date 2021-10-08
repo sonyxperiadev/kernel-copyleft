@@ -245,8 +245,7 @@ phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t size,
 		 * so we use WARN_ONCE() here to see the stack trace if
 		 * fail happens.
 		 */
-		WARN_ONCE(1, "memblock: bottom-up allocation failed, "
-			     "memory hotunplug may be affected\n");
+		WARN_ONCE(1, "memblock: bottom-up allocation failed, memory hotunplug may be affected\n");
 	}
 
 	return __memblock_find_range_top_down(start, end, size, align, nid,
@@ -837,6 +836,16 @@ int __init_memblock memblock_mark_mirror(phys_addr_t base, phys_addr_t size)
 int __init_memblock memblock_mark_nomap(phys_addr_t base, phys_addr_t size)
 {
 	return memblock_setclr_flag(base, size, 1, MEMBLOCK_NOMAP);
+}
+
+/**
+ * memblock_clear_nomap - Clear a flag of MEMBLOCK_NOMAP memory region
+ * @base: the base phys addr of the region
+ * @size: the size of the region
+ */
+int __init_memblock memblock_clear_nomap(phys_addr_t base, phys_addr_t size)
+{
+	return memblock_setclr_flag(base, size, 0, MEMBLOCK_NOMAP);
 }
 
 /**
@@ -1605,11 +1614,12 @@ int __init_memblock memblock_is_region_memory(phys_addr_t base, phys_addr_t size
 		 memblock.memory.regions[idx].size) >= end;
 }
 
-int __init_memblock memblock_overlaps_memory(phys_addr_t base, phys_addr_t size)
+bool __init_memblock memblock_overlaps_memory(phys_addr_t base,
+					      phys_addr_t size)
 {
 	memblock_cap_size(base, &size);
 
-	return memblock_overlaps_region(&memblock.memory, base, size) >= 0;
+	return memblock_overlaps_region(&memblock.memory, base, size);
 }
 
 /**

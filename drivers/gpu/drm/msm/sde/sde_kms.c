@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -37,6 +37,7 @@
 #include "sde_encoder.h"
 #include "sde_plane.h"
 #include "sde_crtc.h"
+#include "sde_recovery_manager.h"
 
 #define CREATE_TRACE_POINTS
 #include "sde_trace.h"
@@ -57,6 +58,20 @@
  */
 #define SDE_DEBUGFS_DIR "msm_sde"
 #define SDE_DEBUGFS_HWMASKNAME "hw_log_mask"
+
+static int sde_kms_recovery_callback(int err_code,
+	    struct recovery_client_info *client_info);
+
+static struct recovery_client_info info = {
+	.name = "sde_kms",
+	.recovery_cb = sde_kms_recovery_callback,
+	.err_supported[0] = {SDE_UNDERRUN, 0, 0},
+	.err_supported[1] = {SDE_VSYNC_MISS, 0, 0},
+	.err_supported[2] = {SDE_SMMU_FAULT, 0, 0},
+	.no_of_err = 3,
+	.handle = NULL,
+	.pdata = NULL,
+};
 
 /**
  * sdecustom - enable certain driver customizations for sde clients
@@ -343,10 +358,12 @@ static void sde_kms_prepare_commit(struct msm_kms *kms,
 	struct drm_device *dev = sde_kms->dev;
 	struct msm_drm_private *priv = dev->dev_private;
 
-	if (sde_kms->splash_info.handoff)
-		sde_splash_clean_up_exit_lk(kms);
+	if (sde_kms->splash_info.handoff &&
+		sde_kms->splash_info.display_splash_enabled)
+		sde_splash_lk_stop_splash(kms, state);
 
-	sde_power_resource_enable(&priv->phandle, sde_kms->core_client, true);
+	sde_power_resource_enable(&priv->phandle,
+			sde_kms->core_client, true);
 }
 
 static void sde_kms_commit(struct msm_kms *kms,
@@ -385,11 +402,12 @@ static void sde_kms_wait_for_commit_done(struct msm_kms *kms,
 		struct drm_crtc *crtc)
 {
 	struct drm_encoder *encoder;
-	struct drm_device *dev = crtc->dev;
+	struct drm_device *dev;
 	int ret;
 
-	if (!kms || !crtc || !crtc->state) {
-		SDE_ERROR("invalid params\n");
+	dev = crtc->dev;
+	if (!dev) {
+		SDE_ERROR("invalid dev\n");
 		return;
 	}
 
@@ -637,6 +655,15 @@ static int _sde_kms_setup_displays(struct drm_device *dev,
 			continue;
 		}
 
+		rc = sde_splash_setup_display_resource(&sde_kms->splash_info,
+					display, DRM_MODE_CONNECTOR_DSI);
+		if (rc) {
+			SDE_ERROR("dsi %d splash resource setup failed %d\n",
+									i, rc);
+			sde_encoder_destroy(encoder);
+			continue;
+		}
+
 		rc = dsi_display_drm_bridge_init(display, encoder);
 		if (rc) {
 			SDE_ERROR("dsi bridge %d init failed, %d\n", i, rc);
@@ -729,6 +756,15 @@ static int _sde_kms_setup_displays(struct drm_device *dev,
 			continue;
 		}
 
+		rc = sde_splash_setup_display_resource(&sde_kms->splash_info,
+				display, DRM_MODE_CONNECTOR_HDMIA);
+		if (rc) {
+			SDE_ERROR("hdmi %d splash resource setup failed %d\n",
+									i, rc);
+			sde_encoder_destroy(encoder);
+			continue;
+		}
+
 		rc = sde_hdmi_drm_init(display, encoder);
 		if (rc) {
 			SDE_ERROR("hdmi drm %d init failed, %d\n", i, rc);
@@ -810,6 +846,7 @@ static int _sde_kms_drm_obj_init(struct sde_kms *sde_kms)
 
 	struct msm_drm_private *priv;
 	struct sde_mdss_cfg *catalog;
+	struct sde_splash_info *sinfo;
 
 	int primary_planes_idx, i, ret;
 	int max_crtc_count, max_plane_count;
@@ -822,6 +859,7 @@ static int _sde_kms_drm_obj_init(struct sde_kms *sde_kms)
 	dev = sde_kms->dev;
 	priv = dev->dev_private;
 	catalog = sde_kms->catalog;
+	sinfo = &sde_kms->splash_info;
 
 	ret = sde_core_irq_domain_add(sde_kms);
 	if (ret)
@@ -849,7 +887,7 @@ static int _sde_kms_drm_obj_init(struct sde_kms *sde_kms)
 				primary = false;
 
 			plane = sde_plane_init(dev, catalog->vp[i].id,
-					primary, 1UL << crtc_id, true);
+					primary, 1UL << crtc_id, true, false);
 			if (IS_ERR(plane)) {
 				SDE_ERROR("sde_plane_init failed\n");
 				ret = PTR_ERR(plane);
@@ -867,14 +905,22 @@ static int _sde_kms_drm_obj_init(struct sde_kms *sde_kms)
 
 		for (i = 0; i < max_plane_count; i++) {
 			bool primary = true;
+			bool resv_plane = false;
 
 			if (catalog->sspp[i].features & BIT(SDE_SSPP_CURSOR)
 				|| primary_planes_idx >= max_crtc_count)
 				primary = false;
 
+			if (sde_splash_query_plane_is_reserved(sinfo,
+							catalog->sspp[i].id)) {
+				resv_plane = true;
+				DRM_INFO("pipe%d is reserved\n",
+					catalog->sspp[i].id);
+			}
+
 			plane = sde_plane_init(dev, catalog->sspp[i].id,
 					primary, (1UL << max_crtc_count) - 1,
-					false);
+					false, resv_plane);
 			if (IS_ERR(plane)) {
 				SDE_ERROR("sde_plane_init failed\n");
 				ret = PTR_ERR(plane);
@@ -1031,6 +1077,8 @@ static void sde_kms_destroy(struct msm_kms *kms)
 		return;
 	}
 
+	sde_recovery_client_unregister(info.handle);
+	info.handle = NULL;
 	_sde_kms_hw_destroy(sde_kms, dev->platformdev);
 	kfree(sde_kms);
 }
@@ -1093,10 +1141,23 @@ static int _sde_kms_mmu_destroy(struct sde_kms *sde_kms)
 	return 0;
 }
 
+static int sde_smmu_fault_handler(struct iommu_domain *iommu,
+	 struct device *dev, unsigned long iova, int flags, void *arg)
+{
+
+	dev_info(dev, "%s: iova=0x%08lx, flags=0x%x, iommu=%pK\n", __func__,
+			iova, flags, iommu);
+
+	sde_recovery_set_events(SDE_SMMU_FAULT);
+
+	return 0;
+}
+
 static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 {
 	struct msm_mmu *mmu;
 	int i, ret;
+	int data = 0;
 
 	for (i = 0; i < MSM_SMMU_DOMAIN_MAX; i++) {
 		struct msm_gem_address_space *aspace;
@@ -1109,6 +1170,8 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 					ret);
 			continue;
 		}
+
+		msm_smmu_register_fault_handler(mmu, sde_smmu_fault_handler);
 
 		/* Attaching smmu means IOMMU HW starts to work immediately.
 		 * However, display HW in LK is still accessing memory
@@ -1157,6 +1220,20 @@ static int _sde_kms_mmu_init(struct sde_kms *sde_kms)
 				msm_gem_address_space_put(aspace);
 				goto fail;
 			}
+
+			/*
+			 * Enable stage 1 smmu after user has finished early
+			 * mapping of splash memory.
+			 */
+			ret = mmu->funcs->set_property(mmu,
+					DOMAIN_ATTR_EARLY_MAP,
+					&data);
+			if (ret) {
+				SDE_ERROR("failed to set map att(%d): %d\n",
+								data, ret);
+				msm_gem_address_space_put(aspace);
+				goto fail;
+			}
 		}
 	}
 
@@ -1166,6 +1243,44 @@ fail:
 
 	return ret;
 }
+
+static void __iomem *_sde_kms_ioremap(struct platform_device *pdev,
+		const char *name, unsigned long *out_size)
+{
+	struct resource *res;
+	unsigned long size;
+	void __iomem *ptr;
+
+	if (out_size)
+		*out_size = 0;
+
+	if (name)
+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
+	else
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+
+	if (!res) {
+		/* availability depends on platform */
+		SDE_DEBUG("failed to get memory resource: %s\n", name);
+		return NULL;
+	}
+
+	size = resource_size(res);
+
+	ptr = devm_ioremap_nocache(&pdev->dev, res->start, size);
+	if (!ptr) {
+		SDE_ERROR("failed to ioremap: %s\n", name);
+		return NULL;
+	}
+
+	SDE_DEBUG("IO:region %s %pK %08lx\n", name, ptr, size);
+
+	if (out_size)
+		*out_size = size;
+
+	return ptr;
+}
+
 
 static int sde_kms_hw_init(struct msm_kms *kms)
 {
@@ -1180,6 +1295,11 @@ static int sde_kms_hw_init(struct msm_kms *kms)
 		goto end;
 	}
 
+	rc = sde_recovery_client_register(&info);
+	if (rc)
+		pr_err("%s recovery mgr register failed %d\n",
+							__func__, rc);
+
 	sde_kms = to_sde_kms(kms);
 	dev = sde_kms->dev;
 	if (!dev || !dev->platformdev) {
@@ -1193,29 +1313,42 @@ static int sde_kms_hw_init(struct msm_kms *kms)
 		goto end;
 	}
 
-	sde_kms->mmio = msm_ioremap(dev->platformdev, "mdp_phys", "SDE");
-	if (IS_ERR(sde_kms->mmio)) {
-		rc = PTR_ERR(sde_kms->mmio);
-		SDE_ERROR("mdp register memory map failed: %d\n", rc);
-		sde_kms->mmio = NULL;
+	sde_kms->mmio = _sde_kms_ioremap(dev->platformdev, "mdp_phys",
+			&sde_kms->mmio_len);
+	if (!sde_kms->mmio) {
+		SDE_ERROR("mdp register memory map failed\n");
 		goto error;
 	}
-	DRM_INFO("mapped mdp address space @%p\n", sde_kms->mmio);
+	DRM_INFO("mapped mdp address space @%pK\n", sde_kms->mmio);
 
-	sde_kms->vbif[VBIF_RT] = msm_ioremap(dev->platformdev,
-			"vbif_phys", "VBIF");
-	if (IS_ERR(sde_kms->vbif[VBIF_RT])) {
-		rc = PTR_ERR(sde_kms->vbif[VBIF_RT]);
-		SDE_ERROR("vbif register memory map failed: %d\n", rc);
-		sde_kms->vbif[VBIF_RT] = NULL;
+	rc = sde_dbg_reg_register_base(SDE_DBG_NAME, sde_kms->mmio,
+			sde_kms->mmio_len);
+	if (rc)
+		SDE_ERROR("dbg base register kms failed: %d\n", rc);
+
+	sde_kms->vbif[VBIF_RT] = _sde_kms_ioremap(dev->platformdev, "vbif_phys",
+			&sde_kms->vbif_len[VBIF_RT]);
+	if (!sde_kms->vbif[VBIF_RT]) {
+		SDE_ERROR("vbif register memory map failed\n");
 		goto error;
 	}
 
-	sde_kms->vbif[VBIF_NRT] = msm_ioremap(dev->platformdev,
-			"vbif_nrt_phys", "VBIF_NRT");
-	if (IS_ERR(sde_kms->vbif[VBIF_NRT])) {
-		sde_kms->vbif[VBIF_NRT] = NULL;
+	rc = sde_dbg_reg_register_base("vbif_rt", sde_kms->vbif[VBIF_RT],
+				sde_kms->vbif_len[VBIF_RT]);
+	if (rc)
+		SDE_ERROR("dbg base register vbif_rt failed: %d\n", rc);
+
+	sde_kms->vbif[VBIF_NRT] = _sde_kms_ioremap(dev->platformdev,
+			"vbif_nrt_phys", &sde_kms->vbif_len[VBIF_NRT]);
+	if (!sde_kms->vbif[VBIF_NRT]) {
 		SDE_DEBUG("VBIF NRT is not defined");
+	} else {
+		rc = sde_dbg_reg_register_base("vbif_nrt",
+				sde_kms->vbif[VBIF_NRT],
+				sde_kms->vbif_len[VBIF_NRT]);
+		if (rc)
+			SDE_ERROR("dbg base register vbif_nrt failed: %d\n",
+					rc);
 	}
 
 	sde_kms->core_client = sde_power_client_create(&priv->phandle, "core");
@@ -1244,6 +1377,8 @@ static int sde_kms_hw_init(struct msm_kms *kms)
 		sde_kms->catalog = NULL;
 		goto power_error;
 	}
+
+	sde_dbg_init_dbg_buses(sde_kms->core_rev);
 
 	rc = sde_rm_init(&sde_kms->rm, sde_kms->catalog, sde_kms->mmio,
 			sde_kms->dev);
@@ -1282,11 +1417,16 @@ static int sde_kms_hw_init(struct msm_kms *kms)
 	 */
 	sinfo = &sde_kms->splash_info;
 	if (sinfo->handoff) {
-		rc = sde_splash_parse_dt(dev);
+		rc = sde_splash_parse_memory_dt(dev);
 		if (rc) {
-			SDE_ERROR("parse dt for splash info failed: %d\n", rc);
+			SDE_ERROR("parse memory dt failed: %d\n", rc);
 			goto power_error;
 		}
+
+		rc = sde_splash_parse_reserved_plane_dt(sinfo,
+							sde_kms->catalog);
+		if (rc)
+			SDE_ERROR("parse reserved plane dt failed: %d\n", rc);
 
 		sde_splash_init(&priv->phandle, kms);
 	}
@@ -1383,10 +1523,38 @@ end:
 	return rc;
 }
 
+static int sde_kms_recovery_callback(int err_code,
+	    struct recovery_client_info *client_info)
+{
+	int rc = 0;
+
+	switch (err_code) {
+	case SDE_UNDERRUN:
+		pr_debug("%s [SDE_UNDERRUN] error is auto HW receovered\n",
+			__func__);
+		break;
+
+	case SDE_VSYNC_MISS:
+		pr_debug("%s [SDE_VSYNC_MISS] trigger soft reset\n", __func__);
+		break;
+
+	case SDE_SMMU_FAULT:
+		pr_debug("%s [SDE_SMMU_FAULT] trigger soft reset\n", __func__);
+		break;
+
+	default:
+		pr_err("%s error %d undefined\n", __func__, err_code);
+
+	}
+
+	return rc;
+}
+
 struct msm_kms *sde_kms_init(struct drm_device *dev)
 {
 	struct msm_drm_private *priv;
 	struct sde_kms *sde_kms;
+	int rc = 0;
 
 	if (!dev || !dev->dev_private) {
 		SDE_ERROR("drm device node invalid\n");
@@ -1399,6 +1567,13 @@ struct msm_kms *sde_kms_init(struct drm_device *dev)
 	if (!sde_kms) {
 		SDE_ERROR("failed to allocate sde kms\n");
 		return ERR_PTR(-ENOMEM);
+	}
+
+	rc = sde_init_recovery_mgr(dev);
+	if (rc) {
+		SDE_ERROR("Failed SDE recovery mgr Init, err = %d\n", rc);
+		kfree(sde_kms);
+		return ERR_PTR(-EFAULT);
 	}
 
 	msm_kms_init(&sde_kms->base, &kms_funcs);

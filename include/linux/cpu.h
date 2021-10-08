@@ -53,6 +53,17 @@ extern void cpu_remove_dev_attr(struct device_attribute *attr);
 extern int cpu_add_dev_attr_group(struct attribute_group *attrs);
 extern void cpu_remove_dev_attr_group(struct attribute_group *attrs);
 
+extern ssize_t cpu_show_meltdown(struct device *dev,
+				 struct device_attribute *attr, char *buf);
+extern ssize_t cpu_show_spectre_v1(struct device *dev,
+				   struct device_attribute *attr, char *buf);
+extern ssize_t cpu_show_spectre_v2(struct device *dev,
+				   struct device_attribute *attr, char *buf);
+extern ssize_t cpu_show_spec_store_bypass(struct device *dev,
+					  struct device_attribute *attr, char *buf);
+extern ssize_t cpu_show_l1tf(struct device *dev,
+			     struct device_attribute *attr, char *buf);
+
 extern __printf(4, 5)
 struct device *cpu_device_create(struct device *parent, void *drvdata,
 				 const struct attribute_group **groups,
@@ -234,6 +245,7 @@ extern struct bus_type cpu_subsys;
 extern void cpu_hotplug_begin(void);
 extern void cpu_hotplug_done(void);
 extern void get_online_cpus(void);
+extern void cpu_hotplug_mutex_held(void);
 extern void put_online_cpus(void);
 extern void cpu_hotplug_disable(void);
 extern void cpu_hotplug_enable(void);
@@ -256,6 +268,7 @@ static inline void cpu_hotplug_done(void) {}
 #define cpu_hotplug_enable()	do { } while (0)
 #define hotcpu_notifier(fn, pri)	do { (void)(fn); } while (0)
 #define __hotcpu_notifier(fn, pri)	do { (void)(fn); } while (0)
+#define cpu_hotplug_mutex_held()	do { } while (0)
 /* These aren't inline functions due to a GCC bug. */
 #define register_hotcpu_notifier(nb)	({ (void)(nb); 0; })
 #define __register_hotcpu_notifier(nb)	({ (void)(nb); 0; })

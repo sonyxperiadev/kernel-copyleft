@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,6 +31,7 @@
 #define WCD_PROCFS_ENTRY_MAX_LEN 16
 #define WCD_934X_RAMDUMP_START_ADDR 0x20100000
 #define WCD_934X_RAMDUMP_SIZE ((1024 * 1024) - 128)
+#define WCD_DSP_CNTL_MAX_COUNT 2
 
 #define WCD_CNTL_MUTEX_LOCK(codec, lock)             \
 {                                                    \
@@ -763,10 +764,6 @@ static int wcd_control_handler(struct device *dev, void *priv_data,
 	case WDSP_EVENT_DLOAD_FAILED:
 	case WDSP_EVENT_POST_SHUTDOWN:
 
-		if (event == WDSP_EVENT_POST_DLOAD_CODE)
-			/* Mark DSP online since code download is complete */
-			wcd_cntl_change_online_state(cntl, 1);
-
 		/* Disable CPAR */
 		wcd_cntl_cpar_ctrl(cntl, false);
 		/* Disable all the clocks */
@@ -775,6 +772,11 @@ static int wcd_control_handler(struct device *dev, void *priv_data,
 			dev_err(codec->dev,
 				"%s: Failed to disable clocks, err = %d\n",
 				__func__, ret);
+
+		if (event == WDSP_EVENT_POST_DLOAD_CODE)
+			/* Mark DSP online since code download is complete */
+			wcd_cntl_change_online_state(cntl, 1);
+
 		break;
 
 	case WDSP_EVENT_PRE_DLOAD_DATA:
@@ -908,11 +910,13 @@ static ssize_t wcd_miscdev_write(struct file *filep, const char __user *ubuf,
 {
 	struct wcd_dsp_cntl *cntl = container_of(filep->private_data,
 						 struct wcd_dsp_cntl, miscdev);
-	char val[count];
+	char val[WCD_DSP_CNTL_MAX_COUNT + 1];
 	bool vote;
 	int ret = 0;
 
-	if (count == 0 || count > 2) {
+	memset(val, 0, WCD_DSP_CNTL_MAX_COUNT + 1);
+
+	if (count == 0 || count > WCD_DSP_CNTL_MAX_COUNT) {
 		pr_err("%s: Invalid count = %zd\n", __func__, count);
 		ret = -EINVAL;
 		goto done;

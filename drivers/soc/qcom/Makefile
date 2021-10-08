@@ -42,11 +42,13 @@ obj-$(CONFIG_MSM_PFE_WA) += pfe-wa.o
 obj-$(CONFIG_ARCH_MSM8996) += msm_cpu_voltage.o
 
 obj-$(CONFIG_MSM_PERFORMANCE) += msm_performance.o
+obj-$(CONFIG_MSM_PASR) += pasr.o
 
 ifdef CONFIG_MSM_SUBSYSTEM_RESTART
 	obj-y += subsystem_notif.o
 	obj-y += subsystem_restart.o
 	obj-y += ramdump.o
+	obj-$(CONFIG_MSM_GVM_QUIN) += subsystem_notif_virt.o
 endif
 
 obj-$(CONFIG_QPNP_HAPTIC) += qpnp-haptic.o
@@ -107,3 +109,17 @@ obj-$(CONFIG_QCOM_SMCINVOKE) += smcinvoke.o
 obj-$(CONFIG_QCOM_EARLY_RANDOM)	+= early_random.o
 obj-$(CONFIG_QCOM_CX_IPEAK) += cx_ipeak.o
 obj-$(CONFIG_MSM_CACHE_M4M_ERP64) += cache_m4m_erp64.o
+obj-$(CONFIG_MSM_HAB) += hab/
+obj-$(CONFIG_QCOM_QDSS_BRIDGE) += qdss_bridge.o
+obj-$(CONFIG_ARCH_MSM8998) += debug_memory.o
+obj-$(CONFIG_RAMDUMP_TAGS) += board-rdtags.o
+CFLAGS_board-rdtags.o  := \
+       -D"INFO_PRODUCT=\"$(if $(TARGET_PRODUCT),$(TARGET_PRODUCT),unknown)\"" \
+       -D"INFO_VARIANT= \
+       \"$(if $(TARGET_BUILD_VARIANT),$(TARGET_BUILD_VARIANT),unknown)\"" \
+       -D"INFO_BUILDID= \
+       \"$(if $(SEMC_SYSTEM_VERSION),$(SEMC_SYSTEM_VERSION),private)\""
+obj-$(CONFIG_SUBSYS_LAST_ERR_LOG) += last_subsys_errlog.o
+obj-$(CONFIG_ARCH_MSM8998) += console_setup.o
+obj-$(CONFIG_LAST_LOGS) += last_logs.o
+obj-$(CONFIG_SECURITY_STATUS) += security_status.o

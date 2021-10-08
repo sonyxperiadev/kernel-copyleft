@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/module.h>
@@ -56,6 +61,24 @@ enum ldo_levels {
 #define SW_PORTSELECT		BIT(0)
 /* port select mux: 1 - sw control. 0 - HW control*/
 #define SW_PORTSELECT_MX	BIT(1)
+
+#define SSUSB3PHY_TXA_DRV_LVL		0x21c
+#define SSUSB3PHY_TXB_DRV_LVL		0x61c
+#define SSUSB3PHY_TXA_EMP_POST1_LVL	0x20c
+#define SSUSB3PHY_TXB_EMP_POST1_LVL	0x60c
+
+unsigned int ssphy_txa_drv_lvl;
+unsigned int ssphy_txb_drv_lvl;
+unsigned int ssphy_txa_emp_post1_lvl;
+unsigned int ssphy_txb_emp_post1_lvl;
+module_param(ssphy_txa_drv_lvl, uint, S_IRUGO | S_IWUSR);
+module_param(ssphy_txb_drv_lvl, uint, S_IRUGO | S_IWUSR);
+module_param(ssphy_txa_emp_post1_lvl, uint, S_IRUGO | S_IWUSR);
+module_param(ssphy_txb_emp_post1_lvl, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(ssphy_txa_drv_lvl, "SSUSB3PHY QSERDES TXA DRV LVL");
+MODULE_PARM_DESC(ssphy_txb_drv_lvl, "SSUSB3PHY QSERDES TXB DRV LVL");
+MODULE_PARM_DESC(ssphy_txa_emp_post1_lvl, "SSUSB3PHY QSERDES TXA EMP POST1 LVL");
+MODULE_PARM_DESC(ssphy_txb_emp_post1_lvl, "SSUSB3PHY QSERDES TXB EMP POST1 LVL");
 
 enum qmp_phy_rev_reg {
 	USB3_PHY_PCS_STATUS,
@@ -149,15 +172,17 @@ static void msm_ssusb_qmp_enable_autonomous(struct msm_ssphy_qmp *phy,
 
 	if (enable) {
 		msm_ssusb_qmp_clr_lfps_rxterm_int(phy);
+		val = readb_relaxed(phy->base + autonomous_mode_offset);
+		val |= ARCVR_DTCT_EN;
 		if (phy->phy.flags & DEVICE_IN_SS_MODE) {
-			val =
-			readb_relaxed(phy->base + autonomous_mode_offset);
-			val |= ARCVR_DTCT_EN;
 			val |= ALFPS_DTCT_EN;
 			val &= ~ARCVR_DTCT_EVENT_SEL;
-			writeb_relaxed(val, phy->base + autonomous_mode_offset);
+		} else {
+			val &= ~ALFPS_DTCT_EN;
+			val |= ARCVR_DTCT_EVENT_SEL;
 		}
 
+		writeb_relaxed(val, phy->base + autonomous_mode_offset);
 		/* clamp phy level shifter to perform autonomous detection */
 		writel_relaxed(0x1, phy->vls_clamp_reg);
 	} else {
@@ -261,6 +286,21 @@ disable_fpc_redrive:
 	return rc < 0 ? rc : 0;
 }
 
+static void msm_ssphy_param_output(struct usb_phy *uphy)
+{
+	struct msm_ssphy_qmp *phy = container_of(uphy, struct msm_ssphy_qmp,
+					phy);
+
+	dev_dbg(uphy->dev, "SS_USB3PHY_QSERDES_TXA_TX_DEV_LVL:0x%02x\n",
+		readb_relaxed(phy->base + SSUSB3PHY_TXA_DRV_LVL));
+	dev_dbg(uphy->dev, "SS_USB3PHY_QSERDES_TXB_TX_DEV_LVL:0x%02x\n",
+		readb_relaxed(phy->base + SSUSB3PHY_TXB_DRV_LVL));
+	dev_dbg(uphy->dev, "SS_USB3PHY_QSERDES_TXA_TX_EMP_POST1_LVL:0x%02x\n",
+		readb_relaxed(phy->base + SSUSB3PHY_TXA_EMP_POST1_LVL));
+	dev_dbg(uphy->dev, "SS_USB3PHY_QSERDES_TXB_TX_EMP_POST1_LVL:0x%02x\n",
+		readb_relaxed(phy->base + SSUSB3PHY_TXB_EMP_POST1_LVL));
+}
+
 static int configure_phy_regs(struct usb_phy *uphy,
 				const struct qmp_reg_val *reg)
 {
@@ -278,6 +318,23 @@ static int configure_phy_regs(struct usb_phy *uphy,
 			usleep_range(reg->delay, reg->delay + 10);
 		reg++;
 	}
+
+	/* ssusb phy dynamic set */
+	if (ssphy_txa_drv_lvl)
+		writel_relaxed(ssphy_txa_drv_lvl,
+				phy->base + SSUSB3PHY_TXA_DRV_LVL);
+	if (ssphy_txb_drv_lvl)
+		writel_relaxed(ssphy_txb_drv_lvl,
+				phy->base + SSUSB3PHY_TXB_DRV_LVL);
+	if (ssphy_txa_emp_post1_lvl)
+		writel_relaxed(ssphy_txa_emp_post1_lvl,
+				phy->base + SSUSB3PHY_TXA_EMP_POST1_LVL);
+	if (ssphy_txb_emp_post1_lvl)
+		writel_relaxed(ssphy_txb_emp_post1_lvl,
+				phy->base + SSUSB3PHY_TXB_EMP_POST1_LVL);
+
+	/* parameter output */
+	msm_ssphy_param_output(uphy);
 	return 0;
 }
 
@@ -471,11 +528,13 @@ static int msm_ssphy_qmp_set_suspend(struct usb_phy *uphy, int suspend)
 	}
 
 	if (suspend) {
-		if (!phy->cable_connected)
+		if (phy->cable_connected) {
+			if (phy->vls_clamp_reg)
+				msm_ssusb_qmp_enable_autonomous(phy, 1);
+		} else {
 			writel_relaxed(0x00,
 			phy->base + phy->phy_reg[USB3_PHY_POWER_DOWN_CONTROL]);
-		else
-			msm_ssusb_qmp_enable_autonomous(phy, 1);
+		}
 
 		/* Make sure above write completed with PHY */
 		wmb();
@@ -507,7 +566,8 @@ static int msm_ssphy_qmp_set_suspend(struct usb_phy *uphy, int suspend)
 			writel_relaxed(0x01,
 			phy->base + phy->phy_reg[USB3_PHY_POWER_DOWN_CONTROL]);
 		} else  {
-			msm_ssusb_qmp_enable_autonomous(phy, 0);
+			if (phy->vls_clamp_reg)
+				msm_ssusb_qmp_enable_autonomous(phy, 0);
 		}
 
 		/* Make sure that above write completed with PHY */
@@ -537,6 +597,10 @@ static int msm_ssphy_qmp_notify_disconnect(struct usb_phy *uphy,
 {
 	struct msm_ssphy_qmp *phy = container_of(uphy, struct msm_ssphy_qmp,
 					phy);
+
+	writel_relaxed(0x00,
+		phy->base + phy->phy_reg[USB3_PHY_POWER_DOWN_CONTROL]);
+	readl_relaxed(phy->base + phy->phy_reg[USB3_PHY_POWER_DOWN_CONTROL]);
 
 	dev_dbg(uphy->dev, "QMP phy disconnect notification\n");
 	dev_dbg(uphy->dev, " cable_connected=%d\n", phy->cable_connected);
@@ -642,13 +706,13 @@ static int msm_ssphy_qmp_probe(struct platform_device *pdev)
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 			"vls_clamp_reg");
 	if (!res) {
-		dev_err(dev, "failed getting vls_clamp_reg\n");
-		return -ENODEV;
-	}
-	phy->vls_clamp_reg = devm_ioremap_resource(dev, res);
-	if (IS_ERR(phy->vls_clamp_reg)) {
-		dev_err(dev, "couldn't find vls_clamp_reg address.\n");
-		return PTR_ERR(phy->vls_clamp_reg);
+		dev_dbg(dev, "vls_clamp_reg not passed\n");
+	} else {
+		phy->vls_clamp_reg = devm_ioremap_resource(dev, res);
+		if (IS_ERR(phy->vls_clamp_reg)) {
+			dev_err(dev, "couldn't find vls_clamp_reg address.\n");
+			return PTR_ERR(phy->vls_clamp_reg);
+		}
 	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,

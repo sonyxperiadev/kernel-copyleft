@@ -32,6 +32,12 @@ enum {
 	MSM89XX_RX_MAX,
 };
 
+struct tx_mute_work {
+	struct msm_dig_priv *dig_cdc;
+	u32 decimator;
+	struct delayed_work dwork;
+};
+
 struct msm_dig_priv {
 	struct snd_soc_codec *codec;
 	u32 comp_enabled[MSM89XX_RX_MAX];
@@ -49,15 +55,18 @@ struct msm_dig_priv {
 	u32 mute_mask;
 	int dapm_bias_off;
 	void *handle;
+	void (*set_compander_mode)(void *handle, int val);
 	void (*update_clkdiv)(void *handle, int val);
 	int (*get_cdc_version)(void *handle);
 	int (*register_notifier)(void *handle,
 				 struct notifier_block *nblock,
 				 bool enable);
+	struct tx_mute_work tx_mute_dwork[NUM_DECIMATORS];
 };
 
 struct dig_ctrl_platform_data {
 	void *handle;
+	void (*set_compander_mode)(void *handle, int val);
 	void (*update_clkdiv)(void *handle, int val);
 	int (*get_cdc_version)(void *handle);
 	int (*register_notifier)(void *handle,

@@ -2,7 +2,7 @@
  * drivers/staging/android/ion/ion_priv.h
  *
  * Copyright (C) 2011 Google, Inc.
- * Copyright (c) 2011-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -13,6 +13,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #ifndef _ION_PRIV_H
@@ -200,8 +205,8 @@ struct ion_heap {
 	struct task_struct *task;
 
 	int (*debug_show)(struct ion_heap *heap, struct seq_file *, void *);
-	atomic_t total_allocated;
-	atomic_t total_handles;
+	atomic_long_t total_allocated;
+	atomic_long_t total_handles;
 };
 
 /**
@@ -422,6 +427,7 @@ void ion_carveout_free(struct ion_heap *heap, ion_phys_addr_t addr,
  * @gfp_mask:		gfp_mask to use from alloc
  * @order:		order of pages in the pool
  * @list:		plist node for list of pools
+ * @inode:		inode for ion_pool pseudo filesystem
  *
  * Allows you to keep a pool of pre allocated pages to use from your heap.
  * Keeping a pool of pages that is ready for dma, ie any cached mapping have
@@ -438,10 +444,11 @@ struct ion_page_pool {
 	gfp_t gfp_mask;
 	unsigned int order;
 	struct plist_node list;
+	struct inode *inode;
 };
 
 struct ion_page_pool *ion_page_pool_create(struct device *dev, gfp_t gfp_mask,
-					   unsigned int order);
+					   unsigned int order, bool movable);
 void ion_page_pool_destroy(struct ion_page_pool *);
 void *ion_page_pool_alloc(struct ion_page_pool *, bool *from_pool);
 void *ion_page_pool_alloc_pool_only(struct ion_page_pool *);

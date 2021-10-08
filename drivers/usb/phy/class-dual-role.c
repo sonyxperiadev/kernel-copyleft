@@ -13,6 +13,11 @@
  * GNU General Public License for more details.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/ctype.h>
 #include <linux/device.h>
@@ -70,7 +75,15 @@ static char *kstrdupcase(const char *str, gfp_t gfp, bool to_upper)
 	return ret;
 }
 
-static void dual_role_changed_work(struct work_struct *work);
+static void dual_role_changed_work(struct work_struct *work)
+{
+	struct dual_role_phy_instance *dual_role =
+	    container_of(work, struct dual_role_phy_instance,
+			 changed_work);
+
+	dev_dbg(&dual_role->dev, "%s\n", __func__);
+	kobject_uevent(&dual_role->dev.kobj, KOBJ_CHANGE);
+}
 
 void dual_role_instance_changed(struct dual_role_phy_instance *dual_role)
 {
@@ -405,7 +418,7 @@ static umode_t dual_role_attr_is_visible(struct kobject *kobj,
 			if (dual_role->desc->property_is_writeable &&
 			    dual_role_property_is_writeable(dual_role, property)
 			    > 0)
-				mode |= S_IWUSR;
+				mode |= S_IWUSR | S_IWGRP;
 
 			return mode;
 		}
@@ -495,17 +508,6 @@ out:
 	free_page((unsigned long)prop_buf);
 
 	return ret;
-}
-
-static void dual_role_changed_work(struct work_struct *work)
-{
-	struct dual_role_phy_instance *dual_role =
-	    container_of(work, struct dual_role_phy_instance,
-			 changed_work);
-
-	dev_dbg(&dual_role->dev, "%s\n", __func__);
-	sysfs_update_group(&dual_role->dev.kobj, &dual_role_attr_group);
-	kobject_uevent(&dual_role->dev.kobj, KOBJ_CHANGE);
 }
 
 /******************* Module Init ***********************************/

@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -44,9 +44,11 @@
 #define SDE_HW_VER_172	SDE_HW_VER(1, 7, 2) /* 8996 v3.0 */
 #define SDE_HW_VER_300	SDE_HW_VER(3, 0, 0) /* 8998 v1.0 */
 #define SDE_HW_VER_301	SDE_HW_VER(3, 0, 1) /* 8998 v1.1 */
-#define SDE_HW_VER_400	SDE_HW_VER(4, 0, 0) /* msmskunk v1.0 */
+#define SDE_HW_VER_400	SDE_HW_VER(4, 0, 0) /* sdm845 v1.0 */
 
 #define IS_MSMSKUNK_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_400)
+
+#define SDE_HW_BLK_NAME_LEN	16
 
 #define MAX_IMG_WIDTH 0x3fff
 #define MAX_IMG_HEIGHT 0x3fff
@@ -57,8 +59,6 @@
 		((((MAJOR) & 0xFFFF) << 16) | (((MINOR) & 0xFFFF)))
 #define SDE_COLOR_PROCESS_MAJOR(version) (((version) & 0xFFFF0000) >> 16)
 #define SDE_COLOR_PROCESS_MINOR(version) ((version) & 0xFFFF)
-
-#define SSPP_NAME_SIZE 12
 
 /**
  * MDP TOP BLOCK features
@@ -119,12 +119,18 @@ enum {
  * @SDE_MIXER_LAYER           Layer mixer layer blend configuration,
  * @SDE_MIXER_SOURCESPLIT     Layer mixer supports source-split configuration
  * @SDE_MIXER_GC              Gamma correction block
+ * @SDE_DISP_PRIMARY_PREF     Primary display prefers this mixer
+ * @SDE_DISP_SECONDARY_PREF   Secondary display prefers this mixer
+ * @SDE_DISP_TERTIARY_PREF    Tertiary display prefers this mixer
  * @SDE_MIXER_MAX             maximum value
  */
 enum {
 	SDE_MIXER_LAYER = 0x1,
 	SDE_MIXER_SOURCESPLIT,
 	SDE_MIXER_GC,
+	SDE_DISP_PRIMARY_PREF,
+	SDE_DISP_SECONDARY_PREF,
+	SDE_DISP_TERTIARY_PREF,
 	SDE_MIXER_MAX
 };
 
@@ -180,11 +186,17 @@ enum {
  * CTL sub-blocks
  * @SDE_CTL_SPLIT_DISPLAY       CTL supports video mode split display
  * @SDE_CTL_PINGPONG_SPLIT      CTL supports pingpong split
+ * @SDE_CTL_PRIMARY_PREF        Primary display perfers this CTL
+ * @SDE_CTL_SECONDARY_PREF      Secondary display perfers this CTL
+ * @SDE_CTL_TERTIARY_PREF       Tertiary display perfers this CTL
  * @SDE_CTL_MAX
  */
 enum {
 	SDE_CTL_SPLIT_DISPLAY = 0x1,
 	SDE_CTL_PINGPONG_SPLIT,
+	SDE_CTL_PRIMARY_PREF,
+	SDE_CTL_SECONDARY_PREF,
+	SDE_CTL_TERTIARY_PREF,
 	SDE_CTL_MAX
 };
 
@@ -236,12 +248,14 @@ enum {
 
 /**
  * MACRO SDE_HW_BLK_INFO - information of HW blocks inside SDE
+ * @name:              string name for debug purposes
  * @id:                enum identifying this block
  * @base:              register base offset to mdss
  * @len:               length of hardware block
  * @features           bit mask identifying sub-blocks/features
  */
 #define SDE_HW_BLK_INFO \
+	char name[SDE_HW_BLK_NAME_LEN]; \
 	u32 id; \
 	u32 base; \
 	u32 len; \
@@ -249,12 +263,14 @@ enum {
 
 /**
  * MACRO SDE_HW_SUBBLK_INFO - information of HW sub-block inside SDE
+ * @name:              string name for debug purposes
  * @id:                enum identifying this sub-block
  * @base:              offset of this sub-block relative to the block
  *                     offset
  * @len                register block length of this sub-block
  */
 #define SDE_HW_SUBBLK_INFO \
+	char name[SDE_HW_BLK_NAME_LEN]; \
 	u32 id; \
 	u32 base; \
 	u32 len
@@ -458,7 +474,6 @@ struct sde_ctl_cfg {
  * @sblk:              SSPP sub-blocks information
  * @xin_id:            bus client identifier
  * @clk_ctrl           clock control identifier
- * @name               source pipe name
  * @type               sspp type identifier
  */
 struct sde_sspp_cfg {
@@ -466,7 +481,6 @@ struct sde_sspp_cfg {
 	const struct sde_sspp_sub_blks *sblk;
 	u32 xin_id;
 	enum sde_clk_ctrl_type clk_ctrl;
-	char name[SSPP_NAME_SIZE];
 	u32 type;
 };
 

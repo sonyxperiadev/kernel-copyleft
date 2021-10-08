@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM kmem
 
@@ -214,6 +219,34 @@ TRACE_EVENT(mm_page_free_batched,
 			__entry->cold)
 );
 
+TRACE_EVENT(mm_page_alloc_highorder,
+
+	TP_PROTO(struct page *page, unsigned int order,
+			gfp_t gfp_flags, int migratetype),
+
+	TP_ARGS(page, order, gfp_flags, migratetype),
+
+	TP_STRUCT__entry(__field(struct page *, page)
+		__field(unsigned int, order)
+		__field(gfp_t, gfp_flags)
+		__field(int, migratetype)
+	),
+
+	TP_fast_assign(
+		__entry->page		= page;
+		__entry->order		= order;
+		__entry->gfp_flags	= gfp_flags;
+		__entry->migratetype	= migratetype;
+	),
+
+	TP_printk("page=%p pfn=%lu order=%d migratetype=%d gfp_flags=%s",
+		__entry->page,
+		page_to_pfn(__entry->page),
+		__entry->order,
+		__entry->migratetype,
+		show_gfp_flags(__entry->gfp_flags))
+);
+
 TRACE_EVENT(mm_page_alloc,
 
 	TP_PROTO(struct page *page, unsigned int order,
@@ -308,6 +341,28 @@ TRACE_EVENT_CONDITION(mm_page_pcpu_drain,
 	TP_printk("page=%p pfn=%lu order=%d migratetype=%d",
 		pfn_to_page(__entry->pfn), __entry->pfn,
 		__entry->order, __entry->migratetype)
+);
+
+TRACE_EVENT(mm_page_alloc_fail,
+
+	TP_PROTO(int alloc_order, gfp_t gfp_mask),
+
+	TP_ARGS(alloc_order, gfp_mask),
+
+	TP_STRUCT__entry(
+		__field(int, alloc_order)
+		__field(gfp_t, gfp_mask)
+	),
+
+	TP_fast_assign(
+		__entry->alloc_order		= alloc_order;
+		__entry->gfp_mask		= gfp_mask;
+	),
+
+	TP_printk("alloc_order=%d pageblock_order=%d gfp_mask=%s",
+		__entry->alloc_order,
+		pageblock_order,
+		show_gfp_flags(__entry->gfp_mask))
 );
 
 TRACE_EVENT(mm_page_alloc_extfrag,

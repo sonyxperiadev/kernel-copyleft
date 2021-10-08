@@ -10,6 +10,7 @@ obj-$(CONFIG_INPUT_AB8500_PONKEY)	+= ab8500-ponkey.o
 obj-$(CONFIG_INPUT_AD714X)		+= ad714x.o
 obj-$(CONFIG_INPUT_AD714X_I2C)		+= ad714x-i2c.o
 obj-$(CONFIG_INPUT_AD714X_SPI)		+= ad714x-spi.o
+obj-$(CONFIG_INPUT_ADUX1050)		+= adux1050.o
 obj-$(CONFIG_INPUT_ADXL34X)		+= adxl34x.o
 obj-$(CONFIG_INPUT_ADXL34X_I2C)		+= adxl34x-i2c.o
 obj-$(CONFIG_INPUT_ADXL34X_SPI)		+= adxl34x-spi.o

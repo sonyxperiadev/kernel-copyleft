@@ -9,6 +9,11 @@
  * This file is released under the GPLv2
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/device.h>
 #include <linux/module.h>
@@ -83,7 +88,7 @@ static struct kobj_type class_ktype = {
 };
 
 /* Hotplug events for classes go to the class subsys */
-static struct kset *class_kset;
+struct kset *class_kset;
 
 
 int class_create_file_ns(struct class *cls, const struct class_attribute *attr,

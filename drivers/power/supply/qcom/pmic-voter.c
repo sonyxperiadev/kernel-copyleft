@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/debugfs.h>
 #include <linux/spinlock.h>
@@ -20,7 +25,9 @@
 
 #include <linux/pmic-voter.h>
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 #define NUM_MAX_CLIENTS		16
+#endif
 #define DEBUG_FORCE_CLIENT	"DEBUG_FORCE_CLIENT"
 
 static DEFINE_SPINLOCK(votable_list_slock);
@@ -521,11 +528,10 @@ static int show_votable_clients(struct seq_file *m, void *data)
 
 	lock_votable(votable);
 
-	seq_printf(m, "Votable %s:\n", votable->name);
-	seq_puts(m, "clients:\n");
 	for (i = 0; i < votable->num_clients; i++) {
 		if (votable->client_strs[i]) {
-			seq_printf(m, "%-15s:\t\ten=%d\t\tv=%d\n",
+			seq_printf(m, "%s: %s:\t\t\ten=%d v=%d\n",
+					votable->name,
 					votable->client_strs[i],
 					votable->votes[i].enabled,
 					votable->votes[i].value);
@@ -544,11 +550,11 @@ static int show_votable_clients(struct seq_file *m, void *data)
 		break;
 	}
 
-	seq_printf(m, "type: %s\n", type_str);
-	seq_puts(m, "Effective:\n");
 	effective_client_str = get_effective_client_locked(votable);
-	seq_printf(m, "%-15s:\t\tv=%d\n",
+	seq_printf(m, "%s: effective=%s type=%s v=%d\n",
+			votable->name,
 			effective_client_str ? effective_client_str : "none",
+			type_str,
 			get_effective_result_locked(votable));
 	unlock_votable(votable);
 
@@ -694,3 +700,65 @@ void destroy_votable(struct votable *votable)
 	kfree(votable->name);
 	kfree(votable);
 }
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+ssize_t somc_output_voter_param(struct votable *votable,
+						char *buf, size_t size)
+{
+	int i;
+	int stored_size = 0;
+	char *print_format;
+
+	memset(buf, '\0', size);
+	size--;
+	if (votable->type == VOTE_SET_ANY) {
+		for (i = 0; i < votable->num_clients
+					&& votable->client_strs[i]; i++) {
+			if (!votable->votes[i].enabled)
+				continue;
+
+			if (stored_size == 0)
+				print_format = "%s";
+			else
+				print_format = "; %s";
+			stored_size += scnprintf(buf + stored_size,
+					size - stored_size, print_format,
+					votable->client_strs[i]);
+			if (stored_size >= size)
+				break;
+		}
+	} else {
+		for (i = 0; i < votable->num_clients
+					&& votable->client_strs[i]; i++) {
+			if (!votable->votes[i].enabled)
+				continue;
+
+			if (stored_size == 0)
+				print_format = "%s:%d";
+			else
+				print_format = "; %s:%d";
+			stored_size += scnprintf(buf + stored_size,
+					size - stored_size, print_format,
+					votable->client_strs[i],
+					get_client_vote(votable,
+					votable->client_strs[i]));
+			if (stored_size >= size)
+				break;
+		}
+	}
+	if (stored_size < size)
+		stored_size += scnprintf(buf + stored_size,
+						size - stored_size, "\n");
+	return stored_size;
+}
+
+int somc_get_vote_clients(struct votable *votable, char *clients[])
+{
+	int i;
+	int num_clients = 0;
+	for (i = 0; i < votable->num_clients; i++) {
+		if (votable->client_strs[i])
+			clients[num_clients++] = votable->client_strs[i];
+	}
+	return num_clients;
+}
+#endif

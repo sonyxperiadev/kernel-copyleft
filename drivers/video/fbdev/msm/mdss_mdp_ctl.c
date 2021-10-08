@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1525,7 +1525,7 @@ static bool is_mdp_prefetch_needed(struct mdss_panel_info *pinfo)
  * the mdp fetch lines  as the last (25 - vbp - vpw) lines of vertical
  * front porch.
  */
-int mdss_mdp_get_prefetch_lines(struct mdss_panel_info *pinfo)
+int mdss_mdp_get_prefetch_lines(struct mdss_panel_info *pinfo, bool is_fixed)
 {
 	int prefetch_avail = 0;
 	int v_total, vfp_start;
@@ -1534,7 +1534,11 @@ int mdss_mdp_get_prefetch_lines(struct mdss_panel_info *pinfo)
 	if (!is_mdp_prefetch_needed(pinfo))
 		return 0;
 
-	v_total = mdss_panel_get_vtotal(pinfo);
+	if (is_fixed)
+		v_total = mdss_panel_get_vtotal_fixed(pinfo);
+	else
+		v_total = mdss_panel_get_vtotal(pinfo);
+
 	vfp_start = (pinfo->lcdc.v_back_porch + pinfo->lcdc.v_pulse_width +
 			pinfo->yres);
 
@@ -5912,9 +5916,7 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg,
 		} else {
 			sctl_flush_bits = sctl->flush_bits;
 		}
-		sctl->commit_in_progress = true;
 	}
-	ctl->commit_in_progress = true;
 	ctl_flush_bits = ctl->flush_bits;
 
 	ATRACE_END("postproc_programming");
@@ -5928,6 +5930,9 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg,
 			MDP_COMMIT_STAGE_SETUP_DONE,
 			commit_cb->data);
 	ret = mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_READY);
+	ctl->commit_in_progress = true;
+	if (sctl)
+		sctl->commit_in_progress = true;
 
 	/*
 	 * When wait for fence timed out, driver ignores the fences

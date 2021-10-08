@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -64,6 +64,8 @@
 #define IPA_MAX_STATUS_STAT_NUM 30
 
 #define IPA_IPC_LOG_PAGES 50
+
+#define IPA_MAX_NUM_REQ_CACHE 10
 
 #define IPADBG(fmt, args...) \
 	do { \
@@ -240,6 +242,8 @@ struct ipa_smmu_cb_ctx {
  * @tbl: filter table
  * @rt_tbl: routing table
  * @hw_len: entry's size
+ * @id: rule handle - globally unique
+ * @ipacm_installed: indicate if installed by ipacm
  */
 struct ipa_flt_entry {
 	struct list_head link;
@@ -249,6 +253,7 @@ struct ipa_flt_entry {
 	struct ipa_rt_tbl *rt_tbl;
 	u32 hw_len;
 	int id;
+	bool ipacm_installed;
 };
 
 /**
@@ -303,6 +308,7 @@ struct ipa_rt_tbl {
  * @is_eth2_ofst_valid: is eth2_ofst field valid?
  * @eth2_ofst: offset to start of Ethernet-II/802.3 header
  * @user_deleted: is the header deleted by the user?
+ * @ipacm_installed: indicate if installed by ipacm
  */
 struct ipa_hdr_entry {
 	struct list_head link;
@@ -321,6 +327,7 @@ struct ipa_hdr_entry {
 	u8 is_eth2_ofst_valid;
 	u16 eth2_ofst;
 	bool user_deleted;
+	bool ipacm_installed;
 };
 
 /**
@@ -344,11 +351,13 @@ struct ipa_hdr_tbl {
  * @link: entry's link in global processing context header offset entries list
  * @offset: the offset
  * @bin: bin
+ * @ipacm_installed: indicate if installed by ipacm
  */
 struct ipa_hdr_proc_ctx_offset_entry {
 	struct list_head link;
 	u32 offset;
 	u32 bin;
+	bool ipacm_installed;
 };
 
 /**
@@ -385,6 +394,7 @@ struct ipa_hdr_proc_ctx_add_hdr_cmd_seq {
  * @ref_cnt: reference counter of routing table
  * @id: processing context header entry id
  * @user_deleted: is the hdr processing context deleted by the user?
+ * @ipacm_installed: indicate if installed by ipacm
  */
 struct ipa_hdr_proc_ctx_entry {
 	struct list_head link;
@@ -395,6 +405,7 @@ struct ipa_hdr_proc_ctx_entry {
 	u32 ref_cnt;
 	int id;
 	bool user_deleted;
+	bool ipacm_installed;
 };
 
 /**
@@ -444,6 +455,8 @@ struct ipa_flt_tbl {
  * @hdr: header table
  * @proc_ctx: processing context table
  * @hw_len: the length of the table
+ * @id: rule handle - globaly unique
+ * @ipacm_installed: indicate if installed by ipacm
  */
 struct ipa_rt_entry {
 	struct list_head link;
@@ -454,6 +467,7 @@ struct ipa_rt_entry {
 	struct ipa_hdr_proc_ctx_entry *proc_ctx;
 	u32 hw_len;
 	int id;
+	bool ipacm_installed;
 };
 
 /**
@@ -996,6 +1010,11 @@ struct ipacm_client_info {
 	bool uplink;
 };
 
+struct ipa_cne_evt {
+	struct ipa_wan_msg wan_msg;
+	struct ipa_msg_meta msg_meta;
+};
+
 /**
  * struct ipa_context - IPA context
  * @class: pointer to the struct class
@@ -1144,6 +1163,8 @@ struct ipa_context {
 	struct list_head msg_list;
 	struct list_head pull_msg_list;
 	struct mutex msg_lock;
+	struct list_head msg_wlan_client_list;
+	struct mutex msg_wlan_client_lock;
 	wait_queue_head_t msg_waitq;
 	enum ipa_hw_type ipa_hw_type;
 	enum ipa_hw_mode ipa_hw_mode;
@@ -1197,6 +1218,11 @@ struct ipa_context {
 	u32 ipa_rx_max_timeout_usec;
 	u32 ipa_polling_iteration;
 	bool ipa_uc_monitor_holb;
+	struct ipa_cne_evt ipa_cne_evt_req_cache[IPA_MAX_NUM_REQ_CACHE];
+	int num_ipa_cne_evt_req;
+	struct mutex ipa_cne_evt_lock;
+	int (*q6_cleanup_cb)(void);
+	bool is_apps_shutdown_support;
 };
 
 /**
@@ -1253,6 +1279,7 @@ struct ipa_plat_drv_res {
 	u32 ipa_rx_polling_sleep_msec;
 	u32 ipa_polling_iteration;
 	bool ipa_uc_monitor_holb;
+	bool is_apps_shutdown_support;
 };
 
 struct ipa_mem_partition {
@@ -1378,6 +1405,8 @@ int ipa2_disconnect(u32 clnt_hdl);
  */
 int ipa2_reset_endpoint(u32 clnt_hdl);
 
+void ipa2_apps_shutdown_apps_ep_reset(void);
+
 /*
  * Remove ep delay
  */
@@ -1426,13 +1455,15 @@ int ipa2_cfg_ep_ctrl(u32 clnt_hdl, const struct ipa_ep_cfg_ctrl *ep_ctrl);
  */
 int ipa2_add_hdr(struct ipa_ioc_add_hdr *hdrs);
 
+int ipa2_add_hdr_usr(struct ipa_ioc_add_hdr *hdrs, bool by_user);
+
 int ipa2_del_hdr(struct ipa_ioc_del_hdr *hdls);
 
 int ipa2_del_hdr_by_user(struct ipa_ioc_del_hdr *hdls, bool by_user);
 
 int ipa2_commit_hdr(void);
 
-int ipa2_reset_hdr(void);
+int ipa2_reset_hdr(bool user_only);
 
 int ipa2_get_hdr(struct ipa_ioc_get_hdr *lookup);
 
@@ -1443,7 +1474,8 @@ int ipa2_copy_hdr(struct ipa_ioc_copy_hdr *copy);
 /*
  * Header Processing Context
  */
-int ipa2_add_hdr_proc_ctx(struct ipa_ioc_add_hdr_proc_ctx *proc_ctxs);
+int ipa2_add_hdr_proc_ctx(struct ipa_ioc_add_hdr_proc_ctx *proc_ctxs,
+							bool user_only);
 
 int ipa2_del_hdr_proc_ctx(struct ipa_ioc_del_hdr_proc_ctx *hdls);
 
@@ -1455,11 +1487,14 @@ int ipa2_del_hdr_proc_ctx_by_user(struct ipa_ioc_del_hdr_proc_ctx *hdls,
  */
 int ipa2_add_rt_rule(struct ipa_ioc_add_rt_rule *rules);
 
+int ipa2_add_rt_rule_usr(struct ipa_ioc_add_rt_rule *rules,
+	bool user_only);
+
 int ipa2_del_rt_rule(struct ipa_ioc_del_rt_rule *hdls);
 
 int ipa2_commit_rt(enum ipa_ip_type ip);
 
-int ipa2_reset_rt(enum ipa_ip_type ip);
+int ipa2_reset_rt(enum ipa_ip_type ip, bool user_only);
 
 int ipa2_get_rt_tbl(struct ipa_ioc_get_rt_tbl *lookup);
 
@@ -1474,13 +1509,16 @@ int ipa2_mdfy_rt_rule(struct ipa_ioc_mdfy_rt_rule *rules);
  */
 int ipa2_add_flt_rule(struct ipa_ioc_add_flt_rule *rules);
 
+int ipa2_add_flt_rule_usr(struct ipa_ioc_add_flt_rule *rules,
+	bool user_only);
+
 int ipa2_del_flt_rule(struct ipa_ioc_del_flt_rule *hdls);
 
 int ipa2_mdfy_flt_rule(struct ipa_ioc_mdfy_flt_rule *rules);
 
 int ipa2_commit_flt(enum ipa_ip_type ip);
 
-int ipa2_reset_flt(enum ipa_ip_type ip);
+int ipa2_reset_flt(enum ipa_ip_type ip, bool user_only);
 
 /*
  * NAT
@@ -1498,6 +1536,7 @@ int ipa2_nat_del_cmd(struct ipa_ioc_v4_nat_del *del);
  */
 int ipa2_send_msg(struct ipa_msg_meta *meta, void *buff,
 		  ipa_msg_free_fn callback);
+int ipa2_resend_wlan_msg(void);
 int ipa2_register_pull_msg(struct ipa_msg_meta *meta, ipa_msg_pull_fn callback);
 int ipa2_deregister_pull_msg(struct ipa_msg_meta *meta);
 
@@ -1566,6 +1605,8 @@ int ipa2_setup_uc_ntn_pipes(struct ipa_ntn_conn_in_params *inp,
 		ipa_notify_cb notify, void *priv, u8 hdr_len,
 		struct ipa_ntn_conn_out_params *outp);
 int ipa2_tear_down_uc_offload_pipes(int ipa_ep_idx_ul, int ipa_ep_idx_dl);
+int ipa2_ntn_uc_reg_rdyCB(void (*ipauc_ready_cb)(void *), void *priv);
+void ipa2_ntn_uc_dereg_rdyCB(void);
 
 /*
  * To retrieve doorbell physical address of
@@ -1769,7 +1810,7 @@ static inline u32 ipa_read_reg_field(void *base, u32 offset,
 	return (ipa_read_reg(base, offset) & mask) >> shift;
 }
 
-static inline void ipa_write_reg(void *base, u32 offset, u32 val)
+static inline void ipa_write_reg(void __iomem *base, u32 offset, u32 val)
 {
 	iowrite32(val, base + offset);
 }
@@ -1856,6 +1897,8 @@ int ipa_tag_process(struct ipa_desc *desc, int num_descs,
 		    unsigned long timeout);
 
 int ipa_q6_pre_shutdown_cleanup(void);
+int ipa_apps_shutdown_cleanup(void);
+int register_ipa_platform_cb(int (*cb)(void));
 int ipa_q6_post_shutdown_cleanup(void);
 int ipa_init_q6_smem(void);
 int ipa_q6_monitor_holb_mitigation(bool enable);

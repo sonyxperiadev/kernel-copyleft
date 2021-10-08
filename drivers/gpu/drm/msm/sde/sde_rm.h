@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -70,6 +70,7 @@ enum sde_rm_topology_control {
  * @hw_mdp: hardware object for mdp_top
  * @lm_max_width: cached layer mixer maximum width
  * @rsvp_next_seq: sequence number for next reservation for debugging purposes
+ * @rm_lock: resource manager mutex
  */
 struct sde_rm {
 	struct drm_device *dev;
@@ -78,6 +79,7 @@ struct sde_rm {
 	struct sde_hw_mdp *hw_mdp;
 	uint32_t lm_max_width;
 	uint32_t rsvp_next_seq;
+	struct mutex rm_lock;
 };
 
 /**
@@ -209,5 +211,15 @@ int sde_rm_check_property_topctl(uint64_t val);
  * @Return: 0 on success or error
  */
 int sde_rm_check_property_topctl(uint64_t val);
+
+/**
+ * sde_rm_read_resource_for_splash - read splash resource used in bootloader
+ * @rm: SDE Resource Manager handle
+ * @sinfo: handle for splash info
+ * @cat: Pointer to hardware catalog
+ */
+int sde_rm_read_resource_for_splash(struct sde_rm *rm,
+				void *sinfo,
+				struct sde_mdss_cfg *cat);
 
 #endif /* __SDE_RM_H__ */

@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -454,6 +454,42 @@ static void glink_put_ch_ctx(struct channel_ctx *ctx)
 {
 	rwref_put(&ctx->ch_state_lhb2);
 }
+
+
+/**
+ * glink_subsys_up() - Inform transport about remote subsystem up.
+ * @subsystem:	The name of the subsystem
+ *
+ * Call into the transport using the subsys_up(if_ptr) function to allow it to
+ * initialize any necessary structures.
+ *
+ * Return: Standard error codes.
+ */
+int glink_subsys_up(const char *subsystem)
+{
+	int ret = 0;
+	bool transport_found = false;
+	struct glink_core_xprt_ctx *xprt_ctx = NULL;
+
+	mutex_lock(&transport_list_lock_lha0);
+	list_for_each_entry(xprt_ctx, &transport_list, list_node) {
+		if (!strcmp(subsystem, xprt_ctx->edge) &&
+				!xprt_is_fully_opened(xprt_ctx)) {
+			GLINK_INFO_XPRT(xprt_ctx, "%s: %s Subsystem up\n",
+							__func__, subsystem);
+			if (xprt_ctx->ops->subsys_up)
+				xprt_ctx->ops->subsys_up(xprt_ctx->ops);
+			transport_found = true;
+		}
+	}
+	mutex_unlock(&transport_list_lock_lha0);
+
+	if (!transport_found)
+		ret = -ENODEV;
+
+	return ret;
+}
+EXPORT_SYMBOL(glink_subsys_up);
 
 /**
  * glink_ssr() - Clean up locally for SSR by simulating remote close
@@ -1667,6 +1703,8 @@ void ch_purge_intent_lists(struct channel_ctx *ctx)
 				&ctx->local_rx_intent_list, list) {
 		ctx->notify_rx_abort(ctx, ctx->user_priv,
 				ptr_intent->pkt_priv);
+		ctx->transport_ptr->ops->deallocate_rx_intent(
+					ctx->transport_ptr->ops, ptr_intent);
 		list_del(&ptr_intent->list);
 		kfree(ptr_intent);
 	}
@@ -2372,6 +2410,35 @@ static void dummy_tx_cmd_ch_remote_close_ack(struct glink_transport_if *if_ptr,
 }
 
 /**
+ * dummy_tx_cmd_ch_open() - dummy channel open cmd sending function
+ * @if_ptr:	The transport to transmit on.
+ * @lcid:	The local channel id to encode.
+ * @name:	The channel name to encode.
+ * @req_xprt:	The transport the core would like to migrate this channel to.
+ *
+ * Return: 0 on success or standard Linux error code.
+ */
+static int dummy_tx_cmd_ch_open(struct glink_transport_if *if_ptr,
+			uint32_t lcid, const char *name,
+			uint16_t req_xprt)
+{
+	return -EOPNOTSUPP;
+}
+
+/**
+ * dummy_tx_cmd_ch_remote_open_ack() - convert a channel open ack cmd to wire
+ *				format and transmit
+ * @if_ptr:	The transport to transmit on.
+ * @rcid:	The remote channel id to encode.
+ * @xprt_resp:	The response to a transport migration request.
+ */
+static void dummy_tx_cmd_ch_remote_open_ack(struct glink_transport_if *if_ptr,
+					uint32_t rcid, uint16_t xprt_resp)
+{
+	/* intentionally left blank */
+}
+
+/**
  * dummy_get_power_vote_ramp_time() - Dummy Power vote ramp time
  * @if_ptr:	The transport to transmit on.
  * @state:	The power state being requested from the transport.
@@ -2960,7 +3027,7 @@ static int glink_tx_common(void *handle, void *pkt_priv,
 			if (!wait_for_completion_timeout(
 					&ctx->int_req_ack_complete,
 					ctx->rx_intent_req_timeout_jiffies)) {
-				GLINK_ERR_CH(ctx,
+				GLINK_ERR(
 					"%s: Intent request ack with size: %zu not granted for lcid\n",
 					__func__, size);
 				ret = -ETIMEDOUT;
@@ -2980,7 +3047,7 @@ static int glink_tx_common(void *handle, void *pkt_priv,
 			if (!wait_for_completion_timeout(
 					&ctx->int_req_complete,
 					ctx->rx_intent_req_timeout_jiffies)) {
-				GLINK_ERR_CH(ctx,
+				GLINK_ERR(
 					"%s: Intent request with size: %zu not granted for lcid\n",
 					__func__, size);
 				ret = -ETIMEDOUT;
@@ -3736,6 +3803,8 @@ static void glink_dummy_xprt_ctx_release(struct rwref_lock *xprt_st_lock)
 	GLINK_INFO("%s: freeing transport [%s->%s]context\n", __func__,
 				xprt_ctx->name,
 				xprt_ctx->edge);
+	kfree(xprt_ctx->ops);
+	xprt_ctx->ops = NULL;
 	kfree(xprt_ctx);
 }
 
@@ -4184,8 +4253,14 @@ static struct glink_core_xprt_ctx *glink_create_dummy_xprt_ctx(
 	if_ptr->tx_cmd_remote_rx_intent_req_ack =
 				dummy_tx_cmd_remote_rx_intent_req_ack;
 	if_ptr->tx_cmd_set_sigs = dummy_tx_cmd_set_sigs;
+	if_ptr->tx_cmd_ch_open = dummy_tx_cmd_ch_open;
+	if_ptr->tx_cmd_ch_remote_open_ack = dummy_tx_cmd_ch_remote_open_ack;
 	if_ptr->tx_cmd_ch_close = dummy_tx_cmd_ch_close;
 	if_ptr->tx_cmd_ch_remote_close_ack = dummy_tx_cmd_ch_remote_close_ack;
+	if_ptr->tx_cmd_tracer_pkt = dummy_tx_cmd_tracer_pkt;
+	if_ptr->get_power_vote_ramp_time = dummy_get_power_vote_ramp_time;
+	if_ptr->power_vote = dummy_power_vote;
+	if_ptr->power_unvote = dummy_power_unvote;
 
 	xprt_ptr->ops = if_ptr;
 	xprt_ptr->log_ctx = log_ctx;
@@ -4255,6 +4330,12 @@ static void glink_core_channel_cleanup(struct glink_core_xprt_ctx *xprt_ptr)
 	rwref_read_get(&xprt_ptr->xprt_state_lhb0);
 	ctx = get_first_ch_ctx(xprt_ptr);
 	while (ctx) {
+		spin_lock_irqsave(&xprt_ptr->tx_ready_lock_lhb3, flags);
+		spin_lock(&ctx->tx_lists_lock_lhc3);
+		if (!list_empty(&ctx->tx_active))
+			glink_qos_done_ch_tx(ctx);
+		spin_unlock(&ctx->tx_lists_lock_lhc3);
+		spin_unlock_irqrestore(&xprt_ptr->tx_ready_lock_lhb3, flags);
 		rwref_write_get_atomic(&ctx->ch_state_lhb2, true);
 		if (ctx->local_open_state == GLINK_CHANNEL_OPENED ||
 			ctx->local_open_state == GLINK_CHANNEL_OPENING) {

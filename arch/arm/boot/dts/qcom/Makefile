@@ -32,6 +32,7 @@ dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-cdp.dtb \
 	msm8996pro-auto-adp.dtb \
 	msm8996pro-auto-adp-lite.dtb \
 	msm8996pro-auto-cdp.dtb \
+	msm8996pro-auto-cv2x.dtb \
 	msm8996pro-pmi8994-cdp.dtb \
 	msm8996pro-pmi8994-mtp.dtb \
 	msm8996pro-pmi8994-pmk8001-cdp.dtb \
@@ -112,10 +113,16 @@ dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-cdp.dtb \
 	apq8096-v3-pmi8994-mdm9x55-slimbus-mtp.dtb \
 	apq8096-v3-pmi8996-mdm9x55-i2s-mtp.dtb \
 	apq8096-v3-pmi8996-mdm9x55-slimbus-mtp.dtb \
-	apq8096-v3-pmi8996-dragonboard.dtb
+	apq8096-v3-pmi8996-dragonboard.dtb \
+	msm8996-auto-mizar.dtb
 
-dtb-$(CONFIG_MSM_GVM_QUIN) += vplatform-lfv-msm8996.dtb
+dtb-$(CONFIG_MSM_GVM_QUIN) += vplatform-lfv-msm8996-telematics.dtb \
+	vplatform-lfv-msm8996-ivi.dtb \
+	vplatform-lfv-msm8996-baseline.dtb \
+	vplatform-lfv-msm8996-ivi-la.dtb \
+	vplatform-lfv-msm8996-ivi-lv-mt.dtb
 
+ifneq ($(CONFIG_ARCH_SONY_YOSHINO),y)
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 dtbo-$(CONFIG_ARCH_MSM8998) += \
 	msm8998-cdp-overlay.dtbo \
@@ -171,10 +178,24 @@ dtb-$(CONFIG_ARCH_MSM8998) += msm8998-sim.dtb \
 	apq8098-v2.1-svr20.dtb \
 	msm8998-v2.1-interposer-sdm660-cdp.dtb \
 	msm8998-v2.1-interposer-sdm660-mtp.dtb \
-	msm8998-v2.1-interposer-sdm660-qrd.dtb \
-	msm8998-9x55-rcm.dtb \
-	msm8998-9x55-cdp.dtb \
-	msm8998-9x55-mtp.dtb
+	msm8998-v2.1-interposer-sdm660-qrd.dtb
+endif
+else
+dtb-$(CONFIG_MACH_SONY_MAPLE) += msm8998-yoshino-maple_generic.dtb \
+	msm8998-v2-yoshino-maple_generic.dtb \
+	msm8998-v2.1-yoshino-maple_generic.dtb
+dtb-$(CONFIG_MACH_SONY_MAPLE_DSDS) += msm8998-yoshino-maple_dsds.dtb \
+	msm8998-v2-yoshino-maple_dsds.dtb \
+	msm8998-v2.1-yoshino-maple_dsds.dtb
+dtb-$(CONFIG_MACH_SONY_POPLAR) += msm8998-yoshino-poplar_generic.dtb \
+	msm8998-v2-yoshino-poplar_generic.dtb \
+	msm8998-v2.1-yoshino-poplar_generic.dtb
+dtb-$(CONFIG_MACH_SONY_POPLAR_DSDS) += msm8998-yoshino-poplar_dsds.dtb \
+	msm8998-v2-yoshino-poplar_dsds.dtb \
+	msm8998-v2.1-yoshino-poplar_dsds.dtb
+dtb-$(CONFIG_MACH_SONY_LILAC) += msm8998-yoshino-lilac_generic.dtb \
+	msm8998-v2-yoshino-lilac_generic.dtb \
+	msm8998-v2.1-yoshino-lilac_generic.dtb
 endif
 
 dtb-$(CONFIG_ARCH_MSMHAMSTER) += msmhamster-rumi.dtb
@@ -229,7 +250,34 @@ dtb-$(CONFIG_ARCH_SDM660) += sdm660-sim.dtb \
 	sda658-rcm.dtb \
 	sda658-pm660a-mtp.dtb \
 	sda658-pm660a-cdp.dtb \
-	sda658-pm660a-rcm.dtb
+	sda658-pm660a-rcm.dtb \
+	sdm636-cdp.dtb \
+	sdm636-mtp.dtb \
+	sdm636-qrd.dtb \
+	sdm636-rcm.dtb \
+	sdm636-headset-jacktype-no-cdp.dtb \
+	sdm636-headset-jacktype-no-rcm.dtb \
+	sdm636-internal-codec-cdp.dtb \
+	sdm636-internal-codec-mtp.dtb \
+	sdm636-internal-codec-pm660a-cdp.dtb \
+	sdm636-internal-codec-pm660a-mtp.dtb \
+	sdm636-internal-codec-pm660a-rcm.dtb \
+	sdm636-internal-codec-rcm.dtb \
+	sdm636-pm660a-headset-jacktype-no-cdp.dtb \
+	sdm636-pm660a-headset-jacktype-no-rcm.dtb \
+	sdm636-pm660a-cdp.dtb \
+	sdm636-pm660a-mtp.dtb \
+	sdm636-pm660a-qrd.dtb \
+	sdm636-pm660a-rcm.dtb \
+	sdm636-usbc-audio-mtp.dtb \
+	sdm636-usbc-audio-rcm.dtb \
+	sda636-cdp.dtb \
+	sda636-mtp.dtb \
+	sda636-rcm.dtb \
+	sda636-pm660a-cdp.dtb \
+	sda636-pm660a-mtp.dtb \
+	sda636-pm660a-qrd-hdk.dtb \
+	sda636-pm660a-rcm.dtb
 
 dtb-$(CONFIG_ARCH_SDM630) += sdm630-rumi.dtb \
 	sdm630-pm660a-rumi.dtb \

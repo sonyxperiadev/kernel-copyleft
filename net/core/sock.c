@@ -1486,7 +1486,7 @@ void sk_destruct(struct sock *sk)
 
 static void __sk_free(struct sock *sk)
 {
-	if (unlikely(sock_diag_has_destroy_listeners(sk) && sk->sk_net_refcnt))
+	if (unlikely(sk->sk_net_refcnt && sock_diag_has_destroy_listeners(sk)))
 		sock_diag_broadcast_destroy(sk);
 	else
 		sk_destruct(sk);
@@ -1527,6 +1527,8 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 		struct sk_filter *filter;
 
 		sock_copy(newsk, sk);
+
+		newsk->sk_prot_creator = sk->sk_prot;
 
 		/* SANITY */
 		if (likely(newsk->sk_net_refcnt))

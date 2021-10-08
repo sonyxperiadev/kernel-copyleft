@@ -838,7 +838,7 @@ static int raid10_congested(struct mddev *mddev, int bits)
 		if (rdev && !test_bit(Faulty, &rdev->flags)) {
 			struct request_queue *q = bdev_get_queue(rdev->bdev);
 
-			ret |= bdi_congested(&q->backing_dev_info, bits);
+			ret |= bdi_congested(q->backing_dev_info, bits);
 		}
 	}
 	rcu_read_unlock();
@@ -1414,11 +1414,24 @@ retry_write:
 			mbio->bi_private = r10_bio;
 
 			atomic_inc(&r10_bio->remaining);
+
+			cb = blk_check_plugged(raid10_unplug, mddev,
+					       sizeof(*plug));
+			if (cb)
+				plug = container_of(cb, struct raid10_plug_cb,
+						    cb);
+			else
+				plug = NULL;
 			spin_lock_irqsave(&conf->device_lock, flags);
-			bio_list_add(&conf->pending_bio_list, mbio);
-			conf->pending_count++;
+			if (plug) {
+				bio_list_add(&plug->pending, mbio);
+				plug->pending_cnt++;
+			} else {
+				bio_list_add(&conf->pending_bio_list, mbio);
+				conf->pending_count++;
+			}
 			spin_unlock_irqrestore(&conf->device_lock, flags);
-			if (!mddev_check_plugged(mddev))
+			if (!plug)
 				md_wakeup_thread(mddev->thread);
 		}
 	}
@@ -2617,7 +2630,8 @@ static void handle_write_completed(struct r10conf *conf, struct r10bio *r10_bio)
 		for (m = 0; m < conf->copies; m++) {
 			int dev = r10_bio->devs[m].devnum;
 			rdev = conf->mirrors[dev].rdev;
-			if (r10_bio->devs[m].bio == NULL)
+			if (r10_bio->devs[m].bio == NULL ||
+				r10_bio->devs[m].bio->bi_end_io == NULL)
 				continue;
 			if (!r10_bio->devs[m].bio->bi_error) {
 				rdev_clear_badblocks(
@@ -2632,7 +2646,8 @@ static void handle_write_completed(struct r10conf *conf, struct r10bio *r10_bio)
 					md_error(conf->mddev, rdev);
 			}
 			rdev = conf->mirrors[dev].replacement;
-			if (r10_bio->devs[m].repl_bio == NULL)
+			if (r10_bio->devs[m].repl_bio == NULL ||
+				r10_bio->devs[m].repl_bio->bi_end_io == NULL)
 				continue;
 
 			if (!r10_bio->devs[m].repl_bio->bi_error) {
@@ -2685,6 +2700,11 @@ static void handle_write_completed(struct r10conf *conf, struct r10bio *r10_bio)
 			list_add(&r10_bio->retry_list, &conf->bio_end_io_list);
 			conf->nr_queued++;
 			spin_unlock_irq(&conf->device_lock);
+			/*
+			 * In case freeze_array() is waiting for condition
+			 * nr_pending == nr_queued + extra to be true.
+			 */
+			wake_up(&conf->wait_barrier);
 			md_wakeup_thread(conf->mddev->thread);
 		} else {
 			if (test_bit(R10BIO_WriteError,
@@ -3620,6 +3640,7 @@ static int run(struct mddev *mddev)
 
 		if (blk_queue_discard(bdev_get_queue(rdev->bdev)))
 			discard_supported = true;
+		first = 0;
 	}
 
 	if (mddev->queue) {
@@ -3698,8 +3719,8 @@ static int run(struct mddev *mddev)
 		 * maybe...
 		 */
 		stripe /= conf->geo.near_copies;
-		if (mddev->queue->backing_dev_info.ra_pages < 2 * stripe)
-			mddev->queue->backing_dev_info.ra_pages = 2 * stripe;
+		if (mddev->queue->backing_dev_info->ra_pages < 2 * stripe)
+			mddev->queue->backing_dev_info->ra_pages = 2 * stripe;
 	}
 
 	if (md_integrity_register(mddev))
@@ -4026,6 +4047,7 @@ static int raid10_start_reshape(struct mddev *mddev)
 				diff = 0;
 			if (first || diff < min_offset_diff)
 				min_offset_diff = diff;
+			first = 0;
 		}
 	}
 
@@ -4493,8 +4515,8 @@ static void end_reshape(struct r10conf *conf)
 		int stripe = conf->geo.raid_disks *
 			((conf->mddev->chunk_sectors << 9) / PAGE_SIZE);
 		stripe /= conf->geo.near_copies;
-		if (conf->mddev->queue->backing_dev_info.ra_pages < 2 * stripe)
-			conf->mddev->queue->backing_dev_info.ra_pages = 2 * stripe;
+		if (conf->mddev->queue->backing_dev_info->ra_pages < 2 * stripe)
+			conf->mddev->queue->backing_dev_info->ra_pages = 2 * stripe;
 	}
 	conf->fullsync = 0;
 }

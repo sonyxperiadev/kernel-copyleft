@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,6 +15,7 @@
 
 #include <linux/slab.h>
 #include <linux/idr.h>
+#include <linux/pm.h>
 #include <linux/pm_qos.h>
 #include <linux/sched.h>
 
@@ -171,6 +172,9 @@ struct kgsl_functable {
 	void (*gpu_model)(struct kgsl_device *device, char *str,
 		size_t bufsz);
 	void (*stop_fault_timer)(struct kgsl_device *device);
+	void (*suspend_device)(struct kgsl_device *device,
+		pm_message_t pm_state);
+	void (*resume_device)(struct kgsl_device *device);
 };
 
 struct kgsl_ioctl {
@@ -417,6 +421,7 @@ struct kgsl_context {
  * @syncsource_idr: sync sources created by this process
  * @syncsource_lock: Spinlock to protect the syncsource idr
  * @fd_count: Counter for the number of FDs for this process
+ * @ctxt_count: Count for the number of contexts for this process
  */
 struct kgsl_process_private {
 	unsigned long priv;
@@ -436,6 +441,7 @@ struct kgsl_process_private {
 	struct idr syncsource_idr;
 	spinlock_t syncsource_lock;
 	int fd_count;
+	atomic_t ctxt_count;
 };
 
 /**

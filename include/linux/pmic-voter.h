@@ -15,6 +15,9 @@
 
 #include <linux/mutex.h>
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+#define NUM_MAX_CLIENTS	20
+#endif
 struct votable;
 
 enum votable_type {
@@ -46,5 +49,9 @@ struct votable *create_votable(const char *name,
 void destroy_votable(struct votable *votable);
 void lock_votable(struct votable *votable);
 void unlock_votable(struct votable *votable);
-
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+ssize_t somc_output_voter_param(struct votable *votable,
+						char *buf, size_t size);
+int somc_get_vote_clients(struct votable *votable, char *clients[]);
+#endif
 #endif /* __PMIC_VOTER_H */

@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -2647,12 +2652,15 @@ static int msm_cpe_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 				u_event_status32.payload_size;
 			err = msm_cpe_lsm_ioctl_shared(substream,
 						       cmd, event_status);
-			if (err)
+			if (err) {
 				dev_err(rtd->dev,
 					"%s: %s failed, error = %d\n",
 					__func__,
 					"SNDRV_LSM_EVENT_STATUS_V3_32",
 					err);
+				kfree(event_status);
+				goto done;
+			}
 		}
 
 		if (!err) {

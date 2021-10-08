@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 #ifndef _CALIB_HWDEP_H
 #define _CALIB_HWDEP_H
 
@@ -31,5 +36,7 @@ struct wcdcal_ioctl_buffer {
 
 #define SNDRV_CTL_IOCTL_HWDEP_CAL_TYPE \
 	_IOW('U', 0x1, struct wcdcal_ioctl_buffer)
+#define SNDRV_CTL_IOCTL_HWDEP_IS_ANC_INSERT \
+        _IOWR('U', 0x2, int)
 
 #endif /*_CALIB_HWDEP_H*/

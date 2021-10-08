@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #ifndef MDSS_PANEL_H
@@ -392,6 +397,7 @@ struct lcd_panel_info {
 	u32 h_active_low;
 	u32 v_back_porch;
 	u32 v_front_porch;
+	u32 v_front_porch_fixed;
 	u32 v_pulse_width;
 	u32 v_active_low;
 	u32 border_clr;
@@ -520,6 +526,9 @@ struct mipi_panel_info {
 	char dma_trigger;
 	/* Dynamic Switch Support */
 	enum dynamic_mode_switch dms_mode;
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	bool switch_mode_pending;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	u32 pixel_packing;
 	u32 dsi_pclk_rate;
@@ -928,6 +937,11 @@ struct mdss_panel_info {
 
 	/* esc clk recommended for the panel */
 	u32 esc_clk_rate_hz;
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	const char *panel_id_name;
+	int dsi_master;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 };
 
 struct mdss_panel_timing {
@@ -962,6 +976,10 @@ struct mdss_panel_timing {
 
 	struct mdss_mdp_pp_tear_check te;
 	struct mdss_panel_roi_alignment roi_alignment;
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	bool koff_thshold_enable;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 };
 
 struct mdss_panel_data {
@@ -969,6 +987,10 @@ struct mdss_panel_data {
 	void (*set_backlight) (struct mdss_panel_data *pdata, u32 bl_level);
 	int (*apply_display_setting)(struct mdss_panel_data *pdata, u32 mode);
 	unsigned char *mmss_cc_base;
+
+#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
+	struct platform_device *panel_pdev;
+#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	/**
 	 * event_handler() - callback handler for MDP core events
@@ -1058,6 +1080,23 @@ static inline u32 mdss_panel_get_framerate(struct mdss_panel_info *panel_info)
 		break;
 	}
 	return frame_rate;
+}
+
+/*
+ * mdss_panel_get_vtotal_fixed() - return panel device tree vertical height
+ * @pinfo:	Pointer to panel info containing all panel information
+ *
+ * Returns the total height as defined in panel device tree including any
+ * blanking regions which are not visible to user but used to calculate
+ * panel clock.
+ */
+static inline int mdss_panel_get_vtotal_fixed(struct mdss_panel_info *pinfo)
+{
+	return pinfo->yres + pinfo->lcdc.v_back_porch +
+			pinfo->lcdc.v_front_porch_fixed +
+			pinfo->lcdc.v_pulse_width+
+			pinfo->lcdc.border_top +
+			pinfo->lcdc.border_bottom;
 }
 
 /*

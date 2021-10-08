@@ -986,7 +986,10 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr,
 	INIT_HLIST_NODE(&ifa->addr_lst);
 	ifa->scope = scope;
 	ifa->prefix_len = pfxlen;
-	ifa->flags = flags | IFA_F_TENTATIVE;
+	ifa->flags = flags;
+	/* No need to add the TENTATIVE flag for addresses with NODAD */
+	if (!(flags & IFA_F_NODAD))
+		ifa->flags |= IFA_F_TENTATIVE;
 	ifa->valid_lft = valid_lft;
 	ifa->prefered_lft = prefered_lft;
 	ifa->cstamp = ifa->tstamp = jiffies;
@@ -5230,7 +5233,7 @@ static void __ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 		 * our DAD process, so we don't need
 		 * to do it again
 		 */
-		if (!(ifp->rt->rt6i_node))
+		if (!rcu_access_pointer(ifp->rt->rt6i_node))
 			ip6_ins_rt(ifp->rt);
 		if (ifp->idev->cnf.forwarding)
 			addrconf_join_anycast(ifp);

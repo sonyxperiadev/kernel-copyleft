@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2015, 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2015, 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -220,7 +220,7 @@ static int mdm_cmd_exe(enum esoc_cmd cmd, struct esoc_clink *esoc)
 		}
 		dev_dbg(mdm->dev, "Waiting for status gpio go low\n");
 		status_down = false;
-		end_time = jiffies + msecs_to_jiffies(10000);
+		end_time = jiffies + msecs_to_jiffies(mdm->shutdown_timeout_ms);
 		while (time_before(jiffies, end_time)) {
 			if (gpio_get_value(MDM_GPIO(mdm, MDM2AP_STATUS))
 									== 0) {
@@ -230,10 +230,15 @@ static int mdm_cmd_exe(enum esoc_cmd cmd, struct esoc_clink *esoc)
 			}
 			msleep(100);
 		}
-		if (status_down)
+		if (status_down) {
 			dev_dbg(dev, "shutdown successful\n");
-		else
+			esoc_clink_queue_request(ESOC_REQ_SHUTDOWN, esoc);
+		} else {
 			dev_err(mdm->dev, "graceful poff ipc fail\n");
+			graceful_shutdown = false;
+			goto force_poff;
+		}
+		break;
 force_poff:
 	case ESOC_FORCE_PWR_OFF:
 		if (!graceful_shutdown) {
@@ -1084,10 +1089,23 @@ static int mdm9x55_setup_hw(struct mdm_ctrl *mdm,
 					&esoc->link_info);
 	if (ret)
 		dev_info(mdm->dev, "esoc link info missing\n");
+
+	ret = of_property_read_u32(node, "qcom,shutdown-timeout-ms",
+				   &mdm->shutdown_timeout_ms);
+	if (ret)
+		mdm->shutdown_timeout_ms = DEF_SHUTDOWN_TIMEOUT;
+
 	esoc->clink_ops = clink_ops;
 	esoc->parent = mdm->dev;
 	esoc->owner = THIS_MODULE;
 	esoc->np = pdev->dev.of_node;
+
+	esoc->auto_boot = of_property_read_bool(esoc->np,
+						"qcom,mdm-auto-boot");
+	esoc->statusline_not_a_powersource = of_property_read_bool(esoc->np,
+				"qcom,mdm-statusline-not-a-powersource");
+	esoc->userspace_handle_shutdown = of_property_read_bool(esoc->np,
+				"qcom,mdm-userspace-handle-shutdown");
 	set_esoc_clink_data(esoc, mdm);
 	ret = esoc_clink_register(esoc);
 	if (ret) {
@@ -1103,6 +1121,8 @@ static int mdm9x55_setup_hw(struct mdm_ctrl *mdm,
 	mdm->debug_fail = false;
 	mdm->esoc = esoc;
 	mdm->init = 0;
+	if (esoc->auto_boot)
+		gpio_direction_output(MDM_GPIO(mdm, AP2MDM_STATUS), 1);
 	return 0;
 }
 

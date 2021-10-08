@@ -12,6 +12,11 @@
  *
  */
 /*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
+/*
  * SOC Info Routines
  *
  */
@@ -29,6 +34,9 @@
 #include <linux/string.h>
 #include <linux/types.h>
 
+#ifdef CONFIG_RAMDUMP_TAGS
+#include <linux/rdtags.h>
+#endif
 #include <asm/system_misc.h>
 
 #include <soc/qcom/socinfo.h>
@@ -47,6 +55,18 @@
 #define SMEM_IMAGE_VERSION_PARTITION_APPS 10
 
 static DECLARE_RWSEM(current_image_rwsem);
+
+#ifdef CONFIG_RAMDUMP_TAGS
+#define RDT_ADD_UINT(func, name) \
+	do { \
+		res = func(); \
+		if (res != 0) { \
+			snprintf(buf, sizeof(buf), "%u (0x%.8X)", res, res); \
+			rdtags_add_tag(name, buf, strnlen(buf, sizeof(buf))); \
+		} \
+	} while (0)
+#endif
+
 enum {
 	HW_PLATFORM_UNKNOWN = 0,
 	HW_PLATFORM_SURF    = 1,
@@ -565,6 +585,10 @@ static struct msm_soc_info cpu_of_id[] = {
 	/* 630 ID */
 	[318] = {MSM_CPU_630, "SDM630"},
 	[327] = {MSM_CPU_630, "SDA630"},
+
+	/* 636 ID */
+	[345] = {MSM_CPU_636, "SDM636"},
+	[346] = {MSM_CPU_636, "SDA636"},
 
 	/* Uninitialized IDs are not known to run Linux.
 	   MSM_CPU_UNKNOWN is set to 0 to ensure these IDs are
@@ -1289,6 +1313,14 @@ static void * __init setup_dummy_socinfo(void)
 		dummy_socinfo.id = 327;
 		strlcpy(dummy_socinfo.build_id, "sda630 - ",
 			sizeof(dummy_socinfo.build_id));
+	} else if (early_machine_is_sdm636()) {
+		dummy_socinfo.id = 345;
+		strlcpy(dummy_socinfo.build_id, "sdm636 - ",
+			sizeof(dummy_socinfo.build_id));
+	} else if (early_machine_is_sda636()) {
+		dummy_socinfo.id = 346;
+		strlcpy(dummy_socinfo.build_id, "sda636 - ",
+			sizeof(dummy_socinfo.build_id));
 	} else if (early_machine_is_apq8098()) {
 		dummy_socinfo.id = 319;
 		strlcpy(dummy_socinfo.build_id, "apq8098 - ",
@@ -1559,6 +1591,34 @@ static void socinfo_select_format(void)
 	}
 }
 
+#ifdef CONFIG_RAMDUMP_TAGS
+/* Extracts information from QC:s socinfo to get
+ * information about the hardware revisions of main soc
+ */
+static void add_socinfo_tags(void)
+{
+	uint32_t res;
+	char buf[64];
+	char *str;
+
+	RDT_ADD_UINT(read_cpuid_id, "cpuid_id");
+	RDT_ADD_UINT(socinfo_get_platform_version, "socinfo_platform_version");
+	RDT_ADD_UINT(socinfo_get_platform_subtype, "socinfo_platform_subtype");
+	RDT_ADD_UINT(socinfo_get_platform_type, "socinfo_platform_type");
+	RDT_ADD_UINT(socinfo_get_raw_id, "socinfo_raw_id");
+	RDT_ADD_UINT(socinfo_get_id, "socinfo_id");
+
+	res = socinfo_get_version();
+	snprintf(buf, sizeof(buf), "%u.%u", SOCINFO_VERSION_MAJOR(res),
+						SOCINFO_VERSION_MINOR(res));
+	rdtags_add_tag("socinfo_version", buf, strnlen(buf, sizeof(buf)));
+
+	str = socinfo_get_build_id();
+	if (str)
+		rdtags_add_tag("socinfo_build_id", str, strlen(str));
+}
+#endif
+
 int __init socinfo_init(void)
 {
 	static bool socinfo_init_done;
@@ -1587,6 +1647,9 @@ int __init socinfo_init(void)
 	socinfo_print();
 	arch_read_hardware_id = msm_read_hardware_id;
 	socinfo_init_done = true;
+#ifdef CONFIG_RAMDUMP_TAGS
+	add_socinfo_tags();
+#endif
 
 	return 0;
 }

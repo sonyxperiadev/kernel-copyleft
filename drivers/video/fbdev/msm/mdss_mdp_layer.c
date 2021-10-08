@@ -1853,9 +1853,15 @@ static int __validate_secure_session(struct mdss_overlay_private *mdp5_data)
 		pr_err("secure-camera cnt:%d secure video:%d secure display:%d\n",
 				secure_cam_pipes, secure_vid_pipes, sd_pipes);
 		return -EINVAL;
-	} else {
-		return 0;
+	} else if (mdp5_data->ctl->is_video_mode &&
+		((sd_pipes && !mdp5_data->sd_enabled) ||
+		(!sd_pipes && mdp5_data->sd_enabled)) &&
+		!mdp5_data->cache_null_commit) {
+		pr_err("NULL commit missing before display secure session entry/exit\n");
+		return -EINVAL;
 	}
+
+	return 0;
 }
 
 /*
@@ -3191,11 +3197,14 @@ int mdss_mdp_layer_atomic_validate_wfd(struct msm_fb_data_type *mfd,
 		goto validate_failed;
 	}
 
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
 	rc = mdss_mdp_wfd_setup(wfd, output_layer);
 	if (rc) {
 		pr_err("fail to prepare wfd = %d\n", rc);
+		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 		goto validate_failed;
 	}
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 
 	rc = mdss_mdp_layer_atomic_validate(mfd, file, commit);
 	if (rc) {

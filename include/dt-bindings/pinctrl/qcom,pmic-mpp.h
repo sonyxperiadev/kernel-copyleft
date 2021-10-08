@@ -2,6 +2,11 @@
  * This header provides constants for the Qualcomm PMIC's
  * Multi-Purpose Pin binding.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2015 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _DT_BINDINGS_PINCTRL_QCOM_PMIC_MPP_H
 #define _DT_BINDINGS_PINCTRL_QCOM_PMIC_MPP_H

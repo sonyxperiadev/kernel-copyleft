@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,6 +27,8 @@
 #include <sound/q6afe-v2.h>
 #include <sound/msm-dai-q6-v2.h>
 #include <sound/pcm_params.h>
+#include <sound/q6core.h>
+#include <soc/qcom/boot_stats.h>
 
 #define MSM_DAI_PRI_AUXPCM_DT_DEV_ID 1
 #define MSM_DAI_SEC_AUXPCM_DT_DEV_ID 2
@@ -88,86 +90,6 @@ enum {
 	RATE_8KHZ,
 	RATE_16KHZ,
 	RATE_MAX_NUM_OF_AUX_PCM_RATES,
-};
-
-enum {
-	IDX_PRIMARY_TDM_RX_0,
-	IDX_PRIMARY_TDM_RX_1,
-	IDX_PRIMARY_TDM_RX_2,
-	IDX_PRIMARY_TDM_RX_3,
-	IDX_PRIMARY_TDM_RX_4,
-	IDX_PRIMARY_TDM_RX_5,
-	IDX_PRIMARY_TDM_RX_6,
-	IDX_PRIMARY_TDM_RX_7,
-	IDX_PRIMARY_TDM_TX_0,
-	IDX_PRIMARY_TDM_TX_1,
-	IDX_PRIMARY_TDM_TX_2,
-	IDX_PRIMARY_TDM_TX_3,
-	IDX_PRIMARY_TDM_TX_4,
-	IDX_PRIMARY_TDM_TX_5,
-	IDX_PRIMARY_TDM_TX_6,
-	IDX_PRIMARY_TDM_TX_7,
-	IDX_SECONDARY_TDM_RX_0,
-	IDX_SECONDARY_TDM_RX_1,
-	IDX_SECONDARY_TDM_RX_2,
-	IDX_SECONDARY_TDM_RX_3,
-	IDX_SECONDARY_TDM_RX_4,
-	IDX_SECONDARY_TDM_RX_5,
-	IDX_SECONDARY_TDM_RX_6,
-	IDX_SECONDARY_TDM_RX_7,
-	IDX_SECONDARY_TDM_TX_0,
-	IDX_SECONDARY_TDM_TX_1,
-	IDX_SECONDARY_TDM_TX_2,
-	IDX_SECONDARY_TDM_TX_3,
-	IDX_SECONDARY_TDM_TX_4,
-	IDX_SECONDARY_TDM_TX_5,
-	IDX_SECONDARY_TDM_TX_6,
-	IDX_SECONDARY_TDM_TX_7,
-	IDX_TERTIARY_TDM_RX_0,
-	IDX_TERTIARY_TDM_RX_1,
-	IDX_TERTIARY_TDM_RX_2,
-	IDX_TERTIARY_TDM_RX_3,
-	IDX_TERTIARY_TDM_RX_4,
-	IDX_TERTIARY_TDM_RX_5,
-	IDX_TERTIARY_TDM_RX_6,
-	IDX_TERTIARY_TDM_RX_7,
-	IDX_TERTIARY_TDM_TX_0,
-	IDX_TERTIARY_TDM_TX_1,
-	IDX_TERTIARY_TDM_TX_2,
-	IDX_TERTIARY_TDM_TX_3,
-	IDX_TERTIARY_TDM_TX_4,
-	IDX_TERTIARY_TDM_TX_5,
-	IDX_TERTIARY_TDM_TX_6,
-	IDX_TERTIARY_TDM_TX_7,
-	IDX_QUATERNARY_TDM_RX_0,
-	IDX_QUATERNARY_TDM_RX_1,
-	IDX_QUATERNARY_TDM_RX_2,
-	IDX_QUATERNARY_TDM_RX_3,
-	IDX_QUATERNARY_TDM_RX_4,
-	IDX_QUATERNARY_TDM_RX_5,
-	IDX_QUATERNARY_TDM_RX_6,
-	IDX_QUATERNARY_TDM_RX_7,
-	IDX_QUATERNARY_TDM_TX_0,
-	IDX_QUATERNARY_TDM_TX_1,
-	IDX_QUATERNARY_TDM_TX_2,
-	IDX_QUATERNARY_TDM_TX_3,
-	IDX_QUATERNARY_TDM_TX_4,
-	IDX_QUATERNARY_TDM_TX_5,
-	IDX_QUATERNARY_TDM_TX_6,
-	IDX_QUATERNARY_TDM_TX_7,
-	IDX_TDM_MAX,
-};
-
-enum {
-	IDX_GROUP_PRIMARY_TDM_RX,
-	IDX_GROUP_PRIMARY_TDM_TX,
-	IDX_GROUP_SECONDARY_TDM_RX,
-	IDX_GROUP_SECONDARY_TDM_TX,
-	IDX_GROUP_TERTIARY_TDM_RX,
-	IDX_GROUP_TERTIARY_TDM_TX,
-	IDX_GROUP_QUATERNARY_TDM_RX,
-	IDX_GROUP_QUATERNARY_TDM_TX,
-	IDX_GROUP_TDM_MAX,
 };
 
 struct msm_dai_q6_dai_data {
@@ -3571,13 +3493,13 @@ static int msm_dai_q6_dai_mi2s_probe(struct snd_soc_dai *dai)
 	ctrl = NULL;
 	if (mi2s_dai_data->tx_dai.mi2s_dai_data.port_config.i2s.channel_mode) {
 		if (dai->id == MSM_PRIM_MI2S)
-			ctrl = &mi2s_config_controls[4];
-		if (dai->id == MSM_SEC_MI2S)
 			ctrl = &mi2s_config_controls[5];
-		if (dai->id == MSM_TERT_MI2S)
+		if (dai->id == MSM_SEC_MI2S)
 			ctrl = &mi2s_config_controls[6];
-		if (dai->id == MSM_QUAT_MI2S)
+		if (dai->id == MSM_TERT_MI2S)
 			ctrl = &mi2s_config_controls[7];
+		if (dai->id == MSM_QUAT_MI2S)
+			ctrl = &mi2s_config_controls[8];
 		if (dai->id == MSM_QUIN_MI2S)
 			ctrl = &mi2s_config_controls[9];
 		if (dai->id == MSM_SENARY_MI2S)
@@ -3585,9 +3507,6 @@ static int msm_dai_q6_dai_mi2s_probe(struct snd_soc_dai *dai)
 		if (dai->id == MSM_INT5_MI2S)
 			ctrl = &mi2s_config_controls[11];
 	}
-
-	if (dai->id == MSM_QUAT_MI2S)
-		ctrl = &mi2s_config_controls[8];
 
 	if (ctrl) {
 		rc = snd_ctl_add(dai->component->card->snd_card,
@@ -4124,7 +4043,8 @@ static struct snd_soc_dai_driver msm_dai_q6_mi2s_dai[] = {
 				 SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 |
 				 SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 |
 				 SNDRV_PCM_RATE_192000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				SNDRV_PCM_FMTBIT_S24_LE,
 			.rate_min =     8000,
 			.rate_max =     192000,
 		},
@@ -4166,18 +4086,6 @@ static struct snd_soc_dai_driver msm_dai_q6_mi2s_dai[] = {
 	},
 	{
 		.playback = {
-			.stream_name = "Secondary MI2S Playback SD1",
-			.aif_name = "SEC_MI2S_RX_SD1",
-			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
-			SNDRV_PCM_RATE_16000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-			.rate_min =     8000,
-			.rate_max =     48000,
-		},
-		.id = MSM_SEC_MI2S_SD1,
-	},
-	{
-		.playback = {
 			.stream_name = "Quinary MI2S Playback",
 			.aif_name = "QUIN_MI2S_RX",
 			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
@@ -4200,6 +4108,18 @@ static struct snd_soc_dai_driver msm_dai_q6_mi2s_dai[] = {
 		.id = MSM_QUIN_MI2S,
 		.probe = msm_dai_q6_dai_mi2s_probe,
 		.remove = msm_dai_q6_dai_mi2s_remove,
+	},
+	{
+		.playback = {
+			.stream_name = "Secondary MI2S Playback SD1",
+			.aif_name = "SEC_MI2S_RX_SD1",
+			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
+			SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.rate_min =     8000,
+			.rate_max =     48000,
+		},
+		.id = MSM_SEC_MI2S_SD1,
 	},
 	{
 		.capture = {
@@ -4555,6 +4475,7 @@ static int msm_dai_q6_mi2s_dev_probe(struct platform_device *pdev)
 	u32 mi2s_intf = 0;
 	struct msm_mi2s_pdata *mi2s_pdata;
 	int rc;
+	char boot_marker[40];
 
 	rc = of_property_read_u32(pdev->dev.of_node, q6_mi2s_dev_id,
 				  &mi2s_intf);
@@ -4563,6 +4484,10 @@ static int msm_dai_q6_mi2s_dev_probe(struct platform_device *pdev)
 			"%s: missing 0x%x in dt node\n", __func__, mi2s_intf);
 		goto rtn;
 	}
+
+	snprintf(boot_marker, sizeof(boot_marker),
+			"M - DRIVER MSM I2S_%d Init", mi2s_intf);
+	place_marker(boot_marker);
 
 	dev_dbg(&pdev->dev, "dev name %s dev id 0x%x\n", dev_name(&pdev->dev),
 		mi2s_intf);
@@ -4627,6 +4552,11 @@ static int msm_dai_q6_mi2s_dev_probe(struct platform_device *pdev)
 
 	if (IS_ERR_VALUE(rc))
 		goto err_register;
+
+	snprintf(boot_marker, sizeof(boot_marker),
+			"M - DRIVER MSM I2S_%d Ready", mi2s_intf);
+	place_marker(boot_marker);
+
 	return 0;
 
 err_register:
@@ -6160,6 +6090,9 @@ static int msm_dai_q6_tdm_set_tdm_slot(struct snd_soc_dai *dai,
 	case 16:
 		cap_mask = 0xFFFF;
 		break;
+	case 32:
+		cap_mask = 0xFFFFFFFF;
+		break;
 	default:
 		dev_err(dai->dev, "%s: invalid slots %d\n",
 			__func__, slots);
@@ -6292,6 +6225,8 @@ static int msm_dai_q6_tdm_set_channel_map(struct snd_soc_dai *dai,
 		dev_get_drvdata(dai->dev);
 	struct afe_param_id_slot_mapping_cfg *slot_mapping =
 		&dai_data->port_cfg.slot_mapping;
+	struct afe_param_id_slot_mapping_cfg_v2 *slot_mapping_v2 =
+		&dai_data->port_cfg.slot_mapping_v2;
 	int i = 0;
 
 	dev_dbg(dai->dev, "%s: dai id = 0x%x\n", __func__, dai->id);
@@ -6329,23 +6264,49 @@ static int msm_dai_q6_tdm_set_channel_map(struct snd_soc_dai *dai,
 	case AFE_PORT_ID_QUATERNARY_TDM_RX_5:
 	case AFE_PORT_ID_QUATERNARY_TDM_RX_6:
 	case AFE_PORT_ID_QUATERNARY_TDM_RX_7:
-		if (!rx_slot) {
-			dev_err(dai->dev, "%s: rx slot not found\n", __func__);
-			return -EINVAL;
-		}
-		if (rx_num > AFE_PORT_MAX_AUDIO_CHAN_CNT) {
-			dev_err(dai->dev, "%s: invalid rx num %d\n", __func__,
-				rx_num);
-			return -EINVAL;
-		}
+		if (afe_get_svc_version(APR_SVC_AFE) >=
+				ADSP_AFE_API_VERSION_V3) {
+			if (!rx_slot) {
+				dev_err(dai->dev, "%s: rx slot not found\n",
+						__func__);
+				return -EINVAL;
+			}
+			if (rx_num > AFE_PORT_MAX_AUDIO_CHAN_CNT_V2) {
+				dev_err(dai->dev, "%s: invalid rx num %d\n",
+						__func__,
+					rx_num);
+				return -EINVAL;
+			}
 
-		for (i = 0; i < rx_num; i++)
-			slot_mapping->offset[i] = rx_slot[i];
-		for (i = rx_num; i < AFE_PORT_MAX_AUDIO_CHAN_CNT; i++)
-			slot_mapping->offset[i] =
-				AFE_SLOT_MAPPING_OFFSET_INVALID;
+			for (i = 0; i < rx_num; i++)
+				slot_mapping_v2->offset[i] = rx_slot[i];
+			for (i = rx_num; i < AFE_PORT_MAX_AUDIO_CHAN_CNT_V2;
+					i++)
+				slot_mapping_v2->offset[i] =
+					AFE_SLOT_MAPPING_OFFSET_INVALID;
 
-		slot_mapping->num_channel = rx_num;
+			slot_mapping_v2->num_channel = rx_num;
+		} else {
+			if (!rx_slot) {
+				dev_err(dai->dev, "%s: rx slot not found\n",
+						__func__);
+				return -EINVAL;
+			}
+			if (rx_num > AFE_PORT_MAX_AUDIO_CHAN_CNT) {
+				dev_err(dai->dev, "%s: invalid rx num %d\n",
+						__func__,
+					rx_num);
+				return -EINVAL;
+			}
+
+			for (i = 0; i < rx_num; i++)
+				slot_mapping->offset[i] = rx_slot[i];
+			for (i = rx_num; i < AFE_PORT_MAX_AUDIO_CHAN_CNT; i++)
+				slot_mapping->offset[i] =
+					AFE_SLOT_MAPPING_OFFSET_INVALID;
+
+			slot_mapping->num_channel = rx_num;
+		}
 		break;
 	case AFE_PORT_ID_PRIMARY_TDM_TX:
 	case AFE_PORT_ID_PRIMARY_TDM_TX_1:
@@ -6379,23 +6340,49 @@ static int msm_dai_q6_tdm_set_channel_map(struct snd_soc_dai *dai,
 	case AFE_PORT_ID_QUATERNARY_TDM_TX_5:
 	case AFE_PORT_ID_QUATERNARY_TDM_TX_6:
 	case AFE_PORT_ID_QUATERNARY_TDM_TX_7:
-		if (!tx_slot) {
-			dev_err(dai->dev, "%s: tx slot not found\n", __func__);
-			return -EINVAL;
-		}
-		if (tx_num > AFE_PORT_MAX_AUDIO_CHAN_CNT) {
-			dev_err(dai->dev, "%s: invalid tx num %d\n", __func__,
-				tx_num);
-			return -EINVAL;
-		}
+		if (afe_get_svc_version(APR_SVC_AFE) >=
+				ADSP_AFE_API_VERSION_V3) {
+			if (!tx_slot) {
+				dev_err(dai->dev, "%s: tx slot not found\n",
+						__func__);
+				return -EINVAL;
+			}
+			if (tx_num > AFE_PORT_MAX_AUDIO_CHAN_CNT_V2) {
+				dev_err(dai->dev, "%s: invalid tx num %d\n",
+						__func__,
+					tx_num);
+				return -EINVAL;
+			}
 
-		for (i = 0; i < tx_num; i++)
-			slot_mapping->offset[i] = tx_slot[i];
-		for (i = tx_num; i < AFE_PORT_MAX_AUDIO_CHAN_CNT; i++)
-			slot_mapping->offset[i] =
-				AFE_SLOT_MAPPING_OFFSET_INVALID;
+			for (i = 0; i < tx_num; i++)
+				slot_mapping_v2->offset[i] = tx_slot[i];
+			for (i = tx_num; i < AFE_PORT_MAX_AUDIO_CHAN_CNT_V2;
+					i++)
+				slot_mapping_v2->offset[i] =
+					AFE_SLOT_MAPPING_OFFSET_INVALID;
 
-		slot_mapping->num_channel = tx_num;
+			slot_mapping_v2->num_channel = tx_num;
+		} else {
+			if (!tx_slot) {
+				dev_err(dai->dev, "%s: tx slot not found\n",
+						__func__);
+				return -EINVAL;
+			}
+			if (tx_num > AFE_PORT_MAX_AUDIO_CHAN_CNT) {
+				dev_err(dai->dev, "%s: invalid tx num %d\n",
+						__func__,
+					tx_num);
+				return -EINVAL;
+			}
+
+			for (i = 0; i < tx_num; i++)
+				slot_mapping->offset[i] = tx_slot[i];
+			for (i = tx_num; i < AFE_PORT_MAX_AUDIO_CHAN_CNT; i++)
+				slot_mapping->offset[i] =
+					AFE_SLOT_MAPPING_OFFSET_INVALID;
+
+			slot_mapping->num_channel = tx_num;
+		}
 		break;
 	default:
 		dev_err(dai->dev, "%s: invalid dai id 0x%x\n",
@@ -6419,6 +6406,8 @@ static int msm_dai_q6_tdm_hw_params(struct snd_pcm_substream *substream,
 		&dai_data->port_cfg.tdm;
 	struct afe_param_id_slot_mapping_cfg *slot_mapping =
 		&dai_data->port_cfg.slot_mapping;
+	struct afe_param_id_slot_mapping_cfg_v2 *slot_mapping_v2 =
+		&dai_data->port_cfg.slot_mapping_v2;
 	struct afe_param_id_custom_tdm_header_cfg *custom_tdm_header =
 		&dai_data->port_cfg.custom_tdm_header;
 
@@ -6426,7 +6415,7 @@ static int msm_dai_q6_tdm_hw_params(struct snd_pcm_substream *substream,
 		__func__, dev_name(dai->dev));
 
 	if ((params_channels(params) == 0) ||
-		(params_channels(params) > 8)) {
+		(params_channels(params) > 32)) {
 		dev_err(dai->dev, "%s: invalid param channels %d\n",
 			__func__, params_channels(params));
 		return -EINVAL;
@@ -6514,32 +6503,88 @@ static int msm_dai_q6_tdm_hw_params(struct snd_pcm_substream *substream,
 		tdm->ctrl_data_out_enable,
 		tdm->ctrl_invert_sync_pulse,
 		tdm->ctrl_sync_data_delay);
+	if (afe_get_svc_version(APR_SVC_AFE) >=
+			ADSP_AFE_API_VERSION_V3) {
+		/*
+		 * update slot mapping v2 config param
+		 * NOTE: channels/rate/bitwidth are per stream property
+		 */
+		slot_mapping_v2->bitwidth = dai_data->bitwidth;
 
-	/*
-	 * update slot mapping config param
-	 * NOTE: channels/rate/bitwidth are per stream property
-	 */
-	slot_mapping->bitwidth = dai_data->bitwidth;
-
-	pr_debug("%s: SLOT MAPPING:\n"
+	pr_debug("%s: SLOT MAPPING_V2:\n"
 		"num_channel=%d bitwidth=%d data_align=0x%x\n",
 		__func__,
-		slot_mapping->num_channel,
-		slot_mapping->bitwidth,
-		slot_mapping->data_align_type);
-	pr_debug("%s: SLOT MAPPING:\n"
+		slot_mapping_v2->num_channel,
+		slot_mapping_v2->bitwidth,
+		slot_mapping_v2->data_align_type);
+	pr_debug("%s: SLOT MAPPING V2:\n"
 		"offset[0]=0x%x offset[1]=0x%x offset[2]=0x%x offset[3]=0x%x\n"
-		"offset[4]=0x%x offset[5]=0x%x offset[6]=0x%x offset[7]=0x%x\n",
+		"offset[4]=0x%x offset[5]=0x%x offset[6]=0x%x offset[7]=0x%x\n"
+		"offset[8]=0x%x offset[9]=0x%x offset[10]=0x%x offset[11]=0x%x\n"
+		"offset[12]=0x%x offset[13]=0x%x offset[14]=0x%x offset[15]=0x%x\n"
+		"offset[16]=0x%x offset[17]=0x%x offset[18]=0x%x offset[19]=0x%x\n"
+		"offset[20]=0x%x offset[21]=0x%x offset[22]=0x%x offset[23]=0x%x\n"
+		"offset[24]=0x%x offset[25]=0x%x offset[26]=0x%x offset[27]=0x%x\n"
+		"offset[28]=0x%x offset[29]=0x%x offset[30]=0x%x offset[31]=0x%x\n",
 		__func__,
-		slot_mapping->offset[0],
-		slot_mapping->offset[1],
-		slot_mapping->offset[2],
-		slot_mapping->offset[3],
-		slot_mapping->offset[4],
-		slot_mapping->offset[5],
-		slot_mapping->offset[6],
-		slot_mapping->offset[7]);
+		slot_mapping_v2->offset[0],
+		slot_mapping_v2->offset[1],
+		slot_mapping_v2->offset[2],
+		slot_mapping_v2->offset[3],
+		slot_mapping_v2->offset[4],
+		slot_mapping_v2->offset[5],
+		slot_mapping_v2->offset[6],
+		slot_mapping_v2->offset[7],
+		slot_mapping_v2->offset[8],
+		slot_mapping_v2->offset[9],
+		slot_mapping_v2->offset[10],
+		slot_mapping_v2->offset[11],
+		slot_mapping_v2->offset[12],
+		slot_mapping_v2->offset[13],
+		slot_mapping_v2->offset[14],
+		slot_mapping_v2->offset[15],
+		slot_mapping_v2->offset[16],
+		slot_mapping_v2->offset[17],
+		slot_mapping_v2->offset[18],
+		slot_mapping_v2->offset[19],
+		slot_mapping_v2->offset[20],
+		slot_mapping_v2->offset[21],
+		slot_mapping_v2->offset[22],
+		slot_mapping_v2->offset[23],
+		slot_mapping_v2->offset[24],
+		slot_mapping_v2->offset[25],
+		slot_mapping_v2->offset[26],
+		slot_mapping_v2->offset[27],
+		slot_mapping_v2->offset[28],
+		slot_mapping_v2->offset[29],
+		slot_mapping_v2->offset[30],
+		slot_mapping_v2->offset[31]);
+	} else {
+		/*
+		 * update slot mapping config param
+		 * NOTE: channels/rate/bitwidth are per stream property
+		 */
+		slot_mapping->bitwidth = dai_data->bitwidth;
 
+		pr_debug("%s: SLOT MAPPING:\n"
+			"num_channel=%d bitwidth=%d data_align=0x%x\n",
+			__func__,
+			slot_mapping->num_channel,
+			slot_mapping->bitwidth,
+			slot_mapping->data_align_type);
+		pr_debug("%s: SLOT MAPPING:\n"
+			"offset[0]=0x%x offset[1]=0x%x offset[2]=0x%x offset[3]=0x%x\n"
+			"offset[4]=0x%x offset[5]=0x%x offset[6]=0x%x offset[7]=0x%x\n",
+			__func__,
+			slot_mapping->offset[0],
+			slot_mapping->offset[1],
+			slot_mapping->offset[2],
+			slot_mapping->offset[3],
+			slot_mapping->offset[4],
+			slot_mapping->offset[5],
+			slot_mapping->offset[6],
+			slot_mapping->offset[7]);
+	}
 	/*
 	 * update custom header config param
 	 * NOTE: channels/rate/bitwidth are per playback stream property.
@@ -8120,6 +8165,9 @@ static int msm_dai_q6_tdm_dev_probe(struct platform_device *pdev)
 	/* TDM SLOT MAPPING CFG -- set default */
 	dai_data->port_cfg.slot_mapping.minor_version =
 		AFE_API_VERSION_SLOT_MAPPING_CONFIG;
+
+	dai_data->port_cfg.slot_mapping_v2.minor_version =
+		AFE_API_VERSION_SLOT_MAPPING_CONFIG_V2;
 
 	/* CUSTOM TDM HEADER CFG */
 	custom_tdm_header = &dai_data->port_cfg.custom_tdm_header;

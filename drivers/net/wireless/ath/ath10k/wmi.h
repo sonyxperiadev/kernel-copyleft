@@ -20,6 +20,9 @@
 
 #include <linux/types.h>
 #include <net/mac80211.h>
+#include <linux/ipv6.h>
+#include <net/ipv6.h>
+#include <linux/in.h>
 
 /*
  * This file specifies the WMI interface for the Unified Software
@@ -2884,6 +2887,66 @@ struct wmi_start_scan_common {
 	__le32 scan_ctrl_flags;
 } __packed;
 
+/* ARP-NS offload data structure */
+#define WMI_NS_ARP_OFFLOAD		2
+#define WMI_ARP_NS_OFF_FLAGS_VALID	BIT(0)
+#define WMI_IPV4_ARP_REPLY_OFFLOAD	0
+#define WMI_ARP_NS_OFFLOAD_DISABLE	0
+#define WMI_ARP_NS_OFFLOAD_ENABLE	1
+#define WMI_NSOFF_IPV6_ANYCAST		BIT(3)
+
+struct wmi_ns_offload_info {
+	struct in6_addr src_addr;
+	struct in6_addr self_addr[TARGET_NUM_STATIONS];
+	struct in6_addr target_addr[TARGET_NUM_STATIONS];
+	struct wmi_mac_addr self_macaddr;
+	u8 src_ipv6_addr_valid;
+	struct in6_addr target_addr_valid;
+	struct in6_addr target_ipv6_ac;
+	u8 slot_idx;
+} __packed;
+
+struct wmi_ns_arp_offload_req {
+	u8 offload_type;
+	u8 enable_offload;
+	__le32 num_ns_offload_count;
+	union {
+		struct in_addr ipv4_addr;
+		struct in6_addr ipv6_addr;
+	} params;
+	struct wmi_ns_offload_info info;
+	struct wmi_mac_addr bssid;
+} __packed;
+
+struct wmi_ns_offload {
+	__le32 flags;
+	struct in6_addr target_ipaddr[WMI_NS_ARP_OFFLOAD];
+	struct in6_addr solicitation_ipaddr;
+	struct in6_addr remote_ipaddr;
+	struct wmi_mac_addr target_mac;
+} __packed;
+
+struct wmi_arp_offload {
+	__le32 flags;
+	struct in_addr target_ipaddr;
+	struct in_addr remote_ipaddr;
+	struct wmi_mac_addr target_mac;
+} __packed;
+
+/* GTK offload data structure */
+#define WMI_GTK_OFFLOAD_ENABLE_OPCODE	BIT(24)
+#define WMI_GTK_OFFLOAD_DISABLE_OPCODE	BIT(25)
+#define WMI_GTK_OFFLOAD_ENABLE	1
+#define WMI_GTK_OFFLOAD_DISABLE	0
+
+struct wmi_gtk_rekey_data {
+	bool valid;
+	bool enable_offload;
+	u8 kck[NL80211_KCK_LEN];
+	u8 kek[NL80211_KEK_LEN];
+	__le64 replay_ctr;
+} __packed;
+
 struct wmi_start_scan_tlvs {
 	/* TLV parameters. These includes channel list, ssid list, bssid list,
 	 * extra ies.
@@ -2960,6 +3023,8 @@ struct wmi_start_scan_arg {
 /* Different FW scan engine may choose to bail out on errors.
  * Allow the driver to have influence over that. */
 #define WMI_SCAN_CONTINUE_ON_ERROR 0x80
+/** add DS content in probe req frame */
+#define WMI_SCAN_ADD_DS_IE_IN_PROBE_REQ   0x800
 
 /* WMI_SCAN_CLASS_MASK must be the same value as IEEE80211_SCAN_CLASS_MASK */
 #define WMI_SCAN_CLASS_MASK 0xFF000000
@@ -3113,6 +3178,10 @@ struct wmi_mgmt_rx_ext_info {
 
 #define PHY_ERROR_10_4_RADAR_MASK               0x4
 #define PHY_ERROR_10_4_SPECTRAL_SCAN_MASK       0x4000000
+
+#define WMI_PHY_ERROR_MASK0_RADAR		BIT(2)
+#define WMI_PHY_ERROR_MASK0_FALSE_RADAR_EXT	BIT(24)
+#define WMI_PHY_ERROR_MASK0_SPECTRAL_SCAN	BIT(26)
 
 enum phy_err_type {
 	PHY_ERROR_UNKNOWN,
@@ -5019,7 +5088,8 @@ enum wmi_10_4_vdev_param {
 #define WMI_VDEV_PARAM_TXBF_MU_TX_BFER BIT(3)
 
 #define WMI_TXBF_STS_CAP_OFFSET_LSB	4
-#define WMI_TXBF_STS_CAP_OFFSET_MASK	0xf0
+#define WMI_TXBF_STS_CAP_OFFSET_MASK	0x70
+#define WMI_TXBF_CONF_IMPLICIT_BF       BIT(7)
 #define WMI_BF_SOUND_DIM_OFFSET_LSB	8
 #define WMI_BF_SOUND_DIM_OFFSET_MASK	0xf00
 
@@ -6239,6 +6309,12 @@ struct wmi_peer_delete_resp_ev_arg {
 	struct wmi_mac_addr peer_addr;
 };
 
+struct wmi_tlv_mgmt_tx_compl_ev_arg {
+	__le32 desc_id;
+	__le32 status;
+	__le32 pdev_id;
+};
+
 struct wmi_mgmt_rx_ev_arg {
 	__le32 channel;
 	__le32 snr;
@@ -6301,6 +6377,8 @@ struct wmi_phyerr_hdr_arg {
 	u32 tsf_u32;
 	u32 buf_len;
 	const void *phyerrs;
+	u32 phy_err_mask0;
+	u32 phy_err_mask1;
 };
 
 struct wmi_svc_rdy_ev_arg {
@@ -6611,6 +6689,7 @@ int ath10k_wmi_event_scan(struct ath10k *ar, struct sk_buff *skb);
 int ath10k_wmi_tlv_event_peer_delete_resp(struct ath10k *ar,
 					  struct sk_buff *skb);
 int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct sk_buff *skb);
+int ath10k_wmi_tlv_event_mgmt_tx_compl(struct ath10k *ar, struct sk_buff *skb);
 void ath10k_wmi_event_chan_info(struct ath10k *ar, struct sk_buff *skb);
 void ath10k_wmi_event_echo(struct ath10k *ar, struct sk_buff *skb);
 int ath10k_wmi_event_debug_mesg(struct ath10k *ar, struct sk_buff *skb);

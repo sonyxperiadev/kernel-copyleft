@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -226,8 +226,8 @@ enum clk_osm_trace_packet_id {
 #define PLL_DD_D0_USER_CTL_LO				0x17916208
 #define PLL_DD_D1_USER_CTL_LO				0x17816208
 
-#define PWRCL_EFUSE_SHIFT				0
-#define PWRCL_EFUSE_MASK				0
+#define PWRCL_EFUSE_SHIFT				29
+#define PWRCL_EFUSE_MASK				0x7
 #define PERFCL_EFUSE_SHIFT				29
 #define PERFCL_EFUSE_MASK				0x7
 
@@ -623,18 +623,21 @@ static inline bool is_better_rate(unsigned long req, unsigned long best,
 	return (req <= new && new < best) || (best < req && best < new);
 }
 
-static long clk_osm_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *parent_rate)
+static int clk_osm_determine_rate(struct clk_hw *hw,
+					struct clk_rate_request *req)
 {
 	int i;
 	unsigned long rrate = 0;
+	unsigned long rate = req->rate;
 
 	/*
 	 * If the rate passed in is 0, return the first frequency in the
 	 * FMAX table.
 	 */
-	if (!rate)
-		return hw->init->rate_max[0];
+	if (!rate) {
+		req->rate = hw->init->rate_max[0];
+		return 0;
+	}
 
 	for (i = 0; i < hw->init->num_rate_max; i++) {
 		if (is_better_rate(rate, rrate, hw->init->rate_max[i])) {
@@ -644,10 +647,12 @@ static long clk_osm_round_rate(struct clk_hw *hw, unsigned long rate,
 		}
 	}
 
+	req->rate = rrate;
+
 	pr_debug("%s: rate %lu, rrate %ld, Rate max %ld\n", __func__, rate,
 						rrate, hw->init->rate_max[i]);
 
-	return rrate;
+	return 0;
 }
 
 static int clk_osm_search_table(struct osm_entry *table, int entries, long rate)
@@ -678,18 +683,19 @@ static int clk_osm_set_rate(struct clk_hw *hw, unsigned long rate,
 {
 	struct clk_osm *cpuclk = to_clk_osm(hw);
 	int index = 0;
-	unsigned long r_rate;
+	struct clk_rate_request req;
 
-	r_rate = clk_osm_round_rate(hw, rate, NULL);
+	req.rate = rate;
+	clk_osm_determine_rate(hw, &req);
 
-	if (rate != r_rate) {
+	if (rate != req.rate) {
 		pr_err("invalid rate requested rate=%ld\n", rate);
 		return -EINVAL;
 	}
 
 	/* Convert rate to table index */
 	index = clk_osm_search_table(cpuclk->osm_table,
-				     cpuclk->num_entries, r_rate);
+				     cpuclk->num_entries, req.rate);
 	if (index < 0) {
 		pr_err("cannot set cluster %u to %lu\n",
 		       cpuclk->cluster_num, rate);
@@ -773,7 +779,7 @@ static unsigned long clk_osm_recalc_rate(struct clk_hw *hw,
 static struct clk_ops clk_ops_cpu_osm = {
 	.enable = clk_osm_enable,
 	.set_rate = clk_osm_set_rate,
-	.round_rate = clk_osm_round_rate,
+	.determine_rate = clk_osm_determine_rate,
 	.list_rate = clk_osm_list_rate,
 	.recalc_rate = clk_osm_recalc_rate,
 	.debug_init = clk_debug_measure_add,
@@ -2685,7 +2691,7 @@ static ssize_t debugfs_trace_method_get(struct file *file, char __user *buf,
 	else if (c->trace_method == XOR_PACKET)
 		len = snprintf(debug_buf, sizeof(debug_buf), "xor\n");
 
-	rc = simple_read_from_buffer((void __user *) buf, len, ppos,
+	rc = simple_read_from_buffer((void __user *) buf, count, ppos,
 				     (void *) debug_buf, len);
 
 	mutex_unlock(&debug_buf_mutex);

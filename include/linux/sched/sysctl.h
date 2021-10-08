@@ -40,7 +40,6 @@ extern unsigned int sysctl_sched_min_granularity;
 extern unsigned int sysctl_sched_wakeup_granularity;
 extern unsigned int sysctl_sched_child_runs_first;
 extern unsigned int sysctl_sched_sync_hint_enable;
-extern unsigned int sysctl_sched_initial_task_util;
 extern unsigned int sysctl_sched_cstate_aware;
 
 #ifdef CONFIG_SCHED_HMP
@@ -85,6 +84,11 @@ extern unsigned int sysctl_sched_short_sleep;
 #define sysctl_sched_enable_hmp_task_placement 0
 
 #endif /* CONFIG_SCHED_HMP */
+
+#if defined(CONFIG_PREEMPT_TRACER) || defined(CONFIG_IRQSOFF_TRACER)
+extern unsigned int sysctl_preemptoff_tracing_threshold_ns;
+extern unsigned int sysctl_irqsoff_tracing_threshold_ns;
+#endif
 
 enum sched_tunable_scaling {
 	SCHED_TUNABLESCALING_NONE,

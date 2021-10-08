@@ -10,6 +10,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/io.h>
 #include <linux/of.h>
@@ -26,6 +31,8 @@
 #define UFS_QCOM_ICE_COMPLETION_TIMEOUT_MS 500
 
 #define UFS_QCOM_ICE_DEFAULT_DBG_PRINT_EN	0
+
+static struct workqueue_struct *ice_workqueue;
 
 static void ufs_qcom_ice_dump_regs(struct ufs_qcom_host *qcom_host, int offset,
 					int len, char *prefix)
@@ -224,6 +231,13 @@ int ufs_qcom_ice_init(struct ufs_qcom_host *qcom_host)
 	}
 
 	qcom_host->dbg_print_en |= UFS_QCOM_ICE_DEFAULT_DBG_PRINT_EN;
+	ice_workqueue = alloc_workqueue("ice-set-key",
+			WQ_MEM_RECLAIM | WQ_HIGHPRI, 0);
+	if (!ice_workqueue) {
+		dev_err(ufs_dev, "%s: workqueue allocation failed.\n",
+			__func__);
+		goto out;
+	}
 	INIT_WORK(&qcom_host->ice_cfg_work, ufs_qcom_ice_cfg_work);
 
 out:
@@ -284,7 +298,7 @@ int ufs_qcom_ice_req_setup(struct ufs_qcom_host *qcom_host,
 				if (!qcom_host->work_pending) {
 					qcom_host->req_pending = cmd->request;
 
-					if (!schedule_work(
+					if (!queue_work(ice_workqueue,
 						&qcom_host->ice_cfg_work)) {
 						qcom_host->req_pending = NULL;
 
@@ -377,6 +391,7 @@ int ufs_qcom_ice_cfg_start(struct ufs_qcom_host *qcom_host,
 		return -EINVAL;
 	}
 
+	memset(&ice_set, 0, sizeof(ice_set));
 
 	memset(&ice_set, 0, sizeof(ice_set));
 	if (qcom_host->ice.vops->config_start) {
@@ -404,7 +419,7 @@ int ufs_qcom_ice_cfg_start(struct ufs_qcom_host *qcom_host,
 				if (!qcom_host->work_pending) {
 
 					qcom_host->req_pending = cmd->request;
-					if (!schedule_work(
+					if (!queue_work(ice_workqueue,
 						&qcom_host->ice_cfg_work)) {
 						qcom_host->req_pending = NULL;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -120,30 +120,19 @@ static int msm_smmu_map(struct msm_mmu *mmu, uint64_t iova,
 {
 	struct msm_smmu *smmu = to_msm_smmu(mmu);
 	struct msm_smmu_client *client = msm_smmu_to_client(smmu);
-	struct iommu_domain *domain;
 	int ret;
 
 	if (!client || !sgt)
 		return -EINVAL;
 
-	if (iova != 0) {
-		if (!client->mmu_mapping || !client->mmu_mapping->domain)
-			return -EINVAL;
+	if (priv)
+		ret = msm_dma_map_sg_lazy(client->dev, sgt->sgl,
+				sgt->nents, DMA_BIDIRECTIONAL, priv);
+	else
+		ret = dma_map_sg(client->dev, sgt->sgl, sgt->nents,
+			DMA_BIDIRECTIONAL);
 
-		domain = client->mmu_mapping->domain;
-
-		return iommu_map_sg(domain, iova, sgt->sgl,
-				sgt->nents, flags);
-	} else {
-		if (priv)
-			ret = msm_dma_map_sg_lazy(client->dev, sgt->sgl,
-					sgt->nents, DMA_BIDIRECTIONAL, priv);
-		else
-			ret = dma_map_sg(client->dev, sgt->sgl, sgt->nents,
-				DMA_BIDIRECTIONAL);
-
-		return (ret != sgt->nents) ? -ENOMEM : 0;
-	}
+	return (ret != sgt->nents) ? -ENOMEM : 0;
 }
 
 static void msm_smmu_unmap(struct msm_mmu *mmu, uint64_t iova,
@@ -158,6 +147,47 @@ static void msm_smmu_unmap(struct msm_mmu *mmu, uint64_t iova,
 	else
 		dma_unmap_sg(client->dev, sgt->sgl, sgt->nents,
 			DMA_BIDIRECTIONAL);
+}
+
+static int msm_smmu_early_splash_map(struct msm_mmu *mmu, uint64_t iova,
+		struct sg_table *sgt, u32 flags)
+{
+	struct msm_smmu *smmu = to_msm_smmu(mmu);
+	struct msm_smmu_client *client = msm_smmu_to_client(smmu);
+	struct iommu_domain *domain;
+
+	if (!client || !sgt)
+		return -EINVAL;
+
+	if (!client->mmu_mapping || !client->mmu_mapping->domain)
+		return -EINVAL;
+
+	domain = client->mmu_mapping->domain;
+
+	return iommu_map_sg(domain, iova, sgt->sgl, sgt->nents, flags);
+}
+
+static void msm_smmu_early_splash_unmap(struct msm_mmu *mmu, uint64_t iova,
+				struct sg_table *sgt)
+{
+	struct msm_smmu *smmu = to_msm_smmu(mmu);
+	struct msm_smmu_client *client = msm_smmu_to_client(smmu);
+	struct iommu_domain *domain;
+	struct scatterlist *sg;
+	size_t len = 0;
+	int unmapped, i = 0;
+
+	if (!client || !client->mmu_mapping || !client->mmu_mapping->domain)
+		return;
+
+	domain = client->mmu_mapping->domain;
+
+	for_each_sg(sgt->sgl, sg, sgt->nents, i)
+		len += sg->length;
+
+	unmapped = iommu_unmap(domain, iova, len);
+	if (unmapped < len)
+		DRM_ERROR("could not unmap iova@%llx\n", iova);
 }
 
 static void msm_smmu_destroy(struct msm_mmu *mmu)
@@ -199,6 +229,8 @@ static const struct msm_mmu_funcs funcs = {
 	.map = msm_smmu_map,
 	.unmap = msm_smmu_unmap,
 	.destroy = msm_smmu_destroy,
+	.early_splash_map = msm_smmu_early_splash_map,
+	.early_splash_unmap = msm_smmu_early_splash_unmap,
 	.set_property = msm_smmu_set_property,
 };
 
@@ -301,6 +333,18 @@ static struct device *msm_smmu_device_create(struct device *dev,
 	smmu->client = platform_get_drvdata(pdev);
 
 	return &pdev->dev;
+}
+
+void msm_smmu_register_fault_handler(struct msm_mmu *mmu,
+	iommu_fault_handler_t handler)
+{
+	struct msm_smmu *smmu = to_msm_smmu(mmu);
+	struct msm_smmu_client *client = msm_smmu_to_client(smmu);
+
+	if (client)
+		iommu_set_fault_handler(client->mmu_mapping->domain,
+						handler, client->dev);
+
 }
 
 struct msm_mmu *msm_smmu_new(struct device *dev,

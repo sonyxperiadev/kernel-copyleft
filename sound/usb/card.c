@@ -31,6 +31,11 @@
  *     this type *correctly*.  SB extigy looks as if it supports, but it's
  *     indeed an AC3 stream packed in SPDIF frames (i.e. no real AC3 stream).
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2018 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 
 #include <linux/bitops.h>
@@ -316,6 +321,7 @@ static int snd_usb_create_streams(struct snd_usb_audio *chip, int ctrlif)
 	case UAC_VERSION_1: {
 		void *control_header;
 		struct uac1_ac_header_descriptor *h1;
+		int rest_bytes;
 
 		control_header = snd_usb_find_csint_desc(host_iface->extra,
 					host_iface->extralen, NULL, UAC_HEADER);
@@ -324,9 +330,29 @@ static int snd_usb_create_streams(struct snd_usb_audio *chip, int ctrlif)
 			return -EINVAL;
 		}
 
+		rest_bytes = (void *)(host_iface->extra + host_iface->extralen) -
+			control_header;
+
+		/* just to be sure -- this shouldn't hit at all */
+		if (rest_bytes <= 0) {
+			dev_err(&dev->dev, "invalid control header\n");
+			return -EINVAL;
+		}
+
 		h1 = control_header;
+
+		if (rest_bytes < sizeof(*h1)) {
+			dev_err(&dev->dev, "too short v1 buffer descriptor\n");
+			return -EINVAL;
+		}
+
 		if (!h1->bInCollection) {
 			dev_info(&dev->dev, "skipping empty audio interface (v1)\n");
+			return -EINVAL;
+		}
+
+		if (rest_bytes < h1->bLength) {
+			dev_err(&dev->dev, "invalid buffer length (v1)\n");
 			return -EINVAL;
 		}
 
@@ -660,7 +686,6 @@ static int usb_audio_probe(struct usb_interface *intf,
 	chip->num_interfaces++;
 	usb_set_intfdata(intf, chip);
 	intf->needs_remote_wakeup = 1;
-	usb_enable_autosuspend(chip->dev);
 	atomic_dec(&chip->active);
 	mutex_unlock(&register_mutex);
 	return 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Linux Foundation. All rights reserved.
+ * Copyright (c) 2015,2017, Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -111,20 +111,25 @@ static ssize_t ufs_qcom_dbg_testbus_cfg_write(struct file *file,
 				loff_t *ppos)
 {
 	struct ufs_qcom_host *host = file->f_mapping->host->i_private;
-	char configuration[TESTBUS_CFG_BUFF_LINE_SIZE] = {0};
+	char configuration[TESTBUS_CFG_BUFF_LINE_SIZE] = {'\0'};
 	loff_t buff_pos = 0;
 	char *comma;
 	int ret = 0;
 	int major;
 	int minor;
+	unsigned long flags;
+	struct ufs_hba *hba = host->hba;
 
-	ret = simple_write_to_buffer(configuration, TESTBUS_CFG_BUFF_LINE_SIZE,
+
+	ret = simple_write_to_buffer(configuration,
+		TESTBUS_CFG_BUFF_LINE_SIZE - 1,
 		&buff_pos, ubuf, cnt);
 	if (ret < 0) {
 		dev_err(host->hba->dev, "%s: failed to read user data\n",
 			__func__);
 		goto out;
 	}
+	configuration[ret] = '\0';
 
 	comma = strnchr(configuration, TESTBUS_CFG_BUFF_LINE_SIZE, ',');
 	if (!comma || comma == configuration) {
@@ -142,8 +147,15 @@ static ssize_t ufs_qcom_dbg_testbus_cfg_write(struct file *file,
 		goto out;
 	}
 
+	if (!ufs_qcom_testbus_cfg_is_ok(host, major, minor)) {
+		ret = -EPERM;
+		goto out;
+	}
+
+	spin_lock_irqsave(hba->host->host_lock, flags);
 	host->testbus.select_major = (u8)major;
 	host->testbus.select_minor = (u8)minor;
+	spin_unlock_irqrestore(hba->host->host_lock, flags);
 
 	/*
 	 * Sanity check of the {major, minor} tuple is done in the
@@ -174,6 +186,7 @@ static const struct file_operations ufs_qcom_dbg_testbus_cfg_desc = {
 	.open		= ufs_qcom_dbg_testbus_cfg_open,
 	.read		= seq_read,
 	.write		= ufs_qcom_dbg_testbus_cfg_write,
+	.release	= single_release,
 };
 
 static int ufs_qcom_dbg_testbus_bus_read(void *data, u64 *attr_val)
@@ -228,6 +241,7 @@ static int ufs_qcom_dbg_dbg_regs_open(struct inode *inode,
 static const struct file_operations ufs_qcom_dbg_dbg_regs_desc = {
 	.open		= ufs_qcom_dbg_dbg_regs_open,
 	.read		= seq_read,
+	.release	= single_release,
 };
 
 static int ufs_qcom_dbg_pm_qos_show(struct seq_file *file, void *data)
@@ -261,6 +275,7 @@ static int ufs_qcom_dbg_pm_qos_open(struct inode *inode,
 static const struct file_operations ufs_qcom_dbg_pm_qos_desc = {
 	.open		= ufs_qcom_dbg_pm_qos_open,
 	.read		= seq_read,
+	.release	= single_release,
 };
 
 void ufs_qcom_dbg_add_debugfs(struct ufs_hba *hba, struct dentry *root)

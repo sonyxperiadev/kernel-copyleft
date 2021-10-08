@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -309,7 +309,7 @@
 					dev = "/dev/block/platform/soc/c0c4000.sdhci/by-name/vendor";
 					type = "ext4";
 					mnt_flags = "ro,barrier=1,discard";
-					fsmgr_flags = "wait,slotselect";
+					fsmgr_flags = "wait,slotselect,verify";
 					status = "ok";
 				};
 			};
@@ -627,6 +627,16 @@
 		qcom,client-id = <0 1 2 3 4 5 6 7 8 9 10 11>;
 		qcom,sensor-id = <0 8 10 4 5 6 7 9 2 1 3 11>;
 		qcom,sensors = <12>;
+	};
+
+	qcom,qbt1000 {
+		compatible = "qcom,qbt1000";
+		clock-names = "core", "iface";
+		clocks = <&clock_gcc GCC_BLSP1_QUP3_SPI_APPS_CLK>,
+			<&clock_gcc GCC_BLSP1_AHB_CLK>;
+		clock-frequency = <15000000>;
+		qcom,ipc-gpio = <&tlmm 72 0>;
+		qcom,finger-detect-gpio = <&pm660_gpios 11 0>;
 	};
 
 	qcom,sensor-information {
@@ -1366,7 +1376,6 @@
 
 		qcom,up-timer = <1000 1000>;
 		qcom,down-timer = <1000 1000>;
-		qcom,pc-override-index = <0 0>;
 		qcom,set-ret-inactive;
 		qcom,enable-llm-freq-vote;
 		qcom,llm-freq-up-timer = <327675 327675>;
@@ -1428,6 +1437,7 @@
 	qcom,msm_fastrpc {
 		compatible = "qcom,msm-fastrpc-adsp";
 		qcom,fastrpc-glink;
+		qcom,fastrpc-vmid-heap-shared;
 
 		qcom,msm_fastrpc_compute_cb1 {
 			compatible = "qcom,msm-fastrpc-compute-cb";
@@ -1677,7 +1687,7 @@
 		vdd-1.8-xo-supply = <&pm660_l9_pin_ctrl>;
 		vdd-1.3-rfa-supply = <&pm660_l6_pin_ctrl>;
 		vdd-3.3-ch0-supply = <&pm660_l19_pin_ctrl>;
-		qcom,vdd-0.8-cx-mx-config = <525000 950000>;
+		qcom,vdd-0.8-cx-mx-config = <848000 848000>;
 		qcom,vdd-1.8-xo-config = <1750000 1900000>;
 		qcom,vdd-1.3-rfa-config = <1200000 1370000>;
 		qcom,vdd-3.3-ch0-config = <3200000 3400000>;

@@ -18,6 +18,11 @@
  *
  * Licensed under the GPL-2 or later.
  */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2017 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -208,12 +213,6 @@ static inline struct usb_request *midi_alloc_ep_req(struct usb_ep *ep,
 						    unsigned length)
 {
 	return alloc_ep_req(ep, length, length);
-}
-
-static void free_ep_req(struct usb_ep *ep, struct usb_request *req)
-{
-	kfree(req->buf);
-	usb_ep_free_request(ep, req);
 }
 
 static const uint8_t f_midi_cin_length[] = {
@@ -944,6 +943,8 @@ fail_f_midi:
 	kfree(midi_function);
 	usb_free_descriptors(f->hs_descriptors);
 	kfree(midi_ss_function);
+	if (gadget_is_superspeed(c->cdev->gadget) && f->ss_descriptors)
+		usb_free_descriptors(f->ss_descriptors);
 fail:
 	f_midi_unregister_card(midi);
 fail_register:

@@ -2,7 +2,7 @@
  * drivers/mmc/host/sdhci-msm.c - Qualcomm Technologies, Inc. MSM SDHCI Platform
  * driver source file
  *
- * Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ */
+/*
+ * NOTE: This file has been modified by Sony Mobile Communications Inc.
+ * Modifications are Copyright (c) 2016 Sony Mobile Communications Inc,
+ * and licensed under the license of the file.
  */
 
 #include <linux/module.h>
@@ -39,6 +44,7 @@
 #include <linux/msm-bus.h>
 #include <linux/pm_runtime.h>
 #include <trace/events/mmc.h>
+#include <soc/qcom/boot_stats.h>
 
 #include "sdhci-msm.h"
 #include "sdhci-msm-ice.h"
@@ -142,6 +148,7 @@
 #define CORE_START_CDC_TRAFFIC		(1 << 6)
 
 #define CORE_PWRSAVE_DLL	(1 << 3)
+#define CORE_FIFO_ALT_EN	(1 << 10)
 #define CORE_CMDEN_HS400_INPUT_MASK_CNT (1 << 13)
 
 #define CORE_DDR_CAL_EN		(1 << 0)
@@ -800,19 +807,23 @@ static int msm_init_cm_dll(struct sdhci_host *host)
 			| CORE_CK_OUT_EN), host->ioaddr +
 			msm_host_offset->CORE_DLL_CONFIG);
 
-	wait_cnt = 50;
-	/* Wait until DLL_LOCK bit of DLL_STATUS register becomes '1' */
-	while (!(readl_relaxed(host->ioaddr +
-		msm_host_offset->CORE_DLL_STATUS) & CORE_DLL_LOCK)) {
-		/* max. wait for 50us sec for LOCK bit to be set */
-		if (--wait_cnt == 0) {
-			pr_err("%s: %s: DLL failed to LOCK\n",
-				mmc_hostname(mmc), __func__);
-			rc = -ETIMEDOUT;
-			goto out;
+	/* For hs400es mode, no need to wait for core dll lock */
+	if (!(msm_host->enhanced_strobe &&
+				mmc_card_strobe(msm_host->mmc->card))) {
+		wait_cnt = 50;
+		/* Wait until DLL_LOCK bit of DLL_STATUS register becomes '1' */
+		while (!(readl_relaxed(host->ioaddr +
+			msm_host_offset->CORE_DLL_STATUS) & CORE_DLL_LOCK)) {
+			/* max. wait for 50us sec for LOCK bit to be set */
+			if (--wait_cnt == 0) {
+				pr_err("%s: %s: DLL failed to LOCK\n",
+					mmc_hostname(mmc), __func__);
+				rc = -ETIMEDOUT;
+				goto out;
+			}
+			/* wait for 1us before polling again */
+			udelay(1);
 		}
-		/* wait for 1us before polling again */
-		udelay(1);
 	}
 
 out:
@@ -1842,6 +1853,12 @@ struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev,
 	pdata->status_gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
 	if (gpio_is_valid(pdata->status_gpio) && !(flags & OF_GPIO_ACTIVE_LOW))
 		pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+
+	pdata->uim2_gpio = of_get_named_gpio(np, "uim2-gpios", 0);
+	if (!gpio_is_valid(pdata->uim2_gpio)) {
+		pr_err("## %s: gpio_is_valid(pdata->uim2_gpio)=%d: failure\n",
+			mmc_hostname(msm_host->mmc), pdata->uim2_gpio);
+	}
 
 	of_property_read_u32(np, "qcom,bus-width", &bus_width);
 	if (bus_width == 8)
@@ -3165,7 +3182,10 @@ static void sdhci_msm_set_clock(struct sdhci_host *host, unsigned int clock)
 					| CORE_HC_SELECT_IN_EN), host->ioaddr +
 					msm_host_offset->CORE_VENDOR_SPEC);
 		}
-		if (!host->mmc->ios.old_rate && !msm_host->use_cdclp533) {
+		/* No need to check for DLL lock for HS400es mode */
+		if (!host->mmc->ios.old_rate && !msm_host->use_cdclp533 &&
+				!((card && mmc_card_strobe(card) &&
+				 msm_host->enhanced_strobe))) {
 			/*
 			 * Poll on DLL_LOCK and DDR_DLL_LOCK bits in
 			 * CORE_DLL_STATUS to be set.  This should get set
@@ -3945,11 +3965,10 @@ void sdhci_msm_pm_qos_cpu_init(struct sdhci_host *host,
 		group->latency = PM_QOS_DEFAULT_VALUE;
 		pm_qos_add_request(&group->req, PM_QOS_CPU_DMA_LATENCY,
 			group->latency);
-		pr_info("%s (): voted for group #%d (mask=0x%lx) latency=%d (0x%p)\n",
+		pr_info("%s (): voted for group #%d (mask=0x%lx) latency=%d\n",
 			__func__, i,
 			group->req.cpus_affine.bits[0],
-			group->latency,
-			&latency[i].latency[SDHCI_PERFORMANCE_MODE]);
+			group->latency);
 	}
 	msm_host->pm_qos_prev_cpu = -1;
 	msm_host->pm_qos_group_enable = true;
@@ -4154,7 +4173,7 @@ static void sdhci_set_default_hw_caps(struct sdhci_msm_host *msm_host,
 	 * starts coming.
 	 */
 	if ((major == 1) && ((minor == 0x42) || (minor == 0x46) ||
-				(minor == 0x49)))
+				(minor == 0x49) || (minor >= 0x6b)))
 		msm_host->use_14lpp_dll = true;
 
 	/* Fake 3.0V support for SDIO devices which requires such voltage */
@@ -4249,6 +4268,8 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	struct resource *tlmm_memres = NULL;
 	void __iomem *tlmm_mem;
 	unsigned long flags;
+	bool force_probe;
+	char boot_marker[40];
 
 	pr_debug("%s: Enter %s\n", dev_name(&pdev->dev), __func__);
 	msm_host = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_msm_host),
@@ -4272,6 +4293,10 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 		ret = PTR_ERR(host);
 		goto out_host_free;
 	}
+
+	snprintf(boot_marker, sizeof(boot_marker),
+			"M - DRIVER %s Init", mmc_hostname(host->mmc));
+	place_marker(boot_marker);
 
 	pltfm_host = sdhci_priv(host);
 	pltfm_host->priv = msm_host;
@@ -4312,8 +4337,13 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 			goto pltfm_free;
 		}
 
+		/* Read property to determine if the probe is forced */
+		force_probe = of_find_property(pdev->dev.of_node,
+			"qcom,force-sdhc1-probe", NULL);
+
 		/* skip the probe if eMMC isn't a boot device */
-		if ((ret == 1) && !sdhci_msm_is_bootdevice(&pdev->dev)) {
+		if ((ret == 1) && !sdhci_msm_is_bootdevice(&pdev->dev)
+		    && !force_probe) {
 			ret = -ENODEV;
 			goto pltfm_free;
 		}
@@ -4468,8 +4498,6 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 			goto vreg_deinit;
 		}
 		writel_relaxed(readl_relaxed(tlmm_mem) | 0x2, tlmm_mem);
-		dev_dbg(&pdev->dev, "tlmm reg %pa value 0x%08x\n",
-				&tlmm_memres->start, readl_relaxed(tlmm_mem));
 	}
 
 	/*
@@ -4477,6 +4505,14 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	 */
 	writel_relaxed(CORE_VENDOR_SPEC_POR_VAL,
 	host->ioaddr + msm_host_offset->CORE_VENDOR_SPEC);
+
+	/*
+	 * Ensure SDHCI FIFO is enabled by disabling alternative FIFO
+	 */
+	writel_relaxed((readl_relaxed(host->ioaddr +
+			msm_host_offset->CORE_VENDOR_SPEC3) &
+			~CORE_FIFO_ALT_EN), host->ioaddr +
+			msm_host_offset->CORE_VENDOR_SPEC3);
 
 	if (!msm_host->mci_removed) {
 		/* Set HC_MODE_EN bit in HC_MODE register */
@@ -4596,7 +4632,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	msm_host->mmc->caps2 |= msm_host->pdata->caps2;
 	msm_host->mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
 	msm_host->mmc->caps2 |= MMC_CAP2_HS400_POST_TUNING;
+#ifdef CONFIG_MMC_ENABLE_CLK_SCALE
 	msm_host->mmc->caps2 |= MMC_CAP2_CLK_SCALE;
+#endif
 	msm_host->mmc->caps2 |= MMC_CAP2_SANITIZE;
 	msm_host->mmc->caps2 |= MMC_CAP2_MAX_DISCARD_SIZE;
 	msm_host->mmc->caps2 |= MMC_CAP2_SLEEP_AWAKE;
@@ -4647,6 +4685,13 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 					__func__, ret);
 			goto vreg_deinit;
 		}
+	}
+
+	if (gpio_is_valid(msm_host->pdata->uim2_gpio)) {
+		mmc_gpio_init_uim2(msm_host->mmc, msm_host->pdata->uim2_gpio);
+	} else {
+		pr_err("## %s: can't set uim2_gpio: %d\n", mmc_hostname(host->mmc),
+			msm_host->pdata->uim2_gpio);
 	}
 
 	if ((sdhci_readl(host, SDHCI_CAPABILITIES) & SDHCI_CAN_64BIT) &&
@@ -4732,6 +4777,13 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 		       mmc_hostname(host->mmc), __func__, ret);
 		device_remove_file(&pdev->dev, &msm_host->auto_cmd21_attr);
 	}
+	if (sdhci_msm_is_bootdevice(&pdev->dev))
+		mmc_flush_detect_work(host->mmc);
+
+	snprintf(boot_marker, sizeof(boot_marker),
+			"M - DRIVER %s Ready", mmc_hostname(host->mmc));
+	place_marker(boot_marker);
+
 	/* Successful initialization */
 	goto out;
 
@@ -5009,7 +5061,7 @@ static int sdhci_msm_suspend_noirq(struct device *dev)
 }
 
 static const struct dev_pm_ops sdhci_msm_pmops = {
-	SET_SYSTEM_SLEEP_PM_OPS(sdhci_msm_suspend, sdhci_msm_resume)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(sdhci_msm_suspend, sdhci_msm_resume)
 	SET_RUNTIME_PM_OPS(sdhci_msm_runtime_suspend, sdhci_msm_runtime_resume,
 			   NULL)
 	.suspend_noirq = sdhci_msm_suspend_noirq,
