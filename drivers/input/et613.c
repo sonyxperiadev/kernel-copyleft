@@ -692,6 +692,13 @@ void power_on(struct etspi_data *etspi)
 	int status = 0;
 	DEBUG_PRINT("%s\n", __func__);
 	if (etspi != NULL) {
+                gpio_direction_output(etspi->rstPin, 1);
+		if (status < 0) {
+			pr_err("%s gpio_direction_output rstPin failed\n",__func__);
+			status = -EBUSY;
+			goto etspi_platformInit_gpio_init_failed;
+		}
+ 		mdelay(3);
 		gpio_direction_output(etspi->vcc_Pin, 1);
 		if (status < 0) {
 			pr_err("%s gpio_direction_output vcc_pin failed\n",__func__);
@@ -712,7 +719,7 @@ void power_on(struct etspi_data *etspi)
 		pr_err("power_on et613: succeed power gpio_pwr1_8_en on\n");
 		mdelay(3);
 
-		gpio_set_value(etspi->rstPin, 1);
+		//gpio_set_value(etspi->rstPin, 1);
 		pr_err("power_on et613: set rstPin is 1\n");
 	}
 	return ;
@@ -747,7 +754,13 @@ void power_off(struct etspi_data *etspi)
 		pr_err("power_off et613: succeed power gpio_pwr1_8_en off\n");
 		mdelay(3);
 
-		gpio_set_value(etspi->rstPin, 0);
+		//gpio_set_value(etspi->rstPin, 0);
+		gpio_direction_output(etspi->rstPin, 0);
+		if (status < 0) {
+			pr_err("%s gpio_direction_output rstPin failed\n",__func__);
+			status = -EBUSY;
+			goto etspi_platformInit_gpio_init_failed;
+		}
 		pr_err("power_off et613: set rstPin is 0\n");
 	}
 	return ;
@@ -770,7 +783,7 @@ int etspi_platformInit(struct etspi_data *etspi)
 			pr_err("%s gpio_requset gpio_pwr_en failed\n",__func__);
 			goto etspi_platformInit_gpio_init_failed;
 		}
-		gpio_direction_output(etspi->vcc_Pin, 1);
+		//gpio_direction_output(etspi->vcc_Pin, 1);
 		if (status < 0) {
 			pr_err("%s gpio_direction_output vcc_pin failed\n",__func__);
 			status = -EBUSY;
@@ -788,7 +801,7 @@ int etspi_platformInit(struct etspi_data *etspi)
 			pr_err("%s gpio_requset gpio_pwr1_8_en failed\n",__func__);
 			goto etspi_platformInit_gpio_init_failed;
 		}
-		gpio_direction_output(etspi->vdd_18v_Pin, 1);
+	//      gpio_direction_output(etspi->vdd_18v_Pin, 1);
 		if (status < 0) {
 			pr_err("%s gpio_direction_output gpio_pwr1_8_en failed\n",__func__);
 			status = -EBUSY;
@@ -807,7 +820,7 @@ int etspi_platformInit(struct etspi_data *etspi)
 			pr_err("%s gpio_requset etspi_Reset failed\n", __func__);
 			goto etspi_platformInit_rst_failed;
 		}
-		gpio_direction_output(etspi->rstPin, 1);
+	//      gpio_direction_output(etspi->rstPin, 1);
 		if (status < 0) {
 			pr_err("%s gpio_direction_output Reset failed\n", __func__);
 			status = -EBUSY;
