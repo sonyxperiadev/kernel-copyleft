@@ -486,6 +486,25 @@ static int smb5_parse_dt_misc(struct smb5 *chip, struct device_node *node)
 		}
 	}
 
+	if (of_find_property(node, "qcom,thermal-mitigation-sleep", &byte_len)) {
+		chg->thermal_mitigation_sleep = devm_kzalloc(chg->dev, byte_len,
+			GFP_KERNEL);
+
+		if (chg->thermal_mitigation_sleep == NULL)
+			return -ENOMEM;
+
+		chg->thermal_levels = byte_len / sizeof(u32);
+		rc = of_property_read_u32_array(node,
+				"qcom,thermal-mitigation-sleep",
+				chg->thermal_mitigation_sleep,
+				chg->thermal_levels);
+		if (rc < 0) {
+			dev_err(chg->dev,
+				"Couldn't read screen off threm limits rc = %d\n", rc);
+			return rc;
+		}
+	}
+
 	rc = of_property_read_u32(node, "qcom,charger-temp-max",
 			&chg->charger_temp_max);
 	if (rc < 0)
@@ -1357,6 +1376,7 @@ static int smb5_batt_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_STATUS:
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
 	case POWER_SUPPLY_PROP_CAPACITY:
+	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT:
 		return 1;
 	default:
 		break;
@@ -2182,6 +2202,7 @@ static int smb5_init_hw(struct smb5 *chip)
 		return rc;
 	}
 
+#if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	val = (ilog2(chip->dt.wd_bark_time / 16) << BARK_WDOG_TIMEOUT_SHIFT)
 			& BARK_WDOG_TIMEOUT_MASK;
 	val |= (BITE_WDOG_TIMEOUT_8S | BITE_WDOG_DISABLE_CHARGING_CFG_BIT);
@@ -2208,6 +2229,23 @@ static int smb5_init_hw(struct smb5 *chip)
 		pr_err("Couldn't configue WD config rc=%d\n", rc);
 		return rc;
 	}
+#endif
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	/* disable watchdog timer */
+	rc = smblib_write(chg, WD_CFG_REG, 0);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't wdog cfg rc=%d\n", rc);
+		return rc;
+	}
+
+	/* just in case, allow charging when bite watchdog timer expires */
+	rc = smblib_masked_write(chg, SNARL_BARK_BITE_WD_CFG_REG,
+			BITE_WDOG_DISABLE_CHARGING_CFG_BIT, 0);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't enable wdog charging rc=%d\n", rc);
+		return rc;
+	}
+#endif
 
 	/* set termination current threshold values */
 	rc = smb5_configure_iterm_thresholds(chip);
@@ -3282,4 +3320,5 @@ static struct platform_driver smb5_driver = {
 module_platform_driver(smb5_driver);
 
 MODULE_DESCRIPTION("QPNP SMB5 Charger Driver");
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 MODULE_LICENSE("GPL v2");

@@ -10,6 +10,8 @@
 #include <linux/interrupt.h>
 #include <linux/device.h>
 
+#define SUBSYS_CRASH_REASON_LEN 512
+
 struct subsys_device;
 extern struct bus_type subsys_bus_type;
 
@@ -156,6 +158,8 @@ static inline void complete_shutdown_ack(struct subsys_desc *desc)
 	complete(&desc->shutdown_ack);
 }
 struct subsys_device *find_subsys_device(const char *str);
+extern int subsystem_crash_reason(const char *name, char *reason);
+extern void update_crash_reason(struct subsys_device *dev, char *, int);
 #else
 
 static inline int subsys_get_restart_level(struct subsys_device *dev)
@@ -213,6 +217,13 @@ enum crash_status subsys_get_crash_status(struct subsys_device *dev)
 static inline void notify_proxy_vote(struct device *device) { }
 static inline void notify_proxy_unvote(struct device *device) { }
 static inline void notify_before_auth_and_reset(struct device *device) { }
+static inline void update_crash_reason(struct subsys_device *dev,
+						char *reason, int size) { }
+
+static inline int subsystem_crash_reason(const char *name, char *reason)
+{
+	return 0;
+}
 #endif /* CONFIG_MSM_SUBSYSTEM_RESTART */
 
 /* Helper wrappers */

@@ -1994,6 +1994,16 @@ static int icnss_service_notifier_notify(struct notifier_block *nb,
 	}
 	icnss_pr_info("PD service down, pd_state: %d, state: 0x%lx: cause: %s\n",
 		      *state, priv->state, icnss_pdr_cause[cause]);
+
+	if (*state == USER_PD_STATE_CHANGE) {
+		memset(priv->crash_reason, 0, sizeof(priv->crash_reason));
+		snprintf(priv->crash_reason, sizeof(priv->crash_reason),
+				"PD service down, pd_state: %d, state: 0x%lx: cause: %s\n",
+				*state, priv->state, icnss_pdr_cause[cause]);
+		priv->data_ready = 1;
+		wake_up(&priv->wlan_pdr_debug_q);
+	}
+
 event_post:
 	if (!test_bit(ICNSS_FW_DOWN, &priv->state)) {
 		set_bit(ICNSS_FW_DOWN, &priv->state);
@@ -3967,6 +3977,16 @@ static void pil_restart_level_notifier(void *ignore,
 }
 #endif
 
+int wlan_pdr_open(struct inode *inode, struct file *filp)
+{
+	int minor = iminor(inode);
+	if (minor > 0)
+		return -ENXIO;
+
+	filp->private_data = penv;
+	return 0;
+}
+
 static int icnss_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -4032,6 +4052,7 @@ static int icnss_probe(struct platform_device *pdev)
 		goto smmu_cleanup;
 	}
 
+	init_waitqueue_head(&priv->wlan_pdr_debug_q);
 	INIT_WORK(&priv->event_work, icnss_driver_event_work);
 	INIT_LIST_HEAD(&priv->event_list);
 
@@ -4088,6 +4109,8 @@ static int icnss_probe(struct platform_device *pdev)
 #endif
 	}
 
+	chr_dev_init();
+
 	INIT_LIST_HEAD(&priv->icnss_tcdev_list);
 
 	icnss_pr_info("Platform driver probed successfully\n");
@@ -4121,6 +4144,8 @@ static int icnss_remove(struct platform_device *pdev)
 		unregister_trace_pil_restart_level(pil_restart_level_notifier, NULL);
 #endif
 	}
+
+	chr_dev_term();
 
 	device_init_wakeup(&priv->pdev->dev, false);
 

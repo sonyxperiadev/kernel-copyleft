@@ -8,9 +8,11 @@
   filp_close
   filp_open
   find_vpid
+  i2c_bus_type
   input_mt_destroy_slots
   led_trigger_blink_oneshot
   nr_irqs
+  param_set_byte
   pid_task
   rdev_get_id
   regcache_drop_region
@@ -158,3 +160,25 @@
 
 # required by ledtrig_transient.ko
   led_set_brightness_nosleep
+
+# required by camera.ko
+  devm_pwm_get
+  i2c_unregister_device
+
+# required by msm_drm.ko
+  mipi_dsi_dcs_write
+
+# required by aw882xx_dlkm.ko or qpnp-smb5-main.ko
+  class_remove_file_ns
+  class_create_file_ns
+  devm_gpio_free
+
+  i2c_new_dummy
+  i2c_smbus_write_word_data
+  i2c_smbus_read_word_data
+  power_supply_unregister
+  power_supply_register
+  __irq_alloc_descs
+
+  scsi_print_sense_hdr
+  __scsi_execute

@@ -507,6 +507,12 @@ config PROFILER
 	  It exposes APIs for userspace to get system profiling
 	  information.
 
+config SONY_EXT_UIM_CTRL
+	tristate "Sony External UIM Control Driver"
+	default n
+	help
+	  A misc driver related to UIM selector/enabler
+
 config WIGIG_SENSING_SPI
 	tristate "Sensing over 60GHz using wil6210 / SPI bus"
 	depends on SPI && WIL6210
@@ -539,4 +545,7 @@ source "drivers/misc/cxl/Kconfig"
 source "drivers/misc/ocxl/Kconfig"
 source "drivers/misc/cardreader/Kconfig"
 source "drivers/misc/habanalabs/Kconfig"
+source "drivers/misc/haptic_nv/Kconfig"
+source "drivers/misc/ti_haptics/Kconfig"
+source "drivers/misc/huaqinhardware_info/Kconfig"
 endmenu

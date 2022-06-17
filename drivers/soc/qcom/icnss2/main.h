@@ -18,6 +18,7 @@
 #include <soc/qcom/service-locator.h>
 #include <soc/qcom/service-notifier.h>
 #include "wlan_firmware_service_v01.h"
+#include <soc/qcom/subsystem_restart.h>
 
 #define WCN6750_DEVICE_ID 0x6750
 #define ADRASTEA_DEVICE_ID 0xabcd
@@ -461,6 +462,9 @@ struct icnss_priv {
 	struct mutex tcdev_lock;
 	bool is_chain1_supported;
 	bool chain_reg_info_updated;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
+	wait_queue_head_t wlan_pdr_debug_q;
+	int data_ready;
 	u32 hw_trc_override;
 	struct icnss_dms_data dms;
 	u8 use_nv_mac;

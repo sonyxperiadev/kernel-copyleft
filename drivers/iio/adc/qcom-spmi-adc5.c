@@ -718,7 +718,6 @@ static int adc7_read_raw(struct iio_dev *indio_dev,
 					&adc_code_volt, &adc_code_cur);
 		if (ret)
 			return ret;
-
 		ret = qcom_adc5_hw_scale(prop->scale_fn_type,
 			&adc5_prescale_ratios[prop->prescale],
 			adc->data,
@@ -726,7 +725,7 @@ static int adc7_read_raw(struct iio_dev *indio_dev,
 
 		if (ret)
 			return ret;
-
+		
 		return IIO_VAL_INT;
 
 	case IIO_CHAN_INFO_RAW:
@@ -762,7 +761,6 @@ static int adc5_read_raw(struct iio_dev *indio_dev,
 					&adc_code_volt, &adc_code_cur);
 		if (ret)
 			return ret;
-
 		ret = qcom_adc5_hw_scale(prop->scale_fn_type,
 			&adc5_prescale_ratios[prop->prescale],
 			adc->data,
@@ -855,11 +853,10 @@ static int adc7_sw_calib_conv(struct adc5_chip *adc, struct adc5_channel_prop *p
 	ret = adc7_calib(adc);
 	if (ret)
 		return ret;
-
+	
 	ret = adc7_sw_calib_do_conversion(adc, prop, &adc_code_volt);
 	if (ret)
 		return ret;
-
 	return qcom_adc5_hw_scale(prop->scale_fn_type,
 		&adc5_prescale_ratios[prop->prescale],
 		adc->data,
@@ -985,9 +982,9 @@ static const struct adc5_channels adc5_chans_pmic[ADC5_MAX_CHANNEL] = {
 	[ADC5_GPIO1_100K_PU]	= ADC5_CHAN_TEMP("gpio1_100k_pu", 0,
 					SCALE_HW_CALIB_THERM_100K_PULLUP)
 	[ADC5_GPIO2_100K_PU]	= ADC5_CHAN_TEMP("gpio2_100k_pu", 0,
-					SCALE_HW_CALIB_THERM_100K_PULLUP)
-	[ADC5_GPIO3_100K_PU]	= ADC5_CHAN_TEMP("gpio3_100k_pu", 0,
-					SCALE_HW_CALIB_THERM_100K_PULLUP)
+					SCALE_HW_CALIB_BATT_THERM_100K_QN5965)/*batt_therm*/
+	[ADC5_GPIO3_100K_PU]	= ADC5_CHAN_VOLT("gpio3_100k_pu", 0,
+					SCALE_HW_CALIB_DEFAULT)
 	[ADC5_GPIO4_100K_PU]	= ADC5_CHAN_TEMP("gpio4_100k_pu", 0,
 					SCALE_HW_CALIB_THERM_100K_PULLUP)
 };
@@ -1019,12 +1016,12 @@ static const struct adc5_channels adc7_chans_pmic[ADC5_MAX_CHANNEL] = {
 					SCALE_HW_CALIB_PMIC_THERM_PM7)
 	[ADC7_AMUX_THM1_100K_PU]	= ADC5_CHAN_TEMP("amux_thm1_pu2", 0,
 					SCALE_HW_CALIB_THERM_100K_PU_PM7)
-	[ADC7_AMUX_THM2_100K_PU]	= ADC5_CHAN_TEMP("amux_thm2_pu2", 0,
-					SCALE_HW_CALIB_THERM_100K_PU_PM7)
+	[ADC7_AMUX_THM2_100K_PU]	= ADC5_CHAN_VOLT("amux_thm2_pu2", 0,
+					SCALE_HW_CALIB_DEFAULT)		/*batt_id*/
 	[ADC7_AMUX_THM3_100K_PU]	= ADC5_CHAN_TEMP("amux_thm3_pu2", 0,
 					SCALE_HW_CALIB_THERM_100K_PU_PM7)
 	[ADC7_AMUX_THM4_100K_PU]	= ADC5_CHAN_TEMP("amux_thm4_pu2", 0,
-					SCALE_HW_CALIB_THERM_100K_PU_PM7)
+					SCALE_HW_CALIB_THERM_100K_QN5965)/*usb_conn_therm*/
 	[ADC7_AMUX_THM5_100K_PU]	= ADC5_CHAN_TEMP("amux_thm5_pu2", 0,
 					SCALE_HW_CALIB_THERM_100K_PU_PM7)
 	[ADC7_AMUX_THM6_100K_PU]	= ADC5_CHAN_TEMP("amux_thm6_pu2", 0,
@@ -1034,7 +1031,7 @@ static const struct adc5_channels adc7_chans_pmic[ADC5_MAX_CHANNEL] = {
 	[ADC7_GPIO2_100K_PU]	= ADC5_CHAN_TEMP("gpio2_pu2", 0,
 					SCALE_HW_CALIB_THERM_100K_PU_PM7)
 	[ADC7_GPIO3_100K_PU]	= ADC5_CHAN_TEMP("gpio3_pu2", 0,
-					SCALE_HW_CALIB_THERM_100K_PU_PM7)
+					SCALE_HW_CALIB_THERM_100K_QN5965)/*pmr735a_charger_skin_therm*/
 	[ADC7_GPIO4_100K_PU]	= ADC5_CHAN_TEMP("gpio4_pu2", 0,
 					SCALE_HW_CALIB_THERM_100K_PU_PM7)
 };

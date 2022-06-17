@@ -3,6 +3,9 @@
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
  */
 
+#include <linux/seq_file.h>
+#include <linux/uaccess.h>
+#include <linux/fs.h>
 #include <linux/device.h>
 #include <linux/regmap.h>
 #include <linux/delay.h>
@@ -44,6 +47,8 @@
 
 static void update_sw_icl_max(struct smb_charger *chg, int val);
 static int smblib_get_prop_typec_mode(struct smb_charger *chg);
+
+static int screen_state = 1;
 
 int smblib_read(struct smb_charger *chg, u16 addr, u8 *val)
 {
@@ -2035,6 +2040,20 @@ int smblib_get_prop_batt_present(struct smb_charger *chg,
 	return rc;
 }
 
+int smblib_get_prop_batt_charging_enable(struct smb_charger *chg,
+				  union power_supply_propval *val){
+	int rc;
+	u8 regval;
+
+	rc = smblib_read(chg, CHARGING_ENABLE_CMD_REG, &regval);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't read CHARGING_ENABLE_CMD_REG rc=%d\n", rc);
+		return rc;
+	}
+	val->intval = (regval & CHARGING_ENABLE_CMD_BIT? 1 :0);
+	return 0;
+}
+
 int smblib_get_prop_batt_capacity(struct smb_charger *chg,
 				  union power_supply_propval *val)
 {
@@ -2502,6 +2521,51 @@ int smblib_set_prop_batt_status(struct smb_charger *chg,
 	return 0;
 }
 
+#ifdef CHARGE_SCREEN_ON_OFF /* debug screen_on/screen_off */
+#define BACKLIGHT_NAME "/sys/class/backlight/panel0-backlight/brightness"
+int smblib_get_screen_state(struct smb_charger *chg)
+{
+	struct file *pfile = NULL;
+	//mm_segment_t old_fs;
+	loff_t pos;
+
+	ssize_t ret = 0;
+	char brightness[10];
+	memset(brightness, 0, sizeof(brightness));
+
+	pfile = filp_open(BACKLIGHT_NAME, O_RDONLY, 0);
+	if (IS_ERR(pfile)) {
+		smblib_err(chg, "open BACKLIGHT_NAME  file failed!\n");
+		goto ERR_0;
+	}
+
+	//old_fs = get_fs();
+	//set_fs(KERNEL_DS);
+	pos = 0;
+
+	ret = kernel_read(pfile, brightness, 10, &pos);
+	if(ret <= 0) {
+		smblib_err(chg, "read BACKLIGHT_NAME  file failed!\n");
+		goto ERR_1;
+	}
+
+	if(brightness[0] == '0') {
+		screen_state = 0;
+	} else {
+		screen_state = 1;
+	}
+	smblib_dbg(chg, PR_INTERRUPT, "brightness = %s\n", brightness);
+
+ERR_1:
+	filp_close(pfile, NULL);
+	//set_fs(old_fs);
+	return 0;
+
+ERR_0:
+	return -1;
+}
+#endif
+
 int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 				const union power_supply_propval *val)
 {
@@ -2521,12 +2585,39 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 			THERMAL_DAEMON_VOTER, true, 0);
 
 	vote(chg->chg_disable_votable, THERMAL_DAEMON_VOTER, false, 0);
-	if (chg->system_temp_level == 0)
-		return vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, false, 0);
 
-	vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
+#ifdef CHARGE_SCREEN_ON_OFF /* debug screen_on/screen_off */
+	smblib_get_screen_state(chg);
+#endif
+
+	if (screen_state == 1) {
+		vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
 			chg->thermal_mitigation[chg->system_temp_level]);
+		vote(chg->usb_icl_votable, THERMAL_DAEMON_VOTER, true,
+			chg->thermal_mitigation[chg->system_temp_level]);
+		smblib_dbg(chg, PR_INTERRUPT, "screen_on state=%d,thermal_mitigation=%d\n",
+			screen_state, chg->thermal_mitigation[chg->system_temp_level]);
+	} else {
+		vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
+			chg->thermal_mitigation_sleep[chg->system_temp_level]);
+		vote(chg->usb_icl_votable, THERMAL_DAEMON_VOTER, true,
+			chg->thermal_mitigation_sleep[chg->system_temp_level]);
+		smblib_dbg(chg, PR_INTERRUPT, "screen_off state=%d,thermal_mitigation_sleep=%d\n",
+			screen_state, chg->thermal_mitigation_sleep[chg->system_temp_level]);
+	}
+
 	return 0;
+}
+
+int smblib_set_prop_batt_charging_enable(struct smb_charger *chg,
+				const union power_supply_propval *val){
+	int rc;
+	u8 write_value = (u8)val->intval;
+	rc = smblib_masked_write(chg, CHARGING_ENABLE_CMD_REG, CHARGING_ENABLE_CMD_BIT, write_value);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't write to CHARGING_ENABLE_CMD_REG rc=%d\n", rc);
+	}
+	return rc;
 }
 
 int smblib_set_prop_input_current_limited(struct smb_charger *chg,
@@ -4393,7 +4484,7 @@ int smblib_set_prop_pd_current_max(struct smb_charger *chg,
 
 	if (chg->pd_active) {
 		icl = get_client_vote(chg->usb_icl_votable, PD_VOTER);
-		rc = vote(chg->usb_icl_votable, PD_VOTER, true, val);
+		rc = vote(chg->usb_icl_votable, PD_VOTER, true, 3300000);
 		if (val != icl)
 			power_supply_changed(chg->usb_psy);
 	} else {
@@ -4820,6 +4911,20 @@ int smblib_set_prop_pd_active(struct smb_charger *chg,
 
 	power_supply_changed(chg->usb_psy);
 	return rc;
+}
+
+int smblib_get_prop_set_ship_mode(struct smb_charger *chg,
+				  union power_supply_propval *val){
+	int rc;
+	u8 regval;
+
+	rc = smblib_read(chg, SHIP_MODE_REG, &regval);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't read SHIP_MODE_REG rc=%d\n", rc);
+		return rc;
+	}
+	val->intval = (regval & SHIP_MODE_EN_BIT? 1 :0);
+	return 0;
 }
 
 int smblib_set_prop_ship_mode(struct smb_charger *chg,

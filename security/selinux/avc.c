@@ -31,6 +31,9 @@
 #include "avc_ss.h"
 #include "classmap.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/avc.h>
+
 #define AVC_CACHE_SLOTS			512
 #define AVC_DEF_CACHE_THRESHOLD		512
 #define AVC_CACHE_RECLAIM		16
@@ -695,6 +698,35 @@ static void avc_audit_pre_callback(struct audit_buffer *ab, void *a)
 }
 
 /**
+ * avc_dump_extra_info - add extra info about task and audit result
+ * @ab: the audit buffer
+ * @ad: audit_data
+ */
+#ifdef CONFIG_SECURITY_SELINUX_AVC_EXTRA_INFO
+static void avc_dump_extra_info(struct audit_buffer *ab,
+		struct common_audit_data *ad)
+{
+	struct task_struct *tsk = current;
+
+	if (tsk && tsk->pid) {
+		audit_log_format(ab, " ppid=%d pcomm=", tsk->parent->pid);
+		audit_log_untrustedstring(ab, tsk->parent->comm);
+
+		if (tsk->group_leader->pid != tsk->pid) {
+			audit_log_format(ab, " pgid=%d pgcomm=",
+					tsk->group_leader->pid);
+			audit_log_untrustedstring(ab,
+					tsk->group_leader->comm);
+		} else if (tsk->parent->group_leader->pid) {
+			audit_log_format(ab, " pgid=%d pgcomm=",
+					tsk->parent->group_leader->pid);
+			audit_log_untrustedstring(ab,
+					tsk->parent->group_leader->comm);
+		}
+	}
+}
+#endif
+/**
  * avc_audit_post_callback - SELinux specific information
  * will be called by generic audit code
  * @ab: the audit buffer
@@ -704,33 +736,36 @@ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
 {
 	struct common_audit_data *ad = a;
 	struct selinux_audit_data *sad = ad->selinux_audit_data;
-	char *scontext;
+	char *scontext = NULL;
+	char *tcontext = NULL;
+	const char *tclass = NULL;
 	u32 scontext_len;
+	u32 tcontext_len;
 	int rc;
 
 	rc = security_sid_to_context(sad->state, sad->ssid, &scontext,
 				     &scontext_len);
 	if (rc)
 		audit_log_format(ab, " ssid=%d", sad->ssid);
-	else {
+	else
 		audit_log_format(ab, " scontext=%s", scontext);
-		kfree(scontext);
-	}
 
-	rc = security_sid_to_context(sad->state, sad->tsid, &scontext,
-				     &scontext_len);
+	rc = security_sid_to_context(sad->state, sad->tsid, &tcontext,
+				     &tcontext_len);
 	if (rc)
 		audit_log_format(ab, " tsid=%d", sad->tsid);
-	else {
-		audit_log_format(ab, " tcontext=%s", scontext);
-		kfree(scontext);
-	}
+	else
+		audit_log_format(ab, " tcontext=%s", tcontext);
 
-	audit_log_format(ab, " tclass=%s", secclass_map[sad->tclass-1].name);
+	tclass = secclass_map[sad->tclass-1].name;
+	audit_log_format(ab, " tclass=%s", tclass);
 
 	if (sad->denied)
 		audit_log_format(ab, " permissive=%u", sad->result ? 0 : 1);
 
+	trace_selinux_audited(sad, scontext, tcontext, tclass);
+	kfree(tcontext);
+	kfree(scontext);
 	/* in case of invalid context report also the actual context string */
 	rc = security_sid_to_context_inval(sad->state, sad->ssid, &scontext,
 					   &scontext_len);
@@ -751,6 +786,10 @@ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
 		audit_log_n_untrustedstring(ab, scontext, scontext_len);
 		kfree(scontext);
 	}
+
+#ifdef CONFIG_SECURITY_SELINUX_AVC_EXTRA_INFO
+	avc_dump_extra_info(ab, ad);
+#endif
 }
 
 /* This is the slow part of avc audit with big stack footprint */

@@ -4,7 +4,7 @@
 # These targets are used from top-level makefile
 
 PHONY += xconfig gconfig menuconfig config localmodconfig localyesconfig \
-	build_menuconfig build_nconfig build_gconfig build_xconfig
+	build_menuconfig build_nconfig build_gconfig build_xconfig savediffconfig
 
 ifdef KBUILD_KCONFIG
 Kconfig := $(KBUILD_KCONFIG)
@@ -77,6 +77,18 @@ PHONY += savedefconfig defconfig
 savedefconfig: $(obj)/conf
 	$< $(silent) --$@=defconfig $(Kconfig)
 
+savecommondiffconfig:
+ifneq ($(KBUILD_DIFFCONFIG), )
+	$(Q)$(srctree)/scripts/diffconfig -m .config.def .config > diffconfig.common
+	$(Q)rm -f .config.def .config.common
+endif
+
+savediffconfig:
+ifneq ($(KBUILD_DIFFCONFIG), )
+	$(Q)$(srctree)/scripts/diffconfig -m .config.common .config > diffconfig
+	$(Q)rm -f .config.def .config.common
+endif
+
 defconfig: $(obj)/conf
 ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/configs/$(KBUILD_DEFCONFIG)),)
 	@$(kecho) "*** Default configuration is based on '$(KBUILD_DEFCONFIG)'"
@@ -88,6 +100,20 @@ endif
 
 %_defconfig: $(obj)/conf
 	$(Q)$< $(silent) --defconfig=arch/$(SRCARCH)/configs/$@ $(Kconfig)
+ifneq ($(KBUILD_DIFFCONFIG), )
+	$(Q)cp -f .config .config.def
+	$(Q)$(srctree)/$(obj)/merge_config.sh -m .config \
+		$(srctree)/arch/$(SRCARCH)/configs/diffconfig/common_diffconfig
+	$(Q)$< --olddefconfig $(Kconfig)
+	$(Q)cp -f .config .config.common
+	$(Q)$(srctree)/$(obj)/merge_config.sh -m .config \
+		$(srctree)/arch/$(SRCARCH)/configs/diffconfig/$(KBUILD_DIFFCONFIG)
+ifeq ($(TARGET_BUILD_VARIANT),user)
+	$(Q)$(srctree)/$(obj)/merge_config.sh -m .config \
+		$(srctree)/arch/$(SRCARCH)/configs/vendor/debugfs.config
+endif
+	$(Q)$< --defconfig=.config $(Kconfig)
+endif
 
 configfiles=$(wildcard $(srctree)/kernel/configs/$@ $(srctree)/arch/$(SRCARCH)/configs/$@)
 

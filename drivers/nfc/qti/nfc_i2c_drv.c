@@ -367,10 +367,10 @@ int nfc_i2c_dev_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	ret = nfcc_hw_check(nfc_dev);
-	if (ret) {
+	/*if (ret) {
 		pr_err("nfc hw check failed ret %d\n", ret);
 		goto err_nfcc_hw_check;
-	}
+	}*/
 
 	device_init_wakeup(&client->dev, true);
 	i2c_dev->irq_wake_up = false;
@@ -378,12 +378,12 @@ int nfc_i2c_dev_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	pr_info("%s success\n", __func__);
 	return 0;
-
+/*
 err_nfcc_hw_check:
 	if (nfc_dev->reg) {
 		nfc_ldo_unvote(nfc_dev);
 		regulator_put(nfc_dev->reg);
-	}
+	}*/
 err_ldo_config_failed:
 	free_irq(client->irq, nfc_dev);
 err_nfc_misc_remove:

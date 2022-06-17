@@ -27,6 +27,9 @@ enum print_reason {
 	PR_PARALLEL	= BIT(3),
 	PR_OTG		= BIT(4),
 	PR_WLS		= BIT(5),
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	PR_SOMC		= BIT(15),
+#endif
 };
 
 #define DEFAULT_VOTER			"DEFAULT_VOTER"
@@ -97,14 +100,16 @@ enum print_reason {
 #define SDP_CURRENT_UA			500000
 #define CDP_CURRENT_UA			1500000
 #define DCP_CURRENT_UA			1500000
-#define HVDCP_CURRENT_UA		3000000
+#define HVDCP_CURRENT_UA		3300000
 #define TYPEC_DEFAULT_CURRENT_UA	900000
 #define TYPEC_MEDIUM_CURRENT_UA		1500000
-#define TYPEC_HIGH_CURRENT_UA		3000000
+#define TYPEC_HIGH_CURRENT_UA		3300000
 #define DCIN_ICL_MIN_UA			100000
 #define DCIN_ICL_MAX_UA			1500000
 #define DCIN_ICL_STEP_UA		100000
 #define ROLE_REVERSAL_DELAY_MS		500
+
+#define CHARGE_SCREEN_ON_OFF /* debug screen_on/screen_off */
 
 enum smb_mode {
 	PARALLEL_MASTER = 0,
@@ -515,6 +520,7 @@ struct smb_charger {
 	int			system_temp_level;
 	int			thermal_levels;
 	int			*thermal_mitigation;
+	int			*thermal_mitigation_sleep;
 	int			dcp_icl_ua;
 	int			fake_capacity;
 	int			fake_batt_status;
@@ -683,6 +689,8 @@ int smblib_get_prop_batt_present(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_batt_capacity(struct smb_charger *chg,
 				union power_supply_propval *val);
+int smblib_get_prop_batt_charging_enable(struct smb_charger *chg,
+				  union power_supply_propval *val);
 int smblib_get_prop_batt_status(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_batt_charge_type(struct smb_charger *chg,
@@ -794,10 +802,14 @@ int smblib_set_prop_pd_active(struct smb_charger *chg,
 				int val);
 int smblib_set_prop_pd_in_hard_reset(struct smb_charger *chg,
 				int val);
+int smblib_get_prop_set_ship_mode(struct smb_charger *chg,
+				  union power_supply_propval *val);
 int smblib_set_prop_ship_mode(struct smb_charger *chg,
 				int val);
 int smblib_set_prop_rechg_soc_thresh(struct smb_charger *chg,
 				int val);
+int smblib_set_prop_batt_charging_enable(struct smb_charger *chg,
+				const union power_supply_propval *val);
 void smblib_config_charger_on_debug_battery(struct smb_charger *chg);
 int smblib_rerun_apsd_if_required(struct smb_charger *chg);
 void smblib_rerun_apsd(struct smb_charger *chg);

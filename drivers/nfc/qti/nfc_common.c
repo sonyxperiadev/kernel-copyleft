@@ -7,7 +7,7 @@
 #include <linux/of_device.h>
 #include <linux/delay.h>
 #include "nfc_common.h"
-
+#include <linux/hardware_info.h>
 
 int nfc_parse_dt(struct device *dev, struct platform_gpio *nfc_gpio,
 		 struct platform_ldo *ldo, uint8_t interface)
@@ -928,6 +928,8 @@ int nfcc_hw_check(struct nfc_dev *nfc_dev)
 	pr_debug("%s: - NFC reset rsp : NfcNciRx %x %x %x\n",
 		__func__, nci_reset_rsp[0],
 		nci_reset_rsp[1], nci_reset_rsp[2]);
+
+	get_hardware_info_data(HWID_NFC,"0xA4");
 
 err_nfcc_reset_failed:
 	pr_info("NFC chip_type = %x\n",

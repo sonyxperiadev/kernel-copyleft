@@ -4824,6 +4824,8 @@ nopage:
 fail:
 	warn_alloc(gfp_mask, ac->nodemask,
 			"page allocation failure: order:%u", order);
+	trace_mm_page_alloc_fail(order, gfp_mask);
+
 got_pg:
 	return page;
 }
@@ -4941,6 +4943,9 @@ out:
 	}
 
 	trace_mm_page_alloc(page, order, alloc_mask, ac.migratetype);
+	if (order > 1)
+		trace_mm_page_alloc_highorder(page, order,
+					      alloc_mask, ac.migratetype);
 
 	return page;
 }

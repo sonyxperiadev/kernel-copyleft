@@ -903,6 +903,19 @@ config INPUT_SC27XX_VIBRA
 	  To compile this driver as a module, choose M here. The module will
 	  be called sc27xx_vibra.
 
+config HALL_SENSOR_NOT_USE_SWITCH
+	tristate "switch class support"
+	default y
+	help
+	Say Y here if you want to use switch_class.
+
+config HALL_SENSOR_NOT_USE_SETUP_TIMER
+	tristate "setup_timer macor support"
+	default y
+	help
+	Say N here if you can use setup_timer.
+
+
 config INPUT_STPMIC1_ONKEY
 	tristate "STPMIC1 PMIC Onkey support"
 	depends on MFD_STPMIC1

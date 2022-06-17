@@ -1217,7 +1217,10 @@ static void invalidate_reclaim_iterators(struct mem_cgroup *dead_memcg)
  * This function must not be called for the root memory cgroup.
  */
 int mem_cgroup_scan_tasks(struct mem_cgroup *memcg,
-			  int (*fn)(struct task_struct *, void *), void *arg)
+			  int (*fn)(struct task_struct *,
+				    const char *,
+				    struct oom_control *),
+			  void *arg)
 {
 	struct mem_cgroup *iter;
 	int ret = 0;
@@ -1230,7 +1233,7 @@ int mem_cgroup_scan_tasks(struct mem_cgroup *memcg,
 
 		css_task_iter_start(&iter->css, CSS_TASK_ITER_PROCS, &it);
 		while (!ret && (task = css_task_iter_next(&it)))
-			ret = fn(task, arg);
+			ret = fn(task, "memcontrol", arg);
 		css_task_iter_end(&it);
 		if (ret) {
 			mem_cgroup_iter_break(memcg, iter);

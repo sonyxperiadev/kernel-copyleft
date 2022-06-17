@@ -2752,12 +2752,22 @@ static void sdhci_msm_set_timeout(struct sdhci_host *host, struct mmc_command *c
 {
 	u32 count, start = 15;
 
+	/*
+	 * Qcom SoC hardware data timeout value was calculated
+	 * using 4 * MCLK * 2^(count + 13). where MCLK = 1 / host->clock.
+	 */
+
+	host->timeout_clk = host->mmc->actual_clock ?
+				host->mmc->actual_clock / 1000 :
+				host->clock / 1000;
+	host->timeout_clk /= 4;
+
 	__sdhci_set_timeout(host, cmd);
 	count = sdhci_readb(host, SDHCI_TIMEOUT_CONTROL);
+
 	/*
 	 * Update software timeout value if its value is less than hardware data
-	 * timeout value. Qcom SoC hardware data timeout value was calculated
-	 * using 4 * MCLK * 2^(count + 13). where MCLK = 1 / host->clock.
+	 * timeout value.
 	 */
 	if (cmd && cmd->data && host->clock > 400000 &&
 	    host->clock <= 50000000 &&
@@ -4266,6 +4276,7 @@ static void sdhci_msm_set_caps(struct sdhci_msm_host *msm_host)
 {
 	msm_host->mmc->caps |= MMC_CAP_AGGRESSIVE_PM;
 	msm_host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_NEED_RSP_BUSY;
+	msm_host->mmc->caps |= MMC_CAP_CD_WAKE;
 }
 
 static int sdhci_msm_probe(struct platform_device *pdev)
@@ -4535,7 +4546,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 
 #if defined(CONFIG_SDC_QTI)
 	host->timeout_clk_div = 4;
+#ifdef CONFIG_MMC_ENABLE_CLK_SCALE
 	msm_host->mmc->caps2 |= MMC_CAP2_CLK_SCALE;
+#endif
 #endif
 	sdhci_msm_setup_pm(pdev, msm_host);
 

@@ -96,6 +96,7 @@ struct gadget_info {
 	struct work_struct work;
 	struct device *dev;
 #endif
+    bool isMSOSDesc;
 };
 
 static inline struct gadget_info *to_gadget_info(struct config_item *item)
@@ -141,6 +142,10 @@ struct gadget_config_name {
 	struct config_group group;
 	struct list_head list;
 };
+
+/* vendor code */
+#define MSOS_VENDOR_CODE	0x08
+#define MSOS_GOOGLE_VENDOR_CODE	0x01
 
 #define USB_MAX_STRING_WITH_NULL_LEN	(USB_MAX_STRING_LEN+1)
 
@@ -418,6 +423,13 @@ static ssize_t gadget_driver_match_existing_only_show(struct config_item *item,
 
 	return sprintf(page, "%s\n", match_existing_only ? "true" : "false");
 }
+static ssize_t gadget_dev_desc_isMSOSDesc_show(struct config_item *item,
+		char *page)
+{
+	struct gadget_info *gi = to_gadget_info(item);
+
+	return snprintf(page, 3, "%s\n", gi->isMSOSDesc ? "Y" : "N");
+}
 
 CONFIGFS_ATTR(gadget_dev_desc_, bDeviceClass);
 CONFIGFS_ATTR(gadget_dev_desc_, bDeviceSubClass);
@@ -430,6 +442,7 @@ CONFIGFS_ATTR(gadget_dev_desc_, bcdUSB);
 CONFIGFS_ATTR(gadget_dev_desc_, UDC);
 CONFIGFS_ATTR(gadget_dev_desc_, max_speed);
 CONFIGFS_ATTR(gadget_, driver_match_existing_only);
+CONFIGFS_ATTR_RO(gadget_dev_desc_, isMSOSDesc);
 
 static struct configfs_attribute *gadget_root_attrs[] = {
 	&gadget_dev_desc_attr_bDeviceClass,
@@ -443,6 +456,7 @@ static struct configfs_attribute *gadget_root_attrs[] = {
 	&gadget_dev_desc_attr_UDC,
 	&gadget_dev_desc_attr_max_speed,
 	&gadget_attr_driver_match_existing_only,
+	&gadget_dev_desc_attr_isMSOSDesc,
 	NULL,
 };
 
@@ -1591,6 +1605,15 @@ static int android_setup(struct usb_gadget *gadget,
 	int value = -EOPNOTSUPP;
 	struct usb_function_instance *fi;
 
+	if ((c->bRequestType & USB_TYPE_MASK) == USB_TYPE_VENDOR) {
+			if (((c->bRequest == MSOS_GOOGLE_VENDOR_CODE) ||
+					(c->bRequest == MSOS_VENDOR_CODE)) &&
+					(c->bRequestType & USB_DIR_IN) && le16_to_cpu(c->wIndex == 4)) {
+					gi->isMSOSDesc = true;
+			}
+	}
+
+
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (!gi->connected) {
 		gi->connected = 1;
@@ -1686,6 +1709,7 @@ static void configfs_composite_disconnect(struct usb_gadget *gadget)
 		schedule_work(&gi->work);
 #endif
 	composite_disconnect(gadget);
+	gi->isMSOSDesc = false;
 	spin_unlock_irqrestore(&gi->spinlock, flags);
 }
 
