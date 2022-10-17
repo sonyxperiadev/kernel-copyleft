@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2022 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-or-later
  /***************************************************************************
  *
@@ -21,6 +26,8 @@
 #include <linux/mdio.h>
 #include <linux/phy.h>
 #include "smsc95xx.h"
+
+#define SOMC_GG_LAN9514
 
 #define SMSC_CHIPNAME			"smsc95xx"
 #define SMSC_DRIVER_VERSION		"2.0.0"
@@ -61,11 +68,37 @@ struct smsc95xx_priv {
 	u8 suspend_flags;
 	struct mii_bus *mdiobus;
 	struct phy_device *phydev;
+#ifdef SOMC_GG_LAN9514
+	atomic_t link_polling_enable;
+	struct timer_list link_polling_timer;
+	struct work_struct link_polling_work;
+#endif /* SOMC_GG_LAN9514 */
 };
 
 static bool turbo_mode = true;
 module_param(turbo_mode, bool, 0644);
 MODULE_PARM_DESC(turbo_mode, "Enable multiple frames per Rx transaction");
+
+#ifdef SOMC_GG_LAN9514
+#define DEFAULT_LINK_POLLING_INTERVAL (5)
+static u32 link_polling_interval = DEFAULT_LINK_POLLING_INTERVAL;
+module_param(link_polling_interval, uint, 0644);
+MODULE_PARM_DESC(link_polling_interval, "link polling interval");
+
+static bool debug;
+module_param(debug, bool, 0644);
+MODULE_PARM_DESC(debug, "debug");
+
+#define SOMC_GG_DLOG(priv, format, arg...)	\
+	if (debug) {		    \
+		netdev_info(priv, "%s.%4d: " format,	\
+			    __func__, __LINE__, ##arg);	\
+	}
+
+static void smsc95xx_link_polling_start(struct usbnet *dev);
+static void smsc95xx_link_polling_timer_fn(struct timer_list *t);
+static void smsc95xx_link_polling_work(struct work_struct *param);
+#endif /* SOMC_GG_LAN9514 */
 
 static int __must_check __smsc95xx_read_reg(struct usbnet *dev, u32 index,
 					    u32 *data, int in_pm)
@@ -1071,6 +1104,9 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->driver_priv = pdata;
 
 	spin_lock_init(&pdata->mac_cr_lock);
+#ifdef SOMC_GG_LAN9514
+	INIT_WORK(&pdata->link_polling_work, smsc95xx_link_polling_work);
+#endif /* SOMC_GG_LAN9514 */
 
 	/* LAN95xx devices do not alter the computed checksum of 0 to 0xffff.
 	 * RFC 2460, ipv6 UDP calculated checksum yields a result of zero must
@@ -1162,6 +1198,9 @@ free_mdio:
 	mdiobus_free(pdata->mdiobus);
 
 free_pdata:
+#ifdef SOMC_GG_LAN9514
+	cancel_work_sync(&pdata->link_polling_work);
+#endif /* SOMC_GG_LAN9514 */
 	kfree(pdata);
 	return ret;
 }
@@ -1170,6 +1209,11 @@ static void smsc95xx_unbind(struct usbnet *dev, struct usb_interface *intf)
 {
 	struct smsc95xx_priv *pdata = dev->driver_priv;
 
+#ifdef SOMC_GG_LAN9514
+	atomic_set(&pdata->link_polling_enable, 0);
+	del_timer_sync(&pdata->link_polling_timer);
+	cancel_work_sync(&pdata->link_polling_work);
+#endif /* SOMC_GG_LAN9514 */
 	mdiobus_unregister(pdata->mdiobus);
 	mdiobus_free(pdata->mdiobus);
 	netif_dbg(dev, ifdown, dev->net, "free pdata\n");
@@ -1178,7 +1222,14 @@ static void smsc95xx_unbind(struct usbnet *dev, struct usb_interface *intf)
 
 static void smsc95xx_handle_link_change(struct net_device *net)
 {
+	struct usbnet *dev = netdev_priv(net);
+
 	phy_print_status(net->phydev);
+	usbnet_defer_kevent(dev, EVENT_LINK_CHANGE);
+
+#ifdef SOMC_GG_LAN9514
+	smsc95xx_link_polling_start(dev);
+#endif /* SOMC_GG_LAN9514 */
 }
 
 static int smsc95xx_start_phy(struct usbnet *dev)
@@ -1956,6 +2007,59 @@ static int smsc95xx_manage_power(struct usbnet *dev, int on)
 	return 0;
 }
 
+#ifdef SOMC_GG_LAN9514
+static void smsc95xx_link_polling_start(struct usbnet *dev)
+{
+	struct smsc95xx_priv *pdata = dev->driver_priv;
+
+	if (!netif_carrier_ok(dev->net)) {
+		// Link down
+		SOMC_GG_DLOG(dev->net, "Link down -> start link polling timer\n");
+		atomic_set(&pdata->link_polling_enable, 1);
+		timer_setup(&pdata->link_polling_timer,
+			smsc95xx_link_polling_timer_fn, 0);
+		pdata->link_polling_timer.expires =
+			jiffies + link_polling_interval * HZ;
+		add_timer(&pdata->link_polling_timer);
+	}
+	else {
+		atomic_set(&pdata->link_polling_enable, 0);
+		del_timer_sync(&pdata->link_polling_timer);
+	}
+	return;
+}
+
+static void smsc95xx_link_polling_timer_fn(struct timer_list *t)
+{
+	struct smsc95xx_priv *pdata = from_timer(pdata, t, link_polling_timer);
+
+	if (atomic_read(&pdata->link_polling_enable)) {
+		schedule_work(&pdata->link_polling_work);
+	}
+}
+
+static void smsc95xx_link_polling_work(struct work_struct *param)
+{
+	struct smsc95xx_priv *pdata =
+		container_of(param, struct smsc95xx_priv, link_polling_work);
+	struct usbnet *dev = pdata->mdiobus->priv;
+	if (!dev || !dev->net || !dev->net->phydev) {
+		SOMC_GG_DLOG(dev->net, "error\n");
+		return;
+	}
+
+	if (atomic_read(&pdata->link_polling_enable) &&
+		!netif_carrier_ok(dev->net)) {
+		SOMC_GG_DLOG(dev->net, "PHY reset to be re-powered\n");
+		smsc95xx_reset(dev);
+
+		/* set next timer */
+		mod_timer(&(pdata->link_polling_timer),
+			  jiffies + link_polling_interval * HZ);
+	}
+}
+
+#endif /* SOMC_GG_LAN9514 */
 static const struct driver_info smsc95xx_info = {
 	.description	= "smsc95xx USB 2.0 Ethernet",
 	.bind		= smsc95xx_bind,

@@ -64,3 +64,5 @@ blocklist locktorture
 blocklist rcutorture
 blocklist mmrm_test_module
 blocklist q5drv_linux
+blocklist slg51000-regulator
+blocklist sony_camera
