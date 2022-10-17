@@ -238,15 +238,6 @@ config MACH_SONY_PDX225
 	  If you enable this config,
 	  please use SONY Mobile device tree.
 
-config MACH_SONY_PDX225_J
-	bool "Sony Mobile PDX225 J"
-	depends on ARCH_SONY_MURRAY
-	help
-	  Support for the SONY Mobile PDX225 J device
-	  which is based on SONY Murray platform.
-	  If you enable this config,
-	  please use SONY Mobile device tree.
-
 config ARCH_BLAIR
 	bool "Enable Support for Qualcomm Technologies, Inc. BLAIR"
 	depends on ARCH_QCOM

@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: MIT */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * drm_panel_orientation_quirks.c -- Quirks for non-normal panel orientation
  *
  * Copyright (C) 2017 Hans de Goede <hdegoede@redhat.com>

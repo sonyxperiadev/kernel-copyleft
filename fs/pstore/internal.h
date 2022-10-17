@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2019 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #ifndef __PSTORE_INTERNAL_H__
 #define __PSTORE_INTERNAL_H__
 

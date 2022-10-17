@@ -6,6 +6,11 @@
  * Copyright (C) 1994 - 2001, 2003 by Ralf Baechle
  * Copyright (C) 1999, 2000, 2001 Silicon Graphics, Inc.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #ifndef _ASM_PGALLOC_H
 #define _ASM_PGALLOC_H
 

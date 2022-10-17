@@ -49,6 +49,11 @@
  * Examples are: [__initramfs_start, __initramfs_end] for initramfs and
  *               [__nosave_begin, __nosave_end] for the nosave data
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2014 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #ifndef LOAD_OFFSET
 #define LOAD_OFFSET 0

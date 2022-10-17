@@ -32,6 +32,11 @@
  *   registers n a separate memory area for the per-CPU GPIO
  *   interrupts.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/bitops.h>
 #include <linux/clk.h>

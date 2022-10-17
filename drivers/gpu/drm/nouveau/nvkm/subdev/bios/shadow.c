@@ -21,6 +21,11 @@
  *
  * Authors: Ben Skeggs <bskeggs@redhat.com>
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #include "priv.h"
 
 #include <core/option.h>

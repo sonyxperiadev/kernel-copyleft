@@ -3,6 +3,11 @@
  *
  * Copyright © 2008,2010 Intel Corporation
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/intel-iommu.h>
 #include <linux/dma-resv.h>

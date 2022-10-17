@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 /* Copyright (c) 2011-2014 PLUMgrid, http://plumgrid.com
  */
 #ifndef _LINUX_BPF_H

@@ -22,6 +22,11 @@
  * including keys needed to generate an equivalently functional executable
  * are deemed to be part of the source code.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
  
  
 #include <linux/module.h>

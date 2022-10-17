@@ -36,6 +36,11 @@
  * The Linux Foundation chooses to take subject only to the GPLv2
  * license terms, and distributes only under these terms.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2015 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/async.h>
 #include <linux/devfreq.h>

@@ -10,6 +10,11 @@
  *
  * Usage: modpost vmlinux module1.o module2.o ...
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #define _GNU_SOURCE
 #include <stdio.h>

@@ -22,6 +22,11 @@
  * Authors: Dave Airlie
  *          Alon Levy
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include "qxl_drv.h"
 #include "qxl_object.h"

@@ -5,6 +5,11 @@
  * Ported the filesystem routines to 2.5.
  * 2003-02-10 Petr Baudis <pasky@ucw.cz>
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/fs.h>
 #include <linux/magic.h>

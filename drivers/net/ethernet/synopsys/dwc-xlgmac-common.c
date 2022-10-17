@@ -14,6 +14,11 @@
  * Synopsys is a registered trademark of Synopsys, Inc. Other names included
  * in the SOFTWARE may be the trademarks of their respective owners.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>

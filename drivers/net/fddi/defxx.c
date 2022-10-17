@@ -198,6 +198,11 @@
  *		14 Dec 2006	macro		TURBOchannel support.
  *		01 Jul 2014	macro		Fixes for DMA on 64-bit hosts.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 /* Include files */
 #include <linux/bitops.h>

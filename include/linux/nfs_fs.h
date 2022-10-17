@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  *  linux/include/linux/nfs_fs.h
  *
  *  Copyright (C) 1992  Rick Sladkey

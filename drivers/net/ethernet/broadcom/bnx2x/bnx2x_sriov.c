@@ -19,6 +19,11 @@
  *	       Ariel Elior <ariel.elior@qlogic.com>
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #include "bnx2x.h"
 #include "bnx2x_init.h"
 #include "bnx2x_cmn.h"

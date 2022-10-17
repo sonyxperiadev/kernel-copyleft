@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * acpi.h - ACPI Interface
  *
  * Copyright (C) 2001 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>

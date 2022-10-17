@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2020 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  *  Universal power supply monitor class
  *
  *  Copyright © 2007  Anton Vorontsov <cbou@mail.ru>

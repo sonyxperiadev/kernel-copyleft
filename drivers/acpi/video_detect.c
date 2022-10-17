@@ -24,6 +24,11 @@
  * this file will not be compiled and acpi_video_get_backlight_type() will
  * always return acpi_backlight_vendor.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/export.h>
 #include <linux/acpi.h>

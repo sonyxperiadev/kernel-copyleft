@@ -8,6 +8,11 @@
  * Copyright (C) 2015, Imagination Technologies Ltd.
  * Authors: Matt Redfearn (matt.redfearn@mips.com)
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #include <asm/bootinfo.h>
 #include <asm/cacheflush.h>
 #include <asm/fw/fw.h>

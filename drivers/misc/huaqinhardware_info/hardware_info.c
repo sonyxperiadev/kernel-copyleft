@@ -20,6 +20,11 @@
  * HUAQIN FOR SUCH HUAQIN SOFTWARE AT ISSUE.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2022 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 /*******************************************************************************
 * Dependency

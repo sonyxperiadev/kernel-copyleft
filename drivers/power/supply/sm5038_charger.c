@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * sm5038-charger.c - SM5038 Charger device driver
@@ -164,6 +169,8 @@ extern int sm5038_charger_cable_type_update(int cable_type);
 extern int sm5038_charger_charge_mode_update(int charge_mode);
 extern int sm5038_charger_chg_on_status_update(int chg_on_status);
 extern int sm5038_charger_input_current_update(int input_current);
+/* muic */
+extern int sm5038_muic_get_device_type(int *dev_type1, int *dev_type2);
 
 #if !defined(CONFIG_SOMC_CHARGER_EXTENSION)
 /* jeita */
@@ -3315,6 +3322,9 @@ static inline void sm5038_chg_init(struct sm5038_charger_data *charger)
 #if defined(CONFIG_SOMC_CHARGER_EXTENSION)
 	vote(charger->fv_votable, DEFAULT_VOTER, true,
 					charger->pdata->chg_float_voltage);
+	rerun_election(charger->usb_icl_votable);
+	rerun_election(charger->fcc_votable);
+	rerun_election(charger->fv_votable);
 	somc_sm5038_disable_watchdog(charger);
 #endif
 	chg_set_wdt_timer(charger, WDT_TIME_S_90);
@@ -3413,6 +3423,10 @@ step_err:
 void sm5038_chg_register_reset(struct i2c_client *i2c, void *charger_data)
 {
 	struct sm5038_charger_data *charger = static_charger_data;
+	u8 reg_data, ret = 0;
+	int op_table_vbus = 0x0, op_status = 0x0;
+	int vbus_status = 0x0;
+	int dev_type1, dev_type2;
 
 	if (charger == NULL) {
 		pr_info("%s: static charger fail", __func__);
@@ -3428,6 +3442,19 @@ void sm5038_chg_register_reset(struct i2c_client *i2c, void *charger_data)
 	sm5038_update_reg(charger->i2c, SM5038_CHG_REG_INTMSK3, (0x5B << 0), (0xFF << 0));
 	sm5038_chg_init(charger);
 
+	ret = sm5038_muic_get_device_type(&dev_type1, &dev_type2);
+
+	sm5038_read_reg(charger->i2c, SM5038_CHG_REG_STATUS1, &reg_data);
+	vbus_status = (reg_data & 0x02) ? 0 : 1;	/* 0: vbusuvlo, 1:vbuspok */
+
+	op_status = sm5038_charger_oper_get_current_status();
+	op_table_vbus = (op_status & 0x80) ? 1 : 0; /* 0: battery, 1: attached */
+	pr_info("sm5038-charger: %s: vbus ST(%d),OP(%d) \n", __func__, vbus_status, op_status);
+	if ((vbus_status != op_table_vbus) &&
+		(dev_type1 == 0x00 && dev_type2 == 0x00)) {
+		psy_chg_set_online(charger, POWER_SUPPLY_TYPE_BATTERY);
+	}
+	
 }
 EXPORT_SYMBOL_GPL(sm5038_chg_register_reset);
 

@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * sm5038-muic.c
@@ -233,6 +238,26 @@ int sm5038_muic_get_vbus_voltage(void)
 	return vbus_voltage;
 }
 EXPORT_SYMBOL_GPL(sm5038_muic_get_vbus_voltage);
+
+int sm5038_muic_get_device_type(int *dev_type1, int *dev_type2)
+{
+	struct sm5038_muic_data *muic_data = static_data;
+	int dev1 = 0, dev2 = 0;
+	
+	dev1 = sm5038_muic_i2c_read_byte(muic_data->i2c, SM5038_MUIC_REG_DEVICETYPE1);
+	dev2 = sm5038_muic_i2c_read_byte(muic_data->i2c, SM5038_MUIC_REG_DEVICETYPE2);
+	if ( (dev1 < 0) || (dev2 < 0)) {
+		return (-1);
+	}
+
+	*dev_type1 = dev1;
+	*dev_type2 = dev2;
+
+	pr_info("[%s:%s]Device Type[0x%02x,0x%02x]\n", MUIC_DEV_NAME, __func__, dev1, dev2);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(sm5038_muic_get_device_type);
 
 int sm5038_muic_hvdcp_voltage_control(struct sm5038_muic_data *muic_data, int voltage)
 {

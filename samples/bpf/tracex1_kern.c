@@ -4,6 +4,11 @@
  * modify it under the terms of version 2 of the GNU General Public
  * License as published by the Free Software Foundation.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <uapi/linux/bpf.h>

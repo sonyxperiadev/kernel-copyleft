@@ -8,6 +8,11 @@
  * Copyright (C) 2005 - 2012 Cavium Inc.
  * Copyright (C) 2008 Wind River Systems
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>

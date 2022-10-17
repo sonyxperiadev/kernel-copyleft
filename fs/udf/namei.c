@@ -18,6 +18,11 @@
  *  12/12/98 blf  Created. Split out the lookup code from dir.c
  *  04/19/99 blf  link, mknod, symlink support
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include "udfdecl.h"
 

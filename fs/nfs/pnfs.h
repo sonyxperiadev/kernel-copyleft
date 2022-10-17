@@ -26,6 +26,11 @@
  *  even if it has been or is hereafter advised of the possibility of
  *  such damages.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #ifndef FS_NFS_PNFS_H
 #define FS_NFS_PNFS_H

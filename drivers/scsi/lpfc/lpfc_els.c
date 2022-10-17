@@ -20,6 +20,11 @@
  * more details, a copy of which can be found in the file COPYING  *
  * included with this package.                                     *
  *******************************************************************/
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 /* See Fibre Channel protocol T11 FC-LS for details */
 #include <linux/blkdev.h>
 #include <linux/pci.h>

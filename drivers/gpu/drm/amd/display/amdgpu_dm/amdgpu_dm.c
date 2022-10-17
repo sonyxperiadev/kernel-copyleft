@@ -22,6 +22,11 @@
  * Authors: AMD
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 /* The caprices of the preprocessor require that this be declared right here */
 #define CREATE_TRACE_POINTS

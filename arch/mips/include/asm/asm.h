@@ -14,6 +14,11 @@
  * away by gas in -O mode. These nops are however required to fill delay
  * slots in noreorder mode.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #ifndef __ASM_ASM_H
 #define __ASM_ASM_H
 

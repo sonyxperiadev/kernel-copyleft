@@ -28,6 +28,11 @@
  *                New funcs, inode_bmap, udf_next_aext
  *  04/19/99      Support for writing device EA's for major/minor #
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include "udfdecl.h"
 #include <linux/mm.h>

@@ -24,6 +24,11 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2015 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <drm/drm_mipi_dsi.h>
 

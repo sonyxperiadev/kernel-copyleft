@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause OR GPL-2.0 */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 /******************************************************************************
  *
  * Name: acexcep.h - Exception codes returned by the ACPI subsystem

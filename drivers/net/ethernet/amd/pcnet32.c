@@ -1,5 +1,10 @@
 /* pcnet32.c: An AMD PCnet32 ethernet driver for linux. */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  *	Copyright 1996-1999 Thomas Bogendoerfer
  *
  *	Derived from the lance driver written 1993,1994,1995 by Donald Becker.

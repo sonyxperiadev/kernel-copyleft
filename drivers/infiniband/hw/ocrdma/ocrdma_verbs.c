@@ -39,6 +39,11 @@
  * 3333 Susan Street
  * Costa Mesa, CA 92626
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/dma-mapping.h>
 #include <rdma/ib_verbs.h>

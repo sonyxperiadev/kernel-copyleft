@@ -17,6 +17,11 @@
  * - Serial RX wake-up alarm
  * - low power debouncer
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/clk.h>
 #include <linux/clk/at91_pmc.h>

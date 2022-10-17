@@ -5,6 +5,11 @@
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include "fuse_i.h"
 
