@@ -63,3 +63,5 @@ blocklist xc4000
 blocklist xc5000
 blocklist limits_stat
 blocklist kunit
+blocklist slg51000-regulator
+blocklist sony_camera

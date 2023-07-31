@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2020 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
@@ -453,6 +458,7 @@ static int get_property_id(struct psy_state *pst,
 	return -ENOENT;
 }
 
+#if 0
 static void battery_chg_notify_disable(struct battery_chg_dev *bcdev)
 {
 	struct battery_charger_set_notify_msg req_msg = { { 0 } };
@@ -471,6 +477,7 @@ static void battery_chg_notify_disable(struct battery_chg_dev *bcdev)
 			bcdev->notify_en = false;
 	}
 }
+#endif
 
 static void battery_chg_notify_enable(struct battery_chg_dev *bcdev)
 {
@@ -1025,6 +1032,21 @@ static int usb_psy_get_prop(struct power_supply *psy,
 	if (prop == POWER_SUPPLY_PROP_TEMP)
 		pval->intval = DIV_ROUND_CLOSEST((int)pval->intval, 10);
 
+	if (prop == POWER_SUPPLY_PROP_ONLINE) {
+		rc = read_property_id(bcdev, pst, USB_ADAP_TYPE);
+		if (rc < 0) {
+			pr_err("Failed to read prop USB_ADAP_TYPE, rc=%d\n",
+									rc);
+			return 0;
+		}
+
+		if (pval->intval && pst->prop[USB_ADAP_TYPE] ==
+						POWER_SUPPLY_USB_TYPE_UNKNOWN) {
+			pr_debug("Since usb_type property is unknown, set online property to 0\n");
+			pval->intval = 0;
+		}
+	}
+
 	return 0;
 }
 
@@ -1188,8 +1210,12 @@ static int battery_psy_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		pval->intval = DIV_ROUND_CLOSEST(pst->prop[prop_id], 100);
+#if 0
 		if (IS_ENABLED(CONFIG_QTI_PMIC_GLINK_CLIENT_DEBUG) &&
 		   (bcdev->fake_soc >= 0 && bcdev->fake_soc <= 100))
+#else
+		if (bcdev->fake_soc >= 0 && bcdev->fake_soc <= 100)
+#endif
 			pval->intval = bcdev->fake_soc;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
@@ -1746,7 +1772,11 @@ static ssize_t fake_soc_store(struct class *c, struct class_attribute *attr,
 	bcdev->fake_soc = val;
 	pr_debug("Set fake soc to %d\n", val);
 
+#if 0
 	if (IS_ENABLED(CONFIG_QTI_PMIC_GLINK_CLIENT_DEBUG) && pst->psy)
+#else
+	if (pst && pst->psy)
+#endif
 		power_supply_changed(pst->psy);
 
 	return count;
@@ -1965,9 +1995,14 @@ static int battery_chg_parse_dt(struct battery_chg_dev *bcdev)
 
 	rc = read_property_id(bcdev, pst, BATT_CHG_CTRL_LIM_MAX);
 	if (rc < 0) {
+		/* This process may fail depending on the timing.
+		 *  If this fails, the property will not be registered.
+		 *  Work around this issue by changing the return
+		 *  value from rc to -EPROBE_DEFER.
+		 */
 		pr_err("Failed to read prop BATT_CHG_CTRL_LIM_MAX, rc=%d\n",
 			rc);
-		return rc;
+		return -EPROBE_DEFER;
 	}
 
 	rc = of_property_count_elems_of_size(node, "qcom,thermal-mitigation",
@@ -2076,6 +2111,7 @@ static int battery_chg_ship_mode(struct notifier_block *nb, unsigned long code,
 	return NOTIFY_DONE;
 }
 
+#if 0
 static void panel_event_notifier_callback(enum panel_event_notifier_tag tag,
 			struct panel_event_notification *notification, void *data)
 {
@@ -2148,6 +2184,7 @@ static int battery_chg_register_panel_notifier(struct battery_chg_dev *bcdev)
 	bcdev->notifier_cookie = cookie;
 	return 0;
 }
+#endif
 
 static int battery_chg_probe(struct platform_device *pdev)
 {
@@ -2195,9 +2232,11 @@ static int battery_chg_probe(struct platform_device *pdev)
 	INIT_WORK(&bcdev->battery_check_work, battery_chg_check_status_work);
 	bcdev->dev = dev;
 
+#if 0
 	rc = battery_chg_register_panel_notifier(bcdev);
 	if (rc < 0)
 		return rc;
+#endif
 
 	client_data.id = MSG_OWNER_BC;
 	client_data.name = "battery_charger";
