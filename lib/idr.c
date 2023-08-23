@@ -489,8 +489,7 @@ void ida_free(struct ida *ida, unsigned int id)
 	struct ida_bitmap *bitmap;
 	unsigned long flags;
 
-	if ((int)id < 0)
-		return;
+	BUG_ON((int)id < 0);
 
 	xas_lock_irqsave(&xas, flags);
 	bitmap = xas_load(&xas);

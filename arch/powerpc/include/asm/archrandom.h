@@ -6,34 +6,43 @@
 
 #include <asm/machdep.h>
 
-static inline bool arch_get_random_long(unsigned long *v)
+static inline int arch_get_random_long(unsigned long *v)
 {
-	return false;
+	return 0;
 }
 
-static inline bool arch_get_random_int(unsigned int *v)
+static inline int arch_get_random_int(unsigned int *v)
 {
-	return false;
+	return 0;
 }
 
-static inline bool arch_get_random_seed_long(unsigned long *v)
+static inline int arch_get_random_seed_long(unsigned long *v)
 {
 	if (ppc_md.get_random_seed)
 		return ppc_md.get_random_seed(v);
 
-	return false;
+	return 0;
 }
-
-static inline bool arch_get_random_seed_int(unsigned int *v)
+static inline int arch_get_random_seed_int(unsigned int *v)
 {
 	unsigned long val;
-	bool rc;
+	int rc;
 
 	rc = arch_get_random_seed_long(&val);
 	if (rc)
 		*v = val;
 
 	return rc;
+}
+
+static inline int arch_has_random(void)
+{
+	return 0;
+}
+
+static inline int arch_has_random_seed(void)
+{
+	return !!ppc_md.get_random_seed;
 }
 #endif /* CONFIG_ARCH_RANDOM */
 

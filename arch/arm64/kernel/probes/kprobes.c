@@ -36,16 +36,25 @@ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
 static void __kprobes
 post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
 
+static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
+{
+	void *addrs[1];
+	u32 insns[1];
+
+	addrs[0] = addr;
+	insns[0] = opcode;
+
+	return aarch64_insn_patch_text(addrs, insns, 1);
+}
+
 static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
 {
-	kprobe_opcode_t *addr = p->ainsn.api.insn;
-	void *addrs[] = {addr, addr + 1};
-	u32 insns[] = {p->opcode, BRK64_OPCODE_KPROBES_SS};
-
 	/* prepare insn slot */
-	aarch64_insn_patch_text(addrs, insns, 2);
+	patch_text(p->ainsn.api.insn, p->opcode);
 
-	flush_icache_range((uintptr_t)addr, (uintptr_t)(addr + MAX_INSN_SIZE));
+	flush_icache_range((uintptr_t) (p->ainsn.api.insn),
+			   (uintptr_t) (p->ainsn.api.insn) +
+			   MAX_INSN_SIZE * sizeof(kprobe_opcode_t));
 
 	/*
 	 * Needs restoring of return address after stepping xol.
@@ -125,18 +134,13 @@ void *alloc_insn_page(void)
 /* arm kprobe: install breakpoint in text */
 void __kprobes arch_arm_kprobe(struct kprobe *p)
 {
-	void *addr = p->addr;
-	u32 insn = BRK64_OPCODE_KPROBES;
-
-	aarch64_insn_patch_text(&addr, &insn, 1);
+	patch_text(p->addr, BRK64_OPCODE_KPROBES);
 }
 
 /* disarm kprobe: remove breakpoint from text */
 void __kprobes arch_disarm_kprobe(struct kprobe *p)
 {
-	void *addr = p->addr;
-
-	aarch64_insn_patch_text(&addr, &p->opcode, 1);
+	patch_text(p->addr, p->opcode);
 }
 
 void __kprobes arch_remove_kprobe(struct kprobe *p)
@@ -165,15 +169,20 @@ static void __kprobes set_current_kprobe(struct kprobe *p)
 }
 
 /*
- * Mask all of DAIF while executing the instruction out-of-line, to keep things
- * simple and avoid nesting exceptions. Interrupts do have to be disabled since
- * the kprobe state is per-CPU and doesn't get migrated.
+ * Interrupts need to be disabled before single-step mode is set, and not
+ * reenabled until after single-step mode ends.
+ * Without disabling interrupt on local CPU, there is a chance of
+ * interrupt occurrence in the period of exception return and  start of
+ * out-of-line single-step, that result in wrongly single stepping
+ * into the interrupt handler.
  */
 static void __kprobes kprobes_save_local_irqflag(struct kprobe_ctlblk *kcb,
 						struct pt_regs *regs)
 {
 	kcb->saved_irqflag = regs->pstate & DAIF_MASK;
-	regs->pstate |= DAIF_MASK;
+	regs->pstate |= PSR_I_BIT;
+	/* Unmask PSTATE.D for enabling software step exceptions. */
+	regs->pstate &= ~PSR_D_BIT;
 }
 
 static void __kprobes kprobes_restore_local_irqflag(struct kprobe_ctlblk *kcb,
@@ -216,7 +225,10 @@ static void __kprobes setup_singlestep(struct kprobe *p,
 		slot = (unsigned long)p->ainsn.api.insn;
 
 		set_ss_context(kcb, slot);	/* mark pending ss */
+
+		/* IRQs and single stepping do not mix well. */
 		kprobes_save_local_irqflag(kcb, regs);
+		kernel_enable_single_step(regs);
 		instruction_pointer_set(regs, slot);
 	} else {
 		/* insn simulation */
@@ -267,8 +279,12 @@ post_kprobe_handler(struct kprobe_ctlblk *kcb, struct pt_regs *regs)
 	}
 	/* call post handler */
 	kcb->kprobe_status = KPROBE_HIT_SSDONE;
-	if (cur->post_handler)
+	if (cur->post_handler)	{
+		/* post_handler can hit breakpoint and single step
+		 * again, so we enable D-flag for recursive exception.
+		 */
 		cur->post_handler(cur, regs, 0);
+	}
 
 	reset_current_kprobe();
 }
@@ -291,6 +307,8 @@ int __kprobes kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr)
 		instruction_pointer_set(regs, (unsigned long) cur->addr);
 		if (!instruction_pointer(regs))
 			BUG();
+
+		kernel_disable_single_step();
 
 		if (kcb->kprobe_status == KPROBE_REENTER)
 			restore_previous_kprobe(kcb);
@@ -353,6 +371,10 @@ static void __kprobes kprobe_handler(struct pt_regs *regs)
 			 * pre-handler and it returned non-zero, it will
 			 * modify the execution path and no need to single
 			 * stepping. Let's just reset current kprobe and exit.
+			 *
+			 * pre_handler can hit a breakpoint and can step thru
+			 * before return, keep PSTATE D-flag enabled until
+			 * pre_handler return back.
 			 */
 			if (!p->pre_handler || !p->pre_handler(p, regs)) {
 				setup_singlestep(p, regs, kcb, 0);
@@ -383,7 +405,7 @@ kprobe_ss_hit(struct kprobe_ctlblk *kcb, unsigned long addr)
 }
 
 static int __kprobes
-kprobe_breakpoint_ss_handler(struct pt_regs *regs, unsigned int esr)
+kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr)
 {
 	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
 	int retval;
@@ -393,15 +415,16 @@ kprobe_breakpoint_ss_handler(struct pt_regs *regs, unsigned int esr)
 
 	if (retval == DBG_HOOK_HANDLED) {
 		kprobes_restore_local_irqflag(kcb, regs);
+		kernel_disable_single_step();
+
 		post_kprobe_handler(kcb, regs);
 	}
 
 	return retval;
 }
 
-static struct break_hook kprobes_break_ss_hook = {
-	.imm = KPROBES_BRK_SS_IMM,
-	.fn = kprobe_breakpoint_ss_handler,
+static struct step_hook kprobes_step_hook = {
+	.fn = kprobe_single_step_handler,
 };
 
 static int __kprobes
@@ -545,7 +568,7 @@ int __kprobes arch_trampoline_kprobe(struct kprobe *p)
 int __init arch_init_kprobes(void)
 {
 	register_kernel_break_hook(&kprobes_break_hook);
-	register_kernel_break_hook(&kprobes_break_ss_hook);
+	register_kernel_step_hook(&kprobes_step_hook);
 
 	return 0;
 }

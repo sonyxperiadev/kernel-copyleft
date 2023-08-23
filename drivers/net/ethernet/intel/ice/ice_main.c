@@ -3495,12 +3495,10 @@ int ice_vsi_cfg(struct ice_vsi *vsi)
 	if (vsi->netdev) {
 		ice_set_rx_mode(vsi->netdev);
 
-		if (vsi->type != ICE_VSI_LB) {
-			err = ice_vsi_vlan_setup(vsi);
+		err = ice_vsi_vlan_setup(vsi);
 
-			if (err)
-				return err;
-		}
+		if (err)
+			return err;
 	}
 	ice_vsi_cfg_dcb_rings(vsi);
 
@@ -3563,10 +3561,9 @@ static int ice_up_complete(struct ice_vsi *vsi)
 		netif_carrier_on(vsi->netdev);
 	}
 
-	/* Perform an initial read of the statistics registers now to
-	 * set the baseline so counters are ready when interface is up
-	 */
-	ice_update_eth_stats(vsi);
+	/* clear this now, and the first stats read will be used as baseline */
+	vsi->stat_offsets_loaded = false;
+
 	ice_service_task_schedule(pf);
 
 	return 0;

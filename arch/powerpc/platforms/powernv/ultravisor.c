@@ -55,7 +55,6 @@ static int __init uv_init(void)
 		return -ENODEV;
 
 	uv_memcons = memcons_init(node, "memcons");
-	of_node_put(node);
 	if (!uv_memcons)
 		return -ENOENT;
 

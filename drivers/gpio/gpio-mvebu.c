@@ -32,6 +32,11 @@
  *   registers n a separate memory area for the per-CPU GPIO
  *   interrupts.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/bitops.h>
 #include <linux/clk.h>
@@ -696,9 +701,6 @@ static int mvebu_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	unsigned long long val;
 	unsigned long flags;
 	unsigned int on, off;
-
-	if (state->polarity != PWM_POLARITY_NORMAL)
-		return -EINVAL;
 
 	val = (unsigned long long) mvpwm->clk_rate * state->duty_cycle;
 	do_div(val, NSEC_PER_SEC);

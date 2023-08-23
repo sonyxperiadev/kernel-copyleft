@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #ifndef _ADDRCONF_H
 #define _ADDRCONF_H
 
@@ -410,9 +415,6 @@ static inline void in6_dev_hold(struct inet6_dev *idev)
 static inline bool ip6_ignore_linkdown(const struct net_device *dev)
 {
 	const struct inet6_dev *idev = __in6_dev_get(dev);
-
-	if (unlikely(!idev))
-		return true;
 
 	return !!idev->cnf.ignore_routes_with_linkdown;
 }

@@ -8,6 +8,11 @@
  * Copyright (C) 1999 Silicon Graphics
  * Copyright (C) 2000 MIPS Technologies, Inc.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #include <asm/irqflags.h>
 #include <asm/hazards.h>
 #include <linux/compiler.h>

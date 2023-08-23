@@ -340,7 +340,7 @@ __arm940_setup:
 
 	.align
 
-	.section ".proc.info.init", "a"
+	.section ".proc.info.init", #alloc
 
 	.type	__arm940_proc_info,#object
 __arm940_proc_info:

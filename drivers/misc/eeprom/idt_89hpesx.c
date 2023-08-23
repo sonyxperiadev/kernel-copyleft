@@ -39,6 +39,11 @@
  * Serge Semin <fancer.lancer@gmail.com>, <Sergey.Semin@t-platforms.ru>
  */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  *           NOTE of the IDT 89HPESx SMBus-slave interface driver
  *    This driver primarily is developed to have an access to EEPROM device of
  * IDT PCIe-switches. IDT provides a simple SMBus interface to perform IO-

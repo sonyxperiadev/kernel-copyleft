@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2015 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
 // core.c  --  Voltage/Current Regulator framework.
@@ -2011,13 +2016,10 @@ struct regulator *_regulator_get(struct device *dev, const char *id,
 		rdev->exclusive = 1;
 
 		ret = _regulator_is_enabled(rdev);
-		if (ret > 0) {
+		if (ret > 0)
 			rdev->use_count = 1;
-			regulator->enable_count = 1;
-		} else {
+		else
 			rdev->use_count = 0;
-			regulator->enable_count = 0;
-		}
 	}
 
 	link = device_link_add(dev, &rdev->dev, DL_FLAG_STATELESS);

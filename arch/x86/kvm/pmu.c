@@ -143,6 +143,7 @@ static void pmc_reprogram_counter(struct kvm_pmc *pmc, u32 type,
 void reprogram_gp_counter(struct kvm_pmc *pmc, u64 eventsel)
 {
 	unsigned config, type = PERF_TYPE_RAW;
+	u8 event_select, unit_mask;
 	struct kvm *kvm = pmc->vcpu->kvm;
 	struct kvm_pmu_event_filter *filter;
 	int i;
@@ -174,12 +175,17 @@ void reprogram_gp_counter(struct kvm_pmc *pmc, u64 eventsel)
 	if (!allow_event)
 		return;
 
+	event_select = eventsel & ARCH_PERFMON_EVENTSEL_EVENT;
+	unit_mask = (eventsel & ARCH_PERFMON_EVENTSEL_UMASK) >> 8;
+
 	if (!(eventsel & (ARCH_PERFMON_EVENTSEL_EDGE |
 			  ARCH_PERFMON_EVENTSEL_INV |
 			  ARCH_PERFMON_EVENTSEL_CMASK |
 			  HSW_IN_TX |
 			  HSW_IN_TX_CHECKPOINTED))) {
-		config = kvm_x86_ops->pmu_ops->pmc_perf_hw_id(pmc);
+		config = kvm_x86_ops->pmu_ops->find_arch_event(pmc_to_pmu(pmc),
+						      event_select,
+						      unit_mask);
 		if (config != PERF_COUNT_HW_MAX)
 			type = PERF_TYPE_HARDWARE;
 	}

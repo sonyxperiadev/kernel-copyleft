@@ -385,13 +385,12 @@ static int winbond_gpio_get(struct gpio_chip *gc, unsigned int offset)
 	unsigned long *base = gpiochip_get_data(gc);
 	const struct winbond_gpio_info *info;
 	bool val;
-	int ret;
 
 	winbond_gpio_get_info(&offset, &info);
 
-	ret = winbond_sio_enter(*base);
-	if (ret)
-		return ret;
+	val = winbond_sio_enter(*base);
+	if (val)
+		return val;
 
 	winbond_sio_select_logical(*base, info->dev);
 

@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0
 #include <linux/tcp.h>
 #include <net/tcp.h>
@@ -33,8 +38,7 @@ static u32 tcp_rack_reo_wnd(const struct sock *sk)
 			return 0;
 
 		if (tp->sacked_out >= tp->reordering &&
-		    !(READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_recovery) &
-		      TCP_RACK_NO_DUPTHRESH))
+		    !(sock_net(sk)->ipv4.sysctl_tcp_recovery & TCP_RACK_NO_DUPTHRESH))
 			return 0;
 	}
 
@@ -205,8 +209,7 @@ void tcp_rack_update_reo_wnd(struct sock *sk, struct rate_sample *rs)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 
-	if ((READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_recovery) &
-	     TCP_RACK_STATIC_REO_WND) ||
+	if (sock_net(sk)->ipv4.sysctl_tcp_recovery & TCP_RACK_STATIC_REO_WND ||
 	    !rs->prior_delivered)
 		return;
 

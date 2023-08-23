@@ -74,7 +74,7 @@
 
 #define I2C_TIMEOUT_SAFETY_COEFFICIENT	10
 
-#define I2C_TIMEOUT_MIN_USEC	500000
+#define I2C_TIMEOUT_MIN_USEC	5000000
 
 #define MAX_SE	20
 
@@ -135,7 +135,9 @@ struct geni_i2c_dev {
 	bool gpi_reset;
 	bool disable_dma_mode;
 	bool prev_cancel_pending; //Halt cancel till IOS in good state
+/*modify by zhouchenghua for baseline upgrade at 2022/7/6 start */
 	bool is_i2c_rtl_based; /* doing pending cancel only for rtl based SE's */
+/*modify by zhouchenghua for baseline upgrade at 2022/7/6 end */
 };
 
 static struct geni_i2c_dev *gi2c_dev_dbg[MAX_SE];
@@ -300,11 +302,18 @@ static int geni_i2c_prepare(struct geni_i2c_dev *gi2c)
 	if (gi2c->se_mode == UNINITIALIZED) {
 		int proto = get_se_proto(gi2c->base);
 		u32 se_mode;
+                int ret = 0;
 
 		if (proto != I2C) {
 			dev_err(gi2c->dev, "Invalid proto %d\n", proto);
-			if (!gi2c->is_le_vm)
-				se_geni_resources_off(&gi2c->i2c_rsc);
+			if (!gi2c->is_le_vm) {
+				ret = se_geni_resources_off(&gi2c->i2c_rsc);
+				if (ret) {
+					dev_err(gi2c->dev, "%s: resource_off Error ret %d\n",
+						__func__, ret);
+					return ret;
+				}
+			}
 			return -ENXIO;
 		}
 
@@ -391,7 +400,7 @@ static irqreturn_t geni_i2c_irq(int irq, void *dev)
 				cur->buf[i] = (u8) ((temp >> (p * 8)) & 0xff);
 			gi2c->cur_rd = i;
 			if (gi2c->cur_rd == cur->len) {
-				dev_dbg(gi2c->dev, "FIFO i:%d,read 0x%x\n",
+				GENI_SE_DBG(gi2c->ipcl, false, gi2c->dev, "FIFO i:%d,read 0x%x\n",
 					i, temp);
 				break;
 			}
@@ -469,11 +478,11 @@ static void gi2c_ev_cb(struct dma_chan *ch, struct msm_gpi_cb const *cb_str,
 			geni_i2c_err(gi2c, I2C_BUS_PROTO);
 		if (m_stat & M_GP_IRQ_4_EN)
 			geni_i2c_err(gi2c, I2C_ARB_LOST);
-		complete(&gi2c->xfer);
 		break;
 	default:
 		break;
 	}
+	complete(&gi2c->xfer);
 	if (cb_str->cb_event != MSM_GPI_QUP_NOTIFY)
 		GENI_SE_ERR(gi2c->ipcl, true, gi2c->dev,
 				"GSI QN err:0x%x, status:0x%x, err:%d\n",
@@ -995,9 +1004,11 @@ static int geni_i2c_gsi_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 
 			/* WAR: Set flag to mark cancel pending if IOS stuck */
 			geni_ios = geni_read_reg_nolog(gi2c->base, SE_GENI_IOS);
+/*modify by zhouchenghua for baseline upgrade at 2022/7/6 start */
 			if ((geni_ios & 0x3) != 0x3) { //SCL:b'1, SDA:b'0
 				GENI_SE_DBG(gi2c->ipcl, true, gi2c->dev,
 					"%s: IO lines not in good state\n", __func__);
+/*modify by zhouchenghua for baseline upgrade at 2022/7/6 end */
 					/* doing pending cancel only rtl based SE's */
 					if (gi2c->is_i2c_rtl_based) {
 						gi2c->prev_cancel_pending = true;
@@ -1050,6 +1061,7 @@ static int geni_i2c_xfer(struct i2c_adapter *adap,
 {
 	struct geni_i2c_dev *gi2c = i2c_get_adapdata(adap);
 	int i, ret = 0, timeout = 0;
+        u32 geni_ios = 0;
 
 	gi2c->err = 0;
 
@@ -1072,6 +1084,15 @@ static int geni_i2c_xfer(struct i2c_adapter *adap,
 		}
 	}
 
+	geni_ios = geni_read_reg_nolog(gi2c->base, SE_GENI_IOS);
+	if ((geni_ios & 0x3) != 0x3) { //SCL:b'1, SDA:b'0
+		GENI_SE_ERR(gi2c->ipcl, true, gi2c->dev,
+			"IO lines in bad state, Power the slave, ios:0x%x\n", geni_ios);
+		pm_runtime_mark_last_busy(gi2c->dev);
+		pm_runtime_put_autosuspend(gi2c->dev);
+		return -ENXIO;
+	}
+
 	// WAR : Complete previous pending cancel cmd
 	if (gi2c->prev_cancel_pending) {
 		ret = do_pending_cancel(gi2c);
@@ -1079,7 +1100,9 @@ static int geni_i2c_xfer(struct i2c_adapter *adap,
 			pm_runtime_mark_last_busy(gi2c->dev);
 			pm_runtime_put_autosuspend(gi2c->dev);
 			return ret; //Don't perform xfer is cancel failed
+/*modify by zhouchenghua for baseline upgrade at 2022/7/6 start */
 		}
+/*modify by zhouchenghua for baseline upgrade at 2022/7/6 end */
 	}
 
 	GENI_SE_DBG(gi2c->ipcl, false, gi2c->dev,
@@ -1207,9 +1230,11 @@ static int geni_i2c_xfer(struct i2c_adapter *adap,
 
 			/* WAR: Set flag to mark cancel pending if IOS bad */
 			geni_ios = geni_read_reg_nolog(gi2c->base, SE_GENI_IOS);
+/*modify by zhouchenghua for baseline upgrade at 2022/7/6 start */
 			if ((geni_ios & 0x3) != 0x3) { //SCL:b'1, SDA:b'0
 				GENI_SE_DBG(gi2c->ipcl, true, gi2c->dev,
 					"%s: IO lines not in good state\n", __func__);
+/*modify by zhouchenghua for baseline upgrade at 2022/7/6 end */
 				/* doing pending cancel only rtl based SE's */
 				if (gi2c->is_i2c_rtl_based) {
 					gi2c->prev_cancel_pending = true;
@@ -1516,6 +1541,7 @@ static int geni_i2c_resume_early(struct device *device)
 #if IS_ENABLED(CONFIG_PM)
 static int geni_i2c_runtime_suspend(struct device *dev)
 {
+	int ret = 0;
 	struct geni_i2c_dev *gi2c = dev_get_drvdata(dev);
 
 	if (gi2c->se_mode == FIFO_SE_DMA)
@@ -1528,12 +1554,16 @@ static int geni_i2c_runtime_suspend(struct device *dev)
 			gi2c->first_resume = false;
 	} else if (gi2c->is_shared) {
 		/* Do not unconfigure GPIOs if shared se */
-		se_geni_clks_off(&gi2c->i2c_rsc);
+		ret = se_geni_clks_off(&gi2c->i2c_rsc);
+		if (ret)
+			dev_err(dev, "%s: clks_off Error ret %d\n", __func__, ret);
 	} else {
-		se_geni_resources_off(&gi2c->i2c_rsc);
+		ret = se_geni_resources_off(&gi2c->i2c_rsc);
+		if (ret)
+			dev_err(dev, "%s: resource_off Error ret %d\n", __func__, ret);
 	}
 	GENI_SE_DBG(gi2c->ipcl, false, gi2c->dev, "%s\n", __func__);
-	return 0;
+	return ret;
 }
 
 static int geni_i2c_runtime_resume(struct device *dev)
@@ -1551,9 +1581,10 @@ static int geni_i2c_runtime_resume(struct device *dev)
 	if (!gi2c->is_le_vm) {
 		/* Do not control clk/gpio/icb for LE-VM */
 		ret = se_geni_resources_on(&gi2c->i2c_rsc);
-		if (ret)
-			return ret;
-
+		if (ret) {
+			dev_err(dev, "%s: resource_off Error ret %d\n", __func__, ret);
+ 			return ret;
+		}
 		ret = geni_i2c_prepare(gi2c);
 		if (ret) {
 			dev_err(gi2c->dev, "I2C prepare failed: %d\n", ret);

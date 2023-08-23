@@ -761,8 +761,6 @@ _request_firmware(const struct firmware **firmware_p, const char *name,
 		  enum fw_opt opt_flags)
 {
 	struct firmware *fw = NULL;
-	struct cred *kern_cred = NULL;
-	const struct cred *old_cred;
 	int ret;
 
 	if (!firmware_p)
@@ -777,18 +775,6 @@ _request_firmware(const struct firmware **firmware_p, const char *name,
 					opt_flags);
 	if (ret <= 0) /* error or already assigned */
 		goto out;
-
-	/*
-	 * We are about to try to access the firmware file. Because we may have been
-	 * called by a driver when serving an unrelated request from userland, we use
-	 * the kernel credentials to read the file.
-	 */
-	kern_cred = prepare_kernel_cred(NULL);
-	if (!kern_cred) {
-		ret = -ENOMEM;
-		goto out;
-	}
-	old_cred = override_creds(kern_cred);
 
 	ret = fw_get_filesystem_firmware(device, fw->priv, "", NULL);
 #ifdef CONFIG_FW_LOADER_COMPRESS
@@ -805,9 +791,6 @@ _request_firmware(const struct firmware **firmware_p, const char *name,
 		ret = firmware_fallback_sysfs(fw, name, device, opt_flags, ret);
 	} else
 		ret = assign_fw(fw, device, opt_flags);
-
-	revert_creds(old_cred);
-	put_cred(kern_cred);
 
  out:
 	if (ret < 0) {

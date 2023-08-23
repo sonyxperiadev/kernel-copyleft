@@ -5,6 +5,11 @@
  *
  * This file is released under the LGPL.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #ifndef DM_CORE_INTERNAL_H
 #define DM_CORE_INTERNAL_H

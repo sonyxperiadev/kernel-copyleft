@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
@@ -340,7 +345,7 @@ static ssize_t store_not_preferred(struct cluster_data *state,
 				   const char *buf, size_t count)
 {
 	struct cpu_data *c;
-	unsigned int i, mask;
+	unsigned int i;
 	unsigned int val[MAX_CPUS_PER_CLUSTER];
 	unsigned long flags;
 	int ret;
@@ -353,16 +358,10 @@ static ssize_t store_not_preferred(struct cluster_data *state,
 		return -EINVAL;
 
 	spin_lock_irqsave(&state_lock, flags);
-	for (i = 0, mask = 0; i < state->num_cpus;) {
-		if (!cpumask_test_cpu(i + mask + state->first_cpu, cpu_possible_mask)) {
-			mask++;
-			continue;
-		}
-
-		c = &per_cpu(cpu_state, i + mask + state->first_cpu);
+	for (i = 0; i < state->num_cpus; i++) {
+		c = &per_cpu(cpu_state, i + state->first_cpu);
 		c->not_preferred = val[i];
 		not_preferred_count += !!val[i];
-		i++;
 	}
 	state->nr_not_preferred_cpus = not_preferred_count;
 	spin_unlock_irqrestore(&state_lock, flags);
@@ -375,25 +374,19 @@ static ssize_t show_not_preferred(const struct cluster_data *state, char *buf)
 	struct cpu_data *c;
 	ssize_t count = 0;
 	unsigned long flags;
-	int i, mask;
+	int i;
 
 	spin_lock_irqsave(&state_lock, flags);
-	for (i = 0, mask = 0; i < state->num_cpus;) {
-		if (!cpumask_test_cpu(i + mask + state->first_cpu, cpu_possible_mask)) {
-			mask++;
-			continue;
-		}
-
-		c = &per_cpu(cpu_state, i + mask + state->first_cpu);
+	for (i = 0; i < state->num_cpus; i++) {
+		c = &per_cpu(cpu_state, i + state->first_cpu);
 		count += scnprintf(buf + count, PAGE_SIZE - count,
-			"CPU#%d: %u\n", c->cpu, c->not_preferred);
-		i++;
+				"CPU#%d: %u\n", c->cpu, c->not_preferred);
 	}
-
 	spin_unlock_irqrestore(&state_lock, flags);
 
 	return count;
 }
+
 
 struct core_ctl_attr {
 	struct attribute attr;

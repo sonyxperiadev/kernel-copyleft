@@ -24,6 +24,11 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2015 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <drm/drm_mipi_dsi.h>
 
@@ -1053,8 +1058,15 @@ EXPORT_SYMBOL(mipi_dsi_dcs_set_tear_scanline);
 int mipi_dsi_dcs_set_display_brightness(struct mipi_dsi_device *dsi,
 					u16 brightness)
 {
-	u8 payload[2] = { brightness & 0xff, brightness >> 8 };
-	ssize_t err;
+        u8 payload[2] = { 0, 0};
+        ssize_t err;
+
+        if((brightness > 0) && (brightness < 8))
+            brightness = 8;
+        printk("[lcm] the brightness is %d\n", brightness);
+
+        payload[0] = brightness >> 8;
+        payload[1] = brightness & 0xff;
 
 	err = mipi_dsi_dcs_write(dsi, MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
 				 payload, sizeof(payload));

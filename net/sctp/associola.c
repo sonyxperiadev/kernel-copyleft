@@ -224,8 +224,9 @@ static struct sctp_association *sctp_association_init(
 	if (!sctp_ulpq_init(&asoc->ulpq, asoc))
 		goto fail_init;
 
-	if (sctp_stream_init(&asoc->stream, asoc->c.sinit_num_ostreams, 0, gfp))
-		goto stream_free;
+	if (sctp_stream_init(&asoc->stream, asoc->c.sinit_num_ostreams,
+			     0, gfp))
+		goto fail_init;
 
 	/* Initialize default path MTU. */
 	asoc->pathmtu = sp->pathmtu;

@@ -95,8 +95,6 @@ config INDIRECT_PIO
 
 	  When in doubt, say N.
 
-source "lib/crypto/Kconfig"
-
 config CRC_CCITT
 	tristate "CRC-CCITT functions"
 	help

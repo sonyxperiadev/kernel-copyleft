@@ -680,7 +680,7 @@ next_wqe:
 	opcode = next_opcode(qp, wqe, wqe->wr.opcode);
 	if (unlikely(opcode < 0)) {
 		wqe->status = IB_WC_LOC_QP_OP_ERR;
-		goto err;
+		goto exit;
 	}
 
 	mask = rxe_opcode[opcode].mask;

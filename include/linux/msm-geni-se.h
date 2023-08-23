@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -71,6 +76,9 @@ struct se_geni_rsc {
 	struct pinctrl_state *geni_gpio_shutdown;
 	struct pinctrl_state *geni_gpio_active;
 	struct pinctrl_state *geni_gpio_sleep;
+	/*PDX225 code for QN5965F-837  at 2021/11/17 start*/
+	struct pinctrl_state *geni_gpio_suspend;
+	/*PDX225 code for QN5965F-837  at 2021/11/17 end*/
 	int	clk_freq_out;
 	unsigned int num_clk_levels;
 	unsigned long *clk_perf_tbl;

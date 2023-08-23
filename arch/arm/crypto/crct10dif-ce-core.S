@@ -72,7 +72,7 @@
 #endif
 
 	.text
-	.arch		armv8-a
+	.arch		armv7-a
 	.fpu		crypto-neon-fp-armv8
 
 	init_crc	.req	r0

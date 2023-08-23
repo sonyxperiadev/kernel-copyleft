@@ -4,6 +4,11 @@
  *
  * This file is released under the GPL.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/slab.h>
 #include <linux/module.h>
@@ -998,13 +1003,12 @@ static int validate_region_size(struct raid_set *rs, unsigned long region_size)
 static int validate_raid_redundancy(struct raid_set *rs)
 {
 	unsigned int i, rebuild_cnt = 0;
-	unsigned int rebuilds_per_group = 0, copies, raid_disks;
+	unsigned int rebuilds_per_group = 0, copies;
 	unsigned int group_size, last_group_start;
 
-	for (i = 0; i < rs->raid_disks; i++)
-		if (!test_bit(FirstUse, &rs->dev[i].rdev.flags) &&
-		    ((!test_bit(In_sync, &rs->dev[i].rdev.flags) ||
-		      !rs->dev[i].rdev.sb_page)))
+	for (i = 0; i < rs->md.raid_disks; i++)
+		if (!test_bit(In_sync, &rs->dev[i].rdev.flags) ||
+		    !rs->dev[i].rdev.sb_page)
 			rebuild_cnt++;
 
 	switch (rs->md.level) {
@@ -1044,9 +1048,8 @@ static int validate_raid_redundancy(struct raid_set *rs)
 		 *	    A	 A    B	   B	C
 		 *	    C	 D    D	   E	E
 		 */
-		raid_disks = min(rs->raid_disks, rs->md.raid_disks);
 		if (__is_raid10_near(rs->md.new_layout)) {
-			for (i = 0; i < raid_disks; i++) {
+			for (i = 0; i < rs->md.raid_disks; i++) {
 				if (!(i % copies))
 					rebuilds_per_group = 0;
 				if ((!rs->dev[i].rdev.sb_page ||
@@ -1069,10 +1072,10 @@ static int validate_raid_redundancy(struct raid_set *rs)
 		 * results in the need to treat the last (potentially larger)
 		 * set differently.
 		 */
-		group_size = (raid_disks / copies);
-		last_group_start = (raid_disks / group_size) - 1;
+		group_size = (rs->md.raid_disks / copies);
+		last_group_start = (rs->md.raid_disks / group_size) - 1;
 		last_group_start *= group_size;
-		for (i = 0; i < raid_disks; i++) {
+		for (i = 0; i < rs->md.raid_disks; i++) {
 			if (!(i % copies) && !(i > last_group_start))
 				rebuilds_per_group = 0;
 			if ((!rs->dev[i].rdev.sb_page ||
@@ -1587,7 +1590,7 @@ static sector_t __rdev_sectors(struct raid_set *rs)
 {
 	int i;
 
-	for (i = 0; i < rs->raid_disks; i++) {
+	for (i = 0; i < rs->md.raid_disks; i++) {
 		struct md_rdev *rdev = &rs->dev[i].rdev;
 
 		if (!test_bit(Journal, &rdev->flags) &&
@@ -3748,13 +3751,13 @@ static int raid_iterate_devices(struct dm_target *ti,
 	unsigned int i;
 	int r = 0;
 
-	for (i = 0; !r && i < rs->raid_disks; i++) {
-		if (rs->dev[i].data_dev) {
-			r = fn(ti, rs->dev[i].data_dev,
-			       0, /* No offset on data devs */
-			       rs->md.dev_sectors, data);
-		}
-	}
+	for (i = 0; !r && i < rs->md.raid_disks; i++)
+		if (rs->dev[i].data_dev)
+			r = fn(ti,
+				 rs->dev[i].data_dev,
+				 0, /* No offset on data devs */
+				 rs->md.dev_sectors,
+				 data);
 
 	return r;
 }

@@ -175,8 +175,9 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	spin_lock_init(&qdev->ul_lock);
 
 	dev_set_drvdata(&mhi_dev->dev, qdev);
-
-	rc = qrtr_endpoint_register(&qdev->ep, net_id, rt);
+       /*PDX225T code for JIMODM18-39912 by qiantao at 2022/09/13 start*/
+	rc = qrtr_endpoint_register(&qdev->ep, net_id, rt,NULL);
+       /*PDX225T code for JIMODM18-39912 by qiantao at 2022/09/13 end*/
 	if (rc)
 		return rc;
 

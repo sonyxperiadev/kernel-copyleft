@@ -416,7 +416,7 @@ mohawk_crval:
 
 	.align
 
-	.section ".proc.info.init", "a"
+	.section ".proc.info.init", #alloc
 
 	.type	__88sv331x_proc_info,#object
 __88sv331x_proc_info:

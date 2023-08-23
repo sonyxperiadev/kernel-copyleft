@@ -61,16 +61,7 @@
 774:						\
 	dec	reg;				\
 	jnz	771b;				\
-	add	$(BITS_PER_LONG/8) * nr, sp;	\
-	/* barrier for jnz misprediction */	\
-	lfence;
-
-#define __ISSUE_UNBALANCED_RET_GUARD(sp)	\
-	call	881f;				\
-	int3;					\
-881:						\
-	add	$(BITS_PER_LONG/8), sp;		\
-	lfence;
+	add	$(BITS_PER_LONG/8) * nr, sp;
 
 #ifdef __ASSEMBLY__
 
@@ -139,14 +130,6 @@
 #else
 	call	*\reg
 #endif
-.endm
-
-.macro ISSUE_UNBALANCED_RET_GUARD ftr:req
-	ANNOTATE_NOSPEC_ALTERNATIVE
-	ALTERNATIVE "jmp .Lskip_pbrsb_\@",				\
-		__stringify(__ISSUE_UNBALANCED_RET_GUARD(%_ASM_SP))	\
-		\ftr
-.Lskip_pbrsb_\@:
 .endm
 
  /*
@@ -329,8 +312,6 @@ DECLARE_STATIC_KEY_FALSE(switch_mm_always_ibpb);
 
 DECLARE_STATIC_KEY_FALSE(mds_user_clear);
 DECLARE_STATIC_KEY_FALSE(mds_idle_clear);
-
-DECLARE_STATIC_KEY_FALSE(mmio_stale_data_clear);
 
 #include <asm/segment.h>
 

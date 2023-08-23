@@ -94,16 +94,13 @@ static void tls_device_queue_ctx_destruction(struct tls_context *ctx)
 	unsigned long flags;
 
 	spin_lock_irqsave(&tls_device_lock, flags);
-	if (unlikely(!refcount_dec_and_test(&ctx->refcount)))
-		goto unlock;
-
 	list_move_tail(&ctx->list, &tls_device_gc_list);
 
 	/* schedule_work inside the spinlock
 	 * to make sure tls_device_down waits for that work.
 	 */
 	schedule_work(&tls_device_gc_work);
-unlock:
+
 	spin_unlock_irqrestore(&tls_device_lock, flags);
 }
 
@@ -194,7 +191,8 @@ static void tls_device_sk_destruct(struct sock *sk)
 		clean_acked_data_disable(inet_csk(sk));
 	}
 
-	tls_device_queue_ctx_destruction(tls_ctx);
+	if (refcount_dec_and_test(&tls_ctx->refcount))
+		tls_device_queue_ctx_destruction(tls_ctx);
 }
 
 void tls_device_free_resources_tx(struct sock *sk)
@@ -472,13 +470,11 @@ handle_error:
 		copy = min_t(size_t, size, (pfrag->size - pfrag->offset));
 		copy = min_t(size_t, copy, (max_open_record_len - record->len));
 
-		if (copy) {
-			rc = tls_device_copy_data(page_address(pfrag->page) +
-						  pfrag->offset, copy, msg_iter);
-			if (rc)
-				goto handle_error;
-			tls_append_frag(record, pfrag, copy);
-		}
+		rc = tls_device_copy_data(page_address(pfrag->page) +
+					  pfrag->offset, copy, msg_iter);
+		if (rc)
+			goto handle_error;
+		tls_append_frag(record, pfrag, copy);
 
 		size -= copy;
 		if (!size) {

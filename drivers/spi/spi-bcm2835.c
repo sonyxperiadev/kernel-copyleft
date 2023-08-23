@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Driver for Broadcom BCM2835 SPI Controllers
@@ -1159,14 +1164,10 @@ static void bcm2835_spi_handle_err(struct spi_controller *ctlr,
 	struct bcm2835_spi *bs = spi_controller_get_devdata(ctlr);
 
 	/* if an error occurred and we have an active dma, then terminate */
-	if (ctlr->dma_tx) {
-		dmaengine_terminate_sync(ctlr->dma_tx);
-		bs->tx_dma_active = false;
-	}
-	if (ctlr->dma_rx) {
-		dmaengine_terminate_sync(ctlr->dma_rx);
-		bs->rx_dma_active = false;
-	}
+	dmaengine_terminate_sync(ctlr->dma_tx);
+	bs->tx_dma_active = false;
+	dmaengine_terminate_sync(ctlr->dma_rx);
+	bs->rx_dma_active = false;
 	bcm2835_spi_undo_prologue(bs);
 
 	/* and reset */

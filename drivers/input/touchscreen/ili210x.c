@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 #include <linux/module.h>
 #include <linux/i2c.h>
@@ -290,9 +295,9 @@ static int ili210x_i2c_probe(struct i2c_client *client,
 		if (error)
 			return error;
 
-		usleep_range(12000, 15000);
+		usleep_range(50, 100);
 		gpiod_set_value_cansleep(reset_gpio, 0);
-		msleep(160);
+		msleep(100);
 	}
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);

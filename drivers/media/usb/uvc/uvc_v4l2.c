@@ -859,31 +859,29 @@ static int uvc_ioctl_enum_input(struct file *file, void *fh,
 	struct uvc_video_chain *chain = handle->chain;
 	const struct uvc_entity *selector = chain->selector;
 	struct uvc_entity *iterm = NULL;
-	struct uvc_entity *it;
 	u32 index = input->index;
+	int pin = 0;
 
 	if (selector == NULL ||
 	    (chain->dev->quirks & UVC_QUIRK_IGNORE_SELECTOR_UNIT)) {
 		if (index != 0)
 			return -EINVAL;
-		list_for_each_entry(it, &chain->entities, chain) {
-			if (UVC_ENTITY_IS_ITERM(it)) {
-				iterm = it;
+		list_for_each_entry(iterm, &chain->entities, chain) {
+			if (UVC_ENTITY_IS_ITERM(iterm))
 				break;
-			}
 		}
+		pin = iterm->id;
 	} else if (index < selector->bNrInPins) {
-		list_for_each_entry(it, &chain->entities, chain) {
-			if (!UVC_ENTITY_IS_ITERM(it))
+		pin = selector->baSourceID[index];
+		list_for_each_entry(iterm, &chain->entities, chain) {
+			if (!UVC_ENTITY_IS_ITERM(iterm))
 				continue;
-			if (it->id == selector->baSourceID[index]) {
-				iterm = it;
+			if (iterm->id == pin)
 				break;
-			}
 		}
 	}
 
-	if (iterm == NULL)
+	if (iterm == NULL || iterm->id != pin)
 		return -EINVAL;
 
 	memset(input, 0, sizeof(*input));

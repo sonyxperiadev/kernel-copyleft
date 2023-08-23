@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/fs/proc/net.c
@@ -342,9 +347,6 @@ static __net_init int proc_net_ns_init(struct net *net)
 		gid = netd->gid;
 
 	proc_set_user(netd, uid, gid);
-
-	/* Seed dentry revalidation for /proc/${pid}/net */
-	pde_force_lookup(netd);
 
 	err = -EEXIST;
 	net_statd = proc_net_mkdir(net, "stat", netd);

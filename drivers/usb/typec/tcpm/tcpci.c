@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2015-2017 Google, Inc
@@ -611,7 +616,7 @@ static int tcpci_remove(struct i2c_client *client)
 	/* Disable chip interrupts before unregistering port */
 	err = tcpci_write16(chip->tcpci, TCPC_ALERT_MASK, 0);
 	if (err < 0)
-		dev_warn(&client->dev, "Failed to disable irqs (%pe)\n", ERR_PTR(err));
+		return err;
 
 	tcpci_unregister_port(chip->tcpci);
 

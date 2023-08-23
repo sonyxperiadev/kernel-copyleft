@@ -44,7 +44,7 @@ void start_thread(struct pt_regs *regs, unsigned long eip, unsigned long esp)
 {
 	PT_REGS_IP(regs) = eip;
 	PT_REGS_SP(regs) = esp;
-	clear_thread_flag(TIF_SINGLESTEP);
+	current->ptrace &= ~PT_DTRACE;
 #ifdef SUBARCH_EXECVE1
 	SUBARCH_EXECVE1(regs->regs);
 #endif

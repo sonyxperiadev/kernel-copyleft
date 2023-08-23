@@ -48,7 +48,7 @@ flush_disable_75x:
 
 	/* Stop DST streams */
 BEGIN_FTR_SECTION
-	PPC_DSSALL
+	DSSALL
 	sync
 END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 
@@ -196,7 +196,7 @@ flush_disable_745x:
 	isync
 
 	/* Stop prefetch streams */
-	PPC_DSSALL
+	DSSALL
 	sync
 
 	/* Disable L2 prefetching */

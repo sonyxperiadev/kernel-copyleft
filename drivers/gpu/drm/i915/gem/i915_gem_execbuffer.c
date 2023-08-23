@@ -3,6 +3,11 @@
  *
  * Copyright © 2008,2010 Intel Corporation
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/intel-iommu.h>
 #include <linux/dma-resv.h>
@@ -1452,7 +1457,7 @@ static int eb_relocate_vma(struct i915_execbuffer *eb, struct i915_vma *vma)
 
 	urelocs = u64_to_user_ptr(entry->relocs_ptr);
 	remain = entry->relocation_count;
-	if (unlikely((unsigned long)remain > N_RELOC(ULONG_MAX)))
+	if (unlikely(remain > N_RELOC(ULONG_MAX)))
 		return -EINVAL;
 
 	/*

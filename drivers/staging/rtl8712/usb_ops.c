@@ -29,8 +29,7 @@ static u8 usb_read8(struct intf_hdl *intfhdl, u32 addr)
 	u16 wvalue;
 	u16 index;
 	u16 len;
-	int status;
-	__le32 data = 0;
+	__le32 data;
 	struct intf_priv *intfpriv = intfhdl->pintfpriv;
 
 	request = 0x05;
@@ -38,10 +37,8 @@ static u8 usb_read8(struct intf_hdl *intfhdl, u32 addr)
 	index = 0;
 	wvalue = (u16)(addr & 0x0000ffff);
 	len = 1;
-	status = r8712_usbctrl_vendorreq(intfpriv, request, wvalue, index,
-					 &data, len, requesttype);
-	if (status < 0)
-		return 0;
+	r8712_usbctrl_vendorreq(intfpriv, request, wvalue, index, &data, len,
+				requesttype);
 	return (u8)(le32_to_cpu(data) & 0x0ff);
 }
 
@@ -52,8 +49,7 @@ static u16 usb_read16(struct intf_hdl *intfhdl, u32 addr)
 	u16 wvalue;
 	u16 index;
 	u16 len;
-	int status;
-	__le32 data = 0;
+	__le32 data;
 	struct intf_priv *intfpriv = intfhdl->pintfpriv;
 
 	request = 0x05;
@@ -61,10 +57,8 @@ static u16 usb_read16(struct intf_hdl *intfhdl, u32 addr)
 	index = 0;
 	wvalue = (u16)(addr & 0x0000ffff);
 	len = 2;
-	status = r8712_usbctrl_vendorreq(intfpriv, request, wvalue, index,
-					 &data, len, requesttype);
-	if (status < 0)
-		return 0;
+	r8712_usbctrl_vendorreq(intfpriv, request, wvalue, index, &data, len,
+				requesttype);
 	return (u16)(le32_to_cpu(data) & 0xffff);
 }
 
@@ -75,8 +69,7 @@ static u32 usb_read32(struct intf_hdl *intfhdl, u32 addr)
 	u16 wvalue;
 	u16 index;
 	u16 len;
-	int status;
-	__le32 data = 0;
+	__le32 data;
 	struct intf_priv *intfpriv = intfhdl->pintfpriv;
 
 	request = 0x05;
@@ -84,10 +77,8 @@ static u32 usb_read32(struct intf_hdl *intfhdl, u32 addr)
 	index = 0;
 	wvalue = (u16)(addr & 0x0000ffff);
 	len = 4;
-	status = r8712_usbctrl_vendorreq(intfpriv, request, wvalue, index,
-					 &data, len, requesttype);
-	if (status < 0)
-		return 0;
+	r8712_usbctrl_vendorreq(intfpriv, request, wvalue, index, &data, len,
+				requesttype);
 	return le32_to_cpu(data);
 }
 

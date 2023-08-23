@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, 2021, The Linux Foundation.
@@ -722,9 +727,6 @@ static int icnss_driver_event_server_arrive(struct icnss_priv *priv,
 	if (priv->vbatt_supported)
 		icnss_init_vph_monitor(priv);
 
-	if (priv->psf_supported)
-		queue_work(priv->soc_update_wq, &priv->soc_update_work);
-
 	return ret;
 
 device_info_failure:
@@ -747,9 +749,6 @@ static int icnss_driver_event_server_exit(struct icnss_priv *priv)
 	if (priv->adc_tm_dev && priv->vbatt_supported)
 		adc_tm_disable_chan_meas(priv->adc_tm_dev,
 					  &priv->vph_monitor_params);
-
-	if (priv->psf_supported)
-		priv->last_updated_voltage = 0;
 
 	return 0;
 }
@@ -2020,6 +2019,16 @@ static int icnss_service_notifier_notify(struct notifier_block *nb,
 	}
 	icnss_pr_info("PD service down, pd_state: %d, state: 0x%lx: cause: %s\n",
 		      *state, priv->state, icnss_pdr_cause[cause]);
+
+	if (*state == USER_PD_STATE_CHANGE) {
+		memset(priv->crash_reason, 0, sizeof(priv->crash_reason));
+		snprintf(priv->crash_reason, sizeof(priv->crash_reason),
+				"PD service down, pd_state: %d, state: 0x%lx: cause: %s\n",
+				*state, priv->state, icnss_pdr_cause[cause]);
+		priv->data_ready = 1;
+		wake_up(&priv->wlan_pdr_debug_q);
+	}
+
 event_post:
 	if (!test_bit(ICNSS_FW_DOWN, &priv->state)) {
 		set_bit(ICNSS_FW_DOWN, &priv->state);
@@ -3616,13 +3625,6 @@ static int icnss_resource_parse(struct icnss_priv *priv)
 		goto put_vreg;
 	}
 
-	if (of_property_read_bool(pdev->dev.of_node, "qcom,psf-supported")) {
-		ret = icnss_get_psf_info(priv);
-		if (ret < 0)
-			goto out;
-		priv->psf_supported = true;
-	}
-
 	if (priv->device_id == ADRASTEA_DEVICE_ID) {
 		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 						   "membase");
@@ -4013,6 +4015,16 @@ static void pil_restart_level_notifier(void *ignore,
 }
 #endif
 
+int wlan_pdr_open(struct inode *inode, struct file *filp)
+{
+	int minor = iminor(inode);
+	if (minor > 0)
+		return -ENXIO;
+
+	filp->private_data = penv;
+	return 0;
+}
+
 static int icnss_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -4080,6 +4092,7 @@ static int icnss_probe(struct platform_device *pdev)
 		goto smmu_cleanup;
 	}
 
+	init_waitqueue_head(&priv->wlan_pdr_debug_q);
 	INIT_WORK(&priv->event_work, icnss_driver_event_work);
 	INIT_LIST_HEAD(&priv->event_list);
 
@@ -4139,6 +4152,8 @@ static int icnss_probe(struct platform_device *pdev)
 			    icnss_recovery_timeout_hdlr, 0);
 	}
 
+	chr_dev_init();
+
 	INIT_LIST_HEAD(&priv->icnss_tcdev_list);
 
 	icnss_pr_info("Platform driver probed successfully\n");
@@ -4158,18 +4173,6 @@ out_reset_drvdata:
 	return ret;
 }
 
-static void icnss_unregister_power_supply_notifier(struct icnss_priv *priv)
-{
-	if (priv->batt_psy)
-		power_supply_put(penv->batt_psy);
-
-	if (priv->psf_supported) {
-		flush_workqueue(priv->soc_update_wq);
-		destroy_workqueue(priv->soc_update_wq);
-		power_supply_unreg_notifier(&priv->psf_nb);
-	}
-}
-
 static int icnss_remove(struct platform_device *pdev)
 {
 	struct icnss_priv *priv = dev_get_drvdata(&pdev->dev);
@@ -4185,11 +4188,11 @@ static int icnss_remove(struct platform_device *pdev)
 #endif
 	}
 
+	chr_dev_term();
+
 	device_init_wakeup(&priv->pdev->dev, false);
 
 	icnss_debugfs_destroy(priv);
-
-	icnss_unregister_power_supply_notifier(penv);
 
 	icnss_sysfs_destroy(priv);
 

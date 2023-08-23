@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2022 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0
 /*
  * fs/f2fs/super.c
@@ -1054,7 +1059,6 @@ static struct inode *f2fs_alloc_inode(struct super_block *sb)
 
 	/* Initialize f2fs-specific inode info */
 	atomic_set(&fi->dirty_pages, 0);
-	atomic_set(&fi->i_compr_blocks, 0);
 	init_rwsem(&fi->i_sem);
 	spin_lock_init(&fi->i_size_lock);
 	INIT_LIST_HEAD(&fi->dirty_list);
@@ -2268,8 +2272,7 @@ int f2fs_quota_sync(struct super_block *sb, int type)
 		if (!sb_has_quota_active(sb, cnt))
 			continue;
 
-		if (!f2fs_sb_has_quota_ino(sbi))
-			inode_lock(dqopt->files[cnt]);
+		inode_lock(dqopt->files[cnt]);
 
 		/*
 		 * do_quotactl
@@ -2288,8 +2291,7 @@ int f2fs_quota_sync(struct super_block *sb, int type)
 		up_read(&sbi->quota_sem);
 		f2fs_unlock_op(sbi);
 
-		if (!f2fs_sb_has_quota_ino(sbi))
-			inode_unlock(dqopt->files[cnt]);
+		inode_unlock(dqopt->files[cnt]);
 
 		if (ret)
 			break;
@@ -3919,8 +3921,6 @@ free_node_inode:
 free_stats:
 	f2fs_destroy_stats(sbi);
 free_nm:
-	/* stop discard thread before destroying node manager */
-	f2fs_stop_discard_thread(sbi);
 	f2fs_destroy_node_manager(sbi);
 free_sm:
 	f2fs_destroy_segment_manager(sbi);

@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: (GPL-2.0 OR CDDL-1.0) */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * vboxguest vmm-req and hgcm-call code, VBoxGuestR0LibHGCMInternal.cpp,
  * VBoxGuestR0LibGenericRequest.cpp and RTErrConvertToErrno.cpp in vbox svn.
  *

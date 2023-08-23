@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2000 - 2007 Jeff Dike (jdike@{linux.intel,addtoit}.com)
@@ -220,7 +225,7 @@ static int winch_tramp(int fd, struct tty_port *port, int *fd_out,
 		       unsigned long *stack_out)
 {
 	struct winch_data data;
-	int fds[2], n, err, pid;
+	int fds[2], n, err;
 	char c;
 
 	err = os_pipe(fds, 1, 1);
@@ -238,9 +243,8 @@ static int winch_tramp(int fd, struct tty_port *port, int *fd_out,
 	 * problem with /dev/net/tun, which if held open by this
 	 * thread, prevents the TUN/TAP device from being reused.
 	 */
-	pid = run_helper_thread(winch_thread, &data, CLONE_FILES, stack_out);
-	if (pid < 0) {
-		err = pid;
+	err = run_helper_thread(winch_thread, &data, CLONE_FILES, stack_out);
+	if (err < 0) {
 		printk(UM_KERN_ERR "fork of winch_thread failed - errno = %d\n",
 		       -err);
 		goto out_close;
@@ -264,7 +268,7 @@ static int winch_tramp(int fd, struct tty_port *port, int *fd_out,
 		goto out_close;
 	}
 
-	return pid;
+	return err;
 
  out_close:
 	close(fds[1]);

@@ -225,12 +225,12 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
 
 void user_enable_single_step(struct task_struct *child)
 {
-	set_tsk_thread_flag(child, TIF_SINGLESTEP);
+	child->ptrace |= PT_SINGLESTEP;
 }
 
 void user_disable_single_step(struct task_struct *child)
 {
-	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
+	child->ptrace &= ~PT_SINGLESTEP;
 }
 
 /*

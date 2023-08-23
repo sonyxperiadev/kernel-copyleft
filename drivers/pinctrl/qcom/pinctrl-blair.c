@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
@@ -1593,7 +1598,7 @@ static const struct msm_pingroup blair_groups[] = {
 };
 
 static const int blair_reserved_gpios[] = {
-	13, 14, 15, 16, 17, 45, 46, 48, 56, 57, -1
+	13, 14, 15, 16, -1
 };
 
 static const struct msm_gpio_wakeirq_map blair_mpm_map[] = {

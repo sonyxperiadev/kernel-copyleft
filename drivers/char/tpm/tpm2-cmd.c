@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2014, 2015 Intel Corporation
@@ -706,16 +711,7 @@ ssize_t tpm2_get_tpm_pt(struct tpm_chip *chip, u32 property_id,  u32 *value,
 	if (!rc) {
 		out = (struct tpm2_get_cap_out *)
 			&buf.data[TPM_HEADER_SIZE];
-		/*
-		 * To prevent failing boot up of some systems, Infineon TPM2.0
-		 * returns SUCCESS on TPM2_Startup in field upgrade mode. Also
-		 * the TPM2_Getcapability command returns a zero length list
-		 * in field upgrade mode.
-		 */
-		if (be32_to_cpu(out->property_cnt) > 0)
-			*value = be32_to_cpu(out->value);
-		else
-			rc = -ENODATA;
+		*value = be32_to_cpu(out->value);
 	}
 	tpm_buf_destroy(&buf);
 	return rc;

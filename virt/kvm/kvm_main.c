@@ -3329,11 +3329,8 @@ static int kvm_ioctl_create_device(struct kvm *kvm,
 		kvm_put_kvm(kvm);
 		mutex_lock(&kvm->lock);
 		list_del(&dev->vm_node);
-		if (ops->release)
-			ops->release(dev);
 		mutex_unlock(&kvm->lock);
-		if (ops->destroy)
-			ops->destroy(dev);
+		ops->destroy(dev);
 		return ret;
 	}
 

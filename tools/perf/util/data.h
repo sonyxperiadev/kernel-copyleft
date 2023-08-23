@@ -3,7 +3,6 @@
 #define __PERF_DATA_H
 
 #include <stdbool.h>
-#include <linux/types.h>
 
 enum perf_data_mode {
 	PERF_DATA_MODE_WRITE,

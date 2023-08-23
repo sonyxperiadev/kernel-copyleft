@@ -129,7 +129,7 @@ $(obj)/configs.o: $(obj)/config_data.gz
 
 targets += config_data config_data.gz
 $(obj)/config_data.gz: $(obj)/config_data FORCE
-	$(call if_changed,gzip)
+	@grep -v "CONFIG_MACH_[^ ]\+ is not set" $< | gzip > $@
 
 filechk_cat = cat $<
 

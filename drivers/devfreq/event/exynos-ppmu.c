@@ -514,19 +514,15 @@ static int of_get_devfreq_events(struct device_node *np,
 
 	count = of_get_child_count(events_np);
 	desc = devm_kcalloc(dev, count, sizeof(*desc), GFP_KERNEL);
-	if (!desc) {
-		of_node_put(events_np);
+	if (!desc)
 		return -ENOMEM;
-	}
 	info->num_events = count;
 
 	of_id = of_match_device(exynos_ppmu_id_match, dev);
 	if (of_id)
 		info->ppmu_type = (enum exynos_ppmu_type)of_id->data;
-	else {
-		of_node_put(events_np);
+	else
 		return -EINVAL;
-	}
 
 	j = 0;
 	for_each_child_of_node(events_np, node) {

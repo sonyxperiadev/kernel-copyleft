@@ -23,11 +23,9 @@ static long write_ldt_entry(struct mm_id *mm_idp, int func,
 {
 	long res;
 	void *stub_addr;
-
-	BUILD_BUG_ON(sizeof(*desc) % sizeof(long));
-
 	res = syscall_stub_data(mm_idp, (unsigned long *)desc,
-				sizeof(*desc) / sizeof(long),
+				(sizeof(*desc) + sizeof(long) - 1) &
+				    ~(sizeof(long) - 1),
 				addr, &stub_addr);
 	if (!res) {
 		unsigned long args[] = { func,

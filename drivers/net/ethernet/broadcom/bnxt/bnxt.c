@@ -9791,7 +9791,7 @@ static bool bnxt_rfs_capable(struct bnxt *bp)
 
 	if (bp->flags & BNXT_FLAG_CHIP_P5)
 		return bnxt_rfs_supported(bp);
-	if (!(bp->flags & BNXT_FLAG_MSIX_CAP) || !bnxt_can_reserve_rings(bp) || !bp->rx_nr_rings)
+	if (!(bp->flags & BNXT_FLAG_MSIX_CAP) || !bnxt_can_reserve_rings(bp))
 		return false;
 
 	vnics = 1 + bp->rx_nr_rings;
@@ -11725,9 +11725,10 @@ static int bnxt_init_dflt_ring_mode(struct bnxt *bp)
 		goto init_dflt_ring_err;
 
 	bp->tx_nr_rings_per_tc = bp->tx_nr_rings;
-
-	bnxt_set_dflt_rfs(bp);
-
+	if (bnxt_rfs_supported(bp) && bnxt_rfs_capable(bp)) {
+		bp->flags |= BNXT_FLAG_RFS;
+		bp->dev->features |= NETIF_F_NTUPLE;
+	}
 init_dflt_ring_err:
 	bnxt_ulp_irq_restart(bp, rc);
 	return rc;

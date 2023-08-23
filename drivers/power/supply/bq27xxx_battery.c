@@ -44,6 +44,11 @@
  * http://www.ti.com/product/bq27441-g1
  * http://www.ti.com/product/bq27621-g1
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/device.h>
 #include <linux/module.h>

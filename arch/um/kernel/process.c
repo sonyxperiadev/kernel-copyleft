@@ -380,7 +380,7 @@ int singlestepping(void * t)
 {
 	struct task_struct *task = t ? t : current;
 
-	if (!test_thread_flag(TIF_SINGLESTEP))
+	if (!(task->ptrace & PT_DTRACE))
 		return 0;
 
 	if (task->thread.singlestep_syscall)

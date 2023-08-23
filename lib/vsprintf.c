@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/lib/vsprintf.c
@@ -731,16 +736,14 @@ static void enable_ptr_key_workfn(struct work_struct *work)
 
 static DECLARE_WORK(enable_ptr_key_work, enable_ptr_key_workfn);
 
-static int fill_random_ptr_key(struct notifier_block *nb,
-			       unsigned long action, void *data)
+static void fill_random_ptr_key(struct random_ready_callback *unused)
 {
 	/* This may be in an interrupt handler. */
 	queue_work(system_unbound_wq, &enable_ptr_key_work);
-	return 0;
 }
 
-static struct notifier_block random_ready = {
-	.notifier_call = fill_random_ptr_key
+static struct random_ready_callback random_ready = {
+	.func = fill_random_ptr_key
 };
 
 static int __init initialize_ptr_random(void)
@@ -754,7 +757,7 @@ static int __init initialize_ptr_random(void)
 		return 0;
 	}
 
-	ret = register_random_ready_notifier(&random_ready);
+	ret = add_random_ready_callback(&random_ready);
 	if (!ret) {
 		return 0;
 	} else if (ret == -EALREADY) {

@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2014 Jiri Pirko <jiri@resnulli.us>
  */
 
@@ -16,10 +21,6 @@ struct tcf_vlan_params {
 	u8                tcfv_push_prio;
 	bool              tcfv_push_prio_exists;
 	struct rcu_head   rcu;
-#ifdef CONFIG_NET_SCHED_ACT_VLAN_QGKI
-	unsigned char     tcfv_push_dst[ETH_ALEN];
-	unsigned char     tcfv_push_src[ETH_ALEN];
-#endif
 };
 
 struct tcf_vlan {

@@ -604,7 +604,9 @@ static int qrtr_haven_probe(struct platform_device *pdev)
 	INIT_WORK(&qdev->work, qrtr_haven_retry_work);
 
 	qdev->ep.xmit = qrtr_haven_send;
-	ret = qrtr_endpoint_register(&qdev->ep, QRTR_EP_NET_ID_AUTO, false);
+        /*PDX225T code for JIMODM18-39912 by qiantao at 2022/09/13 start*/
+	ret = qrtr_endpoint_register(&qdev->ep, QRTR_EP_NET_ID_AUTO, false,NULL);
+        /*PDX225T code for JIMODM18-39912 by qiantao at 2022/09/13 end*/
 	if (ret)
 		goto register_fail;
 

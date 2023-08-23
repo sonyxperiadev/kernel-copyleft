@@ -37,26 +37,11 @@ struct exiu_irq_data {
 	u32		spi_base;
 };
 
-static void exiu_irq_ack(struct irq_data *d)
-{
-	struct exiu_irq_data *data = irq_data_get_irq_chip_data(d);
-
-	writel(BIT(d->hwirq), data->base + EIREQCLR);
-}
-
 static void exiu_irq_eoi(struct irq_data *d)
 {
 	struct exiu_irq_data *data = irq_data_get_irq_chip_data(d);
 
-	/*
-	 * Level triggered interrupts are latched and must be cleared during
-	 * EOI or the interrupt will be jammed on. Of course if a level
-	 * triggered interrupt is still asserted then the write will not clear
-	 * the interrupt.
-	 */
-	if (irqd_is_level_type(d))
-		writel(BIT(d->hwirq), data->base + EIREQCLR);
-
+	writel(BIT(d->hwirq), data->base + EIREQCLR);
 	irq_chip_eoi_parent(d);
 }
 
@@ -106,13 +91,10 @@ static int exiu_irq_set_type(struct irq_data *d, unsigned int type)
 	writel_relaxed(val, data->base + EILVL);
 
 	val = readl_relaxed(data->base + EIEDG);
-	if (type == IRQ_TYPE_LEVEL_LOW || type == IRQ_TYPE_LEVEL_HIGH) {
+	if (type == IRQ_TYPE_LEVEL_LOW || type == IRQ_TYPE_LEVEL_HIGH)
 		val &= ~BIT(d->hwirq);
-		irq_set_handler_locked(d, handle_fasteoi_irq);
-	} else {
+	else
 		val |= BIT(d->hwirq);
-		irq_set_handler_locked(d, handle_fasteoi_ack_irq);
-	}
 	writel_relaxed(val, data->base + EIEDG);
 
 	writel_relaxed(BIT(d->hwirq), data->base + EIREQCLR);
@@ -122,7 +104,6 @@ static int exiu_irq_set_type(struct irq_data *d, unsigned int type)
 
 static struct irq_chip exiu_irq_chip = {
 	.name			= "EXIU",
-	.irq_ack		= exiu_irq_ack,
 	.irq_eoi		= exiu_irq_eoi,
 	.irq_enable		= exiu_irq_enable,
 	.irq_mask		= exiu_irq_mask,

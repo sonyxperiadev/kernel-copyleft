@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 /* Copyright(c) 2013 - 2018 Intel Corporation. */
 
 #ifndef _I40E_ADMINQ_CMD_H_

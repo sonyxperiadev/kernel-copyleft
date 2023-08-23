@@ -137,7 +137,7 @@ int sctp_stream_init(struct sctp_stream *stream, __u16 outcnt, __u16 incnt,
 
 	ret = sctp_stream_alloc_out(stream, outcnt, gfp);
 	if (ret)
-		return ret;
+		goto out_err;
 
 	for (i = 0; i < stream->outcnt; i++)
 		SCTP_SO(stream, i)->state = SCTP_STREAM_OPEN;
@@ -145,9 +145,22 @@ int sctp_stream_init(struct sctp_stream *stream, __u16 outcnt, __u16 incnt,
 handle_in:
 	sctp_stream_interleave_init(stream);
 	if (!incnt)
-		return 0;
+		goto out;
 
-	return sctp_stream_alloc_in(stream, incnt, gfp);
+	ret = sctp_stream_alloc_in(stream, incnt, gfp);
+	if (ret)
+		goto in_err;
+
+	goto out;
+
+in_err:
+	sched->free(stream);
+	genradix_free(&stream->in);
+out_err:
+	genradix_free(&stream->out);
+	stream->outcnt = 0;
+out:
+	return ret;
 }
 
 int sctp_stream_init_ext(struct sctp_stream *stream, __u16 sid)

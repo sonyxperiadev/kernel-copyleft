@@ -397,16 +397,13 @@ static int msr_to_offset(u32 msr)
 	return -1;
 }
 
-static void ex_handler_msr_mce(struct pt_regs *regs, bool wrmsr)
+__visible bool ex_handler_rdmsr_fault(const struct exception_table_entry *fixup,
+				      struct pt_regs *regs, int trapnr,
+				      unsigned long error_code,
+				      unsigned long fault_addr)
 {
-	if (wrmsr) {
-		pr_emerg("MSR access error: WRMSR to 0x%x (tried to write 0x%08x%08x) at rIP: 0x%lx (%pS)\n",
-			 (unsigned int)regs->cx, (unsigned int)regs->dx, (unsigned int)regs->ax,
-			 regs->ip, (void *)regs->ip);
-	} else {
-		pr_emerg("MSR access error: RDMSR from 0x%x at rIP: 0x%lx (%pS)\n",
-			 (unsigned int)regs->cx, regs->ip, (void *)regs->ip);
-	}
+	pr_emerg("MSR access error: RDMSR from 0x%x at rIP: 0x%lx (%pS)\n",
+		 (unsigned int)regs->cx, regs->ip, (void *)regs->ip);
 
 	show_stack_regs(regs);
 
@@ -414,14 +411,7 @@ static void ex_handler_msr_mce(struct pt_regs *regs, bool wrmsr)
 
 	while (true)
 		cpu_relax();
-}
 
-__visible bool ex_handler_rdmsr_fault(const struct exception_table_entry *fixup,
-				      struct pt_regs *regs, int trapnr,
-				      unsigned long error_code,
-				      unsigned long fault_addr)
-{
-	ex_handler_msr_mce(regs, false);
 	return true;
 }
 
@@ -457,7 +447,17 @@ __visible bool ex_handler_wrmsr_fault(const struct exception_table_entry *fixup,
 				      unsigned long error_code,
 				      unsigned long fault_addr)
 {
-	ex_handler_msr_mce(regs, true);
+	pr_emerg("MSR access error: WRMSR to 0x%x (tried to write 0x%08x%08x) at rIP: 0x%lx (%pS)\n",
+		 (unsigned int)regs->cx, (unsigned int)regs->dx, (unsigned int)regs->ax,
+		  regs->ip, (void *)regs->ip);
+
+	show_stack_regs(regs);
+
+	panic("MCA architectural violation!\n");
+
+	while (true)
+		cpu_relax();
+
 	return true;
 }
 

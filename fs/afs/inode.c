@@ -12,6 +12,11 @@
  *          David Howells <dhowells@redhat.com>
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -734,22 +739,9 @@ int afs_getattr(const struct path *path, struct kstat *stat,
 {
 	struct inode *inode = d_inode(path->dentry);
 	struct afs_vnode *vnode = AFS_FS_I(inode);
-	struct key *key;
-	int ret, seq = 0;
+	int seq = 0;
 
 	_enter("{ ino=%lu v=%u }", inode->i_ino, inode->i_generation);
-
-	if (vnode->volume &&
-	    !(query_flags & AT_STATX_DONT_SYNC) &&
-	    !test_bit(AFS_VNODE_CB_PROMISED, &vnode->flags)) {
-		key = afs_request_key(vnode->volume->cell);
-		if (IS_ERR(key))
-			return PTR_ERR(key);
-		ret = afs_validate(vnode, key);
-		key_put(key);
-		if (ret < 0)
-			return ret;
-	}
 
 	do {
 		read_seqbegin_or_lock(&vnode->cb_lock, &seq);

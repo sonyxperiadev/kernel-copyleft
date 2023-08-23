@@ -430,16 +430,6 @@ void acpi_init_properties(struct acpi_device *adev)
 		acpi_extract_apple_properties(adev);
 }
 
-static void acpi_free_device_properties(struct list_head *list)
-{
-	struct acpi_device_properties *props, *tmp;
-
-	list_for_each_entry_safe(props, tmp, list, list) {
-		list_del(&props->list);
-		kfree(props);
-	}
-}
-
 static void acpi_destroy_nondev_subnodes(struct list_head *list)
 {
 	struct acpi_data_node *dn, *next;
@@ -452,18 +442,22 @@ static void acpi_destroy_nondev_subnodes(struct list_head *list)
 		wait_for_completion(&dn->kobj_done);
 		list_del(&dn->sibling);
 		ACPI_FREE((void *)dn->data.pointer);
-		acpi_free_device_properties(&dn->data.properties);
 		kfree(dn);
 	}
 }
 
 void acpi_free_properties(struct acpi_device *adev)
 {
+	struct acpi_device_properties *props, *tmp;
+
 	acpi_destroy_nondev_subnodes(&adev->data.subnodes);
 	ACPI_FREE((void *)adev->data.pointer);
 	adev->data.of_compatible = NULL;
 	adev->data.pointer = NULL;
-	acpi_free_device_properties(&adev->data.properties);
+	list_for_each_entry_safe(props, tmp, &adev->data.properties, list) {
+		list_del(&props->list);
+		kfree(props);
+	}
 }
 
 /**

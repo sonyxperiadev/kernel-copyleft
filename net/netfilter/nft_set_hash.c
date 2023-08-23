@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2008-2014 Patrick McHardy <kaber@trash.net>
@@ -142,7 +147,6 @@ static bool nft_rhash_update(struct nft_set *set, const u32 *key,
 	/* Another cpu may race to insert the element with the same key */
 	if (prev) {
 		nft_set_elem_destroy(set, he, true);
-		atomic_dec(&set->nelems);
 		he = prev;
 	}
 
@@ -152,7 +156,6 @@ out:
 
 err2:
 	nft_set_elem_destroy(set, he, true);
-	atomic_dec(&set->nelems);
 err1:
 	return false;
 }

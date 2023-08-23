@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2017-2020, 2021, The Linux Foundation.
  * All rights reserved.
  */
@@ -13,13 +18,13 @@
 #include <linux/kobject.h>
 #include <linux/platform_device.h>
 #include <linux/ipc_logging.h>
-#include <linux/power_supply.h>
 #include <dt-bindings/iio/qcom,spmi-vadc.h>
 #include <soc/qcom/icnss2.h>
 #include <soc/qcom/service-locator.h>
 #include <soc/qcom/service-notifier.h>
 #include "wlan_firmware_service_v01.h"
 #include <linux/timer.h>
+#include <soc/qcom/subsystem_restart.h>
 
 #define WCN6750_DEVICE_ID 0x6750
 #define ADRASTEA_DEVICE_ID 0xabcd
@@ -166,11 +171,6 @@ struct icnss_clk_cfg {
 	const char *name;
 	u32 freq;
 	u32 required;
-};
-
-struct icnss_battery_level {
-	int lower_battery_threshold;
-	int ldo_voltage;
 };
 
 struct icnss_clk_info {
@@ -468,16 +468,13 @@ struct icnss_priv {
 	struct mutex tcdev_lock;
 	bool is_chain1_supported;
 	bool chain_reg_info_updated;
+	char crash_reason[SUBSYS_CRASH_REASON_LEN];
+	wait_queue_head_t wlan_pdr_debug_q;
+	int data_ready;
 	u32 hw_trc_override;
 	struct icnss_dms_data dms;
 	u8 use_nv_mac;
 	u32 wlan_en_delay_ms;
-	bool psf_supported;
-	struct notifier_block psf_nb;
-	struct power_supply *batt_psy;
-	int last_updated_voltage;
-	struct work_struct soc_update_work;
-	struct workqueue_struct *soc_update_wq;
 	unsigned long device_config;
 	struct timer_list recovery_timer;
 };

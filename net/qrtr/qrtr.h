@@ -11,6 +11,9 @@ struct sk_buff;
 #define QRTR_EP_NET_ID_AUTO (1)
 
 #define QRTR_DEL_PROC_MAGIC	0xe111
+/*PDX225T code for JIMODM18-39912 by qiantao at 2022/09/13 start*/
+#define MAX_NON_WAKE_SVC_LEN    5
+/*PDX225T code for JIMODM18-39912 by qiantao at 2022/09/13 end*/
 
 /**
  * struct qrtr_endpoint - endpoint handle
@@ -25,10 +28,10 @@ struct qrtr_endpoint {
 	/* private: not for endpoint use */
 	struct qrtr_node *node;
 };
-
+/*PDX225T code for JIMODM18-39912 by qiantao at 2022/09/13 start*/
 int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
-			   bool rt);
-
+			   bool rt, u32 *svc_arr);
+/*PDX225T code for JIMODM18-39912 by qiantao at 2022/09/13 end*/
 void qrtr_endpoint_unregister(struct qrtr_endpoint *ep);
 
 int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len);

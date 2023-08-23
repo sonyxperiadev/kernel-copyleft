@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Faraday FTGMAC100 Gigabit Ethernet
@@ -1734,19 +1739,6 @@ static void ftgmac100_setup_clk(struct ftgmac100 *priv)
 			FTGMAC_100MHZ);
 }
 
-static bool ftgmac100_has_child_node(struct device_node *np, const char *name)
-{
-	struct device_node *child_np = of_get_child_by_name(np, name);
-	bool ret = false;
-
-	if (child_np) {
-		ret = true;
-		of_node_put(child_np);
-	}
-
-	return ret;
-}
-
 static int ftgmac100_probe(struct platform_device *pdev)
 {
 	struct resource *res;
@@ -1863,7 +1855,7 @@ static int ftgmac100_probe(struct platform_device *pdev)
 
 		/* Display what we found */
 		phy_attached_info(phy);
-	} else if (np && !ftgmac100_has_child_node(np, "mdio")) {
+	} else if (np && !of_get_child_by_name(np, "mdio")) {
 		/* Support legacy ASPEED devicetree descriptions that decribe a
 		 * MAC with an embedded MDIO controller but have no "mdio"
 		 * child node. Automatically scan the MDIO bus for available
@@ -1893,11 +1885,6 @@ static int ftgmac100_probe(struct platform_device *pdev)
 	/* AST2400  doesn't have working HW checksum generation */
 	if (np && (of_device_is_compatible(np, "aspeed,ast2400-mac")))
 		netdev->hw_features &= ~NETIF_F_HW_CSUM;
-
-	/* AST2600 tx checksum with NCSI is broken */
-	if (priv->use_ncsi && of_device_is_compatible(np, "aspeed,ast2600-mac"))
-		netdev->hw_features &= ~NETIF_F_HW_CSUM;
-
 	if (np && of_get_property(np, "no-hw-checksum", NULL))
 		netdev->hw_features &= ~(NETIF_F_HW_CSUM | NETIF_F_RXCSUM);
 	netdev->features |= netdev->hw_features;

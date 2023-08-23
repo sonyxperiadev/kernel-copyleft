@@ -19,6 +19,11 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #define pr_fmt(fmt) "kfd2kgd: " fmt
 
@@ -951,14 +956,10 @@ int amdgpu_amdkfd_gpuvm_acquire_process_vm(struct kgd_dev *kgd,
 					   struct dma_fence **ef)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	struct amdgpu_fpriv *drv_priv;
-	struct amdgpu_vm *avm;
+	struct drm_file *drm_priv = filp->private_data;
+	struct amdgpu_fpriv *drv_priv = drm_priv->driver_priv;
+	struct amdgpu_vm *avm = &drv_priv->vm;
 	int ret;
-
-	ret = amdgpu_file_to_fpriv(filp, &drv_priv);
-	if (ret)
-		return ret;
-	avm = &drv_priv->vm;
 
 	/* Already a compute VM? */
 	if (avm->process_info)

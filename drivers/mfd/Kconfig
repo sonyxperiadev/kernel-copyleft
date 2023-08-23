@@ -2034,5 +2034,6 @@ config MFD_WCD
 	  This driver include only the core APIs. You have to select
 	  individual drivers separately to enable the codec functionality.
 
+
 endmenu
 endif

@@ -3,9 +3,9 @@
 #include <linux/module.h>
 #include <linux/random.h>
 
-unsigned int __next_node_in(int node, const nodemask_t *srcp)
+int __next_node_in(int node, const nodemask_t *srcp)
 {
-	unsigned int ret = __next_node(node, srcp);
+	int ret = __next_node(node, srcp);
 
 	if (ret == MAX_NUMNODES)
 		ret = __first_node(srcp);

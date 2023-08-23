@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * DMA driver for Xilinx ZynqMP DMA Engine
@@ -232,7 +237,7 @@ struct zynqmp_dma_chan {
 	bool is_dmacoherent;
 	struct tasklet_struct tasklet;
 	bool idle;
-	size_t desc_size;
+	u32 desc_size;
 	bool err;
 	u32 bus_width;
 	u32 src_burst_len;
@@ -489,8 +494,7 @@ static int zynqmp_dma_alloc_chan_resources(struct dma_chan *dchan)
 	}
 
 	chan->desc_pool_v = dma_alloc_coherent(chan->dev,
-					       (2 * ZYNQMP_DMA_DESC_SIZE(chan) *
-					       ZYNQMP_DMA_NUM_DESCS),
+					       (2 * chan->desc_size * ZYNQMP_DMA_NUM_DESCS),
 					       &chan->desc_pool_p, GFP_KERNEL);
 	if (!chan->desc_pool_v)
 		return -ENOMEM;

@@ -673,9 +673,6 @@ static void mlx5_fw_tracer_handle_traces(struct work_struct *work)
 	if (!tracer->owner)
 		return;
 
-	if (unlikely(!tracer->str_db.loaded))
-		goto arm;
-
 	block_count = tracer->buff.size / TRACER_BLOCK_SIZE_BYTE;
 	start_offset = tracer->buff.consumer_index * TRACER_BLOCK_SIZE_BYTE;
 
@@ -733,7 +730,6 @@ static void mlx5_fw_tracer_handle_traces(struct work_struct *work)
 						      &tmp_trace_block[TRACES_PER_BLOCK - 1]);
 	}
 
-arm:
 	mlx5_fw_tracer_arm(dev);
 }
 
@@ -1088,7 +1084,8 @@ static int fw_tracer_event(struct notifier_block *nb, unsigned long action, void
 			queue_work(tracer->work_queue, &tracer->ownership_change_work);
 		break;
 	case MLX5_TRACER_SUBTYPE_TRACES_AVAILABLE:
-		queue_work(tracer->work_queue, &tracer->handle_traces_work);
+		if (likely(tracer->str_db.loaded))
+			queue_work(tracer->work_queue, &tracer->handle_traces_work);
 		break;
 	default:
 		mlx5_core_dbg(dev, "FWTracer: Event with unrecognized subtype: sub_type %d\n",

@@ -1,4 +1,9 @@
 /* Copyright 2015 Advanced Micro Devices, Inc. */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 #include "dm_services.h"
 #include "dc.h"
 #include "dc_link_dp.h"

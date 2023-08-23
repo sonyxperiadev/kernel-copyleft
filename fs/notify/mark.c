@@ -426,7 +426,7 @@ void fsnotify_free_mark(struct fsnotify_mark *mark)
 void fsnotify_destroy_mark(struct fsnotify_mark *mark,
 			   struct fsnotify_group *group)
 {
-	mutex_lock(&group->mark_mutex);
+	mutex_lock_nested(&group->mark_mutex, SINGLE_DEPTH_NESTING);
 	fsnotify_detach_mark(mark);
 	mutex_unlock(&group->mark_mutex);
 	fsnotify_free_mark(mark);
@@ -738,7 +738,7 @@ void fsnotify_clear_marks_by_group(struct fsnotify_group *group,
 	 * move marks to free to to_free list in one go and then free marks in
 	 * to_free list one by one.
 	 */
-	mutex_lock(&group->mark_mutex);
+	mutex_lock_nested(&group->mark_mutex, SINGLE_DEPTH_NESTING);
 	list_for_each_entry_safe(mark, lmark, &group->marks_list, g_list) {
 		if ((1U << mark->connector->type) & type_mask)
 			list_move(&mark->g_list, &to_free);
@@ -747,7 +747,7 @@ void fsnotify_clear_marks_by_group(struct fsnotify_group *group,
 
 clear:
 	while (1) {
-		mutex_lock(&group->mark_mutex);
+		mutex_lock_nested(&group->mark_mutex, SINGLE_DEPTH_NESTING);
 		if (list_empty(head)) {
 			mutex_unlock(&group->mark_mutex);
 			break;

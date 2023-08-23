@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018 Chelsio Communications, Inc.
@@ -1103,8 +1108,8 @@ static struct sock *chtls_recv_sock(struct sock *lsk,
 	csk->sndbuf = newsk->sk_sndbuf;
 	csk->smac_idx = ((struct port_info *)netdev_priv(ndev))->smt_idx;
 	RCV_WSCALE(tp) = select_rcv_wscale(tcp_full_space(newsk),
-					   READ_ONCE(sock_net(newsk)->
-						     ipv4.sysctl_tcp_window_scaling),
+					   sock_net(newsk)->
+						ipv4.sysctl_tcp_window_scaling,
 					   tp->window_clamp);
 	neigh_release(n);
 	inet_inherit_port(&tcp_hashinfo, lsk, newsk);
@@ -1235,7 +1240,7 @@ static void chtls_pass_accept_request(struct sock *sk,
 	chtls_set_req_addr(oreq, iph->daddr, iph->saddr);
 	ip_dsfield = ipv4_get_dsfield(iph);
 	if (req->tcpopt.wsf <= 14 &&
-	    READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_window_scaling)) {
+	    sock_net(sk)->ipv4.sysctl_tcp_window_scaling) {
 		inet_rsk(oreq)->wscale_ok = 1;
 		inet_rsk(oreq)->snd_wscale = req->tcpopt.wsf;
 	}

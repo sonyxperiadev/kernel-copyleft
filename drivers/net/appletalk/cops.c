@@ -32,6 +32,11 @@
  *                                      setup for Jay's brace style.
  *	20000211	Alan Cox	Cleaned up for softnet
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 static const char *version =
 "cops.c:v0.04 6/7/98 Jay Schulist <jschlst@samba.org>\n";

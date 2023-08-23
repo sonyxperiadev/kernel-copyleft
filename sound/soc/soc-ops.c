@@ -322,8 +322,12 @@ int snd_soc_put_volsw(struct snd_kcontrol *kcontrol,
 		mask = BIT(sign_bit + 1) - 1;
 
 	val = ucontrol->value.integer.value[0];
-	if (mc->platform_max && ((int)val + min) > mc->platform_max)
+/*PDX225T code to resolve baseline conflicts by zhouchenghua at 2022/8/5 start*/
+ /*PDX225T code for SU6391A-11 by zhouchenghua at 2022/7/8 start*/
+	if (mc->platform_max &&((int)val + min) > mc->platform_max)
 		return -EINVAL;
+ /*PDX225T code for SU6391A-11 by zhouchenghua at 2022/7/8 end*/
+/*PDX225T code to resolve baseline conflicts by zhouchenghua at 2022/8/5 end*/
 	if (val > max - min)
 		return -EINVAL;
 	if (val < 0)
@@ -335,8 +339,13 @@ int snd_soc_put_volsw(struct snd_kcontrol *kcontrol,
 	val = val << shift;
 	if (snd_soc_volsw_is_stereo(mc)) {
 		val2 = ucontrol->value.integer.value[1];
+
+/*PDX225T code to resolve baseline conflicts by zhouchenghua at 2022/8/5 start*/
+ /*PDX225T code for SU6391A-11 by zhouchenghua at 2022/7/8 start*/
 		if (mc->platform_max && ((int)val2 + min) > mc->platform_max)
 			return -EINVAL;
+ /*PDX225T code for SU6391A-11 by zhouchenghua at 2022/7/8 end*/
+/*PDX225T code to resolve baseline conflicts by zhouchenghua at 2022/8/5 end*/
 		if (val2 > max - min)
 			return -EINVAL;
 		if (val2 < 0)
@@ -522,15 +531,7 @@ int snd_soc_put_volsw_range(struct snd_kcontrol *kcontrol,
 	unsigned int mask = (1 << fls(max)) - 1;
 	unsigned int invert = mc->invert;
 	unsigned int val, val_mask;
-	int err, ret, tmp;
-
-	tmp = ucontrol->value.integer.value[0];
-	if (tmp < 0)
-		return -EINVAL;
-	if (mc->platform_max && tmp > mc->platform_max)
-		return -EINVAL;
-	if (tmp > mc->max - mc->min)
-		return -EINVAL;
+	int err, ret;
 
 	if (invert)
 		val = (max - ucontrol->value.integer.value[0]) & mask;
@@ -545,14 +546,6 @@ int snd_soc_put_volsw_range(struct snd_kcontrol *kcontrol,
 	ret = err;
 
 	if (snd_soc_volsw_is_stereo(mc)) {
-		tmp = ucontrol->value.integer.value[1];
-		if (tmp < 0)
-			return -EINVAL;
-		if (mc->platform_max && tmp > mc->platform_max)
-			return -EINVAL;
-		if (tmp > mc->max - mc->min)
-			return -EINVAL;
-
 		if (invert)
 			val = (max - ucontrol->value.integer.value[1]) & mask;
 		else

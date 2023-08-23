@@ -4635,7 +4635,7 @@ static int __init megaraid_init(void)
 	 * major number allocation.
 	 */
 	major = register_chrdev(0, "megadev_legacy", &megadev_fops);
-	if (major < 0) {
+	if (!major) {
 		printk(KERN_WARNING
 				"megaraid: failed to register char device\n");
 	}

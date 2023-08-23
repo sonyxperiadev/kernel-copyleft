@@ -5269,8 +5269,6 @@ long copy_huge_page_from_user(struct page *dst_page,
 		if (rc)
 			break;
 
-		flush_dcache_page(subpage);
-
 		cond_resched();
 	}
 	return ret_val;

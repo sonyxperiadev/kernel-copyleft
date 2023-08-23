@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2015 The Linux Foundation. All rights reserved.
@@ -534,15 +539,9 @@ int mdp5_crtc_setup_pipeline(struct drm_crtc *crtc,
 		if (ret)
 			return ret;
 
-		ret = mdp5_mixer_release(new_crtc_state->state, old_mixer);
-		if (ret)
-			return ret;
-
+		mdp5_mixer_release(new_crtc_state->state, old_mixer);
 		if (old_r_mixer) {
-			ret = mdp5_mixer_release(new_crtc_state->state, old_r_mixer);
-			if (ret)
-				return ret;
-
+			mdp5_mixer_release(new_crtc_state->state, old_r_mixer);
 			if (!need_right_mixer)
 				pipeline->r_mixer = NULL;
 		}
@@ -909,10 +908,8 @@ static int mdp5_crtc_cursor_set(struct drm_crtc *crtc,
 
 	ret = msm_gem_get_and_pin_iova(cursor_bo, kms->aspace,
 			&mdp5_crtc->cursor.iova);
-	if (ret) {
-		drm_gem_object_put(cursor_bo);
+	if (ret)
 		return -EINVAL;
-	}
 
 	pm_runtime_get_sync(&pdev->dev);
 

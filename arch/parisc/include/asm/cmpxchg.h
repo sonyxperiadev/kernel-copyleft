@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * forked from parisc asm/atomic.h which was:
  *	Copyright (C) 2000 Philipp Rumpf <prumpf@tux.org>
  *	Copyright (C) 2006 Kyle McMartin <kyle@parisc-linux.org>

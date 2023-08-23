@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
@@ -1767,6 +1772,7 @@ static int geni_se_probe(struct platform_device *pdev)
 
 	dev_set_drvdata(dev, geni_se_dev);
 
+#ifndef CONFIG_QGKI
 	/*
 	 * TBD: Proxy vote on QUP core path on behalf of earlycon.
 	 * Once the ICC sync state feature is implemented, we can make
@@ -1790,6 +1796,7 @@ static int geni_se_probe(struct platform_device *pdev)
 				ret);
 		return ret;
 	}
+#endif
 #endif
 
 	ret = of_platform_populate(dev->of_node, geni_se_dt_match, NULL, dev);

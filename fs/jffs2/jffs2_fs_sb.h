@@ -9,6 +9,11 @@
  * For licensing information, see the file 'LICENCE' in this directory.
  *
  */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #ifndef _JFFS2_FS_SB
 #define _JFFS2_FS_SB

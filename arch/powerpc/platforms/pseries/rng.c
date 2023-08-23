@@ -10,7 +10,6 @@
 #include <asm/archrandom.h>
 #include <asm/machdep.h>
 #include <asm/plpar_wrappers.h>
-#include "pseries.h"
 
 
 static int pseries_get_random_long(unsigned long *v)
@@ -25,13 +24,19 @@ static int pseries_get_random_long(unsigned long *v)
 	return 0;
 }
 
-void __init pseries_rng_init(void)
+static __init int rng_init(void)
 {
 	struct device_node *dn;
 
 	dn = of_find_compatible_node(NULL, NULL, "ibm,random");
 	if (!dn)
-		return;
+		return -ENODEV;
+
+	pr_info("Registering arch random hook.\n");
+
 	ppc_md.get_random_seed = pseries_get_random_long;
+
 	of_node_put(dn);
+	return 0;
 }
+machine_subsys_initcall(pseries, rng_init);

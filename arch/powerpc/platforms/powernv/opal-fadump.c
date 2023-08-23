@@ -60,7 +60,7 @@ void __init opal_fadump_dt_scan(struct fw_dump *fadump_conf, u64 node)
 	addr = be64_to_cpu(addr);
 	pr_debug("Kernel metadata addr: %llx\n", addr);
 	opal_fdm_active = (void *)addr;
-	if (be16_to_cpu(opal_fdm_active->registered_regions) == 0)
+	if (opal_fdm_active->registered_regions == 0)
 		return;
 
 	ret = opal_mpipl_query_tag(OPAL_MPIPL_TAG_BOOT_MEM, &addr);
@@ -95,17 +95,17 @@ static int opal_fadump_unregister(struct fw_dump *fadump_conf);
 static void opal_fadump_update_config(struct fw_dump *fadump_conf,
 				      const struct opal_fadump_mem_struct *fdm)
 {
-	pr_debug("Boot memory regions count: %d\n", be16_to_cpu(fdm->region_cnt));
+	pr_debug("Boot memory regions count: %d\n", fdm->region_cnt);
 
 	/*
 	 * The destination address of the first boot memory region is the
 	 * destination address of boot memory regions.
 	 */
-	fadump_conf->boot_mem_dest_addr = be64_to_cpu(fdm->rgn[0].dest);
+	fadump_conf->boot_mem_dest_addr = fdm->rgn[0].dest;
 	pr_debug("Destination address of boot memory regions: %#016llx\n",
 		 fadump_conf->boot_mem_dest_addr);
 
-	fadump_conf->fadumphdr_addr = be64_to_cpu(fdm->fadumphdr_addr);
+	fadump_conf->fadumphdr_addr = fdm->fadumphdr_addr;
 }
 
 /*
@@ -126,9 +126,9 @@ static void opal_fadump_get_config(struct fw_dump *fadump_conf,
 	fadump_conf->boot_memory_size = 0;
 
 	pr_debug("Boot memory regions:\n");
-	for (i = 0; i < be16_to_cpu(fdm->region_cnt); i++) {
-		base = be64_to_cpu(fdm->rgn[i].src);
-		size = be64_to_cpu(fdm->rgn[i].size);
+	for (i = 0; i < fdm->region_cnt; i++) {
+		base = fdm->rgn[i].src;
+		size = fdm->rgn[i].size;
 		pr_debug("\t[%03d] base: 0x%lx, size: 0x%lx\n", i, base, size);
 
 		fadump_conf->boot_mem_addr[i] = base;
@@ -143,7 +143,7 @@ static void opal_fadump_get_config(struct fw_dump *fadump_conf,
 	 * Start address of reserve dump area (permanent reservation) for
 	 * re-registering FADump after dump capture.
 	 */
-	fadump_conf->reserve_dump_area_start = be64_to_cpu(fdm->rgn[0].dest);
+	fadump_conf->reserve_dump_area_start = fdm->rgn[0].dest;
 
 	/*
 	 * Rarely, but it can so happen that system crashes before all
@@ -155,14 +155,13 @@ static void opal_fadump_get_config(struct fw_dump *fadump_conf,
 	 * Hope the memory that could not be preserved only has pages
 	 * that are usually filtered out while saving the vmcore.
 	 */
-	if (be16_to_cpu(fdm->region_cnt) > be16_to_cpu(fdm->registered_regions)) {
+	if (fdm->region_cnt > fdm->registered_regions) {
 		pr_warn("Not all memory regions were saved!!!\n");
 		pr_warn("  Unsaved memory regions:\n");
-		i = be16_to_cpu(fdm->registered_regions);
-		while (i < be16_to_cpu(fdm->region_cnt)) {
+		i = fdm->registered_regions;
+		while (i < fdm->region_cnt) {
 			pr_warn("\t[%03d] base: 0x%llx, size: 0x%llx\n",
-				i, be64_to_cpu(fdm->rgn[i].src),
-				be64_to_cpu(fdm->rgn[i].size));
+				i, fdm->rgn[i].src, fdm->rgn[i].size);
 			i++;
 		}
 
@@ -171,7 +170,7 @@ static void opal_fadump_get_config(struct fw_dump *fadump_conf,
 	}
 
 	fadump_conf->boot_mem_top = (fadump_conf->boot_memory_size + hole_size);
-	fadump_conf->boot_mem_regs_cnt = be16_to_cpu(fdm->region_cnt);
+	fadump_conf->boot_mem_regs_cnt = fdm->region_cnt;
 	opal_fadump_update_config(fadump_conf, fdm);
 }
 
@@ -179,38 +178,35 @@ static void opal_fadump_get_config(struct fw_dump *fadump_conf,
 static void opal_fadump_init_metadata(struct opal_fadump_mem_struct *fdm)
 {
 	fdm->version = OPAL_FADUMP_VERSION;
-	fdm->region_cnt = cpu_to_be16(0);
-	fdm->registered_regions = cpu_to_be16(0);
-	fdm->fadumphdr_addr = cpu_to_be64(0);
+	fdm->region_cnt = 0;
+	fdm->registered_regions = 0;
+	fdm->fadumphdr_addr = 0;
 }
 
 static u64 opal_fadump_init_mem_struct(struct fw_dump *fadump_conf)
 {
 	u64 addr = fadump_conf->reserve_dump_area_start;
-	u16 reg_cnt;
 	int i;
 
 	opal_fdm = __va(fadump_conf->kernel_metadata);
 	opal_fadump_init_metadata(opal_fdm);
 
 	/* Boot memory regions */
-	reg_cnt = be16_to_cpu(opal_fdm->region_cnt);
 	for (i = 0; i < fadump_conf->boot_mem_regs_cnt; i++) {
-		opal_fdm->rgn[i].src	= cpu_to_be64(fadump_conf->boot_mem_addr[i]);
-		opal_fdm->rgn[i].dest	= cpu_to_be64(addr);
-		opal_fdm->rgn[i].size	= cpu_to_be64(fadump_conf->boot_mem_sz[i]);
+		opal_fdm->rgn[i].src	= fadump_conf->boot_mem_addr[i];
+		opal_fdm->rgn[i].dest	= addr;
+		opal_fdm->rgn[i].size	= fadump_conf->boot_mem_sz[i];
 
-		reg_cnt++;
+		opal_fdm->region_cnt++;
 		addr += fadump_conf->boot_mem_sz[i];
 	}
-	opal_fdm->region_cnt = cpu_to_be16(reg_cnt);
 
 	/*
 	 * Kernel metadata is passed to f/w and retrieved in capture kerenl.
 	 * So, use it to save fadump header address instead of calculating it.
 	 */
-	opal_fdm->fadumphdr_addr = cpu_to_be64(be64_to_cpu(opal_fdm->rgn[0].dest) +
-					       fadump_conf->boot_memory_size);
+	opal_fdm->fadumphdr_addr = (opal_fdm->rgn[0].dest +
+				    fadump_conf->boot_memory_size);
 
 	opal_fadump_update_config(fadump_conf, opal_fdm);
 
@@ -273,21 +269,18 @@ static u64 opal_fadump_get_bootmem_min(void)
 static int opal_fadump_register(struct fw_dump *fadump_conf)
 {
 	s64 rc = OPAL_PARAMETER;
-	u16 registered_regs;
 	int i, err = -EIO;
 
-	registered_regs = be16_to_cpu(opal_fdm->registered_regions);
-	for (i = 0; i < be16_to_cpu(opal_fdm->region_cnt); i++) {
+	for (i = 0; i < opal_fdm->region_cnt; i++) {
 		rc = opal_mpipl_update(OPAL_MPIPL_ADD_RANGE,
-				       be64_to_cpu(opal_fdm->rgn[i].src),
-				       be64_to_cpu(opal_fdm->rgn[i].dest),
-				       be64_to_cpu(opal_fdm->rgn[i].size));
+				       opal_fdm->rgn[i].src,
+				       opal_fdm->rgn[i].dest,
+				       opal_fdm->rgn[i].size);
 		if (rc != OPAL_SUCCESS)
 			break;
 
-		registered_regs++;
+		opal_fdm->registered_regions++;
 	}
-	opal_fdm->registered_regions = cpu_to_be16(registered_regs);
 
 	switch (rc) {
 	case OPAL_SUCCESS:
@@ -298,8 +291,7 @@ static int opal_fadump_register(struct fw_dump *fadump_conf)
 	case OPAL_RESOURCE:
 		/* If MAX regions limit in f/w is hit, warn and proceed. */
 		pr_warn("%d regions could not be registered for MPIPL as MAX limit is reached!\n",
-			(be16_to_cpu(opal_fdm->region_cnt) -
-			 be16_to_cpu(opal_fdm->registered_regions)));
+			(opal_fdm->region_cnt - opal_fdm->registered_regions));
 		fadump_conf->dump_registered = 1;
 		err = 0;
 		break;
@@ -320,7 +312,7 @@ static int opal_fadump_register(struct fw_dump *fadump_conf)
 	 * If some regions were registered before OPAL_MPIPL_ADD_RANGE
 	 * OPAL call failed, unregister all regions.
 	 */
-	if ((err < 0) && (be16_to_cpu(opal_fdm->registered_regions) > 0))
+	if ((err < 0) && (opal_fdm->registered_regions > 0))
 		opal_fadump_unregister(fadump_conf);
 
 	return err;
@@ -336,7 +328,7 @@ static int opal_fadump_unregister(struct fw_dump *fadump_conf)
 		return -EIO;
 	}
 
-	opal_fdm->registered_regions = cpu_to_be16(0);
+	opal_fdm->registered_regions = 0;
 	fadump_conf->dump_registered = 0;
 	return 0;
 }
@@ -571,20 +563,19 @@ static void opal_fadump_region_show(struct fw_dump *fadump_conf,
 	else
 		fdm_ptr = opal_fdm;
 
-	for (i = 0; i < be16_to_cpu(fdm_ptr->region_cnt); i++) {
+	for (i = 0; i < fdm_ptr->region_cnt; i++) {
 		/*
 		 * Only regions that are registered for MPIPL
 		 * would have dump data.
 		 */
 		if ((fadump_conf->dump_active) &&
-		    (i < be16_to_cpu(fdm_ptr->registered_regions)))
-			dumped_bytes = be64_to_cpu(fdm_ptr->rgn[i].size);
+		    (i < fdm_ptr->registered_regions))
+			dumped_bytes = fdm_ptr->rgn[i].size;
 
 		seq_printf(m, "DUMP: Src: %#016llx, Dest: %#016llx, ",
-			   be64_to_cpu(fdm_ptr->rgn[i].src),
-			   be64_to_cpu(fdm_ptr->rgn[i].dest));
+			   fdm_ptr->rgn[i].src, fdm_ptr->rgn[i].dest);
 		seq_printf(m, "Size: %#llx, Dumped: %#llx bytes\n",
-			   be64_to_cpu(fdm_ptr->rgn[i].size), dumped_bytes);
+			   fdm_ptr->rgn[i].size, dumped_bytes);
 	}
 
 	/* Dump is active. Show reserved area start address. */
@@ -633,7 +624,6 @@ void __init opal_fadump_dt_scan(struct fw_dump *fadump_conf, u64 node)
 {
 	const __be32 *prop;
 	unsigned long dn;
-	__be64 be_addr;
 	u64 addr = 0;
 	int i, len;
 	s64 ret;
@@ -690,13 +680,13 @@ void __init opal_fadump_dt_scan(struct fw_dump *fadump_conf, u64 node)
 	if (!prop)
 		return;
 
-	ret = opal_mpipl_query_tag(OPAL_MPIPL_TAG_KERNEL, &be_addr);
-	if ((ret != OPAL_SUCCESS) || !be_addr) {
+	ret = opal_mpipl_query_tag(OPAL_MPIPL_TAG_KERNEL, &addr);
+	if ((ret != OPAL_SUCCESS) || !addr) {
 		pr_err("Failed to get Kernel metadata (%lld)\n", ret);
 		return;
 	}
 
-	addr = be64_to_cpu(be_addr);
+	addr = be64_to_cpu(addr);
 	pr_debug("Kernel metadata addr: %llx\n", addr);
 
 	opal_fdm_active = __va(addr);
@@ -707,14 +697,14 @@ void __init opal_fadump_dt_scan(struct fw_dump *fadump_conf, u64 node)
 	}
 
 	/* Kernel regions not registered with f/w for MPIPL */
-	if (be16_to_cpu(opal_fdm_active->registered_regions) == 0) {
+	if (opal_fdm_active->registered_regions == 0) {
 		opal_fdm_active = NULL;
 		return;
 	}
 
-	ret = opal_mpipl_query_tag(OPAL_MPIPL_TAG_CPU, &be_addr);
-	if (be_addr) {
-		addr = be64_to_cpu(be_addr);
+	ret = opal_mpipl_query_tag(OPAL_MPIPL_TAG_CPU, &addr);
+	if (addr) {
+		addr = be64_to_cpu(addr);
 		pr_debug("CPU metadata addr: %llx\n", addr);
 		opal_cpu_metadata = __va(addr);
 	}

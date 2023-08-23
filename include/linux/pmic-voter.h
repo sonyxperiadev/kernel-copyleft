@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2020 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  */
 
@@ -44,4 +49,8 @@ void destroy_votable(struct votable *votable);
 void lock_votable(struct votable *votable);
 void unlock_votable(struct votable *votable);
 
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+ssize_t somc_output_voter_param(struct votable *votable,
+						char *buf, size_t size);
+#endif
 #endif /* __PMIC_VOTER_H */

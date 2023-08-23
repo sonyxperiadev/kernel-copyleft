@@ -212,6 +212,7 @@ $code=<<___;
 #else
 .syntax unified
 # ifdef __thumb2__
+#  define adrl adr
 .thumb
 # else
 .code   32
@@ -601,8 +602,7 @@ sha512_block_data_order_neon:
 	dmb				@ errata #451034 on early Cortex A8
 	add	$len,$inp,$len,lsl#7	@ len to point at the end of inp
 	VFP_ABI_PUSH
-	adr	$Ktbl,.Lsha512_block_data_order
-	sub	$Ktbl,$Ktbl,.Lsha512_block_data_order-K512
+	adrl	$Ktbl,K512
 	vldmia	$ctx,{$A-$H}		@ load context
 .Loop_neon:
 ___
