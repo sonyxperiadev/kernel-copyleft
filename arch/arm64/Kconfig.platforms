@@ -220,6 +220,33 @@ config ARCH_HOLI
 	  HOLI chipset. If you do not wish to build a kernel that
 	  runs on this chipset or if you are unsure, say 'N' here.
 
+config ARCH_SONY_ZAMBEZI
+	bool "Sony Mobile Zambezi platform"
+	depends on ARCH_HOLI
+	help
+	  Support for the SONY Mobile Zambezi platform
+	  which is based on QCOM HOLI chipset.
+	  If you enable this config,
+	  please use SONY Mobile device tree.
+
+config MACH_SONY_PDX235
+	bool "Sony Mobile PDX235"
+	depends on ARCH_SONY_ZAMBEZI
+	help
+	  Support for the SONY Mobile PDX235 board
+	  which is based on SONY Zambezi platform.
+	  If you enable this config,
+	  please use SONY Mobile device tree.
+
+config MACH_SONY_PDX235_J
+	bool "Sony Mobile PDX235 J"
+	depends on ARCH_SONY_ZAMBEZI
+	help
+	  Support for the SONY Mobile PDX235 J device
+	  which is based on SONY Zambezi platform.
+	  If you enable this config,
+	  please use SONY Mobile device tree.
+
 config ARCH_BLAIR
 	bool "Enable Support for Qualcomm Technologies, Inc. BLAIR"
 	depends on ARCH_QCOM

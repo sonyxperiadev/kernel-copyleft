@@ -71,6 +71,9 @@ struct se_geni_rsc {
 	struct pinctrl_state *geni_gpio_shutdown;
 	struct pinctrl_state *geni_gpio_active;
 	struct pinctrl_state *geni_gpio_sleep;
+#if defined(CONFIG_SOMC_CHARGER_EXTENSION)
+	struct pinctrl_state *geni_gpio_suspend;
+#endif
 	int	clk_freq_out;
 	unsigned int num_clk_levels;
 	unsigned long *clk_perf_tbl;

@@ -74,7 +74,7 @@ struct ramoops_context {
 	struct persistent_ram_zone **dprzs;	/* Oops dump zones */
 	struct persistent_ram_zone *cprz;	/* Console zone */
 	struct persistent_ram_zone **fprzs;	/* Ftrace zones */
-	struct persistent_ram_zone *mprz;	/* PMSG zone */
+	struct persistent_ram_zone **mprz;	/* PMSG zone */
 	phys_addr_t phys_addr;
 	unsigned long size;
 	unsigned int memtype;
@@ -92,6 +92,7 @@ struct ramoops_context {
 	unsigned int console_read_cnt;
 	unsigned int max_ftrace_cnt;
 	unsigned int ftrace_read_cnt;
+	unsigned int pmsg_node_cnt;
 	unsigned int pmsg_read_cnt;
 	struct pstore_info pstore;
 };
@@ -134,10 +135,10 @@ static void register_minidump(struct ramoops_context *cxt)
 		if (msm_minidump_add_region(&pstore_entry) < 0)
 			pr_err("failed to add ftrace in minidump\n");
 	}
-	if (cxt->pmsg_size) {
-		prz = cxt->mprz;
-		strlcpy(pstore_entry.name, "KPMSG",
-				sizeof(pstore_entry.name));
+	for (i = 0; i < cxt->pmsg_node_cnt; i++) {
+		prz = cxt->mprz[i];
+		scnprintf(pstore_entry.name, sizeof(pstore_entry.name),
+				"KPMSG%d", i);
 		pstore_entry.virt_addr = (u64)(prz->vaddr);
 		pstore_entry.phys_addr = prz->paddr;
 		pstore_entry.size = prz->size;
@@ -306,8 +307,9 @@ static ssize_t ramoops_pstore_read(struct pstore_record *record)
 	if (!prz_ok(prz) && !cxt->console_read_cnt++)
 		prz = ramoops_get_next_prz(&cxt->cprz, 0 /* single */, record);
 
-	if (!prz_ok(prz) && !cxt->pmsg_read_cnt++)
-		prz = ramoops_get_next_prz(&cxt->mprz, 0 /* single */, record);
+	while ((cxt->pmsg_read_cnt < cxt->pmsg_node_cnt) && !prz_ok(prz)) {
+		prz = ramoops_get_next_prz(cxt->mprz, cxt->pmsg_read_cnt++, record);
+	}
 
 	/* ftrace is last since it may want to dynamically allocate memory. */
 	if (!prz_ok(prz)) {
@@ -490,7 +492,8 @@ static int notrace ramoops_pstore_write_user(struct pstore_record *record,
 
 		if (!cxt->mprz)
 			return -ENOMEM;
-		return persistent_ram_write_user(cxt->mprz, buf, record->size);
+		return persistent_ram_write_user(cxt->mprz[record->part], buf,
+						record->size);
 	}
 
 	return -EINVAL;
@@ -516,7 +519,9 @@ static int ramoops_pstore_erase(struct pstore_record *record)
 		prz = cxt->fprzs[record->id];
 		break;
 	case PSTORE_TYPE_PMSG:
-		prz = cxt->mprz;
+		if (record->id >= cxt->pmsg_node_cnt)
+			return -EINVAL;
+		prz = cxt->mprz[record->id];
 		break;
 	default:
 		return -EINVAL;
@@ -540,6 +545,16 @@ static struct ramoops_context oops_cxt = {
 	},
 };
 
+int pstore_get_pmsg_cnt(void)
+{
+	struct ramoops_context *cxt = &oops_cxt;
+
+	if (!cxt->pmsg_node_cnt)
+		return 0;
+
+	return cxt->pmsg_node_cnt;
+}
+
 static void ramoops_free_przs(struct ramoops_context *cxt)
 {
 	int i;
@@ -559,6 +574,14 @@ static void ramoops_free_przs(struct ramoops_context *cxt)
 			persistent_ram_free(cxt->fprzs[i]);
 		kfree(cxt->fprzs);
 		cxt->max_ftrace_cnt = 0;
+	}
+
+	/* Free pmsg PRZs */
+	if (cxt->mprz) {
+		for (i = 0; i < cxt->pmsg_node_cnt; i++)
+			persistent_ram_free(cxt->mprz[i]);
+		kfree(cxt->mprz);
+		cxt->pmsg_node_cnt = 0;
 	}
 }
 
@@ -715,6 +738,48 @@ static int ramoops_parse_dt_size(struct platform_device *pdev,
 	return 0;
 }
 
+static int ramoops_parse_pmsg_dt(struct device_node *of_node,
+				 const char *propname,
+				 struct ramoops_platform_data *pdata)
+{
+	u32 value;
+	int count = 0, i;
+	struct ramoops_context *cxt = &oops_cxt;
+
+	if (!of_get_property(of_node, propname, &count))
+		return 0;
+
+	if (!count)
+		return count;
+
+	count /= sizeof(unsigned int);
+
+	pdata->pmsg_size = kzalloc(sizeof(*(pdata->pmsg_size)) * (count + 1),
+				   GFP_KERNEL);
+	if (!pdata->pmsg_size) {
+		pr_err("Failed to allocate memory\n");
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < count; i++) {
+		if (of_property_read_u32_index(of_node, propname,
+						 i, &value)) {
+			pr_warn("Failed to read pmsg size from dt\n");
+			return -EINVAL;
+		}
+
+		if ((value > INT_MAX) || (value <= 0)) {
+			pr_err("Size exceeded or zero. Skip pmsg przs\n");
+			cxt->pmsg_node_cnt = 0;
+			return 0;
+		}
+		pdata->pmsg_size[i] = value;
+	}
+	cxt->pmsg_node_cnt = count;
+
+	return count;
+}
+
 static int ramoops_parse_dt(struct platform_device *pdev,
 			    struct ramoops_platform_data *pdata)
 {
@@ -749,7 +814,6 @@ static int ramoops_parse_dt(struct platform_device *pdev,
 	parse_size("record-size", pdata->record_size);
 	parse_size("console-size", pdata->console_size);
 	parse_size("ftrace-size", pdata->ftrace_size);
-	parse_size("pmsg-size", pdata->pmsg_size);
 	parse_size("ecc-size", pdata->ecc_info.ecc_size);
 	parse_size("flags", pdata->flags);
 
@@ -771,9 +835,15 @@ static int ramoops_parse_dt(struct platform_device *pdev,
 	    !pdata->console_size && !pdata->ftrace_size &&
 	    !pdata->pmsg_size && !pdata->ecc_info.ecc_size) {
 		pdata->console_size = pdata->record_size;
-		pdata->pmsg_size = pdata->record_size;
+		pdata->pmsg_size = &pdata->record_size;
 	}
 	of_node_put(parent_node);
+
+	ret = ramoops_parse_pmsg_dt(of_node, "msg-size", pdata);
+	if (ret < 0) {
+		pr_err("Failed to read pmsg size in dt\n");
+		return ret;
+	}
 
 	return 0;
 }
@@ -787,6 +857,7 @@ static int ramoops_probe(struct platform_device *pdev)
 	size_t dump_mem_sz;
 	phys_addr_t paddr;
 	int err = -EINVAL;
+	int i;
 
 	/*
 	 * Only a single ramoops area allowed at a time, so fail extra
@@ -825,8 +896,16 @@ static int ramoops_probe(struct platform_device *pdev)
 		pdata->console_size = rounddown_pow_of_two(pdata->console_size);
 	if (pdata->ftrace_size && !is_power_of_2(pdata->ftrace_size))
 		pdata->ftrace_size = rounddown_pow_of_two(pdata->ftrace_size);
-	if (pdata->pmsg_size && !is_power_of_2(pdata->pmsg_size))
-		pdata->pmsg_size = rounddown_pow_of_two(pdata->pmsg_size);
+
+	if (pdata->pmsg_size && cxt->pmsg_node_cnt) {
+		for (i = 0; i < cxt->pmsg_node_cnt; i++) {
+			if (!is_power_of_2(pdata->pmsg_size[i]))
+				pdata->pmsg_size[i] =
+					rounddown_pow_of_two(pdata->pmsg_size[i]);
+			cxt->pmsg_size += pdata->pmsg_size[i];
+		}
+	}
+
 
 	cxt->size = pdata->mem_size;
 	cxt->phys_addr = pdata->mem_address;
@@ -834,7 +913,6 @@ static int ramoops_probe(struct platform_device *pdev)
 	cxt->record_size = pdata->record_size;
 	cxt->console_size = pdata->console_size;
 	cxt->ftrace_size = pdata->ftrace_size;
-	cxt->pmsg_size = pdata->pmsg_size;
 	cxt->dump_oops = pdata->dump_oops;
 	cxt->flags = pdata->flags;
 	cxt->ecc_info = pdata->ecc_info;
@@ -865,10 +943,18 @@ static int ramoops_probe(struct platform_device *pdev)
 	if (err)
 		goto fail_init_fprz;
 
-	err = ramoops_init_prz("pmsg", dev, cxt, &cxt->mprz, &paddr,
-				cxt->pmsg_size, 0);
-	if (err)
-		goto fail_init_mprz;
+	if (cxt->pmsg_node_cnt) {
+		cxt->mprz = kzalloc(cxt->pmsg_node_cnt * sizeof(*cxt->mprz),
+				GFP_KERNEL);
+		for (i = 0; i < cxt->pmsg_node_cnt; i++) {
+			err = ramoops_init_prz("pmsg", dev, cxt, &cxt->mprz[i],
+					&paddr, pdata->pmsg_size[i], 0);
+			if (err) {
+				pr_err("Error while creating pmsg prz\n");
+				goto fail_init_mprz;
+			}
+		}
+	}
 
 	cxt->pstore.data = cxt;
 	/*
@@ -908,6 +994,8 @@ static int ramoops_probe(struct platform_device *pdev)
 		goto fail_buf;
 	}
 
+	kfree(pdata->pmsg_size);
+
 	/*
 	 * Update the module parameter variables as well so they are visible
 	 * through /sys/module/ramoops/parameters/
@@ -917,7 +1005,7 @@ static int ramoops_probe(struct platform_device *pdev)
 	record_size = pdata->record_size;
 	dump_oops = pdata->dump_oops;
 	ramoops_console_size = pdata->console_size;
-	ramoops_pmsg_size = pdata->pmsg_size;
+	ramoops_pmsg_size = cxt->pmsg_size;
 	ramoops_ftrace_size = pdata->ftrace_size;
 
 	pr_info("using 0x%lx@0x%llx, ecc: %d\n",
@@ -932,13 +1020,13 @@ fail_buf:
 	kfree(cxt->pstore.buf);
 fail_clear:
 	cxt->pstore.bufsize = 0;
-	persistent_ram_free(cxt->mprz);
 fail_init_mprz:
 fail_init_fprz:
 	persistent_ram_free(cxt->cprz);
 fail_init_cprz:
 	ramoops_free_przs(cxt);
 fail_out:
+	kfree(pdata->pmsg_size);
 	return err;
 }
 
@@ -951,7 +1039,6 @@ static int ramoops_remove(struct platform_device *pdev)
 	kfree(cxt->pstore.buf);
 	cxt->pstore.bufsize = 0;
 
-	persistent_ram_free(cxt->mprz);
 	persistent_ram_free(cxt->cprz);
 	ramoops_free_przs(cxt);
 
@@ -999,7 +1086,6 @@ static void __init ramoops_register_dummy(void)
 	pdata.record_size = record_size;
 	pdata.console_size = ramoops_console_size;
 	pdata.ftrace_size = ramoops_ftrace_size;
-	pdata.pmsg_size = ramoops_pmsg_size;
 	pdata.dump_oops = dump_oops;
 	pdata.flags = RAMOOPS_FLAG_FTRACE_PER_CPU;
 

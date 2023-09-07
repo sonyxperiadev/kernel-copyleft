@@ -106,4 +106,7 @@ void icnss_debug_init(void);
 void icnss_debug_deinit(void);
 int icnss_debugfs_create(struct icnss_priv *priv);
 void icnss_debugfs_destroy(struct icnss_priv *priv);
+int chr_dev_init(void);
+void chr_dev_term(void);
+int wlan_pdr_open(struct inode *inode, struct file *filp);
 #endif /* _ICNSS_DEBUG_H */

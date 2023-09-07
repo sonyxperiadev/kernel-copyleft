@@ -2,7 +2,7 @@
  *
  * FocalTech ftxxxx TouchScreen driver.
  *
- * Copyright (c) 2012-2019, Focaltech Ltd. All rights reserved.
+ * Copyright (c) 2012-2020, Focaltech Ltd. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -33,7 +33,7 @@
 * 1.Included header files
 *****************************************************************************/
 #include "focaltech_core.h"
-
+bool __attribute__ ((weak)) is_tp_on(void);
 /*****************************************************************************
 * 2.Private constant and macro definitions using #define
 *****************************************************************************/
@@ -45,9 +45,10 @@ enum _ex_mode {
 	MODE_GLOVE = 0,
 	MODE_COVER,
 	MODE_CHARGER,
-	REPORT_RATE,
+	MODE_EDGE,
 };
-
+int TPcharger = 1;
+int TPcharger1 = 1;
 /*****************************************************************************
 * 4.Static variables
 *****************************************************************************/
@@ -62,32 +63,38 @@ enum _ex_mode {
 static int fts_ex_mode_switch(enum _ex_mode mode, u8 value)
 {
 	int ret = 0;
+	u8 m_val = 0;
+
+	if (value)
+		m_val = value;
+	else
+		m_val = 0x00;
 
 	switch (mode) {
 	case MODE_GLOVE:
-		ret = fts_write_reg(FTS_REG_GLOVE_MODE_EN, value > 0 ? 1 : 0);
-		if (ret < 0)
-			FTS_ERROR("MODE_GLOVE switch to %d fail", value);
+		ret = fts_write_reg(FTS_REG_GLOVE_MODE_EN, m_val);
+		if (ret < 0) {
+			FTS_ERROR("MODE_GLOVE switch to %d fail", m_val);
+		}
 		break;
-
 	case MODE_COVER:
-		ret = fts_write_reg(FTS_REG_COVER_MODE_EN, value > 0 ? 1 : 0);
-		if (ret < 0)
-			FTS_ERROR("MODE_COVER switch to %d fail", value);
+		ret = fts_write_reg(FTS_REG_COVER_MODE_EN, m_val);
+		if (ret < 0) {
+			FTS_ERROR("MODE_COVER switch to %d fail", m_val);
+		}
 		break;
-
 	case MODE_CHARGER:
-		ret = fts_write_reg(FTS_REG_CHARGER_MODE_EN, value > 0 ? 1 : 0);
-		if (ret < 0)
-			FTS_ERROR("MODE_CHARGER switch to %d fail", value);
+		ret = fts_write_reg(FTS_REG_CHARGER_MODE_EN, m_val);
+		if (ret < 0) {
+			FTS_ERROR("MODE_CHARGER switch to %d fail", m_val);
+		}
 		break;
-
-	case REPORT_RATE:
-		ret = fts_write_reg(FTS_REG_REPORT_RATE, value);
-		if (ret < 0)
-			FTS_ERROR("REPORT_RATE switch to %d fail", value);
+	case MODE_EDGE:
+		ret = fts_write_reg(FTS_REG_EDGE_MODE_EN, m_val);
+		if (ret < 0) {
+			FTS_ERROR("MODE_EDGE switch to %d fail", m_val);
+		}
 		break;
-
 	default:
 		FTS_ERROR("mode(%d) unsupport", mode);
 		ret = -EINVAL;
@@ -102,15 +109,14 @@ static ssize_t fts_glove_mode_show(
 {
 	int count = 0;
 	u8 val = 0;
-	struct fts_ts_data *ts_data = fts_data;
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 	struct input_dev *input_dev = ts_data->input_dev;
 
 	mutex_lock(&input_dev->mutex);
 	fts_read_reg(FTS_REG_GLOVE_MODE_EN, &val);
-	count = scnprintf(buf + count, PAGE_SIZE, "Glove Mode:%s\n",
-			ts_data->glove_mode ? "On" : "Off");
-	count += scnprintf(buf + count, PAGE_SIZE - count,
-			"Glove Reg(0xC0):%d\n", val);
+	count = snprintf(buf + count, PAGE_SIZE, "Glove Mode:%s\n",
+					 ts_data->glove_mode ? "On" : "Off");
+	count += snprintf(buf + count, PAGE_SIZE, "Glove Reg(0xC0):%d\n", val);
 	mutex_unlock(&input_dev->mutex);
 
 	return count;
@@ -121,7 +127,7 @@ static ssize_t fts_glove_mode_store(
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	int ret = 0;
-	struct fts_ts_data *ts_data = fts_data;
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 
 	if (FTS_SYSFS_ECHO_ON(buf)) {
 		if (!ts_data->glove_mode) {
@@ -151,15 +157,14 @@ static ssize_t fts_cover_mode_show(
 {
 	int count = 0;
 	u8 val = 0;
-	struct fts_ts_data *ts_data = fts_data;
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 	struct input_dev *input_dev = ts_data->input_dev;
 
 	mutex_lock(&input_dev->mutex);
 	fts_read_reg(FTS_REG_COVER_MODE_EN, &val);
-	count = scnprintf(buf + count, PAGE_SIZE, "Cover Mode:%s\n",
-			ts_data->cover_mode ? "On" : "Off");
-	count += scnprintf(buf + count, PAGE_SIZE - count,
-			"Cover Reg(0xC1):%d\n", val);
+	count = snprintf(buf + count, PAGE_SIZE, "Cover Mode:%s\n",
+					 ts_data->cover_mode ? "On" : "Off");
+	count += snprintf(buf + count, PAGE_SIZE, "Cover Reg(0xC1):%d\n", val);
 	mutex_unlock(&input_dev->mutex);
 
 	return count;
@@ -170,7 +175,7 @@ static ssize_t fts_cover_mode_store(
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	int ret = 0;
-	struct fts_ts_data *ts_data = fts_data;
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 
 	if (FTS_SYSFS_ECHO_ON(buf)) {
 		if (!ts_data->cover_mode) {
@@ -199,15 +204,14 @@ static ssize_t fts_charger_mode_show(
 {
 	int count = 0;
 	u8 val = 0;
-	struct fts_ts_data *ts_data = fts_data;
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 	struct input_dev *input_dev = ts_data->input_dev;
 
 	mutex_lock(&input_dev->mutex);
 	fts_read_reg(FTS_REG_CHARGER_MODE_EN, &val);
-	count = scnprintf(buf + count, PAGE_SIZE, "Charger Mode:%s\n",
-			ts_data->charger_mode ? "On" : "Off");
-	count += scnprintf(buf + count, PAGE_SIZE - count,
-			"Charger Reg(0x8B):%d\n", val);
+	count = snprintf(buf + count, PAGE_SIZE, "Charger Mode:%s\n",
+					 is_tp_on() ? "On" : "Off");
+	count += snprintf(buf + count, PAGE_SIZE, "Charger Reg(0x8B):%d\n", val);
 	mutex_unlock(&input_dev->mutex);
 
 	return count;
@@ -218,92 +222,132 @@ static ssize_t fts_charger_mode_store(
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	int ret = 0;
-	struct fts_ts_data *ts_data = fts_data;
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 
 	if (FTS_SYSFS_ECHO_ON(buf)) {
-		if (!ts_data->charger_mode) {
+                FTS_DEBUG("21enter charger mode:%d",is_tp_on());
+		if(is_tp_on())
+                FTS_DEBUG("321enter charger mode:%d",is_tp_on());
+		{
+		ts_data->charger_mode = is_tp_on();
 			FTS_DEBUG("enter charger mode");
 			ret = fts_ex_mode_switch(MODE_CHARGER, ENABLE);
+        FTS_DEBUG("1234enter charger mode:%d",is_tp_on());
 			if (ret >= 0) {
+              FTS_DEBUG("12345enter charger mode");
 				ts_data->charger_mode = ENABLE;
 			}
-		}
-	} else if (FTS_SYSFS_ECHO_OFF(buf)) {
-		if (ts_data->charger_mode) {
-			FTS_DEBUG("exit charger mode");
+	}} else if (FTS_SYSFS_ECHO_OFF(buf)) {
+		if(!is_tp_on())
+		{
+		ts_data->charger_mode = is_tp_on();
+			FTS_DEBUG("1exit charger mode");
 			ret = fts_ex_mode_switch(MODE_CHARGER, DISABLE);
 			if (ret >= 0) {
 				ts_data->charger_mode = DISABLE;
 			}
-		}
-	}
-
+	}}
 	FTS_DEBUG("charger mode:%d", ts_data->glove_mode);
 	return count;
 }
-
-static ssize_t fts_report_rate_show(
-	struct device *dev, struct device_attribute *attr, char *buf)
+int fts_ex_mode_charger()
+{
+	int ret = 0;
+		if (is_tp_on() && TPcharger) {
+		FTS_DEBUG("enter charger mode");
+		ret = fts_ex_mode_switch(MODE_CHARGER, ENABLE);
+			if (ret >= 0) {
+			FTS_DEBUG("enter charger mode1");
+				TPcharger = 0;
+				TPcharger1 = 1;
+			}}
+			if (!is_tp_on() && TPcharger1) {
+			FTS_DEBUG("exit charger mode");
+			ret = fts_ex_mode_switch(MODE_CHARGER, DISABLE);
+			if (ret >= 0) {
+				FTS_DEBUG("exit charger mode1");
+				TPcharger1 = 0;
+				TPcharger = 1;
+			}}
+		return 0;
+}
+static ssize_t fts_edge_mode_show(
+    struct device *dev, struct device_attribute *attr, char *buf)
 {
 	int count = 0;
 	u8 val = 0;
-	struct fts_ts_data *ts_data = fts_data;
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 	struct input_dev *input_dev = ts_data->input_dev;
 
 	mutex_lock(&input_dev->mutex);
-	fts_read_reg(FTS_REG_REPORT_RATE, &val);
-	count = scnprintf(buf + count, PAGE_SIZE,
-			"Report Rate:%d\n", ts_data->report_rate);
-	count += scnprintf(buf + count, PAGE_SIZE - count,
-			"Report Rate Reg(0x88):%d\n", val);
+	fts_read_reg(FTS_REG_EDGE_MODE_EN, &val);
+	count = snprintf(buf + count, PAGE_SIZE, "Edge Mode:%s\n",
+			ts_data->edge_mode ? "On" : "Off");
+	count += snprintf(buf + count, PAGE_SIZE, "Edge Reg(0x8C):%d\n", val);
 	mutex_unlock(&input_dev->mutex);
 
 	return count;
 }
 
-static ssize_t fts_report_rate_store(
+static ssize_t fts_edge_mode_store(
 	struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	int ret = 0;
-	struct fts_ts_data *ts_data = fts_data;
-	int rate;
+	struct fts_ts_data *ts_data = dev_get_drvdata(dev);
 
-	ret = kstrtoint(buf, 16, &rate);
-	if (ret)
-		return ret;
-
-	if (rate != ts_data->report_rate) {
-		ret = fts_ex_mode_switch(REPORT_RATE, (u8)rate);
-		if (ret >= 0)
-			ts_data->report_rate = rate;
+	if (FTS_SYSFS_ECHO_ON(buf)) {
+		if (!ts_data->edge_mode) {
+			FTS_DEBUG("enter edge mode");
+			if (buf[0] == '1') /*USB PORTS RIGHT*/ {
+				ret = fts_ex_mode_switch(MODE_EDGE, 1);
+				if (ret >= 0) {
+					ts_data->edge_mode = 1;
+				}
+				ret = fts_ex_mode_charger();
+			}
+			else if (buf[0] == '2') /*USB PORTS LEFT*/ {
+				ret = fts_ex_mode_switch(MODE_EDGE, 2);
+				if (ret >= 0) {
+				ts_data->edge_mode = 2;
+				}
+				ret = fts_ex_mode_charger();
+			}
+		}
+	} else if (FTS_SYSFS_ECHO_OFF(buf)) {
+		if (ts_data->edge_mode) {
+			FTS_DEBUG("exit edge mode");
+			ret = fts_ex_mode_switch(MODE_EDGE, DISABLE);
+			if (ret >= 0) {
+				ts_data->edge_mode = DISABLE;
+			}
+		}
+			ret = fts_ex_mode_charger();
 	}
-
-	FTS_DEBUG("report rate:%d", ts_data->report_rate);
+	FTS_DEBUG("edge mode:%d", ts_data->edge_mode);
 	return count;
 }
 
-
 /* read and write charger mode
- * read example: cat fts_glove_mode        ---read  glove mode
+ * read example: cat fts_glove_mode		---read  glove mode
  * write example:echo 1 > fts_glove_mode   ---write glove mode to 01
  */
 static DEVICE_ATTR(fts_glove_mode, S_IRUGO | S_IWUSR,
-			fts_glove_mode_show, fts_glove_mode_store);
+				   fts_glove_mode_show, fts_glove_mode_store);
 
 static DEVICE_ATTR(fts_cover_mode, S_IRUGO | S_IWUSR,
-			fts_cover_mode_show, fts_cover_mode_store);
+				   fts_cover_mode_show, fts_cover_mode_store);
 
 static DEVICE_ATTR(fts_charger_mode, S_IRUGO | S_IWUSR,
-			fts_charger_mode_show, fts_charger_mode_store);
+				   fts_charger_mode_show, fts_charger_mode_store);
 
-static DEVICE_ATTR_RW(fts_report_rate);
-
+static DEVICE_ATTR(fts_edge_mode, S_IRUGO | S_IWUSR,
+				   fts_edge_mode_show, fts_edge_mode_store);
 static struct attribute *fts_touch_mode_attrs[] = {
 	&dev_attr_fts_glove_mode.attr,
 	&dev_attr_fts_cover_mode.attr,
 	&dev_attr_fts_charger_mode.attr,
-	&dev_attr_fts_report_rate.attr,
+	&dev_attr_fts_edge_mode.attr,
 	NULL,
 };
 
@@ -321,32 +365,31 @@ int fts_ex_mode_recovery(struct fts_ts_data *ts_data)
 		fts_ex_mode_switch(MODE_COVER, ENABLE);
 	}
 
-	if (ts_data->charger_mode) {
+	if (is_tp_on()) {
 		fts_ex_mode_switch(MODE_CHARGER, ENABLE);
 	}
 
-	if (ts_data->report_rate > 0)
-		fts_ex_mode_switch(REPORT_RATE, ts_data->report_rate);
-
+	if (ts_data->edge_mode) {
+		fts_ex_mode_switch(MODE_EDGE, ts_data->edge_mode);
+	}
 	return 0;
 }
 
 int fts_ex_mode_init(struct fts_ts_data *ts_data)
 {
 	int ret = 0;
-
+	ts_data->charger_mode = is_tp_on();
 	ts_data->glove_mode = DISABLE;
 	ts_data->cover_mode = DISABLE;
 	ts_data->charger_mode = DISABLE;
-	ts_data->report_rate = 0;
-
+	ts_data->edge_mode = DISABLE;
 	ret = sysfs_create_group(&ts_data->dev->kobj, &fts_touch_mode_group);
 	if (ret < 0) {
 		FTS_ERROR("create sysfs(ex_mode) fail");
 		sysfs_remove_group(&ts_data->dev->kobj, &fts_touch_mode_group);
 		return ret;
 	} else {
-		FTS_DEBUG("create sysfs(ex_mode) succeedfully");
+		FTS_DEBUG("create sysfs(ex_mode) successfully");
 	}
 
 	return 0;

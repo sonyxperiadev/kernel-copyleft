@@ -8,6 +8,7 @@
   filp_close
   filp_open
   find_vpid
+  i2c_bus_type
   input_mt_destroy_slots
   led_trigger_blink_oneshot
   nr_irqs
@@ -158,6 +159,15 @@
 
 # required by ledtrig_transient.ko
   led_set_brightness_nosleep
+
+# rquired by aw882xx_dlkm.ko
+  class_remove_file_ns
+  class_create_file_ns
+  devm_gpio_free
+
+# rquired by camera.ko
+  i2c_unregister_device
+  devm_pwm_get
 
 # required by sec_touchscreen.ko
   input_set_timestamp

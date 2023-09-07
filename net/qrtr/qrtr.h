@@ -12,6 +12,10 @@ struct sk_buff;
 
 #define QRTR_DEL_PROC_MAGIC	0xe111
 
+/*PDX225T code for JIMODM18-39912 start*/
+#define MAX_NON_WAKE_SVC_LEN    5
+/*PDX225T code for JIMODM18-39912 end*/
+
 /**
  * struct qrtr_endpoint - endpoint handle
  * @xmit: Callback for outgoing packets
@@ -26,8 +30,13 @@ struct qrtr_endpoint {
 	struct qrtr_node *node;
 };
 
-int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
-			   bool rt);
+// int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
+// 			   bool rt);
+
+/*PDX225T code for JIMODM18-39912  start*/
+ int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
+			    bool rt, u32 *svc_arr);
+/*PDX225T code for JIMODM18-39912 end*/
 
 void qrtr_endpoint_unregister(struct qrtr_endpoint *ep);
 

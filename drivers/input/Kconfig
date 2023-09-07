@@ -195,6 +195,10 @@ source "drivers/input/joystick/Kconfig"
 
 source "drivers/input/tablet/Kconfig"
 
+source "drivers/input/fingerprint/egis/Kconfig"
+
+source "drivers/input/fingerprint/et6xx/Kconfig"
+
 source "drivers/input/touchscreen/Kconfig"
 
 source "drivers/input/misc/Kconfig"

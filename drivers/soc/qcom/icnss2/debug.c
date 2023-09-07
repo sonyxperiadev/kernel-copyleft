@@ -7,6 +7,7 @@
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <linux/poll.h>
 #include "main.h"
 #include "debug.h"
 #include "qmi.h"
@@ -242,6 +243,84 @@ static const struct file_operations icnss_regread_fops = {
 	.owner          = THIS_MODULE,
 	.llseek         = seq_lseek,
 };
+
+static unsigned int wlan_pdr_crash_reason_poll(struct file *filp,
+		struct poll_table_struct *wait)
+{
+	unsigned int mask = 0;
+	struct icnss_priv *priv = filp->private_data;
+
+	poll_wait(filp, &priv->wlan_pdr_debug_q, wait);
+
+	if (priv->data_ready)
+		mask |= (POLLIN | POLLRDNORM);
+
+	return mask;
+}
+
+static ssize_t wlan_pdr_crash_reason_read(struct file *filp, char __user *ubuf,
+		size_t cnt, loff_t *ppos)
+{
+	int r;
+	char buf[SUBSYS_CRASH_REASON_LEN];
+	ssize_t size = 0;
+	struct icnss_priv *priv = filp->private_data;
+
+	memset(buf, 0, sizeof(buf));
+	r = snprintf(buf, sizeof(buf), "%s", priv->crash_reason);
+	size = simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+	if (*ppos == r) {
+		memset(priv->crash_reason, 0, sizeof(priv->crash_reason));
+		priv->data_ready = 0;
+	}
+
+	return size;
+}
+
+static const struct file_operations wlan_pdr_crash_reason_fops = {
+	.open 	= simple_open,
+	.read   = wlan_pdr_crash_reason_read,
+	.poll   = wlan_pdr_crash_reason_poll,
+	.llseek = default_llseek,
+};
+
+static const struct file_operations wlan_pdr_fops = {
+       .owner   = THIS_MODULE,
+       .open    = wlan_pdr_open,
+       .read    = wlan_pdr_crash_reason_read,
+       .poll    = wlan_pdr_crash_reason_poll,
+       .llseek  = default_llseek,
+};
+
+#define WLAN_PDR_NAME "wlan_pdr"
+static struct class *wlan_pdr_class;
+static int wlan_pdr_major;
+
+int chr_dev_init(void)
+{
+       wlan_pdr_major = register_chrdev(0, WLAN_PDR_NAME, &wlan_pdr_fops);
+       if (wlan_pdr_major < 0) {
+               icnss_pr_err("unable to get major for %s devs = %d\n",
+                            WLAN_PDR_NAME, wlan_pdr_major);
+               return wlan_pdr_major;
+       }
+       icnss_pr_info("%s devs got major %d\n", WLAN_PDR_NAME, wlan_pdr_major);
+
+       wlan_pdr_class = class_create(THIS_MODULE, WLAN_PDR_NAME);
+       if (IS_ERR(wlan_pdr_class))
+               return PTR_ERR(wlan_pdr_class);
+
+       device_create(wlan_pdr_class, NULL, MKDEV(wlan_pdr_major, 0),
+                     NULL, "%s_crash_reason", WLAN_PDR_NAME);
+       return 0;
+}
+
+void chr_dev_term(void)
+{
+       device_destroy(wlan_pdr_class, MKDEV(wlan_pdr_major, 0));
+       class_destroy(wlan_pdr_class);
+       unregister_chrdev(wlan_pdr_major, WLAN_PDR_NAME);
+}
 
 static ssize_t icnss_stats_write(struct file *fp, const char __user *buf,
 				size_t count, loff_t *off)
@@ -791,6 +870,23 @@ static const struct file_operations icnss_control_params_debug_fops = {
 	.llseek		= seq_lseek,
 };
 
+static void wlan_pdr_debugfs_create(struct dentry *root_dentry,
+		struct icnss_priv *priv)
+{
+	struct dentry *crash_reason_dentry;
+
+	crash_reason_dentry = debugfs_create_dir("crash_reason",
+			root_dentry);
+	if (IS_ERR(crash_reason_dentry))
+		icnss_pr_err("Unable to create debugfs %ld\n",
+				PTR_ERR(crash_reason_dentry));
+	else
+		debugfs_create_file("wlan_pdr_crash_reason", S_IRUGO | S_IWUSR,
+				crash_reason_dentry, priv,
+				&wlan_pdr_crash_reason_fops);
+
+}
+
 #ifdef CONFIG_ICNSS2_DEBUG
 int icnss_debugfs_create(struct icnss_priv *priv)
 {
@@ -817,6 +913,7 @@ int icnss_debugfs_create(struct icnss_priv *priv)
 						&icnss_regwrite_fops);
 		debugfs_create_file("control_params", 0600, root_dentry, priv,
 					&icnss_control_params_debug_fops);
+		wlan_pdr_debugfs_create(root_dentry, priv);
 out:
 		return ret;
 }
@@ -838,6 +935,8 @@ int icnss_debugfs_create(struct icnss_priv *priv)
 
 	debugfs_create_file("stats", 0600, root_dentry, priv,
 							     &icnss_stats_fops);
+	wlan_pdr_debugfs_create(root_dentry, priv);
+
 	return 0;
 }
 #endif

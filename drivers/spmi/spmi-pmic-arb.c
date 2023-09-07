@@ -601,12 +601,67 @@ static void qpnpint_irq_ack(struct irq_data *d)
 	struct spmi_pmic_arb *pmic_arb = irq_data_get_irq_chip_data(d);
 	u8 irq = hwirq_to_irq(d->hwirq);
 	u16 apid = hwirq_to_apid(d->hwirq);
-	u8 data;
+	u8 data, data_r;
+	u8 powerkey_irq = 0x80;
+	u32 loop_count = 0;
+	u32 loop_max = 10;
 
 	writel_relaxed(BIT(irq), pmic_arb->ver_ops->irq_clear(pmic_arb, apid));
 
 	data = BIT(irq);
 	qpnpint_spmi_write(d, QPNPINT_REG_LATCHED_CLR, &data, 1);
+
+	/*
+	 * Now check if the interrupt status of the power key has
+	 * been cleared properly. If not we continue to clear the
+	 * status and re-read it again in the loop. Finally if the
+	 * status is not changed over some time a system is halted.
+	 */
+	if (data == powerkey_irq) {
+		/*
+		 * Reading over SPMI bus can fail, therefore "data_r" can
+		 * contain rubbish. Set it to powerkey_irq to prevent miss
+		 * judgement.
+		 */
+		data_r = powerkey_irq;
+		qpnpint_spmi_read(d, QPNPINT_REG_LATCHED_STS , &data_r, 1);
+
+		dev_dbg(&pmic_arb->spmic->dev,
+			"Check IRQ status of PowerKEY, data=%x, data_r=%x\n",
+				data, data_r);
+
+		/*
+		 * The loop handles a fail state trying to recover.
+		 */
+		while (data_r == powerkey_irq) {
+			if (loop_count++ > loop_max)
+				panic("Loop count reach to loop_max %u\n", loop_max);
+
+			/*
+			 * Try to clear the power-key-irq status again.
+			 */
+			qpnpint_spmi_write(d, QPNPINT_REG_LATCHED_CLR, &data, 1);
+
+			/*
+			 * Give some time for a register to be settled. We
+			 * do not know if it is required and it is more for
+			 * just in case.
+			 */
+			udelay(50);
+
+			/*
+			 * Check it. The loop is interrupted when the status
+			 * is cleared or the loop_max threshold is reached.
+			 * The last case will lead to panic.
+			 */
+			data_r = powerkey_irq;
+			qpnpint_spmi_read(d, QPNPINT_REG_LATCHED_STS , &data_r, 1);
+
+			dev_err(&pmic_arb->spmic->dev,
+				"Cleared IRQ status of PowerKEY, data=%x, data_r=%x, loop count=%u\n",
+					data, data_r, loop_count);
+		}
+	}
 }
 
 static void qpnpint_irq_mask(struct irq_data *d)

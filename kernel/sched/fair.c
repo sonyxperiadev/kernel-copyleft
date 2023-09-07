@@ -8443,6 +8443,14 @@ redo:
 		if (env->idle != CPU_NOT_IDLE && env->src_rq->nr_running <= 1)
 			break;
 
+		/*
+		 * Another CPU can place tasks, since we do not hold dst_rq lock
+		 * while doing balancing. If newly idle CPU already got something,
+		 * give up to reduce a latency.
+		 */
+		if (env->idle == CPU_NEWLY_IDLE && env->dst_rq->nr_running > 0)
+			break;
+
 		p = list_last_entry(tasks, struct task_struct, se.group_node);
 
 		env->loop++;
@@ -8473,6 +8481,8 @@ redo:
 		if (sched_feat(LB_MIN) && load < 16 && !env->sd->nr_balance_failed)
 			goto next;
 
+
+		if (env->idle != CPU_NEWLY_IDLE) {
 		/*
 		 * p is not running task when we goes until here, so if p is one
 		 * of the 2 task in src cpu rq and not the running one,
@@ -8489,6 +8499,7 @@ redo:
 			(env->flags & LBF_IGNORE_BIG_TASKS)) &&
 			((load / 2) > env->imbalance))
 			goto next;
+		}
 
 		detach_task(p, env);
 		list_add(&p->se.group_node, &env->tasks);

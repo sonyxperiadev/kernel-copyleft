@@ -1,0 +1,6 @@
+config FP_ET613
+	tristate "et613 fingerprint driver support"
+	help
+	  Say Y here to enable et613 fingerprint driver support!
+
+

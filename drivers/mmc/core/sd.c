@@ -326,7 +326,7 @@ static int mmc_read_switch(struct mmc_card *card)
 	 * The argument does not matter, as the support bits do not
 	 * change with the arguments.
 	 */
-	err = mmc_sd_switch(card, 0, 0, 0, status);
+	err = mmc_sd_switch(card, 0, 0, 1, status);
 	if (err) {
 		/*
 		 * If the host or the card can't do the switch,

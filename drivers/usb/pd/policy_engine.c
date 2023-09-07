@@ -376,7 +376,9 @@ static void *usbpd_ipc_log;
 
 #define PD_MIN_SINK_CURRENT	900
 
-static const u32 default_src_caps[] = { 0x36019096 };	/* VSafe5V @ 1.5A */
+/*PDX235 modify PD soerce currrent to 900mA start*/
+static const u32 default_src_caps[] = { 0x3601905A };	/* VSafe5V @ 0.9A */
+/*PDX235 modify PD soerce currrent to 900mA end*/
 static const u32 default_snk_caps[] = { 0x2601912C };	/* VSafe5V @ 3A */
 
 struct vdm_tx {
@@ -1300,6 +1302,11 @@ static bool in_src_ams(struct usbpd *pd)
 	if (pd->spec_rev != USBPD_REV_30)
 		return true;
 
+/*PDX235 modify PD soerce currrent to 900mA start*/
+	if (!pd->in_explicit_contract)
+		return true;
+/*PDX235 modify PD soerce currrent to 900mA end*/
+
 	usbpd_get_psy_iio_property(pd,
 			POWER_SUPPLY_PROP_TYPEC_SRC_RP, &val);
 
@@ -2185,7 +2192,18 @@ static void enter_state_src_startup(struct usbpd *pd)
 				&pd->partner_desc);
 	}
 
+/*PDX235 modify PD soerce currrent to 900mA start*/
+#if 0
 	val.intval = 1; /* Rp-1.5A; SinkTxNG for PD 3.0 */
+#else
+	if (pd->in_explicit_contract) {
+		val.intval = 1; /* Rp-1.5A; SinkTxNG for PD 3.0 */
+	} else {
+		val.intval = 0; /* Rp-Default; */
+	}
+#endif
+/*PDX235 modify PD soerce currrent to 900mA end*/
+
 	usbpd_set_psy_iio_property(pd,
 			POWER_SUPPLY_PROP_TYPEC_SRC_RP, &val);
 

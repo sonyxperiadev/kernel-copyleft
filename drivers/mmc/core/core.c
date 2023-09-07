@@ -2100,7 +2100,10 @@ int mmc_set_uhs_voltage(struct mmc_host *host, u32 ocr)
 	}
 
 	/* Wait for at least 1 ms according to spec */
-	mmc_delay(1);
+	if (host->caps & MMC_CAP_NONREMOVABLE)
+		mmc_delay(1);
+	else
+		mmc_delay(40);
 
 	/*
 	 * Failure to switch is indicated by the card holding

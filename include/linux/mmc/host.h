@@ -20,6 +20,8 @@
 #include <linux/dma-direction.h>
 #include <linux/ipc_logging.h>
 
+/* Default idle timeout for SD cards: 30 seconds. */
+#define MMC_SDCARD_AUTOSUSPEND_DELAY_MS 30000
 struct mmc_ios {
 	unsigned int	clock;			/* clock rate */
 	unsigned short	vdd;

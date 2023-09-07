@@ -1767,6 +1767,7 @@ static int geni_se_probe(struct platform_device *pdev)
 
 	dev_set_drvdata(dev, geni_se_dev);
 
+#ifndef CONFIG_QGKI
 	/*
 	 * TBD: Proxy vote on QUP core path on behalf of earlycon.
 	 * Once the ICC sync state feature is implemented, we can make
@@ -1790,6 +1791,7 @@ static int geni_se_probe(struct platform_device *pdev)
 				ret);
 		return ret;
 	}
+#endif
 #endif
 
 	ret = of_platform_populate(dev->of_node, geni_se_dt_match, NULL, dev);

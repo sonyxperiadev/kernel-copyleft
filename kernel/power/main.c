@@ -16,10 +16,43 @@
 #include <linux/suspend.h>
 #include <linux/syscalls.h>
 #include <linux/pm_runtime.h>
+#include <linux/random.h>
 
 #include "power.h"
 
 #ifdef CONFIG_PM_SLEEP
+/*
+ * Enable/Disable suspend back off logic attribute
+ */
+static bool sbo_enabled = true;
+
+/*
+ * For how many percent an alive time is decayed
+ * if suspend back-off keeps ongoing.
+ */
+static u32 sbo_decay_value = 20;
+
+/*
+ * Initial max back-off alive time
+ */
+static u32 sbo_initial_alive_time_msecs = 10000;
+
+/*
+ * A time in milliseconds, before which a short
+ * sleep counter is increased to trigger a back-off.
+ */
+static u32 sbo_short_sleep_msecs = 1100;
+
+/*
+ * This variable regulates starting of suspend
+ * back off functionality, after counter is reached
+ * specified value.
+ */
+static u32 sbo_short_sleep_count = 10;
+
+static u32 decay_alive_time_ms;
+static u32 suspend_short_count;
+static struct wakeup_source *ws;
 
 void lock_system_sleep(void)
 {
@@ -599,10 +632,147 @@ static suspend_state_t decode_state(const char *buf, size_t n)
 	return PM_SUSPEND_ON;
 }
 
+static inline u32
+decay_val(u32 val, u32 percent)
+{
+	u32 ratio;
+
+	percent = clamp(percent, 0U, 100U);
+	ratio = 1024 - ((1024 * percent) / 100);
+
+	return (val * ratio) / 1024;
+}
+
+static ssize_t sbo_decay_value_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	if (val > 100)
+		return -EINVAL;
+
+	sbo_decay_value = val;
+	return n;
+}
+
+static ssize_t sbo_decay_value_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", sbo_decay_value);
+}
+
+power_attr(sbo_decay_value);
+
+static ssize_t sbo_short_sleep_msecs_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	sbo_short_sleep_msecs = val;
+	return n;
+}
+
+static ssize_t sbo_short_sleep_msecs_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", sbo_short_sleep_msecs);
+}
+
+power_attr(sbo_short_sleep_msecs);
+
+static ssize_t sbo_short_sleep_count_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	sbo_short_sleep_count = val;
+	return n;
+}
+
+static ssize_t sbo_short_sleep_count_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", sbo_short_sleep_count);
+}
+
+power_attr(sbo_short_sleep_count);
+
+static ssize_t sbo_initial_alive_time_msecs_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	sbo_initial_alive_time_msecs = val;
+	return n;
+}
+
+static ssize_t sbo_initial_alive_time_msecs_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", sbo_initial_alive_time_msecs);
+}
+
+power_attr(sbo_initial_alive_time_msecs);
+
+static ssize_t sbo_enabled_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	if (val > 1)
+		return -EINVAL;
+
+	sbo_enabled = !!val;
+	return n;
+}
+
+static ssize_t sbo_enabled_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", sbo_enabled);
+}
+
+power_attr(sbo_enabled);
+
+static void
+suspend_backoff(u32 timeout_msecs)
+{
+	if (!sbo_enabled)
+		return;
+
+	pr_info("suspend: too many immediate wakeups, back off (%u msecs)\n",
+			timeout_msecs);
+
+	__pm_wakeup_event(ws, timeout_msecs);
+}
+
 static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 			   const char *buf, size_t n)
 {
 	suspend_state_t state;
+	struct timespec ts_entry, ts_exit;
+	u64 elapsed_msecs64;
+	u32 elapsed_msecs32;
 	int error;
 
 	error = pm_autosleep_lock();
@@ -619,7 +789,46 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 		if (state == PM_SUSPEND_MEM)
 			state = mem_sleep_current;
 
+		/*
+		 * We want to prevent system from frequent periodic wake-ups
+		 * when sleeping time is less or equal certain interval.
+		 * It's done in order to save power in certain cases, one of
+		 * the examples is GPS tracking, but not only.
+		 */
+		getnstimeofday(&ts_entry);
 		error = pm_suspend(state);
+		getnstimeofday(&ts_exit);
+
+		elapsed_msecs64 = timespec_to_ns(&ts_exit) -
+			timespec_to_ns(&ts_entry);
+		do_div(elapsed_msecs64, NSEC_PER_MSEC);
+		elapsed_msecs32 = elapsed_msecs64;
+
+		if (elapsed_msecs32 <= sbo_short_sleep_msecs) {
+			if (suspend_short_count == sbo_short_sleep_count) {
+				if (decay_alive_time_ms >= MSEC_PER_SEC) {
+					suspend_backoff(decay_alive_time_ms);
+					decay_alive_time_ms =
+						decay_val(decay_alive_time_ms,
+							sbo_decay_value);
+					goto out;
+				}
+			} else {
+				suspend_short_count++;
+				goto out;
+			}
+		}
+
+		/* Start from scratch */
+		suspend_short_count = 0;
+
+		/*
+		 * Randomize a bit an initial alive time value to be
+		 * not synced with any wake up sources, for example
+		 * IRQs.
+		 */
+		decay_alive_time_ms = sbo_initial_alive_time_msecs -
+			get_random_int() % (sbo_initial_alive_time_msecs / 10);
 	} else if (state == PM_SUSPEND_MAX) {
 		error = hibernate();
 	} else {
@@ -859,6 +1068,11 @@ static struct attribute * g[] = {
 #ifdef CONFIG_SUSPEND
 	&mem_sleep_attr.attr,
 #endif
+	&sbo_enabled_attr.attr,
+	&sbo_decay_value_attr.attr,
+	&sbo_short_sleep_msecs_attr.attr,
+	&sbo_short_sleep_count_attr.attr,
+	&sbo_initial_alive_time_msecs_attr.attr,
 #ifdef CONFIG_PM_AUTOSLEEP
 	&autosleep_attr.attr,
 #endif
@@ -916,6 +1130,10 @@ static int __init pm_init(void)
 	if (error)
 		return error;
 	pm_print_times_init();
+
+#ifdef CONFIG_PM_SLEEP
+	ws = wakeup_source_register(NULL, "suspend_backoff");
+#endif
 	return pm_autosleep_init();
 }
 
