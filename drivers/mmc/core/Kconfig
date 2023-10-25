@@ -89,3 +89,12 @@ config MMC_CRYPTO
 	  Enabling this makes it possible for the kernel to use the crypto
 	  capabilities of the MMC device (if present) to perform crypto
 	  operations on data being transferred to/from the device.
+
+config MMC_LOG_PROBES
+	tristate "MMC log support"
+	depends on MMC_BLOCK
+	default n
+	help
+	  This driver collects mmc errors by leveraging block_rq_complete
+	  tracepoint and mmc_blk_mq_rw_recovery vendor hook. Also, mmc_log
+	  sysfs node will be created.
