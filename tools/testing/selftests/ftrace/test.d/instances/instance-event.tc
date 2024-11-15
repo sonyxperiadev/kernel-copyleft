@@ -39,7 +39,7 @@ instance_read() {
 
 instance_set() {
         while :; do
-                echo 1 > foo/events/sched/sched_switch/enable
+                echo 1 > foo/events/sched/sched_switch
         done 2> /dev/null
 }
 

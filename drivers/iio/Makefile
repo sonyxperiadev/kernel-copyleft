@@ -16,7 +16,6 @@ obj-$(CONFIG_IPD) += ipd.o
 
 obj-y += accel/
 obj-y += adc/
-obj-y += addac/
 obj-y += afe/
 obj-y += amplifiers/
 obj-y += buffer/

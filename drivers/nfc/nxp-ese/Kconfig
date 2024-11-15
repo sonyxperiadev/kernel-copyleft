@@ -1,0 +1,17 @@
+#
+# secure element driver configuration
+#
+
+config NXP_ESE_P73
+	tristate "Nxp P73 secure element protocol driver (SPI) devices"
+	depends on SPI && NXP_NFC_I2C
+	help
+	  This enables the Secure Element driver for SNxxx based devices.
+
+	  If unsure, say N.
+
+	  This selects Secure Element support.
+
+	  If you want NFC support, you should say Y here and
+	  also to your specific host controller driver.
+

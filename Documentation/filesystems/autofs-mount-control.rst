@@ -196,7 +196,7 @@ information and return operation results::
 		    struct args_ismountpoint	ismountpoint;
 	    };
 
-	    char path[];
+	    char path[0];
     };
 
 The ioctlfd field is a mount point file descriptor of an autofs mount

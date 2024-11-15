@@ -1064,7 +1064,6 @@
 			#clock-cells = <1>;
 			#reset-cells = <1>;
 			#power-domain-cells = <1>;
-			power-domains = <&rpmhpd SDM845_CX>;
 		};
 
 		qfprom@784000 {
@@ -2109,7 +2108,7 @@
 				<0 0>,
 				<0 0>,
 				<0 0>,
-				<75000000 300000000>;
+				<0 300000000>;
 
 			status = "disabled";
 		};

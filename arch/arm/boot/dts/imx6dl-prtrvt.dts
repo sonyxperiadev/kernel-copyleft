@@ -126,10 +126,6 @@
 	status = "disabled";
 };
 
-&usbotg {
-	disable-over-current;
-};
-
 &vpu {
 	status = "disabled";
 };

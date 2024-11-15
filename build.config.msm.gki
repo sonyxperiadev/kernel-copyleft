@@ -67,6 +67,9 @@ append_cmd POST_DEFCONFIG_CMDS 'sanity_check_abi'
 function build_defconfig_fragments() {
 	if [[ "${VARIANT}" =~ ^(gki|consolidate)$ ]]; then
 		apply_defconfig_fragment ${KERNEL_DIR}/arch/${ARCH}/configs/vendor/${MSM_ARCH}_GKI.config vendor/${MSM_ARCH}-gki_defconfig
+		if [ "${TARGET_BUILD_VARIANT}" = userdebug ]; then
+			apply_defconfig_fragment ${KERNEL_DIR}/arch/${ARCH}/configs/qcom_rtb.fragment vendor/${MSM_ARCH}-gki_defconfig
+		fi
 		if [ "${VARIANT}" = gki ]; then
 			return
 		fi

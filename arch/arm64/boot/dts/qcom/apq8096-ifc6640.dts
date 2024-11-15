@@ -26,7 +26,7 @@
 
 	v1p05: v1p05-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "v1p05";
+		reglator-name = "v1p05";
 		regulator-always-on;
 		regulator-boot-on;
 
@@ -38,7 +38,7 @@
 
 	v12_poe: v12-poe-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "v12_poe";
+		reglator-name = "v12_poe";
 		regulator-always-on;
 		regulator-boot-on;
 

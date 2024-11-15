@@ -1327,6 +1327,7 @@ struct dwc3 {
 struct dwc3_vendor {
 	struct dwc3	dwc;
 	unsigned	softconnect:1;
+	unsigned	suspended:1;
 };
 
 #define INCRX_BURST_MODE 0

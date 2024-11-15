@@ -3,10 +3,11 @@
 #
 
 config TOUCHSCREEN_FTS
-	tristate "Focaltech Touchscreen"
-	help
-	  Say Y here if you have Focaltech touch panel.
-	  If unsure, say N.
+    tristate "Focaltech Touchscreen"
+    default m
+    help
+      Say Y here if you have Focaltech touch panel.
+      If unsure, say N.
 
 config TOUCHSCREEN_FTS_DIRECTORY
 	string "Focaltech ts directory name"
@@ -14,9 +15,10 @@ config TOUCHSCREEN_FTS_DIRECTORY
 	depends on TOUCHSCREEN_FTS
 
 config FTS_TRUSTED_TOUCH
-	bool "Focaltech Trusted Touch"
-	depends on TOUCHSCREEN_FTS
-	help
-	  Say Y here to enable Focaltech Trusted Touch.
-	  If unsure, say N.
-
+    bool "Focaltech Trusted Touch"
+    depends on TOUCHSCREEN_FTS
+    help
+    Say Y here to enable Focaltech Trusted Touch.
+    If unsure, say N.
+          
+          

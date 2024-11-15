@@ -286,8 +286,6 @@ different_speeds_autoneg_on()
 	ethtool -s $h1 autoneg on
 }
 
-skip_on_veth
-
 trap cleanup EXIT
 
 setup_prepare

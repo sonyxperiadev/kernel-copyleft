@@ -72,7 +72,6 @@
 };
 
 &cpu_thermal {
-	thermal-sensors = <&bandgap>;
 	coefficients = <0 20000>;
 };
 

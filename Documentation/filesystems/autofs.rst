@@ -467,7 +467,7 @@ Each ioctl is passed a pointer to an `autofs_dev_ioctl` structure::
 			struct args_ismountpoint	ismountpoint;
 		};
 
-                char path[];
+                char path[0];
         };
 
 For the **OPEN_MOUNT** and **IS_MOUNTPOINT** commands, the target
