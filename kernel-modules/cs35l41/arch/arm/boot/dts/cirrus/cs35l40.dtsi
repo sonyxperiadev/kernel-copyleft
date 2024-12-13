@@ -1,0 +1,33 @@
+&spi1 {
+	cs35l40: cs35l40@2 {
+		#sound-dai-cells = <1>;
+		compatible = "cirrus,cs35l40";
+		spi-max-frequency = <25000000>;
+		reg = <2>;
+		interrupt-parent = <&gpio0>;
+		interrupts = <55 8>;
+		VA-supply = <&dummy_vreg>;
+		VP-supply = <&dummy_vreg>;
+
+		cirrus,sclk-force-output;
+		cirrus,lrclk-force-output;
+	};
+};
+
+
+/ {
+	sound {
+		compatible = "cirrus-zynq-cs35l36";
+		cirrus-zynq-cs35l36,name = "CirrusLogic-zynq-cs35l36";
+		cirrus-zynq-cs35l36,need-sclk;
+		cirrus-zynq-cs35l36,dai-link@0 {
+			format = "i2s";
+			cpu {
+				sound-dai = <&cirrus_axi_i2s0 0>;
+			};
+			codec {
+				sound-dai = <&cs35l40 0>;
+			};
+		};
+	};
+};

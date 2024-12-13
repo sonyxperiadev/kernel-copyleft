@@ -1,0 +1,453 @@
+CS40L20/CS40L25/CS40L25A/CS40L25B Boosted Haptics Driver
+
+Required properties:
+
+  - compatible : One of "cirrus,cs40l20", "cirrus,cs40l25", "cirrus,cs40l25a"
+    or "cirrus,cs40l25b".
+
+  - reg : The I2C slave address of the device.
+
+  - VA-supply, VP-supply : Regulators for the device's VA and VP supplies,
+    respectively. See the following:
+    Documentation/devicetree/bindings/regulator/regulator.txt
+
+  - cirrus,boost-ind-nanohenry : Boost inductor value, expressed in nH. Valid
+    values include 1000, 1200, 1500 and 2200.
+
+  - cirrus,boost-cap-microfarad : Total equivalent boost capacitance on the VBST
+    and VAMP pins, derated at 11 volts DC (or the voltage specified by the
+    boost-ctl-millivolt property, if present). The value must be rounded to the
+    nearest integer and expressed in uF.
+
+  - cirrus,boost-ipk-milliamp : Boost inductor peak current, expressed in mA.
+    Valid values range from 1600 to 4500 (inclusive) in steps of 50.
+
+Optional properties:
+
+  - reset-gpios : GPIO used for resetting the device.
+
+  - interrupt-parent : Single phandle representing the interrupt controller to
+    which the /ALERT pin is connected (silicon revision B1 only). Auxiliary
+    Serial Port (ASP) support (CS40L25A only) requires the /ALERT pin to be
+    used.
+
+  - interrupts : interrupt specifiers for the device (silicon revision B1 only).
+    See the following:
+    Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+
+  - cirrus,refclk-gpio2 : Boolean for configuring the device to expect its
+    32.768-kHz reference clock on the REFCLK/GPIO2 pin. If this property is
+    omitted, the device expects its 32.768-kHz reference clock on the
+    ASP_BCLK/REFCLK pin. This property is ignored for silicon revision B1 as
+    reference clock selection is configured automatically in that case.
+
+  - cirrus,f0-default : Default LRA resonant frequency (f0), expressed as
+    follows: cirrus,f0-default = f0 (Hz) * 2^14. This value represents the
+    frequency used during playback of PWLE segments specified with frequency
+    equal to f0; it also serves as the unit-specific f0 input to the click
+    compensation algorithm. It can be overwritten at a later time by writing
+    to the f0_stored sysfs control.
+
+    If this value is omitted or specified as zero in the presence of silicon
+    revisions A0 or B0, the measurement recorded in the f0_measured sysfs
+    control is used. In that case, if LRA diagnostics has not been administered
+    and f0_measured is uninitialized, 2621440 (160 Hz) is used.
+
+    If this value is omitted or specified as zero in the presence of silicon
+    revision B1, 2621440 (160 Hz) is used irrespective of the measurement
+    recorded in the f0_measured sysfs control.
+
+  - cirrus,f0-min : Minimum LRA resonant frequency (f0) that may be written to
+    the f0_stored sysfs control, expressed using the same numerical format as
+    cirrus,f0-default. If this value is omitted or specified as zero, no lower-
+    bound validation is performed.
+
+  - cirrus,f0-max : Maximum LRA resonant frequency (f0) that may be written to
+    the f0_stored sysfs control, expressed using the same numerical format as
+    cirrus,f0-default. If this value is omitted or specified as zero, no upper-
+    bound validation is performed.
+
+  - cirrus,redc-default : Default LRA series resistance (ReDC), expressed as
+    follows: cirrus,redc-default = ReDC (ohms) / 5.857 * 2^17. This value
+    represents the unit-specific ReDC input to the click compensation algorithm.
+    It can be overwritten at a later time by writing to the redc_stored sysfs
+    control.
+
+    If this value is omitted or specified as zero in the presence of silicon
+    revisions A0 or B0, the measurement recorded in the redc_measured sysfs
+    control is used. In that case, if LRA diagnostics has not been administered
+    and redc_measured is uninitialized, 340787 (15.2 ohms) is used.
+
+    If this value is omitted or specified as zero in the presence of silicon
+    revision B1, 340787 (15.2 ohms) is used irrespective of the measurement
+    recorded in the redc_measured sysfs control.
+
+  - cirrus,redc-min : Minimum LRA series resistance (ReDC) that may be written
+    to the redc_stored sysfs control, expressed using the same numerical format
+    as cirrus,redc-default. If this value is omitted or specified as zero, no
+    lower-bound validation is performed.
+
+  - cirrus,redc-max : Maximum LRA series resistance (ReDC) that may be written
+    to the redc_stored sysfs control, expressed using the same numerical format
+    as cirrus,redc-default. If this value is omitted or specified as zero, no
+    upper-bound validation is performed.
+
+  - cirrus,q-default : Default LRA Q factor (silicon revision B1 only),
+    expressed as follows: cirrus,q-default = Q * 2^16. This value represents
+    the unit-specific Q factor used to select the correct sub-waveform for
+    Q-dependent wavetable indexes. It can be overwritten at a later time by
+    writing to the q_stored sysfs control. If this value is omitted or specified
+    as zero, a default value of 27 is used.
+
+  - cirrus,q-min : Minimum LRA Q factor that may be written to the q_stored
+    sysfs control (silicon revision B1 only), expressed using the same numerical
+    format as cirrus,q-default. If this value is omitted or specified as zero,
+    no lower-bound validation is performed.
+
+  - cirrus,q-max : Maximum LRA Q factor that may be written to the q_stored
+    sysfs control (silicon revision B1 only), expressed using the same numerical
+    format as cirrus,q-default. If this value is omitted or specified as zero,
+    no upper-bound validation is performed.
+
+  - cirrus,redc-comp-disable : Boolean for disabling ReDC-based click
+    compensation (silicon revision B1 only). If this property is omitted, ReDC-
+    based click compensation remains enabled in the absence of the comp-disable
+    property. ReDC-based click compensation can be enabled or disabled at a
+    later time by writing 1 or 0 to the redc_comp_enable sysfs control,
+    respectively. This property does not affect f0-based click compensation and
+    its effect is overridden in the presence of the comp-disable property.
+
+  - cirrus,comp-disable : Boolean for disabling both f0-based and ReDC-based
+    click compensation. If this property is omitted, f0-based click compensation
+    remains enabled and ReDC-based click compensation is enabled or disabled as
+    a function of the redc-comp-disable property. Both f0-based and ReDC-based
+    click compensation can be enabled or disabled at a later time by writing 1
+    or 0 to the comp_enable sysfs control, respectively.
+
+  - cirrus,dyn-f0-disable : Boolean for disabling dynamic F0 support
+    (silicon revision B1 only). If this property is omitted, dynamic F0
+    remains enabled in the absence of the dyn-f0-disable property.  If
+    cs40l25a_f0.bin does not exist, then disabling dynamic F0 support is
+    recommended.
+
+  - cirrus,open-wt-disable : Boolean for disabling open wavetable support
+    (silicon revision B1 only). If this property is omitted, open wavetable
+    remains enabled in the absence of the open-wt-disable property. The open
+    wavetable feature can only be disabled with this property due to the
+    required adjustment of the wavetable during initialization.
+
+  - cirrus,gpio1-rise-index : Specifies the wavetable index mapped to GPIO1
+    rising edges. If this value is omitted, specified as zero or exceeds the
+    maximum available index in the wavetable, GPIO1 rising edges are mapped to
+    index 1 (active-high polarity) or index 2 (active-low polarity) based on
+    cirrus,gpio-indv-pol. This value is ignored if cirrus,gpio-indv-enable does
+    not specify that GPIO1 is enabled.
+
+  - cirrus,gpio1-fall-index : Specifies the wavetable index mapped to GPIO1
+    falling edges. If this value is omitted, specified as zero or exceeds the
+    maximum available index in the wavetable, GPIO1 falling edges are mapped to
+    index 2 (active-high polarity) or index 1 (active-low polarity) based on
+    cirrus,gpio-indv-pol. This value is ignored if cirrus,gpio-indv-enable does
+    not specify that GPIO1 is enabled.
+
+  - cirrus,gpio1-fall-timeout : Specifies the number of 48-kHz periods for
+    which the device remains in the active state in search of a GPIO1 falling
+    edge, following a GPIO1 rising edge (the latter of which renders the device
+    active). If a GPIO1 falling edge does not arrive within this timeout, the
+    device automatically returns to the standby state and the subsequent GPIO1
+    falling edge is ignored. If this value is omitted or exceeds the maximum
+    timeout (8388607) then a default of 240000 is assumed (corresponding to
+    240000 / 48000 = 5 seconds). If this value is specified as zero, the timeout
+    is effectively disabled.
+
+    The timeout specified for GPIO1 applies to any additional GPIO2, GPIO3 or
+    GPIO4 pins enabled by cirrus,gpio-indv-enable.
+
+    If cirrus,gpio-indv-pol specifies a pin as active low, the timeout instead
+    follows a falling edge and specifies the time the device remains active in
+    search of a subsequent rising edge. Rising edges that arrive following the
+    timeout are ignored.
+
+  - cirrus,gpio2-rise-index : Specifies the wavetable index mapped to GPIO2
+    rising edges. If this value is omitted, specified as zero or exceeds the
+    maximum available index in the wavetable, GPIO2 rising edges are mapped to
+    index 1 (active-high polarity) or index 2 (active-low polarity) based on
+    cirrus,gpio-indv-pol. This value is ignored if cirrus,gpio-indv-enable does
+    not specify that GPIO2 is enabled.
+
+  - cirrus,gpio2-fall-index : Specifies the wavetable index mapped to GPIO2
+    falling edges. If this value is omitted, specified as zero or exceeds the
+    maximum available index in the wavetable, GPIO2 falling edges are mapped to
+    index 2 (active-high polarity) or index 1 (active-low polarity) based on
+    cirrus,gpio-indv-pol. This value is ignored if cirrus,gpio-indv-enable does
+    not specify that GPIO2 is enabled.
+
+  - cirrus,gpio3-rise-index : Specifies the wavetable index mapped to GPIO3
+    rising edges. If this value is omitted, specified as zero or exceeds the
+    maximum available index in the wavetable, GPIO3 rising edges are mapped to
+    index 1 (active-high polarity) or index 2 (active-low polarity) based on
+    cirrus,gpio-indv-pol. This value is ignored if cirrus,gpio-indv-enable does
+    not specify that GPIO3 is enabled.
+
+  - cirrus,gpio3-fall-index : Specifies the wavetable index mapped to GPIO3
+    falling edges. If this value is omitted, specified as zero or exceeds the
+    maximum available index in the wavetable, GPIO3 falling edges are mapped to
+    index 2 (active-high polarity) or index 1 (active-low polarity) based on
+    cirrus,gpio-indv-pol. This value is ignored if cirrus,gpio-indv-enable does
+    not specify that GPIO3 is enabled.
+
+  - cirrus,gpio4-rise-index : Specifies the wavetable index mapped to GPIO4
+    rising edges. If this value is omitted, specified as zero or exceeds the
+    maximum available index in the wavetable, GPIO4 rising edges are mapped to
+    index 1 (active-high polarity) or index 2 (active-low polarity) based on
+    cirrus,gpio-indv-pol. This value is ignored if cirrus,gpio-indv-enable does
+    not specify that GPIO4 is enabled.
+
+  - cirrus,gpio4-fall-index : Specifies the wavetable index mapped to GPIO4
+    falling edges. If this value is omitted, specified as zero or exceeds the
+    maximum available index in the wavetable, GPIO4 falling edges are mapped to
+    index 2 (active-high polarity) or index 1 (active-low polarity) based on
+    cirrus,gpio-indv-pol. This value is ignored if cirrus,gpio-indv-enable does
+    not specify that GPIO4 is enabled.
+
+  - cirrus,gpio-indv-enable : Bit mask for enabling any of the GPIO1, GPIO2,
+    GPIO3 or GPIO4 pins individually. Individual pins are enabled by writing
+    the bitwise OR of any of the following:
+
+    0x1 = GPIO1
+    0x2 = GPIO2 (CS40L25B only)
+    0x4 = GPIO3
+    0x8 = GPIO4
+
+    Enabling a pin arms the device to render playback in response to rising or
+    falling edges along that pin. If cirrus,gpio-indv-pol specifies the pin as
+    active high, rising edges along that pin prompt the device to exit standby
+    as well as hibernation (with the exception of GPIO3). The edge sensitivity
+    is inverted if cirrus,gpio-indv-pol specifies the pin as active low.
+
+    If this value is omitted, a value of 0x1 (GPIO1 only) or 0xF (GPIO1, GPIO2,
+    GPIO3 and GPIO4) is assumed for CS40L25A or CS40L25B, respectively.
+
+    All pins enabled by cirrus,gpio-indv-enable are collectively enabled or
+    disabled as a function of the mode specified by cirrus,gpio1-mode.
+
+  - cirrus,gpio1-mode : Specifies the operating mode of the GPIO1 pin, equal to
+    one of the following.
+
+    0 = enabled by default
+    1 = disabled by default
+    2 = disabled by default, but automatically enabled and disabled upon suspend
+        and resume, respectively
+
+    If this value is omitted or given an invalid value, mode 0 (enabled by
+    default) is assumed. Regardless of mode, the GPIO1 pin can be enabled or
+    disabled at will from user space using the gpio1_enable sysfs control.
+
+    The behavior specified for GPIO1 applies to any additional GPIO2, GPIO3 or
+    GPIO4 pins enabled by cirrus,gpio-indv-enable.
+
+  - cirrus,gpio-indv-pol : Bit mask for specifying active-low polarity for any
+    of the GPIO1, GPIO2, GPIO3 or GPIO4 pins individually. Individual pins are
+    made active low by writing the bitwise OR of any of the following:
+
+    0x1 = GPIO1
+    0x2 = GPIO2
+    0x4 = GPIO3 (standby only)
+    0x8 = GPIO4
+
+    If this value is omitted, a value of 0x0 (all active high) is assumed.
+
+  - cirrus,hiber-enable : Boolean for instructing the device to enter and exit
+    hibernation mode upon suspend and resume, respectively. Hibernation mode is
+    supported by silicon revision B1 only. If this property is omitted, the
+    device remains in standby and automatic entry into hibernation mode is
+    effectively disabled.
+
+  - cirrus,asp-bclk-freq-hz : Specifies the frequency (in Hz) of the ASP_BCLK
+    pin (CS40L25A only). If this value is omitted, ASP support is disabled.
+
+  - cirrus,asp-bclk-inv : Boolean to specify that the ASP_BCLK pin is inverted
+    relative to that which is defined for cirrus,asp-fmt (CS40L25A only).
+
+  - cirrus,asp-fsync-inv : Boolean to specify that the ASP_FSYNC pin is inverted
+    relative to that which is defined for cirrus,asp-fmt (CS40L25A only).
+
+  - cirrus,asp-fmt : Specifies the interface format of the ASP, equal to one of
+    the following (refer to the device's data sheet for more information).
+
+    0 = TDM 1
+    1 = Reserved
+    2 = I2S
+    3 = Reserved
+    4 = TDM 1.5
+
+    If this value is omitted, I2S is assumed.
+
+  - cirrus,asp-slot-num : ASP slot number (CS40L25A only) relative to the start
+    of the frame (0 through 63). If this value is omitted, slot 0 is assumed.
+
+  - cirrus,asp-slot-width : ASP slot width (CS40L25A only), specified in bits
+    (12 through 128). If this value is omitted, ASP support is disabled.
+
+  - cirrus,asp-samp-width : ASP sample width (CS40L25A only), specified in bits
+    (12 through 24). If this value is omitted, ASP support is disabled.
+
+  - cirrus,asp-timeout : Specifies the minimum number of milliseconds to pause
+    ASP playback following haptic playback interruption (CS40L25A only). If this
+    value is omitted or exceeds the maximum permitted delay (10 seconds), the
+    timeout is effectively disabled.
+
+  - cirrus,amp-gnd-stby : Boolean to specify that the OUT+ and OUT- pins are to
+    remain grounded during the standby state. In this case, the latency of I2C-
+    triggered playback is increased by that of a single I2C write transaction
+    and GPIO-triggered playback is unavailable.
+
+    If this property is omitted or the device's interrupt (/ALERT) pin is not
+    available, the OUT+ and OUT- pins remain high-impedance during the standby
+    state (default case) and neither I2C-triggered nor GPIO-triggered playback
+    are affected.
+
+    Starting with firmware revision 8.7.0, OUT+ and OUT- pin state control is
+    deferred to the DSP such that neither I2C-triggered nor GPIO-triggered
+    playback are affected even if cirrus,amp-gnd-stby is specified.
+
+  - cirrus,boost-ctl-millivolt : Maximum target voltage to which the class H
+    algorithm may increase the VBST supply, expressed in mV. Valid values range
+    from 2550 to 11000 (inclusive) in steps of 50. If this value is specified as
+    zero or VP rises above this value, VBST is bypassed to VP. If this value is
+    omitted, the maximum target voltage remains at 11 V.
+
+  - cirrus,boost-clab-millivolt : Voltage closed-loop active-breaking, expressed
+    in mV. Valid values range from 2550 to 11000 (inclusive) in steps of 50. If
+    this value is omitted, then the target voltage will be 11V.
+
+  - cirrus,boost-ovp-millivolt : Nominal VBST overvoltage protection threshold,
+    expressed in mV. Valid values range from 9000 to 12875 (inclusive) in steps
+    of 125. If this value is omitted, the threshold remains at 12 V.
+
+  - cirrus,vpbr-enable : Boolean for enabling VP brownout prevention. If this
+    property is omitted, VP brownout prevention remains disabled unless it is
+    enabled through a cirrus,vpbr-config child node.
+
+    This property remains available for backwards compatibility and need not be
+    specified if a cirrus,vpbr-config child node is present and cirrus,br-enable
+    is already specified within the child node.
+
+  - cirrus,vpbr-thld1-millivolt : Initial VP brownout prevention threshold,
+    expressed in mV. Valid values range from 2497 to 3874 (inclusive). The value
+    written to the device is quantized in steps of approximately 48 mV. If this
+    value is omitted, the threshold remains at 2.639 V.
+
+    This property remains available for backwards compatibility and need not be
+    specified if a cirrus,vpbr-config child node is present and cirrus,br-thld1
+    is already specified within the child node. If both are present, however,
+    cirrus,vpbr-thld1-millivolt takes priority.
+
+  - cirrus,vbbr-enable : Boolean for enabling VBST brownout prevention. If this
+    property is omitted, VBST brownout prevention remains disabled unless it is
+    enabled through a cirrus,vbbr-config child node.
+
+    This property remains available for backwards compatibility and need not be
+    specified if a cirrus,vbbr-config child node is present and cirrus,br-enable
+    is already specified within the child node.
+
+  - cirrus,vbbr-thld1-millivolt : Initial VBST brownout prevention threshold,
+    expressed in mV. Valid values range from 109 to 3445 (inclusive). The value
+    written to the device is quantized in steps of approximately 55 mV. If this
+    value is omitted, the threshold remains at 0.273 V. This threshold is
+    interpreted as the difference between the target VBST level and the actual
+    measured VBST level.
+
+    This property remains available for backwards compatibility and need not be
+    specified if a cirrus,vbbr-config child node is present and cirrus,br-thld1
+    is already specified within the child node. If both are present, however,
+    cirrus,vbbr-thld1-millivolt takes priority.
+
+  - cirrus,fw-id-remap : Alternative firmware build ID (silicon revision B1
+    only), equal to one of the following.
+
+    0x1400C3: cs40l25a.wmfw
+    0x1400CB: cs40l25a_clab.wmfw
+
+    If this value is omitted, an ID of 0x1400C3 is assumed.
+
+  - cirrus,auto-recovery : Boolean for enabling auto-recovery mode, wherein the
+    driver checks for inadvertent device reset prior to administering I2C-
+    triggered playback. If the driver determines the device's register map has
+    been compromised, the driver issues a full device reset and restores the
+    device to its previous state.
+
+    Auto-recovery mode increases the latency of I2C-triggered playback by that
+    of a single I2C read transaction. If this property is omitted, auto-recovery
+    mode remains disabled and I2C-triggered playback is unaffected.
+
+  - cirrus,cond-classh : Boolean for enabling conditional classh. This will
+    keep classh enabled unless a clab waveform is triggered. Otherwise, classh
+    will be disabled unless data is streamed to the ASP port.
+
+Optional properties for VP (cirrus,vpbr-config) and VBST (cirrus,vbbr-config)
+brownout prevention child nodes:
+
+  - cirrus,br-enable: Boolean for enabling brownout prevention.
+
+  - cirrus,br-thld1: Value to be used for the VPBR_THLD1/VBBR_THLD1 register
+    field (see the CS40L25/B data sheet for more information). If this property
+    is omitted, a value of zero is assumed. Note that this field is interpreted
+    differently between VP and VBST brownout prevention.
+
+  - cirrus,br-max-att: Value to be used for the VPBR_MAX_ATT/VBBR_MAX_ATT
+    register field (see the CS40L25/B data sheet for more information). If this
+    property is omitted, a value of zero is assumed.
+
+  - cirrus,br-atk-vol: Value to be used for the VPBR_ATK_VOL/VBBR_ATK_VOL
+    register field (see the CS40L25/B data sheet for more information). If this
+    property is omitted, a value of zero is assumed.
+
+  - cirrus,br-atk-rate: Value to be used for the VPBR_ATK_RATE/VBBR_ATK_RATE
+    register field (see the CS40L25/B data sheet for more information). If this
+    property is omitted, a value of zero is assumed.
+
+  - cirrus,br-wait: Value to be used for the VPBR_WAIT/VBBR_WAIT register field
+    (see the CS40L25/B data sheet for more information). If this property is
+    omitted, a value of zero is assumed.
+
+  - cirrus,br-rel-rate: Value to be used for the VPBR_REL_RATE/VBBR_REL_RATE
+    register field (see the CS40L25/B data sheet for more information). If this
+    property is omitted, a value of zero is assumed.
+
+  - cirrus,br-mute-enable: Boolean to specify that the output shall be muted
+    if VPBR_MAX_ATT/VBBR_MAX_ATT is reached during the attack state in the
+    continued presence of a brownout condition.
+
+  - cirrus,dcm-disable: Boolean to disable DCM automatic low power mode in
+    favor of CCM mode for specific hardware configurations.
+
+Examples:
+
+  cs40l20: cs40l20@43 {
+    compatible = "cirrus,cs40l20";
+    reg = <0x43>;
+    reset-gpios = <&gpio0 54 0>;
+    VA-supply = <&dummy_vreg>;
+    VP-supply = <&dummy_vreg>;
+    cirrus,boost-ind-nanohenry = <1000>;
+    cirrus,boost-cap-microfarad = <4>;
+    cirrus,boost-ipk-milliamp = <4500>;
+    cirrus,refclk-gpio2;
+  };
+
+  cs40l25a: cs40l25a@43 {
+    compatible = "cirrus,cs40l25a";
+    reg = <0x43>;
+    reset-gpios = <&gpio0 54 0>;
+    interrupt-parent = <&gpio0>;
+    interrupts = <55 8>;
+    VA-supply = <&dummy_vreg>;
+    VP-supply = <&dummy_vreg>;
+    cirrus,boost-ind-nanohenry = <1000>;
+    cirrus,boost-cap-microfarad = <4>;
+    cirrus,boost-ipk-milliamp = <4500>;
+    cirrus,asp-bclk-freq-hz = <1536000>;
+    cirrus,asp-slot-width = <16>;
+    cirrus,asp-samp-width = <16>;
+  };

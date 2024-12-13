@@ -311,6 +311,7 @@ enum cnss_driver_state {
 	CNSS_PCI_PROBE_DONE,
 	CNSS_DRIVER_REGISTER,
 	CNSS_FS_READY,
+	CNSS_DRIVER_REGISTERED = 25,
 };
 
 struct cnss_recovery_data {
@@ -437,6 +438,8 @@ struct cnss_thermal_cdev {
 	struct thermal_cooling_device *tcdev;
 };
 
+#define SUBSYS_CRASH_REASON_LEN 512
+
 struct cnss_plat_data {
 	struct platform_device *plat_dev;
 	void *bus_priv;
@@ -556,6 +559,7 @@ struct cnss_plat_data {
 	u32 num_shadow_regs_v3;
 	u32 on_chip_pmic_devices_count;
 	u32 *on_chip_pmic_board_ids;
+	char crash_reason_buf[SUBSYS_CRASH_REASON_LEN];
 };
 
 #if IS_ENABLED(CONFIG_ARCH_QCOM)
@@ -643,4 +647,5 @@ int cnss_get_feature_list(struct cnss_plat_data *plat_priv,
 			  u64 *feature_list);
 int cnss_get_input_gpio_value(struct cnss_plat_data *plat_priv, int gpio_num);
 bool cnss_check_driver_loading_allowed(void);
+void cnss_recovery_handler(struct cnss_plat_data *plat_priv);
 #endif /* _CNSS_MAIN_H */

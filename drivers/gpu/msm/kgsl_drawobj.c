@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /*
@@ -280,7 +280,7 @@ static void drawobj_sync_func(struct kgsl_device *device,
 	kgsl_drawobj_put(&event->syncobj->base);
 }
 
-static void drawobj_sync_timeline_fence_work(struct irq_work *work)
+static void drawobj_sync_timeline_fence_work(struct work_struct *work)
 {
 	struct kgsl_drawobj_sync_event *event = container_of(work,
 		struct kgsl_drawobj_sync_event, work);
@@ -333,7 +333,7 @@ static void drawobj_sync_timeline_fence_callback(struct dma_fence *f,
 	 * removing the fence
 	 */
 	if (drawobj_sync_expire(event->device, event))
-		irq_work_queue(&event->work);
+		queue_work(kgsl_driver.lockless_workqueue, &event->work);
 }
 
 static void syncobj_destroy(struct kgsl_drawobj *drawobj)
@@ -437,8 +437,10 @@ static void cmdobj_destroy(struct kgsl_drawobj *drawobj)
 		kmem_cache_free(memobjs_cache, mem);
 	}
 
-	if (drawobj->type & CMDOBJ_TYPE)
+	if (drawobj->type & CMDOBJ_TYPE) {
 		atomic_dec(&drawobj->context->proc_priv->cmd_count);
+		atomic_dec(&drawobj->context->proc_priv->period->active_cmds);
+	}
 }
 
 /**
@@ -543,7 +545,7 @@ static int drawobj_add_sync_timeline(struct kgsl_device *device,
 	event->device = device;
 	event->context = NULL;
 	event->fence = fence;
-	init_irq_work(&event->work, drawobj_sync_timeline_fence_work);
+	INIT_WORK(&event->work, drawobj_sync_timeline_fence_work);
 
 	INIT_LIST_HEAD(&event->cb.node);
 
@@ -1146,8 +1148,23 @@ struct kgsl_drawobj_cmd *kgsl_drawobj_cmd_create(struct kgsl_device *device,
 	INIT_LIST_HEAD(&cmdobj->memlist);
 	cmdobj->requeue_cnt = 0;
 
-	if (type & CMDOBJ_TYPE)
-		atomic_inc(&context->proc_priv->cmd_count);
+	if (!(type & CMDOBJ_TYPE))
+		return cmdobj;
+
+	atomic_inc(&context->proc_priv->cmd_count);
+	atomic_inc(&context->proc_priv->period->active_cmds);
+	spin_lock(&device->work_period_lock);
+	if (!__test_and_set_bit(KGSL_WORK_PERIOD, &device->flags)) {
+		mod_timer(&device->work_period_timer,
+			  jiffies + msecs_to_jiffies(KGSL_WORK_PERIOD_MS));
+		device->gpu_period.begin = ktime_get_ns();
+	}
+
+	/* Take a refcount here and put it back in kgsl_work_period_timer() */
+	if (!__test_and_set_bit(KGSL_WORK_PERIOD, &context->proc_priv->period->flags))
+		kref_get(&context->proc_priv->period->refcount);
+
+	spin_unlock(&device->work_period_lock);
 
 	return cmdobj;
 }
