@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/bitops.h>
@@ -487,7 +487,7 @@ retry:
 			}
 		}
 
-		inst = match ? inst : NULL;
+		inst = match && kref_get_unless_zero(&inst->kref) ? inst : NULL;
 		mutex_unlock(&core->lock);
 	} else {
 		if (core->state == CVP_CORE_UNINIT)
@@ -546,6 +546,7 @@ static int hfi_process_session_dump_notify(u32 device_id,
 	info->response_type = HAL_SESSION_DUMP_NOTIFY;
 	info->response.cmd = cmd_done;
 
+	cvp_put_inst(inst);
 	return 0;
 }
 
@@ -584,7 +585,7 @@ static int hfi_process_session_cvp_msg(u32 device_id,
 	sess_msg = cvp_kmem_cache_zalloc(&cvp_driver->msg_cache, GFP_KERNEL);
 	if (sess_msg == NULL) {
 		dprintk(CVP_ERR, "%s runs out msg cache memory\n", __func__);
-		return -ENOMEM;
+		goto error_no_mem;
 	}
 
 	memcpy(&sess_msg->pkt, pkt, get_msg_size(pkt));
@@ -607,11 +608,14 @@ static int hfi_process_session_cvp_msg(u32 device_id,
 
 	info->response_type = HAL_NO_RESP;
 
+	cvp_put_inst(inst);
 	return 0;
 
 error_handle_msg:
 	spin_unlock(&sq->lock);
 	cvp_kmem_cache_free(&cvp_driver->msg_cache, sess_msg);
+error_no_mem:
+	cvp_put_inst(inst);
 	return -ENOMEM;
 }
 
