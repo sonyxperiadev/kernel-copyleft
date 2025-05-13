@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -1751,6 +1751,7 @@ static int process_detached_hw_fences_after_reset(struct adreno_device *adreno_d
 {
 	struct adreno_hw_fence_entry *entry, *tmp;
 	struct gen7_hwsched_hfi *hfi = to_gen7_hwsched_hfi(adreno_dev);
+	struct kgsl_context *context = NULL;
 	int ret = 0;
 
 	list_for_each_entry_safe(entry, tmp, &hfi->detached_hw_fence_list, node) {
@@ -1764,7 +1765,11 @@ static int process_detached_hw_fences_after_reset(struct adreno_device *adreno_d
 		if (ret)
 			return ret;
 
+		context = &entry->drawctxt->base;
+
 		gen7_remove_hw_fence_entry(adreno_dev, entry);
+
+		kgsl_context_put(context);
 	}
 
 	return ret;

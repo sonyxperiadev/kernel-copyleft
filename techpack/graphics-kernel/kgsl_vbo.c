@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/file.h>
@@ -43,7 +43,17 @@ static struct kgsl_memdesc_bind_range *bind_range_create(u64 start, u64 last,
 		return ERR_PTR(-EINVAL);
 	}
 
+	atomic_inc(&entry->vbo_count);
 	return range;
+}
+
+static void bind_range_destroy(struct kgsl_memdesc_bind_range *range)
+{
+	struct kgsl_mem_entry *entry = range->entry;
+
+	atomic_dec(&entry->vbo_count);
+	kgsl_mem_entry_put(entry);
+	kfree(range);
 }
 
 static u64 bind_range_len(struct kgsl_memdesc_bind_range *range)
@@ -114,8 +124,7 @@ static void kgsl_memdesc_remove_range(struct kgsl_mem_entry *target,
 				kgsl_mmu_map_zero_page_to_range(memdesc->pagetable,
 					memdesc, range->range.start, bind_range_len(range));
 
-			kgsl_mem_entry_put(range->entry);
-			kfree(range);
+			bind_range_destroy(range);
 		}
 	}
 
@@ -175,8 +184,7 @@ static int kgsl_memdesc_add_range(struct kgsl_mem_entry *target,
 					}
 				}
 
-				kgsl_mem_entry_put(cur->entry);
-				kfree(cur);
+				bind_range_destroy(cur);
 				continue;
 			}
 
@@ -253,8 +261,7 @@ static int kgsl_memdesc_add_range(struct kgsl_mem_entry *target,
 	return ret;
 
 error:
-	kgsl_mem_entry_put(range->entry);
-	kfree(range);
+	bind_range_destroy(range);
 	mutex_unlock(&memdesc->ranges_lock);
 	return ret;
 }
@@ -264,6 +271,7 @@ static void kgsl_sharedmem_vbo_put_gpuaddr(struct kgsl_memdesc *memdesc)
 	struct interval_tree_node *node, *next;
 	struct kgsl_memdesc_bind_range *range;
 	int ret = 0;
+	bool unmap_fail;
 
 	/*
 	 * If the VBO maps the zero range then we can unmap the entire
@@ -272,6 +280,8 @@ static void kgsl_sharedmem_vbo_put_gpuaddr(struct kgsl_memdesc *memdesc)
 	if (!(memdesc->flags & KGSL_MEMFLAGS_VBO_NO_MAP_ZERO))
 		ret = kgsl_mmu_unmap_range(memdesc->pagetable, memdesc,
 			0, memdesc->size);
+
+	unmap_fail = ret;
 
 	/*
 	 * FIXME: do we have a use after free potential here?  We might need to
@@ -294,15 +304,16 @@ static void kgsl_sharedmem_vbo_put_gpuaddr(struct kgsl_memdesc *memdesc)
 				range->range.start,
 				range->range.last - range->range.start + 1);
 
-		/* If unmap failed, mark the child memdesc as still mapped */
-		if (ret)
-			range->entry->memdesc.priv |= KGSL_MEMDESC_MAPPED;
+		/* Put the child's refcount if unmap succeeds */
+		if (!ret)
+			bind_range_destroy(range);
+		else
+			kfree(range);
 
-		kgsl_mem_entry_put(range->entry);
-		kfree(range);
+		unmap_fail = unmap_fail || ret;
 	}
 
-	if (ret)
+	if (unmap_fail)
 		return;
 
 	/* Put back the GPU address */
@@ -354,8 +365,12 @@ static void kgsl_sharedmem_free_bind_op(struct kgsl_sharedmem_bind_op *op)
 	if (IS_ERR_OR_NULL(op))
 		return;
 
-	for (i = 0; i < op->nr_ops; i++)
+	for (i = 0; i < op->nr_ops; i++) {
+		/* Decrement the vbo_count we added when creating the bind_op */
+		if (op->ops[i].entry)
+			atomic_dec(&op->ops[i].entry->vbo_count);
 		kgsl_mem_entry_put(op->ops[i].entry);
+	}
 
 	kgsl_mem_entry_put(op->target);
 
@@ -460,6 +475,9 @@ kgsl_sharedmem_create_bind_op(struct kgsl_process_private *private,
 			ret = -ENOENT;
 			goto err;
 		}
+
+		/* Keep the child pinned in memory */
+		atomic_inc(&entry->vbo_count);
 
 		/* Make sure the child is not a VBO */
 		if ((entry->memdesc.flags & KGSL_MEMFLAGS_VBO)) {

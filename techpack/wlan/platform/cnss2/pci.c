@@ -3929,7 +3929,8 @@ int cnss_pci_resume_bus(struct cnss_pci_data *pci_priv)
 	pci_set_master(pci_dev);
 
 skip_enable_pci:
-	cnss_pci_set_mhi_state(pci_priv, CNSS_MHI_RESUME);
+	if (cnss_pci_set_mhi_state(pci_priv, CNSS_MHI_RESUME))
+		ret = -EAGAIN;
 out:
 	return ret;
 }
