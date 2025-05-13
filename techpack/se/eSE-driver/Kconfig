@@ -1,0 +1,11 @@
+#
+# st54spi gpio driver
+#
+
+menuconfig NFC_SE_STM_GPIO
+	tristate "GPIO driver for ST54_SE"
+	help
+	  This enables the gpio driver for STM NFC-SE chip based devices.
+	  This is for SPI connected version. 
+
+	  If unsure, say N.

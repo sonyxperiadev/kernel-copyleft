@@ -1,0 +1,38 @@
+headers_src = [
+    "include/uapi/*.h",
+    "include/kernel/*.h",
+]
+
+ubwcp_headers_out = [
+    "ubwcp_ioctl.h",
+    "ubwcp.h",
+]
+
+ubwcp_kernel_headers_verbose = "--verbose "
+genrule {
+    name: "qti_generate_ubwcp_kernel_headers",
+    tools: [
+        "headers_install.sh",
+        "unifdef"
+    ],
+    tool_files: [
+        "ubwcp_kernel_headers.py",
+    ],
+    srcs: headers_src,
+    cmd: "python3 $(location ubwcp_kernel_headers.py) " +
+          ubwcp_kernel_headers_verbose +
+         "--header_arch arm64 " +
+         "--gen_dir $(genDir) " +
+         "--ubwcp_include $(locations include/uapi/*.h) $(locations include/kernel/*.h) " +
+         "--unifdef $(location unifdef) " +
+         "--headers_install $(location headers_install.sh)",
+    out: ubwcp_headers_out,
+}
+
+cc_library_headers {
+    name: "qti_ubwcp_kernel_headers",
+    generated_headers: ["qti_generate_ubwcp_kernel_headers"],
+    export_generated_headers: ["qti_generate_ubwcp_kernel_headers"],
+    vendor: true,
+    recovery_available: true
+}

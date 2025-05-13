@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Qualcomm Peripheral Image Loader for Q6V5
@@ -5,7 +10,7 @@
  * Copyright (C) 2016-2018 Linaro Ltd.
  * Copyright (C) 2014 Sony Mobile Communications AB
  * Copyright (c) 2012-2013, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
@@ -94,6 +99,15 @@ static void qcom_q6v5_crash_handler_work(struct work_struct *work)
 	panic("Panicking, remoteproc %s crashed\n", q6v5->rproc->name);
 }
 
+void update_crash_reason(struct qcom_q6v5 *subsys,
+				char *smem_reason, int size)
+{
+	memcpy(subsys->crash_reason_buf, smem_reason,
+		min((size_t)size, sizeof(subsys->crash_reason_buf)));
+	subsys->data_ready = 1;
+}
+EXPORT_SYMBOL(update_crash_reason);
+
 static irqreturn_t q6v5_wdog_interrupt(int irq, void *data)
 {
 	struct qcom_q6v5 *q6v5 = data;
@@ -115,20 +129,21 @@ static irqreturn_t q6v5_wdog_interrupt(int irq, void *data)
 		dev_err(q6v5->dev, "watchdog without message\n");
 	}
 
+	update_crash_reason(q6v5, msg, len);
+
 	q6v5->running = false;
 	dev_err(q6v5->dev, "rproc recovery state: %s\n",
 		q6v5->rproc->recovery_disabled ?
 		"disabled and lead to device crash" :
 		"enabled and kick reovery process");
 
-	if (q6v5->rproc->recovery_disabled) {
-		schedule_work(&q6v5->crash_handler);
-	} else {
-		if (q6v5->ssr_subdev)
-			qcom_notify_early_ssr_clients(q6v5->ssr_subdev);
+	if (q6v5->ssr_subdev)
+		qcom_notify_early_ssr_clients(q6v5->ssr_subdev);
 
+	if (q6v5->rproc->recovery_disabled)
+		schedule_work(&q6v5->crash_handler);
+	else
 		rproc_report_crash(q6v5->rproc, RPROC_WATCHDOG);
-	}
 
 	return IRQ_HANDLED;
 }
@@ -152,18 +167,20 @@ static irqreturn_t q6v5_fatal_interrupt(int irq, void *data)
 		dev_err(q6v5->dev, "fatal error without message\n");
 	}
 
+	update_crash_reason(q6v5, msg, len);
+
 	q6v5->running = false;
 	dev_err(q6v5->dev, "rproc recovery state: %s\n",
 		q6v5->rproc->recovery_disabled ? "disabled and lead to device crash" :
 		"enabled and kick reovery process");
-	if (q6v5->rproc->recovery_disabled) {
-		schedule_work(&q6v5->crash_handler);
-	} else {
-		if (q6v5->ssr_subdev)
-			qcom_notify_early_ssr_clients(q6v5->ssr_subdev);
 
+	if (q6v5->ssr_subdev)
+		qcom_notify_early_ssr_clients(q6v5->ssr_subdev);
+
+	if (q6v5->rproc->recovery_disabled)
+		schedule_work(&q6v5->crash_handler);
+	else
 		rproc_report_crash(q6v5->rproc, RPROC_FATAL_ERROR);
-	}
 
 	return IRQ_HANDLED;
 }

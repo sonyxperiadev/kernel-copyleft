@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2023 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
@@ -371,7 +376,7 @@ static int qti_flash_led_strobe(struct qti_flash_led *led,
 	int rc, i;
 	bool enable = mask & value;
 
-	spin_lock(&led->lock);
+	spin_lock_irq(&led->lock);
 
 	if (enable) {
 		for (i = 0; i < led->max_channels; i++)
@@ -417,7 +422,7 @@ static int qti_flash_led_strobe(struct qti_flash_led *led,
 	}
 
 error:
-	spin_unlock(&led->lock);
+	spin_unlock_irq(&led->lock);
 
 	return rc;
 }
@@ -430,7 +435,7 @@ static int qti_flash_led_enable(struct flash_node_data *fnode)
 
 	addr_offset = fnode->id;
 
-	spin_lock(&led->lock);
+	spin_lock_irq(&led->lock);
 	val = (fnode->updated_ires_idx ? 0 : 1) << fnode->id;
 	rc = qti_flash_led_masked_write(led, FLASH_LED_IRESOLUTION,
 		FLASH_LED_IRESOLUTION_MASK(fnode->id), val);
@@ -448,7 +453,7 @@ static int qti_flash_led_enable(struct flash_node_data *fnode)
 	 * just configure the target current.
 	 */
 	if (fnode->type == FLASH_LED_TYPE_TORCH && fnode->enabled) {
-		spin_unlock(&led->lock);
+		spin_unlock_irq(&led->lock);
 		return 0;
 	}
 
@@ -467,7 +472,7 @@ static int qti_flash_led_enable(struct flash_node_data *fnode)
 		gpio_set_value(led->hw_strobe_gpio[fnode->id], 1);
 
 out:
-	spin_unlock(&led->lock);
+	spin_unlock_irq(&led->lock);
 	return rc;
 }
 
@@ -481,7 +486,7 @@ static int qti_flash_led_disable(struct flash_node_data *fnode)
 		return 0;
 	}
 
-	spin_lock(&led->lock);
+	spin_lock_irq(&led->lock);
 	if ((fnode->strobe_sel == HW_STROBE) &&
 		gpio_is_valid(led->hw_strobe_gpio[fnode->id]))
 		gpio_set_value(led->hw_strobe_gpio[fnode->id], 0);
@@ -502,7 +507,7 @@ static int qti_flash_led_disable(struct flash_node_data *fnode)
 	fnode->user_current_ma = 0;
 
 out:
-	spin_unlock(&led->lock);
+	spin_unlock_irq(&led->lock);
 	return rc;
 }
 

@@ -1,0 +1,36 @@
+headers_src = [
+    "include/uapi/linux/*.h",
+]
+
+spu_drivers_headers_out = [
+    "linux/spcom.h", "linux/spss_utils.h",
+]
+
+spu_drivers_kernel_headers_verbose = "--verbose "
+genrule {
+    name: "qti_generate_spu_drivers_kernel_headers",
+    tools: [
+        "headers_install.sh",
+        "unifdef"
+    ],
+    tool_files: [
+        "spu_drivers_kernel_headers.py",
+    ],
+    srcs: headers_src,
+    cmd: "python3 -u $(location spu_drivers_kernel_headers.py) " +
+          spu_drivers_kernel_headers_verbose +
+         "--header_arch arm64 " +
+         "--gen_dir $(genDir) " +
+         "--spu_drivers_include_uapi $(locations include/uapi/linux/*.h) " +
+         "--unifdef $(location unifdef) " +
+         "--headers_install $(location headers_install.sh)",
+    out: spu_drivers_headers_out,
+}
+
+cc_library_headers {
+    name: "qti_spu_drivers_kernel_headers",
+    generated_headers: ["qti_generate_spu_drivers_kernel_headers"],
+    export_generated_headers: ["qti_generate_spu_drivers_kernel_headers"],
+    vendor: true,
+    recovery_available: true
+}

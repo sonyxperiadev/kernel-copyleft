@@ -1,0 +1,38 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+package(
+    default_visibility = [
+      "//visibility:public"],
+)
+
+ddk_headers(
+    name = "eva_drivers_configs",
+    hdrs  =  [
+      "config/waipioevaconf.h"
+    ],
+    includes = ["config"]
+)
+ddk_headers(
+    name = "uapi_headers",
+    hdrs = glob([
+      "include/uapi/eva/media/*.h",
+    ]),
+    includes = ["include/uapi/eva"]
+)
+ddk_headers(
+    name = "msm_headers",
+    hdrs = glob([
+      "msm/eva/*.h",
+      "msm/eva/vm/*.h",
+    ]),
+    includes = ["msm","msm/eva"]
+)
+
+ddk_headers(
+    name = "eva_drivers_headers",
+    hdrs = [":eva_drivers_configs", ":uapi_headers", ":msm_headers"]
+)
+
+
+load(":pineapple.bzl", "define_pineapple")
+define_pineapple()

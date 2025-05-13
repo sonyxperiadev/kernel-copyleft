@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+obj-$(CONFIG_ECM_IPA) += ecmipam.o
+ecmipam-objs := ecm_ipa.o
+

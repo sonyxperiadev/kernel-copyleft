@@ -1,0 +1,22 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+ddk_headers(
+    name = "mm_drivers_configs",
+    hdrs = glob(["config/*.h"]),
+    includes = ["config"],
+)
+
+ddk_headers(
+    name = "mm_drivers_headers",
+    hdrs = [
+        ":mm_drivers_configs",
+        "//vendor/qcom/opensource/mm-drivers/hw_fence:hw_fence_headers",
+        "//vendor/qcom/opensource/mm-drivers/sync_fence:sync_fence_uapi_headers",
+    ],
+)

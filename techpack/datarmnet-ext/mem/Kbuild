@@ -1,0 +1,7 @@
+obj-m += rmnet_mem.o
+
+ccflags-y := $(call cc-option,-Wno-misleading-indentation)
+        rmnet_mem-y := \
+        rmnet_mem_main.o \
+        rmnet_mem_nl.o \
+	rmnet_mem_pool.o

@@ -1,0 +1,94 @@
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+ddk_headers(
+    name = "smcinvoke_kernel_headers",
+    hdrs = glob([
+        "include/linux/smcinvoke*.h",
+        "include/uapi/linux/smcinvoke*.h",
+        "include/linux/IClientE*.h",
+        "include/linux/ITrustedCameraDriver.h",
+        "include/linux/CTrustedCameraDriver.h",
+    ]),
+    includes = [
+        "include",
+        "include/linux",
+        "linux",
+        "include/uapi/linux",
+    ],
+)
+
+ddk_headers(
+    name = "qseecom_kernel_headers",
+    hdrs = glob([
+        "include/uapi/linux/qseecom.h",
+        "include/uapi/linux/qseecom_api.h",
+        "linux/misc/qseecom_kernel.h",
+        "linux/misc/qseecom_priv.h",
+        "linux/misc/qseecomi.h",
+    ]),
+    includes = ["linux", "include/uapi", "include/uapi/linux"]
+)
+
+ddk_headers(
+    name = "last_logs_headers",
+    hdrs = [
+       "tz_log/last_logs.h",
+    ],
+    includes = ["tz_log"]
+)
+
+ddk_headers(
+    name = "hdcp_qseecom_dlkm",
+    hdrs = glob([
+        ":smcinvoke_kernel_headers",
+        "linux/*.h",
+        "include/linux/*h",
+        "include/smci/uid/*h",
+        "include/smci/interface/*h",
+        "linux/misc/*.h",
+        "config/*.h",
+    ]),
+    includes = [
+        ".",
+        "config",
+        "include",
+        "linux",
+    ],
+)
+
+ddk_headers(
+    name = "qcedev_local_headers",
+    hdrs = glob([
+        "include/uapi/linux/*.h",
+        "crypto-qti/*.h"
+    ]),
+    includes = ["include/uapi", "include/uapi/linux", "crypto-qti"]
+)
+
+ddk_headers(
+    name = "smmu_proxy_headers",
+    hdrs = glob([
+        "smmu-proxy/*.h",
+        "smmu-proxy/linux/*.h",
+        "smmu-proxy/include/uapi/linux/*.h"
+    ]),
+    includes = [".", "smmu-proxy"],
+)
+
+load(":build/pineapple.bzl", "define_pineapple")
+load(":build/blair.bzl", "define_blair")
+load(":build/sun.bzl", "define_sun")
+load(":build/niobe.bzl", "define_niobe")
+load(":build/monaco.bzl", "define_monaco")
+
+define_pineapple()
+define_blair()
+define_niobe()
+define_monaco()
+define_sun()

@@ -1,0 +1,4 @@
+config QTI_HW_FENCE
+	bool "HW Fence"
+	help
+	  Enable the hw_fence module

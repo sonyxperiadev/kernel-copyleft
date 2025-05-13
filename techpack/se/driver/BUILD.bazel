@@ -1,0 +1,5 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+load(":define_modules.bzl", "define_modules")
+
+define_modules("pineapple", "consolidate")
+define_modules("pineapple", "gki")

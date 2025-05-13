@@ -24,6 +24,7 @@ pinctrl-msm.ko
 pinctrl-pineapple.ko
 pinctrl-cliffs.ko
 pinctrl-volcano.ko
+pinctrl-somc.ko
 sched-walt.ko
 sched-walt-debug.ko
 thermal_pause.ko
@@ -100,3 +101,5 @@ sdhci-msm.ko
 cqhci.ko
 crm.ko
 bcl_pmic5.ko
+fels.ko
+mmc_error_logging.ko

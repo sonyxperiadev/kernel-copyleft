@@ -1,0 +1,12 @@
+<manifest version="1.0" type="device">
+    <!-- Nordic service-->
+    <hal format="hidl">
+        <name>vendor.shadowcreator.hardware.nordic</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>INordic</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+</manifest>

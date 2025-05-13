@@ -1,0 +1,28 @@
+cc_library_shared {
+    name: "libipanat",
+
+    header_libs: ["device_kernel_headers"]+["qti_kernel_headers"]+["qti_ipa_kernel_headers"],
+
+    srcs: [
+        "src/ipa_nat_map.cpp",
+        "src/ipa_table.c",
+        "src/ipa_nat_statemach.c",
+        "src/ipa_nat_drvi.c",
+        "src/ipa_nat_drv.c",
+        "src/ipa_mem_descriptor.c",
+        "src/ipa_nat_utils.c",
+        "src/ipa_ipv6ct.c",
+    ],
+
+   shared_libs:
+        ["libcutils",
+        "libdl",
+        "libbase",
+        "libutils",
+    ],
+    export_include_dirs: ["inc"],
+    vendor: true,
+
+    cflags: ["-DDEBUG"] + ["-DFEATURE_IPA_ANDROID"] + ["-Wno-int-conversion"],
+
+}
