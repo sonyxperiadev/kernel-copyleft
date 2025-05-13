@@ -1,0 +1,35 @@
+headers_src = [
+    "include/uapi/linux/*.h",
+]
+
+gfx_headers_out = [
+    "linux/msm_kgsl.h",
+]
+
+gfx_kernel_headers_verbose = "--verbose "
+genrule {
+    name: "qti_generate_gfx_kernel_headers",
+    tools: ["headers_install.sh",
+            "unifdef"
+    ],
+    tool_files: [
+         "gfx_kernel_headers.py",
+    ],
+    srcs: headers_src,
+    cmd: "python3 -u $(location gfx_kernel_headers.py) " +
+        gfx_kernel_headers_verbose +
+        "--header_arch arm64 " +
+        "--gen_dir $(genDir) " +
+        "--gfx_include_uapi $(locations include/uapi/linux/*.h) " +
+        "--unifdef $(location unifdef) " +
+        "--headers_install $(location headers_install.sh)",
+    out: gfx_headers_out,
+}
+
+cc_library_headers {
+    name: "qti_gfx_kernel_uapi",
+    generated_headers: ["qti_generate_gfx_kernel_headers"],
+    export_generated_headers: ["qti_generate_gfx_kernel_headers"],
+    vendor: true,
+    recovery_available: true
+}

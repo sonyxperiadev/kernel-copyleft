@@ -1,0 +1,36 @@
+headers_src = [
+    "sync_fence/include/uapi/*/**/*.h",
+]
+
+mm_drivers_headers_out = [
+    "sync_fence/qcom_sync_file.h",
+]
+
+mm_drivers_kernel_headers_verbose = "--verbose "
+genrule {
+    name: "qti_generate_mm_drivers_kernel_headers",
+    tools: [
+        "headers_install.sh",
+        "unifdef"
+    ],
+    tool_files: [
+        "mm_drivers_kernel_headers.py",
+    ],
+    srcs: headers_src,
+    cmd: "python3 $(location mm_drivers_kernel_headers.py) " +
+          mm_drivers_kernel_headers_verbose +
+         "--header_arch arm64 " +
+         "--gen_dir $(genDir) " +
+         "--mm_drivers_include_uapi $(locations sync_fence/include/uapi/*/**/*.h) " +
+         "--unifdef $(location unifdef) " +
+         "--headers_install $(location headers_install.sh)",
+    out: mm_drivers_headers_out,
+}
+
+cc_library_headers {
+    name: "qti_mm_drivers_kernel_headers",
+    generated_headers: ["qti_generate_mm_drivers_kernel_headers"],
+    export_generated_headers: ["qti_generate_mm_drivers_kernel_headers"],
+    vendor: true,
+    recovery_available: true
+}

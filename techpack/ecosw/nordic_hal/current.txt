@@ -1,0 +1,1 @@
+a6a0793043b33c706d592cad5ee28fe66da4cec2691a3e04846b603dd6ec5794 vendor.shadowcreator.hardware.nordic@1.0::INordic

@@ -425,7 +425,8 @@ def define_msm_la(
         in_tree_module_list,
         kmi_enforced = True,
         dpm_overlay = False,
-        boot_image_opts = boot_image_opts()):
+        boot_image_opts = boot_image_opts(),
+        somc_product_operator = ""):
     """Top-level kernel build definition macro for an MSM platform
 
     Args:
@@ -439,6 +440,7 @@ def define_msm_la(
       page_size: kernel page size
       super_image_size: size of super image partition
       lz4_ramdisk: whether to use an lz4-compressed ramdisk
+      somc_product_operator: variant of somc product-operator (e.g. pdx245-generic)
     """
 
     if not variant in la_variants:
@@ -448,6 +450,12 @@ def define_msm_la(
     # between target and variant)
     target = msm_target.replace("_", "-") + "_" + variant.replace("_", "-")
 
+    # Create somc_target
+    if somc_product_operator == "":
+        somc_target = target
+    else:
+        somc_target = target + "-" + somc_product_operator
+
     if variant == "consolidate":
         base_kernel = "//common:kernel_aarch64_consolidate"
         define_abi_targets = False
@@ -456,9 +464,12 @@ def define_msm_la(
         define_abi_targets = True
 
     dtb_list = get_dtb_list(msm_target)
-    dtbo_list = get_dtbo_list(msm_target)
+    if somc_product_operator == "":
+        dtbo_list = get_dtbo_list(msm_target)
+    else:
+        dtbo_list = get_dtbo_list(somc_product_operator)
     dtstree = get_dtstree(msm_target)
-    vendor_ramdisk_binaries = get_vendor_ramdisk_binaries(target)
+    vendor_ramdisk_binaries = get_vendor_ramdisk_binaries(somc_target)
     gki_ramdisk_prebuilt_binary = get_gki_ramdisk_prebuilt_binary()
     build_config_fragments = get_build_config_fragments(msm_target)
 
@@ -468,14 +479,14 @@ def define_msm_la(
 
     _define_build_config(
         msm_target,
-        target,
+        somc_target,
         variant,
         boot_image_opts = boot_image_opts,
         build_config_fragments = build_config_fragments,
     )
 
     _define_kernel_build(
-        target,
+        somc_target,
         base_kernel,
         in_tree_module_list,
         dtb_list,
@@ -486,7 +497,7 @@ def define_msm_la(
     )
 
     _define_image_build(
-        target,
+        somc_target,
         msm_target,
         base_kernel,
         # When building a GKI target, we take the kernel and boot.img directly from
@@ -505,7 +516,7 @@ def define_msm_la(
     )
 
     _define_kernel_dist(
-        target,
+        somc_target,
         msm_target,
         variant,
         base_kernel,
@@ -514,10 +525,10 @@ def define_msm_la(
         dpm_overlay = dpm_overlay,
     )
 
-    _define_uapi_library(target)
+    _define_uapi_library(somc_target)
 
-    define_abl_dist(target, msm_target, variant)
+    define_abl_dist(somc_target, msm_target, variant)
 
-    define_dtc_dist(target, msm_target, variant)
+    define_dtc_dist(somc_target, msm_target, variant)
 
-    define_extras(target)
+    define_extras(somc_target)

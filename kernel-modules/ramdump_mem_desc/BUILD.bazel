@@ -1,0 +1,13 @@
+# Bazel file for ramdump_mem_desc
+
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+load(":define_modules.bzl", "define_modules")
+
+define_modules("pineapple", "gki")
+
+define_modules("pineapple", "consolidate")

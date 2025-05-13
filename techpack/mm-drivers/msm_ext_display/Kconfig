@@ -1,0 +1,4 @@
+config MSM_EXT_DISPLAY
+	bool "Enable msm_ext_display"
+	help
+	  Enable msm_ext_display driver

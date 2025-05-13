@@ -1,0 +1,5 @@
+cc_library_headers {
+    name: "qti_synx_kernel_headers",
+    export_include_dirs: ["include/uapi/synx/media"],
+    vendor_available: true
+}

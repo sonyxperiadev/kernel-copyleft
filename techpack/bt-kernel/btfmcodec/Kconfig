@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config BTFM_CODEC
+	tristate "MSM Bluetooth/FM CODEC Driver"
+	help
+		This will enables BT/FM Codec driver. Hardware endpoint
+		drivers will register to this driver to communicates with ALSA codec
+		driver.
+
+		Say Y here to compile support for BT/FM Codec driver
+		into the kernel or say M to compile as a module.

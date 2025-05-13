@@ -1,0 +1,12 @@
+
+config BTFM_SWR
+	tristate "MSM Bluetooth/FM SoundWire Device"
+	depends on MSM_BT_POWER
+	help
+		This enables BT/FM soundwire driver to open/close ports.
+		This will make use of soundwire bus driver and soundwire
+		master driver to communicate with soundwire slave.
+
+		Say Y here to compile support for Bluetooth/FM soundwire slave driver
+		into the kernel or say M to compile as a module.
+

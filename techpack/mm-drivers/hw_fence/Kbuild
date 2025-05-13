@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+KDIR := $(TOP)/kernel_platform/msm-kernel
+include $(MSM_HW_FENCE_ROOT)/config/kalamammdrivers.conf
+LINUXINCLUDE += -include $(MSM_HW_FENCE_ROOT)/config/kalamammdriversconf.h \
+		-I$(MSM_HW_FENCE_ROOT)hw_fence/include/
+
+ifdef CONFIG_QTI_HW_FENCE
+obj-m += msm_hw_fence.o
+
+msm_hw_fence-y := src/msm_hw_fence.o \
+		src/hw_fence_drv_priv.o \
+		src/hw_fence_drv_utils.o \
+		src/hw_fence_drv_debug.o \
+		src/hw_fence_drv_ipc.o
+
+ifneq ($(CONFIG_ARCH_KALAMA), y)
+LINUXINCLUDE += -I$(MSM_HW_FENCE_ROOT)/../synx-kernel/msm/synx/ \
+		-I$(MSM_HW_FENCE_ROOT)/../synx-kernel/include/uapi/synx/media/
+msm_hw_fence-y += src/msm_hw_fence_synx_translation.o
+endif
+
+msm_hw_fence-$(CONFIG_DEBUG_FS) += src/hw_fence_ioctl.o
+
+CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+endif
+EXTRA_CFLAGS += -Wformat-extra-args -Wstrict-prototypes -Wformat-insufficient-args \
+		-Wformat-invalid-specifier -Wformat-zero-length -Wnonnull

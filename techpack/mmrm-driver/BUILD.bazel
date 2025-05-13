@@ -1,0 +1,30 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+package(
+    default_visibility = [
+        "//visibility:public"],
+)
+
+ddk_headers(
+    name = "mmrm_drivers_configs",
+    hdrs  = glob([
+        "config/*.h",
+    ]),
+    includes = ["config"]
+)
+
+ddk_headers(
+    name = "driver_headers",
+    hdrs = glob([
+      "driver/src/*.h",
+    ]),
+    includes = ["driver/src"]
+)
+
+ddk_headers(
+    name = "mmrm_driver_headers",
+    hdrs = [":mmrm_drivers_configs", "driver_headers"]
+)
+
+load(":target.bzl", "define_pineapple")
+define_pineapple()

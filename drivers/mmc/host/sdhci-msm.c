@@ -188,7 +188,7 @@
  * but clk's driver supply 37MHz only and uses ceil ops. So vote for
  * 37MHz to avoid picking next ceil value.
  */
-#define LEVEL_SHIFTER_HIGH_SPEED_FREQ	37000000
+#define LEVEL_SHIFTER_HIGH_SPEED_FREQ	37500000
 
 #define VS_CAPABILITIES_SDR_50_SUPPORT BIT(0)
 #define VS_CAPABILITIES_SDR_104_SUPPORT BIT(1)
@@ -5217,6 +5217,15 @@ static int sdhci_msm_setup_pwr_irq(struct sdhci_msm_host *msm_host)
 	return 0;
 }
 
+static void sdhci_msm_disable_scr_cmd48_support(void *unused, struct mmc_card *card)
+{
+	if (card && mmc_card_sd(card) &&
+			(card->scr.cmds & SD_SCR_CMD48_SUPPORT)) {
+		pr_info("%s: disabling SD_SCR_CMD48_SUPPORT\n", mmc_hostname(card->host));
+		card->scr.cmds &= ~SD_SCR_CMD48_SUPPORT;
+	}
+}
+
 static int sdhci_msm_probe(struct platform_device *pdev)
 {
 	struct sdhci_host *host;
@@ -5425,6 +5434,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	/* Initialize sysfs entries */
 	sdhci_msm_init_sysfs_gating_qos(dev);
 
+	register_trace_android_vh_sd_update_bus_speed_mode(
+			sdhci_msm_disable_scr_cmd48_support, NULL);
+
 	if (of_property_read_bool(node, "supports-cqe"))
 		ret = sdhci_msm_cqe_add_host(host, pdev);
 	else
@@ -5535,6 +5547,9 @@ skip_removing_qos:
 		sdhci_msm_bus_get_and_set_vote(host, 0);
 		sdhci_msm_bus_unregister(&pdev->dev, msm_host);
 	}
+	unregister_trace_android_vh_sd_update_bus_speed_mode(
+			sdhci_msm_disable_scr_cmd48_support, NULL);
+
 	sdhci_pltfm_free(pdev);
 	return 0;
 }

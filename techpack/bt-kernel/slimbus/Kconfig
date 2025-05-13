@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config BTFM_SLIM
+	tristate "MSM Bluetooth/FM Slimbus Device"
+	depends on MSM_BT_POWER
+	help
+		This enables BT/FM slimbus driver to get multiple audio channel.
+		This will make use of slimbus platform driver and slimbus
+		codec driver to communicate with slimbus machine driver and LPSS which
+		is Slimbus master.Slimbus slave initialization and configuration
+		will be done through this driver.
+
+		Say Y here to compile support for Bluetooth slimbus driver
+		into the kernel or say M to compile as a module.
+
+config SLIM_BTFM_CODEC
+	tristate "MSM Bluetooth/FM Slimbus Device using BTFM codec driver"
+	depends on MSM_BT_POWER
+	depends on BTFM_CODEC
+	help
+		This enables BT/FM slimbus driver to use btfm codec driver as
+		interface to interacts with codec driver.
+
+		Say Y here to compile support for Bluetooth slimbus driver
+		into the kernel or say M to compile as a module.

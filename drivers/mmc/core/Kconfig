@@ -89,3 +89,12 @@ config MMC_CRYPTO
 	  Enabling this makes it possible for the kernel to use the crypto
 	  capabilities of the MMC device (if present) to perform crypto
 	  operations on data being transferred to/from the device.
+
+config MMC_ERROR_LOGGING
+	tristate "MMC error logging support"
+	depends on MMC_BLOCK
+	depends on FELS
+	default n
+	help
+	  This driver collects mmc errors by leveraging some tracepoints and
+	  vendor hooks and passes them to fels framework.

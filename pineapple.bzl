@@ -1,4 +1,4 @@
-load(":target_variants.bzl", "la_variants")
+load(":target_variants.bzl", "la_variants", "spo_variants")
 load(":msm_kernel_la.bzl", "define_msm_la")
 load(":image_opts.bzl", "boot_image_opts")
 
@@ -69,7 +69,6 @@ def define_pineapple():
         "drivers/iio/adc/qcom-vadc-common.ko",
         "drivers/iio/adc/qti-glink-adc.ko",
         "drivers/input/misc/pm8941-pwrkey.ko",
-        "drivers/input/misc/qcom-hv-haptics.ko",
         "drivers/interconnect/icc-test.ko",
         "drivers/interconnect/qcom/icc-bcm-voter.ko",
         "drivers/interconnect/qcom/icc-debug.ko",
@@ -92,6 +91,7 @@ def define_pineapple():
         "drivers/mfd/qcom-i2c-pmic.ko",
         "drivers/mfd/qcom-spmi-pmic.ko",
         "drivers/misc/qseecom_proxy.ko",
+        "drivers/mmc/core/mmc_error_logging.ko",
         "drivers/mmc/host/cqhci.ko",
         "drivers/mmc/host/sdhci-msm.ko",
         "drivers/nvmem/nvmem_qcom-spmi-sdam.ko",
@@ -105,6 +105,8 @@ def define_pineapple():
         "drivers/pinctrl/qcom/pinctrl-cliffs.ko",
         "drivers/pinctrl/qcom/pinctrl-msm.ko",
         "drivers/pinctrl/qcom/pinctrl-pineapple.ko",
+        "drivers/pinctrl/qcom/pinctrl-somc.ko",
+        "drivers/pinctrl/qcom/pinctrl-somc-pmic.ko",
         "drivers/pinctrl/qcom/pinctrl-spmi-gpio.ko",
         "drivers/pinctrl/qcom/pinctrl-spmi-mpp.ko",
         "drivers/pinctrl/qcom/pinctrl-volcano.ko",
@@ -171,7 +173,6 @@ def define_pineapple():
         "drivers/soc/qcom/llcc_perfmon.ko",
         "drivers/soc/qcom/mdt_loader.ko",
         "drivers/soc/qcom/mem-hooks.ko",
-        "drivers/soc/qcom/mem-offline.ko",
         "drivers/soc/qcom/mem_buf/mem_buf.ko",
         "drivers/soc/qcom/mem_buf/mem_buf_dev.ko",
         "drivers/soc/qcom/mem_buf/mem_buf_msgq.ko",
@@ -247,7 +248,6 @@ def define_pineapple():
         "drivers/usb/phy/phy-msm-snps-eusb2.ko",
         "drivers/usb/phy/phy-msm-ssusb-qmp.ko",
         "drivers/usb/phy/phy-qcom-emu.ko",
-        "drivers/usb/redriver/nb7vpq904m.ko",
         "drivers/usb/redriver/redriver.ko",
         "drivers/usb/repeater/repeater.ko",
         "drivers/usb/repeater/repeater-qti-pmic-eusb2.ko",
@@ -263,7 +263,9 @@ def define_pineapple():
         "drivers/virt/gunyah/gh_virt_wdt.ko",
         "drivers/virt/gunyah/gunyah_loader.ko",
         "drivers/virt/gunyah/gunyah_qcom.ko",
+        "kernel/fels/fels.ko",
         "kernel/msm_sysstats.ko",
+        "kernel/power/wakeup_irq_debug.ko",
         "kernel/sched/walt/sched-walt.ko",
         "kernel/trace/qcom_ipc_logging.ko",
         "net/mac80211/mac80211.ko",
@@ -297,27 +299,30 @@ def define_pineapple():
         "bootconfig",
     ]
 
-    for variant in la_variants:
-        board_kernel_cmdline_extras = []
-        board_bootconfig_extras = []
+    # Create pure pineapple and spo bazel variants
+    for spo in [""] + spo_variants:
+        for variant in la_variants:
+            board_kernel_cmdline_extras = []
+            board_bootconfig_extras = []
 
-        if variant == "consolidate":
-            mod_list = _pineapple_consolidate_in_tree_modules
-        else:
-            mod_list = _pineapple_in_tree_modules
-            board_kernel_cmdline_extras += ["nosoftlockup"]
-            kernel_vendor_cmdline_extras += ["nosoftlockup"]
-            board_bootconfig_extras += ["androidboot.console=0"]
+            if variant == "consolidate":
+                mod_list = _pineapple_consolidate_in_tree_modules
+            else:
+                mod_list = _pineapple_in_tree_modules
+                board_kernel_cmdline_extras += ["nosoftlockup"]
+                kernel_vendor_cmdline_extras += ["nosoftlockup"]
+                board_bootconfig_extras += ["androidboot.console=0"]
 
-        define_msm_la(
-            msm_target = target_name,
-            variant = variant,
-            in_tree_module_list = mod_list,
-            boot_image_opts = boot_image_opts(
-                earlycon_addr = "qcom_geni,0x00a9C000",
-                kernel_vendor_cmdline_extras = kernel_vendor_cmdline_extras,
-                board_kernel_cmdline_extras = board_kernel_cmdline_extras,
-                board_bootconfig_extras = board_bootconfig_extras,
-            ),
-            dpm_overlay = True,
-        )
+            define_msm_la(
+                msm_target = target_name,
+                variant = variant,
+                in_tree_module_list = mod_list,
+                boot_image_opts = boot_image_opts(
+                    earlycon_addr = "qcom_geni,0x00a9C000",
+                    kernel_vendor_cmdline_extras = kernel_vendor_cmdline_extras,
+                    board_kernel_cmdline_extras = board_kernel_cmdline_extras,
+                    board_bootconfig_extras = board_bootconfig_extras,
+                ),
+                somc_product_operator = spo,
+                dpm_overlay = True,
+            )

@@ -1,0 +1,415 @@
+CS35L45 Speaker Amplifier
+
+Required properties:
+
+  - compatible : "cirrus,cs35l45"
+
+  - reg : the SPI chip select line or I2C device address for the device
+
+  - VA-supply, VP-supply : power supplies for the device,
+    as covered in
+    Documentation/devicetree/bindings/regulator/regulator.txt.
+
+Optional properties:
+  - interrupts : IRQ line info CS35L45.
+    (See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+    for further information relating to interrupt properties)
+
+  - reset-gpios : gpio used to reset the amplifier
+
+  - cirrus,use-tdm-slots : Give preference to set_tdm_slot callback from
+    DAI interface for configuring ASP slot width.
+
+  - cirrus,allow-hibernate : Allow the DSP to enter a hibernate state when
+    possible.
+
+  - cirrus,asp-sdout-hiz-ctrl : ASP TX data pin (DOUT) Hi-Z control.
+
+  0 = Logic 0 during unused timeslots, and while all transmit channels disabled
+  1 = Hi-Z during unused timeslots but logic 0 while all transmit channels
+       disabled
+  2 = (Default) Logic 0 during unused timeslots, but Hi-Z while all transmit
+       channels disabled
+  3 = Hi-Z during unused timeslots, and while all transmit channels disabled
+
+  - cirrus,dsp-part-name : String to create custom part name for HALO DSP
+    driver. Default is 'cs35l45'.
+
+  - cirrus,fast-switch : Specify file names for Fast Use Case Switching DSP
+    feature.  Files names are comma-separated strings.
+
+  - cirrus,ngate-ch1-hold : Time that the incoming audio signal must be below
+    the defined threshold before entering the noise gated state.
+
+  - cirrus,ngate-ch1-thr : Threshold of the audio signal input which the
+    noise gate considers the input audio to be at a low enough level to be
+    valid to enter a noise gating state of operation.
+
+  - cirrus,ngate-ch2-hold : Time that the incoming audio signal must be below
+    the defined threshold before entering the noise gated state.
+
+  - cirrus,ngate-ch2-thr : Threshold of the audio signal input which the
+    noise gate considers the input audio to be at a low enough level to be
+    valid to enter a noise gating state of operation.
+
+  - cirrus,sync-id : The MDSYNC SW packet ID the amplifier will use when
+    broadcasting and receiving messages.
+
+    0 - Indicates master device
+    Anything else - Indicates slave device
+
+  - cirrus,sync-num-slaves : Number of slaves present on the MDSYNC bus. Should
+    be the same for all amps on same MDSYNC bus. The master device will wait
+    for 'sync-num-slaves' number of parts to indicate PLL lock events before
+    broadcasting MDSYNC power packets.
+
+  - cirrus,global-en-gpio : Sets which GPIO pin is used to control GLOBAL_EN.
+    0 = (Default) Not enabled
+    1 = GPIO1
+    2 = GPIO2
+    3 = GPIO3
+
+Optional Voltage Based Amplifier BPE Sub-node:
+
+  Details found in section 4.10
+
+  The cs35l45 node can have a single "cirrus,bpe-inst-config" sub-node
+  to set configuration properties for the voltage based amplifier brownout
+  prevention engine.
+
+  There are 4 'levels' associated with voltage based ABPE. Each sub-node
+  property will parse values for each level, but the driver might only
+  utilize a subset of those level. Please refer to section 4.10.3 for complete
+  information.
+
+  Sub-node properties:
+
+  - bpe-inst-thld : Array of four 32-bit values representing amplifier BPE
+    instant voltage thresholds.
+
+  - bpe-inst-attn : Array of four 32-bit values representing amplifier BPE
+    instant current limits.
+
+  - bpe-inst-atk-rate : Array of four 32-bit values representing amplifier BPE
+    instant attack rates.
+
+  - bpe-inst-hold-time : Array of four 32-bit values representing amplifier BPE
+    instant hold times.
+
+  - bpe-inst-rls-rate : Array of four 32-bit values representing amplifier BPE
+    instant release rates.
+
+Optional Miscellaneous Based Amplifier BPE Configuration Sub-node:
+
+  Details found in section 4.10
+
+  The cs35l45 node can have a single "cirrus,bpe-misc-config" sub-node
+  to set various settings related to both voltage based amplifier BPE
+
+  Sub-node properties:
+
+  Section 7.21.12
+  - bst-bpe-inst-bpe-byp
+  - bst-bpe-inst-inf-hold-rls
+  - bst-bpe-inst-l3-byp
+  - bst-bpe-inst-l2-byp
+  - bst-bpe-inst-l1-byp
+  - bst-bpe-mode-sel
+  - bst-bpe-filt-sel
+
+Optional Voltage Based Boost BPE Sub-node:
+
+  Details found in section 4.9.4
+
+  The cs35l45 node can have a single "cirrus,bst-bpe-inst-config" sub-node
+  to set configuration properties for the voltage based boost brownout
+  prevention engine.
+
+  There are 5 'levels' associated with voltage based BBPE. Each sub-node
+  property will parse values for each level, but the driver might only
+  utilize a subset of those level. Please refer to section 4.9.4 for complete
+  information.
+
+  Sub-node properties:
+
+  - bst-bpe-inst-thld : Array of five 32-bit values representing boost BPE
+    instant voltage thresholds.
+
+  - bst-bpe-inst-ilim : Array of five 32-bit values representing boost BPE
+    instant current limits.
+
+  - bst-bpe-inst-ss-ilim : Array of five 32-bit values representing boost BPE
+    instant soft start current limits.
+
+  - bst-bpe-inst-atk-rate : Array of five 32-bit values representing boost BPE
+    instant attack rates.
+
+  - bst-bpe-inst-hold-time : Array of five 32-bit values representing boost BPE
+    instant hold times.
+
+  - bst-bpe-inst-rls-rate : Array of five 32-bit values representing boost BPE
+    instant release rates.
+
+Optional Miscellaneous Based Boost BPE Configuration Sub-node:
+
+  Details found in section 4.9
+
+  The cs35l45 node can have a single "cirrus,bst-bpe-misc-config" sub-node
+  to set various settings related to both voltage based boost BPE
+
+  Sub-node properties:
+
+  Section 7.15.8
+  - bst-bpe-inst-inf-hold-rls
+  - bst-bpe-il-lim-mode
+  - bst-bpe-out-opmode-sel
+  - bst-bpe-inst-l3-byp
+  - bst-bpe-inst-l2-byp
+  - bst-bpe-inst-l1-byp
+  - bst-bpe-filt-sel
+
+  Section 7.15.9
+  - bst-bpe-il-lim1-dly
+  - bst-bpe-il-lim2-dly
+  - bst-bpe-il-lim-dly-hyst
+
+  Section 7.15.10
+  - bst-bpe-il-lim1-atk-rate
+  - bst-bpe-il-lim2-atk-rate
+
+  Section 7.15.11
+  - bst-bpe-il-lim1-rls-rate
+  - bst-bpe-il-lim2-rls-rate
+
+Optional Inductor Current Based Boost BPE Sub-node:
+
+  Details found in section 4.9.5
+
+  The cs35l45 node can have a single "cirrus,bst-bpe-il-lim-config" sub-node
+  to set configuration properties for the inductor current based boost brownout
+  prevention engine. Configuration properties are all interpreted as 32-bit
+  unsigned integers mapped to register bitfields.
+
+  Sub-node properties:
+
+  Section 7.15.8
+  - bst-bpe-il-lim-thld-del1
+  - bst-bpe-il-lim-thld-del2
+  - bst-bpe-il-lim1-thld
+  - bst-bpe-il-lim-thld-hyst
+
+  Section 7.15.9
+  - bst-bpe-il-lim1-dly
+  - bst-bpe-il-lim2-dly
+  - bst-bpe-il-lim-dly-hyst
+
+  Section 7.15.10
+  - bst-bpe-il-lim1-atk-rate
+  - bst-bpe-il-lim2-atk-rate
+
+  Section 7.15.11
+  - bst-bpe-il-lim1-rls-rate
+  - bst-bpe-il-lim2-rls-rate
+
+Optional Adaptive HVLV Sub-node:
+
+  Details found in section 4.7.2
+
+  The cs35l45 node can have a single "cirrus,hvlv-config" sub-node to set
+  configuration properties for the adaptive amplifier drive control engine.
+  Configuration properties are all interpreted as 32-bit unsigned integers
+  mapped to register bitfields.
+
+  Sub-node properties:
+
+  Section 7.22.1
+  - hvlv-thld-hys
+  - hvlv-thld
+  - hvlv-dly
+
+Optional Amplifier Level Dependent Power Management Sub-node:
+
+  Details found in section 4.7.3
+
+  The cs35l45 node can have a single "cirrus,ldpm-config" sub-node to set
+  configuration properties for the amplifier level dependent power management
+  function. Configuration properties are all interpreted as 32-bit unsigned
+  integers mapped to register bitfields.
+
+  Sub-node properties:
+
+  Section 7.22.2
+  - ldpm-gp1-boost-sel
+  - ldpm-gp1-amp-sel
+  - ldpm-gp1-delay
+  - ldpm-gp1-pcm-thld
+  - ldpm-gp2-imon-sel
+  - ldpm-gp2-vmon-sel
+  - ldpm-gp2-delay
+  - ldpm-gp2-pcm-thld
+
+Optional Class H Tracking Configuration Sub-node:
+
+  Details found in section 4.7.1
+
+  The cs35l45 node can have a single "cirrus,classh-config" sub-node to set
+  configuration properties for the Class H with overboost support function.
+  Configuration properties are all interpreted as 32-bit unsigned integers
+  mapped to register bitfields.
+
+  Sub-node properties:
+
+  Section 7.22.3
+  - ch-hdrm
+  - ch-ratio
+  - ch-rel-rate
+
+  Section 7.22.4
+  - ch-ovb-thld1
+  - ch-ovb-thlddelta
+  - ch-vdd-bst-max
+
+  Section 7.22.5
+  - ch-ovb-latch
+  - ch-ovb-ratio
+  - ch-thld1-offset
+
+  Section 7.22.6
+  - aud-mem-depth
+
+Optional GPIOX Sub-nodes:
+
+  Details found in section 4.23
+
+  The cs35l45 node can have up to three "cirrus,gpio-ctrlX" ('X' = [1,2,3])
+  sub-nodes for configuring the GPIO pins.
+
+  - gpio-dir : GPIO pin direction. Valid only when 'gpio-ctrl'
+    is 1.
+
+    0 = Output
+    1 = Input (Default)
+
+  - gpio-lvl : GPIO level. Valid only when 'gpio-ctrl' is 1 and 'gpio-dir' is 0.
+
+    0 = Low (Default)
+    1 = High
+
+  - gpio-op-cfg : GPIO output configuration. Valid only when 'gpio-ctrl' is 1
+    and 'gpio-dir' is 0.
+
+    0 = CMOS (Default)
+    1 = Open Drain
+
+  - gpio-pol : GPIO output polarity select. Valid only when 'gpio-ctrl' is 1
+    and 'gpio-dir' is 0.
+
+    0 = Non-inverted, Active High (Default)
+    1 = Inverted, Active Low
+
+  - gpio-invert : Defines the polarity of the GPIO pin if configured
+    as input.
+
+    0 = Not inverted (Default)
+    1 = Inverted
+
+  - gpio-ctrl : Defines the function of the GPIO pin.
+
+  GPIO1:
+    0 = High impedance input (Default)
+    1 = Pin acts as a GPIO, direction controlled by 'gpio-dir'
+    2 = Pin acts as MDSYNC, direction controlled by MDSYNC
+    3-7 = Reserved
+
+  GPIO2:
+    0 = High impedance input (Default)
+    1 = Pin acts as a GPIO, direction controlled by 'gpio-dir'
+    2 = Pin acts as open drain INT
+    3 = Reserved
+    4 = Pin acts as push-pull output INT. Active low.
+    5 = Pin acts as push-pull output INT. Active high.
+    6,7 = Reserved
+
+  GPIO3:
+    0 = High impedance input (Default)
+    1 = Pin acts as a GPIO, direction controlled by 'gpio-dir'
+    2-7 = Reserved
+
+Example:
+
+cs35l45: cs35l45@30 {
+	compatible = "cirrus,cs35l45";
+	reg = <0x30>;
+
+	VA-supply = <&dummy_vreg>;
+	VP-supply = <&dummy_vreg>;
+
+	interrupt-parent = <&gpio0>;
+	interrupts = <68 8>;
+
+	reset-gpios = <&gpio0 54 0>;
+
+	cirrus,use-tdm-slots;
+	cirrus,asp-sdout-hiz-ctrl = <0x2>;
+	cirrus,dsp-part-name = "cs35l45";
+	cirrus,fast-switch = "sample_fast_switch1.txt",
+		"sample_fast_switch2.txt";
+
+	cirrus,bpe-inst-config {
+		bpe-inst-thld = <0x1E 0x32 0x46 0x5A>;
+		bpe-inst-attn = <0x18 0x12 0x0C 0x06>;
+		bpe-inst-atk-rate = <0x6 0x6 0x6 0x6>;
+		bpe-inst-hold-time = <0x2 0x2 0x2 0x2>;
+		bpe-inst-rls-rate = <0x05 0x05 0x05 0x05>;
+	};
+
+	cirrus,bpe-misc-config {
+		bpe-inst-bpe-byp = <0x0>;
+		bpe-inst-inf-hold-rls = <0x0>;
+		bpe-inst-l3-byp = <0x0>;
+		bpe-inst-l2-byp = <0x0>;
+		bpe-inst-l1-byp = <0x0>;
+		bpe-mode-sel = <0x0>;
+		bpe-filt-sel = <0x0>;
+	};
+
+	cirrus,bst-bpe-inst-config {
+		bst-bpe-inst-thld = <0x1E 0x32 0x46 0x5A 0>;
+		bst-bpe-inst-ilim = <0 0x04 0x0C 0x14 0x3C>;
+		bst-bpe-inst-ss-ilim = <0 0x00 0x04 0x08 0x1C>;
+		bst-bpe-inst-atk-rate = <0 0x6 0x6 0x6 0>;
+		bst-bpe-inst-hold-time = <0x2 0x2 0x2 0x2 0>;
+		bst-bpe-inst-rls-rate = <0x06 0x06 0x06 0x06 0>;
+	};
+
+	cirrus,bst-bpe-misc-config {
+		bst-bpe-inst-inf-hold-rls = <0x0>;
+		bst-bpe-il-lim-mode = <0x1>;
+		bst-bpe-out-opmode-sel = <0x0>;
+		bst-bpe-inst-l3-byp = <0x0>;
+		bst-bpe-inst-l2-byp = <0x0>;
+		bst-bpe-inst-l1-byp = <0x0>;
+		bst-bpe-filt-sel = <0x0>;
+	};
+
+	cirrus,bst-bpe-il-lim-config {
+		bst-bpe-il-lim-thld-del1 = <0x2>;
+		bst-bpe-il-lim-thld-del2 = <0x6>;
+		bst-bpe-il-lim1-thld = <0x2C>;
+		bst-bpe-il-lim-thld-hyst = <0x0>;
+
+		bst-bpe-il-lim1-dly = <0xC>;
+		bst-bpe-il-lim2-dly = <0x4>;
+		bst-bpe-il-lim-dly-hyst = <0x0>;
+
+		bst-bpe-il-lim1-atk-rate = <0x0>;
+		bst-bpe-il-lim2-atk-rate = <0x0>;
+
+		bst-bpe-il-lim1-rls-rate = <0x0>;
+		bst-bpe-il-lim2-rls-rate = <0x0>;
+	};
+
+	cirrus,gpio-ctrl2 {
+		gpio-ctrl = <0x02>;
+	};
+};

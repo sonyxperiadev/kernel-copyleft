@@ -1,0 +1,72 @@
+headers_src = [
+    "include/uapi/linux/*.h",
+]
+
+test_headers_src = [
+    "ipa/ipa_test_module/ipa_test_module.h",
+]
+
+ipa_headers_out = [
+    "linux/msm_ipa.h",
+    "linux/ipa_qmi_service_v01.h",
+    "linux/rmnet_ipa_fd_ioctl.h",
+]
+
+ipa_test_headers_out = [
+    "ipa_test_module.h",
+]
+
+ipa_kernel_headers_verbose = "--verbose "
+ipa_test_kernel_headers_verbose = "--verbose "
+
+genrule {
+    name: "qti_generate_ipa_kernel_headers",
+    tools: ["headers_install.sh",
+            "unifdef"
+    ],
+    tool_files: [
+         "ipa_kernel_headers.py",
+    ],
+    srcs: headers_src,
+    cmd: "python3 -u $(location ipa_kernel_headers.py) " +
+        ipa_kernel_headers_verbose +
+        "--gen_dir $(genDir) " +
+        "--ipa_include_uapi $(locations include/uapi/linux/*.h) " +
+        "--unifdef $(location unifdef) " +
+        "--headers_install $(location headers_install.sh)",
+    out: ipa_headers_out,
+}
+
+genrule {
+    name: "qti_generate_ipa_test_kernel_headers",
+    tools: ["headers_install.sh",
+            "unifdef"
+    ],
+    tool_files: [
+         "ipa_test_kernel_headers.py",
+    ],
+    srcs: test_headers_src,
+    cmd: "python3 -u $(location ipa_test_kernel_headers.py) " +
+        ipa_test_kernel_headers_verbose +
+        "--gen_dir $(genDir) " +
+        "--ipa_test_include_uapi $(locations ipa/ipa_test_module/ipa_test_module.h) " +
+        "--unifdef $(location unifdef) " +
+        "--headers_install $(location headers_install.sh)",
+    out: ipa_test_headers_out,
+}
+
+cc_library_headers {
+    name: "qti_ipa_kernel_headers",
+    generated_headers: ["qti_generate_ipa_kernel_headers"],
+    export_generated_headers: ["qti_generate_ipa_kernel_headers"],
+    vendor: true,
+    recovery_available: true
+}
+
+cc_library_headers {
+    name: "qti_ipa_test_kernel_headers",
+    generated_headers: ["qti_generate_ipa_test_kernel_headers"],
+    export_generated_headers: ["qti_generate_ipa_test_kernel_headers"],
+    vendor: true,
+    recovery_available: true
+}
