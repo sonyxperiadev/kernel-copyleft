@@ -347,7 +347,7 @@ static int compat_fastrpc_ioctl_invoke(struct file *filp,
 	if (err)
 		return err;
 	VERIFY(err, 0 == (err = fastrpc_internal_invoke(fl,
-						fl->mode, USER_MSG, inv)));
+						fl->mode, COMPAT_MSG, inv)));
 	return err;
 }
 
@@ -484,7 +484,7 @@ static int compat_fastrpc_ioctl_invoke2(struct file *filp,
 	if (err)
 		return err;
 
-	VERIFY(err, 0 == (err = fastrpc_internal_invoke2(fl, inv)));
+	VERIFY(err, 0 == (err = fastrpc_internal_invoke2(fl, inv, true)));
 	return err;
 }
 
@@ -975,7 +975,7 @@ long compat_fastrpc_device_ioctl(struct file *filp, unsigned int cmd,
 	if (!filp->f_op || !filp->f_op->unlocked_ioctl)
 		return -ENOTTY;
 
-	fl->is_compat = true;
+	
 	switch (cmd) {
 	case COMPAT_FASTRPC_IOCTL_INVOKE:
 	case COMPAT_FASTRPC_IOCTL_INVOKE_FD:

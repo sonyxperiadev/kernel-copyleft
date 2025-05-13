@@ -37,7 +37,7 @@ static int cvp_msgq_receiver(void *data)
 
 	while (true) {
 		rc = gh_msgq_recv(msgq_drv->config.handle, msg_ptr,
-			GH_MSGQ_MAX_MSG_SIZE_BYTES, &size, 0);
+			sizeof(*msg_ptr), &size, 0);
 
 		if (rc != 0 ) {
 			dprintk(CVP_ERR,
