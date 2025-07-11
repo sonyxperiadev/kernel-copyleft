@@ -127,8 +127,8 @@ static int loongson_card_parse_of(struct loongson_card_data *data)
 	codec = of_get_child_by_name(dev->of_node, "codec");
 	if (!codec) {
 		dev_err(dev, "audio-codec property missing or invalid\n");
-		of_node_put(cpu);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err;
 	}
 
 	for (i = 0; i < card->num_links; i++) {

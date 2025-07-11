@@ -5,7 +5,6 @@
 
 static const struct nvkm_ram_func
 gp102_ram = {
-	.init = gp100_ram_init,
 };
 
 int

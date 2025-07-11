@@ -4493,7 +4493,6 @@ include/trace/hooks/futex.h
 include/trace/hooks/gic.h
 include/trace/hooks/gic_v3.h
 include/trace/hooks/gzvm.h
-include/trace/hooks/huge_memory.h
 include/trace/hooks/hung_task.h
 include/trace/hooks/iommu.h
 include/trace/hooks/logbuf.h
@@ -4633,7 +4632,6 @@ include/uapi/linux/ethtool.h
 include/uapi/linux/ethtool_netlink.h
 include/uapi/linux/eventfd.h
 include/uapi/linux/eventpoll.h
-include/uapi/linux/exfat.h
 include/uapi/linux/ext4.h
 include/uapi/linux/f2fs.h
 include/uapi/linux/fadvise.h

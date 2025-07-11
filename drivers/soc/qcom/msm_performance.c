@@ -813,18 +813,33 @@ static int msm_perf_core_ctl_notify(struct notifier_block *nb,
 					unsigned long unused,
 					void *data)
 {
+	static unsigned int tld, nrb, i;
+	static unsigned int top_ld[CLUSTER_MAX], curr_cp[CLUSTER_MAX];
 	static DECLARE_WORK(sysfs_notify_work, nr_notify_userspace);
 	struct core_ctl_notif_data *d = data;
 	int cluster = 0;
 
+	nrb += d->nr_big;
+	tld += d->coloc_load_pct;
 	for (cluster = 0; cluster < CLUSTER_MAX; cluster++) {
-		top_load[cluster] = d->ta_util_pct[cluster];
-		curr_cap[cluster] = d->cur_cap_pct[cluster];
+		top_ld[cluster] += d->ta_util_pct[cluster];
+		curr_cp[cluster] += d->cur_cap_pct[cluster];
 	}
-	aggr_top_load = d->coloc_load_pct;
-	aggr_big_nr = d->nr_big;
-
-	schedule_work(&sysfs_notify_work);
+	i++;
+	if (i == POLL_INT) {
+		aggr_big_nr = ((nrb%POLL_INT) ? 1 : 0) + nrb/POLL_INT;
+		aggr_top_load = tld/POLL_INT;
+		for (cluster = 0; cluster < CLUSTER_MAX; cluster++) {
+			top_load[cluster] = top_ld[cluster]/POLL_INT;
+			curr_cap[cluster] = curr_cp[cluster]/POLL_INT;
+			top_ld[cluster] = 0;
+			curr_cp[cluster] = 0;
+		}
+		tld = 0;
+		nrb = 0;
+		i = 0;
+		schedule_work(&sysfs_notify_work);
+	}
 	return NOTIFY_OK;
 }
 

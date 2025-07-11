@@ -789,6 +789,7 @@ static int qcom_va_md_driver_probe(struct platform_device *pdev)
 		goto out;
 	}
 
+	dma_free_coherent(&pdev->dev, va_md_data.total_mem_size, vaddr, dma_handle);
 	page = phys_to_page(dma_to_phys(&pdev->dev, dma_handle));
 	count = PAGE_ALIGN(va_md_data.total_mem_size) >> PAGE_SHIFT;
 	pages = kmalloc_array(count, sizeof(struct page *), GFP_KERNEL);
@@ -801,7 +802,6 @@ static int qcom_va_md_driver_probe(struct platform_device *pdev)
 	vaddr = vmap(pages, count, VM_DMA_COHERENT, pgprot_dmacoherent(PAGE_KERNEL));
 	kfree(pages);
 
-	dma_free_coherent(&pdev->dev, va_md_data.total_mem_size, vaddr, dma_handle);
 	va_md_data.mem_phys_addr = dma_to_phys(&pdev->dev, dma_handle);
 	va_md_data.elf_mem = (unsigned long)vaddr;
 

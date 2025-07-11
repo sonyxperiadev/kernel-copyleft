@@ -410,8 +410,8 @@ static struct qcom_icc_qosbox qnm_gpu_qos = {
 	.offsets = { 0x31000, 0xb1000 },
 	.config = &(struct qos_config) {
 		.prio = 0,
-		.urg_fwd = 0,
-		.prio_fwd_disable = 1,
+		.urg_fwd = 1,
+		.prio_fwd_disable = 0,
 	},
 };
 
@@ -532,7 +532,7 @@ static struct qcom_icc_qosbox qnm_pcie_qos = {
 	.num_ports = 1,
 	.offsets = { 0x144000 },
 	.config = &(struct qos_config) {
-		.prio = 2,
+		.prio = 0,
 		.urg_fwd = 1,
 		.prio_fwd_disable = 0,
 	},
@@ -694,7 +694,7 @@ static struct qcom_icc_qosbox qnm_camnoc_rt_cdm_sf_qos = {
 	.num_ports = 1,
 	.offsets = { 0x2c000 },
 	.config = &(struct qos_config) {
-		.prio = 2,
+		.prio = 3,
 		.urg_fwd = 0,
 		.prio_fwd_disable = 1,
 	},
@@ -761,8 +761,8 @@ static struct qcom_icc_qosbox qnm_video_cv_cpu_qos = {
 	.offsets = { 0x29000 },
 	.config = &(struct qos_config) {
 		.prio = 4,
-		.urg_fwd = 1,
-		.prio_fwd_disable = 0,
+		.urg_fwd = 0,
+		.prio_fwd_disable = 1,
 	},
 };
 
@@ -782,7 +782,7 @@ static struct qcom_icc_qosbox qnm_video_eva_qos = {
 	.num_ports = 2,
 	.offsets = { 0x2a000, 0x2d000 },
 	.config = &(struct qos_config) {
-		.prio = 3,
+		.prio = 0,
 		.urg_fwd = 1,
 		.prio_fwd_disable = 0,
 	},
@@ -827,8 +827,8 @@ static struct qcom_icc_qosbox qnm_video_v_cpu_qos = {
 	.offsets = { 0x2b000 },
 	.config = &(struct qos_config) {
 		.prio = 4,
-		.urg_fwd = 1,
-		.prio_fwd_disable = 0,
+		.urg_fwd = 0,
+		.prio_fwd_disable = 1,
 	},
 };
 
@@ -921,50 +921,6 @@ static struct qcom_icc_node qnm_aggre2_noc = {
 	.channels = 1,
 	.buswidth = 16,
 	.noc_ops = &qcom_qnoc4_ops,
-	.num_links = 1,
-	.links = { SLAVE_SNOC_GEM_NOC_SF },
-};
-
-static struct qcom_icc_qosbox qnm_cnoc_data_qos = {
-	.regs = icc_qnoc_qos_regs[ICC_QNOC_QOSGEN_TYPE_RPMH],
-	.num_ports = 1,
-	.offsets = { 0x1d000 },
-	.config = &(struct qos_config) {
-		.prio = 2,
-		.urg_fwd = 0,
-		.prio_fwd_disable = 1,
-	},
-};
-
-static struct qcom_icc_node qnm_cnoc_data = {
-	.name = "qnm_cnoc_data",
-	.id = MASTER_CNOC_SNOC,
-	.channels = 1,
-	.buswidth = 8,
-	.noc_ops = &qcom_qnoc4_ops,
-	.qosbox = &qnm_cnoc_data_qos,
-	.num_links = 1,
-	.links = { SLAVE_SNOC_GEM_NOC_SF },
-};
-
-static struct qcom_icc_qosbox qnm_nsinoc_snoc_qos = {
-	.regs = icc_qnoc_qos_regs[ICC_QNOC_QOSGEN_TYPE_RPMH],
-	.num_ports = 1,
-	.offsets = { 0x1c000 },
-	.config = &(struct qos_config) {
-		.prio = 2,
-		.urg_fwd = 0,
-		.prio_fwd_disable = 1,
-	},
-};
-
-static struct qcom_icc_node qnm_nsinoc_snoc = {
-	.name = "qnm_nsinoc_snoc",
-	.id = MASTER_NSINOC_SNOC,
-	.channels = 1,
-	.buswidth = 8,
-	.noc_ops = &qcom_qnoc4_ops,
-	.qosbox = &qnm_nsinoc_snoc_qos,
 	.num_links = 1,
 	.links = { SLAVE_SNOC_GEM_NOC_SF },
 };
@@ -3698,8 +3654,6 @@ static struct qcom_icc_bcm *system_noc_bcms[] = {
 static struct qcom_icc_node *system_noc_nodes[] = {
 	[MASTER_A1NOC_SNOC] = &qnm_aggre1_noc,
 	[MASTER_A2NOC_SNOC] = &qnm_aggre2_noc,
-	[MASTER_CNOC_SNOC] = &qnm_cnoc_data,
-	[MASTER_NSINOC_SNOC] = &qnm_nsinoc_snoc,
 	[SLAVE_SNOC_GEM_NOC_SF] = &qns_gemnoc_sf,
 };
 

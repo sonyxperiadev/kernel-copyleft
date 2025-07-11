@@ -107,6 +107,9 @@ xhci_sideband_add_endpoint(struct xhci_sideband *sb,
 	struct xhci_virt_ep *ep;
 	unsigned int ep_index;
 
+	if (!sb)
+		return -ENODEV;
+
 	mutex_lock(&sb->mutex);
 	ep_index = xhci_get_endpoint_index(&host_ep->desc);
 	ep = &sb->vdev->eps[ep_index];
@@ -166,8 +169,7 @@ xhci_sideband_remove_endpoint(struct xhci_sideband *sb,
 	}
 
 	__xhci_sideband_remove_endpoint(sb, ep);
-	if (ep->ring)
-		xhci_initialize_ring_info(ep->ring, 1);
+	xhci_initialize_ring_info(ep->ring, 1);
 	mutex_unlock(&sb->mutex);
 
 	return 0;
@@ -210,6 +212,9 @@ xhci_sideband_get_endpoint_buffer(struct xhci_sideband *sb,
 {
 	struct xhci_virt_ep *ep;
 	unsigned int ep_index;
+
+	if (!sb)
+		return NULL;
 
 	ep_index = xhci_get_endpoint_index(&host_ep->desc);
 	ep = sb->eps[ep_index];
@@ -264,7 +269,7 @@ xhci_sideband_create_interrupter(struct xhci_sideband *sb, int num_seg,
 {
 	int ret = 0;
 
-	if (!sb || !sb->xhci)
+	if (!sb)
 		return -ENODEV;
 
 	mutex_lock(&sb->mutex);

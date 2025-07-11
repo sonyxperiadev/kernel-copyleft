@@ -260,9 +260,6 @@ enum ftrace_dump_mode {
 	DUMP_NONE,
 	DUMP_ALL,
 	DUMP_ORIG,
-#ifndef __GENKSYMS__
-	DUMP_PARAM,
-#endif
 };
 
 #ifdef CONFIG_TRACING

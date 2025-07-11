@@ -78,6 +78,11 @@ struct tasdevice {
 	bool is_loaderr;
 };
 
+struct tasdevice_irqinfo {
+	int irq_gpio;
+	int irq;
+};
+
 struct calidata {
 	unsigned char *data;
 	unsigned long total_sz;
@@ -85,6 +90,7 @@ struct calidata {
 
 struct tasdevice_priv {
 	struct tasdevice tasdevice[TASDEVICE_MAX_CHANNELS];
+	struct tasdevice_irqinfo irq_info;
 	struct tasdevice_rca rcabin;
 	struct calidata cali_data;
 	struct tasdevice_fw *fmw;
@@ -95,6 +101,7 @@ struct tasdevice_priv {
 	struct tm tm;
 
 	enum device_catlog_id catlog_id;
+	const char *acpi_subsystem_id;
 	unsigned char cal_binaryname[TASDEVICE_MAX_CHANNELS][64];
 	unsigned char crc8_lkp_tbl[CRC8_TABLE_SIZE];
 	unsigned char coef_binaryname[64];
@@ -105,7 +112,6 @@ struct tasdevice_priv {
 	unsigned int chip_id;
 	unsigned int sysclk;
 
-	int irq;
 	int cur_prog;
 	int cur_conf;
 	int fw_state;

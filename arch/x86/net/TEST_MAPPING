@@ -264,12 +264,6 @@
           "include-filter": "android.incrementalinstall.cts.IncrementalInstallTest"
         }
       ]
-    },
-    {
-      "name": "CtsRootBluetoothTestCases"
-    },
-    {
-      "name": "vts_kernel_net_tests"
     }
   ]
 }

@@ -56,7 +56,6 @@
 
 #include "workqueue_internal.h"
 
-#include <trace/hooks/dtask.h>
 #include <trace/hooks/wqlockup.h>
 /* events/workqueue.h uses default TRACE_INCLUDE_PATH */
 #undef TRACE_INCLUDE_PATH
@@ -1155,8 +1154,6 @@ static bool kick_pool(struct worker_pool *pool)
 		}
 	}
 #endif
-	trace_android_vh_wq_wake_idle_worker(p, list_first_entry(&pool->worklist,
-					struct work_struct, entry));
 	wake_up_process(p);
 	return true;
 }
@@ -1802,8 +1799,6 @@ retry:
 
 	/* pwq determined, queue */
 	trace_workqueue_queue_work(req_cpu, pwq, work);
-
-	trace_android_vh_wq_queue_work(work, wq->name, wq->flags, cpu);
 
 	if (WARN_ON(!list_empty(&work->entry)))
 		goto out;
@@ -3215,9 +3210,7 @@ void __flush_workqueue(struct workqueue_struct *wq)
 
 	mutex_unlock(&wq->mutex);
 
-	trace_android_vh_flush_wq_wait_start(wq);
 	wait_for_completion(&this_flusher.done);
-	trace_android_vh_flush_wq_wait_finish(wq);
 
 	/*
 	 * Wake-up-and-cascade phase
@@ -3429,9 +3422,7 @@ static bool __flush_work(struct work_struct *work, bool from_cancel)
 	lock_map_release(&work->lockdep_map);
 
 	if (start_flush_work(work, &barr, from_cancel)) {
-		trace_android_vh_flush_work_wait_start(work);
 		wait_for_completion(&barr.done);
-		trace_android_vh_flush_work_wait_finish(work);
 		destroy_work_on_stack(&barr.work);
 		return true;
 	} else {
@@ -6510,18 +6501,10 @@ static void wq_watchdog_timer_fn(struct timer_list *unused)
 
 notrace void wq_watchdog_touch(int cpu)
 {
-	unsigned long thresh = READ_ONCE(wq_watchdog_thresh) * HZ;
-	unsigned long touch_ts = READ_ONCE(wq_watchdog_touched);
-	unsigned long now = jiffies;
-
 	if (cpu >= 0)
-		per_cpu(wq_watchdog_touched_cpu, cpu) = now;
-	else
-		WARN_ONCE(1, "%s should be called with valid CPU", __func__);
+		per_cpu(wq_watchdog_touched_cpu, cpu) = jiffies;
 
-	/* Don't unnecessarily store to global cacheline */
-	if (time_after(now, touch_ts + thresh / 4))
-		WRITE_ONCE(wq_watchdog_touched, jiffies);
+	wq_watchdog_touched = jiffies;
 }
 
 static void wq_watchdog_set_thresh(unsigned long thresh)

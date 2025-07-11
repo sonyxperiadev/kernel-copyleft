@@ -5593,10 +5593,8 @@ struct ata_host *ata_host_alloc(struct device *dev, int max_ports)
 	}
 
 	dr = devres_alloc(ata_devres_release, 0, GFP_KERNEL);
-	if (!dr) {
-		kfree(host);
+	if (!dr)
 		goto err_out;
-	}
 
 	devres_add(dev, dr);
 	dev_set_drvdata(dev, host);

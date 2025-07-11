@@ -1326,10 +1326,8 @@ static int btnxpuart_close(struct hci_dev *hdev)
 
 	serdev_device_close(nxpdev->serdev);
 	skb_queue_purge(&nxpdev->txq);
-	if (!IS_ERR_OR_NULL(nxpdev->rx_skb)) {
-		kfree_skb(nxpdev->rx_skb);
-		nxpdev->rx_skb = NULL;
-	}
+	kfree_skb(nxpdev->rx_skb);
+	nxpdev->rx_skb = NULL;
 	clear_bit(BTNXPUART_SERDEV_OPEN, &nxpdev->tx_state);
 	return 0;
 }
@@ -1344,10 +1342,8 @@ static int btnxpuart_flush(struct hci_dev *hdev)
 
 	cancel_work_sync(&nxpdev->tx_work);
 
-	if (!IS_ERR_OR_NULL(nxpdev->rx_skb)) {
-		kfree_skb(nxpdev->rx_skb);
-		nxpdev->rx_skb = NULL;
-	}
+	kfree_skb(nxpdev->rx_skb);
+	nxpdev->rx_skb = NULL;
 
 	return 0;
 }

@@ -184,10 +184,6 @@ static int gdsc_toggle_logic(struct gdsc *sc, enum gdsc_status status,
 	}
 
 	ret = gdsc_poll_status(sc, status);
-	if (ret && sc->gds_hw_ctrl) {
-		pr_warn("%s enable timed out, Re-polling\n", sc->pd.name);
-		ret = gdsc_poll_status(sc, status);
-	}
 	WARN(ret, "%s status stuck at 'o%s'", sc->pd.name, status ? "ff" : "n");
 
 out:

@@ -626,9 +626,12 @@ int __netpoll_setup(struct netpoll *np, struct net_device *ndev)
 	const struct net_device_ops *ops;
 	int err;
 
+	np->dev = ndev;
+	strscpy(np->dev_name, ndev->name, IFNAMSIZ);
+
 	if (ndev->priv_flags & IFF_DISABLE_NETPOLL) {
 		np_err(np, "%s doesn't support polling, aborting\n",
-		       ndev->name);
+		       np->dev_name);
 		err = -ENOTSUPP;
 		goto out;
 	}
@@ -646,7 +649,7 @@ int __netpoll_setup(struct netpoll *np, struct net_device *ndev)
 
 		refcount_set(&npinfo->refcnt, 1);
 
-		ops = ndev->netdev_ops;
+		ops = np->dev->netdev_ops;
 		if (ops->ndo_netpoll_setup) {
 			err = ops->ndo_netpoll_setup(ndev, npinfo);
 			if (err)
@@ -657,8 +660,6 @@ int __netpoll_setup(struct netpoll *np, struct net_device *ndev)
 		refcount_inc(&npinfo->refcnt);
 	}
 
-	np->dev = ndev;
-	strscpy(np->dev_name, ndev->name, IFNAMSIZ);
 	npinfo->netpoll = np;
 
 	/* last thing to do is link it to the net device structure */
@@ -676,7 +677,6 @@ EXPORT_SYMBOL_GPL(__netpoll_setup);
 int netpoll_setup(struct netpoll *np)
 {
 	struct net_device *ndev = NULL;
-	bool ip_overwritten = false;
 	struct in_device *in_dev;
 	int err;
 
@@ -741,7 +741,6 @@ put_noaddr:
 			}
 
 			np->local_ip.ip = ifa->ifa_local;
-			ip_overwritten = true;
 			np_info(np, "local IP %pI4\n", &np->local_ip.ip);
 		} else {
 #if IS_ENABLED(CONFIG_IPV6)
@@ -758,7 +757,6 @@ put_noaddr:
 					    !!(ipv6_addr_type(&np->remote_ip.in6) & IPV6_ADDR_LINKLOCAL))
 						continue;
 					np->local_ip.in6 = ifp->addr;
-					ip_overwritten = true;
 					err = 0;
 					break;
 				}
@@ -789,9 +787,6 @@ put_noaddr:
 	return 0;
 
 put:
-	DEBUG_NET_WARN_ON_ONCE(np->dev);
-	if (ip_overwritten)
-		memset(&np->local_ip, 0, sizeof(np->local_ip));
 	netdev_put(ndev, &np->dev_tracker);
 unlock:
 	rtnl_unlock();

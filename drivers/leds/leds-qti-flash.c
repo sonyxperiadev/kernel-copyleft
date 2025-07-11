@@ -556,7 +556,7 @@ static int __qti_flash_led_brightness_set(struct led_classdev *led_cdev,
 			fnode->ires_ua = IRES_12P5_UA;
 		else
 			fnode->ires_ua = IRES_5P0_UA;
-		fnode->updated_ires_idx = get_ires_idx(fnode->ires_ua);
+		fnode->ires_idx = get_ires_idx(fnode->ires_ua);
 	}
 
 	fnode->current_ma = current_ma;

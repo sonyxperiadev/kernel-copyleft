@@ -56,176 +56,249 @@ static struct qcom_mpam_msc *msc_param_verification(uint32_t msc_id, struct msc_
 
 int msc_system_get_partition(uint32_t msc_id, void *arg1, void *arg2)
 {
+	int ret = -EINVAL;
+	uint8_t qcom_msc_type;
 	struct qcom_mpam_msc *qcom_msc;
+	struct msc_query *query;
 
-	if ((arg1 == NULL) || (arg2 == NULL))
+	query = (struct msc_query *) arg1;
+	if (query == NULL)
 		return -EINVAL;
 
-	qcom_msc = msc_param_verification(msc_id, (struct msc_query *)arg1);
+	qcom_msc = msc_param_verification(msc_id, query);
 	if (qcom_msc == NULL)
-		return -EINVAL;
+		return ret;
 
-	switch (qcom_msc->qcom_msc_id.qcom_msc_type) {
+	qcom_msc_type = qcom_msc->qcom_msc_id.qcom_msc_type;
+	switch (qcom_msc_type) {
 	case SLC:
 		if (qcom_msc->ops->get_cache_partition)
-			return qcom_msc->ops->get_cache_partition(qcom_msc->dev, arg1, arg2);
+			ret = qcom_msc->ops->get_cache_partition(qcom_msc->dev, arg1, arg2);
 		break;
 	default:
 		break;
 	}
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(msc_system_get_partition);
 
 int msc_system_get_device_capability(uint32_t msc_id, void *arg1, void *arg2)
 {
+	int ret = -EINVAL;
+	uint8_t qcom_msc_type;
 	struct qcom_mpam_msc *qcom_msc;
+	struct msc_query *query;
 
-	if ((arg1 == NULL) || (arg2 == NULL))
+	query = (struct msc_query *) arg1;
+	if (query == NULL)
 		return -EINVAL;
 
-	qcom_msc = msc_param_verification(msc_id, (struct msc_query *)arg1);
+	qcom_msc = msc_param_verification(msc_id, query);
 	if (qcom_msc == NULL)
-		return -EINVAL;
+		return ret;
 
-	switch (qcom_msc->qcom_msc_id.qcom_msc_type) {
+	qcom_msc_type = qcom_msc->qcom_msc_id.qcom_msc_type;
+	switch (qcom_msc_type) {
 	case SLC:
 		if (qcom_msc->ops->get_cache_partition_capability)
-			return qcom_msc->ops->get_cache_partition_capability(qcom_msc->dev,
+			ret = qcom_msc->ops->get_cache_partition_capability(qcom_msc->dev,
 					arg1, arg2);
 		break;
 	default:
 		break;
 	}
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(msc_system_get_device_capability);
 
 int msc_system_set_partition(uint32_t msc_id, void *arg1, void *arg2)
 {
+	int ret = -EINVAL;
+	uint8_t qcom_msc_type;
 	struct qcom_mpam_msc *qcom_msc;
+	struct msc_query *query;
 
-	if ((arg1 == NULL) || (arg2 == NULL))
+	query = (struct msc_query *) arg1;
+	if (query == NULL)
 		return -EINVAL;
 
-	qcom_msc = msc_param_verification(msc_id, (struct msc_query *)arg1);
+	qcom_msc = msc_param_verification(msc_id, query);
 	if (qcom_msc == NULL)
-		return -EINVAL;
+		return ret;
 
-	switch (qcom_msc->qcom_msc_id.qcom_msc_type) {
+	qcom_msc_type = qcom_msc->qcom_msc_id.qcom_msc_type;
+	switch (qcom_msc_type) {
 	case SLC:
 		if (qcom_msc->ops->set_cache_partition)
-			return qcom_msc->ops->set_cache_partition(qcom_msc->dev, arg1, arg2);
+			ret = qcom_msc->ops->set_cache_partition(qcom_msc->dev, arg1, arg2);
 		break;
 	default:
 		break;
 	}
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(msc_system_set_partition);
 
 int msc_system_mon_config(uint32_t msc_id, void *arg1, void *arg2)
 {
+	int ret = -EINVAL;
+	uint8_t qcom_msc_type;
 	struct qcom_mpam_msc *qcom_msc;
+	struct msc_query *query;
 
-	if ((arg1 == NULL) || (arg2 == NULL))
+	query = (struct msc_query *) arg1;
+	if (query == NULL)
 		return -EINVAL;
 
-	qcom_msc = msc_param_verification(msc_id, (struct msc_query *)arg1);
+	qcom_msc = msc_param_verification(msc_id, query);
 	if (qcom_msc == NULL)
-		return -EINVAL;
+		return ret;
 
-	switch (qcom_msc->qcom_msc_id.qcom_msc_type) {
+	qcom_msc_type = qcom_msc->qcom_msc_id.qcom_msc_type;
+	switch (qcom_msc_type) {
 	case SLC:
 		if (qcom_msc->ops->mon_config)
-			return qcom_msc->ops->mon_config(qcom_msc->dev, arg1, arg2);
+			ret = qcom_msc->ops->mon_config(qcom_msc->dev, arg1, arg2);
 		break;
 	default:
 		break;
 	}
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(msc_system_mon_config);
 
 int msc_system_reset_partition(uint32_t msc_id, void *arg1, void *arg2)
 {
+	int ret = -EINVAL;
+	uint8_t qcom_msc_type;
 	struct qcom_mpam_msc *qcom_msc;
+	struct msc_query *query;
 
-	if ((arg1 == NULL) || (arg2 == NULL))
+	query = (struct msc_query *) arg1;
+	if (query == NULL)
 		return -EINVAL;
 
-	qcom_msc = msc_param_verification(msc_id, (struct msc_query *)arg1);
+	qcom_msc = msc_param_verification(msc_id, query);
 	if (qcom_msc == NULL)
-		return -EINVAL;
+		return ret;
 
-	switch (qcom_msc->qcom_msc_id.qcom_msc_type) {
+	qcom_msc_type = qcom_msc->qcom_msc_id.qcom_msc_type;
+	switch (qcom_msc_type) {
 	case SLC:
 		if (qcom_msc->ops->reset_cache_partition)
-			return qcom_msc->ops->reset_cache_partition(qcom_msc->dev, arg1, arg2);
+			ret = qcom_msc->ops->reset_cache_partition(qcom_msc->dev, arg1, arg2);
 		break;
 	default:
 		break;
 	}
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(msc_system_reset_partition);
 
 int msc_system_mon_alloc_info(uint32_t msc_id, void *arg1, void *arg2)
 {
+	int part_id;
+	uint8_t qcom_msc_type;
 	struct qcom_mpam_msc *qcom_msc;
+	int ret = -EINVAL;
+	struct qcom_msc_slc_mon_val val = {0};
+	struct msc_query *query;
 	union mon_values *mon_data;
+	struct qcom_slc_mon_data_val *data;
 
-	if ((arg1 == NULL) || (arg2 == NULL))
+
+	query = (struct msc_query *) arg1;
+	if (query == NULL)
 		return -EINVAL;
 
-	qcom_msc = msc_param_verification(msc_id, (struct msc_query *)arg1);
+	mon_data = (union mon_values *) arg2;
+	if (mon_data == NULL)
+		return -EINVAL;
+
+	qcom_msc = msc_param_verification(msc_id, query);
 	if (qcom_msc == NULL)
-		return -EINVAL;
+		return ret;
 
-	mon_data = (union mon_values *)arg2;
-	mon_data->ref.slc_mon_function = CACHE_CAPACITY_CONFIG;
-	switch (qcom_msc->qcom_msc_id.qcom_msc_type) {
+	qcom_msc_type = qcom_msc->qcom_msc_id.qcom_msc_type;
+	switch (qcom_msc_type) {
 	case SLC:
 		if (qcom_msc->ops->mon_stats_read)
-			return qcom_msc->ops->mon_stats_read(qcom_msc->dev, arg1, arg2);
+			ret = qcom_msc->ops->mon_stats_read(qcom_msc->dev, arg1, &val);
 		break;
 	default:
 		break;
 	}
 
-	return 0;
+	if (ret)
+		return ret;
+
+	for (part_id = 0; part_id < SLC_NUM_PARTIDS; part_id++) {
+		data = &(val.data[part_id]);
+		if ((query->client_id == data->part_info.client_id) &&
+				(query->part_id == data->part_info.part_id)) {
+			mon_data->capacity.num_cache_lines = data->num_cache_lines;
+			break;
+		}
+	}
+
+	mon_data->capacity.last_capture_time = val.last_capture_time;
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(msc_system_mon_alloc_info);
 
 int msc_system_mon_read_miss_info(uint32_t msc_id, void *arg1, void *arg2)
 {
+	int part_id;
+	uint8_t qcom_msc_type;
 	struct qcom_mpam_msc *qcom_msc;
+	int ret = -EINVAL;
+	struct qcom_msc_slc_mon_val val = {0};
+	struct msc_query *query;
 	union mon_values *mon_data;
+	struct qcom_slc_mon_data_val *data;
 
-	if ((arg1 == NULL) || (arg2 == NULL))
+	query = (struct msc_query *) arg1;
+	if (query == NULL)
 		return -EINVAL;
 
-	qcom_msc = msc_param_verification(msc_id, (struct msc_query *)arg1);
+	mon_data = (union mon_values *) arg2;
+	if (mon_data == NULL)
+		return -EINVAL;
+
+	qcom_msc = msc_param_verification(msc_id, query);
 	if (qcom_msc == NULL)
-		return -EINVAL;
+		return ret;
 
-	mon_data = (union mon_values *)arg2;
-	mon_data->ref.slc_mon_function = CACHE_READ_MISS_CONFIG;
-	switch (qcom_msc->qcom_msc_id.qcom_msc_type) {
+	qcom_msc_type = qcom_msc->qcom_msc_id.qcom_msc_type;
+	switch (qcom_msc_type) {
 	case SLC:
 		if (qcom_msc->ops->mon_stats_read)
-			return qcom_msc->ops->mon_stats_read(qcom_msc->dev, arg1, arg2);
+			ret = qcom_msc->ops->mon_stats_read(qcom_msc->dev, arg1, &val);
 		break;
 	default:
 		break;
 	}
 
-	return 0;
+	if (ret)
+		return ret;
+
+	for (part_id = 0; part_id < SLC_NUM_PARTIDS; part_id++) {
+		data = &(val.data[part_id]);
+		if ((query->client_id == data->part_info.client_id) &&
+				(query->part_id == data->part_info.part_id)) {
+			mon_data->misses.num_rd_misses = data->rd_misses;
+			break;
+		}
+	}
+
+	mon_data->misses.last_capture_time = val.last_capture_time;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(msc_system_mon_read_miss_info);
 

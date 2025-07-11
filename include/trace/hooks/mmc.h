@@ -7,8 +7,6 @@
 #define _TRACE_HOOK_MMC_H
 #include <trace/hooks/vendor_hooks.h>
 struct mmc_host;
-struct mmc_card;
-struct mmc_queue;
 
 /*
  * Following tracepoints are not exported in tracefs and provide a
@@ -17,10 +15,6 @@ struct mmc_queue;
 DECLARE_HOOK(android_vh_mmc_sdio_pm_flag_set,
 	TP_PROTO(struct mmc_host *host),
 	TP_ARGS(host));
-
-DECLARE_HOOK(android_vh_mmc_update_mmc_queue,
-	TP_PROTO(struct mmc_card *card, struct mmc_queue *mq),
-	TP_ARGS(card, mq));
 
 #endif /* _TRACE_HOOK_MMC_H */
 /* This part must be outside protection */

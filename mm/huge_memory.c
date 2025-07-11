@@ -47,9 +47,6 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/thp.h>
 
-#undef CREATE_TRACE_POINTS
-#include <trace/hooks/huge_memory.h>
-
 /*
  * By default, transparent hugepage support is disabled in order to avoid
  * risking an increased memory footprint for applications that are not
@@ -89,8 +86,6 @@ unsigned long __thp_vma_allowable_orders(struct vm_area_struct *vma,
 	/* Check the intersection of requested and supported orders. */
 	orders &= vma_is_anonymous(vma) ?
 			THP_ORDERS_ALL_ANON : THP_ORDERS_ALL_FILE;
-
-	trace_android_vh_thp_vma_allowable_orders(vma, &orders);
 	if (!orders)
 		return 0;
 
@@ -535,7 +530,7 @@ static const struct kobj_type thpsize_ktype = {
 
 DEFINE_PER_CPU(struct mthp_stat, mthp_stats) = {{{0}}};
 
-unsigned long sum_mthp_stat(int order, enum mthp_stat_item item)
+static unsigned long sum_mthp_stat(int order, enum mthp_stat_item item)
 {
 	unsigned long sum = 0;
 	int cpu;
@@ -548,7 +543,6 @@ unsigned long sum_mthp_stat(int order, enum mthp_stat_item item)
 
 	return sum;
 }
-EXPORT_SYMBOL_GPL(sum_mthp_stat);
 
 #define DEFINE_MTHP_STAT_ATTR(_name, _index)				\
 static ssize_t _name##_show(struct kobject *kobj,			\

@@ -94,10 +94,8 @@ static int bcm2835_rng_init(struct hwrng *rng)
 		return ret;
 
 	ret = reset_control_reset(priv->reset);
-	if (ret) {
-		clk_disable_unprepare(priv->clk);
+	if (ret)
 		return ret;
-	}
 
 	if (priv->mask_interrupts) {
 		/* mask the interrupt */

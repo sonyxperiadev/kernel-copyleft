@@ -69,14 +69,16 @@ static const struct regmap_config bd2606mvv_regmap = {
 
 static int bd2606mvv_probe(struct i2c_client *client)
 {
+	struct fwnode_handle *np, *child;
 	struct device *dev = &client->dev;
 	struct bd2606mvv_priv *priv;
 	struct fwnode_handle *led_fwnodes[BD2606_MAX_LEDS] = { 0 };
 	int active_pairs[BD2606_MAX_LEDS / 2] = { 0 };
 	int err, reg;
-	int i, j;
+	int i;
 
-	if (!dev_fwnode(dev))
+	np = dev_fwnode(dev);
+	if (!np)
 		return -ENODEV;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
@@ -92,18 +94,20 @@ static int bd2606mvv_probe(struct i2c_client *client)
 
 	i2c_set_clientdata(client, priv);
 
-	device_for_each_child_node_scoped(dev, child) {
+	fwnode_for_each_available_child_node(np, child) {
 		struct bd2606mvv_led *led;
 
 		err = fwnode_property_read_u32(child, "reg", &reg);
-		if (err)
+		if (err) {
+			fwnode_handle_put(child);
 			return err;
-
-		if (reg < 0 || reg >= BD2606_MAX_LEDS || led_fwnodes[reg])
+		}
+		if (reg < 0 || reg >= BD2606_MAX_LEDS || led_fwnodes[reg]) {
+			fwnode_handle_put(child);
 			return -EINVAL;
-
+		}
 		led = &priv->leds[reg];
-		led_fwnodes[reg] = fwnode_handle_get(child);
+		led_fwnodes[reg] = child;
 		active_pairs[reg / 2]++;
 		led->priv = priv;
 		led->led_no = reg;
@@ -126,8 +130,7 @@ static int bd2606mvv_probe(struct i2c_client *client)
 						     &priv->leds[i].ldev,
 						     &init_data);
 		if (err < 0) {
-			for (j = i; j < BD2606_MAX_LEDS; j++)
-				fwnode_handle_put(led_fwnodes[j]);
+			fwnode_handle_put(child);
 			return dev_err_probe(dev, err,
 					     "couldn't register LED %s\n",
 					     priv->leds[i].ldev.name);

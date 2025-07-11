@@ -84,13 +84,6 @@ int sched_smart_freq_legacy_freq_handler(struct ctl_table *table, int write,
 	if (!smart_freq_init_done)
 		return -EINVAL;
 
-	if (!write) {
-		tmp.data = reason_dump;
-		tmp.maxlen = sizeof(reason_dump);
-		return sched_smart_freq_legacy_dump_handler(&tmp,
-				write, buffer, lenp, ppos);
-	}
-
 	mutex_lock(&freq_reason_mutex);
 
 	if (data == &sysctl_legacy_freq_levels_cluster0[0])
@@ -101,6 +94,7 @@ int sched_smart_freq_legacy_freq_handler(struct ctl_table *table, int write,
 		id = 2;
 	else if (data == &sysctl_legacy_freq_levels_cluster3[0])
 		id = 3;
+
 
 	ret = proc_dointvec(&tmp, write, buffer, lenp, ppos);
 	if (ret)
@@ -591,10 +585,6 @@ void smart_freq_init(const char *name)
 		i++;
 	}
 
-	/* initialize smart_freq with default values, if socinfo is not available */
-	if (!name)
-		goto done;
-
 	if (!strcmp(name, "SUN") || !strcmp(name, "SUNP")) {
 		for_each_sched_cluster(cluster) {
 			if (cluster->id == 0) {
@@ -810,7 +800,6 @@ void smart_freq_init(const char *name)
 			}
 		}
 	}
-done:
 	smart_freq_init_done = true;
 	update_smart_freq_capacities();
 

@@ -580,8 +580,7 @@ enum kera_functions {
 	msm_mux_jitter_bist,
 	msm_mux_mdp_esync0_out,
 	msm_mux_mdp_esync1_out,
-	msm_mux_mdp_vsync_p,
-	msm_mux_mdp_vsync_s,
+	msm_mux_mdp_vsync,
 	msm_mux_mdp_vsync0_out,
 	msm_mux_mdp_vsync11_out,
 	msm_mux_mdp_vsync1_out,
@@ -941,17 +940,6 @@ static const char *const ddr_pxi1_groups[] = {
 static const char *const dp0_hot_groups[] = {
 	"gpio55",
 };
-static const char *const egpio_groups[] = {
-	"gpio28", "gpio29", "gpio30", "gpio31", "gpio138", "gpio139",
-	"gpio140", "gpio141", "gpio142", "gpio143", "gpio144", "gpio145",
-	"gpio146", "gpio147", "gpio148", "gpio149", "gpio150", "gpio151",
-	"gpio152", "gpio153", "gpio154", "gpio155", "gpio156", "gpio157",
-	"gpio158", "gpio159", "gpio160", "gpio161", "gpio162", "gpio163",
-	"gpio164", "gpio165", "gpio166", "gpio167", "gpio168", "gpio169",
-	"gpio170", "gpio171", "gpio172", "gpio173", "gpio174", "gpio175",
-	"gpio176", "gpio177", "gpio178", "gpio179", "gpio180", "gpio181",
-	"gpio182", "gpio184",
-};
 static const char *const gcc_gp1_groups[] = {
 	"gpio27", "gpio53",
 };
@@ -1019,14 +1007,9 @@ static const char *const mdp_esync0_out_groups[] = {
 static const char *const mdp_esync1_out_groups[] = {
 	"gpio12",
 };
-static const char *const mdp_vsync_p_groups[] = {
-	"gpio17", "gpio79", "gpio120",
+static const char *const mdp_vsync_groups[] = {
+	"gpio16", "gpio17", "gpio79", "gpio100", "gpio120", "gpio121",
 };
-
-static const char *const mdp_vsync_s_groups[] = {
-	"gpio16", "gpio100", "gpio121",
-};
-
 static const char *const mdp_vsync0_out_groups[] = {
 	"gpio17",
 };
@@ -1659,7 +1642,6 @@ static const struct pinfunction kera_functions[] = {
 	MSM_PIN_FUNCTION(ddr_pxi0),
 	MSM_PIN_FUNCTION(ddr_pxi1),
 	MSM_PIN_FUNCTION(dp0_hot),
-	MSM_PIN_FUNCTION(egpio),
 	MSM_PIN_FUNCTION(gcc_gp1),
 	MSM_PIN_FUNCTION(gcc_gp2),
 	MSM_PIN_FUNCTION(gcc_gp3),
@@ -1682,8 +1664,7 @@ static const struct pinfunction kera_functions[] = {
 	MSM_PIN_FUNCTION(jitter_bist),
 	MSM_PIN_FUNCTION(mdp_esync0_out),
 	MSM_PIN_FUNCTION(mdp_esync1_out),
-	MSM_PIN_FUNCTION(mdp_vsync_p),
-	MSM_PIN_FUNCTION(mdp_vsync_s),
+	MSM_PIN_FUNCTION(mdp_vsync),
 	MSM_PIN_FUNCTION(mdp_vsync0_out),
 	MSM_PIN_FUNCTION(mdp_vsync11_out),
 	MSM_PIN_FUNCTION(mdp_vsync1_out),
@@ -1917,9 +1898,9 @@ static const struct msm_pingroup kera_groups[] = {
 		       qup2_se7_l2, NA, NA, NA, NA, NA, NA, 0, -1),
 	[14] = PINGROUP(14, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0, -1),
 	[15] = PINGROUP(15, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0, -1),
-	[16] = PINGROUP(16, qup2_se5_l0, qup2_se2_l4, mdp_vsync_s, mdp_vsync2_out,
+	[16] = PINGROUP(16, qup2_se5_l0, qup2_se2_l4, mdp_vsync, mdp_vsync2_out,
 		       mdp_vsync3_out, NA, NA, NA, NA, NA, NA, 0, -1),
-	[17] = PINGROUP(17, qup2_se5_l1, qup2_se2_l5, mdp_vsync_p, mdp_vsync0_out,
+	[17] = PINGROUP(17, qup2_se5_l1, qup2_se2_l5, mdp_vsync, mdp_vsync0_out,
 		       mdp_vsync1_out, NA, NA, NA, NA, NA, NA, 0, -1),
 	[18] = PINGROUP(18, qup2_se5_l2, qup2_se2_l6, hdmi_pixel_clk, NA,
 		       qdss_cti, NA, NA, NA, NA, NA, NA, 0, -1),
@@ -2039,7 +2020,7 @@ static const struct msm_pingroup kera_groups[] = {
 		       NA, NA, NA, 0, -1),
 	[78] = PINGROUP(78, qup1_se7_l3, qup1_se7_l0_mirb, NA, phase_flag29, NA,
 		       NA, NA, NA, NA, NA, NA, 0, -1),
-	[79] = PINGROUP(79, qspi0_clk, mdp_vsync_p, qup2_se3_l0_mira, NA, NA, NA,
+	[79] = PINGROUP(79, qspi0_clk, mdp_vsync, qup2_se3_l0_mira, NA, NA, NA,
 		       NA, NA, NA, NA, NA, 0, -1),
 	[80] = PINGROUP(80, pcie0_clk_req_n, qup1_se7_l1_mira, NA, phase_flag28,
 		       NA, NA, NA, NA, NA, NA, NA, 0, -1),
@@ -2080,7 +2061,7 @@ static const struct msm_pingroup kera_groups[] = {
 	[99] = PINGROUP(99, uim1_reset_mira, qspi0_data2, NA, NA, NA, NA, NA,
 		       NA, NA, NA, NA, 0, -1),
 	[100] = PINGROUP(100, uim1_present_mira, qspi0_data3, qup2_se3_l2,
-		       coex_uart2_tx, qup2_se3_l1_mirb, mdp_vsync_s, NA, NA, NA,
+		       coex_uart2_tx, qup2_se3_l1_mirb, mdp_vsync, NA, NA, NA,
 		       NA, NA, 0, -1),
 	[101] = PINGROUP(101, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0, -1),
 	[102] = PINGROUP(102, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0, -1),
@@ -2110,9 +2091,9 @@ static const struct msm_pingroup kera_groups[] = {
 		       0, -1),
 	[119] = PINGROUP(119, nav_gpio0, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA,
 		       0, -1),
-	[120] = PINGROUP(120, sdc1_rclk, mdp_vsync_p, NA, NA, NA, NA, NA, NA, NA,
+	[120] = PINGROUP(120, sdc1_rclk, mdp_vsync, NA, NA, NA, NA, NA, NA, NA,
 		       NA, NA, 0, -1),
-	[121] = PINGROUP(121, sdc1_clk, mdp_vsync_s, NA, NA, NA, NA, NA, NA, NA,
+	[121] = PINGROUP(121, sdc1_clk, mdp_vsync, NA, NA, NA, NA, NA, NA, NA,
 		       NA, NA, 0, -1),
 	[122] = PINGROUP(122, usb0_phy_ps, NA, NA, NA, NA, NA, NA, NA, NA, NA,
 		       NA, 0, -1),

@@ -146,16 +146,6 @@ static const char * const drv_names_tuna[][MAX_DRV_NAMES] = {
 			"TME", "MODEM", "WLAN RF", "WLAN BB", "CAM", "PCIE", "MM", ""},
 };
 
-static const char * const drv_names_kera[][MAX_DRV_NAMES] = {
-	[CXPC_DRV_NAME] = {"TZ", "L3", "HLOS", "HYP", "WPSS", "AUDIO", "AUDIO CESTA", "AOP",
-			"DEBUG", "GPU", "DISPLAY", "COMPUTE_DSP", "TME_HW", "TME_SW", "MDM SW",
-			"MDM HW", "MDM Q6 CESTA", "WLAN RF", "WLAN BB", "CAM_IFE0 CESTA",
-			"CAM_IFE1", "CAM_IFE2", "PCI0 CESTA", "MM CESTA",
-			"DDR AUX", "ARC CPRF", ""},
-	[AOSS_DRV_NAME] = {"APPS", "WPSS", "AUDIO", "AOP", "DEBUG", "GPU", "DISPLAY", "COMPUTE",
-			"TME", "MODEM", "WLAN RF", "WLAN BB", "CAM", "PCIE", "MM", ""},
-};
-
 static ssize_t debug_time_ms_show(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
@@ -562,8 +552,6 @@ static const struct of_device_id drv_match_table[] = {
 	  .data = drv_names_sun },
 	{ .compatible = "qcom,sys-pm-tuna",
 	  .data = drv_names_tuna },
-	{ .compatible = "qcom,sys-pm-kera",
-	  .data = drv_names_kera },
 	{ }
 };
 

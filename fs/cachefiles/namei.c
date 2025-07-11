@@ -594,12 +594,14 @@ static bool cachefiles_open_file(struct cachefiles_object *object,
 	 * write and readdir but not lookup or open).
 	 */
 	touch_atime(&file->f_path);
+	dput(dentry);
 	return true;
 
 check_failed:
 	fscache_cookie_lookup_negative(object->cookie);
 	cachefiles_unmark_inode_in_use(object, file);
 	fput(file);
+	dput(dentry);
 	if (ret == -ESTALE)
 		return cachefiles_create_file(object);
 	return false;
@@ -608,6 +610,7 @@ error_fput:
 	fput(file);
 error:
 	cachefiles_do_unmark_inode_in_use(object, d_inode(dentry));
+	dput(dentry);
 	return false;
 }
 
@@ -650,9 +653,7 @@ bool cachefiles_look_up_object(struct cachefiles_object *object)
 		goto new_file;
 	}
 
-	ret = cachefiles_open_file(object, dentry);
-	dput(dentry);
-	if (!ret)
+	if (!cachefiles_open_file(object, dentry))
 		return false;
 
 	_leave(" = t [%lu]", file_inode(object->file)->i_ino);

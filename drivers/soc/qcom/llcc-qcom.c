@@ -499,7 +499,7 @@ static const struct llcc_slice_config sun_data[] = {
 };
 
 static const struct llcc_slice_config tuna_data[] = {
-	{LLCC_CPUSS,     1, 4992, 1, 0, 0xFFFFFF,
+	{LLCC_CPUSS,     1, 5504, 1, 0, 0xFFFFFF,
 			0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 	{LLCC_MDMHPFX,  24, 1024, 5, 1, 0xFFFFFF,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -507,7 +507,7 @@ static const struct llcc_slice_config tuna_data[] = {
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 	{LLCC_MDMHPGRW, 25, 1024, 5, 0, 0xFFFFFF,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-	{LLCC_CMPT,     15, 4096, 1, 1, 0xFFFFFF,
+	{LLCC_CMPT,     34, 4096, 1, 1, 0xFFFFFF,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 	{LLCC_GPUHTW,   11,  256, 1, 1, 0xFFFFFF,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},

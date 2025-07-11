@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 
@@ -1131,9 +1131,8 @@ static int cdsprm_rpmsg_callback(struct rpmsg_device *dev, void *data,
 	} else if (msg->feature_id == SYSMON_CDSP_DCVS_CLIENTS_RX_STATUS) {
 		gcdsprm.dcvs_clients_votes.status = 0;
 		memset(&gcdsprm.dcvs_clients_votes, 0, sizeof(gcdsprm.dcvs_clients_votes));
-		memcpy(&gcdsprm.dcvs_clients_votes, &msg_v2->fs.dcvs_clients_votes,
-			min((msg_v2->size - offsetof(struct sysmon_msg_v2, fs)),
-				sizeof(gcdsprm.dcvs_clients_votes)));
+		memcpy(&gcdsprm.dcvs_clients_votes, &msg_v2->fs.dcvs_clients_votes, msg_v2->size);
+		gcdsprm.dcvs_clients_votes = msg_v2->fs.dcvs_clients_votes;
 		complete(&gcdsprm.dcvs_clients_votes_complete);
 		dev_dbg(&dev->dev, "Received DCVS clients information");
 	} else {

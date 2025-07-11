@@ -127,7 +127,7 @@ static int gdsc_genpd_enable_set(void *data, u64 val)
 	return pm_runtime_put_sync(gdsc_debug->dev);
 }
 DEFINE_DEBUGFS_ATTRIBUTE(gdsc_genpd_debug_enable_fops, gdsc_genpd_enable_get,
-					gdsc_genpd_enable_set, "%lld\n");
+					gdsc_genpd_enable_set, "%llu\n");
 
 static int gdsc_genpd_debug_create_one(struct gdsc_debug *gdsc_debug,
 						struct dentry *pdentry)

@@ -1088,7 +1088,7 @@ struct mvpp2 {
 	unsigned int max_port_rxqs;
 
 	/* Workqueue to gather hardware statistics */
-	char queue_name[31];
+	char queue_name[30];
 	struct workqueue_struct *stats_queue;
 
 	/* Debugfs root entry */

@@ -126,9 +126,7 @@ static int rtw89_ops_add_interface(struct ieee80211_hw *hw,
 	rtwvif->rtwdev = rtwdev;
 	rtwvif->roc.state = RTW89_ROC_IDLE;
 	rtwvif->offchan = false;
-	if (!rtw89_rtwvif_in_list(rtwdev, rtwvif))
-		list_add_tail(&rtwvif->list, &rtwdev->rtwvifs_list);
-
+	list_add_tail(&rtwvif->list, &rtwdev->rtwvifs_list);
 	INIT_WORK(&rtwvif->update_beacon_work, rtw89_core_update_beacon_work);
 	INIT_DELAYED_WORK(&rtwvif->roc.roc_work, rtw89_roc_work);
 	rtw89_leave_ps_mode(rtwdev);

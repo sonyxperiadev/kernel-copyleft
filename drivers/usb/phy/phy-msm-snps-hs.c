@@ -991,9 +991,15 @@ static int msm_hsphy_probe(struct platform_device *pdev)
 	phy->phy.set_power		= msm_hsphy_set_power;
 	phy->phy.type			= USB_PHY_TYPE_USB2;
 
-	ret = msm_hsphy_regulator_init(phy);
+	ret = usb_add_phy_dev(&phy->phy);
 	if (ret)
-		goto err_ret;
+		return ret;
+
+	ret = msm_hsphy_regulator_init(phy);
+	if (ret) {
+		usb_remove_phy(&phy->phy);
+		return ret;
+	}
 
 	INIT_WORK(&phy->vbus_draw_work, msm_hsphy_vbus_draw_work);
 	msm_hsphy_create_debugfs(phy);
@@ -1007,9 +1013,7 @@ static int msm_hsphy_probe(struct platform_device *pdev)
 		msm_hsphy_enable_power(phy, true);
 		msm_hsphy_enable_clocks(phy, true);
 	}
-
-	/* Placed at the end to ensure the probe is complete */
-	ret = usb_add_phy_dev(&phy->phy);
+	return 0;
 
 err_ret:
 	return ret;

@@ -768,7 +768,7 @@ restart:
 			name[i] = '\0';
 			tmp = regulator_get(dev, name);
 			if (IS_ERR(tmp)) {
-				ret = PTR_ERR(tmp);
+				ret = -EINVAL;
 				goto error;
 			}
 			(*consumers)[n].consumer = tmp;

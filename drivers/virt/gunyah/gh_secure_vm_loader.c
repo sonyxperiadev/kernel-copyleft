@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -22,8 +22,6 @@
 #include <linux/fs.h>
 #include <linux/of.h>
 #include <linux/mm.h>
-#include <linux/cpu.h>
-#include <linux/workqueue.h>
 #include <soc/qcom/secure_buffer.h>
 
 #include "gh_private.h"
@@ -51,9 +49,6 @@ struct gh_sec_vm_dev {
 	int pas_id;
 	int vmid;
 	bool is_static;
-	cpumask_t guest_cpus;
-	cpumask_t offlined_cpus;
-	struct delayed_work offline_work;
 };
 
 const static struct {
@@ -187,40 +182,6 @@ static u64 gh_sec_load_metadata(struct gh_sec_vm_dev *vm_dev,
 	return 0;
 }
 
-static void gh_legacy_offline_cpus(struct gh_sec_vm_dev *vm_dev)
-{
-	int cpu, ret;
-
-	for_each_cpu_and(cpu, &vm_dev->guest_cpus, cpu_online_mask) {
-		ret = remove_cpu(cpu);
-		if (ret) {
-			pr_err("fail to offline CPU%d. ret=%d\n", cpu, ret);
-			continue;
-		}
-		pr_info("%s: offlined cpu : %d\n", __func__, cpu);
-		cpumask_set_cpu(cpu, &vm_dev->offlined_cpus);
-	}
-}
-
-static void gh_legacy_offline_cpus_work(struct work_struct *work)
-{
-	struct gh_sec_vm_dev *vm_dev = container_of(work, struct gh_sec_vm_dev,
-						offline_work.work);
-	int i, ret;
-
-	for_each_cpu(i, &vm_dev->offlined_cpus) {
-		ret = add_cpu(i);
-		if (ret) {
-			pr_err("fail to online CPU%d. ret=%d\n", i, ret);
-			continue;
-		}
-		pr_info("%s: onlined cpu : %d\n", __func__, i);
-
-		cpumask_clear_cpu(i, &vm_dev->offlined_cpus);
-	}
-}
-
-#define GH_VM_LOAD_CPUS_OFFLINE_MSEC 15000
 static int gh_vm_legacy_sec_load(struct gh_sec_vm_dev *vm_dev,
 				struct gh_vm *vm, const struct firmware *fw,
 				const char *fw_name)
@@ -248,13 +209,6 @@ static int gh_vm_legacy_sec_load(struct gh_sec_vm_dev *vm_dev,
 	if (ret)
 		dev_err(dev, "Init secure VM %s to memory failed %d\n",
 					vm_dev->vm_name, ret);
-
-	if (cpumask_weight(&vm_dev->guest_cpus)) {
-		cancel_delayed_work_sync(&vm_dev->offline_work);
-		gh_legacy_offline_cpus(vm_dev);
-		schedule_delayed_work(&vm_dev->offline_work,
-				msecs_to_jiffies(GH_VM_LOAD_CPUS_OFFLINE_MSEC));
-	}
 
 release_fw:
 	release_firmware(fw);
@@ -808,23 +762,6 @@ static int gh_secure_vm_loader_probe(struct platform_device *pdev)
 	}
 
 	gh_detect_legacy_firmware();
-
-	if (gh_firmware_is_legacy()) {
-		const char *cpulist;
-
-		ret = of_property_read_string(pdev->dev.of_node,
-					"qcom,guest-cpus", &cpulist);
-		if (!ret) {
-			cpulist_parse(cpulist, &sec_vm_dev->guest_cpus);
-			dev_info(dev, "guest_cpus=%*pbl will be offlined during VM loading\n",
-					cpumask_pr_args(&sec_vm_dev->guest_cpus));
-			INIT_DELAYED_WORK(&sec_vm_dev->offline_work,
-					gh_legacy_offline_cpus_work);
-
-		} else {
-			dev_info(dev, "legacy VM loading without guest_cpus offlining\n");
-		}
-	}
 
 	ret = gh_vm_loader_mem_probe(sec_vm_dev);
 	if (ret)

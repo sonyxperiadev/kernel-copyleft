@@ -11,6 +11,7 @@
 #include <linux/of_device.h>
 #include <linux/of.h>
 #include <linux/regmap.h>
+#include <linux/pm_runtime.h>
 
 #include <dt-bindings/clock/qcom,camcc-sun.h>
 
@@ -2928,7 +2929,7 @@ static const struct regmap_config cam_cc_kera_regmap_config = {
 	.fast_io = true,
 };
 
-static const struct qcom_cc_desc cam_cc_kera_desc = {
+static struct qcom_cc_desc cam_cc_kera_desc = {
 	.config = &cam_cc_kera_regmap_config,
 	.clks = cam_cc_kera_clocks,
 	.num_clks = ARRAY_SIZE(cam_cc_kera_clocks),
@@ -2952,6 +2953,14 @@ static int cam_cc_kera_probe(struct platform_device *pdev)
 	regmap = qcom_cc_map(pdev, &cam_cc_kera_desc);
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
+
+	ret = qcom_cc_runtime_init(pdev, &cam_cc_kera_desc);
+	if (ret)
+		return ret;
+
+	ret = pm_runtime_get_sync(&pdev->dev);
+	if (ret)
+		return ret;
 
 	clk_lucid_ole_pll_configure(&cam_cc_pll0, regmap, &cam_cc_pll0_config);
 	clk_lucid_ole_pll_configure(&cam_cc_pll1, regmap, &cam_cc_pll1_config);
@@ -2979,6 +2988,7 @@ static int cam_cc_kera_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	pm_runtime_put_sync(&pdev->dev);
 	dev_info(&pdev->dev, "Registered CAM CC clocks\n");
 
 	return ret;
@@ -2989,12 +2999,19 @@ static void cam_cc_kera_sync_state(struct device *dev)
 	qcom_cc_sync_state(dev, &cam_cc_kera_desc);
 }
 
+static const struct dev_pm_ops cam_cc_kera_pm_ops = {
+	SET_RUNTIME_PM_OPS(qcom_cc_runtime_suspend, qcom_cc_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+				pm_runtime_force_resume)
+};
+
 static struct platform_driver cam_cc_kera_driver = {
 	.probe = cam_cc_kera_probe,
 	.driver = {
 		.name = "cam_cc-kera",
 		.of_match_table = cam_cc_kera_match_table,
 		.sync_state = cam_cc_kera_sync_state,
+		.pm = &cam_cc_kera_pm_ops,
 	},
 };
 

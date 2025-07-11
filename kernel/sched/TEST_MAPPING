@@ -275,18 +275,6 @@
           "include-filter": "android.util.cts.FloatMathTest"
         }
       ]
-    },
-    {
-      "name": "vts_kernel_net_tests"
-    },
-    {
-      "name": "KernelAbilistTest"
-    },
-    {
-      "name": "VtsAidlHalSensorsTargetTest"
-    },
-    {
-      "name": "VtsBootconfigTest"
     }
   ]
 }

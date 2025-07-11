@@ -115,8 +115,7 @@ static int cfg80211_conn_scan(struct wireless_dev *wdev)
 		n_channels = i;
 	}
 	request->n_channels = n_channels;
-	request->ssids = (void *)request +
-		struct_size(request, channels, n_channels);
+	request->ssids = (void *)&request->channels[n_channels];
 	request->n_ssids = 1;
 
 	memcpy(request->ssids[0].ssid, wdev->conn->params.ssid,
@@ -1296,29 +1295,24 @@ out:
 }
 EXPORT_SYMBOL(cfg80211_roamed);
 
-void __cfg80211_port_authorized(struct wireless_dev *wdev, const u8 *peer_addr,
+void __cfg80211_port_authorized(struct wireless_dev *wdev, const u8 *bssid,
 					const u8 *td_bitmap, u8 td_bitmap_len)
 {
 	ASSERT_WDEV_LOCK(wdev);
 
 	if (WARN_ON(wdev->iftype != NL80211_IFTYPE_STATION &&
-		wdev->iftype != NL80211_IFTYPE_P2P_CLIENT &&
-		wdev->iftype != NL80211_IFTYPE_AP &&
-		wdev->iftype != NL80211_IFTYPE_P2P_GO))
+		    wdev->iftype != NL80211_IFTYPE_P2P_CLIENT))
 		return;
 
-	if (wdev->iftype == NL80211_IFTYPE_STATION ||
-		wdev->iftype == NL80211_IFTYPE_P2P_CLIENT) {
-		if (WARN_ON(!wdev->connected) ||
-			WARN_ON(!ether_addr_equal(wdev->u.client.connected_addr, peer_addr)))
-			return;
-	}
+	if (WARN_ON(!wdev->connected) ||
+	    WARN_ON(!ether_addr_equal(wdev->u.client.connected_addr, bssid)))
+		return;
 
 	nl80211_send_port_authorized(wiphy_to_rdev(wdev->wiphy), wdev->netdev,
-				     peer_addr, td_bitmap, td_bitmap_len);
+				     bssid, td_bitmap, td_bitmap_len);
 }
 
-void cfg80211_port_authorized(struct net_device *dev, const u8 *peer_addr,
+void cfg80211_port_authorized(struct net_device *dev, const u8 *bssid,
 			      const u8 *td_bitmap, u8 td_bitmap_len, gfp_t gfp)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
@@ -1326,7 +1320,7 @@ void cfg80211_port_authorized(struct net_device *dev, const u8 *peer_addr,
 	struct cfg80211_event *ev;
 	unsigned long flags;
 
-	if (WARN_ON(!peer_addr))
+	if (WARN_ON(!bssid))
 		return;
 
 	ev = kzalloc(sizeof(*ev) + td_bitmap_len, gfp);
@@ -1334,7 +1328,7 @@ void cfg80211_port_authorized(struct net_device *dev, const u8 *peer_addr,
 		return;
 
 	ev->type = EVENT_PORT_AUTHORIZED;
-	memcpy(ev->pa.peer_addr, peer_addr, ETH_ALEN);
+	memcpy(ev->pa.bssid, bssid, ETH_ALEN);
 	ev->pa.td_bitmap = ((u8 *)ev) + sizeof(*ev);
 	ev->pa.td_bitmap_len = td_bitmap_len;
 	memcpy((void *)ev->pa.td_bitmap, td_bitmap, td_bitmap_len);

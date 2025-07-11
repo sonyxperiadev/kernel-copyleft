@@ -1710,9 +1710,9 @@ static struct ctl_table kern_table[] = {
 	{
 		.procname	= "ftrace_dump_on_oops",
 		.data		= &ftrace_dump_on_oops,
-		.maxlen		= MAX_TRACER_SIZE,
+		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dostring,
+		.proc_handler	= proc_dointvec,
 	},
 	{
 		.procname	= "traceoff_on_warning",

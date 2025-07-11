@@ -590,10 +590,7 @@ static int __init dell_smbios_init(void)
 	return 0;
 
 fail_sysfs:
-	if (!wmi)
-		exit_dell_smbios_wmi();
-	if (!smm)
-		exit_dell_smbios_smm();
+	free_group(platform_device);
 
 fail_create_group:
 	platform_device_del(platform_device);

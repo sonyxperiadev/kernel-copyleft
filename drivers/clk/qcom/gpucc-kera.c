@@ -10,7 +10,6 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/of.h>
-#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 
 #include <dt-bindings/clock/qcom,gpucc-kera.h>
@@ -22,7 +21,6 @@
 #include "clk-regmap.h"
 #include "clk-regmap-divider.h"
 #include "common.h"
-#include "gdsc.h"
 #include "reset.h"
 #include "vdd-level.h"
 
@@ -425,19 +423,6 @@ static struct clk_branch gpu_cc_freq_measure_clk = {
 	},
 };
 
-static struct clk_branch gpu_cc_gpu_smmu_vote_clk = {
-	.halt_reg = 0x7000,
-	.halt_check = BRANCH_HALT_VOTED,
-	.clkr = {
-		.enable_reg = 0x7000,
-		.enable_mask = BIT(0),
-		.hw.init = &(const struct clk_init_data) {
-			.name = "gpu_cc_gpu_smmu_vote_clk",
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
 static struct clk_branch gpu_cc_hlos1_vote_gpu_smmu_clk = {
 	.halt_reg = 0x7000,
 	.halt_check = BRANCH_HALT_VOTED,
@@ -540,71 +525,6 @@ static struct clk_branch gpu_cc_sleep_clk = {
 	},
 };
 
-static struct gdsc gpu_cc_cx_gdsc = {
-	.gdscr = 0x9110,
-	.gds_hw_ctrl = 0x9124,
-	.en_rest_wait_val = 0x2,
-	.en_few_wait_val = 0x2,
-	.clk_dis_wait_val = 0x8,
-	.pd = {
-		.name = "gpu_cc_cx_gdsc",
-	},
-	.pwrsts = PWRSTS_OFF_ON,
-	.flags = RETAIN_FF_ENABLE | VOTABLE,
-	.supply = "vdd_cx",
-};
-
-static int gdsc_cx_do_nothing(struct generic_pm_domain *domain)
-{
-	return 0;
-}
-
-static struct gdsc gpu_cc_cx_smmu_gdsc = {
-	.gdscr = 0x9110,
-	.gds_hw_ctrl = 0x9124,
-	.en_rest_wait_val = 0x2,
-	.en_few_wait_val = 0x2,
-	.clk_dis_wait_val = 0x8,
-	.pd = {
-		.name = "gpu_cc_cx_smmu_gdsc",
-		.power_on = gdsc_cx_do_nothing,
-		.power_off = gdsc_cx_do_nothing,
-	},
-	.pwrsts = PWRSTS_OFF_ON,
-	.flags = RETAIN_FF_ENABLE | VOTABLE,
-	.parent = &gpu_cc_cx_gdsc.pd,
-};
-
-static struct gdsc gpu_cc_cx_gmu_gdsc = {
-	.gdscr = 0x9110,
-	.gds_hw_ctrl = 0x9124,
-	.en_rest_wait_val = 0x2,
-	.en_few_wait_val = 0x2,
-	.clk_dis_wait_val = 0x8,
-	.pd = {
-		.name = "gpu_cc_cx_gmu_gdsc",
-		.power_on = gdsc_cx_do_nothing,
-		.power_off = gdsc_cx_do_nothing,
-	},
-	.pwrsts = PWRSTS_OFF_ON,
-	.flags = RETAIN_FF_ENABLE | VOTABLE,
-	.parent = &gpu_cc_cx_gdsc.pd,
-};
-
-static struct gdsc gpu_cc_gx_gdsc = {
-	.gdscr = 0x905c,
-	.en_rest_wait_val = 0x2,
-	.en_few_wait_val = 0x2,
-	.clk_dis_wait_val = 0xf,
-	.pd = {
-		.name = "gpu_cc_gx_gdsc",
-		.power_on = gdsc_gx_do_nothing_enable,
-	},
-	.pwrsts = PWRSTS_OFF_ON,
-	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE,
-	.supply = "vdd_gx",
-};
-
 static struct clk_regmap *gpu_cc_kera_clocks[] = {
 	[GPU_CC_AHB_CLK] = &gpu_cc_ahb_clk.clkr,
 	[GPU_CC_CRC_AHB_CLK] = &gpu_cc_crc_ahb_clk.clkr,
@@ -615,7 +535,6 @@ static struct clk_regmap *gpu_cc_kera_clocks[] = {
 	[GPU_CC_FF_CLK_SRC] = &gpu_cc_ff_clk_src.clkr,
 	[GPU_CC_FREQ_MEASURE_CLK] = &gpu_cc_freq_measure_clk.clkr,
 	[GPU_CC_GMU_CLK_SRC] = &gpu_cc_gmu_clk_src.clkr,
-	[GPU_CC_GPU_SMMU_VOTE_CLK] = &gpu_cc_gpu_smmu_vote_clk.clkr,
 	[GPU_CC_HLOS1_VOTE_GPU_SMMU_CLK] = &gpu_cc_hlos1_vote_gpu_smmu_clk.clkr,
 	[GPU_CC_HUB_AON_CLK] = &gpu_cc_hub_aon_clk.clkr,
 	[GPU_CC_HUB_CLK_SRC] = &gpu_cc_hub_clk_src.clkr,
@@ -628,13 +547,6 @@ static struct clk_regmap *gpu_cc_kera_clocks[] = {
 	[GPU_CC_SLEEP_CLK] = &gpu_cc_sleep_clk.clkr,
 	[GPU_CC_XO_CLK_SRC] = &gpu_cc_xo_clk_src.clkr,
 	[GPU_CC_XO_DIV_CLK_SRC] = &gpu_cc_xo_div_clk_src.clkr,
-};
-
-static struct gdsc *gpu_cc_kera_gdscs[] = {
-		[GPU_CC_CX_GDSC] = &gpu_cc_cx_gdsc,
-		[GPU_CC_CX_SMMU_GDSC] = &gpu_cc_cx_smmu_gdsc,
-		[GPU_CC_CX_GMU_GDSC] = &gpu_cc_cx_gmu_gdsc,
-		[GPU_CC_GX_GDSC] = &gpu_cc_gx_gdsc,
 };
 
 static const struct qcom_reset_map gpu_cc_kera_resets[] = {
@@ -667,8 +579,6 @@ static const struct qcom_cc_desc gpu_cc_kera_desc = {
 	.num_resets = ARRAY_SIZE(gpu_cc_kera_resets),
 	.clk_regulators = gpu_cc_kera_regulators,
 	.num_clk_regulators = ARRAY_SIZE(gpu_cc_kera_regulators),
-	.gdscs = gpu_cc_kera_gdscs,
-	.num_gdscs = ARRAY_SIZE(gpu_cc_kera_gdscs),
 };
 
 static const struct of_device_id gpu_cc_kera_match_table[] = {

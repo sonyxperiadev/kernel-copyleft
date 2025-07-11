@@ -129,9 +129,9 @@ int block_info__process_sym(struct hist_entry *he, struct block_hist *bh,
 	al.sym = he->ms.sym;
 
 	notes = symbol__annotation(he->ms.sym);
-	if (!notes || !notes->branch || !notes->branch->cycles_hist)
+	if (!notes || !notes->src || !notes->src->cycles_hist)
 		return 0;
-	ch = notes->branch->cycles_hist;
+	ch = notes->src->cycles_hist;
 	for (unsigned int i = 0; i < symbol__size(he->ms.sym); i++) {
 		if (ch[i].num_aggr) {
 			struct block_info *bi;
@@ -464,7 +464,8 @@ void block_info__free_report(struct block_report *reps, int nr_reps)
 }
 
 int report__browse_block_hists(struct block_hist *bh, float min_percent,
-			       struct evsel *evsel, struct perf_env *env)
+			       struct evsel *evsel, struct perf_env *env,
+			       struct annotation_options *annotation_opts)
 {
 	int ret;
 
@@ -476,7 +477,8 @@ int report__browse_block_hists(struct block_hist *bh, float min_percent,
 		return 0;
 	case 1:
 		symbol_conf.report_individual_block = true;
-		ret = block_hists_tui_browse(bh, evsel, min_percent, env);
+		ret = block_hists_tui_browse(bh, evsel, min_percent,
+					     env, annotation_opts);
 		return ret;
 	default:
 		return -1;

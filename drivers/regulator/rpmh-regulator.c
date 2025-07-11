@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2024 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved. */
 
@@ -1173,6 +1178,7 @@ static int rpmh_regulator_vrm_set_voltage(struct regulator_dev *rdev,
 
 	prev_voltage
 	     = rpmh_regulator_set_reg(vreg, RPMH_REGULATOR_REG_VRM_VOLTAGE, mv);
+
 	rpmh_regulator_check_param_max(vreg->aggr_vreg,
 				RPMH_REGULATOR_REG_VRM_VOLTAGE, max_uv);
 

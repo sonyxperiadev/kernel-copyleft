@@ -2290,58 +2290,6 @@ const struct clk_ops clk_alpha_pll_agera_ops = {
 };
 EXPORT_SYMBOL_GPL(clk_alpha_pll_agera_ops);
 
-/**
- * clk_lucid_5lpe_pll_configure - configure the lucid 5lpe pll
- *
- * @pll: clk alpha pll
- * @regmap: register map
- * @config: configuration to apply for pll
- */
-void clk_lucid_5lpe_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
-				  const struct alpha_pll_config *config)
-{
-	/*
-	 * If the bootloader left the PLL enabled it's likely that there are
-	 * RCGs that will lock up if we disable the PLL below.
-	 */
-	if (trion_pll_is_enabled(pll, regmap)) {
-		pr_debug("Lucid 5LPE PLL is already enabled, skipping configuration\n");
-		return;
-	}
-
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_L_VAL, config->l);
-	regmap_write(regmap, PLL_CAL_L_VAL(pll), TRION_PLL_CAL_VAL);
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_ALPHA_VAL, config->alpha);
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL,
-				     config->config_ctl_val);
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U,
-				     config->config_ctl_hi_val);
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_CONFIG_CTL_U1,
-				     config->config_ctl_hi1_val);
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL,
-					config->user_ctl_val);
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL_U,
-					config->user_ctl_hi_val);
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_USER_CTL_U1,
-					config->user_ctl_hi1_val);
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL,
-					config->test_ctl_val);
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U,
-					config->test_ctl_hi_val);
-	clk_alpha_pll_write_config(pll, regmap, PLL_OFF_TEST_CTL_U1,
-					config->test_ctl_hi1_val);
-
-	/* Disable PLL output */
-	regmap_update_bits(regmap, PLL_MODE(pll),  PLL_OUTCTRL, 0);
-
-	/* Set operation mode to OFF */
-	regmap_write(regmap, PLL_OPMODE(pll), PLL_STANDBY);
-
-	/* Place the PLL in STANDBY mode */
-	regmap_update_bits(regmap, PLL_MODE(pll), PLL_RESET_N, PLL_RESET_N);
-}
-EXPORT_SYMBOL_GPL(clk_lucid_5lpe_pll_configure);
-
 static int alpha_pll_lucid_5lpe_enable(struct clk_hw *hw)
 {
 	struct clk_alpha_pll *pll = to_clk_alpha_pll(hw);

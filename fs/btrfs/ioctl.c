@@ -533,11 +533,13 @@ static noinline int btrfs_ioctl_fitrim(struct btrfs_fs_info *fs_info,
 
 	range.minlen = max(range.minlen, minlen);
 	ret = btrfs_trim_fs(fs_info, &range);
+	if (ret < 0)
+		return ret;
 
 	if (copy_to_user(arg, &range, sizeof(range)))
 		return -EFAULT;
 
-	return ret;
+	return 0;
 }
 
 int __pure btrfs_is_empty_uuid(u8 *uuid)

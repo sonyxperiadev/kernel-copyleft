@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2025 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2010,2015,2019 The Linux Foundation. All rights reserved.
  * Copyright (C) 2015 Linaro Ltd.
@@ -2444,15 +2449,15 @@ static int qcom_scm_do_restart(struct notifier_block *this, unsigned long event,
 			      void *ptr)
 {
 	struct qcom_scm *scm = container_of(this, struct qcom_scm, restart_nb);
-	char *cmd = ptr;
+	char *cmd = ptr ? ptr : "normal";
 
 	if (reboot_mode == REBOOT_WARM &&
 		qcom_scm_custom_reset_type == QCOM_SCM_RST_NONE)
 		qcom_scm_reboot(scm->dev);
-	else if (cmd && !strcmp(cmd, "rtc"))
+	else if (!strcmp(cmd, "rtc"))
 		qcom_scm_custom_reset_type = QCOM_SCM_RST_SHUTDOWN_TO_RTC_MODE;
 
-	else if (cmd && !strcmp(cmd, "twm"))
+	else if (!strcmp(cmd, "twm"))
 		qcom_scm_custom_reset_type = QCOM_SCM_RST_SHUTDOWN_TO_TWM_MODE;
 
 	if (qcom_scm_custom_reset_type > QCOM_SCM_RST_NONE &&

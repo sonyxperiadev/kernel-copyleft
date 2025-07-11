@@ -138,6 +138,7 @@ struct synquacer_i2c {
 	int			irq;
 	struct device		*dev;
 	void __iomem		*base;
+	struct clk		*pclk;
 	u32			pclkrate;
 	u32			speed_khz;
 	u32			timeout_ms;
@@ -534,7 +535,6 @@ static const struct i2c_adapter synquacer_i2c_ops = {
 static int synquacer_i2c_probe(struct platform_device *pdev)
 {
 	struct synquacer_i2c *i2c;
-	struct clk *pclk;
 	u32 bus_speed;
 	int ret;
 
@@ -550,13 +550,13 @@ static int synquacer_i2c_probe(struct platform_device *pdev)
 	device_property_read_u32(&pdev->dev, "socionext,pclk-rate",
 				 &i2c->pclkrate);
 
-	pclk = devm_clk_get_optional_enabled(&pdev->dev, "pclk");
-	if (IS_ERR(pclk))
-		return dev_err_probe(&pdev->dev, PTR_ERR(pclk),
+	i2c->pclk = devm_clk_get_enabled(&pdev->dev, "pclk");
+	if (IS_ERR(i2c->pclk))
+		return dev_err_probe(&pdev->dev, PTR_ERR(i2c->pclk),
 				     "failed to get and enable clock\n");
 
-	if (pclk)
-		i2c->pclkrate = clk_get_rate(pclk);
+	dev_dbg(&pdev->dev, "clock source %p\n", i2c->pclk);
+	i2c->pclkrate = clk_get_rate(i2c->pclk);
 
 	if (i2c->pclkrate < SYNQUACER_I2C_MIN_CLK_RATE ||
 	    i2c->pclkrate > SYNQUACER_I2C_MAX_CLK_RATE)

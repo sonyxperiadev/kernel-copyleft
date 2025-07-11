@@ -15,7 +15,6 @@
 #include "share_config.h"
 #include "user_config.h"
 #include "user_session.h"
-#include "../connection.h"
 #include "../transport_ipc.h"
 #include "../misc.h"
 
@@ -121,13 +120,12 @@ static int parse_veto_list(struct ksmbd_share_config *share,
 	return 0;
 }
 
-static struct ksmbd_share_config *share_config_request(struct ksmbd_work *work,
+static struct ksmbd_share_config *share_config_request(struct unicode_map *um,
 						       const char *name)
 {
 	struct ksmbd_share_config_response *resp;
 	struct ksmbd_share_config *share = NULL;
 	struct ksmbd_share_config *lookup;
-	struct unicode_map *um = work->conn->um;
 	int ret;
 
 	resp = ksmbd_ipc_share_config_request(name);
@@ -183,14 +181,7 @@ static struct ksmbd_share_config *share_config_request(struct ksmbd_work *work,
 				      KSMBD_SHARE_CONFIG_VETO_LIST(resp),
 				      resp->veto_list_sz);
 		if (!ret && share->path) {
-			if (__ksmbd_override_fsids(work, share)) {
-				kill_share(share);
-				share = NULL;
-				goto out;
-			}
-
 			ret = kern_path(share->path, 0, &share->vfs_path);
-			ksmbd_revert_fsids(work);
 			if (ret) {
 				ksmbd_debug(SMB, "failed to access '%s'\n",
 					    share->path);
@@ -223,7 +214,7 @@ out:
 	return share;
 }
 
-struct ksmbd_share_config *ksmbd_share_config_get(struct ksmbd_work *work,
+struct ksmbd_share_config *ksmbd_share_config_get(struct unicode_map *um,
 						  const char *name)
 {
 	struct ksmbd_share_config *share;
@@ -236,7 +227,7 @@ struct ksmbd_share_config *ksmbd_share_config_get(struct ksmbd_work *work,
 
 	if (share)
 		return share;
-	return share_config_request(work, name);
+	return share_config_request(um, name);
 }
 
 bool ksmbd_share_veto_filename(struct ksmbd_share_config *share,

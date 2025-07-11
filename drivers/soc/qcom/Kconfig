@@ -503,6 +503,13 @@ config QCOM_STATS
 	  various SoC level low power modes statistics and export to debugfs
 	  interface.
 
+config QCOM_STATS_ON_SYSFS
+	bool "Enable SoC sleep stats I/F on SYSFS"
+	depends on QCOM_STATS && QCOM_SMEM
+	help
+	  Duplicate stats I/F virtual files to /sys/kernel/qcom_sleep_stats/
+	  derived from /sys/kernel/debug/qcom_stats/ .
+
 config QCOM_LOGBUF_VENDOR_HOOKS
 	tristate "QTI Logbuf Vendor Hooks Support"
 	depends on ARCH_QCOM
@@ -1189,16 +1196,15 @@ config QCOM_DYNAMIC_RAMOOPS
 	  awareness and it reads all ramoops property from device tree and registers
 	  ramoops platform device and driver for this device will still be fs/pstore/ram.c .
 
-config QTI_DMOF_SCMI
-	tristate "QTI SCMI client driver to Disable Memcpy Optimization Feature"
+config QTI_FCTL_SCMI
+	tristate "Qualcomm Technologies Inc. SCMI client driver for Feature Control"
 	depends on QTI_SCMI_VENDOR_PROTOCOL
 	default n
 	help
-	  Driver to Disable Memcpy Optimization Feature (DMOF) from userspace via sysfs.
+	  Driver to expose feature control configuration APIs to userspace via sysfs.
 
-	  This driver gathers configuration parameters from user space
-	  via sysfs interface and relays them to CPUCP via SCMI communication.
-
-	  It is intended to be used by clients familiar with
-	  Memcpy Optimization Feature on Qualcomm Technologies, Inc. SOCs.
+	  This driver gathers configuration parameters from sysfs
+	  userspace and relays them to CPUCP via SCMI communication.
+	  It is intended to be used by clients familiar with modifying
+	  the feature control settings.
 endmenu

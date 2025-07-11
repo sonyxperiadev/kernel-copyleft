@@ -31,13 +31,10 @@
 #define GPU_CC_SLEEP_CLK					21
 #define GPU_CC_XO_CLK_SRC					22
 #define GPU_CC_XO_DIV_CLK_SRC					23
-#define GPU_CC_GPU_SMMU_VOTE_CLK				24
 
 /* GPU_CC power domains */
 #define GPU_CC_CX_GDSC						0
 #define GPU_CC_GX_GDSC						1
-#define GPU_CC_CX_SMMU_GDSC					2
-#define GPU_CC_CX_GMU_GDSC					4
 
 /* GPU_CC resets */
 #define GPU_CC_ACD_BCR						0

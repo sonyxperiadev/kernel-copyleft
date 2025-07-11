@@ -70,3 +70,4 @@ obj-$(CONFIG_TPS6594_PFSM)	+= tps6594-pfsm.o
 obj-$(CONFIG_UID_SYS_STATS)	+= uid_sys_stats.o
 obj-$(CONFIG_QSEECOM_PROXY) 	+= qseecom_proxy.o
 obj-$(CONFIG_PKVM_SMC_FILTER)  += pkvm-smc/
+obj-$(CONFIG_HQHARDWARE_INFO)   += huaqinhardware_info/

@@ -546,14 +546,12 @@ static int bcmbca_hsspi_probe(struct platform_device *pdev)
 			goto out_put_host;
 	}
 
-	ret = devm_pm_runtime_enable(&pdev->dev);
-	if (ret)
-		goto out_put_host;
+	pm_runtime_enable(&pdev->dev);
 
 	ret = sysfs_create_group(&pdev->dev.kobj, &bcmbca_hsspi_group);
 	if (ret) {
 		dev_err(&pdev->dev, "couldn't register sysfs group\n");
-		goto out_put_host;
+		goto out_pm_disable;
 	}
 
 	/* register and we are done */
@@ -567,6 +565,8 @@ static int bcmbca_hsspi_probe(struct platform_device *pdev)
 
 out_sysgroup_disable:
 	sysfs_remove_group(&pdev->dev.kobj, &bcmbca_hsspi_group);
+out_pm_disable:
+	pm_runtime_disable(&pdev->dev);
 out_put_host:
 	spi_controller_put(host);
 out_disable_pll_clk:

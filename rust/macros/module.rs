@@ -203,11 +203,7 @@ pub(crate) fn module(ts: TokenStream) -> TokenStream {
             // freed until the module is unloaded.
             #[cfg(MODULE)]
             static THIS_MODULE: kernel::ThisModule = unsafe {{
-                extern \"C\" {{
-                    static __this_module: kernel::types::Opaque<kernel::bindings::module>;
-                }}
-
-                kernel::ThisModule::from_ptr(__this_module.get())
+                kernel::ThisModule::from_ptr(&kernel::bindings::__this_module as *const _ as *mut _)
             }};
             #[cfg(not(MODULE))]
             static THIS_MODULE: kernel::ThisModule = unsafe {{

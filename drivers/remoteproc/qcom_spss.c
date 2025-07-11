@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2023 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
@@ -82,6 +87,8 @@ struct qcom_rproc_glink_spss {
 	void *notifier_handle;
 };
 
+#define SUBSYS_CRASH_REASON_LEN 512
+
 struct qcom_spss {
 	struct device *dev;
 	struct rproc *rproc;
@@ -115,6 +122,7 @@ struct qcom_spss {
 	void __iomem *err_status_spare;
 	void __iomem *rmb_gpm;
 	u32 bits_arr[2];
+	char crash_reason_buf[SUBSYS_CRASH_REASON_LEN];
 };
 
 static void read_sp2cl_debug_registers(struct qcom_spss *spss);
@@ -264,10 +272,26 @@ static void clear_sw_init_done_error(struct qcom_spss *spss, int err)
 }
 
 
+static ssize_t crash_reason_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct qcom_spss *spss = dev_get_drvdata(dev);
+	int r = 0;
+
+	r = snprintf(buf, PAGE_SIZE, "%s\n", spss->crash_reason_buf);
+	memset(spss->crash_reason_buf, 0, sizeof(spss->crash_reason_buf));
+
+	return r;
+}
+
+static DEVICE_ATTR_RO(crash_reason);
 
 static void clear_wdog(struct qcom_spss *spss)
 {
 	dev_err(spss->dev, "wdog bite received from %s!\n", spss->rproc->name);
+	snprintf(spss->crash_reason_buf, sizeof(spss->crash_reason_buf),
+			"wdog bite received from %s!", spss->rproc->name);
+
 	dev_err(spss->dev, "rproc recovery state: %s\n", spss->rproc->recovery_disabled ?
 		"disabled and lead to device crash" : "enabled and kick reovery process");
 	if (spss->rproc->recovery_disabled) {
@@ -280,6 +304,7 @@ static void clear_wdog(struct qcom_spss *spss)
 
 	__raw_writel(BIT(spss->bits_arr[ERR_READY]), spss->irq_clr);
 	rproc_report_crash(spss->rproc, RPROC_WATCHDOG);
+	sysfs_notify(&spss->dev->kobj, NULL, "crash_reason");
 }
 
 static irqreturn_t spss_generic_handler(int irq, void *dev_id)
@@ -954,6 +979,12 @@ static int qcom_spss_probe(struct platform_device *pdev)
 	ret = rproc_add(rproc);
 	if (ret)
 		goto remove_subdev;
+
+	ret = sysfs_create_file(&pdev->dev.kobj, &dev_attr_crash_reason.attr);
+	if (ret) {
+		dev_err(&pdev->dev, "qcom_spss: failed to create sysfs crash_reason\n");
+		kobject_put(&pdev->dev.kobj);
+	}
 
 	return 0;
 

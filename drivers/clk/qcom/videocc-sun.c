@@ -472,7 +472,7 @@ static int video_cc_sun_fixup(struct platform_device *pdev, struct regmap *regma
 
 static int video_cc_sun_probe(struct platform_device *pdev)
 {
-	unsigned int dly_accu_mask = 0x1f << 21;
+	unsigned int dly_accu_mask = 0xf << 21;
 	struct regmap *regmap;
 	int ret;
 
@@ -490,13 +490,9 @@ static int video_cc_sun_probe(struct platform_device *pdev)
 
 	clk_taycan_elu_pll_configure(&video_cc_pll0, regmap, &video_cc_pll0_config);
 
-	/*
-	 * Maximize ctl data download delay and enable memory redundancy:
-	 * MVS0C_CFG3
-	 * MVS0_CFG3
-	 */
-	regmap_update_bits(regmap, 0x8040, dly_accu_mask, dly_accu_mask);
+	/* Change DLY_ACCU_RED_SHIFTER_DONE to 0xF for mvs0, mvs0c */
 	regmap_update_bits(regmap, 0x8074, dly_accu_mask, dly_accu_mask);
+	regmap_update_bits(regmap, 0x8040, dly_accu_mask, dly_accu_mask);
 
 	ret = video_cc_sun_fixup(pdev, regmap);
 	if (ret)

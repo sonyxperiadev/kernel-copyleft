@@ -6672,10 +6672,8 @@ static int __e1000_shutdown(struct pci_dev *pdev, bool runtime)
 		if (adapter->flags2 & FLAG2_HAS_PHY_WAKEUP) {
 			/* enable wakeup by the PHY */
 			retval = e1000_init_phy_wakeup(adapter, wufc);
-			if (retval) {
-				e_err("Failed to enable wakeup\n");
-				goto skip_phy_configurations;
-			}
+			if (retval)
+				return retval;
 		} else {
 			/* enable wakeup by the MAC */
 			ew32(WUFC, wufc);
@@ -6696,10 +6694,8 @@ static int __e1000_shutdown(struct pci_dev *pdev, bool runtime)
 			 * or broadcast.
 			 */
 			retval = e1000_enable_ulp_lpt_lp(hw, !runtime);
-			if (retval) {
-				e_err("Failed to enable ULP\n");
-				goto skip_phy_configurations;
-			}
+			if (retval)
+				return retval;
 		}
 
 		/* Force SMBUS to allow WOL */
@@ -6748,7 +6744,6 @@ static int __e1000_shutdown(struct pci_dev *pdev, bool runtime)
 		hw->phy.ops.release(hw);
 	}
 
-skip_phy_configurations:
 	/* Release control of h/w to f/w.  If f/w is AMT enabled, this
 	 * would have already happened in close and is redundant.
 	 */
@@ -6991,13 +6986,15 @@ static __maybe_unused int e1000e_pm_suspend(struct device *dev)
 	e1000e_pm_freeze(dev);
 
 	rc = __e1000_shutdown(pdev, false);
-	if (!rc) {
+	if (rc) {
+		e1000e_pm_thaw(dev);
+	} else {
 		/* Introduce S0ix implementation */
 		if (adapter->flags2 & FLAG2_ENABLE_S0IX_FLOWS)
 			e1000e_s0ix_entry_flow(adapter);
 	}
 
-	return 0;
+	return rc;
 }
 
 static __maybe_unused int e1000e_pm_resume(struct device *dev)

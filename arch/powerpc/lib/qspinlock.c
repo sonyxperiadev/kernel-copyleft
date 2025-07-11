@@ -715,15 +715,7 @@ again:
 	}
 
 release:
-	/*
-	 * Clear the lock before releasing the node, as another CPU might see stale
-	 * values if an interrupt occurs after we increment qnodesp->count
-	 * but before node->lock is initialized. The barrier ensures that
-	 * there are no further stores to the node after it has been released.
-	 */
-	node->lock = NULL;
-	barrier();
-	qnodesp->count--;
+	qnodesp->count--; /* release the node */
 }
 
 void queued_spin_lock_slowpath(struct qspinlock *lock)

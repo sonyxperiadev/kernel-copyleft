@@ -27,6 +27,8 @@
 			}                                                     \
 	})
 
+#define NETNS "ns_lwt"
+
 static inline int netns_create(void)
 {
 	return system("ip netns add " NETNS);

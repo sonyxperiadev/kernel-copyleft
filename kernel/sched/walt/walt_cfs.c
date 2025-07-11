@@ -339,8 +339,8 @@ static void walt_find_best_target(struct sched_domain *sd,
 	cpumask_t visit_cpus;
 	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
 	int packing_cpu, cpu;
+	unsigned int visited_cluster = 0;
 	unsigned int search_sibling_cluster = 0;
-	bool visited_clusters[MAX_CLUSTERS] = {[0 ... (MAX_CLUSTERS-1)] = false};
 
 	/* Find start CPU based on boost value */
 	start_cpu = fbt_env->start_cpu;
@@ -364,7 +364,7 @@ static void walt_find_best_target(struct sched_domain *sd,
 	if (packing_cpu >= 0) {
 		fbt_env->fastpath = CLUSTER_PACKING_FASTPATH;
 		cpumask_set_cpu(packing_cpu, candidates);
-		visited_clusters[cpu_cluster(packing_cpu)->id] = true;
+		visited_cluster = BIT(cpu_cluster(packing_cpu)->id);
 		goto out;
 	}
 
@@ -372,7 +372,7 @@ static void walt_find_best_target(struct sched_domain *sd,
 	if (select_prev_cpu_fastpath(prev_cpu, start_cpu, order_index, p)) {
 		fbt_env->fastpath = PREV_CPU_FASTPATH;
 		cpumask_set_cpu(prev_cpu, candidates);
-		visited_clusters[cpu_cluster(prev_cpu)->id] = true;
+		visited_cluster = BIT(cpu_cluster(prev_cpu)->id);
 		goto out;
 	}
 
@@ -383,7 +383,9 @@ retry:
 		int target_cpu_cluster = -1;
 		int this_complex_idle = 0;
 		int best_complex_idle = 0;
-		int cluster_id;
+
+		if (BIT(sched_cluster[cluster]->id) & visited_cluster)
+			continue;
 
 		target_max_spare_cap = 0;
 		min_exit_latency = INT_MAX;
@@ -392,18 +394,13 @@ retry:
 		if (search_sibling_cluster) {
 			if (!(search_sibling_cluster & BIT(cluster)))
 				continue;
-			cluster_id = cluster;
+			visited_cluster |= BIT(cluster);
 			cpumask_and(&visit_cpus, p->cpus_ptr, &sched_cluster[cluster]->cpus);
 		} else {
 			cpumask_and(&visit_cpus, p->cpus_ptr, &cpu_array[order_index][cluster]);
-			cluster_id = cpu_cluster(
-					cpumask_first(&cpu_array[order_index][cluster]))->id;
+			visited_cluster |= BIT(cpu_cluster(
+					cpumask_first(&cpu_array[order_index][cluster]))->id);
 		}
-
-		if (visited_clusters[cluster_id])
-			continue;
-
-		visited_clusters[cluster_id] = true;
 
 		for_each_cpu(i, &visit_cpus) {
 			unsigned long capacity_orig = capacity_orig_of(i);
@@ -572,10 +569,10 @@ out:
 	search_sibling_cluster = 0;
 	for_each_cpu(cpu, candidates) {
 		struct walt_sched_cluster *cluster = cpu_cluster(cpu);
-		int sibling = cluster->sibling_cluster;
 
-		if ((sibling >= 0) && !visited_clusters[sibling]) {
-			search_sibling_cluster |= BIT(sibling);
+		if ((cluster->sibling_cluster >= 0) &&
+				!(BIT(cluster->sibling_cluster) & visited_cluster)) {
+			search_sibling_cluster |= BIT(cluster->sibling_cluster);
 		}
 	}
 	if (search_sibling_cluster) {

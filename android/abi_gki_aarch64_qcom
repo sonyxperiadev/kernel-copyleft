@@ -673,7 +673,6 @@
   _find_next_zero_bit
   find_task_by_vpid
   find_vpid
-  finish_rcuwait
   finish_wait
   firmware_request_nowarn
   flow_keys_dissector
@@ -1526,7 +1525,6 @@
   proc_set_user
   proto_register
   proto_unregister
-  __pskb_copy_fclone
   pskb_expand_head
   __pskb_pull_tail
   ___pskb_trim
@@ -1766,7 +1764,6 @@
   sdhci_cqe_disable
   sdhci_cqe_enable
   sdhci_cqe_irq
-  sdhci_dumpregs
   sdhci_enable_clk
   sdhci_get_property
   sdhci_pltfm_free
@@ -2374,7 +2371,6 @@
   usb_unregister_notify
   __usecs_to_jiffies
   usleep_range_state
-  utf8_data_table
   uuid_parse
   v4l2_compat_ioctl32
   v4l2_ctrl_find

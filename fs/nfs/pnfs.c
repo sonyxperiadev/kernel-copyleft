@@ -1172,9 +1172,10 @@ void pnfs_layoutreturn_free_lsegs(struct pnfs_layout_hdr *lo,
 	LIST_HEAD(freeme);
 
 	spin_lock(&inode->i_lock);
-	if (!nfs4_stateid_match_other(&lo->plh_stateid, arg_stateid))
+	if (!pnfs_layout_is_valid(lo) ||
+	    !nfs4_stateid_match_other(&lo->plh_stateid, arg_stateid))
 		goto out_unlock;
-	if (stateid && pnfs_layout_is_valid(lo)) {
+	if (stateid) {
 		u32 seq = be32_to_cpu(arg_stateid->seqid);
 
 		pnfs_mark_matching_lsegs_invalid(lo, &freeme, range, seq);

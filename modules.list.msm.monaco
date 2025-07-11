@@ -60,4 +60,3 @@ spmi-pmic-arb.ko
 regmap-spmi.ko
 nvmem_qcom-spmi-sdam.ko
 cqhci-crypto-qti.ko
-minidump.ko

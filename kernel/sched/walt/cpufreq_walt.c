@@ -47,6 +47,7 @@ struct waltgov_policy {
 	unsigned long		hispeed_util;
 	unsigned long		hispeed_cond_util;
 	unsigned long		rtg_boost_util;
+	unsigned long		max;
 
 	raw_spinlock_t		update_lock;
 	u64			last_freq_update_time;
@@ -68,7 +69,6 @@ struct waltgov_policy {
 	bool			limits_changed;
 	bool			need_freq_update;
 	bool			thermal_isolated;
-	bool			boost_utils_inited;
 };
 
 struct waltgov_cpu {
@@ -77,6 +77,7 @@ struct waltgov_cpu {
 	unsigned int		cpu;
 	struct walt_cpu_load	walt_load;
 	unsigned long		util;
+	unsigned long		max;
 	unsigned int		flags;
 	unsigned int		reasons;
 };
@@ -154,8 +155,8 @@ static bool waltgov_update_next_freq(struct waltgov_policy *wg_policy, u64 time,
 static unsigned long freq_to_util(struct waltgov_policy *wg_policy,
 				  unsigned int freq)
 {
-	return mult_frac(arch_scale_cpu_capacity(wg_policy->policy->cpu),
-			freq, wg_policy->policy->cpuinfo.max_freq);
+	return mult_frac(wg_policy->max, freq,
+			 wg_policy->policy->cpuinfo.max_freq);
 }
 
 #define KHZ 1000
@@ -415,6 +416,7 @@ out:
 
 static unsigned long waltgov_get_util(struct waltgov_cpu *wg_cpu)
 {
+	wg_cpu->max = arch_scale_cpu_capacity(wg_cpu->cpu);
 	wg_cpu->reasons = 0;
 	return cpu_util_freq_walt(wg_cpu->cpu, &wg_cpu->walt_load, &wg_cpu->reasons);
 }
@@ -503,24 +505,32 @@ static unsigned int waltgov_next_freq_shared(struct waltgov_cpu *wg_cpu, u64 tim
 {
 	struct waltgov_policy *wg_policy = wg_cpu->wg_policy;
 	struct cpufreq_policy *policy = wg_policy->policy;
-	unsigned long util = 0;
+	unsigned long util = 0, max = 1;
 	unsigned int j;
 	int boost = wg_policy->tunables->boost;
-	unsigned long max = arch_scale_cpu_capacity(wg_cpu->cpu);
 
 	for_each_cpu(j, policy->cpus) {
 		struct waltgov_cpu *j_wg_cpu = &per_cpu(waltgov_cpu, j);
-		unsigned long j_util, j_nl;
+		unsigned long j_util, j_max, j_nl;
 
+		/*
+		 * If the util value for all CPUs in a policy is 0, just using >
+		 * will result in a max value of 1. WALT stats can later update
+		 * the aggregated util value, causing get_next_freq() to compute
+		 * freq = max_freq * 1.25 * (util / max) for nonzero util,
+		 * leading to spurious jumps to fmax.
+		 */
 		j_util = j_wg_cpu->util;
 		j_nl = j_wg_cpu->walt_load.nl;
+		j_max = j_wg_cpu->max;
 		if (boost) {
 			j_util = mult_frac(j_util, boost + 100, 100);
 			j_nl = mult_frac(j_nl, boost + 100, 100);
 		}
 
-		if (j_util > util) {
+		if (j_util * max >= j_max * util) {
 			util = j_util;
+			max = j_max;
 			wg_policy->driving_cpu = j;
 		}
 
@@ -576,8 +586,8 @@ static void waltgov_update_freq(struct waltgov_callback *cb, u64 time,
 	wg_cpu->flags = flags;
 	raw_spin_lock(&wg_policy->update_lock);
 
-	if (!wg_policy->boost_utils_inited) {
-		wg_policy->boost_utils_inited = true;
+	if (wg_policy->max != wg_cpu->max) {
+		wg_policy->max = wg_cpu->max;
 		hs_util = target_util(wg_policy,
 					wg_policy->tunables->hispeed_freq);
 		wg_policy->hispeed_util = hs_util;
@@ -591,8 +601,7 @@ static void waltgov_update_freq(struct waltgov_callback *cb, u64 time,
 			   wg_policy->policy->cur);
 
 	trace_waltgov_util_update(wg_cpu->cpu, wg_cpu->util, wg_policy->avg_cap,
-				arch_scale_cpu_capacity(wg_cpu->cpu),
-				wg_cpu->walt_load.nl,
+				wg_cpu->max, wg_cpu->walt_load.nl,
 				wg_cpu->walt_load.pl,
 				wg_cpu->walt_load.rtgb_active, flags,
 				wg_policy->tunables->boost);
@@ -1315,7 +1324,6 @@ static int waltgov_start(struct cpufreq_policy *policy)
 	wg_policy->limits_changed		= false;
 	wg_policy->need_freq_update		= false;
 	wg_policy->cached_raw_freq		= 0;
-	wg_policy->boost_utils_inited		= false;
 
 	for_each_cpu(cpu, policy->cpus) {
 		struct waltgov_cpu *wg_cpu = &per_cpu(waltgov_cpu, cpu);

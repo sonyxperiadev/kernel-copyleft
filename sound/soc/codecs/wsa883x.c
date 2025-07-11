@@ -998,19 +998,15 @@ static const struct reg_sequence reg_init[] = {
 	{WSA883X_GMAMP_SUP1, 0xE2},
 };
 
-static int wsa883x_init(struct wsa883x_priv *wsa883x)
+static void wsa883x_init(struct wsa883x_priv *wsa883x)
 {
 	struct regmap *regmap = wsa883x->regmap;
-	int variant, version, ret;
+	int variant, version;
 
-	ret = regmap_read(regmap, WSA883X_OTP_REG_0, &variant);
-	if (ret)
-		return ret;
+	regmap_read(regmap, WSA883X_OTP_REG_0, &variant);
 	wsa883x->variant = variant & WSA883X_ID_MASK;
 
-	ret = regmap_read(regmap, WSA883X_CHIP_ID0, &version);
-	if (ret)
-		return ret;
+	regmap_read(regmap, WSA883X_CHIP_ID0, &version);
 	wsa883x->version = version;
 
 	switch (wsa883x->variant) {
@@ -1045,8 +1041,6 @@ static int wsa883x_init(struct wsa883x_priv *wsa883x)
 				   WSA883X_DRE_OFFSET_MASK,
 				   wsa883x->comp_offset);
 	}
-
-	return 0;
 }
 
 static int wsa883x_update_status(struct sdw_slave *slave,
@@ -1055,7 +1049,7 @@ static int wsa883x_update_status(struct sdw_slave *slave,
 	struct wsa883x_priv *wsa883x = dev_get_drvdata(&slave->dev);
 
 	if (status == SDW_SLAVE_ATTACHED && slave->dev_num > 0)
-		return wsa883x_init(wsa883x);
+		wsa883x_init(wsa883x);
 
 	return 0;
 }

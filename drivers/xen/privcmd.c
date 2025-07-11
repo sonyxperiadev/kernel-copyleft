@@ -17,7 +17,6 @@
 #include <linux/poll.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/srcu.h>
 #include <linux/string.h>
 #include <linux/workqueue.h>
 #include <linux/errno.h>
@@ -843,7 +842,6 @@ out:
 /* Irqfd support */
 static struct workqueue_struct *irqfd_cleanup_wq;
 static DEFINE_SPINLOCK(irqfds_lock);
-DEFINE_STATIC_SRCU(irqfds_srcu);
 static LIST_HEAD(irqfds_list);
 
 struct privcmd_kernel_irqfd {
@@ -870,9 +868,6 @@ static void irqfd_shutdown(struct work_struct *work)
 	struct privcmd_kernel_irqfd *kirqfd =
 		container_of(work, struct privcmd_kernel_irqfd, shutdown);
 	u64 cnt;
-
-	/* Make sure irqfd has been initialized in assign path */
-	synchronize_srcu(&irqfds_srcu);
 
 	eventfd_ctx_remove_wait_queue(kirqfd->eventfd, &kirqfd->wait, &cnt);
 	eventfd_ctx_put(kirqfd->eventfd);
@@ -936,7 +931,7 @@ static int privcmd_irqfd_assign(struct privcmd_irqfd *irqfd)
 	__poll_t events;
 	struct fd f;
 	void *dm_op;
-	int ret, idx;
+	int ret;
 
 	kirqfd = kzalloc(sizeof(*kirqfd) + irqfd->size, GFP_KERNEL);
 	if (!kirqfd)
@@ -982,7 +977,6 @@ static int privcmd_irqfd_assign(struct privcmd_irqfd *irqfd)
 		}
 	}
 
-	idx = srcu_read_lock(&irqfds_srcu);
 	list_add_tail(&kirqfd->list, &irqfds_list);
 	spin_unlock_irqrestore(&irqfds_lock, flags);
 
@@ -993,8 +987,6 @@ static int privcmd_irqfd_assign(struct privcmd_irqfd *irqfd)
 	events = vfs_poll(f.file, &kirqfd->pt);
 	if (events & EPOLLIN)
 		irqfd_inject(kirqfd);
-
-	srcu_read_unlock(&irqfds_srcu, idx);
 
 	/*
 	 * Do not drop the file until the kirqfd is fully initialized, otherwise

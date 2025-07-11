@@ -875,6 +875,10 @@ static int msm_m31_eusb2_phy_probe(struct platform_device *pdev)
 	phy->phy.type			= USB_PHY_TYPE_USB2;
 	phy->phy.label			= "M31 eUSB2";
 
+	ret = usb_add_phy_dev(&phy->phy);
+	if (ret)
+		goto err_ret;
+
 	INIT_WORK(&phy->vbus_draw_work, msm_m31_eusb2_phy_vbus_draw_work);
 	msm_m31_eusb2_phy_create_debugfs(phy);
 	/*
@@ -888,10 +892,8 @@ static int msm_m31_eusb2_phy_probe(struct platform_device *pdev)
 		msm_m31_eusb2_repeater_reset_and_init(phy);
 	}
 
-	/* Placed at the end to ensure the probe is complete */
-	ret = usb_add_phy_dev(&phy->phy);
-
 	dev_dbg(dev, "M31 Phy Probed");
+	return 0;
 
 err_ret:
 	return ret;

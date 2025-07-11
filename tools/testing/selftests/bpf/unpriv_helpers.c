@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
+#include <error.h>
 #include <stdio.h>
 
 #include "unpriv_helpers.h"

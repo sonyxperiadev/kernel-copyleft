@@ -143,25 +143,32 @@ enum dc_status dp_set_fec_ready(struct dc_link *link, const struct link_resource
 
 	link_enc = link_enc_cfg_get_link_enc(link);
 	ASSERT(link_enc);
-	if (link_enc->funcs->fec_set_ready == NULL)
-		return DC_NOT_SUPPORTED;
 
-	if (ready && dp_should_enable_fec(link)) {
-		fec_config = 1;
+	if (!dp_should_enable_fec(link))
+		return status;
 
-		status = core_link_write_dpcd(link, DP_FEC_CONFIGURATION,
-				&fec_config, sizeof(fec_config));
-
-		if (status == DC_OK) {
-			link_enc->funcs->fec_set_ready(link_enc, true);
-			link->fec_state = dc_link_fec_ready;
-		}
-	} else {
-		if (link->fec_state == dc_link_fec_ready) {
+	if (link_enc->funcs->fec_set_ready &&
+			link->dpcd_caps.fec_cap.bits.FEC_CAPABLE) {
+		if (ready) {
+			fec_config = 1;
+			status = core_link_write_dpcd(link,
+					DP_FEC_CONFIGURATION,
+					&fec_config,
+					sizeof(fec_config));
+			if (status == DC_OK) {
+				link_enc->funcs->fec_set_ready(link_enc, true);
+				link->fec_state = dc_link_fec_ready;
+			} else {
+				link_enc->funcs->fec_set_ready(link_enc, false);
+				link->fec_state = dc_link_fec_not_ready;
+				dm_error("dpcd write failed to set fec_ready");
+			}
+		} else if (link->fec_state == dc_link_fec_ready) {
 			fec_config = 0;
-			core_link_write_dpcd(link, DP_FEC_CONFIGURATION,
-				&fec_config, sizeof(fec_config));
-
+			status = core_link_write_dpcd(link,
+					DP_FEC_CONFIGURATION,
+					&fec_config,
+					sizeof(fec_config));
 			link_enc->funcs->fec_set_ready(link_enc, false);
 			link->fec_state = dc_link_fec_not_ready;
 		}
@@ -176,12 +183,14 @@ void dp_set_fec_enable(struct dc_link *link, bool enable)
 
 	link_enc = link_enc_cfg_get_link_enc(link);
 	ASSERT(link_enc);
-	if (link_enc->funcs->fec_set_enable == NULL)
+
+	if (!dp_should_enable_fec(link))
 		return;
 
-	if (enable && dp_should_enable_fec(link)) {
-		if (link->fec_state == dc_link_fec_ready) {
-			/* According to DP spec, FEC enable sequence can first
+	if (link_enc->funcs->fec_set_enable &&
+			link->dpcd_caps.fec_cap.bits.FEC_CAPABLE) {
+		if (link->fec_state == dc_link_fec_ready && enable) {
+			/* Accord to DP spec, FEC enable sequence can first
 			 * be transmitted anytime after 1000 LL codes have
 			 * been transmitted on the link after link training
 			 * completion. Using 1 lane RBR should have the maximum
@@ -191,9 +200,7 @@ void dp_set_fec_enable(struct dc_link *link, bool enable)
 			udelay(7);
 			link_enc->funcs->fec_set_enable(link_enc, true);
 			link->fec_state = dc_link_fec_enabled;
-		}
-	} else {
-		if (link->fec_state == dc_link_fec_enabled) {
+		} else if (link->fec_state == dc_link_fec_enabled && !enable) {
 			link_enc->funcs->fec_set_enable(link_enc, false);
 			link->fec_state = dc_link_fec_ready;
 		}

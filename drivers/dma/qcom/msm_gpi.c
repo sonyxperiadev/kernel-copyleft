@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/atomic.h>
@@ -675,7 +675,6 @@ static void gpi_process_events(struct gpii *gpii);
 static int gpi_start_chan(struct gpii_chan *gpii_chan);
 static void gpi_free_chan_desc(struct gpii_chan *gpii_chan);
 static void gpi_noop_tre(struct gpii_chan *gpii_chan);
-static u32 gpi_read_ch_state(struct gpii_chan *gpii_chan);
 
 static inline struct gpii_chan *to_gpii_chan(struct dma_chan *dma_chan)
 {
@@ -1900,10 +1899,10 @@ static void gpi_generate_cb_event(struct gpii_chan *gpii_chan,
 	struct gpii *gpii = gpii_chan->gpii;
 	struct gpi_client_info *client_info = &gpii_chan->client_info;
 	struct msm_gpi_cb msm_gpi_cb = {0};
-	u32 ch_state = gpi_read_ch_state(gpii_chan);
 
-	GPII_ERR(gpii, gpii_chan->chid, "notifying event:%s with status:%llu ch_state:%s\n",
-		 TO_GPI_CB_EVENT_STR(event), status, TO_GPI_CH_STATE_STR(ch_state));
+	GPII_ERR(gpii, gpii_chan->chid,
+		 "notifying event:%s with status:%llu\n",
+		 TO_GPI_CB_EVENT_STR(event), status);
 
 	msm_gpi_cb.cb_event = event;
 	msm_gpi_cb.status = status;
@@ -3531,7 +3530,7 @@ struct dma_async_tx_descriptor *gpi_prep_slave_sg(struct dma_chan *chan,
 {
 	struct gpii_chan *gpii_chan = to_gpii_chan(chan);
 	struct gpii *gpii = gpii_chan->gpii;
-	u32 nr, ch_state;
+	u32 nr;
 	u32 nr_req = 0;
 	int i, j;
 	struct scatterlist *sg;
@@ -3549,14 +3548,6 @@ struct dma_async_tx_descriptor *gpi_prep_slave_sg(struct dma_chan *chan,
 			 "invalid dma direction: %d\n", direction);
 		return NULL;
 	}
-
-	ch_state = gpi_read_ch_state(gpii_chan);
-	GPII_VERB(gpii, gpii_chan->chid, "enter_c wp:0x%0llx rp:0x%0llx state:%s\n",
-		  to_physical(ch_ring, ch_ring->wp), to_physical(ch_ring, ch_ring->rp),
-		  TO_GPI_CH_STATE_STR(ch_state));
-
-	if (ch_state == CH_STATE_ERROR)
-		gpi_dump_debug_reg(gpii);
 
 	/* calculate # of elements required & available */
 	nr = gpi_ring_num_elements_avail(ch_ring);
@@ -3773,7 +3764,7 @@ static int gpi_config(struct dma_chan *chan,
 	return ret;
 
 error_start_chan:
-	for (i = i - 1; i >= 0; i--) {
+	for (i = i - 1; i >= 0; i++) {
 		gpi_send_cmd(gpii, gpii_chan, GPI_CH_CMD_STOP);
 		gpi_send_cmd(gpii, gpii_chan, GPI_CH_CMD_RESET);
 	}

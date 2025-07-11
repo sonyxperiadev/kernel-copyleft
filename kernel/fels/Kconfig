@@ -1,0 +1,4 @@
+config FELS
+	tristate "support kernel logging system for driver"
+	help
+	  This option provides sysfs nodes for FELS (Fatal Error Logging System) daemon.

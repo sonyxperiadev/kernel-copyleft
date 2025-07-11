@@ -772,8 +772,7 @@ int setup_arg_pages(struct linux_binprm *bprm,
 	stack_base = calc_max_stack_size(stack_base);
 
 	/* Add space for stack randomization. */
-	if (current->flags & PF_RANDOMIZE)
-		stack_base += (STACK_RND_MASK << PAGE_SHIFT);
+	stack_base += (STACK_RND_MASK << PAGE_SHIFT);
 
 	/* Make sure we didn't let the argument array grow too large. */
 	if (vma->vm_end - vma->vm_start > stack_base)

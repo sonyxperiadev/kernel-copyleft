@@ -3,6 +3,8 @@
 # Makefile for the kernel mmc core.
 #
 
+ccflags-y := -I $(srctree)/kernel/fels/include
+
 obj-$(CONFIG_MMC)		+= mmc_core.o
 mmc_core-y			:= core.o bus.o host.o \
 				   mmc.o mmc_ops.o sd.o sd_ops.o \
@@ -19,3 +21,4 @@ mmc_block-objs			:= block.o queue.o
 obj-$(CONFIG_MMC_TEST)		+= mmc_test.o
 obj-$(CONFIG_SDIO_UART)		+= sdio_uart.o
 mmc_core-$(CONFIG_MMC_CRYPTO)	+= crypto.o
+obj-$(CONFIG_MMC_ERROR_LOGGING)	+= mmc_error_logging.o

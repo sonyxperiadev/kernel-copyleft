@@ -1342,9 +1342,8 @@ static int msm_geni_serial_ioctl(struct uart_port *uport, unsigned int cmd,
 			__func__, uart_error, port->uart_error);
 		ret = uart_error;
 
-		if (port->ioctl_count)
-			geni_se_dump_dbg_regs(uport);
 		/* Do not use previous log file from this issue point */
+		geni_se_dump_dbg_regs(uport);
 		port->ipc_log_rx = port->ipc_log_new;
 		port->ipc_log_tx = port->ipc_log_new;
 		port->ipc_log_misc = port->ipc_log_new;
@@ -5456,7 +5455,6 @@ static int msm_geni_serial_probe(struct platform_device *pdev)
 	if (ret)
 		goto exit_geni_serial_probe;
 
-	msm_geni_serial_debug_init(uport, is_console);
 	ret = msm_geni_serial_port_init(pdev, dev_port);
 	if (ret)
 		goto exit_geni_serial_probe;
@@ -5464,6 +5462,7 @@ static int msm_geni_serial_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Serial port: %d added.FifoSize: %d is_console: %d\n",
 		 line, uport->fifosize, is_console);
 
+	msm_geni_serial_debug_init(uport, is_console);
 	dev_port->port_setup = false;
 
 	dev_port->uart_error = UART_ERROR_DEFAULT;

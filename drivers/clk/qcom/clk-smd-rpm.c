@@ -26,7 +26,6 @@
 #include <dt-bindings/mfd/qcom-rpm.h>
 
 #include "clk-debug.h"
-#include "common.h"
 
 #define __DEFINE_CLK_SMD_RPM(_platform, _name, _active, type, r_id, stat_id,  \
 			     key)					      \
@@ -1470,11 +1469,6 @@ static int rpm_smd_clk_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "Failed to register %s\n", name);
 			return ret;
 		}
-
-		ret = clk_hw_debug_register(&pdev->dev, hw_clks[i]);
-		if (ret)
-			dev_warn(&pdev->dev, "Failed to add %s to debug list\n",
-									name);
 	}
 
 	ret = devm_of_clk_add_hw_provider(&pdev->dev, qcom_smdrpm_clk_hw_get,

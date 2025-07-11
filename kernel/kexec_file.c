@@ -728,7 +728,7 @@ static int kexec_calculate_store_digests(struct kimage *image)
 
 #ifdef CONFIG_CRASH_HOTPLUG
 		/* Exclude elfcorehdr segment to allow future changes via hotplug */
-		if (i == image->elfcorehdr_index)
+		if (j == image->elfcorehdr_index)
 			continue;
 #endif
 

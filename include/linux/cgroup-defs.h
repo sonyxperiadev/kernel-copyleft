@@ -585,8 +585,7 @@ struct cgroup_root {
 	/* The name for this hierarchy - may be empty */
 	char name[MAX_CGROUP_ROOT_NAMELEN];
 
-	ANDROID_BACKPORT_USE_ARRAY(1, CGROUP_SUBSYS_COUNT * sizeof(atomic_t),
-				   struct rcu_head rcu);
+	ANDROID_BACKPORT_RESERVE_ARRAY(1, CGROUP_SUBSYS_COUNT * sizeof(atomic_t));
 };
 
 /*

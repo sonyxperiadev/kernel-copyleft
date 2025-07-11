@@ -364,6 +364,7 @@ static void tce_iommu_release(void *iommu_data)
 		if (!tbl)
 			continue;
 
+		tce_iommu_clear(container, tbl, tbl->it_offset, tbl->it_size);
 		tce_iommu_free_table(container, tbl);
 	}
 
@@ -719,8 +720,6 @@ static long tce_iommu_remove_window(struct tce_container *container,
 
 	BUG_ON(!tbl->it_size);
 
-	tce_iommu_clear(container, tbl, tbl->it_offset, tbl->it_size);
-
 	/* Detach groups from IOMMUs */
 	list_for_each_entry(tcegrp, &container->group_list, next) {
 		table_group = iommu_group_get_iommudata(tcegrp->grp);
@@ -739,6 +738,7 @@ static long tce_iommu_remove_window(struct tce_container *container,
 	}
 
 	/* Free table */
+	tce_iommu_clear(container, tbl, tbl->it_offset, tbl->it_size);
 	tce_iommu_free_table(container, tbl);
 	container->tables[num] = NULL;
 
@@ -1197,14 +1197,9 @@ static void tce_iommu_release_ownership(struct tce_container *container,
 		return;
 	}
 
-	for (i = 0; i < IOMMU_TABLE_GROUP_MAX_TABLES; ++i) {
-		if (container->tables[i]) {
-			tce_iommu_clear(container, container->tables[i],
-					container->tables[i]->it_offset,
-					container->tables[i]->it_size);
+	for (i = 0; i < IOMMU_TABLE_GROUP_MAX_TABLES; ++i)
+		if (container->tables[i])
 			table_group->ops->unset_window(table_group, i);
-		}
-	}
 }
 
 static long tce_iommu_take_ownership(struct tce_container *container,

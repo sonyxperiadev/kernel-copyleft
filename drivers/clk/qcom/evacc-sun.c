@@ -425,7 +425,6 @@ static int eva_cc_sun_fixup(struct platform_device *pdev, struct regmap *regmap)
 
 static int eva_cc_sun_probe(struct platform_device *pdev)
 {
-	unsigned int dly_accu_mask = 0x1f << 21;
 	struct regmap *regmap;
 	int ret;
 
@@ -442,14 +441,6 @@ static int eva_cc_sun_probe(struct platform_device *pdev)
 		return ret;
 
 	clk_taycan_elu_pll_configure(&eva_cc_pll0, regmap, &eva_cc_pll0_config);
-
-	/*
-	 * Maximize ctl data download delay and enable memory redundancy:
-	 * MVS0C_CFG3
-	 * MVS0_CFG3
-	 */
-	regmap_update_bits(regmap, 0x8040, dly_accu_mask, dly_accu_mask);
-	regmap_update_bits(regmap, 0x8074, dly_accu_mask, dly_accu_mask);
 
 	ret = eva_cc_sun_fixup(pdev, regmap);
 	if (ret)

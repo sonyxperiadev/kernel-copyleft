@@ -1812,9 +1812,12 @@ static __init void apic_set_fixmap(bool read_apic);
 
 static __init void x2apic_disable(void)
 {
-	u32 x2apic_id;
+	u32 x2apic_id, state = x2apic_state;
 
-	if (x2apic_state < X2APIC_ON)
+	x2apic_mode = 0;
+	x2apic_state = X2APIC_DISABLED;
+
+	if (state != X2APIC_ON)
 		return;
 
 	x2apic_id = read_apic_id();
@@ -1827,10 +1830,6 @@ static __init void x2apic_disable(void)
 	}
 
 	__x2apic_disable();
-
-	x2apic_mode = 0;
-	x2apic_state = X2APIC_DISABLED;
-
 	/*
 	 * Don't reread the APIC ID as it was already done from
 	 * check_x2apic() and the APIC driver still is a x2APIC variant,

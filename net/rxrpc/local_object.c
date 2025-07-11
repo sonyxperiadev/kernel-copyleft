@@ -232,7 +232,7 @@ static int rxrpc_open_socket(struct rxrpc_local *local, struct net *net)
 	}
 
 	wait_for_completion(&local->io_thread_ready);
-	WRITE_ONCE(local->io_thread, io_thread);
+	local->io_thread = io_thread;
 	_leave(" = 0");
 	return 0;
 

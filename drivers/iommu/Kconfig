@@ -616,15 +616,4 @@ config QTVM_IOMMU_TRACE_HOOKS
 
 	  If unsure, say N here.
 
-config IOMMU_TLBSYNC_DEBUG
-	bool "TLB sync timeout debug"
-	depends on ARM_SMMU
-	help
-	  Collects the SMMU system state information after the
-	  first TLB sync timeout failure by calling BUG() from
-	  a workqueue thread. Note to use this only on debug
-	  builds.
-
-	  Say N here if unsure.
-
 endif # IOMMU_SUPPORT

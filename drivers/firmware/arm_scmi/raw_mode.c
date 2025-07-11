@@ -165,7 +165,6 @@ struct scmi_raw_queue {
  * @wait_wq: A workqueue reference to the created workqueue
  * @dentry: Top debugfs root dentry for SCMI Raw
  * @gid: A group ID used for devres accounting
- * @max_rx_timeout_ms: Max receive channel timeout value
  *
  * Note that this descriptor is passed back to the core after SCMI Raw is
  * initialized as an opaque handle to use by subsequent SCMI Raw call hooks.
@@ -188,7 +187,6 @@ struct scmi_raw_mode_info {
 	struct workqueue_struct	*wait_wq;
 	struct dentry *dentry;
 	void *gid;
-	u32 max_rx_timeout_ms;
 };
 
 /**
@@ -381,7 +379,7 @@ static void scmi_xfer_raw_waiter_enqueue(struct scmi_raw_mode_info *raw,
 	trace_scmi_xfer_response_wait(rw->xfer->transfer_id, rw->xfer->hdr.id,
 				      rw->xfer->hdr.protocol_id,
 				      rw->xfer->hdr.seq,
-				      raw->max_rx_timeout_ms,
+				      raw->desc->max_rx_timeout_ms,
 				      rw->xfer->hdr.poll_completion);
 
 	mutex_lock(&raw->active_mtx);
@@ -439,7 +437,7 @@ static void scmi_xfer_raw_worker(struct work_struct *work)
 
 	raw = container_of(work, struct scmi_raw_mode_info, waiters_work);
 	dev = raw->handle->dev;
-	max_tmo = msecs_to_jiffies(raw->max_rx_timeout_ms);
+	max_tmo = msecs_to_jiffies(raw->desc->max_rx_timeout_ms);
 
 	do {
 		int ret = 0;
@@ -576,7 +574,7 @@ static int scmi_xfer_raw_get_init(struct scmi_raw_mode_info *raw, void *buf,
 			dev_dbg(dev,
 				"...retrying[%d] inflight registration\n",
 				retry);
-			msleep(raw->max_rx_timeout_ms /
+			msleep(raw->desc->max_rx_timeout_ms /
 			       SCMI_XFER_RAW_MAX_RETRIES);
 		}
 	} while (ret && --retry);
@@ -1164,7 +1162,6 @@ err:
  * @num_chans: The number of entries in @channels
  * @desc: Reference to the transport operations
  * @tx_max_msg: Max number of in-flight messages allowed by the transport
- * @max_rx_timeout_ms: Max receive channel timeout value
  *
  * This function prepare the SCMI Raw stack and creates the debugfs API.
  *
@@ -1173,8 +1170,7 @@ err:
 void *scmi_raw_mode_init(const struct scmi_handle *handle,
 			 struct dentry *top_dentry, int instance_id,
 			 u8 *channels, int num_chans,
-			 const struct scmi_desc *desc, int tx_max_msg,
-			 u32 max_rx_timeout_ms)
+			 const struct scmi_desc *desc, int tx_max_msg)
 {
 	int ret;
 	struct scmi_raw_mode_info *raw;
@@ -1192,7 +1188,6 @@ void *scmi_raw_mode_init(const struct scmi_handle *handle,
 	raw->desc = desc;
 	raw->tx_max_msg = tx_max_msg;
 	raw->id = instance_id;
-	raw->max_rx_timeout_ms = max_rx_timeout_ms;
 
 	ret = scmi_raw_mode_setup(raw, channels, num_chans);
 	if (ret) {

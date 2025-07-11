@@ -873,7 +873,7 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
 
 	err = get_create_ext(&args, dir, entry, mode);
 	if (err)
-		goto out_free_ff;
+		goto out_put_forget_req;
 
 	err = fuse_simple_request(fm, &args);
 	free_ext_value(&args);

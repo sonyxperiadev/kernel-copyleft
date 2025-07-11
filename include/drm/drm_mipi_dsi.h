@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2015 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * MIPI DSI Bus
  *
  * Copyright (C) 2012-2013, Samsung Electronics, Co., Ltd.
@@ -19,6 +24,10 @@ struct drm_dsc_picture_parameter_set;
 #define MIPI_DSI_MSG_REQ_ACK	BIT(0)
 /* use Low Power Mode to transmit message */
 #define MIPI_DSI_MSG_USE_LPM	BIT(1)
+/* read mipi_dsi_msg.ctrl and unicast to only that ctrls */
+#define MIPI_DSI_MSG_UNICAST	BIT(2)
+/* Stack all commands until lastcommand bit and trigger all in one go */
+#define MIPI_DSI_MSG_LASTCOMMAND BIT(3)
 
 /**
  * struct mipi_dsi_msg - read/write DSI buffer
@@ -34,6 +43,8 @@ struct mipi_dsi_msg {
 	u8 channel;
 	u8 type;
 	u16 flags;
+	u32 ctrl;
+	//u32 wait_ms;
 
 	size_t tx_len;
 	const void *tx_buf;

@@ -1,0 +1,12 @@
+MODULE_NAME = lxs_touchscreen
+
+obj-m := $(MODULE_NAME).o
+
+$(MODULE_NAME)-objs := lxs_ts.o
+$(MODULE_NAME)-objs += lxs_ts_fn.o
+$(MODULE_NAME)-objs += lxs_ts_hal.o
+$(MODULE_NAME)-objs += lxs_ts_hal_fw.o
+$(MODULE_NAME)-objs += lxs_ts_hal_prd.o
+$(MODULE_NAME)-objs += lxs_ts_hal_abt.o
+$(MODULE_NAME)-objs += lxs_ts_sysfs.o
+$(MODULE_NAME)-objs += touch_lx82907a.o

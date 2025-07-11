@@ -1602,7 +1602,6 @@ static void pt_event_stop(struct perf_event *event, int mode)
 	 * see comment in intel_pt_interrupt().
 	 */
 	WRITE_ONCE(pt->handle_nmi, 0);
-	barrier();
 
 	pt_config_stop(event);
 
@@ -1654,10 +1653,11 @@ static long pt_event_snapshot_aux(struct perf_event *event,
 		return 0;
 
 	/*
-	 * There is no PT interrupt in this mode, so stop the trace and it will
-	 * remain stopped while the buffer is copied.
+	 * Here, handle_nmi tells us if the tracing is on
 	 */
-	pt_config_stop(event);
+	if (READ_ONCE(pt->handle_nmi))
+		pt_config_stop(event);
+
 	pt_read_offset(buf);
 	pt_update_head(pt);
 
@@ -1669,10 +1669,11 @@ static long pt_event_snapshot_aux(struct perf_event *event,
 	ret = perf_output_copy_aux(&pt->handle, handle, from, to);
 
 	/*
-	 * Here, handle_nmi tells us if the tracing was on.
-	 * If the tracing was on, restart it.
+	 * If the tracing was on when we turned up, restart it.
+	 * Compiler barrier not needed as we couldn't have been
+	 * preempted by anything that touches pt->handle_nmi.
 	 */
-	if (READ_ONCE(pt->handle_nmi))
+	if (pt->handle_nmi)
 		pt_config_start(event);
 
 	return ret;
