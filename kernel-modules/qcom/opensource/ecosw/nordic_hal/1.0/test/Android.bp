@@ -1,0 +1,16 @@
+cc_binary {
+    name: "controller_service_test",
+    defaults: ["hidl_defaults"],
+    vendor: true,
+    srcs: ["ControllerServiceTest.cpp"],
+
+    shared_libs: [
+        "liblog",
+        "libbinder",
+        "libhardware",
+        "libhidlbase",
+        "libhidltransport",
+        "libutils",
+        "vendor.shadowcreator.hardware.nordic@1.0",
+    ],
+}

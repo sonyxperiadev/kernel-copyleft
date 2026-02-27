@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "pineapplep-hdk-kiwi-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. PineappleP HDK";
+	compatible = "qcom,pineapplep-hdk", "qcom,pineapplep", "qcom,hdk";
+	qcom,msm-id = <577 0x10000>, <577 0x20000>;
+	qcom,board-id = <0x1f 0>;
+};

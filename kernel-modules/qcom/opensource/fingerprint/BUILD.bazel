@@ -1,0 +1,5 @@
+load(":define_modules.bzl", "define_basic_modules")
+
+targets = ["pineapple"]
+variants = ["gki", "consolidate"]
+define_basic_modules(targets, variants)

@@ -1,0 +1,26 @@
+/*
+ * controller's Nordic Hal Interface
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ */
+
+package vendor.shadowcreator.hardware.nordic@1.0;
+ 
+interface INordic {
+    helloWorld(string name) generates (string result);
+    Nordic_Start() generates (int32_t result);
+    Nordic_Get_Memory() generates(handle mem_prt, int32_t size);
+    Nordic_Stop() generates (int32_t result);
+    Nordic_Get_Nordic_Version() generates (float result);
+    Nordic_Get_Controller_Version(int32_t lr) generates (float result);
+    Nordic_Bind_Controller(int32_t lr) generates (int32_t result);
+    Nordic_Unbind_Controller(int32_t lr) generates (int32_t result);
+    Nordic_Cancel_Bind() generates (int32_t result);
+    Nordic_Get_Bind_State() generates (int32_t result);
+    Nordic_Set_Vibration(int32_t value) generates (int32_t result);
+};         
+

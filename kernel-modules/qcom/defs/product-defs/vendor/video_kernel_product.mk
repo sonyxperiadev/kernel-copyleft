@@ -1,0 +1,1 @@
+../../../opensource/video-driver/video_kernel_product.mk

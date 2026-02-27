@@ -1,0 +1,14 @@
+load(":define_wlan.bzl", "define_wlan")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
+
+define_wlan("pineapple", "consolidate")
+
+define_wlan("pineapple", "gki")
+
+define_wlan("blair", "consolidate")
+
+define_wlan("blair", "gki")
+
+define_wlan("monaco", "consolidate")
+
+define_wlan("monaco", "gki")

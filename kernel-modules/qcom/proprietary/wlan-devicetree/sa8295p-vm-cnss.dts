@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "sa8295p-vm-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. Direwolf Single LA Guest Virtual Machine";
+	compatible = "qcom,direwolf", "qcom,quinvm";
+	qcom,msm-id = <460 0x10000>;
+	qcom,board-id = <0 0x1000001>;
+};

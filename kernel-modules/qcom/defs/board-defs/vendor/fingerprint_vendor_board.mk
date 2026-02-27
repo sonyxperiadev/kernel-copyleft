@@ -1,0 +1,1 @@
+../../../opensource/fingerprint/fingerprint_board.mk

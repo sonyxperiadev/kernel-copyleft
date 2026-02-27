@@ -1,0 +1,109 @@
+#include <dt-bindings/interconnect/qcom,monaco_auto.h>
+
+&tlmm {
+	cnss_pins: cnss_pins {
+		cnss_wlan_en_active: cnss_wlan_en_active {
+			mux {
+				pins = "gpio54";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio54";
+				output-high;
+				bias-pull-up;
+			};
+		};
+
+		cnss_wlan_en_sleep: cnss_wlan_en_sleep {
+			mux {
+				pins = "gpio54";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio54";
+				output-low;
+				bias-pull-down;
+			};
+		};
+	};
+};
+
+&soc {
+	cnss_pcie: qcom,cnss-qca-converged {
+		compatible = "qcom,cnss-qca-converged";
+		qcom,wlan-rc-num = <0>;
+		qcom,wlan;
+		qcom,multi-wlan-exchg;
+		qcom,bus-type=<0>;
+		qcom,notify-modem-status;
+
+		#address-cells=<1>;
+		#size-cells=<1>;
+		ranges = <0xb0000000 0xb0000000 0x10000>;
+
+		vdd-wlan-ctrl1-supply = <&vreg_conn_pa>;
+		vdd-wlan-ctrl2-supply = <&vreg_conn_1p8>;
+
+		wlan_vregs = "vdd-wlan-ctrl1", "vdd-wlan-ctrl2";
+		qcom,vdd-wlan-ctrl1-config = <0 0 0 0 0>;
+		qcom,vdd-wlan-ctrl2-config = <0 0 0 0 0>;
+		/* no vote-off as sw_ctrl is not supported */
+		wlan-en-gpio = <&tlmm 54 0>;
+		qcom,bt-en-gpio = <&tlmm 55 0>;
+		pinctrl-names = "wlan_en_active", "wlan_en_sleep", "default";
+		pinctrl-0 = <&cnss_wlan_en_active>;
+		pinctrl-1 = <&cnss_wlan_en_sleep>;
+		pinctrl-2 = <&cnss_wlan_en_sleep>;
+
+		chip_cfg@0 {
+			supported-ids = <0x1101>;
+			wlan_vregs;
+			qcom,wlan-ramdump-dynamic = <0x400000>;
+		};
+
+		chip_cfg@1 {
+			supported-ids = <0x1102>;
+			wlan_vregs;
+			qcom,wlan-ramdump-dynamic = <0x400000>;
+		};
+
+		chip_cfg@2 {
+			supported-ids = <0x1103>;
+			wlan_vregs;
+			qcom,wlan-ramdump-dynamic = <0x420000>;
+			qcom,no-bwscale;
+		};
+
+		chip_cfg@3 {
+			supported-ids = <0x1107>;
+			wlan_vregs;
+			qcom,wlan-ramdump-dynamic = <0x600000>;
+		};
+	};
+};
+
+&pcie0_rp {
+	#address-cells = <5>;
+	#size-cells = <0>;
+	cnss_pci: cnss_pci {
+		reg = <0 0 0 0 0>;
+		qcom,iommu-group = <&cnss_pci_iommu_group>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		cnss_pci_iommu_group: cnss_pci_iommu_group {
+		qcom,iommu-dma-addr-pool = <0xa0000000 0x10000000>;
+		qcom,iommu-dma = "fastmap";
+		qcom,iommu-pagetable = "coherent";
+		qcom,iommu-faults = "stall-disable", "HUPCF", "no-CFRE",
+			 "non-fatal";
+		};
+	};
+};
+
+&pcie0 {
+	qcom,boot-option = <0x1>;
+};

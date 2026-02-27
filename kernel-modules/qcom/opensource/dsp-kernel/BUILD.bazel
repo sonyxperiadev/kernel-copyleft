@@ -1,0 +1,27 @@
+# Bazel file for fastrpc
+# Three modules to be exported - frpc-adsprpc,
+# cdsp-loader and frpc-trusted
+
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+load(":define_modules.bzl", "define_modules")
+
+define_modules("pineapple", "consolidate")
+
+define_modules("pineapple", "gki")
+
+define_modules("blair", "consolidate")
+
+define_modules("blair", "gki")
+
+define_modules("holi", "consolidate")
+
+define_modules("holi", "gki")
+
+define_modules("cliffs", "consolidate")
+
+define_modules("cliffs", "gki")

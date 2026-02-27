@@ -1,0 +1,34 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+load(":wlan_platform_modules.bzl", "define_modules")
+
+
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+ddk_headers(
+    name = "wlan-platform-headers",
+    hdrs = glob([
+        "inc/*.h",
+    ]),
+    includes = ["inc"],
+)
+
+ddk_headers(
+    name = "wlan-platform-private-headers",
+    hdrs = glob([
+        "cnss2/*.h",
+        "cnss_utils/*.h",
+        "icnss2/*.h"
+    ]),
+    includes = ["cnss2", "cnss_utils", "icnss2"],
+)
+
+ddk_headers(
+    name = "all-wlan-platform-headers",
+    hdrs = [":wlan-platform-headers", ":wlan-platform-private-headers"],
+)
+
+define_modules()

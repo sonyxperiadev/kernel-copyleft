@@ -1,0 +1,9 @@
+#
+# RMNET_MEM driver
+#
+
+menuconfig RMNET_MEM
+    tristate "Rmnet MEM  support"
+    default m
+    ---help---
+        Memory module for RmNet driver

@@ -1,0 +1,12 @@
+/dts-v1/;
+/plugin/;
+
+#include "sa6155p-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. SA6155 SoCs";
+	compatible = "qcom,sa6155", "qcom,sa6155p";
+	qcom,msm-id = <384 0x10000>, <377 0>, <380 0>;
+	qcom,board-id = <0x0 0x0>;
+};
+

@@ -1,0 +1,227 @@
+{
+    "CACHEDUMP_CACHE_ID_L1_D": {
+        "structure": {
+            "associativity": 16,
+            "numSets": 64
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L1_D_TAG_DATA": {
+
+    },
+    "CACHEDUMP_CACHE_ID_L1_D_DATA": {
+        "structure": {
+            "blockSize": 64,
+            "parent": "CACHEDUMP_CACHE_ID_L1_D"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L1_D_TAG": {
+        "fields": [
+            {
+                "bitfield": "1:0",
+                "name": "PBHA"
+            },
+            {
+                "bitfield": "3:2",
+                "name": "Line State(UC)"
+            },
+            {
+                "bitfield": "6:4",
+                "name": "Mem Attr"
+            },
+            {
+                "bitfield": "9:7",
+                "name": "RRIP"
+            },
+            {
+                "bitfield": "32+9:32+0,31:10",
+                "hex": "1",
+                "name": "Tag[43:12]"
+            },
+            {
+                "bitfield": "32+10",
+                "name": "NS"
+            },
+            {
+                "bitfield": "32*2+6:32*2+0",
+                "hex": "1",
+                "name": "ECC"
+            }
+        ],
+        "structure": {
+            "blockSize": 8,
+            "parent": "CACHEDUMP_CACHE_ID_L1_D"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L1_I": {
+        "structure": {
+            "associativity": 4,
+            "numSets": 256
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L1_I_TAG_DATA": {
+
+    },
+    "CACHEDUMP_CACHE_ID_L1_I_DATA": {
+        "structure": {
+            "blockSize": 64,
+            "parent": "CACHEDUMP_CACHE_ID_L1_I"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L1_I_TAG": {
+        "fields": [
+            {
+                "bitfield": "28",
+                "name": "NS"
+            },
+            {
+                "bitfield": "29",
+                "name": "Valid"
+            },
+            {
+                "bitfield": "27:0",
+                "hex": "1",
+                "name": "Tag Addr"
+            }
+        ],
+        "structure": {
+            "blockSize": 4,
+            "parent": "CACHEDUMP_CACHE_ID_L1_I"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB": {
+        "structure": {
+            "associativity": 4,
+            "numSets": 256
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB_TAG_DATA": {
+
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB_DATA": {
+        "fields": [
+            {
+                "bitfield": "31:0",
+                "hex": "1",
+                "name": "PA[43:12]"
+            },
+            {
+                "bitfield": "32",
+                "name": "NS"
+            },
+            {
+                "bitfield": "35:33",
+                "name": "AP[2:0]"
+            },
+            {
+                "bitfield": "36",
+                "name": "S2 UXN"
+            },
+            {
+                "bitfield": "37",
+                "name": "S2 PXN"
+            },
+            {
+                "bitfield": "38",
+                "name": "S1 UXN"
+            },
+            {
+                "bitfield": "39",
+                "name": "S1 PXN"
+            },
+            {
+                "bitfield": "41:40",
+                "name": "S2 Level"
+            },
+            {
+                "bitfield": "43:42",
+                "name": "HAP[1:0]"
+            },
+            {
+                "bitfield": "44",
+                "name": "Stage 2 DBM"
+            },
+            {
+                "bitfield": "48:45",
+                "hex": "1",
+                "name": "Mem Attr"
+            },
+            {
+                "bitfield": "49",
+                "name": "Intermediate Txln Hint"
+            },
+            {
+                "bitfield": "50",
+                "name": "Split Hint"
+            },
+            {
+                "bitfield": "53",
+                "name": "TLB Data Parity"
+            }
+        ],
+        "structure": {
+            "blockSize": 8,
+            "parent": "CACHEDUMP_CACHE_ID_L2_TLB"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB_TAG": {
+        "fields": [
+            {
+                "bitfield": "1:0",
+                "name": "S1 Level"
+            },
+            {
+                "bitfield": "3:2",
+                "name": "S1 Txln Mode"
+            },
+            {
+                "bitfield": "5:4",
+                "name": "Txln Regime"
+            },
+            {
+                "bitfield": "8:6",
+                "name": "Page Size"
+            },
+            {
+                "bitfield": "9",
+                "name": "non-Global"
+            },
+            {
+                "bitfield": "17:10",
+                "hex": "1",
+                "name": "ASID[7:0]"
+            },
+            {
+                "bitfield": "21:18",
+                "hex": "1",
+                "name": "ASID[11:8]/Domain Index"
+            },
+            {
+                "bitfield": "25:22",
+                "hex": "1",
+                "name": "ASID[15:12]"
+            },
+            {
+                "bitfield": "41:26",
+                "hex": "1",
+                "name": "VMID"
+            },
+            {
+                "bitfield": "74:42",
+                "hex": "1",
+                "name": "VA[48:12]"
+            },
+            {
+                "bitfield": "75",
+                "name": "Valid"
+            },
+            {
+                "bitfield": "77:76",
+                "name": "Parity"
+            }
+        ],
+        "structure": {
+            "blockSize": 12,
+            "parent": "CACHEDUMP_CACHE_ID_L2_TLB"
+        }
+    }
+}

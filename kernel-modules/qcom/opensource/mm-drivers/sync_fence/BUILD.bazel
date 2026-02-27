@@ -1,0 +1,16 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+load(":define_sync_fence.bzl", "define_sync_fence")
+
+package(
+    default_visibility = [
+      "//visibility:public"
+    ],
+)
+
+ddk_headers(
+    name = "sync_fence_uapi_headers",
+    hdrs = glob(["include/uapi/sync_fence/*.h"]),
+    includes = ["include"]
+)
+
+define_sync_fence()

@@ -27,6 +27,14 @@ lxc_targets = [
     "gen4auto",
 ]
 
+spo_variants = [
+    # keep sorted
+    "asahi-cdb-ets",
+    "asahi-cdb-generic",
+    "pdx245-ets",
+    "pdx245-generic",
+]
+
 le_targets = [
     # keep sorted
     "pineapple-allyes",
@@ -57,6 +65,9 @@ vm_variants = [
 def get_all_la_variants():
     return [(t, v) for t in la_targets for v in la_variants]
 
+def get_all_somc_la_variants():
+    return [(t, v + "-" + spo) for t in la_targets for v in la_variants for spo in spo_variants]
+
 def get_all_le_variants():
     return [(t, v) for t in le_targets for v in le_variants]
 
@@ -67,4 +78,4 @@ def get_all_vm_variants():
     return [(t, v) for t in vm_targets for v in vm_variants]
 
 def get_all_variants():
-    return get_all_la_variants() + get_all_le_variants() + get_all_lxc_variants() + get_all_vm_variants()
+    return get_all_la_variants() + get_all_le_variants() + get_all_lxc_variants() + get_all_vm_variants() + get_all_somc_la_variants()

@@ -1,0 +1,9 @@
+load(":define_shs.bzl", "define_shs")
+
+define_shs("pineapple", "consolidate")
+
+define_shs("pineapple", "gki")
+
+define_shs("blair", "consolidate")
+
+define_shs("blair", "gki")

@@ -1,0 +1,78 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+package(
+    default_visibility = [
+      "//visibility:public"],
+)
+
+ddk_headers(
+    name = "linux_includes",
+    hdrs = glob([
+      "include/linux/*.h",
+    ]),
+    includes = ["include"]
+)
+
+ddk_headers(
+    name = "uapi_headers",
+    hdrs = glob([
+      "include/uapi/display/drm/*.h",
+      "include/uapi/display/hdcp/*.h",
+      "include/uapi/display/media/*.h",
+    ]),
+    includes = ["include/uapi/display"]
+)
+
+ddk_headers(
+    name = "dp_headers",
+    hdrs = glob([
+      "msm/dp/*.h",
+    ]),
+    includes = ["msm/dp"]
+)
+
+ddk_headers(
+    name = "dsi_headers",
+    hdrs = glob([
+      "msm/dsi/*.h",
+    ]),
+    includes = ["msm/dsi"]
+)
+
+ddk_headers(
+    name = "sde_headers",
+    hdrs = glob([
+      "msm/sde/*.h",
+    ]),
+    includes = ["msm/sde"]
+)
+
+ddk_headers(
+    name = "rotator_headers",
+    hdrs = glob([
+      "rotator/*.h",
+    ]),
+    includes = ["rotator"]
+)
+
+ddk_headers(
+    name = "msm_headers",
+    hdrs = glob([
+      "msm/*.h",
+    ]),
+    includes = ["msm"]
+)
+
+ddk_headers(
+    name = "fels_headers",
+    hdrs = "kernel/fels/include/fels.h",
+    includes = ["kernel/fels/include"]
+)
+
+ddk_headers(
+    name = "display_drivers_headers",
+    hdrs = [ ":linux_includes", ":uapi_headers", ":msm_headers",":dp_headers",":dsi_headers",":sde_headers",":rotator_headers",":fels_headers"]
+)
+
+load(":target.bzl", "define_pineapple")
+define_pineapple()

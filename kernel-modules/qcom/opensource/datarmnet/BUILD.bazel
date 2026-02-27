@@ -1,0 +1,27 @@
+load(":define_modules.bzl", "define_modules")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+define_modules("pineapple", "consolidate")
+
+define_modules("pineapple", "gki")
+
+define_modules("blair", "consolidate")
+
+define_modules("blair", "gki")
+
+define_modules("monaco", "consolidate")
+
+define_modules("monaco", "gki")
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+ddk_headers(
+    name = "rmnet_core_headers",
+    hdrs = glob([
+        "core/*.h",
+    ]),
+    includes = ["core"],
+)

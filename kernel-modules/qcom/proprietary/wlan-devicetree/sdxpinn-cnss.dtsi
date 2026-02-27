@@ -1,0 +1,145 @@
+#include <dt-bindings/interconnect/qcom,sdxpinn.h>
+#include <dt-bindings/clock/qcom,rpmh.h>
+
+&tlmm {
+	cnss_pins {
+		cnss_wlan_en_active: cnss_wlan_en_active {
+			mux {
+				pins = "gpio80";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio80";
+				drive-strength = <16>;
+				output-high;
+				bias-pull-up;
+			};
+		};
+
+		cnss_wlan_en_sleep: cnss_wlan_en_sleep {
+			mux {
+				pins = "gpio80";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio80";
+				drive-strength = <2>;
+				output-low;
+				bias-pull-down;
+			};
+		};
+	};
+};
+
+&reserved_memory {
+	cnss_wlan_mem: cnss_wlan_region {
+		compatible = "shared-dma-pool";
+		alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;
+		reusable;
+		alignment = <0x0 0x400000>;
+		size = <0x0 0x1C00000>;
+	};
+};
+
+&soc {
+	wlan: qcom,cnss-qca-converged {
+		compatible = "qcom,cnss-qca-converged";
+		reg = <0xb0000000 0x10000>;
+		reg-names = "smmu_iova_ipa";
+		qcom,converged-dt;
+		qcom,wlan-sw-ctrl-gpio = <&tlmm 76 0>;
+
+		chip_cfg@0 {
+			supported-ids = <0x1107>;
+			wlan-en-gpio = <&tlmm 80 0>;
+			qcom,sw-ctrl-gpio = <&tlmm 81 0>;
+			pinctrl-names = "wlan_en_active", "wlan_en_sleep";
+			pinctrl-0 = <&cnss_wlan_en_active>;
+			pinctrl-1 = <&cnss_wlan_en_sleep>;
+			qcom,wlan;
+			qcom,wlan-rc-num = <0>;
+			qcom,wlan-ramdump-dynamic = <0x500000>;
+			use-pm-domain;
+			mboxes = <&qmp_aop 0>;
+			platform-name-required;
+
+			vdd-wlan-io-supply = <&L6B>;
+			qcom,vdd-wlan-io-config = <1800000 1800000 0 0 1>;
+			vdd-wlan-supply = <&S1K>;
+			qcom,vdd-wlan-config = <916000 916000 0 0 1>;
+			vdd-wlan-aon-supply = <&S7B>;
+			qcom,vdd-wlan-aon-config = <950000 950000 0 0 1>;
+			vdd-wlan-dig-supply = <&L15B>;
+			qcom,vdd-wlan-dig-config = <1200000 1200000 0 0 1>;
+			vdd-wlan-rfa1-supply = <&S4B>;
+			qcom,vdd-wlan-rfa1-config = <1824000 1824000 0 0 1>;
+			vdd-wlan-rfa2-supply = <&S2B>;
+			qcom,vdd-wlan-rfa2-config = <1224000 1224000 0 0 1>;
+
+			qcom,vreg_pdc_map =
+				"l6b", "rf",
+				"s4b", "rf",
+				"s2b", "rf",
+				"l15b", "rf",
+				"s1k", "bb",
+				"s7b", "rf";
+
+			qcom,pmu_vreg_map =
+				"VDD095_MX_PMU", "s7b",
+				"VDD095_PMU_CX", "s1k",
+				"VDD_PMU_AON_I", "s7b",
+				"VDD095_PMU_BT", "s7b",
+				"VDD09_PMU_RFA_I", "s7b",
+				"VDD13_PMU_PCIE_I", "s2b",
+				"VDD13_PMU_RFA_I", "s2b",
+				"VDD19_PMU_PCIE_I", "s4b",
+				"VDD19_PMU_RFA_I", "s4b";
+
+			qcom,pdc_init_table =
+			"{class: wlan_pdc, ss: rf, res: s7b.v, upval: 976}",
+			"{class: wlan_pdc, ss: rf, res: s7b.v, dwnval: 800}",
+			"{class: wlan_pdc, ss: rf, res: s2b.v, upval: 1316}",
+			"{class: wlan_pdc, ss: rf, res: s2b.v, dwnval: 944}",
+			"{class: wlan_pdc, ss: rf, res: s4b.v, upval: 1864}",
+			"{class: wlan_pdc, ss: rf, res: s4b.v, dwnval: 1820}",
+			"{class: wlan_pdc, ss: bb, res: pdc, enable: 1}",
+			"{class: wlan_pdc, ss: bb, res: s1k.v, upval: 940}",
+			"{class: wlan_pdc, ss: bb, res: s1k.v, dwnval: 420}";
+		};
+
+		cnss_cdev_apss: qcom,cnss_cdev1 {
+			#cooling-cells = <2>;
+		};
+	};
+};
+
+&pcie0_rp {
+	#address-cells = <5>;
+	#size-cells = <0>;
+
+	cnss_pci0: cnss_pci0 {
+		reg = <0 0 0 0 0>;
+		qcom,iommu-group = <&cnss_pci_iommu_group0>;
+		memory-region = <&cnss_wlan_mem>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		cnss_pci_iommu_group0: cnss_pci_iommu_group0 {
+			qcom,iommu-msi-size = <0x1000>;
+			qcom,iommu-dma-addr-pool = <0xa0000000 0x10000000>;
+			qcom,iommu-geometry = <0xa0000000 0x10010000>;
+			qcom,iommu-dma = "fastmap";
+			qcom,iommu-pagetable = "coherent";
+			qcom,iommu-faults = "stall-disable", "HUPCF", "no-CFRE",
+					    "non-fatal";
+		};
+	};
+};
+
+&pcie0 {
+	qcom,boot-option = <0x1>;
+	status = "ok";
+};

@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "cliffs-kiwi-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. Cliffs SoCs";
+	compatible = "qcom,cliffs";
+	qcom,msm-id = <614 0x10000>, <632 0x10000>;
+	qcom,board-id = <33 0>, <8 1>;
+};

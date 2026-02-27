@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "monaco-standalone-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. Monaco standalone IDP V1.0";
+	compatible = "qcom,monaco", "qcom,idp";
+	qcom,msm-id = <486 0x10000>;
+	qcom,board-id = <0x010022 0x1>;
+};

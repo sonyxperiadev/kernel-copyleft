@@ -1,0 +1,56 @@
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+ddk_headers(
+    name = "audio_common_headers",
+    hdrs = glob([
+        "include/asoc/*.h",
+        "include/bindings/*.h",
+        "include/dsp/*.h",
+        "include/ipc/*.h",
+        "include/soc/*.h"
+    ]),
+    includes = ["include"]
+)
+ddk_headers(
+    name = "audio_uapi_headers",
+    hdrs = glob([
+        "include/uapi/audio/**/*.h"
+    ]),
+    includes = ["include/uapi/audio"]
+)
+ddk_headers(
+    name = "audio_src_headers",
+    hdrs = glob([
+        "asoc/**/*.h",
+        "dsp/**/*.h",
+        "ipc/**/*.h",
+        "soc/**/*.h"
+    ])
+)
+ddk_headers(
+    name = "audio_configs",
+    hdrs = glob([
+        "config/*.h"
+    ]),
+    includes = ["config"]
+)
+ddk_headers(
+    name = "audio_headers",
+    hdrs = [":audio_common_headers",  ":audio_uapi_headers", ":audio_src_headers", ":audio_configs"]
+)
+
+load(":build/pineapple.bzl", "define_pineapple")
+load(":build/kalama.bzl", "define_kalama")
+load(":build/blair.bzl", "define_blair")
+load(":build/niobe.bzl", "define_niobe")
+
+define_kalama()
+define_pineapple()
+define_blair()
+define_niobe()

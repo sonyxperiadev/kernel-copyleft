@@ -43,6 +43,10 @@
 #include <ufs/ufs_quirks.h>
 #include <ufs/ufshcd-crypto-qti.h>
 
+#include<scsi/scsi_dbg.h>
+#include<scsi/scsi_common.h>
+#include<scsi/scsi_device.h>
+
 #define MCQ_QCFGPTR_MASK	GENMASK(7, 0)
 #define MCQ_QCFGPTR_UNIT	0x200
 #define MCQ_SQATTR_OFFSET(c) \
@@ -2436,17 +2440,13 @@ ufshcd_is_valid_pm_lvl(enum ufs_pm_level lvl)
 	return lvl >= 0 && lvl < UFS_PM_LVL_MAX;
 }
 
-static void ufshcd_parse_pm_levels(struct ufs_hba *hba)
+static void ufs_qcom_parse_pm_levels(struct ufs_hba *hba)
 {
 	struct device *dev = hba->dev;
 	struct device_node *np = dev->of_node;
-	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 	enum ufs_pm_level rpm_lvl = UFS_PM_LVL_MAX, spm_lvl = UFS_PM_LVL_MAX;
 
 	if (!np)
-		return;
-
-	if (host->is_dt_pm_level_read)
 		return;
 
 	if (!of_property_read_u32(np, "rpm-level", &rpm_lvl) &&
@@ -2455,7 +2455,6 @@ static void ufshcd_parse_pm_levels(struct ufs_hba *hba)
 	if (!of_property_read_u32(np, "spm-level", &spm_lvl) &&
 		ufshcd_is_valid_pm_lvl(spm_lvl))
 		hba->spm_lvl = spm_lvl;
-	host->is_dt_pm_level_read = true;
 }
 
 static void ufs_qcom_override_pa_tx_hsg1_sync_len(struct ufs_hba *hba)
@@ -2497,8 +2496,6 @@ static int ufs_qcom_apply_dev_quirks(struct ufs_hba *hba)
 
 	if (hba->dev_quirks & UFS_DEVICE_QUIRK_PA_TX_HSG1_SYNC_LENGTH)
 		ufs_qcom_override_pa_tx_hsg1_sync_len(hba);
-
-	ufshcd_parse_pm_levels(hba);
 
 	if (hba->dev_info.wmanufacturerid == UFS_VENDOR_MICRON)
 		hba->dev_quirks |= UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM;
@@ -2863,6 +2860,152 @@ static void ufs_qcom_save_host_ptr(struct ufs_hba *hba)
 		dev_err(hba->dev, "invalid host index %d\n", id);
 }
 
+static int ufshcd_write_buffer(struct ufs_hba *hba, void __user *buffer,
+				struct scsi_device *sdev)
+{
+	int err = 0;
+	unsigned char cmd[11] = {WRITE_BUFFER, 0x0E, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	struct ufs_ioctl_write_buffer_data *ioctl_data = NULL;
+	struct ufs_ioctl_write_buffer_data *fw_data = NULL;
+	unsigned char sense[SCSI_SENSE_BUFFERSIZE];
+	struct scsi_sense_hdr sshdr;
+	blk_opf_t opf = REQ_OP_DRV_OUT | REQ_FAILFAST_DEV |
+				REQ_FAILFAST_TRANSPORT | REQ_FAILFAST_DRIVER;
+	const struct scsi_exec_args exec_args = {
+		.sshdr = &sshdr,
+	};
+	unsigned char *data = NULL;
+	u32 buf_size;
+	u32 buf_len;
+	u32 offset = 0;
+
+	ioctl_data = kmalloc(sizeof(struct ufs_ioctl_write_buffer_data),
+			GFP_KERNEL);
+	if (!ioctl_data) {
+		dev_err(hba->dev, "%s: Failed allocating ioctl_data\n",
+			__func__);
+		err = -ENOMEM;
+		goto out;
+	}
+
+	err = copy_from_user(ioctl_data, buffer,
+			sizeof(struct ufs_ioctl_write_buffer_data));
+	if (err) {
+		dev_err(hba->dev, "%s: Failed copying from user, err %d\n",
+			__func__, err);
+		goto out;
+	}
+
+	fw_data = kmalloc(sizeof(struct ufs_ioctl_write_buffer_data) +
+			ioctl_data->buf_size, GFP_KERNEL);
+	if (!fw_data) {
+		dev_err(hba->dev, "%s: Failed allocating fw_data\n", __func__);
+		err = -ENOMEM;
+		goto out;
+	}
+
+	err = copy_from_user(fw_data, buffer, sizeof(struct
+			ufs_ioctl_write_buffer_data) + ioctl_data->buf_size);
+	if (err) {
+		dev_err(hba->dev, "%s: Failed copying from user, err %d\n",
+			__func__, err);
+		goto out;
+	}
+
+	buf_size = ioctl_data->buf_size;
+	if (buf_size > (queue_max_hw_sectors(sdev->request_queue) << 9))
+		buf_len = (queue_max_hw_sectors(sdev->request_queue) << 9);
+	else
+		buf_len = ioctl_data->buf_size;
+
+	data = kzalloc(buf_size, GFP_KERNEL);
+	if (!data) {
+		dev_err(hba->dev, "%s: Failed allocating fw_data\n", __func__);
+		err = -ENOMEM;
+		goto out;
+	}
+
+	err = scsi_device_get(sdev);
+	if (err) {
+		dev_err(hba->dev, "%s: Failed scsi device get %d\n",
+			__func__, err);
+		goto out;
+	}
+
+	while (buf_size) {
+		if (buf_len > buf_size)
+			buf_len = buf_size;
+
+		memcpy(data, fw_data->buffer + offset, buf_len);
+
+		cmd[3] = (offset >> 16) & 0xff;
+		cmd[4] = (offset >> 8) & 0xff;
+		cmd[5] = offset & 0xff;
+		cmd[6] = (buf_len >> 16) & 0xff;
+		cmd[7] = (buf_len >> 8) & 0xff;
+		cmd[8] = buf_len & 0xff;
+
+		err = scsi_execute_cmd(sdev, cmd, opf, data,
+			buf_len, 10000, 0, &exec_args);
+		if (err) {
+			dev_err(hba->dev, "%s: Failed write buffer %d\n",
+				__func__, err);
+			goto out1;
+		}
+
+		if (scsi_normalize_sense(sense, SCSI_SENSE_BUFFERSIZE, &sshdr)) {
+			dev_err(hba->dev, "%s: print sense hdr\n", __func__);
+			__scsi_print_sense(sdev, "ffu", sense,
+                                           SCSI_SENSE_BUFFERSIZE);
+		}
+
+		offset += buf_len;
+		buf_size -= buf_len;
+	}
+
+out1:
+	if (sdev)
+		scsi_device_put(sdev);
+out:
+	kfree(data);
+	kfree(fw_data);
+	kfree(ioctl_data);
+
+	return err;
+}
+
+/**
+ * ufs_qcom_ioctl - ufs ioctl callback registered in scsi_host
+ * @dev: scsi device required for per LUN queries
+ * @cmd: command opcode
+ * @buffer: user space buffer for transferring data
+ *
+ * Supported commands:
+ * UFS_IOCTL_QUERY
+ */
+static int
+ufs_qcom_ioctl(struct scsi_device *dev, unsigned int cmd, void __user *buffer)
+{
+	struct ufs_hba *hba = shost_priv(dev->host);
+	int err = 0;
+	BUG_ON(!hba);
+
+	switch (cmd) {
+	case UFS_IOCTL_WRITE_BUFFER:
+		pm_runtime_get_sync(hba->dev);
+		err = ufshcd_write_buffer(hba, buffer, dev);
+		pm_runtime_put_sync(hba->dev);
+		break;
+	default:
+		err = -ENOIOCTLCMD;
+		dev_dbg(hba->dev, "%s: Unsupported ioctl cmd %d\n", __func__,
+			cmd);
+		break;
+	}
+
+	return err;
+}
+
 static int tag_to_cpu(struct ufs_hba *hba, unsigned int tag)
 {
 	struct ufshcd_lrb *lrbp = &hba->lrb[tag];
@@ -3178,21 +3321,6 @@ static void ufs_qcom_parse_irq_affinity(struct ufs_hba *hba)
 	/* If device includes perf mask, enable dynamic irq affinity feature */
 	if (host->perf_mask.bits[0])
 		host->irq_affinity_support = true;
-}
-
-static void ufs_qcom_parse_pm_level(struct ufs_hba *hba)
-{
-	struct device *dev = hba->dev;
-	struct device_node *np = dev->of_node;
-
-	if (np) {
-		if (of_property_read_u32(np, "rpm-level",
-					 &hba->rpm_lvl))
-			hba->rpm_lvl = -1;
-		if (of_property_read_u32(np, "spm-level",
-					 &hba->spm_lvl))
-			hba->spm_lvl = -1;
-	}
 }
 
 /* Returns the max mitigation level supported */
@@ -3758,7 +3886,7 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 	if (err)
 		goto out_disable_vccq_parent;
 
-	ufs_qcom_parse_pm_level(hba);
+	ufs_qcom_parse_pm_levels(hba);
 	ufs_qcom_parse_limits(host);
 	ufs_qcom_parse_g4_workaround_flag(host);
 	ufs_qcom_parse_lpm(host);
@@ -3803,6 +3931,15 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 				__func__, err);
 
 	ufs_qcom_init_sysfs(hba);
+
+	/* Provide SCSI host ioctl API */
+	hba->host->hostt->ioctl = (int (*)(struct scsi_device *, unsigned int,
+					void __user *))ufs_qcom_ioctl;
+#ifdef CONFIG_COMPAT
+	hba->host->hostt->compat_ioctl = (int (*)(struct scsi_device *,
+						unsigned int,
+						void __user *))ufs_qcom_ioctl;
+#endif
 
 	ut->tcd = devm_thermal_of_cooling_device_register(dev,
 							  dev->of_node,

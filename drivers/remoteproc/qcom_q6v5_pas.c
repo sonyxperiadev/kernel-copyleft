@@ -53,6 +53,8 @@ bool timeout_disabled;
 static bool global_sync_mem_setup;
 static bool recovery_set_cb;
 
+#define to_rproc(d) container_of(d, struct rproc, dev)
+
 struct adsp_data {
 	int crash_reason_smem;
 	const char *firmware_name;
@@ -227,8 +229,14 @@ void adsp_segment_dump(struct rproc *rproc, struct rproc_dump_segment *segment,
 static void adsp_minidump(struct rproc *rproc)
 {
 	struct qcom_adsp *adsp = rproc->priv;
+	struct qcom_q6v5 *q6v5 = &adsp->q6v5;
 
 	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_minidump", "enter");
+
+	if (q6v5->data_ready) {
+		sysfs_notify(&rproc->dev.parent->kobj, NULL, "crash_reason");
+	}
+	dev_info(q6v5->dev, "adsp_minidump sys-notify\n");
 
 	if (rproc->dump_conf == RPROC_COREDUMP_DISABLED)
 		goto exit;
@@ -975,6 +983,35 @@ static unsigned long adsp_panic(struct rproc *rproc)
 	return qcom_q6v5_panic(&adsp->q6v5);
 }
 
+static ssize_t crash_reason_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = container_of(dev, struct platform_device, dev);
+	struct qcom_adsp *adsp = (struct qcom_adsp *)platform_get_drvdata(pdev);
+	int r = 0;
+	struct qcom_q6v5 *q6v5 = &adsp->q6v5;
+
+	r = snprintf(buf, PAGE_SIZE, "%s\n", q6v5->crash_reason_buf);
+	q6v5->data_ready = 0;
+	memset(q6v5->crash_reason_buf, 0, sizeof(q6v5->crash_reason_buf));
+
+	return r;
+}
+
+static DEVICE_ATTR_RO(crash_reason);
+
+void adsp_coredump(struct rproc *rproc)
+{
+	struct qcom_adsp *adsp = (struct qcom_adsp *)rproc->priv;
+	struct qcom_q6v5 *q6v5 = &adsp->q6v5;
+
+	if (q6v5->data_ready) {
+		sysfs_notify(&rproc->dev.parent->kobj, NULL, "crash_reason");
+	}
+	dev_err(q6v5->dev, "adsp_coredump sys-notify\n");
+	rproc_coredump(rproc);
+}
+
 static const struct rproc_ops adsp_ops = {
 	.attach = adsp_attach,
 	.start = adsp_start,
@@ -982,6 +1019,7 @@ static const struct rproc_ops adsp_ops = {
 	.da_to_va = adsp_da_to_va,
 	.load = adsp_load,
 	.panic = adsp_panic,
+	.coredump = adsp_coredump,
 };
 
 static const struct rproc_ops adsp_minidump_ops = {
@@ -1328,6 +1366,12 @@ static int adsp_probe(struct platform_device *pdev)
 	if (!rproc) {
 		dev_err(&pdev->dev, "unable to allocate remoteproc\n");
 		return -ENOMEM;
+	}
+
+	ret = sysfs_create_file(&pdev->dev.kobj, &dev_attr_crash_reason.attr);
+	if (ret) {
+		pr_err("qcom_rproc: failed to create sysfs crash_reason\n");
+		kobject_put(&pdev->dev.kobj);
 	}
 
 	rproc->recovery_disabled = true;

@@ -1,0 +1,10 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+load(":define_msm_ext_display.bzl", "define_msm_ext_display")
+
+package(
+    default_visibility = [
+      "//visibility:public"
+    ],
+)
+
+define_msm_ext_display()

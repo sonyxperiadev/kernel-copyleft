@@ -1,0 +1,666 @@
+{
+    "CACHEDUMP_CACHE_ID_L1_D": {
+        "structure": {
+            "associativity": 4,
+            "numSets": 128
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L1_D_TAG_DATA": {
+
+    },
+    "CACHEDUMP_CACHE_ID_L1_D_DATA": {
+        "structure": {
+            "blockSize": 64,
+            "parent": "CACHEDUMP_CACHE_ID_L1_D"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L1_D_TAG": {
+        "fields": [
+            {
+                "bitfield": "32+31:32+30",
+                "name": "MESI",
+                "valueMap": {
+                    "00": "Invalid",
+                    "01": "Shared",
+                    "02": "Unique_Non_Transient",
+                    "03": "Unique_Transient"
+                }
+            },
+            {
+                "bitfield": "32+29",
+                "name": "NS"
+            },
+            {
+                "bitfield": "32+28:32+1",
+                "hex": "1",
+                "name": "PA",
+                "post_process": [
+                    {
+                        "<<": 6
+                    },
+                    {
+                        "|": {
+                            "Set": "5:0"
+                        }
+                    },
+                    {
+                        "<<": 6
+                    }
+                ]
+            },
+            {
+                "bitfield": "6:5",
+                "name": "PBHA"
+            },
+            {
+                "bitfield": "4",
+                "name": "Dirty"
+            },
+            {
+                "bitfield": "3",
+                "name": "Shareability"
+            },
+            {
+                "bitfield": "2:1",
+                "name": "Age"
+            },
+            {
+                "bitfield": "0",
+                "name": "Outer Alloc Hint"
+            }
+        ],
+        "structure": {
+            "blockSize": 8,
+            "parent": "CACHEDUMP_CACHE_ID_L1_D"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L1_I": {
+        "structure": {
+            "associativity": 4,
+            "numSets": 128
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L1_I_TAG_DATA": {
+
+    },
+    "CACHEDUMP_CACHE_ID_L1_I_DATA": {
+        "fields": [
+            {
+                "bitfield": "32*0+19:32*0+0",
+                "hex": "1",
+                "name": "00"
+            },
+            {
+                "bitfield": "32*1+19:32*1+0",
+                "hex": "1",
+                "name": "02"
+            },
+            {
+                "bitfield": "32*2+19:32*2+0",
+                "hex": "1",
+                "name": "04"
+            },
+            {
+                "bitfield": "32*3+19:32*3+0",
+                "hex": "1",
+                "name": "06"
+            },
+            {
+                "bitfield": "32*4+19:32*4+0",
+                "hex": "1",
+                "name": "08"
+            },
+            {
+                "bitfield": "32*5+19:32*5+0",
+                "hex": "1",
+                "name": "0A"
+            },
+            {
+                "bitfield": "32*6+19:32*6+0",
+                "hex": "1",
+                "name": "0C"
+            },
+            {
+                "bitfield": "32*7+19:32*7+0",
+                "hex": "1",
+                "name": "0E"
+            },
+            {
+                "bitfield": "32*8+19:32*8+0",
+                "hex": "1",
+                "name": "10"
+            },
+            {
+                "bitfield": "32*9+19:32*9+0",
+                "hex": "1",
+                "name": "12"
+            },
+            {
+                "bitfield": "32*10+19:32*10+0",
+                "hex": "1",
+                "name": "14"
+            },
+            {
+                "bitfield": "32*11+19:32*11+0",
+                "hex": "1",
+                "name": "16"
+            },
+            {
+                "bitfield": "32*12+19:32*12+0",
+                "hex": "1",
+                "name": "18"
+            },
+            {
+                "bitfield": "32*13+19:32*13+0",
+                "hex": "1",
+                "name": "1A"
+            },
+            {
+                "bitfield": "32*14+19:32*14+0",
+                "hex": "1",
+                "name": "1C"
+            },
+            {
+                "bitfield": "32*15+19:32*15+0",
+                "hex": "1",
+                "name": "1E"
+            },
+            {
+                "bitfield": "32*16+19:32*16+0",
+                "hex": "1",
+                "name": "20"
+            },
+            {
+                "bitfield": "32*17+19:32*17+0",
+                "hex": "1",
+                "name": "22"
+            },
+            {
+                "bitfield": "32*18+19:32*18+0",
+                "hex": "1",
+                "name": "24"
+            },
+            {
+                "bitfield": "32*19+19:32*19+0",
+                "hex": "1",
+                "name": "26"
+            },
+            {
+                "bitfield": "32*20+19:32*20+0",
+                "hex": "1",
+                "name": "28"
+            },
+            {
+                "bitfield": "32*21+19:32*21+0",
+                "hex": "1",
+                "name": "2A"
+            },
+            {
+                "bitfield": "32*22+19:32*22+0",
+                "hex": "1",
+                "name": "2C"
+            },
+            {
+                "bitfield": "32*23+19:32*23+0",
+                "hex": "1",
+                "name": "2E"
+            },
+            {
+                "bitfield": "32*24+19:32*24+0",
+                "hex": "1",
+                "name": "30"
+            },
+            {
+                "bitfield": "32*25+19:32*25+0",
+                "hex": "1",
+                "name": "32"
+            },
+            {
+                "bitfield": "32*26+19:32*26+0",
+                "hex": "1",
+                "name": "34"
+            },
+            {
+                "bitfield": "32*27+19:32*27+0",
+                "hex": "1",
+                "name": "36"
+            },
+            {
+                "bitfield": "32*28+19:32*28+0",
+                "hex": "1",
+                "name": "38"
+            },
+            {
+                "bitfield": "32*29+19:32*29+0",
+                "hex": "1",
+                "name": "3A"
+            },
+            {
+                "bitfield": "32*30+19:32*30+0",
+                "hex": "1",
+                "name": "3C"
+            },
+            {
+                "bitfield": "32*31+19:32*31+0",
+                "hex": "1",
+                "name": "3E"
+            }
+	],
+        "structure": {
+            "blockSize": 128,
+            "parent": "CACHEDUMP_CACHE_ID_L1_I"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L1_I_TAG": {
+        "fields": [
+            {
+                "bitfield": "30:29",
+                "name": "Valid and set mode",
+                "valueMap": {
+                    "00": "A32",
+                    "01": "T32,",
+                    "02": "A64",
+                    "03": "Invalid"
+                }
+            },
+            {
+                "bitfield": "28",
+                "name": "NS"
+            },
+            {
+                "bitfield": "27:0",
+                "hex": "1",
+                "name": "Tag Addr",
+                "post_process": [
+                    {
+                        "<<": 6
+                    },
+                    {
+                        "|": {
+                            "Set": "5:0"
+                        }
+                    },
+                    {
+                        "<<": 6
+                    }
+                ]
+            }
+        ],
+        "structure": {
+            "blockSize": 4,
+            "parent": "CACHEDUMP_CACHE_ID_L1_I"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB": {
+        "structure": {
+            "associativity": 4,
+            "numSets": 256
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB_TAG_DATA": {
+
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB_DATA": {
+        "fields": [
+            {
+                "bitfield": "0",
+                "name": "XS1Usr"
+            },
+            {
+                "bitfield": "1",
+                "name": "XS1Non-Usr"
+            },
+            {
+                "bitfield": "2",
+                "name": "XS2Usr"
+            },
+            {
+                "bitfield": "3",
+                "name": "XS2Non-Usr"
+            },
+            {
+                "bitfield": "11:4",
+                "hex": 1,
+                "name": "Mem Attr"
+            },
+            {
+                "bitfield": "13:12",
+                "name": "PBHA"
+            },
+            {
+                "bitfield": "15:14",
+                "name": "S2 Level"
+            },
+            {
+                "bitfield": "16",
+                "name": "NS(Descriptor)"
+            },
+            {
+                "bitfield": "44:17",
+                "hex": 1,
+                "name": "PA",
+                "post_process": [
+                    {
+                        "<<": 12
+                    }
+                ]
+            },
+            {
+                "bitfield": "45",
+                "name": "Parity"
+            }
+        ],
+        "structure": {
+            "blockSize": 8,
+            "parent": "CACHEDUMP_CACHE_ID_L2_TLB",
+            "next": "CACHEDUMP_CACHE_ID_L2_TLB_DATA_WALK"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB_DATA_WALK": {
+        "fields": [
+            {
+                "bitfield": "1:0",
+                "name": "APTable"
+            },
+            {
+                "bitfield": "2",
+                "name": "XNTable"
+            },
+            {
+                "bitfield": "3",
+                "name": "PXNTable"
+            },
+            {
+                "bitfield": "4",
+                "name": "NSTable"
+            },
+            {
+                "bitfield": "12:5",
+                "hex": 1,
+                "name": "Attrs"
+            },
+            {
+                "bitfield": "42:13",
+                "hex": 1,
+                "name": "PA",
+                "post_process": [
+                    {
+                        "<<": 10
+                    }
+                ]
+            },
+            {
+                "bitfield": "43",
+                "name": "Parity"
+            }
+        ],
+        "structure": {
+            "blockSize": 8,
+            "subCache": "True",
+            "next": "CACHEDUMP_CACHE_ID_L2_TLB_DATA_IPA",
+            "offset": 8192,
+            "associativity": 4,
+            "numSets": 16
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB_DATA_IPA": {
+        "fields": [
+            {
+                "bitfield": "1:0",
+                "name": "SH"
+            },
+            {
+                "bitfield": "3:2",
+                "name": "S2AP"
+            },
+            {
+                "bitfield": "5:4",
+                "name": "XN"
+            },
+            {
+                "bitfield": "9:6",
+                "hex": 1,
+                "name": "Memattrs"
+            },
+            {
+                "bitfield": "37:10",
+                "hex": 1,
+                "name": "PA",
+                "post_process": [
+                    {
+                        "<<": 12
+                    }
+                ]
+            },
+            {
+                "bitfield": "43",
+                "name": "Parity"
+            }
+        ],
+        "structure": {
+            "blockSize": 8,
+            "subCache": "True",
+            "offset": 512,
+            "associativity": 4,
+            "numSets": 16
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB_TAG": {
+        "fields": [
+            {
+                "bitfield": "0",
+                "name": "Valid"
+            },
+            {
+                "bitfield": "1",
+                "name": "NS(Walk)"
+            },
+            {
+                "bitfield": "17:2",
+                "hex": 1,
+                "name": "ASID"
+            },
+            {
+                "bitfield": "33:18",
+                "hex": 1,
+                "name": "VMID"
+            },
+            {
+                "bitfield": "36:34",
+                "name": "Size"
+            },
+            {
+                "bitfield": "37",
+                "name": "non-Global"
+            },
+            {
+                "bitfield": "40:38",
+                "name": "AP/HYP"
+            },
+            {
+                "bitfield": "42:41",
+                "name": "S2AP"
+            },
+            {
+                "bitfield": "46:43",
+                "hex": 1,
+                "name": "Domain"
+            },
+            {
+                "bitfield": "49:47",
+                "name": "S1 Size"
+            },
+            {
+                "bitfield": "50, 78:51",
+                "hex": "1",
+                "name": "VA",
+                "post_process": [
+                    {
+                        "sign_extend": {
+                            "width": 45,
+                            "extend_start": 29,
+                            "sign_bit": 0,
+                            "comment_1": "Width and sign bit index are relative to this bitfield entry, after any post-processing",
+                            "comment_2": "Provide the extend_start key to prevent bit truncation"
+                        }
+                    },
+                    {
+                        ">>": 1
+                    },
+                    {
+                        "<<": 8
+                    },
+                    {
+                        "|": {
+                            "Set": "7:0"
+                        }
+                    },
+                    {
+                        "<<": 12
+                    }
+                ]
+            },
+            {
+                "bitfield": "79",
+                "name": "DBM"
+            },
+            {
+                "bitfield": "81:80",
+                "name": "Parity"
+            }
+        ],
+        "structure": {
+            "blockSize": 12,
+            "parent": "CACHEDUMP_CACHE_ID_L2_TLB",
+            "next": "CACHEDUMP_CACHE_ID_L2_TLB_TAG_WALK"
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB_TAG_WALK": {
+        "fields": [
+            {
+                "bitfield": "0",
+                "name": "Valid"
+            },
+            {
+                "bitfield": "1",
+                "name": "NS(Walk)"
+            },
+            {
+                "bitfield": "17:2",
+                "hex": 1,
+                "name": "ASID"
+            },
+            {
+                "bitfield": "33:18",
+                "hex": 1,
+                "name": "VMID"
+            },
+            {
+                "bitfield": "34",
+                "name": "HYP/EL2"
+            },
+            {
+                "bitfield": "35",
+                "name": "EL3"
+            },
+            {
+                "bitfield": "38:36",
+                "name": "Arch"
+            },
+            {
+                "bitfield": "42:39",
+                "name": "Domain"
+            },
+            {
+                "bitfield": "69:46, 45",
+                "hex": 1,
+                "name": "VA",
+                "post_process": [
+                    {
+                        "|": {
+                            "Set": "3:0",
+                            "<<": 25,
+                            "comment": "Shift can be added as above if the set/way is to be inserted in the middle of the result" 
+                        }
+                    },
+                    {
+                        "sign_extend": {
+                            "width": 44,
+                            "extend_start": 29,
+                            "sign_bit": 0,
+                            "comment_1": "Width and sign bit index are relative to this bitfield entry, after any post-processing",
+                            "comment_2": "Provide the extend_start key to prevent bit truncation"
+                        }
+                    },
+                    {
+                        ">>": 1
+                    },
+                    {
+                        "<<": 20
+                    }
+                ]
+            },
+            {
+                "bitfield": "71:70",
+                "name": "S2AP"
+            },
+            {
+                "bitfield": "73:72",
+                "name": "S2level"
+            },
+            {
+                "bitfield": "81:80",
+                "name": "Parity"
+            }
+        ],
+        "structure": {
+            "blockSize": 12,
+            "subCache": "True",
+            "offset": 12288,
+            "next": "CACHEDUMP_CACHE_ID_L2_TLB_TAG_IPA",
+            "associativity": 4,
+            "numSets": 16
+        }
+    },
+    "CACHEDUMP_CACHE_ID_L2_TLB_TAG_IPA": {
+        "fields": [
+            {
+                "bitfield": "0",
+                "name": "Valid"
+            },
+            {
+                "bitfield": "2:1",
+                "name": "EntryGranule"
+            },
+            {
+                "bitfield": "8:5",
+                "name": "Size"
+            },
+            {
+                "bitfield": "9",
+                "name": "DBM"
+            },
+            {
+                "bitfield": "33:18",
+                "hex": 1,
+                "name": "VMID"
+            },
+            {
+                "bitfield": "57:34",
+                "hex": 1,
+                "name": "IPA"
+            },
+            {
+                "bitfield": "81:80",
+                "name": "Parity"
+            }
+        ],
+        "structure": {
+            "blockSize": 12,
+            "subCache": "True",
+            "offset": 768,
+            "associativity": 4,
+            "numSets": 16
+        }
+    }
+}

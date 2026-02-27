@@ -1,0 +1,19 @@
+{
+    "Comment ": "The parser expects 8 nibbles to map a numeric MIDR to a CPU type",
+    "510F8010": "KryoBSilver",
+    "510F8000": "KryoBGold",
+    "510F8030": "Kryo3Silver",
+    "510F8050": "Kryo3Silver",
+    "510F8070": "Kryo3Silver",
+    "410FD050": "Kryo3Silver",
+    "510F8020": "Kryo3Gold",
+    "510F8040": "Kryo4Gold",
+    "410FD0D0": "Kryo5Gold",
+    "410FD410": "Cortex_A78",
+    "410FD440": "Cortex_X1",
+    "410FD4B0": "Cortex_A78",
+    "410FD4C0": "Cortex_X1",
+	"410FD470": "Matterhorn",
+    "410FD480": "Matterhorn_ELP",
+    "410FD460": "Klein"
+}

@@ -1,0 +1,6 @@
+config FELS
+	tristate "support kernel logging system for driver"
+	help
+	  fels(Fatal Error Logging System) provide logging framework to upload
+	  kernel logs to IDD/RCA in the case of user variant software in production
+	  environment.

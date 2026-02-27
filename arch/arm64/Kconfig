@@ -2314,6 +2314,8 @@ source "drivers/cpufreq/Kconfig"
 
 endmenu # "CPU Power Management"
 
+source "kernel/fels/Kconfig"
+
 source "drivers/acpi/Kconfig"
 
 source "arch/arm64/kvm/Kconfig"

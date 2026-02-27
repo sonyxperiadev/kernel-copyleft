@@ -1,0 +1,12 @@
+/dts-v1/;
+/plugin/;
+
+#include "sun-peach-cnss-v8.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. Sun SoCs";
+	compatible = "qcom,sun", "qcom,sunp";
+	qcom,msm-id = <618 0x10000>, <618 0x20000>,
+		      <639 0x10000>, <639 0x20000>;
+	qcom,board-id = <0x50001 0>, <0x40008 0>, <0x3000B 0>;
+};

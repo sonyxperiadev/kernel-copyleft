@@ -1,0 +1,1 @@
+../../../opensource/eva-kernel/eva_kernel_board.mk

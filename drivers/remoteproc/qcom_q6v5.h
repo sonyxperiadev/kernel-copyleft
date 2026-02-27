@@ -19,6 +19,8 @@ struct rproc;
 struct qcom_smem_state;
 struct qcom_sysmon;
 
+#define SUBSYS_CRASH_REASON_LEN 512
+
 struct qcom_q6v5 {
 	struct device *dev;
 	struct rproc *rproc;
@@ -44,6 +46,8 @@ struct qcom_q6v5 {
 	struct completion stop_done;
 
 	int crash_reason;
+	char crash_reason_buf[SUBSYS_CRASH_REASON_LEN];
+	int data_ready;
 
 	bool running;
 

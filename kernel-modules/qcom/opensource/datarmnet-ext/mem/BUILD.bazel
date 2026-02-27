@@ -1,0 +1,25 @@
+load(":define_mem.bzl", "define_mem")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+define_mem("pineapple", "consolidate")
+
+define_mem("pineapple", "gki")
+
+define_mem("blair", "consolidate")
+
+define_mem("blair", "gki")
+
+define_mem("monaco", "consolidate")
+
+define_mem("monaco", "gki")
+package(
+	default_visibility = [
+	"//visibility:public", ],
+)
+ddk_headers(
+    name = "rmnet_mem_headers",
+    hdrs = glob([
+        "*.h",
+    ]),
+    includes = ["."],
+)

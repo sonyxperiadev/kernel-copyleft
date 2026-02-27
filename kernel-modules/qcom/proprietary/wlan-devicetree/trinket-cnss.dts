@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "trinket-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. TRINKET IOT IDP Overlay";
+	compatible = "qcom,trinket-iot";
+	qcom,msm-id = <467 0x10000>, <467 0x0>, <468 0x10000>, <468 0x0>;
+	qcom,board-id = <34 0>;
+};

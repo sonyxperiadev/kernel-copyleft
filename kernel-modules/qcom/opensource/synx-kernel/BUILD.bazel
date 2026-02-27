@@ -1,0 +1,27 @@
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+driver_header_globs = [
+    "include/uapi/synx/**/*.h",
+    "include/uapi/synx/media/**/*.h",
+    "msm/synx/**/*.h",
+]
+
+ddk_headers(
+    name = "synx_headers",
+    hdrs = glob(driver_header_globs),
+    includes = [
+        "include/uapi/synx",
+        "include/uapi/synx/media",
+        "msm/synx",
+    ],
+)
+
+load(":pineapple.bzl", "define_pineapple")
+
+define_pineapple()

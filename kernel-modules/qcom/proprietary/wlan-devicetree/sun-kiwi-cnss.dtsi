@@ -1,0 +1,148 @@
+#include <dt-bindings/interconnect/qcom,sun.h>
+
+&tlmm {
+	cnss_pins {
+		cnss_wlan_en_active: cnss_wlan_en_active {
+			mux {
+				pins = "gpio16";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio16";
+				drive-strength = <16>;
+				output-high;
+				bias-pull-up;
+			};
+		};
+
+		cnss_wlan_en_sleep: cnss_wlan_en_sleep {
+			mux {
+				pins = "gpio16";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio16";
+				drive-strength = <2>;
+				output-low;
+				bias-pull-down;
+			};
+		};
+	};
+};
+
+&reserved_memory {
+	cnss_wlan_mem: cnss_wlan_region {
+		compatible = "shared-dma-pool";
+		alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;
+		reusable;
+		alignment = <0x0 0x400000>;
+		size = <0x0 0x2000000>;
+	};
+};
+
+&soc {
+	wlan_kiwi: qcom,cnss-kiwi@b0000000 {
+		compatible = "qcom,cnss-kiwi";
+		reg = <0xb0000000 0x10000>;
+		reg-names = "smmu_iova_ipa";
+		qcom,wlan-sw-ctrl-gpio = <&tlmm 19 0>;
+
+		supported-ids = <0x1107>;
+		wlan-en-gpio = <&tlmm 16 0>;
+		qcom,bt-en-gpio = <&pm8550vs_f 3 0>;
+		qcom,sw-ctrl-gpio = <&tlmm 18 0>;
+		/* List of GPIOs to be setup for interrupt wakeup capable */
+		mpm_wake_set_gpios = <18 19>;
+		pinctrl-names = "wlan_en_active", "wlan_en_sleep";
+		pinctrl-0 = <&cnss_wlan_en_active>;
+		pinctrl-1 = <&cnss_wlan_en_sleep>;
+		qcom,wlan;
+		qcom,wlan-rc-num = <0>;
+		qcom,wlan-ramdump-dynamic = <0x780000>;
+		cnss-enable-self-recovery;
+		qcom,wlan-cbc-enabled;
+		use-pm-domain;
+		qcom,same-dt-multi-dev;
+		/* For AOP communication, use direct QMP instead of mailbox */
+		qcom,qmp = <&aoss_qmp>;
+
+		vdd-wlan-io-supply = <&L3F>;
+		qcom,vdd-wlan-io-config = <1800000 1800000 0 0 1>;
+		vdd-wlan-io12-supply = <&L2F>;
+		qcom,vdd-wlan-io12-config = <1200000 1200000 0 0 1>;
+		vdd-wlan-supply = <&S4J>;
+		qcom,vdd-wlan-config = <932000 1000000 0 0 1>;
+		vdd-wlan-aon-supply = <&S4D>;
+		qcom,vdd-wlan-aon-config = <976000 1036000 0 0 1>;
+		vdd-wlan-dig-supply = <&S1D>;
+		qcom,vdd-wlan-dig-config = <916000 1100000 0 0 1>;
+		vdd-wlan-rfa1-supply = <&S3G>;
+		qcom,vdd-wlan-rfa1-config = <1864000 2000000 0 0 1>;
+		vdd-wlan-rfa2-supply = <&S7I>;
+		qcom,vdd-wlan-rfa2-config = <1316000 1340000 0 0 1>;
+		vdd-wlan-ant-share-supply = <&L6K>;
+		qcom,vdd-wlan-ant-share-config = <1800000 1800000 0 0 1>;
+
+		qcom,vreg_pdc_map =
+			"s4j", "bb",
+			"s4d", "bb",
+			"s3g", "rf",
+			"s7i", "rf",
+			"s1d", "rf";
+
+		qcom,pmu_vreg_map =
+			"VDD095_MX_PMU", "s4d",
+			"VDD095_PMU", "s4j",
+			"VDD_PMU_AON_I", "s1d",
+			"VDD095_PMU_BT", "s1d",
+			"VDD09_PMU_RFA_I", "s1d",
+			"VDD13_PMU_PCIE_I", "s7i",
+			"VDD13_PMU_RFA_I", "s7i",
+			"VDD19_PMU_PCIE_I", "s3g",
+			"VDD19_PMU_RFA_I", "s3g";
+
+		qcom,pdc_init_table =
+			"{class: wlan_pdc, ss: rf, res: s3g.v, upval: 1856}",
+			"{class: wlan_pdc, ss: rf, res: s3g.v, dwnval: 1844}",
+			"{class: wlan_pdc, ss: rf, res: s7i.v, upval: 1316}",
+			"{class: wlan_pdc, ss: rf, res: s7i.v, dwnval: 972}",
+			"{class: wlan_pdc, ss: rf, res: s1d.m, enable: 1}",
+			"{class: wlan_pdc, ss: rf, res: s1d.v, enable: 1}",
+			"{class: wlan_pdc, ss: rf, res: s1d.v, upval: 916}",
+			"{class: wlan_pdc, ss: rf, res: s1d.v, dwnval: 880}",
+			"{class: wlan_pdc, ss: rf, res: s4j.m, enable: 0}",
+			"{class: wlan_pdc, ss: rf, res: s4j.v, enable: 0}",
+			"{class: wlan_pdc, ss: bb, res: s4d.v, upval: 976}",
+			"{class: wlan_pdc, ss: bb, res: s4d.v, dwnval: 536}",
+			"{class: wlan_pdc, ss: bb, res: s4j.m, enable: 1}",
+			"{class: wlan_pdc, ss: bb, res: s4j.v, enable: 1}",
+			"{class: wlan_pdc, ss: bb, res: s4j.v, upval: 932}",
+			"{class: wlan_pdc, ss: bb, res: s4j.v, dwnval: 444}";
+	};
+};
+
+&pcie0_rp {
+	#address-cells = <5>;
+	#size-cells = <0>;
+
+	cnss_pci0: cnss_pci0 {
+		reg = <0 0 0 0 0>;
+		qcom,iommu-group = <&cnss_pci_iommu_group0>;
+		memory-region = <&cnss_wlan_mem>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		cnss_pci_iommu_group0: cnss_pci_iommu_group0 {
+			qcom,iommu-msi-size = <0x1000>;
+			qcom,iommu-dma-addr-pool = <0xa0000000 0x10000000>;
+			qcom,iommu-geometry = <0xa0000000 0x10010000>;
+			qcom,iommu-dma = "fastmap";
+			qcom,iommu-pagetable = "coherent";
+			qcom,iommu-faults = "stall-disable", "HUPCF",
+					    "non-fatal";
+		};
+	};
+};

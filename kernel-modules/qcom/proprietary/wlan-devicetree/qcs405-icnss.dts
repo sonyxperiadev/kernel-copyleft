@@ -1,0 +1,10 @@
+/dts-v1/;
+/plugin/;
+
+#include "qcs405-icnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. QCS405 IOT";
+	compatible = "qcom,qcs405-iot", "qcom,qcs405", "qcom,iot";
+	qcom,board-id = <0 0>;
+};

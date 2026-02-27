@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "sa8155p-vm-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. SA8155 Single LA Guest Virtual Machine";
+	compatible = "qcom,sa8155", "qcom,quinvm";
+	qcom,msm-id = <362 0x20000>;
+	qcom,board-id = <0x0 0x1000001>;
+};

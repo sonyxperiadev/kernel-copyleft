@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "lemans-vm-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. LeMans Single Linux Virtual Machine";
+	compatible = "qcom,lemans", "qcom,quinvm";
+	qcom,msm-id = <532 0x20000>, <534 0x20000>;
+	qcom,board-id = <0x0 0x1000002>, <0x10025 0>;
+};

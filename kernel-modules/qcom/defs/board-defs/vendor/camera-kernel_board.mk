@@ -1,0 +1,1 @@
+../../../opensource/camera-kernel/board.mk

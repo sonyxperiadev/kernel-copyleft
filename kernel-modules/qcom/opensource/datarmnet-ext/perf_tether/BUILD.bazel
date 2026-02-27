@@ -1,0 +1,10 @@
+load(":define_perf_tether.bzl", "define_perf_tether")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
+
+define_perf_tether("pineapple", "consolidate")
+
+define_perf_tether("pineapple", "gki")
+
+define_perf_tether("blair", "consolidate")
+
+define_perf_tether("blair", "gki")
