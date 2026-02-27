@@ -162,13 +162,18 @@ static inline void arm_smmu_rpm_put(struct arm_smmu_device *smmu)
 {
 	if (pm_runtime_enabled(smmu->dev)) {
 		pm_runtime_mark_last_busy(smmu->dev);
-		pm_runtime_put_autosuspend(smmu->dev);
+		pm_runtime_put(smmu->dev);
 	}
 }
 
 static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
 {
 	return container_of(dom, struct arm_smmu_domain, domain);
+}
+
+static struct arm_smmu_domain *cb_cfg_to_smmu_domain(struct arm_smmu_cfg *cfg)
+{
+	return container_of(cfg, struct arm_smmu_domain, cfg);
 }
 
 static void parse_driver_options(struct arm_smmu_device *smmu)
@@ -1493,11 +1498,11 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	int irq, start, ret = 0;
 	unsigned long ias, oas;
 	struct io_pgtable_ops *pgtbl_ops;
-	struct qcom_io_pgtable_info pgtbl_info;
-	struct io_pgtable_cfg *pgtbl_cfg = &pgtbl_info.cfg;
 	enum io_pgtable_fmt fmt;
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+	struct qcom_io_pgtable_info *pgtbl_info = &smmu_domain->pgtbl_info;
+	struct io_pgtable_cfg *pgtbl_cfg = &pgtbl_info->cfg;
 	irqreturn_t (*context_fault)(int irq, void *dev);
 	struct io_pgtable *iop;
 
@@ -1619,8 +1624,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	if (test_bit(DOMAIN_ATTR_FAST, smmu_domain->attributes)) {
 		fmt = ARM_V8L_FAST;
 		ret = qcom_iommu_get_fast_iova_range(dev,
-					&pgtbl_info.iova_base,
-					&pgtbl_info.iova_end);
+					&pgtbl_info->iova_base,
+					&pgtbl_info->iova_end);
 		if (ret < 0)
 			goto out_unlock;
 	}
@@ -1645,8 +1650,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	else
 		cfg->asid = cfg->cbndx;
 
-	pgtbl_info.iommu_pgtbl_ops = &arm_smmu_pgtable_ops;
-	pgtbl_info.cfg = (struct io_pgtable_cfg) {
+	pgtbl_info->iommu_pgtbl_ops = &arm_smmu_pgtable_ops;
+	pgtbl_info->cfg = (struct io_pgtable_cfg) {
 		.pgsize_bitmap	= smmu->pgsize_bitmap,
 		.ias		= ias,
 		.oas		= oas,
@@ -1667,12 +1672,13 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 		pgtbl_cfg->quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
 	pgtbl_cfg->quirks |= arm_smmu_domain_get_qcom_quirks(smmu_domain, smmu);
 
-	pgtbl_ops = qcom_alloc_io_pgtable_ops(fmt, &pgtbl_info, smmu_domain);
+	pgtbl_ops = qcom_alloc_io_pgtable_ops(fmt, pgtbl_info, smmu_domain);
 	if (!pgtbl_ops) {
 		ret = -ENOMEM;
 		goto out_clear_smmu;
 	}
 
+	smmu_domain->pgtbl_fmt = fmt;
 	/* Update the domain's page sizes to reflect the page table format */
 	domain->pgsize_bitmap = pgtbl_cfg->pgsize_bitmap;
 
@@ -2390,20 +2396,6 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 
 	/* Looks ok, so add the device to the domain */
 	ret = arm_smmu_domain_add_master(smmu_domain, cfg, fwspec);
-
-	/*
-	 * Setup an autosuspend delay to avoid bouncing runpm state.
-	 * Otherwise, if a driver for a suspended consumer device
-	 * unmaps buffers, it will runpm resume/suspend for each one.
-	 *
-	 * For example, when used by a GPU device, when an application
-	 * or game exits, it can trigger unmapping 100s or 1000s of
-	 * buffers.  With a runpm cycle for each buffer, that adds up
-	 * to 5-10sec worth of reprogramming the context bank, while
-	 * the system appears to be locked up to the user.
-	 */
-	pm_runtime_set_autosuspend_delay(smmu->dev, 20);
-	pm_runtime_use_autosuspend(smmu->dev);
 
 out_power_off:
 		arm_smmu_rpm_put(smmu);
@@ -4262,11 +4254,88 @@ static int arm_smmu_pm_prepare(struct device *dev)
 	return (atomic_read(&dev->power.usage_count) == 1) ? -EINPROGRESS : 0;
 }
 
+static int __maybe_unused arm_smmu_pm_restore_early(struct device *dev)
+{
+	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
+	struct arm_smmu_domain *smmu_domain;
+	struct io_pgtable_ops *pgtbl_ops;
+	struct io_pgtable_cfg *pgtbl_cfg;
+	struct arm_smmu_cb *cb;
+	int idx, ret;
+
+	/*
+	 * Restore the page tables for secure vmids as they are lost
+	 * after hibernation in secure code context.
+	 */
+	for (idx = 0; idx < smmu->num_context_banks; idx++) {
+		cb = &smmu->cbs[idx];
+		if (!cb->cfg)
+			continue;
+		smmu_domain = cb_cfg_to_smmu_domain(cb->cfg);
+		if (!arm_smmu_has_secure_vmid(smmu_domain))
+			continue;
+		pgtbl_cfg = &smmu_domain->pgtbl_info.cfg;
+		pgtbl_ops = qcom_alloc_io_pgtable_ops(smmu_domain->pgtbl_fmt,
+					&smmu_domain->pgtbl_info, smmu_domain);
+		if (!pgtbl_ops) {
+			dev_err(smmu->dev,
+			"failed to allocate page tables	during pm restore for cxt %d %s\n",
+				idx, dev_name(dev));
+			return -ENOMEM;
+		}
+		smmu_domain->pgtbl_ops = pgtbl_ops;
+		arm_smmu_init_context_bank(smmu_domain, pgtbl_cfg);
+
+		arm_smmu_secure_domain_lock(smmu_domain);
+		ret = arm_smmu_assign_table(smmu_domain);
+		arm_smmu_secure_domain_unlock(smmu_domain);
+		if (ret)
+			dev_err(smmu->dev, "Failed to hyp-assign page table memory cxt:%d dev:%s\n",
+					idx, dev_name(smmu_domain->dev));
+	}
+	arm_smmu_pm_resume(dev);
+	ret = arm_smmu_runtime_suspend(dev);
+	if (ret) {
+		dev_err(dev, "Failed to suspend\n");
+		return ret;
+	}
+	return 0;
+}
+
+static int __maybe_unused arm_smmu_pm_freeze_late(struct device *dev)
+{
+	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
+	struct arm_smmu_domain *smmu_domain;
+	struct arm_smmu_cb *cb;
+	int idx;
+
+	for (idx = 0; idx < smmu->num_context_banks; idx++) {
+		cb = &smmu->cbs[idx];
+		if (cb && cb->cfg) {
+			smmu_domain = cb_cfg_to_smmu_domain(cb->cfg);
+			if (smmu_domain &&
+				arm_smmu_has_secure_vmid(smmu_domain)) {
+				qcom_free_io_pgtable_ops(smmu_domain->pgtbl_ops);
+
+				arm_smmu_secure_domain_lock(smmu_domain);
+				arm_smmu_secure_pool_destroy(smmu_domain);
+				arm_smmu_unassign_table(smmu_domain);
+				arm_smmu_secure_domain_unlock(smmu_domain);
+			}
+		}
+	}
+	return 0;
+}
+
 static const struct dev_pm_ops arm_smmu_pm_ops = {
 	.prepare = arm_smmu_pm_prepare,
-	SET_SYSTEM_SLEEP_PM_OPS(arm_smmu_pm_suspend, arm_smmu_pm_resume)
 	SET_RUNTIME_PM_OPS(arm_smmu_runtime_suspend,
 			   arm_smmu_runtime_resume, NULL)
+	.suspend  = arm_smmu_pm_suspend,
+	.resume   = arm_smmu_pm_resume,
+	.thaw_early = arm_smmu_pm_restore_early,
+	.freeze_late = arm_smmu_pm_freeze_late,
+	.restore_early = arm_smmu_pm_restore_early,
 };
 
 
