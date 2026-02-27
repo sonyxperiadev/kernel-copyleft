@@ -8,6 +8,8 @@
  *  Copyright (c) 2012 Hans de Goede <hdegoede@redhat.com>
  *  Copyright (c) 2018 LG Electronics, Inc.
  *  Copyright (c) 2018 Richwave Technology Co.Ltd
+ *  Copyright (c) 2020 Qualcomm Technolgy, Inc.
+ *  Copyright (c) 2021 Sharp Corporation. 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -229,14 +231,14 @@ static void rtc6226_i2c_interrupt_handler(struct rtc6226_device *radio)
 	unsigned short current_chan;
 
 	FMDBG("%s enter\n", __func__);
-
+        mutex_lock(&radio->lock);
 	/* check Seek/Tune Complete */
 	retval = rtc6226_get_register(radio, STATUS);
 	if (retval < 0) {
 		FMDERR("%s read fail to STATUS\n", __func__);
 		goto end;
 	}
-
+        sf_bl_flag = radio->registers[STATUS] & STATUS_SF;
 	if (radio->registers[STATUS] & STATUS_STD) {
 		FMDBG("%s : STATUS=0x%4.4hx\n", __func__,
 				radio->registers[STATUS]);
@@ -267,11 +269,13 @@ static void rtc6226_i2c_interrupt_handler(struct rtc6226_device *radio)
 			FMDBG("posting RICHWAVE_EVT_TUNE_SUCC event\n");
 			rtc6226_q_event(radio, RTC6226_EVT_TUNE_SUCC);
 			radio->seek_tune_status = NO_SEEK_TUNE_PENDING;
-		} else if (radio->seek_tune_status == TUNE_PENDING) {
+		} else if ((radio->seek_tune_status == TUNE_PENDING) ||
+			(radio->g_search_mode != SCAN)) {
 			FMDBG("posting RICHWAVE_EVT_TUNE_SUCC event\n");
 			rtc6226_q_event(radio, RTC6226_EVT_TUNE_SUCC);
 			radio->seek_tune_status = NO_SEEK_TUNE_PENDING;
-		} else if (radio->seek_tune_status == SCAN_PENDING) {
+		} else if ((radio->seek_tune_status == SCAN_PENDING) ||
+			(radio->g_search_mode == SCAN)) {
 			/* when scan is pending and STC int is set, signal
 			 * so that scan can proceed
 			 */
@@ -279,7 +283,9 @@ static void rtc6226_i2c_interrupt_handler(struct rtc6226_device *radio)
 			complete(&radio->completion);
 		}
 		FMDBG("%s Seek/Tune done\n", __func__);
-	} else {
+	} else if ((radio->seek_tune_status != TUNE_PENDING) && 
+				(radio->seek_tune_status != TUNE_PENDING) &&
+				(radio->seek_tune_status != SCAN_PENDING)) {
 		/* Check RDS data after tune/seek interrupt finished
 		 * Update RDS registers
 		 */
@@ -302,6 +308,7 @@ static void rtc6226_i2c_interrupt_handler(struct rtc6226_device *radio)
 		}
 	}
 end:
+        mutex_unlock(&radio->lock);
 	FMDBG("%s exit :%d\n", __func__, retval);
 }
 
@@ -461,14 +468,6 @@ static int rtc6226_fm_vdd_reg_cfg(struct rtc6226_device *radio, bool on)
 			FMDERR("set_vol(%s) fail %d\n", vreg->name, rc);
 			return rc;
 		}
-		if (vreg->vdd_load) {
-			rc = regulator_set_load(vreg->reg, vreg->vdd_load);
-			if (rc < 0) {
-				FMDERR("%s Unable to set the load %d ,err=%d\n",
-				__func__, vreg->vdd_load, rc);
-				return rc;
-			}
-		}
 
 		rc = regulator_enable(vreg->reg);
 		if (rc < 0) {
@@ -495,14 +494,7 @@ static int rtc6226_fm_vdd_reg_cfg(struct rtc6226_device *radio, bool on)
 			FMDERR("set_vol(%s) fail %d\n", vreg->name, rc);
 			return rc;
 		}
-		if (vreg->vdd_load) {
-			rc = regulator_set_load(vreg->reg, 0);
-			if (rc < 0) {
-				FMDERR("%s Unable to set the load 0 ,err=%d\n",
-					__func__, rc);
-				return rc;
-			}
-		}
+
 	}
 	return rc;
 }
@@ -543,7 +535,7 @@ int rtc6226_fops_open(struct file *file)
 	struct rtc6226_device *radio = video_drvdata(file);
 	int retval;
 
-	FMDBG("%s enter user num = %d\n", __func__, radio->users);
+	FMDBG("%s enter user num = %d\n", __func__, atomic_read(&radio->users));
 	if (atomic_inc_return(&radio->users) != 1) {
 		FMDERR("Device already in use. Try again later\n");
 		atomic_dec(&radio->users);
@@ -586,6 +578,7 @@ int rtc6226_fops_release(struct file *file)
 	int retval = 0;
 
 	FMDBG("%s : Exit\n", __func__);
+        mutex_lock(&radio->lock);
 	if (radio->mode != FM_OFF) {
 		rtc6226_power_down(radio);
 		radio->mode = FM_OFF;
@@ -595,6 +588,7 @@ int rtc6226_fops_release(struct file *file)
 	retval = rtc6226_fm_power_cfg(radio, TURNING_OFF);
 	if (retval < 0)
 		FMDERR("%s: failed to apply voltage\n", __func__);
+        mutex_unlock(&radio->lock);
 	return retval;
 }
 
@@ -783,10 +777,6 @@ static int rtc6226_i2c_probe(struct i2c_client *client,
 	radio->vddreg->reg = vddvreg;
 	radio->vddreg->name = "vdd";
 	radio->vddreg->is_enabled = false;
-	of_property_read_u32(client->dev.of_node,
-			"rtc6226,vdd-load", &radio->vddreg->vdd_load);
-	FMDERR("%s: rtc6226,vdd-load val %d\n",
-		__func__, radio->vddreg->vdd_load);
 	retval = rtc6226_dt_parse_vreg_info(&client->dev,
 			radio->vddreg, "rtc6226,vdd-supply-voltage");
 	if (retval < 0) {

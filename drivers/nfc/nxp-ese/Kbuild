@@ -1,0 +1,3 @@
+obj-$(CONFIG_NXP_ESE_P73) := p73.o
+
+ccflags-y += -DDYNAMIC_DEBUG_MODULE

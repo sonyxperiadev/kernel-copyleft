@@ -6,6 +6,8 @@
  *  Copyright (c) 2012 Hans de Goede <hdegoede@redhat.com>
  *  Copyright (c) 2018 LG Electronics, Inc.
  *  Copyright (c) 2018 Richwave Technology Co.Ltd
+ *  Copyright (c) 2020 Qualcomm Technolgy, Inc.
+ *  Copyright (c) 2021 Sharp Corporatio
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,7 +26,7 @@
 /* driver definitions */
 /* #define _RDSDEBUG */
 #define DRIVER_NAME "rtc6226-fmtuner"
-
+#define fix_bandlimit
 /* kernel includes */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -200,8 +202,9 @@
 #define SCAN_PENDING 3
 #define START_SCAN 1
 #define TUNE_TIMEOUT_MSEC 3000
-#define SEEK_TIMEOUT_MSEC 30000
-
+#define SEEK_TIMEOUT_MSEC 15000
+/* Extend wait time for 50KHZ spacing */
+#define WAIT_TIMEOUT_MSEC 15000
 #define RTC6226_MIN_SRCH_MODE 0x00
 #define RTC6226_MAX_SRCH_MODE 0x02
 
@@ -459,7 +462,6 @@ struct fm_power_vreg_data {
 	/* voltage levels to be set */
 	unsigned int low_vol_level;
 	unsigned int high_vol_level;
-	int vdd_load;
 	/* is this regulator enabled? */
 	bool is_enabled;
 };
@@ -672,6 +674,7 @@ extern const struct v4l2_ctrl_ops rtc6226_ctrl_ops;
 extern struct tasklet_struct my_tasklet;
 extern int rtc6226_wq_flag;
 extern wait_queue_head_t rtc6226_wq;
+extern int sf_bl_flag;
 extern int rtc6226_get_all_registers(struct rtc6226_device *radio);
 extern int rtc6226_get_register(struct rtc6226_device *radio, int regnr);
 extern int rtc6226_set_register(struct rtc6226_device *radio, int regnr);

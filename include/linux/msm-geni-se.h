@@ -73,6 +73,7 @@ struct se_geni_rsc {
 	struct pinctrl_state *geni_gpio_shutdown;
 	struct pinctrl_state *geni_gpio_active;
 	struct pinctrl_state *geni_gpio_sleep;
+	struct pinctrl_state *geni_gpio_suspend;
 	int	clk_freq_out;
 	unsigned int num_clk_levels;
 	unsigned long *clk_perf_tbl;

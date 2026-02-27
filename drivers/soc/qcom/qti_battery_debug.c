@@ -103,6 +103,7 @@ struct battery_dbg_dev {
 	struct votable			*votable;
 	u8				override_voter_id;
 	u32				battery_cell_id;
+	struct class			bmdbg2_class;
 };
 
 static int battery_dbg_write(struct battery_dbg_dev *bd, void *data, size_t len)
@@ -749,6 +750,120 @@ static int battery_dbg_add_dev_attr(struct battery_dbg_dev *bd)
 	return rc;
 }
 
+static int get_votable_id_by_name(struct battery_dbg_dev *bd, char *name)
+{
+	int i;
+	int id = -1;
+
+	for (i = 0; i < bd->all_data.num_votables; i++) {
+		if (strcmp(bd->votable[i].name, name) == 0) {
+			id = i;
+			break;
+		}
+	}
+
+	return id;
+}
+
+static ssize_t get_one_line_votable_status(struct battery_dbg_dev *bd, int id,
+						char *buf, ssize_t buf_size)
+{
+	int i;
+	int rc = 0;
+	unsigned long voter_mask;
+	ssize_t stored_size;
+	struct votable *v = &bd->votable[id];
+
+	if (!buf || buf_size <= 0)
+		return 0;
+
+	rc = battery_dbg_request_read_votable(bd, v->id);
+	if (rc) {
+		pr_err("Failed to read %s votable: %d;", v->name, rc);
+		return 0;
+	}
+
+	voter_mask = v->data.active_voter_mask;
+	stored_size = 0;
+	for (i = 0; i < MAX_NUM_VOTABLES; i++) {
+		for_each_set_bit(i, &voter_mask, MAX_NUM_VOTERS)
+			stored_size += scnprintf(
+				buf + stored_size, buf_size - stored_size,
+				"%s%s:%d", stored_size == 0 ? "" : "; ",
+				bd->all_data.voters[i], v->data.votes[i]);
+	}
+	if (stored_size < buf_size)
+		stored_size += scnprintf(buf + stored_size,
+						buf_size - stored_size, "\n");
+
+	return stored_size;
+}
+
+#define USB_ICL_VOTABLE_NAME "iusb0_tot"
+static ssize_t iusb0_tot_votable_status_show(struct class *c,
+					struct class_attribute *attr, char *buf)
+{
+	int id;
+	ssize_t size;
+	struct battery_dbg_dev *bd = container_of(c, struct battery_dbg_dev,
+								bmdbg2_class);
+
+	id = get_votable_id_by_name(bd, USB_ICL_VOTABLE_NAME);
+	if (id < 0)
+		return 0;
+
+	size = get_one_line_votable_status(bd, id, buf, PAGE_SIZE);
+
+	return size;
+}
+static CLASS_ATTR_RO(iusb0_tot_votable_status);
+
+#define FCC_0_VOTABLE_NAME "fcc_0"
+static ssize_t fcc_0_votable_status_show(struct class *c,
+					struct class_attribute *attr, char *buf)
+{
+	int id;
+	ssize_t size;
+	struct battery_dbg_dev *bd = container_of(c, struct battery_dbg_dev,
+								bmdbg2_class);
+
+	id = get_votable_id_by_name(bd, FCC_0_VOTABLE_NAME);
+	if (id < 0)
+		return 0;
+
+	size = get_one_line_votable_status(bd, id, buf, PAGE_SIZE);
+
+	return size;
+}
+static CLASS_ATTR_RO(fcc_0_votable_status);
+
+#define FV_0_VOTABLE_NAME "fv_0"
+static ssize_t fv_0_votable_status_show(struct class *c,
+					struct class_attribute *attr, char *buf)
+{
+	int id;
+	ssize_t size;
+	struct battery_dbg_dev *bd = container_of(c, struct battery_dbg_dev,
+								bmdbg2_class);
+
+	id = get_votable_id_by_name(bd, FV_0_VOTABLE_NAME);
+	if (id < 0)
+		return 0;
+
+	size = get_one_line_votable_status(bd, id, buf, PAGE_SIZE);
+
+	return size;
+}
+static CLASS_ATTR_RO(fv_0_votable_status);
+
+static struct attribute *battman_dbg2_class_attrs[] = {
+	&class_attr_iusb0_tot_votable_status.attr,
+	&class_attr_fcc_0_votable_status.attr,
+	&class_attr_fv_0_votable_status.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(battman_dbg2_class);
+
 static int battery_dbg_probe(struct platform_device *pdev)
 {
 	struct battery_dbg_dev *bd;
@@ -783,6 +898,15 @@ static int battery_dbg_probe(struct platform_device *pdev)
 		goto out;
 
 	battery_dbg_add_debugfs(bd);
+
+	bd->bmdbg2_class.name = "battman_dbg2";
+	bd->bmdbg2_class.class_groups = battman_dbg2_class_groups;
+	rc = class_register(&bd->bmdbg2_class);
+	if (rc < 0) {
+		dev_err(bd->dev, "Error in registering with battman_dbg2 class %d\n",
+									rc);
+		goto out;
+	}
 
 	return 0;
 out:
