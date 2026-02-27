@@ -1,0 +1,127 @@
+#include <dt-bindings/interconnect/qcom,kona.h>
+
+&tlmm {
+	cnss_pins {
+		cnss_wlan_en_active: cnss_wlan_en_active {
+			mux {
+				pins = "gpio20";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio20";
+				drive-strength = <16>;
+				output-high;
+				bias-pull-up;
+			};
+		};
+
+		cnss_wlan_en_sleep: cnss_wlan_en_sleep {
+			mux {
+				pins = "gpio20";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio20";
+				drive-strength = <2>;
+				output-low;
+				bias-pull-down;
+			};
+		};
+	};
+};
+
+&reserved_memory {
+	cnss_wlan_mem: cnss_wlan_region {
+		compatible = "shared-dma-pool";
+		alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;
+		reusable;
+		alignment = <0x0 0x400000>;
+		size = <0x0 0x1400000>;
+	};
+};
+
+&soc {
+	wlan: qcom,cnss-qca6390@b0000000 {
+		compatible = "qcom,cnss-qca6390";
+		reg = <0xb0000000 0x10000>,
+		      <0xb2e5510 0x5c0>;
+		reg-names = "smmu_iova_ipa", "tcs_cmd";
+		wlan-en-gpio = <&tlmm 20 0>;
+		qcom,bt-en-gpio = <&tlmm 21 0>;
+		qcom,sw-ctrl-gpio = <&tlmm 124 0>;
+		pinctrl-names = "wlan_en_active", "wlan_en_sleep";
+		pinctrl-0 = <&cnss_wlan_en_active>;
+		pinctrl-1 = <&cnss_wlan_en_sleep>;
+		qcom,wlan;
+		qcom,same-dt-multi-dev;
+		cnss-enable-self-recovery;
+		qcom,wlan-rc-num = <0>;
+		qcom,wlan-ramdump-dynamic = <0x420000>;
+		qcom,smmu-s1-enable;
+		qcom,cmd_db_name = "smpf2";
+		qcom,set-wlaon-pwr-ctrl;
+
+		vdd-wlan-aon-supply = <&S6A>;
+		vdd-wlan-io-supply = <&S4A>;
+		vdd-wlan-dig-supply = <&S2F>;
+		vdd-wlan-rfa1-supply = <&S5A>;
+		vdd-wlan-rfa2-supply = <&S8C>;
+		wlan-ant-switch-supply = <&L5C>;
+
+		wlan_vregs = "vdd-wlan-aon", "vdd-wlan-dig",
+				"vdd-wlan-io", "vdd-wlan-rfa1",
+				"vdd-wlan-rfa2", "wlan-ant-switch";
+
+		qcom,vdd-wlan-aon-config = <950000 950000 0 0 1>;
+		qcom,vdd-wlan-dig-config = <950000 952000 0 0 1>;
+		qcom,vdd-wlan-io-config = <1800000 1800000 0 0 1>;
+		qcom,vdd-wlan-rfa1-config = <1900000 1900000 0 0 1>;
+		qcom,vdd-wlan-rfa2-config = <1350000 1350000 0 0 1>;
+		qcom,wlan-ant-switch-config = <1800000 1800000 0 0 0>;
+
+		interconnects = <&aggre2_noc MASTER_PCIE_0 &mc_virt SLAVE_EBI1>;
+		interconnect-names = "pcie_to_ddr";
+
+		qcom,icc-path-count = <1>;
+		qcom,bus-bw-cfg-count = <7>;
+		qcom,bus-bw-cfg =
+		/* no vote */
+		<0 0>,
+		/* idle: 0-18 Mbps, ddr freq: 451.2 MHz */
+		<2250 1600000>,
+		/* low: 18-60 Mbps, ddr freq: 451.2 MHz*/
+		<7500 1600000>,
+		/* medium: 60-240 Mbps, ddr freq: 451.2 MHz */
+		<30000 1804800>,
+		/* high: 240 - 800 Mbps, ddr freq: 451.2 MHz */
+		<100000 1804800>,
+		/* very high: 800 - 1400 Mbps, ddr freq: 1555.2 MHz */
+		<175000 6220800>,
+		/* low (latency critical): 18 - 60 Mbps, ddr freq: 547.2 MHz */
+		<7500 2188800>;
+	};
+};
+
+&pcie0_rp {
+	#address-cells = <5>;
+	#size-cells = <0>;
+
+	cnss_pci: cnss_pci {
+		reg = <0 0 0 0 0>;
+		qcom,iommu-group = <&cnss_pci_iommu_group>;
+		memory-region = <&cnss_wlan_mem>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		cnss_pci_iommu_group: cnss_pci_iommu_group {
+			qcom,iommu-dma-addr-pool = <0xa0000000 0x10000000>;
+			qcom,iommu-dma = "fastmap";
+			qcom,iommu-pagetable = "coherent";
+			qcom,iommu-faults = "stall-disable", "HUPCF", "no-CFRE",
+					    "non-fatal";
+		};
+	};
+};

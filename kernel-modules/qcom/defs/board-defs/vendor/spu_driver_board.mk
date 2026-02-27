@@ -1,0 +1,1 @@
+../../../opensource/spu-kernel/spu_driver_board.mk

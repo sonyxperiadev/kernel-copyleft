@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "sdxpinn-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. SDXPINN SoC";
+	compatible = "qcom,sdxpinn";
+	qcom,msm-id = <556 0x10000>, <580 0x10000>, <609 0x10000>, <610 0x10000>;
+	qcom,board-id = <0x2010022 0x302>, <0x10015 0x300>, <0x20015 0x300>, <0x2010022 0x402>, <0x5010022 0x305>, <0x5010022 0x405>;
+};

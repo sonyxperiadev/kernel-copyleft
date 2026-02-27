@@ -1,0 +1,16 @@
+#
+# Copyright (c) 2023 Qualcomm Technologies, Inc.
+# All Rights Reserved.
+# Confidential and Proprietary - Qualcomm Technologies, Inc.
+#
+
+service qtiwifi /vendor/bin/qtiwifi
+    interface aidl vendor.qti.hardware.wifi.qtiwifi.IQtiWifi/default
+    class main
+    capabilities NET_ADMIN NET_RAW
+    user wifi
+    group wifi net_raw net_admin
+    # don't auto restart
+    oneshot
+    # start only when requested
+    disabled

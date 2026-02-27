@@ -1,0 +1,1 @@
+../../../opensource/mmrm-driver/mmrm_kernel_product.mk

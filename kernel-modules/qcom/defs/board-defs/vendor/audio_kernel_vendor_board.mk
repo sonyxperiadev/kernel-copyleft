@@ -1,0 +1,1 @@
+../../../opensource/audio-kernel/audio_kernel_vendor_board.mk

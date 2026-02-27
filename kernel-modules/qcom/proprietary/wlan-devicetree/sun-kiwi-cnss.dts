@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "sun-kiwi-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. Sun SoCs";
+	compatible = "qcom,sun", "qcom,sunp", "qcom,sun-mtp", "qcom,sun-cdp";
+	qcom,msm-id = <618 0x10000>, <618 0x20000>, <639 0x10000>, <639 0x20000>;
+	qcom,board-id = <0x20001 0>, <0x20008 0>;
+};

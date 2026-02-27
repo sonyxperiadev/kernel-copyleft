@@ -1,0 +1,1 @@
+../../../opensource/mm-sys-kernel/ubwcp_kernel_product_board.mk

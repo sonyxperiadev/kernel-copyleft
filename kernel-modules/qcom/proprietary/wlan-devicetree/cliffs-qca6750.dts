@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "cliffs-qca6750.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. Cliffs SoCs";
+	compatible = "qcom,cliffs";
+	qcom,msm-id = <614 0x10000>, <632 0x10000>;
+	qcom,board-id = <1 0>, <8 0>, <11 0>, <21 0>, <21 1>;
+};

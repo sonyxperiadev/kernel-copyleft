@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "sa525m-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. SA525M";
+	compatible = "qcom,sdxpinn";
+	qcom,msm-id = <558 0x10000>, <559 0x10000>;
+	qcom,board-id = <0 0>;
+};

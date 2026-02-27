@@ -1,0 +1,1 @@
+../../../opensource/dataipa/dataipa_dlkm_vendor_product.mk

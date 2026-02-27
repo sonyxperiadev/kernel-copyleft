@@ -1,0 +1,819 @@
+// @file qsh_wifi.proto
+//
+// Defines standard message types for WIFI
+//
+// Copyright (c) 2020 Qualcomm Technologies, Inc.
+// All Rights Reserved.
+// Confidential and Proprietary - Qualcomm Technologies, Inc.
+
+/*
+      Not a Contribution.
+ * Copyright (C) 2016 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+import "nanopb.proto";
+import "sns_std.proto";
+
+/**
+ * WIFI Attribute Requirements:
+ * SNS_STD_SENSOR_ATTRID_TYPE: "wifi_svc"
+ * SNS_STD_SENSOR_ATTRID_AVAILABLE: true
+ * SNS_STD_SENSOR_ATTRID_API: "qsh_wifi.proto"
+ * SNS_STD_SENSOR_ATTRID_STREAM_TYPE: SNS_STD_SENSOR_STREAM_TYPE_STREAMING
+ */
+
+/**
+ * Listing the general guidelines for Command and Events.
+ *
+ * Here onwards sensor driver (running on SLPI/DSP) will be
+ * referred as sensor and sensor client (on apps or slpi)
+ * will be referred as client.
+ *
+ * Each Command (CMD) direction is from client --> sensor.
+ * On reception of each CMD, sensor will send ACK to client.
+ * When result is available with sensor, it will send asynchronously to client.
+ * So Each Event (EVT) direction is from sensor --> client.
+ *
+ */
+enum qsh_wifi_msgid
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // Uses message : qsh_wifi_cmd_open
+    // Direction    : From client to sensor
+    // Purpose      : Initial handshake with sensor to get sensor supported
+    //                capabilities and version.
+    //                Note : 1.version of sensor is mainly used for
+    //                information purpose and to assist in debugging.
+    //                2.sensor will be always backward compatible.
+    // Expectation  : QSH_WIFI_MSGID_QSH_WIFI_CMD_ACK
+    // Guideline    : No seperate close cmd is needed because it will happen
+    //                when the client close the QSH data stream(for slpi client)
+    //                or close the QMI handle (for apps client).
+    QSH_WIFI_MSGID_QSH_WIFI_CMD_OPEN = 512;
+
+    // Uses message : qsh_wifi_cmd_scan_req
+    // Direction    : From client to sensor
+    // Purpose      : Issue a scan request to sensor
+    // Expectation  : If the sensor accepts the scan request then, the sensor shall
+    //                send ack via QSH_WIFI_MSGID_QSH_WIFI_CMD_ACK with success
+    //                status. Later when scan results are available with sensor,
+    //                it will send via QSH_WIFI_MSGID_QSH_WIFI_EVT_SCAN_RESULTS.
+    //                Note: 1.If the sensor does not accept the scan request then,
+    //                the sensor shall send QSH_WIFI_CMD_ACK with failure status.
+    //                For e.g.- If the sensor is servicing other scan request then,
+    //                the sensor shall send QSH_WIFI_MSGID_QSH_WIFI_CMD_ACK with
+    //                QSH_WIFI_ERROR_BUSY status.
+    // Guideline    : client shall check the status return by sensor in scan event
+    //                (QSH_WIFI_MSGID_QSH_WIFI_EVT_SCAN_RESULTS). There is a chance
+    //                that scan request may not succeed even though the command was
+    //                accepted. The sensor shall send final status of request
+    //                accordingly in scan event.
+    QSH_WIFI_MSGID_QSH_WIFI_CMD_SCAN_REQ = 513;
+
+    // Uses message : qsh_wifi_cmd_monitor_req
+    // Direction    : From client to sensor
+    // Purpose      : Configure monitor mode scan in sensor
+    // Expectation :  If the sensor accept the monitor request then, the sensor
+    //                shall send QSH_WIFI_MSGID_QSH_WIFI_CMD_ACK with success
+    //                status. Later when the sensor have monitored scan results
+    //                then, the sensor shall send scan results via
+    //                QSH_WIFI_MSGID_QSH_WIFI_EVT_SCAN_RESULTS.
+    //                If the sensor does not accept the monitor request then,
+    //                the sensor shall send QSH_WIFI_CMD_ACK with a failure status.
+    // Guideline    : client shall check the status return by sensor in
+    //                ACK (QSH_WIFI_MSGID_QSH_WIFI_CMD_ACK).It is responsibility
+    //                of sensor to holding this request unless client stop
+    //                monitor mode request. client shall stop monitor mode before
+    //                closing the sensor stream.
+    //                In case of wlan chip SSR or wlan UI off scenario, sensor
+    //                reregister the monitor mode without a client intervention.
+    //                During slpi SSR scenario, apps client will be notfied
+    //                using qmi error callbacks. Hence apps clients need to open
+    //                and re-register monitor mode request.
+    QSH_WIFI_MSGID_QSH_WIFI_CMD_MONITOR_REQ = 514;
+
+    // Uses message : qsh_wifi_cmd_ranging_req
+    // Direction    : From client to sensor
+    // Purpose      : Issue a ranging request to sensor
+    // Expectation  : If the sensor accepts the ranging request then, the sensor shall
+    //                send ack via QSH_WIFI_MSGID_QSH_WIFI_CMD_ACK with success
+    //                status. Later when ranging results are available with sensor,
+    //                it will send via QSH_WIFI_MSGID_QSH_WIFI_EVT_RANGING_RESULTS_RESULTS.
+    //                Note: 1.If the sensor does not accept the ranging request then,
+    //                the sensor shall send QSH_WIFI_CMD_ACK with failure status.
+    //                For e.g.- If the sensor is servicing other ranging request then,
+    //                the sensor shall send QSH_WIFI_MSGID_QSH_WIFI_CMD_ACK with
+    //                QSH_WIFI_ERROR_BUSY status.
+    // Guideline    : client shall check the status return by sensor in ranging event
+    //                (QSH_WIFI_MSGID_QSH_WIFI_EVT_SCAN_RESULTS). There is a chance
+    //                that ranging request may not succeed even though the command was
+    //                accepted. The sensor shall send final status of request
+    //                accordingly in ranging event.
+    QSH_WIFI_MSGID_QSH_WIFI_CMD_RANGING_REQ = 515;
+
+    // Uses message : qsh_wifi_cmd_ack
+    // Direction    : From sensor to client
+    // Purpose      : Provide Immediate response for issued commands.
+    //                client uses this as an indication that the command
+    //                was successful accepted/rejected by wifi sensor
+    //                to take sub sequent action. This might carry
+    //                information e.g. capabilities/version of the sensor.
+    QSH_WIFI_MSGID_QSH_WIFI_CMD_ACK = 768;
+
+    // Uses message : qsh_wifi_evt_scan_result
+    // Direction    : From sensor to client
+    // Purpose      : Provide scan results to client who issued
+    //                request for same.
+    QSH_WIFI_MSGID_QSH_WIFI_EVT_SCAN_RESULTS = 769;
+
+    // Uses message : qsh_wifi_evt_ranging_result
+    // Direction    : From sensor to client
+    // Purpose      : Provide ranging results to client who issued
+    //                request for same.
+    QSH_WIFI_MSGID_QSH_WIFI_EVT_RANGING_RESULTS = 770;
+}
+
+/**
+ * A generic listing of error codes for use in qsh WiFi sensor driver.
+ * In general, Feature specific error codes can be added to this enum.
+ */
+enum qsh_wifi_error
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // No error occurred
+    QSH_WIFI_ERROR_NONE = 0;
+
+    // An unspecified failure occurred
+    QSH_WIFI_ERROR = 1;
+
+    // One or more supplied arguments are invalid
+    QSH_WIFI_ERROR_INVALID_ARGS = 2;
+
+    // Unable to satisfy request because the system is busy
+    QSH_WIFI_ERROR_BUSY = 3;
+
+    // Unable to allocate memory
+    QSH_WIFI_ERROR_NO_MEMORY = 4;
+
+    // The requested feature is not supported
+    QSH_WIFI_ERROR_NOT_SUPPORTED = 5;
+
+    // A timeout occurred while processing the request
+    QSH_WIFI_ERROR_TIMEOUT = 6;
+
+    // The relevant capability is disabled There may be may reasons
+    // listing below few of them
+    // 1) User disabled WLAN  OFF using UI in settings
+    // 2) WLAN chip is under SSR or PDR
+    // 3) All wlan interface are down.
+    QSH_WIFI_ERROR_INTF_DISABLED = 7;
+}
+
+/**
+ * These enum help client to seek what are the features
+ * supported by the WiFi sensor, so client can send request
+ * based on the available features.
+ */
+enum qsh_wifi_capabilities
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // No WiFi APIs are supported
+    QSH_WIFI_CAP_NONE = 0x00000000;
+
+    // Monitor mode aka Listening to scan results is supported
+    QSH_WIFI_CAP_SCAN_MONITORING = 0x00000001;
+
+    // WiFi scans based on scan request supported
+    QSH_WIFI_CAP_SCAN_REQUEST_BASED = 0x00000002;
+
+    // Requesting RTT ranging is supported
+    QSH_WIFI_CAP_RANGING_SCAN = 0x00000004;
+}
+
+/**
+ * Identifies a WiFi frequency band
+ */
+enum qsh_wifi_band_mask
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // Identify Wifi 2.4Ghz band
+    QSH_WIFI_BAND_MASK_2P4_GHZ = 0x1;
+
+    // Identify Wifi 5Ghz band
+    QSH_WIFI_BAND_MASK_5_GHZ   = 0x2;
+}
+
+/**
+ * Identifies which radio chain was used to discover an AP.
+ * The underlying hardware does not necessarily support
+ * more than one radio chain.
+ */
+enum qsh_wifi_radio_chain_index
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // Indicate Chain unknown
+    QSH_WIFI_RADIO_CHAIN_INDEX_UNKNOWN = 0;
+
+    // Indicate Radio Chain 0
+    QSH_WIFI_RADIO_CHAIN_INDEX_0 = 1;
+
+    // Indicate Radio Chain 1
+    QSH_WIFI_RADIO_CHAIN_INDEX_1 = 2;
+}
+
+/**
+ * Indicates the type of scan requested or performed
+ */
+enum qsh_wifi_scan_type
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // Perform a purely active scan using probe requests. Do not scan channels
+    // restricted to use via Dynamic Frequency Selection (DFS) only.
+    QSH_WIFI_SCAN_TYPE_ACTIVE = 0;
+
+    // Perform an active scan on unrestricted channels, and also perform a
+    // passive scan on channels that are restricted to use via Dynamic
+    // Frequency Selection (DFS), e.g. the U-NIII bands 5250-5350MHz and
+    // 5470-5725MHz in the USA as mandated by FCC regulation.
+    QSH_WIFI_SCAN_TYPE_ACTIVE_AND_PASSIVE_DFS = 1;
+
+    // Perform a passive scan, only listening for beacons.
+    QSH_WIFI_SCAN_TYPE_PASSIVE = 2;
+}
+
+/**
+ * Identifies the authentication methods supported by an AP.
+ */
+enum qsh_wifi_security
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // Mode is unknown
+    QSH_WIFI_SECURITY_MODE_UNKNOWN = 0;
+
+    // No auth/security
+    QSH_WIFI_SECURITY_MODE_OPEN = 1;
+
+    // WEP mode
+    QSH_WIFI_SECURITY_MODE_WEP = 2;
+
+    // WPA-PSK or WPA2-PSK
+    QSH_WIFI_SECURITY_MODE_PSK = 3;
+
+    // Any type of EAPOL
+    QSH_WIFI_SECURITY_MODE_EAP = 4;
+}
+
+/**
+ * Indicates the BSS operating channel width determined from the VHT and/or HT
+ * Operation elements. Refer to VHT 8.4.2.161 and HT 7.3.2.57.
+ */
+enum qsh_wifi_channel_width
+{
+    option (nanopb_enumopt).long_names = false;
+
+    //Channel Width 20 MHz
+    QSH_WIFI_CHANNEL_WIDTH_20      = 0;
+
+    //Channel Width 40 MHz
+    QSH_WIFI_CHANNEL_WIDTH_40      = 1;
+
+    //Channel Width 80 MHz
+    QSH_WIFI_CHANNEL_WIDTH_80      = 2;
+
+    //Channel Width 160 MHz
+    QSH_WIFI_CHANNEL_WIDTH_160     = 3;
+
+    //Channel Width 80+80 MHz
+    QSH_WIFI_CHANNEL_WIDTH_80_P_80 = 4;
+}
+
+/**
+ * Allows a sensor APP to express its preference for how multiple available
+ * radio chains should be used when performing a scan. This is only a
+ * preference from the sensor APP and is not guaranteed to be honored by the
+ * WiFi firmware.
+ */
+enum qsh_wifi_pref_radio_chain
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // No preference for radio chain usage
+    QSH_WIFI_PREF_RADIO_CHAIN_DEFAULT = 0;
+
+    // Prefer to use available radio chains in a way that minimizes time to
+    // complete the scan
+    QSH_WIFI_PREF_RADIO_CHAIN_LOW_LATENCY = 1;
+
+    // Prefer to use available radio chains in a way that minimizes total power
+    // consumed for the scan
+    QSH_WIFI_PREF_RADIO_CHAIN_LOW_POWER = 2;
+
+    // Prefer to use available radio chains in a way that maximizes accuracy of
+    // the scan result, e.g. RSSI measurements, total number of found AP's
+    QSH_WIFI_PREF_RADIO_CHAIN_HIGH_ACCURACY = 3;
+}
+
+/**
+ * Characteristics of a scanned device which will be
+ * Provided into scan results.
+ */
+enum qsh_wifi_scan_result_flags
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // Indicates no feature flag
+    QSH_WIFI_SCAN_RESULT_FLAG_NONE = 0x0;
+
+    // Indicate Element ID 61 (HT Operation) is present
+    QSH_WIFI_SCAN_RESULT_FLAG_HT_OPS_PRESENT = 0x00000001;
+
+    // Indicate Element ID 192 (VHT Operation) is present
+    QSH_WIFI_SCAN_RESULT_FLAG_VHT_OPS_PRESENT = 0x00000002;
+
+    // Indicate Element ID 127 (Extended Capabilities) is present,
+    // and bit 70 (Fine Timing Measurement Responder) is set to 1.
+    QSH_WIFI_SCAN_RESULT_FLAG_IS_FTM_RESPONDER = 0x00000004;
+
+    // Indicate HT Operation element indicates that a secondary
+    // channel is present.
+    QSH_WIFI_SCAN_RESULT_FLAG_HAS_SECONDARY_CHANNEL_OFFSET = 0x00000008;
+
+    // Indicate HT Operation element indicates that the secondary
+    // channel is below the primary channel.
+    QSH_WIFI_SCAN_RESULT_FLAG_SECONDARY_CHANNEL_OFFSET_IS_BELOW = 0x00000010;
+}
+
+/**
+ * Send open command to the wifi sensor
+ */
+message qsh_wifi_cmd_open
+{
+    // Request sensor to provide sensor capabilities like
+    // ie what are all feature supported by the sensor.
+    // client must check sensor capabilities before issuing
+    // the request. Though interface is backward compatible but
+    // based on wifi chip capability certain features may be switch off.
+    // So it always recommended to check featured supported by sensor.
+    required bool get_capability = 1;
+
+    // Request sensor to provide version number of sensor
+    optional bool get_version = 2;
+}
+
+/**
+ * This single message can be used to send all command's immediate
+ * response/ack from sensor to sensor clients. If status is generic
+ * in nature then it can be set using status(qsh_wifi_error)
+ * otherwise specific nature of response can be added via using
+ * optional params in this message later.
+ */
+message qsh_wifi_cmd_ack
+{
+    // This helps client to decides command/report was successful or not
+    required qsh_wifi_error status = 1;
+
+    // This is in immediate response/ack of command for which this ACK is sent
+    required qsh_wifi_msgid command = 2;
+
+    // Driver's version number, filled only for Open command
+    // First byte denotes Major , Second byte denotes Minor
+    // and remaining two bytes will denote sensor build version.
+    optional uint32 version = 3;
+
+    // driver's capabilities, filled in only for Open command.
+    // see qsh_wifi_capabilities bitwise OR of qsh_wifi_capabilities bits
+    optional uint32 capabilities = 4;
+}
+
+/**
+ * Data structure passed to when qsh wifi based app issue
+ * the wifi scan request to qsh wifi sesnor driver.
+ */
+message qsh_wifi_cmd_scan_req
+{
+    // Set to a value from enum qsh_wifi_scan_type
+    required qsh_wifi_scan_type scan_type = 1;
+
+    // Indicates whether the client is willing to tolerate receiving cached
+    // results of a previous scan, and if so, the maximum age of the scan that
+    // the client will accept. "Age" in this case is defined as the elapsed
+    // time between when the most recent scan was completed and the request is
+    // received, in milliseconds. If set to 0, no cached results may be
+    // provided, and all scan results must come from a "fresh" WiFi scan, i.e.
+    // one that completes strictly after this request is received. If more than
+    // one scan is cached and meets this age threshold, only the newest scan is
+    // provided.
+    optional uint32 max_scan_age_ms = 2;
+
+    // Band identifier for which Wifi scan is requested. it is Bitwise OR of
+    // qsh_wifi_band_mask.
+    required uint32 band = 3;
+
+    // A list of frequencies to scan, given as channel center
+    // frequencies in MHz.
+    // NOTE: Though we recommend to use band field mainly for scan_req.
+    //       If freq_list provided then this will superceed the band value.
+    //       ie sensor will only scan the frequency mention in list.
+    repeated uint32 freq_list = 4;
+
+    // If ssid_list set then do not restrict scan to any SSIDs.
+    // Otherwise, this will list will be used for directed probe requests.
+    // Not applicable and ignore when scanType is qsh_wifi_scan_type_passive.
+    // SSID will null terminated hence size is 33 bytes as max SSID is 32 bytes
+    repeated string ssid_list = 5[(nanopb).max_size = 33];
+
+    // Set to a value from enum qsh_wifi_pref_radio_chain to specify the desired
+    // trade-off between power consumption, accuracy, etc.
+    optional qsh_wifi_pref_radio_chain radio_chain_pref = 6;
+}
+
+/**
+ * Provides information about a single access point (AP) detected in a scan.
+ */
+message qsh_wifi_bss_info
+{
+    // Basic Service Set Identifier (BSSID), represented in big-endian byte
+    // order, such that the first octet of the OUI is accessed in byte index 0.
+    required bytes bssid = 1[(nanopb).max_size = 6];
+
+    // Number of milliseconds prior to reference Time in the enclosing
+    // qsh_wifi_evt_scan_result struct when the probe response or beacon frame
+    // that was used to populate this structure was received.
+    optional uint32 age_ms = 2;
+
+    // Capability Information field sent by the AP (see 802.11 7.3.1.4). This
+    // field must reflect native byte order and bit ordering, such that
+    // (capabilityInfo & 1) gives the bit for the ESS subfield.
+    required uint32 capability_info = 3;
+
+    // Service Set Identifier (SSID), a series of 0 to 32 octets identifying
+    // the access point. Note that this is commonly a human-readable ASCII
+    // string, but this is not the required encoding per the standard.
+    optional string ssid = 4[(nanopb).max_size = 33];
+
+    // A bitwise OR of qsh_wifi_scan_result_flags_*
+    optional uint32 flags = 5;
+
+    // RSSI (Received Signal Strength Indicator), in dBm. Typically negative
+    // If multiple radio chains were used to scan this AP, this is a "best
+    // available" measure that may be a composite of measurements taken across
+    // the radio chains.
+    required int32  rssi = 6;
+
+    // Operating band, set to a value from enum qsh_wifi_band_mask
+    required qsh_wifi_band_mask band = 7;
+
+    // Indicates the center frequency of the primary 20MHz channel, given in
+    // MHz. This value is derived from the channel number via the formula:
+    //
+    //     primaryChannel (MHz) = CSF + 5 * primaryChannelNumber
+    //
+    // Where CSF is the channel starting frequency (in MHz) given by the
+    // operating class/band (i.e. 2407 or 5000), and primaryChannelNumber is the
+    // channel number in the range [1, 200].
+     required uint32 freq = 8;
+
+    // @see #qsh_wifi_channel_width
+    required uint32 channel_width = 9;
+
+    // If channel width is 20MHz, Do not set this field part of message.
+    // If the channel width is 40, 80, or 160 MHz, then this denotes the channel
+    // center frequency (in MHz). If the channel is 80+80 MHz, then this denotes
+    // the center frequency of segment 0, which contains the primary channel.
+    // This value is derived from the frequency index using the same formula as
+    // for freq.
+    optional uint32 cent_freq0 = 10;
+
+    // If the channel width is 80+80MHz, then this denotes the center frequency
+    // of segment 1, which does not contain the primary channel. Otherwise, this
+    // field is not relevant and set to 0.
+    //
+    // @see #cent_freq
+    optional uint32 cent_freq1 = 11;
+
+    // Flags from qsh_wifi_security_mode_* indicating supported authentication
+    // and associated security modes
+    // @see qsh_wifi_security_mode
+    optional uint32 security_mode = 12;
+
+    // Identifies the radio chain(s) used to discover this AP
+    // @see qsh_wifi_radio_chain_flags
+    optional uint32 radio_chain = 13;
+
+    // If the QSH_WIFI_RADIO_CHAIN_INDEX_0 bit is set in radio_chain, gives RSSI
+    // measured on radio chain 0 in dBm; otherwise invalid and set to 0. This
+    // field, along with its relative rssiChain1, can be used to determine RSSI
+    // measurements from each radio chain when multiple chains were used to
+    // discover this AP.
+    // rssi chain 0
+    optional int32 rssi_chain0 = 14;
+    // rssi chain1
+    optional int32 rssi_chain1 = 15;
+}
+
+/**
+ * Data structure sent with events of type qsh_wifi_event.
+ */
+message qsh_wifi_evt_scan_result
+{
+    // Status of event generated in response of scan command
+    required qsh_wifi_error status = 1;
+
+    // The total number of results returned by the scan ie this
+    // is total number of BSS/AP result found during this scan.
+    required uint32 result_total = 2;
+
+    // The qsh wifi implementation may split ap results across multiple
+    // events for memory concerns, etc. Hence this number describes the
+    // total number of AP's in this event.
+    // For e.g. if Wifi Chip Sends 20 AP in single scan to sensor.
+    // Now let us say sensor can send max 12 AP in single event then
+    // For first event, result_count will be 12 and 8 for second event.
+    required uint32 result_count = 3;
+
+    // Indicates this is event last in series of event sent by the sensor.
+    // This hints client to whether they should wait for more scan events are
+    // coming from sensor.
+    required bool last_in_series = 4;
+
+    // A value from enum qsh_wifi_scan_type indicating type of scan performed
+    optional uint32 scan_type = 5;
+
+    // Timestamp when the Ranging was completed in QTIMER ticks
+    optional uint64 ref_time = 6;
+
+    // If not set indicates that all freqs applicable for the scan_type were
+    // scanned, else A list containing set of frequencies that were scanned.
+    // Frequencies are specified as channel center frequencies in MHz.
+    repeated uint32 scanned_freq_list = 7;
+
+    // An AP list containing result_count entries. Will not be present if
+    // result_count is 0.
+    repeated qsh_wifi_bss_info ap_list = 8;
+
+    // Set to a value from enum qsh_wifi_pref_radio_chain indicating the radio
+    // chain preference used for the scan.
+    optional qsh_wifi_pref_radio_chain radio_chain_pref = 10;
+}
+
+/**
+ * Defines action for monitor mode request
+ */
+enum qsh_wifi_monitor_action
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // Configured sensor to stop monitor mode scan
+    QSH_WIFI_MONTIOR_ACTION_OFF = 0;
+
+    // Configured sensor to start monitor mode scan
+    QSH_WIFI_MONTIOR_ACTION_ON  = 1;
+}
+
+/**
+ * Indicates whether RTT ranging with a specific device succeeded
+ */
+enum qsh_wifi_rtt_status
+{
+    option (nanopb_enumopt).long_names = false;
+
+    // Ranging completed successfully
+    QSH_WIFI_RTT_STATUS_SUCCESS = 0;
+    // Ranging failed due to an unspecified error
+    QSH_WIFI_RTT_STATUS_FAILURE = 1;
+    // target STA does not respond to request
+    QSH_WIFI_RTT_STATUS_FAIL_NO_RSP = 2;
+    // Ranging request rejected by target
+    QSH_WIFI_RTT_STATUS_FAIL_REJECTED = 3;
+    // timing measurement times out
+    QSH_WIFI_RTT_STATUS_FAIL_TM_TIMEOUT = 4;
+    // Target on different channel, cannot range
+    QSH_WIFI_RTT_STATUS_FAIL_AP_ON_DIFF_CHANNEL = 5;
+    // ranging not supported by target
+    QSH_WIFI_RTT_STATUS_FAIL_NO_CAPABILITY = 6;
+    // Invalid T1-T4 timestamp
+    QSH_WIFI_RTT_STATUS_FAIL_INVALID_TS = 7;
+    // responder cannot collaborate at time of request
+    QSH_WIFI_RTT_STATUS_FAIL_BUSY_TRY_LATER = 8;
+    // bad request args
+    QSH_WIFI_RTT_STATUS_INVALID_REQ = 9;
+    // WiFi not enabled
+    QSH_WIFI_RTT_STATUS_NO_WIFI = 10;
+}
+
+/**
+ * Indicates Altitude type, Ref: RFC 6225 2.4
+ */
+enum qsh_wifi_lci_altitude_type
+{
+    option (nanopb_enumopt).long_names = false;
+
+    QSH_WIFI_LCI_ALTITUDE_TYPE_UNKNOWN = 0;
+    QSH_WIFI_LCI_ALTITUDE_TYPE_METERS  = 1;
+    QSH_WIFI_LCI_ALTITUDE_TYPE_FLOORS  = 2;
+}
+
+/**
+ * Indicates Result is carry additional info apart from standard
+ * ranging results ie like LCI is present in BSS results
+ */
+enum qsh_rtt_result_has
+{
+    option (nanopb_enumopt).long_names = false;
+    QSH_RTT_RESULT_HAS_LCI = 0x00000001;
+}
+
+/**
+ * Message to requeset sensor to start/stop monitor scan
+ */
+message qsh_wifi_cmd_monitor_req
+{
+    // see @qsh_wifi_monitor_action
+    required qsh_wifi_monitor_action action = 1;
+}
+
+/**
+ * Message to Send Ranging request to sensor from clients
+ *
+ * To keep the interface simple below things are assumed
+ * In future, on need basis we can add additional params.
+ *
+ * Ranging will be always two sided
+ * ASAP field will always  be true for measurment request
+ * BSS measurments will be single shot in nature
+ * BSS PEER Type will be set to as ACCESS POINT (AP)
+ * Max Burst duration will be 15 ie no preference
+ * Number of retries per bssid measurement is 0
+ *
+ */
+message qsh_wifi_cmd_ranging_req
+{
+    // MAX number of ranging node shoule be 20.
+    repeated qsh_wifi_ranging_req_ap bss_list = 1;
+}
+
+/**
+ * Identifies a device to perform RTT ranging against.
+ * These values are normally
+ * populated based on the contents of a scan result.
+ */
+message qsh_wifi_ranging_req_ap
+{
+    // MAC address of the device for which ranging was requested
+    required bytes mac_addr = 1[(nanopb).max_size = 6];
+
+    // Indicates the center frequency of the primary 20MHz channel
+    required uint32 freq = 2;
+
+    // @see #qsh_wifi_channel_width
+    required qsh_wifi_channel_width channel_width = 3;
+
+    // If channel width is 20MHz, this field is ignored.
+    // If the channel width is 40, 80, or 160 MHz, then this denotes the channel
+    // center frequency (in MHz). If the channel is 80+80 MHz, then this denotes
+    // the center frequency of segment 0, which contains the primary channel.
+    optional uint32 cent_freq0 = 4;
+
+    // If the channel width is 80+80MHz, then this denotes the center frequency
+    // of segment 1, which does not contain the primary channel.
+    optional uint32 cent_freq1 = 5;
+
+    // Get the LCI data along with ranging data if responder have it
+    required bool request_lci = 6;
+
+    // num of frames per burst.
+    // Minimum value = 1, Maximum value = 31
+    // For 2-sided this equals the number of FTM frames
+    // to be attempted in a single burst. This also
+    // equals the number of FTM frames that the
+    // initiator will request that the responder send
+    // in a single frame.
+    required uint32 num_frames_per_burst = 7 [default = 8];
+}
+
+/**
+ * message for sending Ranging Results/Events to client.
+ */
+message qsh_wifi_evt_ranging_result
+{
+    // Status of event generated in response of scan command
+    required qsh_wifi_error status = 1;
+
+    // The total number of results returned by the scan ie this
+    // is total number of BSS/AP result found during this scan.
+    required uint32 result_total = 2;
+
+    // The qsh wifi implementation may split ap results across multiple
+    // events for memory concerns, etc. Hence this number describes the
+    // total number of AP's in this event.
+    // For e.g. if Wifi Chip Sends 20 AP in single scan to sensor.
+    // Now let us say sensor can send max 12 AP in single event then
+    // For first event, result_count will be 12 and 8 for second event.
+    required uint32 result_count = 3;
+
+    // Indicates this is event last in series of event sent by the sensor.
+    // This hints client to whether they should wait for more scan events are
+    // coming from sensor.
+    required bool last_in_series = 4;
+
+    // An AP list containing result_count entries. Will not be present if
+    // result_count is 0.
+    repeated qsh_wifi_ranging_result_ap bss_list = 5;
+}
+
+/**
+ * Provides the result of RTT ranging with a single device.
+ */
+message qsh_wifi_ranging_result_ap
+{
+    // MAC address of the device for which ranging was requested
+    required bytes mac_addr = 1[(nanopb).max_size = 6];
+
+    // Gives the result of ranging to this device. If not set to
+    // qsh_wifi_rtt_status_success, the ranging attempt to this device
+    // failed, and other fields in this structure may be invalid.
+    // @see #qsh_wifi_rtt_status
+    required qsh_wifi_rtt_status rtt_status = 2;
+
+    // Set of RTT Result flags, see qsh_rtt_result_has bitwise OR of
+    // qsh_rtt_result_has bits.
+    required uint32 result_flag = 3;
+
+    // Timestamp when the Ranging was completed in QTIMER ticks
+    optional uint64 timestamp = 4;
+
+    // The mean RSSI measured during the RTT burst, in dBm. Typically negative.
+    // If rtt_status is not qsh_wifi_rtt_status_success then it won't present.
+    optional int32 rssi = 5;
+
+    // Estimated distance to the device with the given BSSID, in millimeters.
+    // Generally the mean of multiple measurements performed in a single burst.
+    // If rtt_status is not qsh_wifi_rtt_status_success then it won't present.
+    optional int32 distance = 6;
+
+    // Standard deviation of estimated distance across multiple measurements
+    // performed in a single RTT burst, in millimeters. If status is not
+    // If rtt_status is not qsh_wifi_rtt_status_success then it won't present.
+    optional int32 distance_stddev = 7;
+
+    // Latitude in degrees as 2's complement fixed-point with 25 fractional
+    // bits, i.e. degrees * 2^25. Ref: RFC 6225 2.3
+    // it will be only present  if flag have bit set QSH_RTT_RESULT_HAS_LCI.
+    optional int64 latitude = 8;
+
+    // Longitude, same format as latitude
+    // it will be only present  if flag have bit set QSH_RTT_RESULT_HAS_LCI.
+    optional int64 longitude = 9;
+
+    // Altitude represented as a 2's complement fixed-point value with 8
+    // fractional bits. Interpretation depends on qsh_wifi_lci_altitude_type.
+    // If UNKNOWN, this field must be ignored. If *METERS, distance relative
+    // to the zero point in the vertical datum. If *FLOORS, a floor value
+    // relative to the ground floor, potentially fractional, e.g. to
+    // indicate mezzanine levels. Ref: RFC 6225 2.4
+    // it will be only present  if flag have bit set QSH_RTT_RESULT_HAS_LCI.
+    optional int32 altitude = 10;
+
+    // Maximum extent of latitude uncertainty in degrees, decoded via this
+    // formula: 2 ^ (8 - x) where "x" is the encoded value passed in this
+    // field. Unknown if set to 0.
+    // Ref: RFC 6225 2.3.2
+    // it will be only present  if flag have bit set QSH_RTT_RESULT_HAS_LCI.
+    optional uint32 latitude_uncertainty = 11;
+
+    // @see #latitudeUncertainty
+    // it will be only present  if flag have bit set QSH_RTT_RESULT_HAS_LCI.
+    optional uint32 longitude_uncertainty = 12;
+
+    // Defines how to interpret altitude, set to a value from enum
+    // qsh_wifi_lci_altitude_type
+    // it will be only present  if flag have bit set QSH_RTT_RESULT_HAS_LCI.
+    optional qsh_wifi_lci_altitude_type altitude_type = 13;
+
+    // Uncertainty in altitude, decoded via this formula: 2 ^ (21 - x)
+    // where "x" is the encoded value passed in this field. Unknown if set
+    // to QSH_WIFI_LCI_UNCERTAINTY_UNKNOWN. Only applies when altitude_type
+    // is QSH_WIFI_LCI_ALTITUDE_TYPE_METERS. Ref: RFC 6225 2.4.5
+    // it will be only present if flag have bit set QSH_RTT_RESULT_HAS_LCI.
+    optional uint32 altitude_uncertainty = 14;
+}

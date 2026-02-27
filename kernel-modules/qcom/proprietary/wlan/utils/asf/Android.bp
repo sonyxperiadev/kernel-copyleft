@@ -1,0 +1,33 @@
+cc_library_static {
+    name: "libAniAsf",
+    defaults: ["wifi_binary_defaults"],
+    proprietary: true,
+    srcs: [
+        "src/aniAsfTimer.c",
+        "src/aniAsfIpc.c",
+        "src/aniAsfEvent.c",
+        "src/aniAsfLog.c",
+        "src/aniAsfProcessUtils.c",
+        "src/aniAsfUtils.c",
+        "src/aniAsfMisc.c",
+        "src/aniAsfHashTable.c",
+        "src/aniAsfDict.c",
+        "src/aniAsfPacket.c",
+        "src/aniAsfPortMap.c",
+    ],
+
+    cflags: [
+        "-fno-short-enums",
+        "-Wall",
+        "-Werror",
+    ],
+
+    local_include_dirs: ["inc"],
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+            "unsigned-integer-overflow",
+        ],
+    },
+
+}

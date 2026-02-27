@@ -1,0 +1,43 @@
+headers_src = [
+    "include/uapi/audio/*/**/*.h",
+]
+
+audio_headers_out = [
+    "linux/msm_audio.h",
+    "sound/audio_effects.h",
+    "sound/audio_slimslave.h",
+    "sound/devdep_params.h",
+    "sound/lsm_params.h",
+    "sound/msmcal-hwdep.h",
+    "sound/voice_params.h",
+    "sound/wcd-dsp-glink.h",
+    "linux/msm_audio_calibration.h",
+]
+
+audio_kernel_headers_verbose = "--verbose "
+genrule {
+    name: "qti_generate_audio_kernel_headers",
+    tools: ["headers_install.sh",
+            "unifdef"
+    ],
+    tool_files: [
+         "audio_kernel_headers.py",
+    ],
+    srcs: headers_src,
+    cmd: "python3 -u $(location audio_kernel_headers.py) " +
+        audio_kernel_headers_verbose +
+        "--header_arch arm64 " +
+        "--gen_dir $(genDir) " +
+        "--audio_include_uapi $(locations include/uapi/audio/*/**/*.h) " +
+        "--unifdef $(location unifdef) " +
+        "--headers_install $(location headers_install.sh)",
+    out: audio_headers_out,
+}
+
+cc_library_headers {
+    name: "qti_audio_kernel_uapi",
+    generated_headers: ["qti_generate_audio_kernel_headers"],
+    export_generated_headers: ["qti_generate_audio_kernel_headers"],
+    vendor: true,
+    recovery_available: true
+}

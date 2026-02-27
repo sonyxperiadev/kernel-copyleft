@@ -1,0 +1,18 @@
+<!--
+Copyright (c) 2021 Qualcomm Technologies, Inc.
+All Rights Reserved.
+Confidential and Proprietary - Qualcomm Technologies, Inc.
+			-->
+
+<manifest version="1.0" type="device">
+    <!-- wificfr HAL service -->
+    <hal format="hidl">
+        <name>vendor.qti.hardware.wifi.wificfr</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IWificfr</name>
+           <instance>wificfr</instance>
+        </interface>
+    </hal>
+</manifest>

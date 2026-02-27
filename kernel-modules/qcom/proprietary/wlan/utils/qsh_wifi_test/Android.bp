@@ -1,0 +1,44 @@
+cc_binary {
+    name: "qsh_wifi_test",
+    defaults: [
+         "sns_proto_lib_name-lite",
+         "wifi_binary_defaults",
+    ],
+    owner: "qti",
+    proprietary: true,
+    srcs: [
+        "src/qsh_wifi_test.cpp",
+        "src/qsh_wifi_interface_reference.cpp",
+        "src/qsh_wifi_qmi_reference.cpp",
+        "src/qsh_wifi_glink_reference.cpp",
+        "src/qsh_wifi_suid_util.cpp"
+    ],
+    local_include_dirs: ["./inc"],
+    cflags: [
+        "-Werror",
+        "-Wall",
+        "-Wextra",
+        "-Wno-missing-field-initializers",
+        "-Wno-maybe-uninitialized",
+        "-Wunused-private-field",
+    ],
+    cppflags: ["-fexceptions"],
+    header_libs: [
+        "libqmi_cci_headers",
+        "libqmi_encdec_headers",
+        "libqmi_common_headers",
+    ],
+    shared_libs: [
+        "libdiag",
+        "libdl",
+        "libqmi_common_so",
+        "libsnsapi",
+        "libcutils",
+        "liblog",
+        "libqmi_encdec",
+        "libqmi_cci",
+        "libqsh_wifi_test",
+        "libxml2",
+        "libutils",
+    ],
+}

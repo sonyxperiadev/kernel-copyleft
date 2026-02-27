@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "sa8195p-vm-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. SA8195 Single LA Guest Virtual Machine";
+	compatible = "qcom,sa8195p", "qcom,quinvm";
+	qcom,msm-id = <405 0x20000>;
+	qcom,board-id = <0x1000001 0>, <0 0x1000001>;
+};

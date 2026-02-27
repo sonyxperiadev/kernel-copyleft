@@ -1,0 +1,64 @@
+soong_config_module_type {
+    name: "wifi_test_cc_defaults",
+    module_type: "cc_defaults",
+    config_namespace: "wifi",
+    variables: ["wifi_driver_android_version"],
+    properties: ["clang"],
+}
+
+soong_config_string_variable {
+    name: "wifi_driver_android_version",
+    values: [
+        "android_u",
+    ],
+}
+
+wifi_test_cc_defaults {
+    name: "wifi_binary_defaults",
+    soong_config_variables: {
+        wifi_driver_android_version: {
+            android_u: {
+            },
+            conditions_default: {
+                clang: true,
+            },
+        },
+    },
+}
+
+cc_binary {
+    name: "pktlogconf",
+    defaults: ["wifi_binary_defaults"],
+    proprietary: true,
+    vendor: true,
+    local_include_dirs: ["uapi/linux"] + ["target/inc"],
+    srcs: ["pktlog/pktlogconf.c"],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+    sanitize: {
+        integer_overflow: true,
+    },
+}
+cc_binary {
+    name: "athdiag",
+    proprietary: true,
+    local_include_dirs: ["uapi/linux"] + ["target/inc"],
+    cflags: [
+        "-Wall",
+        "-Werror"
+    ],
+    shared_libs: ["libc","libcutils",],
+    srcs: ["athdiag/athdiag.c"],
+    sanitize: {
+        integer_overflow: true,
+    },
+}
+
+prebuilt_etc {
+    name: "init.vendor.wlan.rc",
+    src: "init.vendor.wlan.rc",
+    vendor: true,
+    sub_dir: "init",
+}

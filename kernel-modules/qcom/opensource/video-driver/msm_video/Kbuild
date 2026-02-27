@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+KBUILD_CPPFLAGS += -DCONFIG_MSM_MMRM=1
+VIDEO_DRIVER_ABS_PATH := $(VIDEO_ROOT)/msm_video/driver
+VIDEO_DRIVER_REL_PATH := ../msm_video/driver
+
+ifeq ($(CONFIG_ARCH_PINEAPPLE), y)
+include $(VIDEO_ROOT)/config/pineapple_video.conf
+LINUXINCLUDE   += -include $(VIDEO_ROOT)/config/pineapple_video.h
+endif
+
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+include $(VIDEO_ROOT)/config/kalama_video.conf
+LINUXINCLUDE   += -include $(VIDEO_ROOT)/config/kalama_video.h
+endif
+
+ifeq ($(CONFIG_MSM_VIDC_PINEAPPLE), y)
+LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/pineapple/inc \
+                  -I$(VIDEO_DRIVER_ABS_PATH)/platform/cliffs/inc \
+                  -I$(VIDEO_DRIVER_ABS_PATH)/variant/iris33/inc
+endif
+ifeq ($(CONFIG_MSM_VIDC_KALAMA), y)
+LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/kalama/inc \
+                  -I$(VIDEO_DRIVER_ABS_PATH)/variant/iris3/inc
+endif
+LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/common/inc \
+                  -I$(VIDEO_DRIVER_ABS_PATH)/variant/common/inc \
+                  -I$(VIDEO_DRIVER_ABS_PATH)/vidc/inc \
+                  -I$(VIDEO_ROOT)/include/uapi/vidc \
+                  -I$(VIDEO_ROOT)/../mm-drivers/hw_fence/include/ \
+                  -I$(VIDEO_ROOT)/../synx-kernel/msm/synx/ \
+                  -I$(VIDEO_ROOT)/../synx-kernel/include/uapi/synx/media/
+
+USERINCLUDE    += -I$(VIDEO_ROOT)/include/uapi/vidc/media \
+                  -I$(VIDEO_ROOT)/include/uapi/vidc
+
+obj-m += msm_video.o
+
+ifeq ($(CONFIG_MSM_VIDC_PINEAPPLE), y)
+msm_video-objs += $(VIDEO_DRIVER_REL_PATH)/platform/pineapple/src/msm_vidc_pineapple.o \
+                  $(VIDEO_DRIVER_REL_PATH)/platform/cliffs/src/msm_vidc_cliffs.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris33/src/msm_vidc_buffer_iris33.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris33/src/msm_vidc_power_iris33.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris33/src/msm_vidc_bus_iris33.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris33/src/msm_vidc_clock_iris33.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris33/src/msm_vidc_iris33.o
+endif
+ifeq ($(CONFIG_MSM_VIDC_KALAMA), y)
+msm_video-objs += $(VIDEO_DRIVER_REL_PATH)/platform/kalama/src/msm_vidc_kalama.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_buffer_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_power_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_bus_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_clock_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_iris3.o
+endif
+msm_video-objs += $(VIDEO_DRIVER_REL_PATH)/platform/common/src/msm_vidc_platform.o \
+                  $(VIDEO_DRIVER_REL_PATH)/platform/common/src/msm_vidc_platform_ext.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/common/src/msm_vidc_variant.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_v4l2.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_vb2.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vdec.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_venc.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_driver.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_state.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_control.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_buffer.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_power.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_probe.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/resources.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/resources_ext.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/firmware.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_debug.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_memory.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_memory_ext.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_fence.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/msm_vidc_synx.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/venus_hfi.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/venus_hfi_queue.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/hfi_packet.o \
+                  $(VIDEO_DRIVER_REL_PATH)/vidc/src/venus_hfi_response.o

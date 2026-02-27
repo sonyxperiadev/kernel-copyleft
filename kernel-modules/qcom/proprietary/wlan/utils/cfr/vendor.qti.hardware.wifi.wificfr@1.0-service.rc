@@ -1,0 +1,16 @@
+#
+# Copyright (c) 2021 Qualcomm Technologies, Inc.
+# All Rights Reserved.
+# Confidential and Proprietary - Qualcomm Technologies, Inc.
+#
+
+service wificfr /system/vendor/bin/wificfrtool
+   class main
+    user wifi
+    group wifi
+    # HIDL interfaces
+    interface vendor.qti.hardware.wifi.wificfr@1.0::IWificfr wificfr
+    # don't auto restart
+    oneshot
+    # start only when requested
+    disabled

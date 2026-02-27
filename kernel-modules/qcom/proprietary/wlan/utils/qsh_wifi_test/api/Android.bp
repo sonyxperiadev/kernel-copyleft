@@ -1,0 +1,33 @@
+cc_library_shared {
+    name: "libqsh_wifi_test",
+    defaults: [
+        "sns_proto_lib_name-lite",
+        "sns_api_dir",
+    ],
+    rtti: false,
+    srcs: [
+        "qsh_wifi.proto",
+    ],
+    local_include_dirs: ["./"],
+    cppflags: ["-DGOOGLE_PROTOBUF_NO_RTTI"],
+    cflags: [
+        "-Werror",
+        "-Wall",
+        "-Wno-unused-parameter",
+        "-fexceptions",
+    ],
+    proto: {
+        canonical_path_from_root: false,
+        export_proto_headers: true,
+        type: "lite",
+    },
+    shared_libs: [
+        "libsnsapi",
+    ],
+    sanitize:{
+        integer_overflow: true,
+    },
+    export_include_dirs: ["."],
+    owner: "qti",
+    proprietary: true,
+}

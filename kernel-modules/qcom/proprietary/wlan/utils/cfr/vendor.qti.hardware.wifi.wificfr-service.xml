@@ -1,0 +1,13 @@
+<!--
+Copyright (c) 2023 Qualcomm Technologies, Inc.
+All Rights Reserved.
+Confidential and Proprietary - Qualcomm Technologies, Inc.
+-->
+
+<manifest version="1.0" type="device">
+    <!-- wificfr AIDL service -->
+    <hal format="aidl">
+        <name>vendor.qti.hardware.wifi.wificfr</name>
+        <fqname>IWificfr/default</fqname>
+    </hal>
+</manifest>

@@ -1,0 +1,1 @@
+../../../opensource/mm-drivers/mm_driver_product.mk

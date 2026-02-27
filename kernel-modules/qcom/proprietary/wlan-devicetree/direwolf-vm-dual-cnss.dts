@@ -1,0 +1,12 @@
+/dts-v1/;
+/plugin/;
+
+#include "direwolf-vm-dual-cnss.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. Direwolf Single LV Virtual Machine";
+	compatible = "qcom,direwolf", "qcom,quinvm";
+	qcom,msm-id = <460 0x10000>;
+	qcom,board-id = <0 0x1000002>;
+	qcom,msm-name = "SA_DIREWOLF_IVI";
+};

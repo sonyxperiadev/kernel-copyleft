@@ -1,0 +1,11 @@
+#==============================================================================
+#       vendor.wlan.lowirpcd.rc
+#  Copyright (c) 2021 Qualcomm Technologies, Inc.
+#  All Rights Reserved.
+#  Confidential and Proprietary - Qualcomm Technologies, Inc.
+#===============================================================================
+service vendor.lowi /vendor/bin/lowirpcd
+    class core
+    user system
+    group system wakelock
+    capabilities BLOCK_SUSPEND

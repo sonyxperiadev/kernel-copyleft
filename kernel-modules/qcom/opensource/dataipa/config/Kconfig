@@ -1,0 +1,68 @@
+config GSI
+        tristate "Short description of export GSI"
+        help
+          Long description of export GSI
+
+config IPA_CLIENTS_MANAGER
+        tristate "Short description of export IPA_CLIENTS_MANAGER"
+        help
+          Long description of export IPA_CLIENTS_MANAGER
+config IPA_WDI_UNIFIED_API
+        bool "Short description of export IPA_WDI_UNIFIED_API"
+        help
+          Long description of export IPA_WDI_UNIFIED_API
+
+config RMNET_IPA3
+        bool "Short description of export RMNET_IPA3"
+        help
+          Long description of export RMNET_IPA3
+
+config RNDIS_IPA
+        tristate "Short description of export RNDIS_IPA"
+        help
+          Long description of export RNDIS_IPA
+
+config IPA3_REGDUMP
+        bool "Short description of export IPA3_REGDUMP"
+        help
+          Long description of export IPA3_REGDUMP
+
+config IPA3_REGDUMP_IPA_5_5
+        bool "Short description of export IPA3_REGDUMP_IPA_5_5"
+        help
+          Long description of export IPA3_REGDUMP_IPA_5_5
+
+config IPA_KERNEL_TESTS_MODULE
+        tristate "Short description of export IPA_KERNEL_TESTS_MODULE"
+        help
+          Long description of export IPA_KERNEL_TESTS_MODULE
+
+config IPA3_MHI_PRIME_MANAGER
+        bool "Short description of export IPA_KERNEL_TESTS_MODULE"
+        help
+          Long description of export IPA_KERNEL_TESTS_MODULE
+
+config IPA_TSP
+        bool "Short description of export IPA_TSP"
+        help
+          Long description of export IPA_TSP
+
+config ECM_IPA
+        bool "Short description of export CONFIG_ECM_IPA"
+        help
+          Long description of export CONFIG_ECM_IPA
+
+config IPA_EMULATION
+        bool "Short description of export CONFIG_IPA_EMULATION"
+        help
+          Long description of export CONFIG_IPA_EMULATION
+
+config IPA_DEBUG
+        bool "Short description of export IPA_DEBUG"
+        help
+          Long description of export IPA_DEBUG
+
+config IPA_UT
+        bool "Short description of export CONFIG_IPA_UT"
+        help
+          Long description of export CONFIG_IPA_UT
