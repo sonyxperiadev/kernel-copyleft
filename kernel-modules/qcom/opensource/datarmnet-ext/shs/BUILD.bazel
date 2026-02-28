@@ -1,0 +1,13 @@
+load(":define_shs.bzl", "define_shs")
+
+define_shs("pineapple", "consolidate")
+define_shs("pineapple", "perf")
+
+define_shs("sun", "consolidate")
+define_shs("sun", "perf")
+
+define_shs("parrot", "consolidate")
+define_shs("parrot", "perf")
+
+define_shs("tuna", "consolidate")
+define_shs("tuna", "perf")

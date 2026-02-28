@@ -90,16 +90,6 @@ static struct sock *iso_get_sock_listen(bdaddr_t *src, bdaddr_t *dst,
 #define ISO_CONN_TIMEOUT	(HZ * 40)
 #define ISO_DISCONN_TIMEOUT	(HZ * 2)
 
-static struct sock *iso_sock_hold(struct iso_conn *conn)
-{
-	if (!conn || !bt_sock_linked(&iso_sk_list, conn->sk))
-		return NULL;
-
-	sock_hold(conn->sk);
-
-	return conn->sk;
-}
-
 static void iso_sock_timeout(struct work_struct *work)
 {
 	struct iso_conn *conn = container_of(work, struct iso_conn,
@@ -107,7 +97,9 @@ static void iso_sock_timeout(struct work_struct *work)
 	struct sock *sk;
 
 	iso_conn_lock(conn);
-	sk = iso_sock_hold(conn);
+	sk = conn->sk;
+	if (sk)
+		sock_hold(sk);
 	iso_conn_unlock(conn);
 
 	if (!sk)
@@ -225,7 +217,9 @@ static void iso_conn_del(struct hci_conn *hcon, int err)
 
 	/* Kill socket */
 	iso_conn_lock(conn);
-	sk = iso_sock_hold(conn);
+	sk = conn->sk;
+	if (sk)
+		sock_hold(sk);
 	iso_conn_unlock(conn);
 
 	if (sk) {
@@ -612,66 +606,17 @@ static struct sock *iso_get_sock_listen(bdaddr_t *src, bdaddr_t *dst,
 			continue;
 
 		/* Exact match. */
-		if (!bacmp(&iso_pi(sk)->src, src)) {
-			sock_hold(sk);
+		if (!bacmp(&iso_pi(sk)->src, src))
 			break;
-		}
 
 		/* Closest match */
-		if (!bacmp(&iso_pi(sk)->src, BDADDR_ANY)) {
-			if (sk1)
-				sock_put(sk1);
-
+		if (!bacmp(&iso_pi(sk)->src, BDADDR_ANY))
 			sk1 = sk;
-			sock_hold(sk1);
-		}
 	}
-
-	if (sk && sk1)
-		sock_put(sk1);
 
 	read_unlock(&iso_sk_list.lock);
 
 	return sk ? sk : sk1;
-}
-
-static struct sock *iso_get_sock_big(struct sock *match_sk, bdaddr_t *src,
-				     bdaddr_t *dst, uint8_t big)
-{
-	struct sock *sk = NULL;
-
-	read_lock(&iso_sk_list.lock);
-
-	sk_for_each(sk, &iso_sk_list.head) {
-		if (match_sk == sk)
-			continue;
-
-		/* Look for sockets that have already been
-		 * connected to the BIG
-		 */
-		if (sk->sk_state != BT_CONNECTED &&
-		    sk->sk_state != BT_CONNECT)
-			continue;
-
-		/* Match Broadcast destination */
-		if (bacmp(&iso_pi(sk)->dst, dst))
-			continue;
-
-		/* Match BIG handle */
-		if (iso_pi(sk)->qos.bcast.big != big)
-			continue;
-
-		/* Match source address */
-		if (bacmp(&iso_pi(sk)->src, src))
-			continue;
-
-		sock_hold(sk);
-		break;
-	}
-
-	read_unlock(&iso_sk_list.lock);
-
-	return sk;
 }
 
 static void iso_sock_destruct(struct sock *sk)
@@ -726,28 +671,6 @@ static void iso_sock_kill(struct sock *sk)
 
 static void iso_sock_disconn(struct sock *sk)
 {
-	struct sock *bis_sk;
-	struct hci_conn *hcon = iso_pi(sk)->conn->hcon;
-
-	if (test_bit(HCI_CONN_BIG_CREATED, &hcon->flags)) {
-		bis_sk = iso_get_sock_big(sk, &iso_pi(sk)->src,
-					  &iso_pi(sk)->dst,
-					  iso_pi(sk)->qos.bcast.big);
-
-		/* If there are any other connected sockets for the
-		 * same BIG, just delete the sk and leave the bis
-		 * hcon active, in case later rebinding is needed.
-		 */
-		if (bis_sk) {
-			hcon->state = BT_OPEN;
-			iso_pi(sk)->conn->hcon = NULL;
-			iso_sock_clear_timer(sk);
-			iso_chan_del(sk, bt_to_errno(hcon->abort_reason));
-			sock_put(bis_sk);
-			return;
-		}
-	}
-
 	sk->sk_state = BT_DISCONN;
 	iso_sock_set_timer(sk, ISO_DISCONN_TIMEOUT);
 	iso_conn_lock(iso_pi(sk)->conn);
@@ -1120,11 +1043,7 @@ static int iso_sock_accept(struct socket *sock, struct socket *newsock,
 	long timeo;
 	int err = 0;
 
-	/* Use explicit nested locking to avoid lockdep warnings generated
-	 * because the parent socket and the child socket are locked on the
-	 * same thread.
-	 */
-	lock_sock_nested(sk, SINGLE_DEPTH_NESTING);
+	lock_sock(sk);
 
 	timeo = sock_rcvtimeo(sk, flags & O_NONBLOCK);
 
@@ -1155,7 +1074,7 @@ static int iso_sock_accept(struct socket *sock, struct socket *newsock,
 		release_sock(sk);
 
 		timeo = wait_woken(&wait, TASK_INTERRUPTIBLE, timeo);
-		lock_sock_nested(sk, SINGLE_DEPTH_NESTING);
+		lock_sock(sk);
 	}
 	remove_wait_queue(sk_sleep(sk), &wait);
 
@@ -1799,7 +1718,6 @@ static void iso_conn_ready(struct iso_conn *conn)
 		parent->sk_data_ready(parent);
 
 		release_sock(parent);
-		sock_put(parent);
 	}
 }
 
@@ -1895,7 +1813,6 @@ int iso_connect_ind(struct hci_dev *hdev, bdaddr_t *bdaddr, __u8 *flags)
 				if (err) {
 					bt_dev_err(hdev, "hci_le_big_create_sync: %d",
 						   err);
-					sock_put(sk);
 					sk = NULL;
 				}
 			}
@@ -1923,8 +1840,6 @@ done:
 
 	if (test_bit(BT_SK_DEFER_SETUP, &bt_sk(sk)->flags))
 		*flags |= HCI_PROTO_DEFER;
-
-	sock_put(sk);
 
 	return lm;
 }
@@ -2197,9 +2112,13 @@ int iso_init(void)
 
 	hci_register_cb(&iso_cb);
 
-	if (!IS_ERR_OR_NULL(bt_debugfs))
+	if (IS_ERR_OR_NULL(bt_debugfs))
+		return 0;
+
+	if (!iso_debugfs) {
 		iso_debugfs = debugfs_create_file("iso", 0444, bt_debugfs,
 						  NULL, &iso_debugfs_fops);
+	}
 
 	iso_inited = true;
 

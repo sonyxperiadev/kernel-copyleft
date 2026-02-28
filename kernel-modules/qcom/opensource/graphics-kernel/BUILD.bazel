@@ -1,0 +1,3 @@
+load(":build/kgsl_defs.bzl", "define_target_modules")
+
+define_target_modules()

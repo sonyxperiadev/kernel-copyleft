@@ -1,0 +1,5 @@
+config GPIO_G7_RESET
+    tristate "NXP Reset Driver"
+    default y
+    help
+    This driver for NXP reset test case.

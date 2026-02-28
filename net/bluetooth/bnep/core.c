@@ -745,7 +745,8 @@ static int __init bnep_init(void)
 	if (flt[0])
 		BT_INFO("BNEP filters: %s", flt);
 
-	return bnep_sock_init();
+	bnep_sock_init();
+	return 0;
 }
 
 static void __exit bnep_exit(void)

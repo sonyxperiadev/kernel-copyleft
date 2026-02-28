@@ -1,0 +1,36 @@
+ifneq (, $(filter y, $(CONFIG_ARCH_PINEAPPLE) $(CONFIG_ARCH_SUN) $(CONFIG_ARCH_PARROT) $(CONFIG_ARCH_MONACO)))
+ccflags-y	+= -DRMNET_LA_PLATFORM
+endif
+
+obj-m += rmnet_core.o
+
+#core sources
+rmnet_core-y := \
+	rmnet_config.o \
+	rmnet_handlers.o \
+	rmnet_descriptor.o \
+	rmnet_genl.o \
+	rmnet_map_command.o \
+	rmnet_map_data.o \
+	rmnet_module.o \
+	rmnet_vnd.o
+
+rmnet_core-y += \
+	rmnet_ll.o \
+	rmnet_ll_ipa.o
+
+#DFC sources
+rmnet_core-y += \
+	qmi_rmnet.o \
+	wda_qmi.o \
+	dfc_qmi.o \
+	dfc_qmap.o \
+	rmnet_qmap.o \
+	rmnet_ll_qmap.o
+
+ifneq (, $(filter y, $(CONFIG_ARCH_PINEAPPLE) $(CONFIG_ARCH_SUN) $(CONFIG_ARCH_PARROT) $(CONFIG_ARCH_MONACO)))
+obj-m += rmnet_ctl.o
+rmnet_ctl-y := \
+	rmnet_ctl_client.o \
+	rmnet_ctl_ipa.o
+endif

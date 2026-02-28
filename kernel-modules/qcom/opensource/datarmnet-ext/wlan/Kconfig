@@ -1,0 +1,10 @@
+#
+# RMNET_WLAN driver
+#
+
+menuconfig RMNET_WLAN
+    tristate "Rmnet WLAN support"
+    default m
+    depends on RMNET_CORE
+    ---help---
+        WLAN processing module for RmNet driver

@@ -1,0 +1,113 @@
+load(":define_modules.bzl", "define_modules")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+define_modules("pineapple", "consolidate")
+
+define_modules("pineapple", "perf")
+
+define_modules("sun", "consolidate")
+
+define_modules("sun", "perf")
+
+define_modules("blair", "consolidate")
+
+define_modules("blair", "perf")
+
+define_modules("parrot", "consolidate")
+
+define_modules("parrot", "perf")
+
+define_modules("monaco", "consolidate")
+
+define_modules("monaco", "perf")
+
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+ddk_headers(
+    name = "include_headers",
+    hdrs = glob([
+        "drivers/platform/msm/include/linux/*.h",
+        "drivers/platform/msm/include/uapi/linux/*.h",
+    ]),
+    includes = [
+        "drivers/platform/msm/include",
+        "drivers/platform/msm/include/linux",
+        "drivers/platform/msm/include/uapi",
+    ],
+)
+
+ddk_headers(
+    name = "gsi_headers",
+    hdrs = glob([
+        "drivers/platform/msm/gsi/*.h",
+        "drivers/platform/msm/gsi/gsihal/*.h",
+    ]),
+    includes = [
+        "drivers/platform/msm/gsi",
+        "drivers/platform/msm/gsi/gsihal",
+    ],
+)
+
+ddk_headers(
+    name = "ipa_headers",
+    hdrs = glob([
+        "drivers/platform/msm/ipa/*.h",
+        "drivers/platform/msm/ipa/ipa_test_module/*.h",
+        "drivers/platform/msm/ipa/ipa_v3/*.h",
+        "drivers/platform/msm/ipa/ipa_v3/ipahal/*.h",
+    ]),
+    includes = [
+        "drivers/platform/msm/ipa",
+        "drivers/platform/msm/ipa/ipa_test_module",
+        "drivers/platform/msm/ipa/ipa_v3",
+        "drivers/platform/msm/ipa/ipa_v3/ipahal",
+    ],
+)
+
+ddk_headers(
+    name = "ipa_clients",
+    hdrs = glob([
+        "drivers/platform/msm/ipa/ipa_clients/*.h",
+    ]),
+    includes = ["drivers/platform/msm/ipa/ipa_clients"],
+)
+
+ddk_headers(
+    name = "consolidate_config_headers",
+    hdrs = [
+        "config/dataipa_debug.h",
+        "config/dataipa_vendor.h",
+    ],
+    includes = ["config"],
+)
+
+ddk_headers(
+    name = "perf_config_headers",
+    hdrs = [
+        "config/dataipa_vendor.h",
+    ],
+    includes = ["config"],
+)
+
+genrule(
+    name = "consolidate_defconfig",
+    srcs = [
+        "config/dataipa_GKI_consolidate.conf",
+        "config/dataipa_GKI.conf",
+    ],
+    outs = ["consolidate_defconfig.conf"],
+    cmd = "cat $(SRCS) | sed -e 's/^export //g' > $@",
+)
+
+genrule(
+    name = "perf_defconfig",
+    srcs = [
+        "config/dataipa_GKI.conf",
+    ],
+    outs = ["gki_defconfig.conf"],
+    cmd = "cat $(SRCS) | sed -e 's/^export //g' > $@",
+)

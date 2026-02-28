@@ -1,0 +1,1 @@
+monaco_consolidate_gpuconf

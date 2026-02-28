@@ -1,0 +1,1 @@
+../../../opensource/synx-kernel/synx_kernel_board.mk

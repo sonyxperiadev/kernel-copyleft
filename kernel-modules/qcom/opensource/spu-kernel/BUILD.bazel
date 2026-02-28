@@ -1,0 +1,56 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+ddk_headers(
+    name = "spu_kernel_configs",
+    hdrs  = glob([
+      "config/*.h"]),
+    includes = ["config"]
+)
+
+ddk_headers(
+    name = "spu_uapi_headers",
+    hdrs = glob(["include/uapi/linux/*.h"]),
+    includes = [
+        "include/uapi/linux",
+        "include/uapi",
+    ],
+)
+
+# Generated list with: find drivers -maxdepth 1 -mindepth 1 -type d -printf '"%p/**/*.h",\n'
+driver_header_globs = [
+    "include/uapi/linux/*.h",
+]
+
+# Generated list with: find drivers -type f -name '*.h' -printf '"%h",\n' | sort -u
+driver_includes = [
+    "include",
+    "include/uapi/linux",
+]
+
+ddk_headers(
+    name = "spu_src_headers",
+    hdrs = glob(driver_header_globs),
+    includes = driver_includes + [
+        ".",
+    ],
+)
+
+ddk_headers(
+    name = "spu_headers",
+    hdrs = [
+        ":spu_src_headers",
+        ":spu_uapi_headers",
+        ":spu_kernel_configs",
+    ],
+)
+
+load(":target.bzl", "define_modules")
+
+targets = ["pineapple", "sun"]
+define_modules(targets)

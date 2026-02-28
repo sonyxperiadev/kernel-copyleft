@@ -1,0 +1,8 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+load(":define_modules.bzl", "define_modules")
+
+define_modules("sun", "consolidate")
+define_modules("sun", "perf")
+
+define_modules("parrot", "consolidate")
+define_modules("parrot", "perf")

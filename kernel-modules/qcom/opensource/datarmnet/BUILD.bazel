@@ -1,0 +1,31 @@
+load(":define_modules.bzl", "define_modules")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+define_modules("pineapple", "consolidate")
+define_modules("pineapple", "perf")
+
+define_modules("sun", "consolidate")
+define_modules("sun", "perf")
+
+define_modules("parrot", "consolidate")
+define_modules("parrot", "perf")
+
+define_modules("monaco", "consolidate")
+define_modules("monaco", "perf")
+
+define_modules("tuna", "consolidate")
+define_modules("tuna", "perf")
+
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+ddk_headers(
+    name = "rmnet_core_headers",
+    hdrs = glob([
+        "core/*.h",
+    ]),
+    includes = ["core"],
+)

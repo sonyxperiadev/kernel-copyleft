@@ -1,0 +1,29 @@
+#
+# RMNET MAP driver
+#
+
+config RMNET_CORE
+	default m
+	depends on RMNET_MEM
+	select GRO_CELLS
+	help
+	  If you select this, you will enable the RMNET module which is used
+	  for handling data in the multiplexing and aggregation protocol (MAP)
+	  format in the embedded data path. RMNET devices can be attached to
+	  any IP mode physical device.
+
+config RMNET_CTL
+	default m
+	help
+	  Enable the RMNET CTL module which is used for handling QMAP commands
+	  for flow control purposes.
+
+config RMNET_LA_PLATFORM
+	default y
+	bool "RMNET platform support"
+	depends on ARCH_PINEAPPLE || ARCH_SUN || ARCH_PARROT || ARCH_MONACO
+	help
+	  Enable the functionality gated by the RMNET_LA_PLATFORM configuration
+	  in rmnet driver.
+	  This should be automatically set based on the target used for
+	  compilation.

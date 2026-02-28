@@ -1,0 +1,72 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+package(
+    default_visibility = [
+        "//visibility:public"],
+)
+
+ddk_headers(
+    name = "uapi_headers",
+    hdrs = glob([
+        "include/uapi/vidc/media/*.h",
+    ]),
+    includes = ["include/uapi/vidc"]
+)
+
+ddk_headers(
+    name = "blair_headers",
+    hdrs = glob([
+      "driver/platform/blair/inc/*.h",
+    ]),
+    includes = ["driver/platform/blair/inc"]
+)
+
+ddk_headers(
+    name = "monaco_headers",
+    hdrs = glob([
+      "driver/platform/monaco/inc/*.h",
+    ]),
+    includes = ["driver/platform/monaco/inc"]
+)
+
+ddk_headers(
+    name = "pitti_headers",
+    hdrs = glob([
+      "driver/platform/blair/inc/*.h",
+    ]),
+    includes = ["driver/platform/blair/inc"]
+)
+
+ddk_headers(
+    name = "vienna_headers",
+    hdrs = glob([
+      "driver/platform/vienna/inc/*.h",
+    ]),
+    includes = ["driver/platform/vienna/inc"]
+)
+
+ddk_headers(
+    name = "ar50lt_headers",
+    hdrs = glob([
+      "driver/variant/ar50lt/inc/*.h",
+    ]),
+    includes = ["driver/variant/ar50lt/inc"]
+)
+
+ddk_headers(
+    name = "vidc_headers",
+    hdrs = glob([
+      "driver/vidc/inc/*.h",
+      "driver/variant/common/inc/*.h",
+      "driver/platform/common/inc/*.h"
+    ]),
+    includes = ["driver/vidc/inc", "driver/platform/common/inc"]
+)
+
+ddk_headers(
+    name = "video_driver_headers",
+    hdrs = [":uapi_headers", "blair_headers", "monaco_headers", "vienna_headers", "ar50lt_headers", "vidc_headers"]
+)
+
+load(":target.bzl", "define_target_modules")
+define_target_modules()

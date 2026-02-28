@@ -1,0 +1,14 @@
+load(":define_sch.bzl", "define_sch")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
+
+define_sch("pineapple", "consolidate")
+define_sch("pineapple", "perf")
+
+define_sch("sun", "consolidate")
+define_sch("sun", "perf")
+
+define_sch("parrot", "consolidate")
+define_sch("parrot", "perf")
+
+define_sch("tuna", "consolidate")
+define_sch("tuna", "perf")

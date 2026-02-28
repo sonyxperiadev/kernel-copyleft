@@ -99,8 +99,30 @@ struct subsystem_data {
 	u32 smem_item;
 	u32 pid;
 	bool not_present;
+#ifdef CONFIG_QCOM_STATS_ON_SYSFS
+	struct kobj_attribute ka;
+#endif
 };
 
+#ifdef CONFIG_QCOM_STATS_ON_SYSFS
+static struct kobject *qcom_stats_kobj;
+static ssize_t sysfs_ddr_stats_show(struct kobject *kobj, struct kobj_attribute *ka, char *buf);
+static ssize_t sysfs_island_stats_show(struct kobject *kobj, struct kobj_attribute *ka, char *buf);
+static struct kobj_attribute island_stats_ka = __ATTR(island_stats, 0444, sysfs_island_stats_show, NULL);
+static struct kobj_attribute ddr_stats_ka = __ATTR(ddr_stats, 0444, sysfs_ddr_stats_show, NULL);
+static struct subsystem_data subsystems[] = {
+	{ "modem", 605, 1, false, __ATTR_NULL },
+	{ "wpss", 605, 13, false, __ATTR_NULL },
+	{ "adsp", 606, 2, false, __ATTR_NULL },
+	{ "cdsp", 607, 5, false, __ATTR_NULL },
+	{ "slpi", 608, 3, false, __ATTR_NULL },
+	{ "gpu", 609, 0, false, __ATTR_NULL },
+	{ "display", 610, 0, false, __ATTR_NULL },
+	{ "adsp_island", 613, 2, false, __ATTR_NULL },
+	{ "slpi_island", 613, 3, false, __ATTR_NULL },
+	{ "apss", 631, QCOM_SMEM_HOST_ANY, false, __ATTR_NULL },
+};
+#else // CONFIG_QCOM_STATS_ON_SYSFS
 static struct subsystem_data subsystems[] = {
 	{ "modem", 605, 1 },
 	{ "wpss", 605, 13 },
@@ -116,6 +138,7 @@ static struct subsystem_data subsystems[] = {
 	{ "slpi_island", 613, 3 },
 	{ "apss", 631, QCOM_SMEM_HOST_ANY },
 };
+#endif // CONFIG_QCOM_STATS_ON_SYSFS
 
 struct stats_config {
 	size_t stats_offset;
@@ -135,6 +158,9 @@ struct stats_config {
 
 struct stats_data {
 	bool appended_stats_avail;
+#ifdef CONFIG_QCOM_STATS_ON_SYSFS
+	struct kobj_attribute ka;
+#endif
 	void __iomem *base;
 };
 
@@ -831,6 +857,246 @@ static int qcom_soc_sleep_stats_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
+#ifdef CONFIG_QCOM_STATS_ON_SYSFS
+static ssize_t sysfs_qcom_print_stats(char *buf, struct sleep_stats *stat)
+{
+	u64 accumulated = stat->accumulated;
+	/*
+	 * If a subsystem is in sleep when reading the sleep stats adjust
+	 * the accumulated sleep duration to show actual sleep time.
+	 */
+	if (stat->last_entered_at > stat->last_exited_at)
+		accumulated += arch_timer_read_counter()
+			       - stat->last_entered_at;
+
+	return scnprintf(buf, PAGE_SIZE,
+		"Count = %u\n"
+		"Last Entered At = %llu\n"
+		"Last Exited At = %llu\n"
+		"Accumulated Duration = %llu\n",
+		stat->count, stat->last_entered_at, stat->last_exited_at, accumulated);
+}
+
+static ssize_t sysfs_qcom_subsystem_sleep_stats_show(struct kobject *kobj, struct kobj_attribute *ka, char *buf)
+{
+	struct subsystem_data *subsystem = container_of(ka, struct subsystem_data, ka);
+	struct sleep_stats *stat;
+
+	/* Items are allocated lazily, so lookup pointer each time */
+	stat = qcom_smem_get(subsystem->pid, subsystem->smem_item, NULL);
+	if (IS_ERR(stat))
+		return 0;
+
+	return sysfs_qcom_print_stats(buf, stat);
+}
+
+static ssize_t sysfs_qcom_sleep_stats_show(struct kobject *kobj, struct kobj_attribute *ka, char *buf)
+{
+	struct stats_data *prv_data = container_of(ka, struct stats_data, ka);
+	void __iomem *reg = prv_data->base;
+	struct sleep_stats stat;
+	ssize_t length;
+
+	stat.count = readl_relaxed(reg + COUNT_OFFSET);
+	stat.last_entered_at = readq(reg + LAST_ENTERED_AT_OFFSET);
+	stat.last_exited_at = readq(reg + LAST_EXITED_AT_OFFSET);
+	stat.accumulated = readq(reg + ACCUMULATED_OFFSET);
+
+	length = sysfs_qcom_print_stats(buf, &stat);
+
+	if (prv_data->appended_stats_avail) {
+		struct appended_stats app_stat;
+
+		app_stat.client_votes = readl_relaxed(reg + CLIENT_VOTES_OFFSET);
+		length += scnprintf(buf+length, PAGE_SIZE - length,
+			"Client_votes = %#x\n",
+			app_stat.client_votes);
+	}
+
+	return length;
+}
+
+static ssize_t sysfs_print_ddr_stats(char *buf, int *count,
+			     struct sleep_stats *data, u64 accumulated_duration)
+{
+	u32 cp_idx = 0;
+	u32 name, duration = 0;
+	ssize_t length = 0;
+
+	if (accumulated_duration)
+		duration = (data->accumulated * 100) / accumulated_duration;
+
+	name = (data->stat_type >> 8) & 0xFF;
+	if (name == 0x0) {
+		name = (data->stat_type) & 0xFF;
+		*count = *count + 1;
+		length = scnprintf(buf, PAGE_SIZE,
+		"LPM %d:\tName:0x%x\tcount:%u\tDuration (ticks):%llu (~%d%%)\n",
+			*count, name, data->count, data->accumulated, duration);
+	} else if (name == 0x1) {
+		cp_idx = data->stat_type & 0x1F;
+		name = data->stat_type >> 16;
+
+		if (!name || !data->count)
+			return 0;
+
+		length = scnprintf(buf, PAGE_SIZE,
+		"Freq %dMhz:\tCP IDX:%u\tcount:%u\tDuration (ticks):%llu (~%d%%)\n",
+			name, cp_idx, data->count, data->accumulated, duration);
+	}
+	return length;
+}
+
+static ssize_t sysfs_ddr_stats_show(struct kobject *kobj, struct kobj_attribute *ka, char *buf)
+{
+	struct sleep_stats data[DDR_STATS_MAX_NUM_MODES];
+	void __iomem *reg = drv->base + drv->config->ddr_stats_offset;
+	u32 entry_count;
+	u64 accumulated_duration = 0, accumulated_duration_ddr_mode = 0;
+	int i, lpm_count = 0;
+	ssize_t len = 0;
+	ssize_t sum_len = 0;
+
+	entry_count = readl_relaxed(reg + DDR_STATS_NUM_MODES_ADDR);
+	if (entry_count > DDR_STATS_MAX_NUM_MODES) {
+		pr_err("Invalid entry count\n");
+		return 0;
+	}
+
+	reg += DDR_STATS_ENTRY_ADDR;
+
+	for (i = 0; i < entry_count; i++) {
+		data[i].count = readl_relaxed(reg + DDR_STATS_COUNT_ADDR);
+		if ((i >= 0x4) && (ddr_stats_is_freq_overtime(&data[i]))) {
+			len = scnprintf(buf, PAGE_SIZE, "ddr_stats: Freq update failed.\n");
+			buf += len;
+			sum_len += len;
+			return sum_len;
+		}
+
+		data[i].stat_type = readl_relaxed(reg + DDR_STATS_NAME_ADDR);
+		data[i].last_entered_at = 0xDEADDEAD;
+		data[i].last_exited_at = 0xDEADDEAD;
+		data[i].accumulated = readq_relaxed(reg + DDR_STATS_DURATION_ADDR);
+
+		accumulated_duration += data[i].accumulated;
+		reg += sizeof(struct sleep_stats) - 2 * sizeof(u64);
+	}
+
+	for (i = 0; i < DDR_STATS_NUM_MODES_ADDR; i++)
+		accumulated_duration_ddr_mode += data[i].accumulated;
+
+	for (i = 0; i < DDR_STATS_NUM_MODES_ADDR; i++) {
+		len = sysfs_print_ddr_stats(buf, &lpm_count, &data[i], accumulated_duration_ddr_mode);
+		buf += len;
+		sum_len += len;
+	}
+
+	if (!accumulated_duration) {
+		len = scnprintf(buf, PAGE_SIZE, "ddr_stats: Freq update failed.\n");
+		buf += len;
+		sum_len += len;
+		return sum_len;
+	}
+
+	accumulated_duration -= accumulated_duration_ddr_mode;
+	for (i = DDR_STATS_NUM_MODES_ADDR; i < entry_count; i++) {
+		len = sysfs_print_ddr_stats(buf, &lpm_count, &data[i], accumulated_duration);
+		buf += len;
+		sum_len += len;
+	}
+	return sum_len;
+}
+
+static ssize_t sysfs_print_island_stats_show(char* buf, struct island_stats *stat)
+{
+	return scnprintf(buf, PAGE_SIZE,
+		"Name: %s\n"
+		"Count: %u\n"
+		"Last Entered At: %llu\n"
+		"Last Exited At: %llu\n"
+		"Accumulated Duration: %llu\n"
+		"Vid: %u\n"
+		"task_id: %u\n",
+		stat->name, stat->count, stat->last_entered_at, stat->last_exited_at,
+		stat->accumulated, stat->vid, stat->task_id);
+}
+
+static ssize_t sysfs_island_stats_show(struct kobject *kobj, struct kobj_attribute *ka, char *buf)
+{
+	struct island_stats *stat;
+	int i, length = 0;
+
+	/* Items are allocated lazily, so lookup pointer each time */
+	stat = qcom_smem_get(ISLAND_STATS_PID, ISLAND_STATS_SMEM_ID, NULL);
+	if (IS_ERR(stat))
+		return 0;
+
+	for (i = 0; i < MAX_ISLAND_STATS; i++) {
+		if (!strcmp(stat[i].name, "DEADDEAD"))
+			continue;
+
+		length += sysfs_print_island_stats_show(buf, &stat[i]);
+	}
+
+	return length;
+  }
+
+static int create_sysfs_entries(struct stats_drvdata *drv,
+					struct device_node *node)
+{
+	char stat_type[sizeof(u32) + 1] = {0};
+	u32 type, key;
+	int i, j, n_subsystems;
+	const char *name;
+	int ret = -ENOMEM;
+
+	qcom_stats_kobj = kobject_create_and_add("qcom_sleep_stats", kernel_kobj);
+
+	// qcom_sleep_stats_show
+	for (i = 0; i < drv->config->num_records; i++) {
+		type = readl(drv->d[i].base);
+		get_sleep_stat_name(type, stat_type);
+		drv->d[i].ka.attr.name = stat_type;
+		drv->d[i].ka.attr.mode = 0444;
+		drv->d[i].ka.show = sysfs_qcom_sleep_stats_show;
+		ret = sysfs_create_file(qcom_stats_kobj, &drv->d[i].ka.attr);
+	}
+
+	// qcom_subsystem
+	n_subsystems = of_property_count_strings(node, "ss-name");
+	if (n_subsystems < 0)
+		goto exit;
+
+	for (i = 0; i < n_subsystems; i++) {
+		of_property_read_string_index(node, "ss-name", i, &name);
+
+		for (j = 0; j < ARRAY_SIZE(subsystems); j++) {
+			if (!strcmp(subsystems[j].name, name)) {
+				subsystems[j].ka.attr.name = subsystems[j].name;
+				subsystems[j].ka.attr.mode = 0444;
+				subsystems[j].ka.show = sysfs_qcom_subsystem_sleep_stats_show;
+				ret = sysfs_create_file(qcom_stats_kobj, &subsystems[j].ka.attr);
+				break;
+			}
+		}
+	}
+
+	if (!drv->base)
+		goto exit;
+
+	key = readl_relaxed(drv->base + drv->config->ddr_stats_offset + DDR_STATS_MAGIC_KEY_ADDR);
+	if (key == DDR_STATS_MAGIC_KEY) {
+		ret = sysfs_create_file(qcom_stats_kobj, &ddr_stats_ka.attr);
+	}
+
+	ret = sysfs_create_file(qcom_stats_kobj, &island_stats_ka.attr);
+
+exit:
+	return ret;
+}
+#endif // CONFIG_QCOM_STATS_ON_SYSFS
+
 static void print_ddr_stats(struct seq_file *s, int *count,
 			     struct sleep_stats *data, u64 accumulated_duration)
 {
@@ -1136,7 +1402,9 @@ static int qcom_stats_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, drv);
-
+#ifdef CONFIG_QCOM_STATS_ON_SYSFS
+	create_sysfs_entries(drv, pdev->dev.of_node);
+#endif
 	return 0;
 
 fail:
@@ -1158,6 +1426,9 @@ static int qcom_stats_remove(struct platform_device *pdev)
 	cdev_del(&drv->stats_cdev);
 	unregister_chrdev_region(drv->dev_no, 1);
 
+#ifdef CONFIG_QCOM_STATS_ON_SYSFS
+	kobject_put(qcom_stats_kobj);
+#endif
 	debugfs_remove_recursive(drv->root);
 
 	return 0;

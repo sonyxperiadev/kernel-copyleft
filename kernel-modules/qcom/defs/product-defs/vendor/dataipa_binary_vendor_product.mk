@@ -1,0 +1,1 @@
+../../../opensource/dataipa/dataipa_binary_vendor_product.mk

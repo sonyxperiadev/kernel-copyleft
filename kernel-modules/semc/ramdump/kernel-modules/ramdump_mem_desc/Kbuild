@@ -1,0 +1,3 @@
+#Rules to build ramdump_mem_desc driver
+
+obj-m := ramdump_mem_desc.o

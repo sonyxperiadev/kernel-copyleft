@@ -1,0 +1,14 @@
+load(":define_perf.bzl", "define_perf")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
+
+define_perf("pineapple", "consolidate")
+define_perf("pineapple", "perf")
+
+define_perf("sun", "consolidate")
+define_perf("sun", "perf")
+
+define_perf("parrot", "consolidate")
+define_perf("parrot", "perf")
+
+define_perf("tuna", "consolidate")
+define_perf("tuna", "perf")

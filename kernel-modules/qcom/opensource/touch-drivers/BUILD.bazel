@@ -1,0 +1,76 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+package(
+    default_visibility = [
+        "//visibility:public"],
+)
+
+ddk_headers(
+    name = "qts_headers",
+    hdrs = glob([
+            "qts/*.h"
+        ]
+    )
+)
+
+ddk_headers(
+    name = "st_ts_headers",
+    hdrs = glob([
+            "st/*.h",
+            "st/fts_lib/*.h",
+        ]
+    )
+)
+
+
+ddk_headers(
+    name = "focaltech_ft3610_headers",
+    hdrs = glob([
+            "focaltech_touch_ft3610/*.h"
+             "focaltech_touch_ft3610/focaltech_test/*.h"
+        ]
+    )
+)
+
+ddk_headers(
+    name = "synaptics_tcm_headers",
+    hdrs = glob([
+            "synaptics_tcm/*.h"
+        ]
+    )
+)
+
+ddk_headers(
+    name = "config_headers",
+    hdrs = glob([
+            "config/*.h"
+        ]
+    ),
+    includes = ["config"]
+)
+
+ddk_headers(
+    name = "pt_headers",
+    hdrs = glob([
+            "pt/*.h",
+        ]
+    )
+)
+
+ddk_headers(
+    name = "raydium_headers",
+    hdrs = glob([
+            "raydium/*.h",
+            "raydium/chip_raydium/*.h"
+        ]
+    )
+)
+
+
+ddk_headers(
+    name = "touch_drivers_headers",
+    hdrs = [":st_ts_headers", ":qts_headers", ":focaltech_ft3610_headers", ":synaptics_tcm_headers", ":pt_headers", ":raydium_headers", ":config_headers"]
+)
+
+load(":target.bzl", "define_touch_target")
+define_touch_target()

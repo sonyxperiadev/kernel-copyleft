@@ -1,0 +1,1 @@
+../../../opensource/touch-drivers/touch_driver_product.mk

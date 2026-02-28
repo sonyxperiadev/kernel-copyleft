@@ -1,0 +1,287 @@
+
+KDIR := $(TOP)/kernel_platform/common
+
+ifeq ($(CONFIG_ARCH_VIENNA), y)
+	include $(TOUCH_ROOT)/config/gki_viennatouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_viennatouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_WAIPIO), y)
+	include $(TOUCH_ROOT)/config/gki_waipiotouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_waipiotouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+	include $(TOUCH_ROOT)/config/gki_kalamatouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_kalamatouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_KHAJE), y)
+	include $(TOUCH_ROOT)/config/gki_khajetouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_khajetouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_PINEAPPLE), y)
+	include $(TOUCH_ROOT)/config/gki_pineappletouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_pineappletouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_MONACO), y)
+	include $(TOUCH_ROOT)/config/gki_monacotouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_monacotouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_KONA), y)
+        include $(TOUCH_ROOT)/config/gki_konatouch.conf
+        LINUX_INC += -include $(TOUCH_ROOT)/config/gki_konatouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_BLAIR), y)
+        include $(TOUCH_ROOT)/config/gki_blairtouch.conf
+        LINUX_INC += -include $(TOUCH_ROOT)/config/gki_blairtouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_CROW), y)
+        include $(TOUCH_ROOT)/config/gki_crowtouch.conf
+        LINUX_INC += -include $(TOUCH_ROOT)/config/gki_crowtouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_TRINKET), y)
+        include $(TOUCH_ROOT)/config/gki_trinkettouch.conf
+        LINUX_INC += -include $(TOUCH_ROOT)/config/gki_trinkettouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_SUN), y)
+	include $(TOUCH_ROOT)/config/gki_suntouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_suntouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_CANOE), y)
+	include $(TOUCH_ROOT)/config/gki_canoetouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_canoetouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_PARROT), y)
+	include $(TOUCH_ROOT)/config/gki_parrottouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_parrottouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_RAVELIN), y)
+	include $(TOUCH_ROOT)/config/gki_ravelintouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_ravelintouchconf.h
+endif
+
+ifeq ($(CONFIG_ARCH_LAHAINA), y)
+	include $(TOUCH_ROOT)/config/gki_lahainatouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_lahainatouchconf.h
+endif
+
+LINUX_INC +=	-Iinclude/linux \
+		-Iinclude/linux/drm \
+		-Iinclude/linux/gunyah \
+		-Iinclude/linux/input
+
+CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
+	-DANI_LITTLE_BIT_ENDIAN \
+	-DDOT11F_LITTLE_ENDIAN_HOST \
+	-DANI_COMPILER_TYPE_GCC \
+	-DANI_OS_TYPE_ANDROID=6 \
+	-DPTT_SOCK_SVC_ENABLE \
+	-Wall\
+	-Werror\
+	-D__linux__
+
+KBUILD_CPPFLAGS += $(CDEFINES)
+
+ccflags-y += $(LINUX_INC)
+
+ifeq ($(call cc-option-yn, -Wmaybe-uninitialized),y)
+EXTRA_CFLAGS += -Wmaybe-uninitialized
+endif
+
+ifeq ($(call cc-option-yn, -Wheader-guard),y)
+EXTRA_CFLAGS += -Wheader-guard
+endif
+
+######### CONFIG_MSM_TOUCH ########
+
+ifeq ($(TARGET_KERNEL_DLKM_DISABLE), true)
+	ifeq ($(TARGET_KERNEL_DLKM_TOUCH_OVERRIDE), false)
+		dummy_ts-y := ./dummy_touch/dummy_touch.o
+		obj-$(CONFIG_MSM_TOUCH) += dummy_ts.o
+	endif
+endif
+
+ifeq ($(CONFIG_QTS_ENABLE), y)
+	LINUX_INC += -include $(TOUCH_ROOT)/qts/qts_core.h
+	LINUX_INC += -include $(TOUCH_ROOT)/qts/qts_core_common.h
+
+	qts-y := ./qts/qts_core.o
+
+	obj-$(CONFIG_MSM_TOUCH) += qts.o
+endif
+
+ifeq ($(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX), y)
+
+	LINUX_INC += -include $(TOUCH_ROOT)/synaptics_dsx/synaptics_dsx.h
+	LINUX_INC += -include $(TOUCH_ROOT)/synaptics_dsx/synaptics_dsx_core.h
+
+	synaptics_dsx-y := \
+		 ./synaptics_dsx/synaptics_dsx_core.o \
+		 ./synaptics_dsx/synaptics_dsx_i2c.o
+
+	obj-$(CONFIG_MSM_TOUCH) += synaptics_dsx.o
+endif
+
+
+ifeq ($(CONFIG_TOUCH_FOCALTECH_FT3610), y)
+        LINUX_INC += -include $(TOUCH_ROOT)/focaltech_touch_ft3610/focaltech_common.h
+        LINUX_INC += -include $(TOUCH_ROOT)/focaltech_touch_ft3610/focaltech_config.h
+        LINUX_INC += -include $(TOUCH_ROOT)/focaltech_touch_ft3610/focaltech_core.h
+        LINUX_INC += -include $(TOUCH_ROOT)/focaltech_touch_ft3610/focaltech_flash.h
+	LINUX_INC += -include $(TOUCH_ROOT)/focaltech_touch_ft3610/focaltech_test/focaltech_test.h
+	LINUX_INC += -include $(TOUCH_ROOT)/focaltech_touch_ft3610/focaltech_test/focaltech_test_ini.h
+
+        focaltech_tp-y := \
+                 ./focaltech_touch_ft3610/focaltech_core.o \
+                 ./focaltech_touch_ft3610/focaltech_ex_fun.o \
+                 ./focaltech_touch_ft3610/focaltech_ex_mode.o \
+                 ./focaltech_touch_ft3610/focaltech_gesture.o \
+                 ./focaltech_touch_ft3610/focaltech_esdcheck.o \
+                 ./focaltech_touch_ft3610/focaltech_point_report_check.o \
+		 ./focaltech_touch_ft3610/focaltech_proximity.o \
+                 ./focaltech_touch_ft3610/focaltech_i2c.o \
+		 ./focaltech_touch_ft3610/focaltech_debug.o \
+                 ./focaltech_touch_ft3610/focaltech_flash.o \
+                 ./focaltech_touch_ft3610/focaltech_flash/focaltech_upgrade_ft3610.o \
+		 ./focaltech_touch_ft3610/focaltech_test/focaltech_test.o \
+		 ./focaltech_touch_ft3610/focaltech_test/focaltech_test_ini.o \
+		 ./focaltech_touch_ft3610/focaltech_test/supported_ic/focaltech_test_ft3610.o
+
+        obj-$(CONFIG_MSM_TOUCH) += focaltech_tp.o
+endif
+
+ifeq ($(CONFIG_TOUCHSCREEN_ST), y)
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_fw.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_limits.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsCompensation.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsCore.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsError.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsFlash.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsFrame.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsGesture.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsHardware.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsIO.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsSoftware.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsTest.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsTime.h
+	LINUX_INC += -include $(TOUCH_ROOT)/st/fts_lib/ftsTool.h
+
+	st_fts-y := \
+		 ./st/fts.o \
+		 ./st/fts_lib/ftsCompensation.o \
+		 ./st/fts_lib/ftsCore.o \
+		 ./st/fts_lib/ftsError.o \
+		 ./st/fts_lib/ftsFlash.o \
+		 ./st/fts_lib/ftsFrame.o \
+		 ./st/fts_lib/ftsGesture.o \
+		 ./st/fts_lib/ftsIO.o \
+		 ./st/fts_lib/ftsTest.o \
+		 ./st/fts_lib/ftsTime.o \
+		 ./st/fts_lib/ftsTool.o
+
+	obj-$(CONFIG_MSM_TOUCH) += st_fts.o
+endif
+
+ifeq ($(CONFIG_TOUCHSCREEN_ATMEL_MXT), y)
+
+	atmel_mxt_ts-y := \
+		 ./atmel_mxt/atmel_mxt_ts.o
+
+	obj-$(CONFIG_MSM_TOUCH) += atmel_mxt_ts.o
+endif
+
+ifeq ($(TARGET_KERNEL_DLKM_TOUCH_OVERRIDE), true)
+	ifeq ($(CONFIG_TOUCHSCREEN_DUMMY), y)
+		dummy_ts-y := ./dummy_touch/dummy_touch.o
+
+		obj-$(CONFIG_MSM_TOUCH) += dummy_ts.o
+	endif
+endif
+
+ifeq ($(CONFIG_TOUCHSCREEN_SYNAPTICS_TCM), y)
+	synaptics_tcm_ts-y := \
+		 ./synaptics_tcm/synaptics_tcm_core.o \
+		 ./synaptics_tcm/synaptics_tcm_i2c.o \
+		 ./synaptics_tcm/synaptics_tcm_touch.o
+
+	obj-$(CONFIG_MSM_TOUCH) += synaptics_tcm_ts.o
+
+endif
+
+ifneq ($(CONFIG_ARCH_PINEAPPLE), y)
+	ifeq ($(CONFIG_TOUCHSCREEN_PARADE), y)
+		LINUX_INC += -include $(TOUCH_ROOT)/pt/pt_regs.h
+		LINUX_INC += -include $(TOUCH_ROOT)/pt/pt_core.h
+		LINUX_INC += -include $(TOUCH_ROOT)/pt/pt_platform.h
+
+		pt_ts-y := \
+			./pt/pt_core.o \
+			./pt/pt_mt_common.o \
+			./pt/pt_platform.o \
+			./pt/pt_devtree.o \
+			./pt/pt_btn.o \
+			./pt/pt_mtb.o \
+			./pt/pt_proximity.o
+
+		obj-$(CONFIG_MSM_TOUCH) += pt_ts.o
+	endif
+
+	ifeq ($(CONFIG_TOUCHSCREEN_PARADE_I2C), y)
+		LINUX_INC += -include $(TOUCH_ROOT)/pt/pt_regs.h
+
+		pt_i2c-y := \
+			./pt/pt_i2c.o
+
+		obj-$(CONFIG_MSM_TOUCH) += pt_i2c.o
+	endif
+
+	ifeq ($(CONFIG_TOUCHSCREEN_PARADE_DEVICE_ACCESS), y)
+		LINUX_INC += -include $(TOUCH_ROOT)/pt/pt_regs.h
+
+		pt_device_access-y := \
+			./pt/pt_device_access.o
+
+		obj-$(CONFIG_MSM_TOUCH) += pt_device_access.o
+	endif
+
+	ifeq ($(CONFIG_TOUCHSCREEN_RM_TS), y)
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/Config.h
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/drv_interface.h
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/rad_fw_image_30.h
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/raydium_driver.h
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/raydium_selftest.h
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/tpselftest_30.h
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/chip_raydium/f303_ic_control.h
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/chip_raydium/f303_ic_reg.h
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/chip_raydium/f303_ic_test.h
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/chip_raydium/ic_drv_global.h
+		LINUX_INC += -include $(TOUCH_ROOT)/raydium/chip_raydium/ic_drv_interface.h
+
+		raydium_ts-y := \
+			./raydium/drv_interface.o \
+			./raydium/raydium_driver.o \
+			./raydium/raydium_fw_update.o \
+			./raydium/raydium_selftest.o \
+			./raydium/raydium_sysfs.o \
+			./raydium/chip_raydium/f303_ic_control.o \
+			./raydium/chip_raydium/f303_ic_test.o \
+			./raydium/chip_raydium/ic_drv_global.o \
+			./raydium/chip_raydium/ic_drv_interface.o
+
+			obj-$(CONFIG_MSM_TOUCH) += raydium_ts.o
+	endif
+endif # pineapple
+
+CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"

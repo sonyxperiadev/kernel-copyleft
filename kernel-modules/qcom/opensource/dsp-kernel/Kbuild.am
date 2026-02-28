@@ -1,0 +1,24 @@
+# ported from Android.mk
+$(info within KBUILD file KBUILD_EXTRA_SYMBOLS = $(KBUILD_EXTRA_SYMBOLS))
+
+ifeq ($(CONFIG_ARCH_PINEAPPLE), y)
+$(info within KBUILD file CONFIG_ARCH_PINEAPPLE = $(CONFIG_ARCH_PINEAPPLE))
+KBUILD_CPPFLAGS += -DCONFIG_DSP_PINEAPPLE=1
+ccflags-y += -DCONFIG_DSP_PINEAPPLE=1
+ccflags-y += -DCONFIG_QCOM_FASTRPC_TRUSTED=1
+endif
+
+ifeq ($(CONFIG_ARCH_SUN), y)
+$(info within KBUILD file CONFIG_ARCH_SUN = $(CONFIG_ARCH_SUN))
+ccflags-y += -DCONFIG_QCOM_FASTRPC_TRUSTED=1
+endif
+
+ifeq ($(CONFIG_ARCH_NIOBE), y)
+$(info within KBUILD file CONFIG_ARCH_NIOBE = $(CONFIG_ARCH_NIOBE))
+ccflags-y += -DCONFIG_QCOM_FASTRPC_TRUSTED=1
+endif
+
+frpc-trusted-adsprpc-y := dsp/fastrpc.o	\
+					 dsp/fastrpc_socket.o \
+
+obj-m := frpc-trusted-adsprpc.o

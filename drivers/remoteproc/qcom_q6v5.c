@@ -138,6 +138,15 @@ static void qcom_q6v5_crash_handler_work(struct work_struct *work)
 	mutex_unlock(&rproc->lock);
 }
 
+void update_crash_reason(struct qcom_q6v5 *subsys,
+				char *smem_reason, int size)
+{
+	memcpy(subsys->crash_reason_buf, smem_reason,
+		min((size_t)size, sizeof(subsys->crash_reason_buf)));
+	subsys->data_ready = 1;
+}
+EXPORT_SYMBOL(update_crash_reason);
+
 static irqreturn_t q6v5_wdog_interrupt(int irq, void *data)
 {
 	struct qcom_q6v5 *q6v5 = data;
@@ -161,6 +170,8 @@ static irqreturn_t q6v5_wdog_interrupt(int irq, void *data)
 		dev_err(q6v5->dev, "watchdog received: %s\n", msg);
 	else
 		dev_err(q6v5->dev, "watchdog without message\n");
+
+	update_crash_reason(q6v5, msg, len);
 
 	if (q6v5->crash_stack) {
 		msg = qcom_smem_get(q6v5->smem_host_id, q6v5->crash_stack, &len);
@@ -202,6 +213,8 @@ static irqreturn_t q6v5_fatal_interrupt(int irq, void *data)
 		dev_err(q6v5->dev, "fatal error received: %s\n", msg);
 	else
 		dev_err(q6v5->dev, "fatal error without message\n");
+
+	update_crash_reason(q6v5, msg, len);
 
 	if (q6v5->crash_stack) {
 		msg = qcom_smem_get(q6v5->smem_host_id, q6v5->crash_stack, &len);

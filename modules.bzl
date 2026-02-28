@@ -82,6 +82,7 @@ _COMMON_GKI_MODULES_LIST = [
     "net/tipc/tipc.ko",
     "net/tls/tls.ko",
     "net/vmw_vsock/vmw_vsock_virtio_transport.ko",
+    "drivers/nfc/qti_rest/nfc_reset_test.ko",
 ]
 
 # Deprecated - Use `get_gki_modules_list` function instead.

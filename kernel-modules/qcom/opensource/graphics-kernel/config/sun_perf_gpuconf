@@ -1,0 +1,1 @@
+sun_consolidate_gpuconf

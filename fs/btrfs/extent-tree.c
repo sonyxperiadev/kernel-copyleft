@@ -1303,11 +1303,9 @@ static int btrfs_issue_discard(struct block_device *bdev, u64 start, u64 len,
 		bytes_left = end - start;
 	}
 
-	while (bytes_left) {
-		u64 bytes_to_discard = min(BTRFS_MAX_DISCARD_CHUNK_SIZE, bytes_left);
-
+	if (bytes_left) {
 		ret = blkdev_issue_discard(bdev, start >> SECTOR_SHIFT,
-					   bytes_to_discard >> SECTOR_SHIFT,
+					   bytes_left >> SECTOR_SHIFT,
 					   GFP_NOFS);
 
 		if (ret) {
@@ -1325,7 +1323,6 @@ static int btrfs_issue_discard(struct block_device *bdev, u64 start, u64 len,
 			break;
 		}
 	}
-
 	return ret;
 }
 

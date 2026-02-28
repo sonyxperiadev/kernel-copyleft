@@ -947,6 +947,13 @@ ddk_headers_archive(
     visibility = ["//visibility:private"],
 )
 
+ddk_headers(
+    name = "fels_headers",
+    hdrs = ["kernel/fels/include/fels.h"],
+    includes = ["kernel/fels/include"],
+    visibility = ["//visibility:public"],
+)
+
 # Implementation details for DDK headers. The targets below cannot be directly
 # depended on by DDK modules.
 

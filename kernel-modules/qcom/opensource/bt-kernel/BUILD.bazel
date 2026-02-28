@@ -1,0 +1,17 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+ddk_headers(
+    name = "btfmcodec_headers",
+    hdrs = glob([
+        "btfmcodec/include/*.h"
+    ]),
+    includes = ["btfmcodec/include"]
+)
+
+load(":target.bzl", "define_pineapple")
+load(":target.bzl", "define_sun")
+load(":target.bzl", "define_parrot")
+
+define_pineapple()
+define_sun()
+define_parrot()

@@ -1,0 +1,18 @@
+cc_library_shared {
+    name: "hal_nordic_client",
+    proprietary: true,
+    srcs: [
+        "HalNordicClient.cpp",
+    ],
+    shared_libs: [
+        "liblog",
+        "libbase",
+        "libdl",
+        "libutils",
+        "libhardware",
+        "libhidlbase",
+        "libhidltransport",
+        "vendor.shadowcreator.hardware.nordic@1.0",
+        "libcutils",
+    ],
+}

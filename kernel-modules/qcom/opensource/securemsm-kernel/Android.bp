@@ -1,0 +1,99 @@
+headers_src = [
+    "include/uapi/linux/smc*ke.h",
+    "include/linux/smc*_object.h",
+    "include/linux/IClientE*v.h",
+    "include/linux/smc*_clientenv.h",
+]
+
+smcinvoke_headers_out = [
+    "include/linux/smcinvoke.h",
+    "include/linux/smcinvoke_object.h",
+    "include/linux/smci_object.h",
+    "include/linux/IClientEnv.h",
+    "include/linux/smci_clientenv.h",
+]
+
+smcinvoke_kernel_headers_verbose = "--verbose "
+
+genrule {
+    name: "qti_generate_smcinvoke_kernel_headers",
+    tools: ["headers_install.sh",
+            "unifdef"
+    ],
+    tool_files: [
+         "ssg_kernel_headers.py",
+    ],
+    srcs: headers_src,
+    cmd: "python3 -u $(location ssg_kernel_headers.py) " +
+        smcinvoke_kernel_headers_verbose +
+        "--header_arch arm64 " +
+        "--gen_dir $(genDir) " +
+        "--smcinvoke_headers_to_expose $(locations include/uapi/linux/smc*ke.h) $(locations include/linux/smc*_object.h) $(locations include/linux/IClientE*v.h) $(locations include/linux/smc*_clientenv.h) " +
+        "--unifdef $(location unifdef) " +
+        "--headers_install $(location headers_install.sh)",
+    out: smcinvoke_headers_out,
+}
+
+cc_library_headers {
+    name: "smcinvoke_kernel_headers",
+    export_include_dirs: ["."] + ["include"] + ["include/uapi"],
+    generated_headers: ["qti_generate_smcinvoke_kernel_headers"],
+    export_generated_headers: ["qti_generate_smcinvoke_kernel_headers"],
+    vendor: true,
+    recovery_available: true
+}
+
+qseecom_headers_src = [
+    "include/uapi/linux/qsee*om.h",
+    "include/uapi/linux/qsee*api.h",
+]
+
+qseecom_headers_out = [
+    "include/linux/qseecom.h",
+    "include/linux/qseecom_api.h",
+]
+
+qseecom_kernel_headers_verbose = "--verbose "
+
+genrule {
+    name: "qti_generate_qseecom_kernel_headers",
+    tools: ["headers_install.sh",
+            "unifdef"
+    ],
+    tool_files: [
+         "ssg_kernel_headers.py",
+    ],
+    srcs: qseecom_headers_src,
+    cmd: "python3 -u $(location ssg_kernel_headers.py) " +
+        qseecom_kernel_headers_verbose +
+        "--header_arch arm64 " +
+        "--gen_dir $(genDir) " +
+        "--smcinvoke_headers_to_expose $(locations include/uapi/linux/qsee*om.h) $(locations include/uapi/linux/qsee*api.h) " +
+        "--unifdef $(location unifdef) " +
+        "--headers_install $(location headers_install.sh)",
+    out: qseecom_headers_out,
+}
+
+
+cc_library_headers {
+    name: "qseecom_kernel_headers",
+    export_include_dirs: ["."] + ["include"] + ["include/uapi"],
+    generated_headers: ["qti_generate_qseecom_kernel_headers"],
+    export_generated_headers: ["qti_generate_qseecom_kernel_headers"],
+    vendor: true,
+    recovery_available: true
+}
+
+
+cc_library_headers {
+    name: "smmu_proxy_uapi_header",
+    vendor_available: true,
+    export_include_dirs: ["smmu-proxy/include/uapi/"],
+}
+
+cc_library_headers {
+    name: "securemsm_kernel_uapi_headers",
+    vendor_available: true,
+    host_supported: true,
+    export_include_dirs: ["include/uapi"],
+}
