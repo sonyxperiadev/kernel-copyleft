@@ -31,11 +31,8 @@ static uint16_t slc_client_id[] = {
 static struct clk *llcc_perfmon_clock;
 static int perf_clk_enable;
 
-static int llcc_perf_clk_enable(bool enable, uint32_t version)
+static int llcc_perf_clk_enable(bool enable)
 {
-	if (version == SLC_MPAM_VERSION_0_3)
-		return 0;
-
 	if (llcc_perfmon_clock == NULL)
 		return -ENOENT;
 
@@ -291,30 +288,16 @@ static int mon_idx_lookup(void __iomem *mem, int client_id, int part_id,
 	struct slc_partid_info *part_info;
 	struct qcom_slc_mon_data *data;
 	struct qcom_slc_mon_data_v1 *data_v1;
-	struct qcom_slc_mon_data_v2 *data_v2;
 	struct slc_client_capability *slc_client_cap;
 	union slc_partid_capability_def *slc_partid_cap;
 	int client_idx, part_idx;
 
 	mon_idx = 0;
 	slc_client_cap = slc_capability->slc_client_cap;
-
-	switch (slc_capability->firmware_ver.firmware_version) {
-	case SLC_MPAM_VERSION_0:
+	if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0)
 		data = &(mon_mem->mem_v0.data[0]);
-		break;
-
-	case SLC_MPAM_VERSION_0_3:
+	else
 		data_v1 = &(mon_mem->mem_v1.data[0]);
-		break;
-
-	case SLC_MPAM_VERSION_1_0:
-		data_v2 = &(mon_mem->mem_v2.data[0]);
-		break;
-
-	default:
-		break;
-	}
 
 	for (client_idx = 0; client_idx < slc_capability->num_clients; client_idx++) {
 		slc_partid_cap = slc_client_cap->slc_partid_cap;
@@ -327,15 +310,9 @@ static int mon_idx_lookup(void __iomem *mem, int client_id, int part_id,
 					slc_partid_cap++;
 					continue;
 				}
-				if (slc_capability->firmware_ver.firmware_version ==
-						SLC_MPAM_VERSION_0_3) {
-					part_info = &(data_v1->part_info);
-					data_v1++;
-				} else if (slc_capability->firmware_ver.firmware_version ==
-						SLC_MPAM_VERSION_1_0) {
-					part_info = &(data_v2->part_info);
-					data_v2++;
-				}
+
+				part_info = &(data_v1->part_info);
+				data_v1++;
 			}
 
 			if ((client_id == part_info->client_id) &&
@@ -350,66 +327,6 @@ static int mon_idx_lookup(void __iomem *mem, int client_id, int part_id,
 	}
 
 	return -EINVAL;
-}
-
-static bool config_request_check_v1(struct device *dev, struct msc_query *query,
-		struct slc_mon_config_val *mon_cfg)
-{
-	struct qcom_mpam_msc *qcom_msc;
-	struct qcom_slc_capability *slc_capability;
-
-	qcom_msc = slc_capability_check(dev, query);
-	if (qcom_msc == NULL)
-		return false;
-
-	slc_capability =  (struct qcom_slc_capability *)qcom_msc->msc_capability;
-
-	switch (mon_cfg->slc_mon_function) {
-	default:
-		break;
-
-	case CACHE_TOTAL_FE_MON_CONFIG:
-		switch (mon_cfg->enable) {
-		default:
-			break;
-
-		case 0:
-			if (slc_capability->slc_mon_configured.total_fe_mon_configured <= 0)
-				return false;
-			break;
-
-		case 1:
-			if (slc_capability->slc_mon_configured.total_fe_mon_configured >=
-					slc_capability->slc_mon_list.total_fe_mon_config_avail) {
-				dev_err(dev, "Max available total fe_mon config used\n");
-				return false;
-			}
-			break;
-		}
-		break;
-
-	case CACHE_TOTAL_BE_MON_CONFIG:
-		switch (mon_cfg->enable) {
-		default:
-			break;
-
-		case 0:
-			if (slc_capability->slc_mon_configured.total_be_mon_configured <= 0)
-				return false;
-			break;
-
-		case 1:
-			if (slc_capability->slc_mon_configured.total_be_mon_configured >=
-					slc_capability->slc_mon_list.total_be_mon_config_avail) {
-				dev_err(dev, "Max available total be_mon config used\n");
-				return false;
-			}
-			break;
-		}
-		break;
-	}
-	return true;
-
 }
 
 static struct qcom_mpam_msc *slc_config_request_check(struct device *dev, struct msc_query *query,
@@ -465,74 +382,19 @@ static struct qcom_mpam_msc *slc_config_request_check(struct device *dev, struct
 
 		case 1:
 			if (slc_capability->slc_mon_configured.read_miss_configured >=
-				slc_capability->slc_mon_list.read_miss_config_available) {
-				dev_err(dev, "Max available read_miss config used\n");
+					slc_capability->slc_mon_list.read_miss_config_available)
 				return NULL;
-			}
 			break;
 		}
 		break;
 
 	case CACHE_FE_MON_CONFIG:
-		/* FE, BE Monitors enabled only for clients, not for Part Id basis */
-		if ((slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0_3) &&
-				(query->part_id != 0)) {
-			dev_err(dev, "Invalid Part ID %d\n", query->part_id);
-			return NULL;
-		} else if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_1_0) {
-			switch (mon_cfg->enable) {
-			default:
-				break;
-
-			case 0:
-				if (slc_capability->slc_mon_configured.fe_mon_configured <= 0)
-					return NULL;
-				break;
-
-			case 1:
-				if (slc_capability->slc_mon_configured.fe_mon_configured >=
-					slc_capability->slc_mon_list.fe_mon_config_available) {
-					dev_err(dev, "Max available fe_mon config used\n");
-					return NULL;
-				}
-				break;
-			}
-		}
-		break;
-
 	case CACHE_BE_MON_CONFIG:
 		/* FE, BE Monitors enabled only for clients, not for Part Id basis */
-		if ((slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0_3) &&
-				(query->part_id != 0)) {
+		if (query->part_id != 0) {
 			dev_err(dev, "Invalid Part ID %d\n", query->part_id);
-			return NULL;
-		} else if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_1_0) {
-			switch (mon_cfg->enable) {
-			default:
-				break;
-
-			case 0:
-				if (slc_capability->slc_mon_configured.be_mon_configured <= 0)
-					return NULL;
-				break;
-
-			case 1:
-				if (slc_capability->slc_mon_configured.be_mon_configured >=
-					slc_capability->slc_mon_list.be_mon_config_available) {
-					dev_err(dev, "Max available be_mon config used\n");
-					return NULL;
-				}
-				break;
-			}
+				return NULL;
 		}
-		break;
-
-	case CACHE_TOTAL_FE_MON_CONFIG:
-	case CACHE_TOTAL_BE_MON_CONFIG:
-		if ((slc_capability->firmware_ver.firmware_version >= SLC_MPAM_VERSION_0_3) &&
-				!(config_request_check_v1(dev, query, mon_cfg)))
-			return NULL;
-
 		break;
 	}
 
@@ -598,70 +460,16 @@ static int update_mon_stats(struct device *dev, struct msc_query *query,
 		break;
 
 	case CACHE_FE_MON_CONFIG:
-		switch (mon_cfg->enable) {
-		default:
-			break;
-
-		case 0:
-			slc_capability->slc_mon_configured.fe_mon_configured--;
-			slc_capability->slc_mon_configured.mon_cfgd--;
-			break;
-
-		case 1:
-			slc_capability->slc_mon_configured.fe_mon_configured++;
-			slc_capability->slc_mon_configured.mon_cfgd++;
-			break;
-
-		}
-		break;
 	case CACHE_BE_MON_CONFIG:
 		switch (mon_cfg->enable) {
 		default:
 			break;
 
 		case 0:
-			slc_capability->slc_mon_configured.be_mon_configured--;
 			slc_capability->slc_mon_configured.mon_cfgd--;
 			break;
 
 		case 1:
-			slc_capability->slc_mon_configured.be_mon_configured++;
-			slc_capability->slc_mon_configured.mon_cfgd++;
-			break;
-
-		}
-		break;
-
-	case CACHE_TOTAL_FE_MON_CONFIG:
-		switch (mon_cfg->enable) {
-		default:
-			break;
-
-		case 0:
-			slc_capability->slc_mon_configured.total_fe_mon_configured--;
-			slc_capability->slc_mon_configured.mon_cfgd--;
-			break;
-
-		case 1:
-			slc_capability->slc_mon_configured.total_fe_mon_configured++;
-			slc_capability->slc_mon_configured.mon_cfgd++;
-			break;
-
-		}
-		break;
-
-	case CACHE_TOTAL_BE_MON_CONFIG:
-		switch (mon_cfg->enable) {
-		default:
-			break;
-
-		case 0:
-			slc_capability->slc_mon_configured.total_be_mon_configured--;
-			slc_capability->slc_mon_configured.mon_cfgd--;
-			break;
-
-		case 1:
-			slc_capability->slc_mon_configured.total_be_mon_configured++;
 			slc_capability->slc_mon_configured.mon_cfgd++;
 			break;
 
@@ -684,13 +492,11 @@ static int slc_mon_config(struct device *dev, void *msc_partid, void *msc_partco
 {
 	struct qcom_mpam_msc *qcom_msc;
 	struct msc_query *query;
-	struct qcom_slc_capability *slc_capability;
 	struct slc_mon_config_val *mon_cfg_val;
 	struct slc_partid_capability_v1 partid_cap = { 0 };
 	struct slc_mon_config mon_cfg = {0};
 	int ret = -EINVAL;
 	uint32_t firmware_ver;
-	bool is_cache_mon, is_fe_be_mon = false;
 
 	query = (struct msc_query *)msc_partid;
 	mon_cfg_val = (struct slc_mon_config_val *)msc_partconfig;
@@ -699,7 +505,6 @@ static int slc_mon_config(struct device *dev, void *msc_partid, void *msc_partco
 	if (qcom_msc == NULL)
 		return ret;
 
-	slc_capability =  (struct qcom_slc_capability *)qcom_msc->msc_capability;
 	firmware_ver = SLC_MPAM_VERSION_0;
 	msc_system_get_mpam_version(SLC, &firmware_ver);
 	if (firmware_ver != SLC_MPAM_VERSION_0) {
@@ -730,7 +535,9 @@ static int slc_mon_config(struct device *dev, void *msc_partid, void *msc_partco
 			if ((partid_cap.mon_support & (1 << fe_mon_support)) == 0)
 				return -EPERM;
 
-			is_fe_be_mon = true;
+			if (mon_cfg_val->enable && !perf_clk_enable)
+				if (llcc_perf_clk_enable(true))
+					return -EPERM;
 			break;
 
 		case CACHE_BE_MON_CONFIG:
@@ -740,142 +547,46 @@ static int slc_mon_config(struct device *dev, void *msc_partid, void *msc_partco
 			if ((partid_cap.mon_support & (1 << be_mon_support)) == 0)
 				return -EPERM;
 
-			is_fe_be_mon = true;
+			if (mon_cfg_val->enable && !perf_clk_enable)
+				if (llcc_perf_clk_enable(true))
+					return -EPERM;
 			break;
 
-		case CACHE_TOTAL_FE_MON_CONFIG:
-		case CACHE_TOTAL_BE_MON_CONFIG:
-			if (firmware_ver == SLC_MPAM_VERSION_0)
-				return -EPERM;
-
-			break;
 		}
-	}
-
-	if (is_fe_be_mon) {
-		if (mon_cfg_val->enable && !perf_clk_enable && llcc_perfmon_clock)
-			if (llcc_perf_clk_enable(true,
-				slc_capability->firmware_ver.firmware_version))
-				return -EPERM;
 	}
 
 	memcpy(&mon_cfg.query, msc_partid, sizeof(struct msc_query));
 	memcpy(&mon_cfg.config, msc_partconfig, sizeof(struct slc_mon_config_val));
-	is_cache_mon = (mon_cfg_val->slc_mon_function == CACHE_FE_MON_CONFIG) ||
-				(mon_cfg_val->slc_mon_function == CACHE_BE_MON_CONFIG);
 	ret = mpam_msc_slc_set_params(dev, &mon_cfg, sizeof(struct  slc_mon_config),
 			PARAM_SET_CONFIG_MON_MSC);
-
-	if (is_cache_mon && slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0_3) {
-		if (ret) {
+	if (ret) {
+		if ((mon_cfg_val->slc_mon_function == CACHE_FE_MON_CONFIG) ||
+			(mon_cfg_val->slc_mon_function == CACHE_BE_MON_CONFIG)) {
 			if (mon_cfg_val->enable && !perf_clk_enable)
-				llcc_perf_clk_enable(false,
-					slc_capability->firmware_ver.firmware_version);
-			pr_err("Failed to Config SLC Mon\n");
-		} else {
+				llcc_perf_clk_enable(false);
+		}
+
+		pr_err("Failed to Config SLC Mon\n");
+	} else {
+		if ((mon_cfg_val->slc_mon_function == CACHE_FE_MON_CONFIG) ||
+			(mon_cfg_val->slc_mon_function == CACHE_BE_MON_CONFIG)) {
 			if (mon_cfg_val->enable)
 				perf_clk_enable++;
 			else
 				perf_clk_enable--;
+
 			if (!mon_cfg_val->enable && !perf_clk_enable)
-				llcc_perf_clk_enable(false,
-					slc_capability->firmware_ver.firmware_version);
+				llcc_perf_clk_enable(false);
 		}
-	}
 
-
-	if (!ret)
 		update_mon_stats(dev, query, mon_cfg_val);
+	}
 
 	return ret;
 };
 
 #define MAX_SHARED_MEM_RETRY_CNT	5000
 #define MAX_SHARED_MATCH_SEQ_CNT	10
-
-static void slc_mon_populate_stats_v1(union mon_values *mon_data,
-					struct qcom_slc_mon_data_v1 *data_mem_v1)
-{
-	if ((mon_data->ref.slc_mon_function == CACHE_CAPACITY_CONFIG) &&
-			(data_mem_v1->mon_enabled & (1 << cap_mon_support))) {
-		mon_data->capacity.num_cache_lines =
-				data_mem_v1->num_cache_lines;
-	} else if ((mon_data->ref.slc_mon_function == CACHE_READ_MISS_CONFIG) &&
-			(data_mem_v1->mon_enabled & (1 << read_miss_mon_support))) {
-		mon_data->misses.num_rd_misses = data_mem_v1->rd_misses;
-	} else if (((mon_data->ref.slc_mon_function == CACHE_FE_MON_CONFIG) ||
-			(mon_data->ref.slc_mon_function == CACHE_TOTAL_FE_MON_CONFIG)) &&
-			(data_mem_v1->mon_enabled & (1 << fe_mon_support))) {
-		mon_data->fe_stats.slc_fe_bytes = data_mem_v1->fe_rd_bytes +
-				data_mem_v1->fe_wr_bytes;
-	} else if (((mon_data->ref.slc_mon_function == CACHE_BE_MON_CONFIG) ||
-			(mon_data->ref.slc_mon_function == CACHE_TOTAL_BE_MON_CONFIG)) &&
-			(data_mem_v1->mon_enabled & (1 << be_mon_support))) {
-		mon_data->be_stats.slc_be_bytes = data_mem_v1->be_rd_bytes +
-				data_mem_v1->be_wr_bytes;
-	} else if (mon_data->ref.slc_mon_function == CACHE_MON_STATS_READ) {
-		if (data_mem_v1->mon_enabled & (1 << cap_mon_support))
-			mon_data->mon_stats.num_cache_lines =
-				data_mem_v1->num_cache_lines;
-
-		if (data_mem_v1->mon_enabled & (1 << read_miss_mon_support))
-			mon_data->mon_stats.num_rd_misses = data_mem_v1->rd_misses;
-
-		if (data_mem_v1->mon_enabled & (1 << fe_mon_support))
-			mon_data->mon_stats.slc_fe_bytes = data_mem_v1->fe_rd_bytes
-				+ data_mem_v1->fe_wr_bytes;
-
-		if (data_mem_v1->mon_enabled & (1 << be_mon_support))
-			mon_data->mon_stats.slc_be_bytes = data_mem_v1->be_rd_bytes
-				+ data_mem_v1->be_wr_bytes;
-	} else if (mon_data->ref.slc_mon_function == CACHE_TOTAL_MON_STATS_READ) {
-		if (data_mem_v1->mon_enabled & (1 << fe_mon_support))
-			mon_data->mon_stats.slc_fe_bytes = data_mem_v1->fe_rd_bytes
-				+ data_mem_v1->fe_wr_bytes;
-
-		if (data_mem_v1->mon_enabled & (1 << be_mon_support))
-			mon_data->mon_stats.slc_be_bytes = data_mem_v1->be_rd_bytes
-				+ data_mem_v1->be_wr_bytes;
-	}
-}
-
-static void slc_mon_populate_stats_v2(union mon_values *mon_data,
-					struct qcom_slc_mon_data_v2 *data_mem_v2)
-{
-	if ((mon_data->ref.slc_mon_function == CACHE_CAPACITY_CONFIG) &&
-			(data_mem_v2->mon_enabled & (1 << cap_mon_support))) {
-		mon_data->capacity.num_cache_lines =
-				data_mem_v2->num_cache_lines;
-	} else if ((mon_data->ref.slc_mon_function == CACHE_READ_MISS_CONFIG) &&
-			(data_mem_v2->mon_enabled & (1 << read_miss_mon_support))) {
-		mon_data->misses.num_rd_misses = data_mem_v2->rd_misses;
-	} else if (((mon_data->ref.slc_mon_function == CACHE_FE_MON_CONFIG) ||
-			(mon_data->ref.slc_mon_function == CACHE_TOTAL_FE_MON_CONFIG)) &&
-			(data_mem_v2->mon_enabled & (1 << fe_mon_support))) {
-		mon_data->fe_stats.slc_fe_bytes = data_mem_v2->fe_bytes;
-	} else if (((mon_data->ref.slc_mon_function == CACHE_BE_MON_CONFIG) ||
-			(mon_data->ref.slc_mon_function == CACHE_TOTAL_BE_MON_CONFIG)) &&
-			(data_mem_v2->mon_enabled & (1 << be_mon_support))) {
-		mon_data->be_stats.slc_be_bytes = data_mem_v2->be_bytes;
-	} else if (mon_data->ref.slc_mon_function == CACHE_MON_STATS_READ) {
-		if (data_mem_v2->mon_enabled & (1 << cap_mon_support))
-			mon_data->mon_stats.num_cache_lines =
-				data_mem_v2->num_cache_lines;
-
-		if (data_mem_v2->mon_enabled & (1 << read_miss_mon_support))
-			mon_data->mon_stats.num_rd_misses = data_mem_v2->rd_misses;
-
-		if (data_mem_v2->mon_enabled & (1 << fe_mon_support))
-			mon_data->mon_stats.slc_fe_bytes = data_mem_v2->fe_bytes;
-
-		if (data_mem_v2->mon_enabled & (1 << be_mon_support))
-			mon_data->mon_stats.slc_be_bytes = data_mem_v2->be_bytes;
-
-	} else if (mon_data->ref.slc_mon_function == CACHE_TOTAL_MON_STATS_READ) {
-		mon_data->mon_stats.slc_fe_bytes = data_mem_v2->fe_bytes;
-		mon_data->mon_stats.slc_be_bytes = data_mem_v2->be_bytes;
-	}
-}
 
 static int slc_mon_stats_read(struct device *dev, void *msc_partid, void *data)
 {
@@ -886,10 +597,9 @@ static int slc_mon_stats_read(struct device *dev, void *msc_partid, void *data)
 	union mon_values *mon_data;
 	struct qcom_slc_mon_data *data_mem;
 	struct qcom_slc_mon_data_v1 *data_mem_v1;
-	struct qcom_slc_mon_data_v2 *data_mem_v2;
 	int mon_idx;
 	uint32_t match_seq, retry_cnt, match_seq_cnt = 0;
-	volatile uint32_t *match_seq_ptr = NULL;
+	volatile uint32_t *match_seq_ptr;
 	uint64_t *last_capture_time;
 
 	qcom_msc = (struct qcom_mpam_msc *)dev_get_drvdata(dev);
@@ -905,42 +615,15 @@ static int slc_mon_stats_read(struct device *dev, void *msc_partid, void *data)
 		return -EINVAL;
 
 	mon_mem = (union qcom_slc_monitor_memory *)qcom_msc->mon_base;
-
-	switch (slc_capability->firmware_ver.firmware_version) {
-	case SLC_MPAM_VERSION_0:
+	if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0) {
 		data_mem = &(mon_mem->mem_v0.data[mon_idx]);
 		match_seq_ptr = &(mon_mem->mem_v0.match_seq);
 		last_capture_time = &(mon_mem->mem_v0.last_capture_time);
-		break;
-
-	case SLC_MPAM_VERSION_0_3:
-		if ((mon_data->ref.slc_mon_function == CACHE_TOTAL_MON_STATS_READ) ||
-				(mon_data->ref.slc_mon_function == CACHE_TOTAL_FE_MON_CONFIG) ||
-				(mon_data->ref.slc_mon_function == CACHE_TOTAL_BE_MON_CONFIG)) {
-			mon_idx = slc_capability->num_partids - 1;
-		}
+	} else {
 		data_mem_v1 = &(mon_mem->mem_v1.data[mon_idx]);
 		match_seq_ptr = &(mon_mem->mem_v1.match_seq);
 		last_capture_time = &(mon_mem->mem_v1.last_capture_time);
-		break;
-
-	case SLC_MPAM_VERSION_1_0:
-		if ((mon_data->ref.slc_mon_function == CACHE_TOTAL_MON_STATS_READ) ||
-				(mon_data->ref.slc_mon_function == CACHE_TOTAL_FE_MON_CONFIG) ||
-				(mon_data->ref.slc_mon_function == CACHE_TOTAL_BE_MON_CONFIG)) {
-			mon_idx = slc_capability->num_partids;
-		}
-		data_mem_v2 = &(mon_mem->mem_v2.data[mon_idx]);
-		match_seq_ptr = &(mon_mem->mem_v2.match_seq);
-		last_capture_time = &(mon_mem->mem_v2.last_capture_time);
-		break;
-
-	default:
-		break;
 	}
-
-	if (match_seq_ptr == NULL)
-		return -EINVAL;
 
 	do {
 		retry_cnt = 0;
@@ -958,9 +641,7 @@ static int slc_mon_stats_read(struct device *dev, void *msc_partid, void *data)
 		mon_data->mon_stats.num_rd_misses = 0;
 		mon_data->mon_stats.slc_fe_bytes = 0;
 		mon_data->mon_stats.slc_be_bytes = 0;
-
-		switch (slc_capability->firmware_ver.firmware_version) {
-		case SLC_MPAM_VERSION_0:
+		if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0) {
 			switch (mon_data->ref.slc_mon_function) {
 			case CACHE_CAPACITY_CONFIG:
 				if (data_mem->cap_stats.cap_enabled)
@@ -978,20 +659,56 @@ static int slc_mon_stats_read(struct device *dev, void *msc_partid, void *data)
 				break;
 			}
 
-			break;
+		} else {
+			switch (mon_data->ref.slc_mon_function) {
+			case CACHE_CAPACITY_CONFIG:
+				if (data_mem_v1->mon_enabled & (1 << cap_mon_support))
+					mon_data->capacity.num_cache_lines =
+						data_mem_v1->num_cache_lines;
 
-		case SLC_MPAM_VERSION_0_3:
-			slc_mon_populate_stats_v1(mon_data, data_mem_v1);
+				break;
 
-			break;
+			case CACHE_READ_MISS_CONFIG:
+				if (data_mem_v1->mon_enabled & (1 << read_miss_mon_support))
+					mon_data->misses.num_rd_misses = data_mem_v1->rd_misses;
 
-		case SLC_MPAM_VERSION_1_0:
-			slc_mon_populate_stats_v2(mon_data, data_mem_v2);
+				break;
 
-			break;
+			case CACHE_FE_MON_CONFIG:
+				if (data_mem_v1->mon_enabled & (1 << fe_mon_support))
+					mon_data->fe_stats.slc_fe_bytes = data_mem_v1->fe_rd_bytes +
+						data_mem_v1->fe_wr_bytes;
 
-		default:
-			break;
+				break;
+
+			case CACHE_BE_MON_CONFIG:
+				if (data_mem_v1->mon_enabled & (1 << be_mon_support))
+					mon_data->be_stats.slc_be_bytes = data_mem_v1->be_rd_bytes +
+						data_mem_v1->be_wr_bytes;
+
+				break;
+
+			case CACHE_MON_STATS_READ:
+				if (data_mem_v1->mon_enabled & (1 << cap_mon_support))
+					mon_data->mon_stats.num_cache_lines =
+						data_mem_v1->num_cache_lines;
+
+				if (data_mem_v1->mon_enabled & (1 << read_miss_mon_support))
+					mon_data->mon_stats.num_rd_misses = data_mem_v1->rd_misses;
+
+				if (data_mem_v1->mon_enabled & (1 << fe_mon_support))
+					mon_data->mon_stats.slc_fe_bytes = data_mem_v1->fe_rd_bytes
+						+ data_mem_v1->fe_wr_bytes;
+
+				if (data_mem_v1->mon_enabled & (1 << be_mon_support))
+					mon_data->mon_stats.slc_be_bytes = data_mem_v1->be_rd_bytes
+						+ data_mem_v1->be_wr_bytes;
+
+				break;
+
+			default:
+				break;
+			}
 		}
 
 		mon_data->ref.last_capture_time = *last_capture_time;
@@ -1012,7 +729,7 @@ static ssize_t slc_mon_stats_print_data_v1(void *buf, struct qcom_slc_capability
 	struct slc_client_capability *slc_client_cap;
 
 	slc_client_cap = slc_capability->slc_client_cap;
-	len = scnprintf(buf, SZ_4K, "timestamp=%llu\n", last_capture_time);
+	len = scnprintf(buf, PAGE_SIZE, "timestamp=%llu\n", last_capture_time);
 	for (client_idx = 0; client_idx < slc_capability->num_clients; client_idx++) {
 		switch (slc_client_cap->client_info.num_part_id) {
 		case 1:
@@ -1021,27 +738,27 @@ static ssize_t slc_mon_stats_print_data_v1(void *buf, struct qcom_slc_capability
 				break;
 			}
 
-			len += scnprintf(buf + len, SZ_4K - len, "%s:\n",
+			len += scnprintf(buf + len, PAGE_SIZE - len, "%s:\n",
 					slc_client_cap->client_name);
 
 			if (data_v1->mon_enabled & (1 << cap_mon_support))
-				len += scnprintf(buf + len, SZ_4K - len, "cap_cnt=%d,",
+				len += scnprintf(buf + len, PAGE_SIZE - len, "cap_cnt=%d,",
 						data_v1->num_cache_lines);
 
 			if (data_v1->mon_enabled & (1 << read_miss_mon_support))
-				len += scnprintf(buf + len, SZ_4K - len,
+				len += scnprintf(buf + len, PAGE_SIZE - len,
 						"miss_cnt=%llu,", data_v1->rd_misses);
 
 			if (data_v1->mon_enabled & (1 << fe_mon_support))
-				len += scnprintf(buf + len, SZ_4K - len, "fe_bytes=%llu,",
+				len += scnprintf(buf + len, PAGE_SIZE - len, "fe_bytes=%llu,",
 						data_v1->fe_rd_bytes + data_v1->fe_wr_bytes);
 
 			if (data_v1->mon_enabled & (1 << be_mon_support))
-				len += scnprintf(buf + len, SZ_4K - len, "be_bytes=%llu,",
+				len += scnprintf(buf + len, PAGE_SIZE - len, "be_bytes=%llu,",
 						data_v1->be_rd_bytes + data_v1->be_wr_bytes);
 
 			len -= 1;
-			len += scnprintf(buf + len, SZ_4K - len, "\n");
+			len += scnprintf(buf + len, PAGE_SIZE - len, "\n");
 			data_v1++;
 			break;
 
@@ -1061,43 +778,43 @@ static ssize_t slc_mon_stats_print_data_v1(void *buf, struct qcom_slc_capability
 				if (!part_idx) {
 					if (data_v1->mon_enabled & ((1 << fe_mon_support) |
 							(1 << be_mon_support)))
-						len += scnprintf(buf + len, SZ_4K - len,
+						len += scnprintf(buf + len, PAGE_SIZE - len,
 								"%s:\n",
 								slc_client_cap->client_name);
 
 					if (data_v1->mon_enabled & (1 << fe_mon_support))
-						len += scnprintf(buf + len, SZ_4K - len,
+						len += scnprintf(buf + len, PAGE_SIZE - len,
 							"fe_bytes=%llu,",
 							data_v1->fe_rd_bytes +
 							data_v1->fe_wr_bytes);
 
 					if (data_v1->mon_enabled & (1 << be_mon_support))
-						len += scnprintf(buf + len, SZ_4K - len,
+						len += scnprintf(buf + len, PAGE_SIZE - len,
 							"be_bytes=%llu,",
 							data_v1->be_rd_bytes +
 							data_v1->be_wr_bytes);
 
 					len -= 1;
-					len += scnprintf(buf + len, SZ_4K - len, "\n");
+					len += scnprintf(buf + len, PAGE_SIZE - len, "\n");
 				}
 
 				if (data_v1->mon_enabled & ((1 << cap_mon_support) |
 							(1 << read_miss_mon_support)))
-					len += scnprintf(buf + len, SZ_4K - len,
+					len += scnprintf(buf + len, PAGE_SIZE - len,
 							"%s part %d:\n",
 							slc_client_cap->client_name,
 							part_idx);
 
 				if (data_v1->mon_enabled & (1 << cap_mon_support))
-					len += scnprintf(buf + len, SZ_4K - len, "cap_cnt=%d,",
+					len += scnprintf(buf + len, PAGE_SIZE - len, "cap_cnt=%d,",
 							data_v1->num_cache_lines);
 
 				if (data_v1->mon_enabled & (1 << read_miss_mon_support))
-					len += scnprintf(buf + len, SZ_4K - len,
+					len += scnprintf(buf + len, PAGE_SIZE - len,
 							"miss_cnt=%llu,", data_v1->rd_misses);
 
 				len -= 1;
-				len += scnprintf(buf + len, SZ_4K - len, "\n");
+				len += scnprintf(buf + len, PAGE_SIZE - len, "\n");
 				data_v1++;
 			}
 			break;
@@ -1105,96 +822,6 @@ static ssize_t slc_mon_stats_print_data_v1(void *buf, struct qcom_slc_capability
 
 		slc_client_cap++;
 	}
-	/* check total fe/be enabled then print then print total traffic. */
-	if ((data_v1->mon_enabled & (1 << fe_mon_support)) ||
-			(data_v1->mon_enabled & (1 << be_mon_support)))
-		len += scnprintf(buf + len, SZ_4K - len, "total:\n");
-
-	if (data_v1->mon_enabled & (1 << fe_mon_support))
-		len += scnprintf(buf + len, SZ_4K - len, "fe_bytes=%llu,",
-							data_v1->fe_rd_bytes +
-							data_v1->fe_wr_bytes);
-
-	if (data_v1->mon_enabled & (1 << be_mon_support))
-		len += scnprintf(buf + len, SZ_4K - len, "be_bytes=%llu,",
-							data_v1->be_rd_bytes +
-							data_v1->be_wr_bytes);
-
-	len -= 1;
-	len += scnprintf(buf + len, SZ_4K - len, "\n");
-
-
-	return len;
-}
-
-static ssize_t slc_mon_stats_print_data_v2(void *buf, struct qcom_slc_capability *slc_capability,
-		volatile struct qcom_slc_mon_data_v2 *data_v2,  uint64_t last_capture_time)
-{
-	ssize_t len;
-	int client_idx, part_idx;
-	struct slc_client_capability *slc_client_cap;
-
-	slc_client_cap = slc_capability->slc_client_cap;
-	len = scnprintf(buf, SZ_4K, "timestamp=%llu\n", last_capture_time);
-	for (client_idx = 0; client_idx < slc_capability->num_clients; client_idx++) {
-		for (part_idx = 0; part_idx < slc_client_cap->client_info.num_part_id; part_idx++) {
-			if (slc_client_cap->slc_partid_cap[part_idx].v1_cap.mon_support == 0)
-				continue;
-
-			if (!data_v2->mon_enabled) {
-				data_v2++;
-				continue;
-			}
-
-			if (slc_client_cap->client_info.num_part_id == 1) {
-				len += scnprintf(buf + len, SZ_4K - len, "%s:\n",
-						slc_client_cap->client_name);
-			} else {
-				len += scnprintf(buf + len, SZ_4K - len, "%s part %d:\n",
-						slc_client_cap->client_name, part_idx);
-			}
-
-			if (data_v2->mon_enabled & (1 << cap_mon_support))
-				len += scnprintf(buf + len, SZ_4K - len, "cap_cnt=%d,",
-						data_v2->num_cache_lines);
-
-			if (data_v2->mon_enabled & (1 << read_miss_mon_support))
-				len += scnprintf(buf + len, SZ_4K - len,
-						"miss_cnt=%llu,", data_v2->rd_misses);
-
-			if (data_v2->mon_enabled & (1 << fe_mon_support))
-				len += scnprintf(buf + len, SZ_4K - len, "fe_bytes=%llu,",
-						data_v2->fe_bytes);
-
-			if (data_v2->mon_enabled & (1 << be_mon_support))
-				len += scnprintf(buf + len, SZ_4K - len, "be_bytes=%llu,",
-						data_v2->be_bytes);
-
-			len -= 1;
-			len += scnprintf(buf + len, SZ_4K - len, "\n");
-			data_v2++;
-
-		}
-
-		slc_client_cap++;
-	}
-
-	/* check total fe/be enabled then print then print total traffic. */
-	data_v2++;
-	if ((data_v2->mon_enabled & (1 << fe_mon_support)) ||
-			(data_v2->mon_enabled & (1 << be_mon_support)))
-		len += scnprintf(buf + len, SZ_4K - len, "total:\n");
-
-	if (data_v2->mon_enabled & (1 << fe_mon_support))
-		len += scnprintf(buf + len, SZ_4K - len, "fe_bytes=%llu,",
-							data_v2->fe_bytes);
-
-	if (data_v2->mon_enabled & (1 << be_mon_support))
-		len += scnprintf(buf + len, SZ_4K - len, "be_bytes=%llu,",
-							data_v2->be_bytes);
-
-	len -= 1;
-	len += scnprintf(buf + len, SZ_4K - len, "\n");
 
 	return len;
 }
@@ -1209,7 +836,7 @@ static ssize_t slc_mon_stats_print_data(void *buf, struct qcom_slc_capability *s
 	volatile struct slc_read_miss_cntr *rd_miss_stats;
 
 	slc_client_cap = slc_capability->slc_client_cap;
-	len = scnprintf(buf, SZ_4K, "timestamp=%llu\n", last_capture_time);
+	len = scnprintf(buf, PAGE_SIZE, "timestamp=%llu\n", last_capture_time);
 	for (client_idx = 0; client_idx < slc_capability->num_clients;
 			client_idx++) {
 		switch (slc_client_cap->client_info.num_part_id) {
@@ -1222,20 +849,20 @@ static ssize_t slc_mon_stats_print_data(void *buf, struct qcom_slc_capability *s
 				break;
 			}
 
-			len += scnprintf(buf + len, SZ_4K - len, "%s:\n",
+			len += scnprintf(buf + len, PAGE_SIZE - len, "%s:\n",
 					slc_client_cap->client_name);
 
 			if (cap_stats->cap_enabled)
-				len += scnprintf(buf + len, SZ_4K - len, "cap_cnt=%d,",
+				len += scnprintf(buf + len, PAGE_SIZE - len, "cap_cnt=%d,",
 						cap_stats->num_cache_lines);
 
 
 			if (rd_miss_stats->miss_enabled)
-				len += scnprintf(buf + len, SZ_4K - len, "miss_cnt=%llu,",
+				len += scnprintf(buf + len, PAGE_SIZE - len, "miss_cnt=%llu,",
 						rd_miss_stats->rd_misses);
 
 			len -= 1;
-			len += scnprintf(buf + len, SZ_4K - len, "\n");
+			len += scnprintf(buf + len, PAGE_SIZE - len, "\n");
 			data++;
 			break;
 		default:
@@ -1250,23 +877,23 @@ static ssize_t slc_mon_stats_print_data(void *buf, struct qcom_slc_capability *s
 					continue;
 				}
 
-				len += scnprintf(buf + len, SZ_4K - len,
+				len += scnprintf(buf + len, PAGE_SIZE - len,
 						"%s part %d:\n",
 						slc_client_cap->client_name,
 						part_idx);
 
 				if (cap_stats->cap_enabled)
-					len += scnprintf(buf + len, SZ_4K - len,
+					len += scnprintf(buf + len, PAGE_SIZE - len,
 							"cap_cnt=%d,",
 							cap_stats->num_cache_lines);
 
 				if (rd_miss_stats->miss_enabled)
-					len += scnprintf(buf + len, SZ_4K - len,
+					len += scnprintf(buf + len, PAGE_SIZE - len,
 							"miss_cnt=%llu,",
 							rd_miss_stats->rd_misses);
 
 				len -= 1;
-				len += scnprintf(buf + len, SZ_4K - len, "\n");
+				len += scnprintf(buf + len, PAGE_SIZE - len, "\n");
 				data++;
 			}
 
@@ -1288,8 +915,7 @@ static int slc_mon_stats_print(struct device *dev, void *msc_partid, void *buf)
 	union qcom_slc_monitor_memory *mon_mem;
 	volatile struct qcom_slc_mon_data *data;
 	volatile struct qcom_slc_mon_data_v1 *data_v1;
-	volatile struct qcom_slc_mon_data_v2 *data_v2;
-	volatile uint32_t *match_seq_ptr = NULL;
+	volatile uint32_t *match_seq_ptr;
 	volatile uint64_t *last_capture_time;
 
 	qcom_msc = (struct qcom_mpam_msc *)dev_get_drvdata(dev);
@@ -1299,48 +925,20 @@ static int slc_mon_stats_print(struct device *dev, void *msc_partid, void *buf)
 	slc_capability = (struct qcom_slc_capability *)qcom_msc->msc_capability;
 	mon_mem = (union qcom_slc_monitor_memory *)qcom_msc->mon_base;
 
-	switch (slc_capability->firmware_ver.firmware_version) {
-	case SLC_MPAM_VERSION_0:
+	if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0) {
 		match_seq_ptr = &(mon_mem->mem_v0.match_seq);
 		last_capture_time = &(mon_mem->mem_v0.last_capture_time);
-		break;
-
-	case SLC_MPAM_VERSION_0_3:
+	} else {
 		match_seq_ptr = &(mon_mem->mem_v1.match_seq);
 		last_capture_time = &(mon_mem->mem_v1.last_capture_time);
-		break;
-
-	case SLC_MPAM_VERSION_1_0:
-		match_seq_ptr = &(mon_mem->mem_v2.match_seq);
-		last_capture_time = &(mon_mem->mem_v2.last_capture_time);
-		break;
-
-	default:
-		break;
 	}
-
-	if (match_seq_ptr == NULL)
-		return -EINVAL;
 
 	do {
 		retry_cnt = 0;
-
-		switch (slc_capability->firmware_ver.firmware_version) {
-		case SLC_MPAM_VERSION_0:
+		if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0)
 			data = &(mon_mem->mem_v0.data[0]);
-			break;
-
-		case SLC_MPAM_VERSION_0_3:
+		else
 			data_v1 = &(mon_mem->mem_v1.data[0]);
-			break;
-
-		case SLC_MPAM_VERSION_1_0:
-			data_v2 = &(mon_mem->mem_v2.data[0]);
-			break;
-
-		default:
-			break;
-		}
 
 		while (unlikely((match_seq = *match_seq_ptr) % 2)
 				&& (retry_cnt++ < MAX_SHARED_MEM_RETRY_CNT))
@@ -1351,25 +949,12 @@ static int slc_mon_stats_print(struct device *dev, void *msc_partid, void *buf)
 			return -EIO;
 		}
 
-		switch (slc_capability->firmware_ver.firmware_version) {
-		case SLC_MPAM_VERSION_0:
+		if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0)
 			len = slc_mon_stats_print_data(buf, slc_capability, data,
 					*last_capture_time);
-			break;
-
-		case SLC_MPAM_VERSION_0_3:
+		else
 			len = slc_mon_stats_print_data_v1(buf, slc_capability, data_v1,
 					*last_capture_time);
-			break;
-
-		case SLC_MPAM_VERSION_1_0:
-			len = slc_mon_stats_print_data_v2(buf, slc_capability, data_v2,
-					*last_capture_time);
-			break;
-
-		default:
-			break;
-		}
 
 	} while ((match_seq != *match_seq_ptr) && (match_seq_cnt++ < MAX_SHARED_MATCH_SEQ_CNT));
 
@@ -1398,8 +983,7 @@ static int slc_client_info_read(struct device *dev, struct device_node *node)
 	struct slc_client_capability *client_cap;
 	struct qcom_slc_capability *slc_capability;
 	struct qcom_slc_mon_mem_v1 *mon_mem;
-	struct qcom_slc_mon_mem_v2 *mon_mem_v2;
-	struct slc_sct_client_info *client_info = NULL;
+	struct slc_sct_client_info *client_info;
 	struct slc_client_details *client_details;
 
 	qcom_msc = (struct qcom_mpam_msc *)dev_get_drvdata(dev);
@@ -1411,36 +995,13 @@ static int slc_client_info_read(struct device *dev, struct device_node *node)
 	query.qcom_msc_id.qcom_msc_class = qcom_msc->qcom_msc_id.qcom_msc_class;
 	query.qcom_msc_id.idx = qcom_msc->qcom_msc_id.idx;
 	if (slc_capability->firmware_ver.firmware_version != SLC_MPAM_VERSION_0) {
-		if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0_3) {
-			mon_mem = (struct qcom_slc_mon_mem_v1 *)qcom_msc->mon_base;
-			client_info = (struct slc_sct_client_info *)&(mon_mem->data);
-			pr_info("SLC Monitor size %lld\n", mon_mem->slc_mpam_monitor_size);
-		} else if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_1_0) {
-			mon_mem_v2 = (struct qcom_slc_mon_mem_v2 *)qcom_msc->mon_base;
-			client_info = (struct slc_sct_client_info *)&(mon_mem_v2->data);
-			pr_info("SLC Monitor size %lld\n", mon_mem_v2->slc_mpam_monitor_size);
-		}
-
-		if (client_info == NULL)
-			return -EINVAL;
-
+		mon_mem = (struct qcom_slc_mon_mem_v1 *)qcom_msc->mon_base;
+		client_info = (struct slc_sct_client_info *)&(mon_mem->data);
 		slc_capability->num_clients = client_info->num_clients;
 		slc_capability->slc_mon_list.capacity_config_available =
 			client_info->slc_mon_info.num_cap_monitor;
 		slc_capability->slc_mon_list.read_miss_config_available =
 			client_info->slc_mon_info.num_miss_monitor;
-		if (slc_capability->firmware_ver.firmware_version >= SLC_MPAM_VERSION_0_3) {
-			slc_capability->slc_mon_list.total_fe_mon_config_avail =
-				MAX_TOTAL_MON_AVAILABLE;
-			slc_capability->slc_mon_list.total_be_mon_config_avail =
-				MAX_TOTAL_MON_AVAILABLE;
-		}
-		if (slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_1_0) {
-			slc_capability->slc_mon_list.fe_mon_config_available =
-				client_info->slc_mon_info.num_slc_fe_bw_monitor;
-			slc_capability->slc_mon_list.be_mon_config_available =
-				client_info->slc_mon_info.num_slc_be_bw_monitor;
-		}
 		if ((slc_capability->num_clients == 0) ||
 				(client_info->slc_mon_info.num_cap_monitor == 0) ||
 				(client_info->slc_mon_info.num_miss_monitor == 0)) {
@@ -1448,6 +1009,7 @@ static int slc_client_info_read(struct device *dev, struct device_node *node)
 			return -EINVAL;
 		}
 
+		pr_info("SLC Monitor size %lld\n", mon_mem->slc_mpam_monitor_size);
 		pr_info("Number of SLC MPAM clients %d\n", slc_capability->num_clients);
 		slc_capability->slc_client_cap = devm_kcalloc(dev, slc_capability->num_clients,
 				sizeof(struct slc_client_capability), GFP_KERNEL);
@@ -1622,6 +1184,12 @@ static int mpam_msc_slc_probe(struct platform_device *pdev)
 		return dev_err_probe(&pdev->dev, PTR_ERR(qcom_msc->scmi_ops),
 				"Error getting vendor protocol ops\n");
 
+	llcc_perfmon_clock = devm_clk_get(&pdev->dev, "qdss_clk");
+	if (IS_ERR_OR_NULL(llcc_perfmon_clock)) {
+		pr_warn("failed to get qdss clock node\n");
+		llcc_perfmon_clock = NULL;
+	}
+
 	qcom_msc->qcom_msc_id.qcom_msc_type = SLC;
 	qcom_msc->qcom_msc_id.qcom_msc_class = CACHE_TYPE;
 	qcom_msc->ops = &slc_msc_ops;
@@ -1687,14 +1255,6 @@ static int mpam_msc_slc_probe(struct platform_device *pdev)
 		goto err_detach;
 	}
 
-	if (qcom_slc_capability->firmware_ver.firmware_version == SLC_MPAM_VERSION_0_3) {
-		llcc_perfmon_clock = devm_clk_get(&pdev->dev, "qdss_clk");
-		if (IS_ERR_OR_NULL(llcc_perfmon_clock)) {
-			pr_warn("failed to get qdss clock node\n");
-			llcc_perfmon_clock = NULL;
-		}
-	}
-
 	if (qcom_slc_capability->firmware_ver.firmware_version != SLC_MPAM_VERSION_0) {
 		/* SLC Monitor memory programmed here on updated firmware */
 		ret = slc_mpam_start_stop(&pdev->dev, mpam_slc_mon_init_v1);
@@ -1710,10 +1270,6 @@ static int mpam_msc_slc_probe(struct platform_device *pdev)
 			qcom_slc_capability->firmware_ver.ver.fixes);
 	qcom_slc_capability->slc_mon_configured.read_miss_configured = 0;
 	qcom_slc_capability->slc_mon_configured.capacity_configured = 0;
-	qcom_slc_capability->slc_mon_configured.fe_mon_configured = 0;
-	qcom_slc_capability->slc_mon_configured.be_mon_configured = 0;
-	qcom_slc_capability->slc_mon_configured.total_fe_mon_configured = 0;
-	qcom_slc_capability->slc_mon_configured.total_be_mon_configured = 0;
 	qcom_msc->mpam_available = MPAM_MONITRS_AVAILABLE;
 	return 0;
 

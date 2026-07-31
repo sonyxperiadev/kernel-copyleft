@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  */
 
 #ifndef __GH_RM_DRV_H
@@ -283,48 +284,6 @@ struct gh_vm_auth_param_entry {
 	u32 auth_param;
 } __packed;
 
-typedef union {
-	struct {
-		u8 type;
-		u8 reserved1;
-		__le16 reserved2;
-		__le32 size;
-		__le64 base_addr;
-	} __packed iomem;
-	struct {
-		u8 type;
-		u8 reserved1;
-		__le16 reserved2;
-		__le32 irq;
-		__le64 reserved3;
-	} __packed irq;
-	struct {
-		u8 type;
-		u8 reserved1;
-		__le16 reserved2;
-		__le32 iommu_hdl;
-		__le32 endpt_id_base;
-		__le32 endpt_id_count;
-	} __packed iommu;
-	struct {
-		u8 type;
-		u8 reserved1;
-		__le16 reserved2;
-		__le32 rtr_hdl;
-		__le32 endpt_id_base;
-		__le32 endpt_id_count;
-	} __packed msi;
-	struct {
-		u8 type;
-		u8 reserved1;
-		__le16 responder_id;
-		__le32 rc_hdl;
-		__le64 reserved2;
-	} __packed pcie;
-} __packed gh_dev_rsc_desc;
-_Static_assert(sizeof(gh_dev_rsc_desc) == 16,
-	       "gh_dev_rsc_desc: Invalid size, expected 16 bytes.");
-
 /* Arch specific APIs */
 #if IS_ENABLED(CONFIG_GH_ARM64_DRV)
 /* IRQ APIs */
@@ -500,16 +459,10 @@ int gh_rm_minidump_register_range(phys_addr_t base_ipa, size_t region_size,
 int gh_rm_minidump_deregister_slot(uint16_t slot_num);
 int gh_rm_minidump_get_slot_from_name(uint16_t starting_slot, const char *name,
 				      size_t name_size);
-/* API for device management */
-int gh_rm_device_find_handle(gh_dev_rsc_desc *rsc_desc, gh_dev_handle_t *hdl);
-void *gh_rm_device_get_resources(gh_dev_handle_t dev_hdl, u8 flags, int *n_rsc);
-int gh_rm_device_accept(gh_dev_handle_t dev_hdl, u8 flags, gh_dev_handle_t bus_hdl);
-int gh_rm_device_lend(gh_dev_handle_t dev_hdl, gh_vmid_t vmid, u8 flags);
-int gh_rm_device_release(gh_dev_handle_t dev_hdl, u8 flags);
-int gh_rm_device_reclaim(gh_dev_handle_t dev_hdl, u8 flags);
-int gh_rm_device_bus_lockdown(gh_dev_handle_t dev_hdl);
-int gh_rm_device_bus_unlock(gh_dev_handle_t dev_hdl);
-
+bool gh_rm_needs_scm_assign(u64 *src, const struct qcom_scm_vmperm *newvm,
+				unsigned int dest_cnt);
+bool gh_rm_needs_hyp_assign(u32 *src_vm_list, int source_nelems,
+				int *dst_vm_list, int dst_nelems);
 #else
 /* RM client register notifications APIs */
 static inline int gh_rm_register_notifier(struct notifier_block *nb)
@@ -865,46 +818,15 @@ static inline int gh_rm_ipa_reserve(u64 size, u64 align, struct range limits,
 	return -EINVAL;
 }
 
-static inline int gh_rm_device_find_handle(gh_dev_rsc_desc *rsc_desc, gh_dev_handle_t *hdl)
+static inline bool gh_rm_needs_scm_assign(u64 *src, const struct qcom_scm_vmperm *newvm,
+				unsigned int dest_cnt)
 {
-	return -EINVAL;
+	return true;
 }
-
-static inline void *gh_rm_device_get_resources(gh_dev_handle_t dev_hdl, u8 flags, int *n_rsc)
+static inline bool gh_rm_needs_hyp_assign(u32 *src_vm_list, int source_nelems,
+				int *dst_vm_list, int dst_nelems)
 {
-	return ERR_PTR(-EINVAL);
+	return true;
 }
-
-static inline int gh_rm_device_bus_lockdown(gh_dev_handle_t dev_hdl)
-{
-	return -EINVAL;
-}
-
-static inline int gh_rm_device_bus_unlock(gh_dev_handle_t dev_hdl)
-{
-	return -EINVAL;
-}
-
-static inline int gh_rm_device_accept(gh_dev_handle_t dev_hdl, u8 flags,
-		gh_dev_handle_t bus_hdl)
-{
-	return -EINVAL;
-}
-
-static inline int gh_rm_device_lend(gh_dev_handle_t dev_hdl, gh_vmid_t vmid, u8 flags)
-{
-	return -EINVAL;
-}
-
-static inline int gh_rm_device_release(gh_dev_handle_t dev_hdl, u8 flags)
-{
-	return -EINVAL;
-}
-
-static inline int gh_rm_device_reclaim(gh_dev_handle_t dev_hdl, u8 flags)
-{
-	return -EINVAL;
-}
-
 #endif
 #endif

@@ -654,7 +654,6 @@ struct gpii {
 	bool is_resumed;
 	bool is_multi_desc;
 	int num_msgs;
-	cpumask_t cpu_affinity_mask; /* saved CPU affinity for IRQ, re-applied after deep sleep */
 };
 
 struct gpi_desc {
@@ -1806,11 +1805,9 @@ static int gpi_send_cmd(struct gpii *gpii,
 	/* confirm new ch state is correct , if the cmd is a state change cmd */
 	if (gpi_cmd_info[gpi_cmd].state == STATE_IGNORE)
 		return 0;
-	if (gpii_chan) {
-		if (IS_CHAN_CMD(gpi_cmd) &&
-		    gpii_chan->ch_state == gpi_cmd_info[gpi_cmd].state)
-			return 0;
-	}
+	if (IS_CHAN_CMD(gpi_cmd) &&
+	    gpii_chan->ch_state == gpi_cmd_info[gpi_cmd].state)
+		return 0;
 	if (!IS_CHAN_CMD(gpi_cmd) &&
 	    gpii->ev_state == gpi_cmd_info[gpi_cmd].state)
 		return 0;
@@ -2300,26 +2297,6 @@ static void gpi_process_qup_notif_event(struct gpii_chan *gpii_chan,
 			      client_info->cb_param);
 }
 
-static void gpi_free_all_chan_desc(struct gpii_chan *gpii_chan)
-{
-	struct virt_dma_chan *vc = &gpii_chan->vc;
-	struct virt_dma_desc *vd, *temp;
-	unsigned long flags;
-	LIST_HEAD(head);
-
-	GPII_VERB(gpii_chan->gpii, gpii_chan->chid, "Freeing all pending descriptors\n");
-	spin_lock_irqsave(&vc->lock, flags);
-	vchan_get_all_descriptors(vc, &head);
-	spin_unlock_irqrestore(&vc->lock, flags);
-
-	list_for_each_entry_safe(vd, temp, &head, node) {
-		struct gpi_desc *gpi_desc = to_gpi_desc(vd);
-
-		list_del(&vd->node);
-		kfree(gpi_desc);
-	}
-}
-
 /* free gpi_desc for the specified channel */
 static void gpi_free_chan_desc(struct gpii_chan *gpii_chan)
 {
@@ -2489,7 +2466,7 @@ static void gpi_process_xfer_compl_event(struct gpii_chan *gpii_chan,
 {
 	struct gpii *gpii = gpii_chan->gpii;
 	struct gpi_ring *ch_ring = gpii_chan->ch_ring;
-	void *ev_rp;
+	void *ev_rp = to_virtual(ch_ring, compl_event->ptr);
 	struct virt_dma_desc *vd;
 	struct msm_gpi_dma_async_tx_cb_param *tx_cb_param;
 	struct gpi_desc *gpi_desc;
@@ -2506,29 +2483,6 @@ static void gpi_process_xfer_compl_event(struct gpii_chan *gpii_chan,
 				      __LINE__);
 		return;
 	}
-
-	/* Validate TRE address belongs to this channel before converting to virtual */
-	if (compl_event->ptr < ch_ring->phys_addr ||
-	    compl_event->ptr >= ch_ring->phys_addr + ch_ring->len) {
-		struct gpi_ere *gpi_ere;
-
-		GPII_ERR(gpii, gpii_chan->chid,
-			 "TRE address 0x%llx not in channel ring! ring:[0x%llx-0x%llx]\n",
-			 compl_event->ptr, ch_ring->phys_addr,
-			 ch_ring->phys_addr + ch_ring->len);
-		gpi_ere = (struct gpi_ere *)compl_event;
-		GPII_ERR(gpii, gpii_chan->chid, "Event: %08x %08x %08x %08x\n",
-			 gpi_ere->dword[0], gpi_ere->dword[1],
-			 gpi_ere->dword[2], gpi_ere->dword[3]);
-
-		/* Don't update ring pointers with invalid TRE address */
-		gpi_generate_cb_event(gpii_chan, MSM_GPI_QUP_EOT_DESC_MISMATCH,
-				      __LINE__);
-		return;
-	}
-
-	/* Safe to convert: TRE address validated */
-	ev_rp = to_virtual(ch_ring, compl_event->ptr);
 
 	spin_lock_irqsave(&gpii_chan->vc.lock, flags);
 	vd = vchan_next_desc(&gpii_chan->vc);
@@ -2619,11 +2573,6 @@ static void gpi_process_xfer_compl_event(struct gpii_chan *gpii_chan,
 			goto gpi_free_desc;
 	}
 	tx_cb_param = vd->tx.callback_param;
-
-	GPII_INFO(gpii, gpii_chan->chid,
-		  "DEBUG: vd:%p vd->tx:%p vd->tx.callback:%p tx_cb_param:%p\n",
-		 vd, &vd->tx, vd->tx.callback, tx_cb_param);
-
 	if (vd->tx.callback && tx_cb_param) {
 		GPII_VERB(gpii, gpii_chan->chid,
 			  "cb_length:%u compl_code:0x%x status:0x%x\n",
@@ -3334,6 +3283,7 @@ int gpi_terminate_all(struct dma_chan *chan)
 	struct gpii *gpii = gpii_chan->gpii;
 	int schid, echid, i;
 	int ret = 0;
+	bool stop_cmd_failed = false;
 	u32 ch_state;
 
 	GPII_INFO(gpii, gpii_chan->chid, "Enter\n");
@@ -3361,30 +3311,29 @@ int gpi_terminate_all(struct dma_chan *chan)
 		if (ret) {
 			GPII_ERR(gpii, gpii_chan->chid,
 				 "Error Stopping Chan:%d resetting\n", ret);
+			stop_cmd_failed = true;
 		} else {
 			gpi_noop_tre(gpii_chan);
 			if (gpii->protocol == SE_PROTOCOL_UART)
 				gpi_free_chan_desc(gpii_chan);
-			else
-				gpi_free_all_chan_desc(gpii_chan);
 		}
 	}
 
-	/* Reset the channels (clears any pending TREs) */
-	if (!gpii->reg_table_dump) {
-		gpi_dump_debug_reg(gpii);
-		gpii->reg_table_dump = true;
-	}
-	for (i = schid; i < echid; i++) {
-		gpii_chan = &gpii->gpii_chan[i];
+	/* Reset channels if stop command fails */
+	if (stop_cmd_failed) {
+		if (!gpii->reg_table_dump) {
+			gpi_dump_debug_reg(gpii);
+			gpii->reg_table_dump = true;
+		}
 		ch_state = gpi_read_ch_state(gpii_chan);
 		GPII_ERR(gpii, gpii_chan->chid, "CH state state:%s\n",
 			 TO_GPI_CH_STATE_STR(ch_state));
-		if (ch_state != CH_STATE_STOPPED) {
+		for (i = schid; i < echid; i++) {
+			gpii_chan = &gpii->gpii_chan[i];
 			ret = gpi_reset_chan(gpii_chan, GPI_CH_CMD_RESET);
 			if (ret) {
-				GPII_ERR(gpii, gpii_chan->chid, "Error resetting channel: %d\n",
-					 ret);
+				GPII_ERR(gpii, gpii_chan->chid,
+					 "Error resetting channel: %d\n", ret);
 				gpi_dump_debug_reg(gpii);
 				goto terminate_exit;
 			}
@@ -3392,8 +3341,8 @@ int gpi_terminate_all(struct dma_chan *chan)
 			/* reprogram channel CNTXT */
 			ret = gpi_alloc_chan(gpii_chan, false);
 			if (ret) {
-				GPII_ERR(gpii, gpii_chan->chid, "Error allocating channel: %d\n",
-					 ret);
+				GPII_ERR(gpii, gpii_chan->chid,
+					 "Error allocating channel: %d\n", ret);
 				goto terminate_exit;
 			}
 		}
@@ -3540,8 +3489,7 @@ static void gpi_noop_tre(struct gpii_chan *gpii_chan)
 		GPII_INFO(gpii, gpii_chan->chid,
 			"local_rp:0x%0llx\n", local_rp);
 	}
-	GPII_INFO(gpii, gpii_chan->chid,
-		  "DEBUG: After noop local_rp:0x%0llx local_wp:0x%0llx\n", local_rp, local_wp);
+
 	GPII_INFO(gpii, gpii_chan->chid, "exit\n");
 }
 
@@ -3758,12 +3706,8 @@ struct dma_async_tx_descriptor *gpi_prep_slave_sg(struct dma_chan *chan,
 		  to_physical(ch_ring, ch_ring->wp), to_physical(ch_ring, ch_ring->rp),
 		  TO_GPI_CH_STATE_STR(ch_state));
 
-	if (ch_state == CH_STATE_ERROR) {
-		GPII_ERR(gpii, gpii_chan->chid,
-			 "Bail out the TRE subimit as Channel is in error state\n");
+	if (ch_state == CH_STATE_ERROR)
 		gpi_dump_debug_reg(gpii);
-		return NULL;
-	}
 
 	/* calculate # of elements required & available */
 	nr = gpi_ring_num_elements_avail(ch_ring);
@@ -3928,19 +3872,6 @@ static int gpi_deep_sleep_exit_config(struct dma_chan *chan)
 		}
 	}
 
-	/* Re-apply CPU affinity for the GPII IRQ if it was previously configured */
-	if (!cpumask_empty(&gpii->cpu_affinity_mask)) {
-		ret = irq_set_affinity_hint(gpii->irq, &gpii->cpu_affinity_mask);
-		if (ret)
-			GPII_CRITIC(gpii, GPI_DBG_COMMON,
-				    "CPU affinity re-apply failed after deep sleep irq:%d ret:%d\n",
-				    gpii->irq, ret);
-		else
-			GPII_INFO(gpii, GPI_DBG_COMMON,
-				  "CPU affinity re-applied after deep sleep irq:%d CPUs:%*pbl\n",
-				  gpii->irq, cpumask_pr_args(&gpii->cpu_affinity_mask));
-	}
-
 	return ret;
 
 error_start_chan:
@@ -4072,23 +4003,6 @@ static int gpi_config(struct dma_chan *chan,
 			  "sending UART RFR READY NOT READY cmd\n");
 		ret = gpi_send_cmd(gpii, gpii_chan,
 				   GPI_CH_CMD_UART_RFR_NOT_READY);
-		break;
-	case MSM_GPI_SET_CPU_AFFINITY:
-		if (!cpumask_empty(&gpi_ctrl->cpu_affinity.cpu_mask)) {
-			ret = irq_set_affinity_hint(gpii->irq, &gpi_ctrl->cpu_affinity.cpu_mask);
-			if (ret) {
-				GPII_CRITIC(gpii, GPI_DBG_COMMON,
-					    "CPU affinity set failed irq:%d ret:%d\n",
-					    gpii->irq, ret);
-				ret = -EINVAL;
-				break;
-			}
-			/* Save mask so it can be re-applied after deep sleep resume */
-			cpumask_copy(&gpii->cpu_affinity_mask, &gpi_ctrl->cpu_affinity.cpu_mask);
-			GPI_LOG(gpii->gpi_dev, "gpii:%d CPU affinity set: irq:%d CPUs:%*pbl\n",
-				gpii->gpii_id, gpii->irq,
-				cpumask_pr_args(&gpi_ctrl->cpu_affinity.cpu_mask));
-		}
 		break;
 	default:
 		GPII_ERR(gpii, gpii_chan->chid,

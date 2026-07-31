@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  */
 
@@ -47,23 +47,6 @@ TRACE_EVENT(pdp0_log,
 );
 
 TRACE_EVENT(pdp1_log,
-
-	TP_PROTO(char *str),
-
-	TP_ARGS(str),
-
-	TP_STRUCT__entry(
-		__string(str, str)
-	),
-
-	TP_fast_assign(
-		__assign_str(str);
-	),
-
-	TP_printk("%s\n", __get_str(str))
-);
-
-TRACE_EVENT(pdp2_log,
 
 	TP_PROTO(char *str),
 

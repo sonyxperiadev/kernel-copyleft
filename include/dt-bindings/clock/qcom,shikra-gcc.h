@@ -214,14 +214,6 @@
 #define GCC_VIDEO_VENUS_CLK_SRC					204
 #define GCC_VIDEO_VENUS_CTL_CLK					205
 #define GCC_VIDEO_XO_CLK					206
-#define GCC_DDRSS_GPU_AXI_CLK					207
-#define GCC_EMAC0_AXI_CLK_SRC					208
-#define GCC_EMAC0_AXI_SYS_NOC_CLK				209
-#define GCC_EMAC1_AXI_CLK_SRC					210
-#define GCC_EMAC1_AXI_SYS_NOC_CLK				211
-#define GCC_PCIE_TILE_AXI_SYS_NOC_CLK				212
-#define GCC_LPASS_CONFIG_CLK					213
-#define GCC_LPASS_CORE_AXIM_CLK					214
 
 /* GCC power domains */
 #define GCC_CAMSS_TOP_GDSC					0

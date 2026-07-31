@@ -199,12 +199,11 @@ static inline void etm4_os_unlock_csa(struct etmv4_drvdata *drvdata,
 	drvdata->os_unlock = true;
 }
 
-void etm4_os_unlock(struct etmv4_drvdata *drvdata)
+static void etm4_os_unlock(struct etmv4_drvdata *drvdata)
 {
 	if (!WARN_ON(!drvdata->csdev))
 		etm4_os_unlock_csa(drvdata, &drvdata->csdev->access);
 }
-EXPORT_SYMBOL_GPL(etm4_os_unlock);
 
 static void etm4_os_lock(struct etmv4_drvdata *drvdata)
 {
@@ -2280,7 +2279,7 @@ static int etm_suspend(struct device *dev)
 {
 	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev);
 
-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
+	if (pm_suspend_via_firmware())
 		coresight_disable_sysfs(drvdata->csdev);
 
 	return 0;

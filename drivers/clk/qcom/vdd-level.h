@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2019, The Linux Foundation. All rights reserved. */
-/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. */
+/* Copyright (c) 2024-2025, Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #ifndef __DRIVERS_CLK_QCOM_VDD_LEVEL_H
 #define __DRIVERS_CLK_QCOM_VDD_LEVEL_H
@@ -10,7 +10,6 @@
 
 enum vdd_levels {
 	VDD_NONE,
-	VDD_RET,		/* RETENTION */
 	VDD_MIN,		/* MIN_SVS */
 	VDD_LOWER_D3,		/* LOW_SVS_D3 */
 	VDD_LOWER_D2,		/* LOW_SVS_D2 */
@@ -29,7 +28,6 @@ enum vdd_levels {
 
 static int vdd_corner[] = {
 	[VDD_NONE]		= 0,
-	[VDD_RET]		= RPMH_REGULATOR_LEVEL_RETENTION,
 	[VDD_MIN]		= RPMH_REGULATOR_LEVEL_MIN_SVS,
 	[VDD_LOWER_D3]		= RPMH_REGULATOR_LEVEL_LOW_SVS_D3,
 	[VDD_LOWER_D2]		= RPMH_REGULATOR_LEVEL_LOW_SVS_D2,

@@ -375,26 +375,6 @@ static ssize_t reclaim_store(struct kobject *kobj, struct kobj_attribute *attr,
 	return 0;
 }
 
-static ssize_t rx_pending_show(struct kobject *kobj, struct kobj_attribute *attr,
-		char *buf)
-{
-	return 0;
-}
-
-static ssize_t rx_pending_store(struct kobject *kobj, struct kobj_attribute *attr,
-		const char *buf, size_t count)
-{
-	int ret;
-
-	ret = hab_stat_store_rx_pending(buf, (int)PAGE_SIZE);
-	if (ret) {
-		pr_err("failed due to invalid input\n");
-		return 0;
-	}
-
-	return (ssize_t)count;
-}
-
 static struct kobj_attribute vchan_attribute = __ATTR(vchan_stat, 0660,
 								vchan_show,
 								vchan_store);
@@ -415,9 +395,6 @@ static struct kobj_attribute virq_attribute = __ATTR(virq_stat, 0660,
 								virq_show,
 								virq_store);
 
-static struct kobj_attribute rx_pending_attribute = __ATTR(rx_pending, 0660,
-								rx_pending_show,
-								rx_pending_store);
 
 int hab_stat_init_sub(struct hab_driver *driver)
 {
@@ -447,10 +424,6 @@ int hab_stat_init_sub(struct hab_driver *driver)
 	if (result)
 		pr_debug("cannot add virq in /sys/kernel/hab %d\n", result);
 
-	result = sysfs_create_file(hab_kobject, &rx_pending_attribute.attr);
-	if (result)
-		pr_debug("cannot add rx_limit in /sys/kernel/hab %d\n", result);
-
 	return result;
 }
 
@@ -459,9 +432,7 @@ int hab_stat_deinit_sub(struct hab_driver *driver)
 	sysfs_remove_file(hab_kobject, &vchan_attribute.attr);
 	sysfs_remove_file(hab_kobject, &ctx_attribute.attr);
 	sysfs_remove_file(hab_kobject, &expimp_attribute.attr);
-	sysfs_remove_file(hab_kobject, &reclaim_attribute.attr);
 	sysfs_remove_file(hab_kobject, &virq_attribute.attr);
-	sysfs_remove_file(hab_kobject, &rx_pending_attribute.attr);
 	kobject_put(hab_kobject);
 
 	return 0;

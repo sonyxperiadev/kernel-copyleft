@@ -59,20 +59,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/power/reset/msm-poweroff",
-        out = "msm-poweroff.ko",
-        config = "CONFIG_POWER_RESET_QCOM",
-        srcs = [
-            # do not sort
-            "drivers/power/reset/msm-poweroff.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/firmware/qcom/qcom-scm",
-        ],
-    )
-
-    registry.register(
         name = "drivers/power/reset/msm-vm-poweroff",
         out = "msm-vm-poweroff.ko",
         config = "CONFIG_POWER_RESET_QCOM_VM",

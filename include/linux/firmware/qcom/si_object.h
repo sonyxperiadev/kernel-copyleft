@@ -8,7 +8,6 @@
 
 #include <linux/kref.h>
 #include <linux/completion.h>
-#include <linux/qtee_shmbridge.h>
 
 /* Primordial Object */
 
@@ -190,9 +189,8 @@ struct si_object {
 	struct kref refcount;
 
 	enum si_object_type object_type;
-	struct object_info {
+	union object_info {
 		unsigned long object_ptr;
-		unsigned long long object_cookie;
 	} info;
 
 	struct si_object_operations *ops;

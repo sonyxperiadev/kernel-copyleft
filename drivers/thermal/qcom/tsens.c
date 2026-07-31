@@ -396,8 +396,6 @@ static void tsens_set_interrupt_v1(struct tsens_priv *priv, u32 hw_id,
 		break;
 	case CRITICAL:
 		/* No critical interrupts before v2 */
-	case COLD:
-		/* No cold interrupt before v2 */
 		return;
 	}
 	regmap_field_write(priv->rf[index], enable ? 0 : 1);
@@ -428,9 +426,6 @@ static void tsens_set_interrupt_v2(struct tsens_priv *priv, u32 hw_id,
 		index_mask  = CRIT_INT_MASK_0 + hw_id;
 		index_clear = CRIT_INT_CLEAR_0 + hw_id;
 		break;
-	case COLD:
-		/* Nothing to handle for cold interrupt */
-		return;
 	}
 
 	if (enable) {
@@ -595,35 +590,6 @@ static int tsens_dump_persist_data(struct tsens_priv *priv, struct seq_file *s)
 	}
 
 	return 0;
-}
-
-/**
- * tsens_cold_irq_thread - Threaded interrupt handler for cold interrupt
- * @irq: irq number
- * @data: tsens controller private data
- *
- * Whenever interrupt triggers notify thermal framework using
- * thermal_zone_device_update().
- *
- * Return: IRQ_HANDLED
- */
-
-irqreturn_t tsens_cold_irq_thread(int irq, void *data)
-{
-	struct tsens_priv *priv = data;
-	struct tsens_sensor *s = priv->cold_sensor;
-	int cold_status, ret;
-
-	ret = regmap_field_read(priv->rf[COLD_STATUS], &cold_status);
-	if (ret)
-		return ret;
-
-	dev_dbg(priv->dev, "[%u] %s: cold interrupt is %s\n",
-		s->hw_id, __func__, cold_status ? "triggered" : "cleared");
-
-	thermal_zone_device_update(s->tzd, THERMAL_EVENT_UNSPECIFIED);
-
-	return IRQ_HANDLED;
 }
 
 /**
@@ -837,20 +803,6 @@ static void tsens_disable_irq(struct tsens_priv *priv)
 	regmap_field_write(priv->rf[INT_EN], 0);
 }
 
-int get_cold_int_status(const struct tsens_sensor *s, bool *cold_status)
-{
-	struct tsens_priv *priv = s->priv;
-	int prev_cold = 0, ret;
-
-	ret = regmap_field_read(priv->rf[COLD_STATUS], &prev_cold);
-	if (ret)
-		return ret;
-
-	*cold_status = (bool)prev_cold;
-
-	return 0;
-}
-
 int get_temp_tsens_valid(const struct tsens_sensor *s, int *temp)
 {
 	struct tsens_priv *priv = s->priv;
@@ -1020,31 +972,6 @@ static void tsens_check_persist_data_feature(struct tsens_priv *priv,
 			}
 		}
 	}
-}
-
-static int init_cold_interrupt(struct tsens_priv *priv,
-				struct platform_device *op, u32 ver_minor)
-{
-
-	struct device *dev = priv->dev;
-	int ret = 0;
-
-	if (tsens_version(priv) > VER_1_X &&  ver_minor > 5) {
-		/* COLD interrupt is present only on v2.6+ */
-		priv->feat->cold_int = 1;
-		priv->rf[COLD_STATUS] = devm_regmap_field_alloc(
-						dev,
-						priv->tm_map,
-						priv->fields[COLD_STATUS]);
-		if (IS_ERR(priv->rf[COLD_STATUS])) {
-			ret = PTR_ERR(priv->rf[COLD_STATUS]);
-			goto err_put_device;
-		}
-	}
-
-err_put_device:
-	put_device(&op->dev);
-	return ret;
 }
 
 int __init init_common(struct tsens_priv *priv)
@@ -1225,7 +1152,6 @@ int __init init_common(struct tsens_priv *priv)
 		regmap_field_write(priv->rf[CC_MON_MASK], 1);
 	}
 
-	ret = init_cold_interrupt(priv, op, ver_minor);
 	spin_lock_init(&priv->ul_lock);
 
 	/* VER_0 interrupt doesn't need to be enabled */
@@ -1237,30 +1163,6 @@ int __init init_common(struct tsens_priv *priv)
 err_put_device:
 	put_device(&op->dev);
 	return ret;
-}
-
-/**
- * tsens_get_cold_status - It gets cold temperature status of TSENS
- * @data: tsens cold sensor private data
- * @cold_status: pointer to store last cold interrupt status
- *
- * It gives cold state value of 0 or 1 on success. A state
- * value of 1 indicates minimum one TSENS is in cold temperature
- * condition and a state value of 0 indicates all TSENS are out of
- * cold temperature condition.
- *
- * Return: 0 on success, a negative errno will be returned in
- * error cases.
- */
-static int tsens_get_cold_status(struct thermal_zone_device *tz, int *cold_status)
-{
-	struct tsens_sensor *s = tz->devdata;
-	struct tsens_priv *priv = s->priv;
-
-	if (priv->ops->get_cold_status)
-		return priv->ops->get_cold_status(s, (bool *)cold_status);
-
-	return -EOPNOTSUPP;
 }
 
 static int tsens_get_temp(struct thermal_zone_device *tz, int *temp)
@@ -1364,10 +1266,6 @@ static const struct thermal_zone_device_ops tsens_of_ops = {
 	.set_trips = tsens_set_trips,
 	.change_mode = qti_tz_change_mode,
 	.get_trend = qti_tz_get_trend,
-};
-
-static const struct thermal_zone_device_ops tsens_cold_of_ops = {
-	.get_temp = tsens_get_cold_status,
 };
 
 static int tsens_register_irq(struct tsens_priv *priv, char *irqname,
@@ -1620,30 +1518,8 @@ static int tsens_register(struct tsens_priv *priv)
 		if (priv->feat->crit_int)
 			ret = tsens_register_irq(priv, "critical",
 						 tsens_critical_irq_thread, &priv->crit_irq);
-
-		if (priv->feat->cold_int) {
-			priv->cold_sensor = devm_kzalloc(priv->dev,
-					 sizeof(struct tsens_sensor),
-					 GFP_KERNEL);
-			if (!priv->cold_sensor)
-				return -ENOMEM;
-
-			priv->cold_sensor->hw_id = COLD_SENSOR_HW_ID;
-			priv->cold_sensor->priv = priv;
-			tzd = devm_thermal_of_zone_register(priv->dev,
-						priv->cold_sensor->hw_id,
-						priv->cold_sensor,
-						&tsens_cold_of_ops);
-			if (IS_ERR(tzd)) {
-				ret = 0;
-				return ret;
-			}
-
-			priv->cold_sensor->tzd = tzd;
-			ret = tsens_register_irq(priv, "cold",
-						tsens_cold_irq_thread, &priv->cold_irq);
-		}
 	}
+
 	return ret;
 }
 
@@ -1692,7 +1568,6 @@ static int tsens_probe(struct platform_device *pdev)
 	priv->uplow_irq = -1;
 	priv->crit_irq = -1;
 	priv->comb_irq = -1;
-	priv->cold_irq = -1;
 	for (i = 0;  i < priv->num_sensors; i++) {
 		if (data->hw_ids)
 			priv->sensor[i].hw_id = data->hw_ids[i];

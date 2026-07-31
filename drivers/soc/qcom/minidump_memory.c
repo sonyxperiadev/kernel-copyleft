@@ -76,14 +76,6 @@ struct dma_buf_priv {
 	size_t size;
 };
 
-#define MD_DEBUG_LOOKUP(_var, type) \
-	do { \
-		md_debug_##_var = (type *)DEBUG_SYMBOL_LOOKUP(_var); \
-		if (!md_debug_##_var) { \
-			pr_err("minidump: %s symbol not available in vmlinux\n", #_var); \
-		} \
-	} while (0)
-
 static void show_val_kb(struct seq_buf *m, const char *s, unsigned long num)
 {
 	seq_buf_printf(m, "%s : %ld KB\n", s, num << (PAGE_SHIFT - 10));
@@ -97,8 +89,6 @@ static void md_dump_meminfo(struct seq_buf *m)
 	unsigned long pages[NR_LRU_LISTS];
 	unsigned long sreclaimable, sunreclaim;
 	int lru;
-
-	MD_DEBUG_LOOKUP(totalcma_pages, unsigned long);
 
 	si_meminfo(&i);
 	si_swapinfo(&i);
@@ -231,9 +221,6 @@ static void md_dump_slabinfo(struct seq_buf *m)
 {
 	struct kmem_cache *s;
 	struct slabinfo sinfo;
-
-	MD_DEBUG_LOOKUP(slab_caches, struct list_head);
-	MD_DEBUG_LOOKUP(slab_mutex, struct mutex);
 
 	if (!md_debug_slab_caches)
 		return;
@@ -545,9 +532,6 @@ static void md_dump_pageowner(char *addr, size_t dump_size)
 	struct page_ext *page_ext;
 	depot_stack_handle_t handle;
 	ssize_t size;
-
-	MD_DEBUG_LOOKUP(min_low_pfn, unsigned long);
-	MD_DEBUG_LOOKUP(max_pfn, unsigned long);
 
 	if (!md_debug_min_low_pfn)
 		return;
@@ -1482,13 +1466,27 @@ void md_dump_memory(void)
 		md_task_memstat(md_task_memstat_addr, md_task_memstat_size);
 }
 
+#define MD_DEBUG_LOOKUP(_var, type) \
+	do { \
+		md_debug_##_var = (type *)DEBUG_SYMBOL_LOOKUP(_var); \
+		if (!md_debug_##_var) { \
+			pr_err("minidump: %s symbol not available in vmlinux\n", #_var); \
+			error |= 1; \
+		} \
+	} while (0)
+
 int md_minidump_memory_init(void)
 {
 	int error = 0;
 	struct dentry *minidump_dir = NULL;
 
+	MD_DEBUG_LOOKUP(totalcma_pages, unsigned long);
+	MD_DEBUG_LOOKUP(slab_caches, struct list_head);
+	MD_DEBUG_LOOKUP(slab_mutex, struct mutex);
 	MD_DEBUG_LOOKUP(page_owner_inited, struct static_key);
 	MD_DEBUG_LOOKUP(slub_debug_enabled, struct static_key);
+	MD_DEBUG_LOOKUP(min_low_pfn, unsigned long);
+	MD_DEBUG_LOOKUP(max_pfn, unsigned long);
 
 	/* error set by MD_DEBUG_LOOKUP */
 	if (error)

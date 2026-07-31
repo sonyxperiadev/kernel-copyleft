@@ -23,7 +23,7 @@ config QCOM_SPMI_TEMP_ALARM
 
 config QCOM_LMH
 	tristate "Qualcomm Limits Management Hardware"
-	depends on ARCH_QCOM || COMPILE_TEST
+	depends on ARCH_QCOM && QCOM_SCM
 	help
 	  This enables initialization of Qualcomm limits management
 	  hardware(LMh). LMh allows for hardware-enforced mitigation for cpus based on
@@ -40,15 +40,6 @@ config QTI_QMI_SENSOR_V2
 	   with QMI TS V2 interface. This driver can read the temperature of
 	   the remote sensor. These sensors can take thresholds and notify the
 	   thermal framework when the threshold is reached.
-
-config QTI_POLICY_ENGINE_SENSOR
-	tristate "QTI Policy Engine Sensor device"
-	depends on THERMAL
-	help
-	    This enables the QTI Policy Engine sensor device. This driver will
-	    register the policy engine recommendation with thermal framework as
-	    a sensor. This will enable to provide configuration to mitigate
-	    cooling devices when a recommendation is sent from hardware.
 
 config QTI_QMI_COOLING_DEVICE
 	tristate "QTI QMI cooling devices"
@@ -127,15 +118,6 @@ config QTI_THERMALZONE_CONFIG_DEBUG
 	   level configuration etc. The userspace client can use this
 	   debugfs interface to understand full snapshot of a thermal zone.
 
-config QTI_SDPM_CLOCK_MONITOR
-	tristate "QTI SDPM Clock Monitor"
-	depends on COMMON_CLK && CPU_FREQ
-	help
-	    This enables the QTI SDPM Clock Monitor. This driver can register
-	    for different clock rate change notifications and write the clock
-	    rate into the SDPM CSR register. This driver will receive the clock
-	    list and the CSR details from devicetree.
-
 config QTI_CPU_PAUSE_COOLING_DEVICE
 	tristate "QTI CPU Pause cooling devices"
 	depends on THERMAL_OF && HOTPLUG_CPU
@@ -147,15 +129,6 @@ config QTI_CPU_PAUSE_COOLING_DEVICE
 	   a CPU will be used when the CPU frequency mitigation
 	   is not good enough to achieve the necessary cooling.
 
-config QTI_CX_IPEAK_COOLING_DEVICE
-	tristate "QTI CX IPeak cooling device"
-	depends on THERMAL && THERMAL_OF
-	help
-	  This implements a mitigation device to place a thermal client vote
-	  to CXIP LM hardware. When all pre-defined clients on CX rail including
-	  thermal client set their vote, CXIP LM hardware throttles the clients
-	  on the CX rail.
-
 config QTI_DEVFREQ_CDEV
 	tristate "QTI Devfreq cooling device"
 	depends on PM_DEVFREQ && THERMAL && PM_OPP
@@ -164,15 +137,6 @@ config QTI_DEVFREQ_CDEV
 	   will help register the devfreq cooling devices with
 	   thermal framework and allow limiting the devfreq
 	   frequency.
-
-config QTI_LMH_CPU_VDD_COOLING_DEVICE
-	tristate "QTI CPU LMH VDD Voltage cooling devices"
-	depends on THERMAL && THERMAL_OF
-	help
-	   This enables the QTI limits hardware CPU VDD cooling devices.
-	   These cooling devices will be used by QTI chipset to place a
-	   request to limits hardware for a minimum CPU railway voltage
-	   corner at cold temperature condition.
 
 config QTI_THERMAL_VENDOR_HOOK
 	tristate "QTI thermal vendor hook driver"
@@ -183,17 +147,6 @@ config QTI_THERMAL_VENDOR_HOOK
 	   disables cooling stats for different thermal cooling devices
 	   selectively.
 
-config QTI_BCL_OFF_COOLING_DEVICE
-	tristate "QTI Ibat threshold update cooling devices"
-	depends on SPMI && THERMAL
-	help
-	   This enables the bcl off cooling devices. These cooling devices will
-	   be used to disable bcl whenever RF calibration is performed using
-	   external power supply. When external power supply is used for RF
-	   calibration, iBat current can cross the battery specs that can trigger
-	   batfet issues. So pmic bcl should be disabled as it is for protection
-	   for battery not external power supply.
-
 config QTI_DYNAMIC_HW_THERMAL_TRIP
 	tristate "QTI SCMI vendor thermal driver"
 	depends on THERMAL && QTI_SCMI_VENDOR_PROTOCOL
@@ -202,35 +155,6 @@ config QTI_DYNAMIC_HW_THERMAL_TRIP
 	   different hardware mitigation. It registers for thermal framework
 	   as thermal zone and enable thermal zone sysfs interface to modify
 	   hardware mitigation threshold via SCMI communication.
-
-config QTI_RPM_SMD_COOLING_DEVICE
-	tristate "Qualcomm Technologies Inc. RPM SMD cooling device driver"
-	depends on MSM_RPM_SMD && THERMAL_OF
-	help
-	  This implements a mitigation device to send temperature band
-	  level to RPM hardware via SMD protocol. This mitigation device
-	  will be used by temperature reliability rules to restrict a
-	  railway at predefined voltage corner using RPM hardware.
-
-config QTI_THERMAL_LIMITS_DCVS
-	tristate "QTI LMH DCVS Driver"
-	depends on THERMAL && CPU_THERMAL
-	help
-	  This enables the driver for Limits Management Hardware - DCVS block
-	  for the application processors. The h/w block that is available for
-	  each cluster can be used to perform quick thermal mitigations by
-	  tracking temperatures of the CPUs and taking thermal action in the
-	  hardware without s/w intervention.
-
-config QTI_CPU_VOLTAGE_COOLING_DEVICE
-	tristate "QTI CPU VOLTAGE cooling devices"
-	depends on CPU_FREQ && THERMAL_OF && THERMAL
-	help
-	    This enables the QTI CPU Voltage cooling devices. This cooling
-	    device will allow the CPUs with different frequency plan in a
-	    cluster to be mitigated together based on the voltages. This will
-	    decrease or increase the voltages in a cluster based on thermal
-	    conditions.
 
 config QTI_THERMAL_LMH_STATS
 	tristate "QTI Thermal lmh stats driver"
@@ -251,41 +175,3 @@ config QCOM_SPMI_ADC_TM5
            device. It shows up as a thermal zone with multiple trip points.
            Thermal client sets threshold temperature for both warm and cool and
            gets updated when a threshold is reached.
-
-config REGULATOR_COOLING_DEVICE
-	tristate "Regulator voltage floor cooling device"
-	depends on REGULATOR && THERMAL_OF
-	help
-	  This implements a mitigation device to place a minimum voltage floor
-	  on a particular regulator. This mitigation device will be used by low
-	  temperature reliability rules to mitigate a regulator at nominal
-	  voltage.
-
-config THERMAL_TSENS_LEGACY
-	tristate "Qualcomm Technologies Inc. TSENS Temperature driver"
-	depends on THERMAL
-	help
-	  This enables the thermal sysfs driver for the TSENS device. It shows
-	  up in Sysfs as a thermal zone with multiple trip points. Also able
-	  to set threshold temperature for both warm and cool and update
-	  thermal userspace client when a threshold is reached. Warm/Cool
-	  temperature thresholds can be set independently for each sensor.
-
-config QTI_QMI_SENSOR
-	tristate "QTI QMI sensor driver"
-	depends on QCOM_QMI_HELPERS && THERMAL
-	help
-	   This enables to list the QTI remote subsystem temperature sensors.
-	   This driver can read the temperature of the remote sensor.
-	   These sensors can take thresholds and notify the thermal
-	   framework when the threshold is reached.
-
-config GENERIC_ADC_THERMAL
-	tristate "Generic ADC based thermal sensor"
-	depends on IIO
-	help
-	   This enabled a thermal sysfs driver for the temperature sensor
-	   which is connected to the General Purpose ADC. The ADC channel
-	   is read via IIO framework and the channel information is provided
-	   to this driver. This driver reports the temperature by reading ADC
-	   channel and converts it to temperature based on lookup table.

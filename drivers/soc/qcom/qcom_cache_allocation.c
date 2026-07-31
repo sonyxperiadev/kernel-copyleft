@@ -20,7 +20,7 @@
 
 #define CONFIG_QTI_GPU_RESOURCE_ENABLED 0
 #define K_F 1831  /* 19200000/1024/1024 * 100 */
-#define SAMPLING_MS 160
+#define SAMPLING_MS 10
 #define RETRY_COUNT 3
 #define boost_dection(ptr, idx) ({ \
 	(ptr->cpu_freq_curr[idx] - ptr->cpu_freq_prev[idx]) \
@@ -848,7 +848,7 @@ static int cache_allocation_probe(struct platform_device *pdev)
 	pd->current_governor = 1;
 	pd->freq_mon_status = 0;
 	pd->bw_mon_ratio_status = 0;
-	pd->win_count_config = 1;
+	pd->win_count_config = 16;
 	pd->win_active = false;
 	pd->client_input[APPS] = 0;
 	pd->client_input[GPU] = 0;
@@ -896,7 +896,7 @@ static int cache_allocation_probe(struct platform_device *pdev)
 	}
 
 	mutex_init(&pd->lock);
-	INIT_DEFERRABLE_WORK(&pd->work, cache_allocation_monitor_work);
+	INIT_DELAYED_WORK(&pd->work, cache_allocation_monitor_work);
 	platform_set_drvdata(pdev, pd);
 
 	return 0;
@@ -971,7 +971,7 @@ static struct freq_mon_config alor_cpu_gpu_freq_cfg[] = {
 static struct bw_ratio_config canoe_bw_ratio_cfg = {
 	.bw_mon_ratio_thresh = { 10, 50, 150, 1000},
 	.bw_gear = {
-		{GEAR_LVL_2, GEAR_LVL_13},
+		{GEAR_BYPASS, GEAR_LVL_11},
 		{GEAR_LVL_5, GEAR_LVL_11},
 		{GEAR_LVL_10, GEAR_LVL_11},
 		{GEAR_LVL_10, GEAR_LVL_6},

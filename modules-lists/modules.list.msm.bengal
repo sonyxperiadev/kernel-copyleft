@@ -30,6 +30,7 @@ socinfo.ko
 icc-bcm-voter.ko
 icc-clk.ko
 icc-debug.ko
+qcom_cpucp.ko
 qcom_scmi_vendor.ko
 qcom_scmi_client.ko
 qcom-dcvs.ko
@@ -39,12 +40,9 @@ bam_dma.ko
 stub-regulator.ko
 clk-smd-rpm.ko
 gcc-khaje.ko
-gcc-sm6115.ko
-gcc-qcm2290.ko
 icc-rpm.ko
 qnoc-qos-rpm.ko
 qnoc-bengal.ko
-qnoc-scuba.ko
 spmi-pmic-arb.ko
 regmap-spmi.ko
 qti-regmap-debugfs.ko
@@ -62,8 +60,6 @@ qcom_logbuf_vendor_hooks.ko
 qcom_logbuf_boot_log.ko
 pinctrl-msm.ko
 pinctrl-khaje.ko
-pinctrl-bengal.ko
-pinctrl-scuba.ko
 qcom_tsens.ko
 qcom-scm.ko
 qcom_hwspinlock.ko
@@ -82,7 +78,6 @@ ufshcd-crypto-qti.ko
 qcom_ice.ko
 ufs-qcom.ko
 phy-qcom-ufs-qmp-v4-khaje.ko
-phy-qcom-ufs-qmp-v3-660.ko
 phy-qcom-ufs-qrbtc-sdm845.ko
 phy-qcom-ufs.ko
 sg.ko
@@ -99,6 +94,3 @@ sdhci-msm.ko
 msm_sharedmem.ko
 nvmem_qfprom.ko
 qcom-cpufreq-hw.ko
-qseecom_proxy.ko
-rtc-pm8xxx.ko
-msm-poweroff.ko

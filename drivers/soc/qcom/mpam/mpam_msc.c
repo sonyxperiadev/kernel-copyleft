@@ -229,60 +229,6 @@ int msc_system_mon_fe_bw_info(uint32_t msc_id, void *arg1, void *arg2)
 }
 EXPORT_SYMBOL_GPL(msc_system_mon_fe_bw_info);
 
-int msc_system_mon_total_fe_bw_info(uint32_t msc_id, void *arg1, void *arg2)
-{
-	struct qcom_mpam_msc *qcom_msc;
-	union mon_values *mon_data;
-
-	if ((arg1 == NULL) || (arg2 == NULL))
-		return -EINVAL;
-
-	qcom_msc = msc_param_verification(msc_id, (struct msc_query *)arg1);
-	if (qcom_msc == NULL)
-		return -EINVAL;
-
-	mon_data = (union mon_values *)arg2;
-	mon_data->ref.slc_mon_function = CACHE_TOTAL_FE_MON_CONFIG;
-	switch (qcom_msc->qcom_msc_id.qcom_msc_type) {
-	case SLC:
-		if (qcom_msc->ops->mon_stats_read)
-			return qcom_msc->ops->mon_stats_read(qcom_msc->dev, arg1, arg2);
-		break;
-	default:
-		break;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(msc_system_mon_total_fe_bw_info);
-
-int msc_system_mon_total_be_bw_info(uint32_t msc_id, void *arg1, void *arg2)
-{
-	struct qcom_mpam_msc *qcom_msc;
-	union mon_values *mon_data;
-
-	if ((arg1 == NULL) || (arg2 == NULL))
-		return -EINVAL;
-
-	qcom_msc = msc_param_verification(msc_id, (struct msc_query *)arg1);
-	if (qcom_msc == NULL)
-		return -EINVAL;
-
-	mon_data = (union mon_values *)arg2;
-	mon_data->ref.slc_mon_function = CACHE_TOTAL_BE_MON_CONFIG;
-	switch (qcom_msc->qcom_msc_id.qcom_msc_type) {
-	case SLC:
-		if (qcom_msc->ops->mon_stats_read)
-			return qcom_msc->ops->mon_stats_read(qcom_msc->dev, arg1, arg2);
-		break;
-	default:
-		break;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(msc_system_mon_total_be_bw_info);
-
 int msc_system_mon_stats_read(uint32_t msc_id, void *arg1, void *arg2)
 {
 	struct qcom_mpam_msc *qcom_msc;
@@ -296,6 +242,7 @@ int msc_system_mon_stats_read(uint32_t msc_id, void *arg1, void *arg2)
 		return -EINVAL;
 
 	mon_data = (union mon_values *)arg2;
+	mon_data->ref.slc_mon_function = CACHE_MON_STATS_READ;
 	switch (qcom_msc->qcom_msc_id.qcom_msc_type) {
 	case SLC:
 		if (qcom_msc->ops->mon_stats_read)

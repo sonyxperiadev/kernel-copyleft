@@ -157,30 +157,6 @@ struct msm_tile {
 	u32 dir_con_regs[8];
 };
 
-int msm_gpio_get_dir_conn_irq(int gpio_irq)
-{
-	struct msm_pinctrl *pctrl = msm_pinctrl_data;
-	struct msm_dir_conn *dc;
-	struct irq_data *irqd;
-	int i;
-
-	if (!pctrl)
-		return -ENODEV;
-
-	irqd = irq_get_irq_data(gpio_irq);
-	if (!irqd)
-		return -EINVAL;
-
-	for (i = 0; i <= pctrl->n_dir_conns; i++) {
-		dc = &pctrl->soc->dir_conn[i];
-		if (dc->gpio == irqd->hwirq)
-			return dc->irq;
-	}
-
-	return -EINVAL;
-}
-EXPORT_SYMBOL_GPL(msm_gpio_get_dir_conn_irq);
-
 static void msm_ack_intr_status(struct msm_pinctrl *pctrl,
 				const struct msm_pingroup *g)
 {

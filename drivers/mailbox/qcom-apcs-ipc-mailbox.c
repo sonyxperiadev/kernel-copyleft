@@ -54,20 +54,12 @@ static const struct qcom_apcs_ipc_data bengal_apcs_data = {
 	.offset = 8, .clk_name = NULL
 };
 
-static const struct qcom_apcs_ipc_data scuba_apcs_data = {
-	.offset = 8, .clk_name = NULL
-};
-
 static const struct qcom_apcs_ipc_data sdx55_apcs_data = {
 	.offset = 0x1008, .clk_name = "qcom-sdx55-acps-clk"
 };
 
 static const struct qcom_apcs_ipc_data monaco_apcs_data = {
 	.offset = 8, .clk_name = NULL
-};
-
-static const struct qcom_apcs_ipc_data shikra_apcs_data = {
-	.offset = 12, .clk_name = NULL
 };
 
 static const struct regmap_config apcs_regmap_config = {
@@ -180,8 +172,6 @@ static const struct of_device_id qcom_apcs_ipc_of_match[] = {
 	{ .compatible = "qcom,sc8180x-apss-shared", .data = &apps_shared_apcs_data },
 	{ .compatible = "qcom,sm8150-apss-shared", .data = &apps_shared_apcs_data },
 	{ .compatible = "qcom,bengal-apcs-hmss-global", .data = &bengal_apcs_data },
-	{ .compatible = "qcom,shikra-apcs-hmss-global", .data = &shikra_apcs_data },
-	{ .compatible = "qcom,scuba-apcs-hmss-global", .data = &scuba_apcs_data },
 	{}
 };
 MODULE_DEVICE_TABLE(of, qcom_apcs_ipc_of_match);

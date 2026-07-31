@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  */
 
 #include <linux/slab.h>
@@ -118,10 +119,6 @@ void gh_reset_vm_prop_table_entry(gh_vmid_t vmid)
 
 	for (vm_name = GH_SELF_VM + 1; vm_name < GH_VM_MAX; vm_name++) {
 		if (vmid == gh_vm_table[vm_name].vmid) {
-			kfree(gh_vm_table[vm_name].uri);
-			kfree(gh_vm_table[vm_name].guid);
-			kfree(gh_vm_table[vm_name].name);
-			kfree(gh_vm_table[vm_name].sign_auth);
 			gh_vm_table[vm_name].vmid = GH_VMID_INVAL;
 			gh_vm_table[vm_name].uri = NULL;
 			gh_vm_table[vm_name].guid = NULL;
@@ -2951,9 +2948,6 @@ static int __gh_rm_setup_feature_scm_assign(void)
 	return 0;
 }
 #else
-static struct notifier_block gh_rm_scm_assign_nb;
-static struct notifier_block gh_rm_hyp_assign_nb;
-
 static int __gh_rm_setup_feature_scm_assign(void)
 {
 	int ret, gh_acl_sz, gh_sgl_sz;
@@ -3002,13 +2996,7 @@ static int __gh_rm_setup_feature_scm_assign(void)
 	gh_sgl->sgl_entries[0].size = PAGE_SIZE;
 
 	ret = ghd_rm_mem_lend(GH_RM_MEM_TYPE_NORMAL, 0, 0, gh_acl, gh_sgl, NULL, &handle);
-	if (ret) {
-		gh_feature_use_scm_assign = true;
-	} else {
-		gh_feature_use_scm_assign = false;
-		qcom_scm_assign_mem_notifier_register(&gh_rm_scm_assign_nb);
-		hyp_assign_notifier_register(&gh_rm_hyp_assign_nb);
-	}
+	gh_feature_use_scm_assign = ret ? true : false;
 
 	if (ret || !ghd_rm_mem_reclaim(handle, 0))
 		__free_page(page);
@@ -3063,317 +3051,68 @@ static bool is_gh_vm_or_hlos(int vmid)
  *
  * SCM ASSIGN never needed:
  * We are running on !QCOM_SCM_VMID_HLOS
- *
- * Returns NOTIFY_STOP if scm assign is not required
  */
-static int scm_assign_notifier(struct notifier_block *nb,
-		unsigned long action, void *_args)
+bool gh_rm_needs_scm_assign(u64 *src, const struct qcom_scm_vmperm *newvm,
+				unsigned int dest_cnt)
 {
 	int ret, i;
 	gh_vmid_t self_vmid;
-	struct qcom_scm_assign_mem_notifier_data *args = _args;
-	u64 *src = args->srcvm;
-	const struct qcom_scm_vmperm *newvm = args->newvm;
-	unsigned int dest_cnt = args->dest_cnt;
 
 	if (gh_feature_use_scm_assign)
-		return NOTIFY_OK;
+		return true;
 
 	ret = gh_rm_get_this_vmid(&self_vmid);
 	if (ret)
-		return NOTIFY_OK;
+		return true;
 
 	if (self_vmid != QCOM_SCM_VMID_HLOS)
-		return NOTIFY_STOP;
+		return false;
 
 	for (i = 0; i < BITS_PER_TYPE(*src); i++) {
 		if (!(*src & BIT(i)))
 			continue;
 		if (!is_gh_vm_or_hlos(i))
-			return NOTIFY_OK;
+			return true;
 	}
 	for (i = 0; i < dest_cnt; i++)
 		if (!is_gh_vm_or_hlos(newvm[i].vmid))
-			return NOTIFY_OK;
+			return true;
 
 	if (hweight64(*src) == 1 && (*src & BIT(QCOM_SCM_VMID_HLOS)) &&
 	    (dest_cnt == 1) && (newvm[0].vmid == QCOM_SCM_VMID_HLOS))
-		return NOTIFY_OK;
+		return true;
 
-	return NOTIFY_STOP;
+	return false;
 }
+EXPORT_SYMBOL_GPL(gh_rm_needs_scm_assign);
 
-static struct notifier_block gh_rm_scm_assign_nb = {
-	.notifier_call = scm_assign_notifier,
-};
-
-static int hyp_assign_notifier(struct notifier_block *nb,
-			unsigned long action, void *_args)
+bool gh_rm_needs_hyp_assign(u32 *src_vm_list, int source_nelems,
+				int *dst_vm_list, int dst_nelems)
 {
 	int ret, i;
 	gh_vmid_t self_vmid;
-	struct hyp_assign_notifier_data *args = _args;
-	u32 *src_vm_list = args->source_vm_list;
-	int source_nelems = args->source_nelems;
-	int *dst_vm_list = args->dest_vmids;
-	int dst_nelems = args->dest_nelems;
 
 	if (gh_feature_use_scm_assign)
-		return NOTIFY_OK;
+		return true;
 
 	ret = gh_rm_get_this_vmid(&self_vmid);
 	if (ret)
-		return NOTIFY_OK;
+		return true;
 
 	if (self_vmid != QCOM_SCM_VMID_HLOS)
-		return NOTIFY_STOP;
+		return false;
 
 	for (i = 0; i < source_nelems; i++)
 		if (!is_gh_vm_or_hlos(src_vm_list[i]))
-			return NOTIFY_OK;
+			return true;
 	for (i = 0; i < dst_nelems; i++)
 		if (!is_gh_vm_or_hlos(dst_vm_list[i]))
-			return NOTIFY_OK;
+			return true;
 
 	if (source_nelems == 1 && src_vm_list[0] == QCOM_SCM_VMID_HLOS &&
 	    dst_nelems == 1 && dst_vm_list[0] == QCOM_SCM_VMID_HLOS)
-		return NOTIFY_OK;
+		return true;
 
-	return NOTIFY_STOP;
+	return false;
 }
-
-static struct notifier_block gh_rm_hyp_assign_nb = {
-	.notifier_call = hyp_assign_notifier,
-};
-
-int gh_rm_device_find_handle(gh_dev_rsc_desc *rsc_desc, gh_dev_handle_t *hdl)
-{
-	struct gh_device_find_handle_resp_payload *resp_payload = NULL;
-	struct gh_device_find_handle_req_payload req_payload = {0};
-	size_t resp_payload_size;
-	int ret;
-
-	req_payload.rsc_desc = *rsc_desc;
-
-	ret = gh_rm_call(rm, GH_RM_RPC_DEVICE_FIND_HANDLE,
-			&req_payload, sizeof(req_payload),
-			(void **)&resp_payload, &resp_payload_size);
-	if (ret) {
-		pr_err("%s: Failed to get device handle: %d\n",
-				__func__, ret);
-		goto err_rm_call;
-	}
-
-	*hdl = le32_to_cpu(resp_payload->dev_hdl);
-err_rm_call:
-	kfree(resp_payload);
-	return ret;
-}
-
-void *gh_rm_device_get_resources(gh_dev_handle_t dev_hdl, u8 flags, int *n_rsc)
-{
-	struct gh_device_get_resources_resp_payload *resp_payload = NULL;
-	struct gh_device_get_resources_req_payload req_payload = {0};
-	size_t resp_payload_size;
-	size_t rsc_buf_size;
-	void *rsc_buf;
-	int ret;
-
-	req_payload.dev_hdl = cpu_to_le32(dev_hdl);
-	req_payload.flags = flags;
-
-	ret = gh_rm_call(rm, GH_RM_RPC_DEVICE_GET_RESOURCES,
-			&req_payload, sizeof(req_payload),
-			(void **)&resp_payload, &resp_payload_size);
-	if (ret) {
-		pr_err("%s: Failed to get device resources: %d\n",
-				__func__, ret);
-		goto err;
-	}
-
-	*n_rsc = le16_to_cpu(resp_payload->n_rsc);
-	rsc_buf_size = (*n_rsc)*sizeof(gh_dev_rsc_desc);
-
-	rsc_buf = kmemdup(resp_payload->rsc_buf, rsc_buf_size, GFP_KERNEL);
-	if (!rsc_buf) {
-		ret = -ENOMEM;
-		goto err;
-	}
-
-	kfree(resp_payload);
-	return rsc_buf;
-
-err:
-	kfree(resp_payload);
-	return ERR_PTR(ret);
-}
-
-int gh_rm_device_accept(gh_dev_handle_t dev_hdl, u8 flags, gh_dev_handle_t bus_hdl)
-{
-	struct gh_device_accept_req_payload req_payload = {0};
-	size_t resp_payload_size;
-	void *resp = NULL;
-	int ret;
-
-	req_payload.dev_hdl = cpu_to_le32(dev_hdl);
-	req_payload.flags = flags;
-	req_payload.bus_hdl = cpu_to_le32(bus_hdl);
-
-	ret = gh_rm_call(rm, GH_RM_RPC_DEVICE_ACCEPT,
-			&req_payload, sizeof(req_payload),
-			(void **)&resp, &resp_payload_size);
-	if (ret) {
-		pr_err("%s: Failed to accept device: %d\n", __func__, ret);
-		return ret;
-	}
-
-	if (resp_payload_size) {
-		pr_err("%s: Invalid size received for DEVICE_ACCEPT: %zu\n",
-				__func__, resp_payload_size);
-		kfree(resp);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-int gh_rm_device_lend(gh_dev_handle_t dev_hdl, gh_vmid_t vmid, u8 flags)
-{
-	struct gh_device_lend_req_payload req_payload = {0};
-	size_t resp_payload_size;
-	void *resp = NULL;
-	int ret;
-
-	req_payload.dev_hdl = cpu_to_le32(dev_hdl);
-	req_payload.flags = flags;
-	req_payload.vmid = cpu_to_le16(vmid);
-
-	ret = gh_rm_call(rm, GH_RM_RPC_DEVICE_LEND,
-			&req_payload, sizeof(req_payload),
-			(void **)&resp, &resp_payload_size);
-	if (ret) {
-		pr_err("%s: Failed to lend device: %d\n", __func__, ret);
-		return ret;
-	}
-
-	if (resp_payload_size) {
-		pr_err("%s: Invalid size received for DEVICE_LEND: %zu\n",
-				__func__, resp_payload_size);
-		kfree(resp);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-int gh_rm_device_release(gh_dev_handle_t dev_hdl, u8 flags)
-{
-	struct gh_device_release_req_payload req_payload = {0};
-	size_t resp_payload_size;
-	void *resp = NULL;
-	int ret;
-
-	req_payload.dev_hdl = cpu_to_le32(dev_hdl);
-	req_payload.flags = flags;
-
-	ret = gh_rm_call(rm, GH_RM_RPC_DEVICE_RELEASE,
-			&req_payload, sizeof(req_payload),
-			(void **)&resp, &resp_payload_size);
-	if (ret) {
-		pr_err("%s: Failed to release device: %d\n", __func__, ret);
-		return ret;
-	}
-
-	if (resp_payload_size) {
-		pr_err("%s: Invalid size received for DEVICE_RELEASE: %zu\n",
-				__func__, resp_payload_size);
-		kfree(resp);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-int gh_rm_device_reclaim(gh_dev_handle_t dev_hdl, u8 flags)
-{
-	struct gh_device_reclaim_req_payload req_payload = {0};
-	size_t resp_payload_size;
-	void *resp = NULL;
-	int ret;
-
-	req_payload.dev_hdl = cpu_to_le32(dev_hdl);
-	req_payload.flags = flags;
-
-	ret = gh_rm_call(rm, GH_RM_RPC_DEVICE_RECLAIM,
-			&req_payload, sizeof(req_payload),
-			(void **)&resp, &resp_payload_size);
-	if (ret) {
-		pr_err("%s: Failed to reclaim device: %d\n", __func__, ret);
-		return ret;
-	}
-
-	if (resp_payload_size) {
-		pr_err("%s: Invalid size received for DEVICE_RECLAIM: %zu\n",
-				__func__, resp_payload_size);
-		kfree(resp);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-int gh_rm_device_bus_lockdown(gh_dev_handle_t dev_hdl)
-{
-	struct gh_device_bus_lockdown_req_payload req_payload = {0};
-	size_t resp_payload_size;
-	void *resp = NULL;
-	int ret;
-
-	req_payload.dev_hdl = cpu_to_le32(dev_hdl);
-
-	ret = gh_rm_call(rm, GH_RM_RPC_DEVICE_BUS_LOCKDOWN,
-			&req_payload, sizeof(req_payload),
-			(void **)&resp, &resp_payload_size);
-	if (ret) {
-		pr_err("%s: Failed to lockdown bus: %d\n",
-				__func__, ret);
-		return ret;
-	}
-
-	if (resp_payload_size) {
-		pr_err("%s: Invalid size received for BUS_LOCKDOWN: %zu\n",
-				__func__, resp_payload_size);
-		kfree(resp);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-int gh_rm_device_bus_unlock(gh_dev_handle_t dev_hdl)
-{
-	struct gh_device_bus_unlock_req_payload req_payload = {0};
-	size_t resp_payload_size;
-	void *resp = NULL;
-	int ret;
-
-	req_payload.dev_hdl = cpu_to_le32(dev_hdl);
-
-	ret = gh_rm_call(rm, GH_RM_RPC_DEVICE_BUS_UNLOCK,
-			&req_payload, sizeof(req_payload),
-			(void **)&resp, &resp_payload_size);
-	if (ret) {
-		pr_err("%s: Failed to unlock bus: %d\n",
-				__func__, ret);
-		return ret;
-	}
-
-	if (resp_payload_size) {
-		pr_err("%s: Invalid size received for BUS_UNLOCK: %zu\n",
-				__func__, resp_payload_size);
-		kfree(resp);
-		return -EINVAL;
-	}
-
-	return 0;
-}
+EXPORT_SYMBOL_GPL(gh_rm_needs_hyp_assign);

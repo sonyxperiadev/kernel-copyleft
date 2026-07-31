@@ -36,10 +36,8 @@ struct mem_buf_vmperm {
 	struct mutex lock;
 	mem_buf_dma_buf_destructor dtor;
 	void *dtor_data;
-	struct kref kref;
-	void (*sg_release)(void *buffer);
 	void (*kref_release)(struct kref *kref);
-	void *buffer;
+	struct kref *kref;
 	struct rcu_head rcu;
 };
 
@@ -125,32 +123,15 @@ static void mem_buf_vmperm_update_state(struct mem_buf_vmperm *vmperm, int *vmid
  */
 static void mem_buf_vmperm_set_err(struct mem_buf_vmperm *vmperm)
 {
-	kref_get(&vmperm->kref);
+	kref_get(vmperm->kref);
 	vmperm->flags |= MEM_BUF_WRAPPER_FLAG_ERR;
-}
-
-/*
- * kref release callback for mem_buf_vmperm.
- *
- * When vmperm->kref reaches zero, this function calls the wrapper-specific
- * sg_release() callback (e.g., qcom_sg_release()) to release the
- * associated qcom_sg_buffer and trigger the final vmperm cleanup.
- */
-
-static void vmperm_kref_release(struct kref *kref)
-{
-	struct mem_buf_vmperm *vmperm =
-		container_of(kref, struct mem_buf_vmperm, kref);
-
-	vmperm->sg_release(vmperm->buffer);
 }
 
 /* Must be freed via mem_buf_vmperm_free. */
 static struct mem_buf_vmperm *mem_buf_vmperm_alloc_flags(
 	struct sg_table *sgt, u32 flags,
 	int *vmids, int *perms, u32 nr_acl_entries,
-	void (*sg_release)(void  *),
-	void *buffer,
+	void (*release)(struct kref *), struct kref *kref,
 	gh_memparcel_handle_t hdl)
 {
 	struct mem_buf_vmperm *vmperm;
@@ -175,13 +156,10 @@ static struct mem_buf_vmperm *mem_buf_vmperm_alloc_flags(
 	for_each_sgtable_sg(sgt, sg, i)
 		vmperm->size += sg->length;
 
-	kref_init(&vmperm->kref);
-
 	vmperm->flags = flags;
 	vmperm->memparcel_hdl = hdl;
-	vmperm->sg_release = sg_release;
-	vmperm->kref_release = vmperm_kref_release;
-	vmperm->buffer = buffer;
+	vmperm->kref_release = release;
+	vmperm->kref = kref;
 
 	/*
 	 * Hold an additional refcount, which represents the need to call
@@ -192,7 +170,7 @@ static struct mem_buf_vmperm *mem_buf_vmperm_alloc_flags(
 		if (xa_insert(&vmperm_xa, hdl, vmperm, GFP_KERNEL))
 			goto err_xa;
 
-		kref_get(&vmperm->kref);
+		kref_get(vmperm->kref);
 	}
 
 	mutex_lock(&vmperm_list_lock);
@@ -211,28 +189,27 @@ err_resize_state:
 
 struct mem_buf_vmperm *mem_buf_vmperm_alloc_accept(struct sg_table *sgt,
 	gh_memparcel_handle_t memparcel_hdl, int *vmids, int *perms,
-	unsigned int nr_acl_entries, void (*sg_release)(void *),
-	void *buffer)
+	unsigned int nr_acl_entries, void (*release)(struct kref *),
+	struct kref *kref)
 {
 	return  mem_buf_vmperm_alloc_flags(sgt, MEM_BUF_WRAPPER_FLAG_ACCEPT,
-		vmids, perms, nr_acl_entries, sg_release, buffer, memparcel_hdl);
+		vmids, perms, nr_acl_entries, release, kref, memparcel_hdl);
 }
 EXPORT_SYMBOL_GPL(mem_buf_vmperm_alloc_accept);
 
 struct mem_buf_vmperm *mem_buf_vmperm_alloc_staticvm(struct sg_table *sgt,
-	int *vmids, int *perms, u32 nr_acl_entries, void (*sg_release)(void *),
-	void *buffer)
+	int *vmids, int *perms, u32 nr_acl_entries,
+	void (*release)(struct kref *), struct kref *kref)
 {
 	return mem_buf_vmperm_alloc_flags(sgt,
 		MEM_BUF_WRAPPER_FLAG_STATIC_VM,
-		vmids, perms, nr_acl_entries, sg_release, buffer,
+		vmids, perms, nr_acl_entries, release, kref,
 		MEM_BUF_MEMPARCEL_INVALID);
 }
 EXPORT_SYMBOL_GPL(mem_buf_vmperm_alloc_staticvm);
 
 struct mem_buf_vmperm *mem_buf_vmperm_alloc(struct sg_table *sgt,
-		void (*sg_release)(void *),
-		void *buffer)
+	void (*release)(struct kref *), struct kref *kref)
 {
 	int vmids[1];
 	int perms[1];
@@ -240,7 +217,7 @@ struct mem_buf_vmperm *mem_buf_vmperm_alloc(struct sg_table *sgt,
 	vmids[0] = current_vmid;
 	perms[0] = PERM_READ | PERM_WRITE | PERM_EXEC;
 	return mem_buf_vmperm_alloc_flags(sgt, 0,
-		vmids, perms, 1, sg_release, buffer,
+		vmids, perms, 1, release, kref,
 		MEM_BUF_MEMPARCEL_INVALID);
 }
 EXPORT_SYMBOL_GPL(mem_buf_vmperm_alloc);
@@ -261,7 +238,7 @@ static int __mem_buf_vmperm_reclaim(struct mem_buf_vmperm *vmperm)
 	vmperm->flags &= ~MEM_BUF_WRAPPER_FLAG_LENDSHARE;
 	xa_erase(&vmperm_xa, vmperm->memparcel_hdl);
 	vmperm->memparcel_hdl = MEM_BUF_MEMPARCEL_INVALID;
-	kref_put(&vmperm->kref, vmperm->kref_release);
+	kref_put(vmperm->kref, vmperm->kref_release);
 	return 0;
 }
 
@@ -285,7 +262,7 @@ static int mem_buf_vmperm_relinquish(struct mem_buf_vmperm *vmperm)
 	xa_erase(&vmperm_xa, vmperm->memparcel_hdl);
 	vmperm->memparcel_hdl = MEM_BUF_MEMPARCEL_INVALID;
 	vmperm->flags &= ~MEM_BUF_WRAPPER_FLAG_ACCEPT;
-	kref_put(&vmperm->kref, vmperm->kref_release);
+	kref_put(vmperm->kref, vmperm->kref_release);
 	return 0;
 }
 
@@ -311,12 +288,6 @@ void mem_buf_vmperm_free(struct mem_buf_vmperm *vmperm)
 	call_rcu(&vmperm->rcu, vmperm_rcu_cb);
 }
 EXPORT_SYMBOL_GPL(mem_buf_vmperm_free);
-
-void mem_buf_vmperm_put(struct mem_buf_vmperm *vmperm)
-{
-	kref_put(&vmperm->kref, vmperm->kref_release);
-}
-EXPORT_SYMBOL_GPL(mem_buf_vmperm_put);
 
 /*
  * Attempt to return to the default security state. For memory in the
@@ -687,7 +658,7 @@ static int mem_buf_lend_internal(struct dma_buf *dmabuf,
 			arg->nr_acl_entries);
 	vmperm->flags |= MEM_BUF_WRAPPER_FLAG_LENDSHARE;
 	vmperm->memparcel_hdl = arg->memparcel_hdl;
-	kref_get(&vmperm->kref);
+	kref_get(vmperm->kref);
 	mutex_unlock(&vmperm->lock);
 
 	if (vmperm->memparcel_hdl != MEM_BUF_MEMPARCEL_INVALID) {
@@ -921,7 +892,7 @@ static struct mem_buf_vmperm *vmperm_lookup(u32 hdl)
 
 	rcu_read_lock();
 	vmperm = xa_load(&vmperm_xa, hdl);
-	if (vmperm && !kref_get_unless_zero(&vmperm->kref))
+	if (vmperm && !kref_get_unless_zero(vmperm->kref))
 		vmperm = NULL;
 	rcu_read_unlock();
 
@@ -951,7 +922,7 @@ static void mem_buf_vmperm_gh_notifier(enum gh_mem_notifier_tag tag, unsigned lo
 
 	mem_buf_vmperm_try_reclaim(vmperm, true);
 	/* Drop refcount from vmperm_lookup */
-	kref_put(&vmperm->kref, vmperm->kref_release);
+	kref_put(vmperm->kref, vmperm->kref_release);
 }
 
 static int mem_buf_vmperm_gh_notifier_register(void)

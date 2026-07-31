@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2026 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (C) 2011 Google, Inc.
  * Copyright (C) 2019, 2020 Linaro Ltd.
  *
@@ -8,7 +13,7 @@
  *	Andrew F. Davis <afd@ti.com>
  *
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _QCOM_SG_OPS_H
@@ -17,6 +22,7 @@
 #include <linux/scatterlist.h>
 #include <linux/dma-heap.h>
 #include <linux/device.h>
+#include <linux/kref.h>
 #include "deferred-free-helper.h"
 #include "qcom_dma_heap_priv.h"
 
@@ -32,6 +38,7 @@ struct qcom_sg_buffer {
 	struct mem_buf_vmperm *vmperm;
 	struct deferred_freelist_item deferred_free;
 	void (*free)(struct qcom_sg_buffer *buffer);
+	struct kref kref;
 };
 
 struct dma_heap_attachment {
@@ -80,7 +87,7 @@ int qcom_sg_vmap(struct dma_buf *dmabuf, struct iosys_map *map);
 
 void qcom_sg_vunmap(struct dma_buf *dmabuf, struct iosys_map *map);
 
-void qcom_sg_release(void *buffer);
+void qcom_sg_release(struct kref *kref);
 
 void qcom_sg_dmabuf_release(struct dma_buf *dmabuf);
 

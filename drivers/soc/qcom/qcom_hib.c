@@ -15,7 +15,7 @@
 
 #define __NEW_UTS_LEN 64
 
-struct block_device *hiber_bdev;
+struct file *hiber_bdev;
 EXPORT_SYMBOL_GPL(hiber_bdev);
 
 struct arch_hibernate_hdr_invariants {
@@ -41,13 +41,13 @@ struct arch_hibernate_hdr {
 
 static void save_hib_resume_bdev(void *data, struct file *hib_resume_bdev)
 {
-	hiber_bdev = file_bdev(hib_resume_bdev);
+	hiber_bdev = hib_resume_bdev;
 }
 
 static void check_hibernation_swap(void *data, struct file *dev,
 			bool *hib_swap)
 {
-	if (file_bdev(dev) == hiber_bdev)
+	if (dev == hiber_bdev)
 		*hib_swap = true;
 	else
 		*hib_swap = false;

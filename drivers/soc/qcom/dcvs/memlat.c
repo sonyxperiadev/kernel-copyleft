@@ -710,7 +710,7 @@ store_grp_attr(adaptive_level_1, 0U, 8000000U, MEMLAT_ADAPTIVE_LEVEL_1);
 show_attr(min_freq);
 show_attr(max_freq);
 show_attr(ipm_ceil);
-store_attr(ipm_ceil, 1U, 20000000U, MEMLAT_IPM_CEIL);
+store_attr(ipm_ceil, 1U, 500000U, MEMLAT_IPM_CEIL);
 show_attr(fe_stall_floor);
 store_attr(fe_stall_floor, 0U, 100U, MEMLAT_FE_STALL_FLOOR);
 show_attr(be_stall_floor);

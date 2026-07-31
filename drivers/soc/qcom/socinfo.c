@@ -54,15 +54,7 @@ enum {
 	HW_PLATFORM_IDP = 34,
 	HW_PLATFORM_WDP = 36,
 	HW_PLATFORM_CRD = 40,
-	HW_PLATFORM_QAR = 44,
 	HW_PLATFORM_WRD = 45,
-	HW_PLATFORM_COME = 46,
-	HW_PLATFORM_EVK = 47,
-	HW_PLATFORM_TDP = 48,
-	HW_PLATFORM_OMTP = 49,
-	HW_PLATFORM_ITPS = 50,
-	HW_PLATFORM_ITP = 51,
-	HW_PLATFORM_EITP = 52,
 	HW_PLATFORM_INVALID
 };
 
@@ -89,15 +81,7 @@ static const char * const hw_platform[] = {
 	[HW_PLATFORM_IDP] = "IDP",
 	[HW_PLATFORM_WDP] = "WDP",
 	[HW_PLATFORM_CRD] = "CRD",
-	[HW_PLATFORM_QAR] = "QAR",
 	[HW_PLATFORM_WRD] = "WRD",
-	[HW_PLATFORM_COME] = "COME",
-	[HW_PLATFORM_EVK] = "EVK",
-	[HW_PLATFORM_TDP] = "TDP",
-	[HW_PLATFORM_OMTP] = "OMTP",
-	[HW_PLATFORM_ITPS] = "ITPS",
-	[HW_PLATFORM_ITP] = "ITP",
-	[HW_PLATFORM_EITP] = "EITP",
 };
 
 enum {
@@ -371,7 +355,6 @@ struct smem_image_version {
 		part_info = kmalloc_array(num_parts, sizeof(*part_info), GFP_KERNEL); \
 		if (!part_info)							      \
 			return -ENOMEM;						      \
-		memset(part_info, 0, num_parts*sizeof(*part_info)); \
 		socinfo_get_subpart_info(part_enum, part_info, num_parts); \
 		for (i = 0; i < num_parts; i++) { \
 			str_pos += scnprintf(buf+str_pos, PAGE_SIZE-str_pos, "0x%x", \
@@ -622,13 +605,8 @@ static const struct soc_id soc_id[] = {
 	{ qcom_board_id(SC7180) },
 	{ qcom_board_id(SM6350) },
 	{ qcom_board_id(QCM2150) },
-	{ qcom_board_id(QCM_SCUBA) },
-	{ qcom_board_id(QCS_SCUBA) },
 	{ qcom_board_id(SDA429W) },
 	{ qcom_board_id(SM8350) },
-	{ qcom_board_id(SM8350P) },
-	{ qcom_board_id(SM8325) },
-	{ qcom_board_id(SM8325P) },
 	{ qcom_board_id(QCM2290) },
 	{ qcom_board_id(SM7125) },
 	{ qcom_board_id(SM6115) },
@@ -677,10 +655,6 @@ static const struct soc_id soc_id[] = {
 	{ qcom_board_id(X1E80100) },
 	{ qcom_board_id(SM8650) },
 	{ qcom_board_id(SM4450) },
-	{ qcom_board_id(RAVELIN) },
-	{ qcom_board_id(RAVELINP) },
-	{ qcom_board_id(SG_RAVELIN) },
-	{ qcom_board_id(SG_RAVELINP) },
 	{ qcom_board_id(QDU1010) },
 	{ qcom_board_id(QRU1032) },
 	{ qcom_board_id(QRU1052) },
@@ -696,11 +670,8 @@ static const struct soc_id soc_id[] = {
 	{ qcom_board_id(IPQ5302) },
 	{ qcom_board_id(QCS8550) },
 	{ qcom_board_id(QCM8550) },
-	{ qcom_board_id(QWM2290) },
-	{ qcom_board_id(QWS2290) },
 	{ qcom_board_id(IPQ5300) },
 	{ qcom_board_id(CANOE) },
-	{ qcom_board_id(QCS8845) },
 	{ qcom_board_id(CANOEP) },
 	{ qcom_board_id(SERAPH) },
 	{ qcom_board_id(ALOR) },
@@ -712,24 +683,18 @@ static const struct soc_id soc_id[] = {
 	{ qcom_board_id(WHALEP) },
 	{ qcom_board_id(CANOEPSG) },
 	{ qcom_board_id(CHORA) },
-	{ qcom_board_id(CHORAP) },
 	{ qcom_board_id(KHAJE) },
 	{ qcom_board_id(KHAJEP) },
 	{ qcom_board_id(KHAJEQ) },
 	{ qcom_board_id(KHAJEG) },
 	{ qcom_board_id(KHAJEIOT) },
 	{ qcom_board_id(MALABAR) },
-	{ qcom_board_id(MALABARP) },
 	{ qcom_board_id(PIKACHU) },
 	{ qcom_board_id(SM7315) },
 	{ qcom_board_id(SM7325) },
 	{ qcom_board_id(SHIKRA) },
-	{ qcom_board_id(BOURTZI) },
-	{ qcom_board_id(BOURTZIP) },
 	{ qcom_board_id(SM4250P) },
 	{ qcom_board_id(SM6115P) },
-	{ qcom_board_id(DIWALI) },
-	{ qcom_board_id(DIWALIP) },
 };
 
 static struct attribute *msm_custom_socinfo_attrs[MAX_SOCINFO_ATTRS];
@@ -1109,9 +1074,6 @@ socinfo_get_subpart_info(enum subset_part_type part,
 		return -EINVAL;
 
 	num_subset_parts = socinfo_get_num_subset_parts();
-	if (part >= num_subset_parts)
-		return -EINVAL;
-
 	offset = socinfo_get_nsubset_parts_array_offset();
 	if (socinfo_format >= SOCINFO_VERSION(0, 21))
 		offset = socinfo_get_nsubpart_feat_array_offset();
@@ -1147,17 +1109,11 @@ msm_get_hw_platform(struct device *dev,
 		char *buf)
 {
 	uint32_t hw_type;
-	const char *name;
 
 	hw_type = socinfo_get_platform_type();
-	if (hw_type >= ARRAY_SIZE(hw_platform) || !hw_platform[hw_type]) {
-		pr_err("Unknown hardware platform type: %u\n", hw_type);
-		name = hw_platform[HW_PLATFORM_UNKNOWN];
-	} else {
-		name = hw_platform[hw_type];
-	}
 
-	return scnprintf(buf, PAGE_SIZE, "%-.32s\n", name);
+	return scnprintf(buf, PAGE_SIZE, "%-.32s\n",
+			hw_platform[hw_type]);
 }
 ATTR_DEFINE(hw_platform);
 
@@ -1311,10 +1267,6 @@ CREATE_PART_FUNCTION(comp1, PART_COMP1);
 CREATE_PART_FUNCTION(display1, PART_DISPLAY1);
 CREATE_PART_FUNCTION(nsp, PART_NSP);
 CREATE_PART_FUNCTION(eva, PART_EVA);
-CREATE_PART_FUNCTION(pcie, PART_PCIE);
-CREATE_PART_FUNCTION(cpu, PART_CPU);
-CREATE_PART_FUNCTION(ddr, PART_DDR);
-CREATE_PART_FUNCTION(slc, PART_SLC);
 
 /* Version 16 */
 static ssize_t
@@ -1416,10 +1368,6 @@ static void socinfo_populate_sysfs(struct qcom_socinfo *qcom_socinfo)
 		msm_custom_socinfo_attrs[i++] = &dev_attr_display1.attr;
 		msm_custom_socinfo_attrs[i++] = &dev_attr_nsp.attr;
 		msm_custom_socinfo_attrs[i++] = &dev_attr_eva.attr;
-		msm_custom_socinfo_attrs[i++] = &dev_attr_pcie.attr;
-		msm_custom_socinfo_attrs[i++] = &dev_attr_cpu.attr;
-		msm_custom_socinfo_attrs[i++] = &dev_attr_ddr.attr;
-		msm_custom_socinfo_attrs[i++] = &dev_attr_slc.attr;
 		fallthrough;
 	case SOCINFO_VERSION(0, 13):
 		msm_custom_socinfo_attrs[i++] = &dev_attr_chip_id.attr;

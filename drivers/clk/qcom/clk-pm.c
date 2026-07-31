@@ -29,8 +29,6 @@ static int clock_pm_restore_early(struct device *dev)
 
 	clk_restore_critical_clocks(dev);
 
-	gdsc_genpd_pm_restore(dev);
-
 	if (pm_runtime_enabled(dev))
 		pm_runtime_put_sync(dev);
 
@@ -52,8 +50,6 @@ static int clock_pm_resume_early(struct device *dev)
 		}
 
 		clk_restore_critical_clocks(dev);
-
-		gdsc_genpd_pm_restore(dev);
 
 		if (pm_runtime_enabled(dev))
 			pm_runtime_put_sync(dev);

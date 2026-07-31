@@ -7,7 +7,7 @@
  * Copyright (C) 2012, 2019 Linaro Ltd.
  * Author: <benjamin.gaignard@linaro.org> for ST-Ericsson.
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/cma.h>
@@ -114,7 +114,7 @@ struct dma_buf *cma_heap_allocate(struct dma_heap *heap,
 	sg_set_page(helper_buffer->sg_table.sgl, cma_pages, size, 0);
 
 	helper_buffer->vmperm = mem_buf_vmperm_alloc(&helper_buffer->sg_table,
-					qcom_sg_release, (void *)helper_buffer);
+					qcom_sg_release, &helper_buffer->kref);
 	if (IS_ERR(helper_buffer->vmperm))
 		goto free_sgtable;
 

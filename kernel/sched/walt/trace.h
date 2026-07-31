@@ -499,8 +499,8 @@ TRACE_EVENT(sched_load_to_gov,
 		__entry->cpu, __entry->policy, __entry->ed_task_pid,
 		__entry->aggr_grp_load, __entry->freq_aggr,
 		__entry->tt_load, __entry->rq_ps, __entry->grp_rq_ps,
-		__entry->nt_ps, __entry->grp_nt_ps, __entry->pl, __entry->nbl,
-		__entry->load, __entry->big_task_rotation, __entry->user_hint,
+		__entry->nt_ps, __entry->grp_nt_ps, __entry->pl, __entry->load,
+		__entry->nbl, __entry->big_task_rotation, __entry->user_hint,
 		__entry->reasons, __entry->util)
 );
 

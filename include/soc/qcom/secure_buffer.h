@@ -8,7 +8,6 @@
 #define __QCOM_SECURE_BUFFER_H__
 
 #include <linux/scatterlist.h>
-#include <linux/notifier.h>
 
 /*
  * if you add a secure VMID here make sure you update
@@ -50,15 +49,6 @@ enum vmid {
 #define PERM_WRITE                      0x2
 #define PERM_EXEC			0x1
 
-struct hyp_assign_notifier_data {
-	struct sg_table *table;
-	u32 *source_vm_list;
-	int source_nelems;
-	int *dest_vmids;
-	int *dest_perms;
-	int dest_nelems;
-};
-
 #if IS_ENABLED(CONFIG_QCOM_SECURE_BUFFER)
 int hyp_assign_table(struct sg_table *table,
 			u32 *source_vm_list, int source_nelems,
@@ -67,8 +57,6 @@ int hyp_assign_table(struct sg_table *table,
 const char *msm_secure_vmid_to_string(int secure_vmid);
 u32 msm_secure_get_vmid_perms(u32 vmid);
 int page_accessible(unsigned long pfn);
-int hyp_assign_notifier_register(struct notifier_block *nb);
-int hyp_assign_notifier_unregister(struct notifier_block *nb);
 #else
 static inline int hyp_assign_table(struct sg_table *table,
 			u32 *source_vm_list, int source_nelems,
@@ -92,16 +80,5 @@ static inline int page_accessible(unsigned long pfn)
 {
 	return 1;
 }
-
-static inline int hyp_assign_notifier_register(struct notifier_block *nb)
-{
-	return 0;
-}
-
-static inline int hyp_assign_notifier_unregister(struct notifier_block *nb)
-{
-	return 0;
-}
-
 #endif
 #endif

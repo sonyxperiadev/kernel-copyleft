@@ -20,7 +20,7 @@
 
 #include "si_core.h"
 #include "si_core_adci.h"
-#include "si_core_doorbell.h"
+#include "si_core_irq.h"
 
 #include "mem-object.h"
 
@@ -30,8 +30,6 @@
 #if IS_ENABLED(CONFIG_QSEECOM_PROXY)
 #include <linux/qseecom_kernel.h>
 #endif
-
-static unsigned long long cookie;
 
 /* Static 'Primordial Object' operations. */
 
@@ -97,11 +95,10 @@ static int next_arg_type(struct si_arg u[], int i, enum arg_type type)
 #define SI_OBJECT_ID_START		(SI_OBJECT_PRIMORDIAL + 1)
 #define SI_OBJECT_ID_END		(UINT_MAX)
 
-#define SET_SI_OBJECT(p, type, ...) __SET_SI_OBJECT(p, type, ##__VA_ARGS__, 0UL, 0ULL)
-#define __SET_SI_OBJECT(p, type, optr, ocookie, ...) do { \
+#define SET_SI_OBJECT(p, type, ...) __SET_SI_OBJECT(p, type, ##__VA_ARGS__, 0UL)
+#define __SET_SI_OBJECT(p, type, optr, ...) do { \
 		(p)->object_type = (type); \
 		(p)->info.object_ptr = (unsigned long)(optr); \
-		(p)->info.object_cookie = (unsigned long long)(ocookie); \
 		(p)->release = NULL; \
 	} while (0)
 
@@ -214,17 +211,6 @@ struct si_object *erase_si_object(u32 idx)
 	return xa_erase(&xa_si_objects, idx);
 }
 
-static void release_si_objects(void)
-{
-	unsigned long object_id;
-	struct si_object *object;
-
-	xa_for_each(&xa_si_objects, object_id, object) {
-		erase_si_object(object_id);
-		put_si_object(object);
-	}
-}
-
 static int __free_si_object(struct si_object *object)
 {
 	/* This is used by si-core itself if it requires to do cleanup on the
@@ -238,8 +224,6 @@ static int __free_si_object(struct si_object *object)
 
 	switch (typeof_si_object(object)) {
 	case SI_OT_USER:
-		if (object->info.object_cookie != cookie)
-			break;
 		release_user_object(object);
 
 		break;
@@ -374,7 +358,7 @@ static int init_si_object(struct si_object **object, unsigned int object_id)
 			/* "no-name"; it is not really a reason to fail here!. */
 			t_object->name = kasprintf(GFP_KERNEL, "qtee-%u", object_id);
 
-			SET_SI_OBJECT(t_object, SI_OT_USER, object_id, cookie);
+			SET_SI_OBJECT(t_object, SI_OT_USER, object_id);
 
 			*object = t_object;
 
@@ -805,7 +789,7 @@ static int update_msg(struct si_object_invoke_ctx *oic)
 
 /* Invoke an 'si_object' instance. */
 
-void si_object_invoke(struct si_object_invoke_ctx *oic, struct qtee_callback *msg)
+static void si_object_invoke(struct si_object_invoke_ctx *oic, struct qtee_callback *msg)
 {
 	int i, errno;
 
@@ -915,25 +899,6 @@ out:
 }
 
 /**
- * si_object_qtee_objects_put() - Put the callback objects in the argument array.
- * @u: array of arguments.
- *
- * When si_object_do_invoke() is successfully invoked, QTEE takes ownership of
- * the callback objects. If the invocation fails, si_object_do_invoke() calls
- * si_object_qtee_objects_put() to mimic the release of callback objects by
- * QTEE.
- */
-static void si_object_qtee_objects_put(struct si_arg *u)
-{
-	int i;
-
-	arg_for_each_input_object(i, u) {
-		if (typeof_si_object(u[i].o) == SI_OT_CB_OBJECT)
-			put_si_object(u[i].o);
-	}
-}
-
-/**
  * si_object_do_invoke - Submit an invocation for si_object_invoke_ctx.
  * @oic: context to use for current invocation.
  * @object: object being invoked.
@@ -962,28 +927,18 @@ int si_object_do_invoke(struct si_object_invoke_ctx *oic,
 	struct qtee_callback *cb_msg;
 
 	if (typeof_si_object(object) != SI_OT_USER &&
-		typeof_si_object(object) != SI_OT_ROOT) {
-		si_object_qtee_objects_put(u);
-		return -EINVAL;
-	}
-
-	if (typeof_si_object(object) == SI_OT_USER &&
-		object->info.object_cookie != cookie)
+		typeof_si_object(object) != SI_OT_ROOT)
 		return -EINVAL;
 
 	ret = si_object_invoke_ctx_init(oic, u);
-	if (ret) {
-		si_object_qtee_objects_put(u);
+	if (ret)
 		return ret;
-	}
 
 	pr_debug("start an invocation for %s.\n", si_object_name(object));
 
 	ret = prepare_msg(oic, object, op, u);
-	if (ret) {
-		si_object_qtee_objects_put(u);
+	if (ret)
 		goto out;
-	}
 
 	/* INVOKE remote object!! */
 
@@ -1042,7 +997,9 @@ int si_object_do_invoke(struct si_object_invoke_ctx *oic,
 
 			/* SI_OT_CB_OBJECT input objects are orphan; let's put them. */
 			if (!(oic->flags & OIC_FLAG_QTEE)) {
-				si_object_qtee_objects_put(u);
+				arg_for_each_input_object(i, u)
+					if (typeof_si_object(u[i].o) == SI_OT_CB_OBJECT)
+						put_si_object(u[i].o);
 
 				/* So QTEE is unaawre of this.
 				 * Let the caller know in case they want to do something about it,
@@ -1118,6 +1075,146 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(si_object_do_invoke);
+
+static int prepare_doorbell_args(struct qtee_callback *msg, struct si_arg u[])
+{
+	/* We initialise user arguments based on the callback message.
+	 * It is important to preserve the order of arguments, i.e. 'SI_AT_IB', 'SI_AT_OB',
+	 * following by 'SI_AT_IO', and 'SI_AT_OO'.
+	 * For doorbell_msg- there should be no args of type 'SI_AT_OB' and 'SI_AT_OO' hence
+	 * we validate that first.
+	 */
+
+	int ret = 0;
+
+	int i;
+
+	/* Invalid input if any output_buffer present */
+	for_each_output_buffer(i, msg->counts)
+		return -EINVAL;
+
+	/* Invalid input if any output_object present */
+	for_each_output_object(i, msg->counts)
+		return -EINVAL;
+
+	/* We assume QTEE already checked the buffer boundaries! */
+
+	for_each_input_buffer(i, msg->counts) {
+		u[i].b.addr = OFFSET_TO_PTR(msg, msg->args[i].b.offset);
+		u[i].b.size = msg->args[i].b.size;
+		u[i].type = SI_AT_IB;
+	}
+
+	for_each_input_object(i, msg->counts) {
+		int err;
+
+		/* See comments for 'for_each_output_object' in 'update_args'. **/
+
+		err = init_si_object(&u[i].o, msg->args[i].o);
+		if (err)
+			ret = err;
+
+		u[i].type = SI_AT_IO;
+	}
+
+	/* End of Arguments. */
+
+	u[i].type = SI_AT_END;
+
+	return ret;
+}
+
+/**
+ * process_doorbell_msg - Parse the buffer contents and invoke the
+ * doorbell_msg callback present it.
+ * @buf: doorbell_msg buffer shared with QTEE.
+ *
+ * Return: On success return 0. On failure returns -EINVAL if invalid
+ * object type or operation not supported.
+ * It returns -ENOMEM if memory could not be allocated.
+ */
+int process_doorbell_msg(void *buf)
+{
+	int i, errno;
+
+	if (!buf)
+		return -EINVAL;
+
+	struct qtee_callback *msg = (struct qtee_callback *) buf;
+
+	/* Get object being invoked!!! */
+	unsigned int object_id = msg->cxt;
+	struct si_object *object;
+
+	/* QTEE can not invoke NULL object or objects it hosts. */
+	if (si_object_type(object_id) == SI_OT_NULL ||
+		si_object_type(object_id) == SI_OT_USER) {
+		return -EINVAL;
+	}
+
+	object = qtee_get_si_object(object_id);
+	if (!object)
+		return -EINVAL;
+
+	struct si_arg *args = kmalloc_array(msg->counts + 1, sizeof(struct si_arg), GFP_KERNEL);
+
+	if (!args) {
+		put_si_object(object);
+		return -ENOMEM;
+	}
+
+	switch (SI_OBJECT_OP_METHOD_ID(msg->op)) {
+	case SI_OBJECT_OP_RELEASE:
+
+		/* Remove the 'object' from 'xa_si_objects' so that the 'object_id'
+		 * becomes invalid for further use. However, call 'put_si_object'
+		 * to schedule the actual release if there is no user.
+		 */
+
+		erase_si_object(object_id);
+		put_si_object(object);
+		errno = 0;
+
+		break;
+	case SI_OBJECT_OP_RETAIN:
+		get_si_object(object);
+		errno = 0;
+
+		break;
+	default:
+
+		/* Check if the operation is supported before going forward. */
+		if (object->ops->op_supported) {
+			if (object->ops->op_supported(msg->op)) {
+				errno = -EINVAL;
+
+				break;
+			}
+		}
+
+		errno = prepare_doorbell_args(msg, args);
+		if (errno) {
+
+			/* Unable to parse the message. Release any object arrived as input. */
+			arg_for_each_input_object(i, args)
+				put_si_object(args[i].o);
+
+			break;
+		}
+
+		/* Using context ID 0 for doorbell_msg as they don't need context tracking */
+		errno = object->ops->dispatch(0,
+			/* .dispatch(Object, Operation, Arguments). */
+			object, msg->op, args);
+
+		put_si_object(object);
+	}
+
+	kfree(args);
+	return errno;
+}
+EXPORT_SYMBOL_GPL(process_doorbell_msg);
+
 
 /* Primordial Object. */
 /* It is invoked by QTEE for kernel services. */
@@ -1319,7 +1416,7 @@ static int si_core_probe(struct platform_device *pdev)
 
 	adci_start();
 
-	ret = si_core_doorbell_init(pdev);
+	ret = si_core_doorbell_setup(pdev);
 	if (ret)
 		goto err_irq_setup;
 
@@ -1341,7 +1438,7 @@ err_kobj_create:
 static void si_core_remove(struct platform_device *pdev)
 {
 	/* TODO. Prevent unloading if 'xa_si_objects' is not empty. */
-	si_core_doorbell_deinit(pdev);
+	si_core_doorbell_cleanup(pdev);
 	adci_shutdown();
 	qtee_ffa_shm_deinit(pdev);
 	sysfs_remove_group(si_core_kobj, &attr_group);
@@ -1350,39 +1447,8 @@ static void si_core_remove(struct platform_device *pdev)
 	destroy_si_core_wq();
 }
 
-static int si_core_pm_freeze(struct device *dev)
-{
-	adci_shutdown();
-	return 0;
-}
-
-static int si_core_pm_restore(struct device *dev)
-{
-	cookie++;
-
-	release_si_objects();
-	adci_start();
-	return 0;
-}
-
-static int si_core_pm_thaw(struct device *dev)
-{
-	adci_start();
-	return 0;
-}
-
-static const struct dev_pm_ops si_core_pm_ops = {
-	.freeze = si_core_pm_freeze,
-	.restore = si_core_pm_restore,
-	.thaw = si_core_pm_thaw,
-};
-
 static const struct of_device_id si_core_match[] = {
-	/* qcom,mem-object is deprecated, only here for backward
-	 * compatibility.
-	 */
-	{ .compatible = "qcom,mem-object", },
-	{ .compatible = "qcom,si-core", }, {}
+	{ .compatible = "qcom,mem-object", }, {}
 };
 
 static struct platform_driver si_core_plat_driver = {
@@ -1391,7 +1457,6 @@ static struct platform_driver si_core_plat_driver = {
 	.driver = {
 		.name = "si-core",
 		.of_match_table = si_core_match,
-		.pm = &si_core_pm_ops,
 	},
 };
 
@@ -1424,7 +1489,3 @@ module_exit(si_core_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("SI CORE driver");
 MODULE_IMPORT_NS(DMA_BUF);
-MODULE_SOFTDEP("pre: qcom-scm");
-#if IS_ENABLED(CONFIG_QCOM_SI_CORE_MEM_FFA)
-MODULE_SOFTDEP("pre: arm_ffa arm_ffa_transport");
-#endif

@@ -56,6 +56,5 @@ sun_tuivm_config = {
     "CONFIG_VIRTIO_MMIO": "m",
     "CONFIG_VIRTIO_MMIO_SWIOTLB": "y",
     "CONFIG_QCOM_TZMEM": "m",
-    "CONFIG_QCOM_TZMEM_MODE_SHMBRIDGE": "y",
     "CONFIG_INTERCONNECT_CLK": "m",
 }

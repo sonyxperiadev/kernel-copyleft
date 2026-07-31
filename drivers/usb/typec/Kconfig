@@ -2,8 +2,6 @@
 
 if TYPEC
 
-source "$(KCONFIG_EXT_PREFIX)drivers/usb/typec/mux/Kconfig"
-
 source "$(KCONFIG_EXT_PREFIX)drivers/usb/typec/ucsi/Kconfig"
 
 endif # TYPEC

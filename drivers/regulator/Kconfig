@@ -125,4 +125,11 @@ config VIRTIO_REGULATOR
           regulator for pass through peripheral devices via regulator backend in
           host.
 
+config REGULATOR_WL28681C
+        tristate "Will Semiconductor WL28681C regulators"
+        help
+          This is support for the Will Semiconductor WL28681C regulators.
+          The WL28681C is seven compact and customizable low dropout
+          regulators.
+
 endif

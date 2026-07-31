@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -208,7 +208,6 @@ static uint32_t dcc_offset_conv(struct dcc_drvdata *drvdata, uint32_t off)
 		if ((off & 0x7F) >= DCC_MAP_LEVEL2)
 			return (off - DCC_MAP_OFFSET4);
 	}
-
 	return (off);
 }
 
@@ -2001,73 +2000,9 @@ static void dcc_configure_list(struct dcc_drvdata *drvdata,
 		dcc_enable(drvdata);
 }
 
-static int dcc_alloc_lists(struct dcc_drvdata *drvdata, struct device *dev)
-{
-	int i;
-
-	drvdata->data_sink = devm_kzalloc(dev, drvdata->nr_link_list *
-			sizeof(enum dcc_data_sink), GFP_KERNEL);
-	if (!drvdata->data_sink)
-		return -ENOMEM;
-
-	drvdata->func_type = devm_kzalloc(dev, drvdata->nr_link_list *
-			sizeof(enum dcc_func_type), GFP_KERNEL);
-	if (!drvdata->func_type)
-		return -ENOMEM;
-
-	drvdata->enable = devm_kzalloc(dev, drvdata->nr_link_list *
-			sizeof(bool), GFP_KERNEL);
-	if (!drvdata->enable)
-		return -ENOMEM;
-
-	drvdata->hw_trig = devm_kzalloc(dev, drvdata->nr_link_list *
-			sizeof(bool), GFP_KERNEL);
-	if (!drvdata->hw_trig)
-		return -ENOMEM;
-
-	drvdata->sw_trig = devm_kzalloc(dev, drvdata->nr_link_list *
-			sizeof(bool), GFP_KERNEL);
-	if (!drvdata->sw_trig)
-		return -ENOMEM;
-
-	drvdata->configured = devm_kzalloc(dev, drvdata->nr_link_list *
-			sizeof(bool), GFP_KERNEL);
-	if (!drvdata->configured)
-		return -ENOMEM;
-
-	drvdata->nr_config = devm_kzalloc(dev, drvdata->nr_link_list *
-			sizeof(uint32_t), GFP_KERNEL);
-	if (!drvdata->nr_config)
-		return -ENOMEM;
-
-	drvdata->cti_trig = devm_kzalloc(dev, drvdata->nr_link_list *
-			sizeof(uint8_t), GFP_KERNEL);
-	if (!drvdata->cti_trig)
-		return -ENOMEM;
-
-	drvdata->qad_output = devm_kzalloc(dev, drvdata->nr_link_list *
-			sizeof(uint8_t), GFP_KERNEL);
-	if (!drvdata->qad_output)
-		return -ENOMEM;
-
-	drvdata->cfg_head = devm_kzalloc(dev, drvdata->nr_link_list *
-			sizeof(struct list_head), GFP_KERNEL);
-	if (!drvdata->cfg_head)
-		return -ENOMEM;
-
-	for (i = 0; i < drvdata->nr_link_list; i++) {
-		INIT_LIST_HEAD(&drvdata->cfg_head[i]);
-		drvdata->nr_config[i] = 0;
-		drvdata->hw_trig[i] = true;
-		drvdata->sw_trig[i] = false;
-	}
-
-	return 0;
-}
-
 static int dcc_probe(struct platform_device *pdev)
 {
-	int ret;
+	int ret, i;
 	struct device *dev = &pdev->dev;
 	struct dcc_drvdata *drvdata;
 	struct resource *res;
@@ -2116,26 +2051,18 @@ static int dcc_probe(struct platform_device *pdev)
 			return -EINVAL;
 	}
 
-	ret = of_property_read_u32(pdev->dev.of_node, "dcc-mem-map-ver",
-					&drvdata->mem_map_ver);
-	if (ret) {
-		if (BVAL(dcc_readl(drvdata, DCC_HW_INFO), 9))
-			drvdata->mem_map_ver = DCC_MEM_MAP_VER3;
-		else if ((dcc_readl(drvdata, DCC_HW_INFO) & 0x3F) == 0x3F)
-			drvdata->mem_map_ver = DCC_MEM_MAP_VER2;
-		else
-			drvdata->mem_map_ver = DCC_MEM_MAP_VER1;
-	}
-
-	if (drvdata->mem_map_ver < DCC_MEM_MAP_VER1
-			|| drvdata->mem_map_ver > DCC_MEM_MAP_VER3)
-		return  -EINVAL;
-
-	if (drvdata->mem_map_ver) {
+	if (BVAL(dcc_readl(drvdata, DCC_HW_INFO), 9)) {
+		drvdata->mem_map_ver = DCC_MEM_MAP_VER3;
+		drvdata->nr_link_list = dcc_readl(drvdata, DCC_LL_NUM_INFO);
+		if (drvdata->nr_link_list == 0)
+			return  -EINVAL;
+	} else if ((dcc_readl(drvdata, DCC_HW_INFO) & 0x3F) == 0x3F) {
+		drvdata->mem_map_ver = DCC_MEM_MAP_VER2;
 		drvdata->nr_link_list = dcc_readl(drvdata, DCC_LL_NUM_INFO);
 		if (drvdata->nr_link_list == 0)
 			return  -EINVAL;
 	} else {
+		drvdata->mem_map_ver = DCC_MEM_MAP_VER1;
 		drvdata->nr_link_list = DCC_MAX_LINK_LIST;
 	}
 
@@ -2145,10 +2072,53 @@ static int dcc_probe(struct platform_device *pdev)
 		drvdata->loopoff = get_bitmask_order((drvdata->ram_size +
 				drvdata->ram_offset) / 4 - 1);
 	mutex_init(&drvdata->mutex);
+	drvdata->data_sink = devm_kzalloc(dev, drvdata->nr_link_list *
+			sizeof(enum dcc_data_sink), GFP_KERNEL);
+	if (!drvdata->data_sink)
+		return -ENOMEM;
+	drvdata->func_type = devm_kzalloc(dev, drvdata->nr_link_list *
+			sizeof(enum dcc_func_type), GFP_KERNEL);
+	if (!drvdata->func_type)
+		return -ENOMEM;
+	drvdata->enable = devm_kzalloc(dev, drvdata->nr_link_list *
+			sizeof(bool), GFP_KERNEL);
+	if (!drvdata->enable)
+		return -ENOMEM;
+	drvdata->hw_trig = devm_kzalloc(dev, drvdata->nr_link_list *
+			sizeof(bool), GFP_KERNEL);
+	if (!drvdata->hw_trig)
+		return -ENOMEM;
+	drvdata->sw_trig = devm_kzalloc(dev, drvdata->nr_link_list *
+			sizeof(bool), GFP_KERNEL);
+	if (!drvdata->sw_trig)
+		return -ENOMEM;
+	drvdata->configured = devm_kzalloc(dev, drvdata->nr_link_list *
+			sizeof(bool), GFP_KERNEL);
+	if (!drvdata->configured)
+		return -ENOMEM;
+	drvdata->nr_config = devm_kzalloc(dev, drvdata->nr_link_list *
+			sizeof(uint32_t), GFP_KERNEL);
+	if (!drvdata->nr_config)
+		return -ENOMEM;
+	drvdata->cti_trig = devm_kzalloc(dev, drvdata->nr_link_list *
+			sizeof(uint8_t), GFP_KERNEL);
+	if (!drvdata->cti_trig)
+		return -ENOMEM;
+	drvdata->qad_output = devm_kzalloc(dev, drvdata->nr_link_list *
+			sizeof(uint8_t), GFP_KERNEL);
+	if (!drvdata->qad_output)
+		return -ENOMEM;
+	drvdata->cfg_head = devm_kzalloc(dev, drvdata->nr_link_list *
+			sizeof(struct list_head), GFP_KERNEL);
+	if (!drvdata->cfg_head)
+		return -ENOMEM;
 
-	ret = dcc_alloc_lists(drvdata, dev);
-	if (ret)
-		return ret;
+	for (i = 0; i < drvdata->nr_link_list; i++) {
+		INIT_LIST_HEAD(&drvdata->cfg_head[i]);
+		drvdata->nr_config[i] = 0;
+		drvdata->hw_trig[i] = true;
+		drvdata->sw_trig[i] = false;
+	}
 
 	memset_io(drvdata->ram_base, 0, drvdata->ram_size);
 
@@ -2333,7 +2303,7 @@ out:
 #ifdef CONFIG_DEEPSLEEP
 static int dcc_v2_suspend(struct device *dev)
 {
-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
+	if (pm_suspend_via_firmware())
 		return dcc_state_store(dev);
 
 	return 0;
@@ -2341,7 +2311,7 @@ static int dcc_v2_suspend(struct device *dev)
 
 static int dcc_v2_resume(struct device *dev)
 {
-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
+	if (pm_suspend_via_firmware())
 		return dcc_state_restore(dev);
 
 	return 0;

@@ -234,19 +234,6 @@ static void glink_cma_tx_kick(struct qcom_glink_pipe *glink_pipe)
 	mbox_send_message(cma->mbox_chan, NULL);
 	mbox_client_txdone(cma->mbox_chan, 0);
 }
-
-static void glink_cma_rx_reset(struct qcom_glink_pipe *np)
-{
-	struct glink_cma_pipe *pipe = to_glink_cma_pipe(np);
-	*pipe->tail = 0;
-}
-
-static void glink_cma_tx_reset(struct qcom_glink_pipe *np)
-{
-	struct glink_cma_pipe *pipe = to_glink_cma_pipe(np);
-	*pipe->head = 0;
-}
-
 static void glink_cma_native_init(struct glink_cma_dev *gdev)
 {
 	struct qcom_glink_pipe *tx_native = &gdev->tx_pipe.native;
@@ -256,13 +243,11 @@ static void glink_cma_native_init(struct glink_cma_dev *gdev)
 	tx_native->avail = glink_cma_tx_avail;
 	tx_native->write = glink_cma_tx_write;
 	tx_native->kick = glink_cma_tx_kick;
-	tx_native->reset = glink_cma_tx_reset;
 
 	rx_native->length = FIFO_SIZE;
 	rx_native->avail = glink_cma_rx_avail;
 	rx_native->peek = glink_cma_rx_peek;
 	rx_native->advance = glink_cma_rx_advance;
-	rx_native->reset = glink_cma_rx_reset;
 	GLINK_CMA_DEBUG_LOG(gdev->glink_cma_ilc, "success");
 }
 
@@ -340,6 +325,7 @@ struct glink_cma_dev *qcom_glink_cma_register(struct device *parent, struct devi
 	if (rc) {
 		pr_err("failed to register glink edge\n");
 		put_device(dev);
+		kfree(gdev);
 		return ERR_PTR(rc);
 	}
 
@@ -357,15 +343,6 @@ struct glink_cma_dev *qcom_glink_cma_register(struct device *parent, struct devi
 
 	scnprintf(gdev->irqname, 32, "glink-native-%s", gdev->name);
 
-	glink_cma_native_init(gdev);
-
-	glink = qcom_glink_native_probe(dev, GLINK_FEATURE_INTENT_REUSE,
-					&gdev->rx_pipe.native, &gdev->tx_pipe.native, false);
-	if (IS_ERR(glink)) {
-		rc = PTR_ERR(glink);
-		goto err_put_dev;
-	}
-
 	gdev->irq = of_irq_get(gdev->dev.of_node, 0);
 	ret = devm_request_irq(&gdev->dev, gdev->irq, qcom_glink_cma_intr,
 							IRQF_NO_SUSPEND,
@@ -380,19 +357,26 @@ struct glink_cma_dev *qcom_glink_cma_register(struct device *parent, struct devi
 	gdev->mbox_chan = mbox_request_channel(&gdev->mbox_client, 0);
 	if (IS_ERR(gdev->mbox_chan)) {
 		pr_err("%s: failed to get mbox channel\n", __func__);
-		disable_irq(gdev->irq);
-		goto err_put_glink;
+		goto err_put_dev;
 	}
 
-	qcom_glink_native_start(glink);
+	glink_cma_native_init(gdev);
+
+	glink = qcom_glink_native_probe(dev, GLINK_FEATURE_INTENT_REUSE,
+					&gdev->rx_pipe.native, &gdev->tx_pipe.native, false);
+	if (IS_ERR(glink)) {
+		rc = PTR_ERR(glink);
+		goto err_free_mbox;
+	}
 
 	gdev->glink = glink;
 
 	GLINK_CMA_DEBUG_LOG(gdev->glink_cma_ilc, "success");
 	return gdev;
 
-err_put_glink:
-	qcom_glink_native_remove(gdev->glink);
+err_free_mbox:
+	mbox_free_channel(gdev->mbox_chan);
+
 err_put_dev:
 	GLINK_CMA_DEBUG_LOG(gdev->glink_cma_ilc, "Exit error %d", rc);
 	device_unregister(dev);

@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 
 #ifndef __QCOM_Q6V5_H__
 #define __QCOM_Q6V5_H__
@@ -14,6 +19,8 @@ struct qcom_sysmon;
 
 #define PING_TIMEOUT 500 /* in milliseconds */
 #define PING_TEST_WAIT 500 /* in milliseconds */
+
+#define SUBSYS_CRASH_REASON_LEN 512
 
 struct string_node {
 	struct list_head list;
@@ -45,7 +52,6 @@ struct qcom_q6v5 {
 	struct rproc_subdev *glink_subdev;
 
 	struct work_struct crash_handler;
-	struct work_struct symbol_loader;
 
 	bool handover_issued;
 
@@ -57,6 +63,8 @@ struct qcom_q6v5 {
 	int crash_reason;
 	int crash_stack;
 	unsigned int smem_host_id;
+	char crash_reason_buf[SUBSYS_CRASH_REASON_LEN];
+	int data_ready;
 
 	bool running;
 

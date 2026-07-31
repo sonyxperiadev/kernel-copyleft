@@ -23,7 +23,7 @@
 #define GPU_CC_GX_ACCU_SHIFT_CLK				13
 #define GPU_CC_GX_AHB_FF_CLK					14
 #define GPU_CC_GX_GMU_CLK					15
-#define GPU_CC_HLOS1_VOTE_GPU_SMMU_CLK				GPU_CC_GPU_SMMU_VOTE_CLK
+#define GPU_CC_HLOS1_VOTE_GPU_SMMU_CLK				16
 #define GPU_CC_HUB_AON_CLK					17
 #define GPU_CC_HUB_CLK_SRC					18
 #define GPU_CC_HUB_CX_INT_CLK					19
@@ -35,8 +35,6 @@
 
 /* GPU_CC power domains */
 #define GPU_CC_CX_GDSC						0
-#define GPU_CC_CX_SMMU_GDSC					1
-#define GPU_CC_CX_GMU_GDSC					2
 
 /* GX_CLKCTL power domains */
 #define GX_CLKCTL_GX_GDSC					0

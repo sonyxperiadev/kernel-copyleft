@@ -201,10 +201,6 @@ struct adc_tm_client_info {
  * SCALE_HW_CALIB_PM5_GEN4_BATT_ID_10K: Returns battery ID resistance
  *	in ohms using 10k pullup. The hardware applies offset/slope to
  *	adc code.
- * SCALE_HW_CALIB_PM5_GEN3_PMIC_THERM_LITE: Returns result in millidegrees Celsius.
- *	The hardware applies offset/slope to adc code. This is for PMIC5 Gen3.
- * SCALE_HW_CALIB_PMW6100_CHG_TEMP:  Returns result in millidegrees for PMIC5
- *	Gen4 charger temperature channel on PMW6100.
  */
 enum vadc_scale_fn_type {
 	SCALE_DEFAULT = 0,
@@ -235,8 +231,6 @@ enum vadc_scale_fn_type {
 	SCALE_HW_CALIB_PM5_GEN3_USB_IN_I,
 	SCALE_HW_CALIB_PM5_GEN4_BATT_THERM_10K,
 	SCALE_HW_CALIB_PM5_GEN4_BATT_ID_10K,
-	SCALE_HW_CALIB_PM5_GEN3_PMIC_THERM_LITE,
-	SCALE_HW_CALIB_PMW6100_CHG_TEMP,
 	SCALE_HW_CALIB_INVALID,
 };
 

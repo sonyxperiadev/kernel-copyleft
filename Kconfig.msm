@@ -1,4 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0
+#
+# Copyright 2025 Sony Corporation
+# NOTE: This file has been modified by Sony Corporation
+# Modifications are licensed under the License.
 
 menu "Qualcomm SoC Repostiory Configuration"
 
@@ -26,8 +30,6 @@ source "$(KCONFIG_EXT_PREFIX)drivers/dma/qcom/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/edac/Kconfig"
 
-source "$(KCONFIG_EXT_PREFIX)drivers/extcon/Kconfig"
-
 source "$(KCONFIG_EXT_PREFIX)drivers/firmware/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/gpu/drm/bridge/Kconfig"
@@ -40,17 +42,17 @@ source "$(KCONFIG_EXT_PREFIX)drivers/hwtracing/coresight/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/hwtracing/stm/Kconfig"
 
+source "$(KCONFIG_EXT_PREFIX)drivers/input/et617/Kconfig"
+
 source "$(KCONFIG_EXT_PREFIX)drivers/i2c/busses/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/i3c/master/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/iio/adc/Kconfig"
 
-source "$(KCONFIG_EXT_PREFIX)drivers/iio/dac/Kconfig"
-
 source "$(KCONFIG_EXT_PREFIX)drivers/input/misc/Kconfig"
 
-source "$(KCONFIG_EXT_PREFIX)drivers/input/touchscreen/Kconfig"
+source "$(KCONFIG_EXT_PREFIX)drivers/input/touchscreen/lxs_ts/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/interconnect/Kconfig"
 
@@ -70,6 +72,8 @@ source "$(KCONFIG_EXT_PREFIX)drivers/eom/pcie/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/misc/Kconfig"
 
+source "$(KCONFIG_EXT_PREFIX)drivers/mmc/core/Kconfig"
+
 source "$(KCONFIG_EXT_PREFIX)drivers/mmc/host/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/net/Kconfig"
@@ -77,8 +81,6 @@ source "$(KCONFIG_EXT_PREFIX)drivers/net/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/pci/controller/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/perf/Kconfig"
-
-source "$(KCONFIG_EXT_PREFIX)drivers/phy/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/phy/qualcomm/Kconfig"
 
@@ -89,8 +91,6 @@ source "$(KCONFIG_EXT_PREFIX)drivers/power/reset/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/power/supply/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/powercap/qcom/Kconfig"
-
-source "$(KCONFIG_EXT_PREFIX)drivers/ptp/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/regulator/Kconfig"
 
@@ -134,13 +134,19 @@ source "$(KCONFIG_EXT_PREFIX)drivers/virtio/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)init/Kconfig"
 
+source "$(KCONFIG_EXT_PREFIX)kernel/fels/Kconfig"
+
 source "$(KCONFIG_EXT_PREFIX)kernel/sched/walt/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)kernel/trace/Kconfig"
 
+source "$(KCONFIG_EXT_PREFIX)kernel/power_irq/Kconfig"
+
 source "$(KCONFIG_EXT_PREFIX)net/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)sound/usb/Kconfig"
+
+source "$(KCONFIG_EXT_PREFIX)sound/soc/codecs/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/block/Kconfig"
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2011-2019, 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 /* Smart-Peripheral-Switch (SPS) Module. */
 
@@ -38,7 +38,7 @@ bool enhd_pipe;
 bool imem;
 enum sps_bam_type bam_type;
 static enum sps_bam_type bam_types[] = {
-	SPS_BAM_LEGACY, SPS_BAM_NDP, SPS_BAM_NDP_4K, SPS_BAM_NDP_V1_7_4K};
+	SPS_BAM_LEGACY, SPS_BAM_NDP, SPS_BAM_NDP_4K};
 
 static void sps_device_de_init(void);
 
@@ -2709,9 +2709,6 @@ static const struct of_device_id msm_sps_match[] = {
 	},
 	{	.compatible = "qcom,msm-sps-4k",
 		.data = &bam_types[SPS_BAM_NDP_4K]
-	},
-	{	.compatible = "qcom,msm-sps-v1_7-4k",
-		.data = &bam_types[SPS_BAM_NDP_V1_7_4K]
 	},
 	{},
 };

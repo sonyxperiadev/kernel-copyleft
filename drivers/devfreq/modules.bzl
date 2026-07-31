@@ -20,7 +20,6 @@ def register_modules(registry):
         deps = [
             # do not sort
             "drivers/firmware/qcom/qcom-scm",
-            "drivers/firmware/qcom/qcom_scm_smci",
             "drivers/virt/gunyah/gh_rm_drv",
             "drivers/virt/gunyah/gh_msgq",
             "drivers/virt/gunyah/gh_dbl",

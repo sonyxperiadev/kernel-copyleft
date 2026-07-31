@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -34,8 +34,7 @@ struct pe_sensor_data {
 	struct mutex			mutex;
 };
 
-static int pe_sensor_get_trend(struct thermal_zone_device *tz,
-				const struct thermal_trip *trip, enum thermal_trend *trend)
+static int pe_sensor_get_trend(struct thermal_zone_device *tz, int trip, enum thermal_trend *trend)
 {
 	int value, last_value;
 
@@ -190,12 +189,14 @@ static int pe_sens_device_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static void pe_sens_device_remove(struct platform_device *pdev)
+static int pe_sens_device_remove(struct platform_device *pdev)
 {
 	struct pe_sensor_data *pe_sens =
 		(struct pe_sensor_data *)dev_get_drvdata(&pdev->dev);
 
 	devm_thermal_of_zone_unregister(pe_sens->dev, pe_sens->tz_dev);
+
+	return 0;
 }
 
 static const struct of_device_id pe_sens_device_match[] = {

@@ -561,15 +561,10 @@ static int habmem_add_export_compress(struct virtual_channel *vchan,
 	struct mem_share_metadata *metadata = NULL;
 	uint32_t sizebytes;
 
-	/*
-	 * Add 1 byte to the export desc size to avoid mismatch in size
-	 * coming from PVM/Host side, as to resolve error for payload[1]
-	 * in 6.12 kernel, as it is converted to payload[]
-	 */
 	if (flags & HABMM_EXP_MEM_TYPE_LOOPBACK)
-		sizebytes = (uint32_t)sizeof(*exp_super) + 1 + (uint32_t)sizeof(struct lb_mem_info);
+		sizebytes = (uint32_t)sizeof(*exp_super) + (uint32_t)sizeof(struct lb_mem_info);
 	else
-		sizebytes = sizeof(*exp_super) + 1 +
+		sizebytes = sizeof(*exp_super) +
 				sizeof(struct compressed_pfns) +
 				page_count * sizeof(struct region);
 

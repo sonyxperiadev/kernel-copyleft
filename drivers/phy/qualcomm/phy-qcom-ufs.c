@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "phy-qcom-ufs-i.h"
@@ -179,18 +179,18 @@ struct phy *ufs_qcom_phy_generic_probe(struct platform_device *pdev,
 		goto out;
 	}
 
+	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+	if (IS_ERR(phy_provider)) {
+		err = PTR_ERR(phy_provider);
+		dev_err(dev, "%s: failed to register phy %d\n", __func__, err);
+		goto out;
+	}
+
 	generic_phy = devm_phy_create(dev, NULL, ufs_qcom_phy_gen_ops);
 	if (IS_ERR(generic_phy)) {
 		err =  PTR_ERR(generic_phy);
 		dev_err(dev, "%s: failed to create phy %d\n", __func__, err);
 		generic_phy = NULL;
-		goto out;
-	}
-
-	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-	if (IS_ERR(phy_provider)) {
-		err = PTR_ERR(phy_provider);
-		dev_err(dev, "%s: failed to register phy %d\n", __func__, err);
 		goto out;
 	}
 
@@ -299,13 +299,6 @@ skip_txrx_clk:
 	__ufs_qcom_phy_clk_get(phy_common->dev, "ref_clk_parent",
 				   &phy_common->ref_clk_parent, false);
 
-	/*
-	 * "ref_clk_pad_en" is only required in case where UFS_PHY and
-	 * UFS_REF_CLK_BSM both needs to be enabled for REF clock supply
-	 * to card. Hence don't abort init if it's not found.
-	 */
-	__ufs_qcom_phy_clk_get(phy_common->dev, "ref_clk_pad_en",
-				&phy_common->ref_clk_pad_en, false);
 	/*
 	 * Some platforms may not have the ON/OFF control for reference clock,
 	 * hence this clock may be optional.
@@ -528,30 +521,9 @@ static int ufs_qcom_phy_enable_ref_clk(struct ufs_qcom_phy *phy)
 	if (phy->is_ref_clk_enabled)
 		goto out;
 
-	/*
-	 * "ref_clk_pad_en" is only required if UFS_PHY and UFS_REF_CLK_BSM
-	 * both needs to be enabled. Hence make sure that clk reference
-	 * is available before trying to enable the clock.
-	 */
-	if (phy->ref_clk_pad_en) {
-		ret = clk_prepare_enable(phy->ref_clk_pad_en);
-		if (ret) {
-			dev_err(phy->dev, "%s: ref_clk_pad_en enable failed %d\n",
-				__func__, ret);
-			goto out;
-		}
-	}
-
 	/* qref clk signal is optional */
-	if (phy->qref_clk) {
-		ret = clk_prepare_enable(phy->qref_clk);
-		if (ret) {
-			dev_err(phy->dev, "%s: qref_clk enable failed %d\n",
-				 __func__, ret);
-			goto out_disable_ref_clk_pad;
-		}
-	}
-
+	if (phy->qref_clk)
+		clk_prepare_enable(phy->qref_clk);
 	/*
 	 * reference clock is propagated in a daisy-chained manner from
 	 * source to phy, so ungate them at each stage.
@@ -560,7 +532,7 @@ static int ufs_qcom_phy_enable_ref_clk(struct ufs_qcom_phy *phy)
 	if (ret) {
 		dev_err(phy->dev, "%s: ref_clk_src enable failed %d\n",
 				__func__, ret);
-		goto out_disable_qref_clk;
+		goto out;
 	}
 
 	/*
@@ -614,14 +586,6 @@ out_disable_parent:
 		clk_disable_unprepare(phy->ref_clk_parent);
 out_disable_src:
 	clk_disable_unprepare(phy->ref_clk_src);
-
-out_disable_qref_clk:
-	if (phy->qref_clk)
-		clk_disable_unprepare(phy->qref_clk);
-
-out_disable_ref_clk_pad:
-	if (phy->ref_clk_pad_en)
-		clk_disable_unprepare(phy->ref_clk_pad_en);
 out:
 	return ret;
 }
@@ -674,13 +638,6 @@ static void ufs_qcom_phy_disable_ref_clk(struct ufs_qcom_phy *phy)
 		if (phy->ref_clk_parent)
 			clk_disable_unprepare(phy->ref_clk_parent);
 		clk_disable_unprepare(phy->ref_clk_src);
-
-		/*
-		 * "ref_clk_pad_en" is optional clock hence make sure that clk
-		 * reference is available before trying to disable the clock.
-		 */
-		if (phy->ref_clk_pad_en)
-			clk_disable_unprepare(phy->ref_clk_pad_en);
 
 		/* qref clk signal is optional */
 		if (phy->qref_clk)

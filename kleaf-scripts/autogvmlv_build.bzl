@@ -9,7 +9,6 @@ load("//build/kernel/kleaf:hermetic_tools.bzl", "hermetic_genrule")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers", "merged_kernel_uapi_headers")
 load(":kleaf-scripts/dtbs.bzl", "define_qcom_dtbs")
 load(":kleaf-scripts/image_opts.bzl", "vm_image_opts")
-load(":kleaf-scripts/msm_dtc.bzl", "define_dtc_dist")
 load(":qcom_modules.bzl", "registry")
 
 def define_make_vm_dtb_img(target, dtb_list, page_size):
@@ -156,7 +155,6 @@ def define_autogvmlv_build(
             k_config = "kernel_aarch64_autogvmlv_debug"
 
         define_extras(name + "_" + variant, kbuild_config = k_config)
-        define_dtc_dist(name + "_" + variant, "autogvm", variant)
 
 def define_typical_autogvmlv_build(
         name,

@@ -26,12 +26,6 @@ def register_modules(registry):
                     "drivers/eom/pcie_eom_seraph_phy.c",
                 ],
             },
-            "CONFIG_ARCH_X1E80100": {
-                True: [
-                    "drivers/eom/pcie_eom_hamoa_phy_reg.h",
-                    "drivers/eom/pcie_eom_hamoa_phy.c",
-                ],
-            },
         },
         hdrs = [
             "include/linux/phy_core.h",

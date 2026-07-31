@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright 2025 Sony Corporation
+# NOTE: This file has been modified by Sony Corporation
+# Modifications are licensed under the License.
+
+config SND_SOC_CS40L26
+	tristate "Cirrus Logic CS40L26 Stub CODEC"
+	depends on INPUT_CS40L26

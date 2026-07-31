@@ -14,6 +14,7 @@ static int neg_five = -5;
 static int three = 3;
 static int four = 4;
 static int five = 5;
+static int two_hundred_fifty_five = 255;
 static unsigned int ns_per_sec = NSEC_PER_SEC;
 static unsigned int one_hundred_thousand = 100000;
 static unsigned int two_hundred_million = 200000000;
@@ -23,11 +24,6 @@ static int one_thousand = 1000;
 static int one_thousand_twenty_four = 1024;
 static int two_thousand = 2000;
 static int max_nr_pipeline = MAX_NR_PIPELINE;
-
-/* This is the decimal value of max supported cpus by WALT.
- * Maximum number of supported cpus are calculated as MAX_CLUSTERS * MAX_CPUS_PER_CLUSTER
- */
-static u32 max_supported_cpus_value = GENMASK_TYPE(u32, (MAX_CLUSTERS * MAX_CPUS_PER_CLUSTER)-1, 0);
 
 /*
  * CFS task prio range is [100 ... 139]
@@ -327,12 +323,9 @@ static int walt_proc_pipeline_cpus_handler(const struct ctl_table *table,
 	unsigned int old_value;
 	unsigned long bitmask;
 	const unsigned long *bitmaskp = &bitmask;
-	cpumask_t tmp;
 	static bool written_once;
 	static DEFINE_MUTEX(mutex);
 	struct ctl_table local_table = *table;
-	struct walt_sched_cluster *cluster;
-	int idx = 0;
 
 	mutex_lock(&mutex);
 
@@ -348,27 +341,8 @@ static int walt_proc_pipeline_cpus_handler(const struct ctl_table *table,
 
 	bitmask = (unsigned long)sysctl_sched_pipeline_cpus;
 	bitmap_copy(sysctl_bitmap, bitmaskp, WALT_NR_CPUS);
-	cpumask_copy(&tmp, to_cpumask(sysctl_bitmap));
-	for_each_sched_cluster(cluster) {
-		if (cpumask_intersects(&cluster->cpus, &tmp)) {
-			if (!idx)
-				pipeline_lower_cluster_id = cluster->id;
-			else
-				pipeline_higher_cluster_id = cluster->id;
-			idx++;
-		}
-	}
-	/* Pipeline is confined within two clusters only */
-	if (idx > 2) {
-		sysctl_sched_pipeline_cpus = old_value;
-		ret = -EINVAL;
-		goto unlock;
-	}
+	cpumask_copy(&cpus_for_pipeline, to_cpumask(sysctl_bitmap));
 
-	if (idx == 1)
-		single_cluster_pipeline = true;
-
-	cpumask_copy(&cpus_for_pipeline, &tmp);
 	written_once = true;
 unlock:
 	mutex_unlock(&mutex);
@@ -1865,7 +1839,7 @@ static struct ctl_table walt_table[] = {
 		.mode		= 0644,
 		.proc_handler	= sched_busy_hyst_handler,
 		.extra1		= SYSCTL_ZERO,
-		.extra2		= &max_supported_cpus_value,
+		.extra2		= &two_hundred_fifty_five,
 	},
 	{
 		.procname	= "sched_busy_hyst_ns",
@@ -1883,7 +1857,7 @@ static struct ctl_table walt_table[] = {
 		.mode		= 0644,
 		.proc_handler	= sched_busy_hyst_handler,
 		.extra1		= SYSCTL_ZERO,
-		.extra2		= &max_supported_cpus_value,
+		.extra2		= &two_hundred_fifty_five,
 	},
 	{
 		.procname	= "sched_coloc_busy_hyst_cpu_ns",
@@ -1919,7 +1893,7 @@ static struct ctl_table walt_table[] = {
 		.mode		= 0644,
 		.proc_handler	= sched_busy_hyst_handler,
 		.extra1		= SYSCTL_ZERO,
-		.extra2		= &max_supported_cpus_value,
+		.extra2		= &two_hundred_fifty_five,
 	},
 	{
 		.procname	= "sched_util_busy_hyst_cpu_ns",
@@ -2066,7 +2040,7 @@ static struct ctl_table walt_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_douintvec_minmax,
 		.extra1		= SYSCTL_ZERO,
-		.extra2		= &max_supported_cpus_value,
+		.extra2		= &two_hundred_fifty_five,
 	},
 	{
 		.procname	= "sched_wake_up_idle",

@@ -9,8 +9,6 @@ source "$(KCONFIG_EXT_PREFIX)drivers/usb/dwc3/Kconfig"
 
 comment "USB port drivers"
 
-source "$(KCONFIG_EXT_PREFIX)drivers/usb/pd/Kconfig"
-
 source "$(KCONFIG_EXT_PREFIX)drivers/usb/phy/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/usb/gadget/Kconfig"

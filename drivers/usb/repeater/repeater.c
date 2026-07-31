@@ -16,7 +16,7 @@ static DEFINE_SPINLOCK(repeater_lock);
 
 void usb_put_repeater(struct usb_repeater *r)
 {
-	if (r && r->dev) {
+	if (r) {
 		put_device(r->dev);
 		if (r->dev->driver && r->dev->driver->owner)
 			module_put(r->dev->driver->owner);

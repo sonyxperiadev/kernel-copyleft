@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -228,7 +228,7 @@ static int sdpm_clk_device_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static void sdpm_clk_device_remove(struct platform_device *pdev)
+static int sdpm_clk_device_remove(struct platform_device *pdev)
 {
 	struct sdpm_clk_instance *sdpm_clk =
 		(struct sdpm_clk_instance *)dev_get_drvdata(&pdev->dev);
@@ -242,6 +242,8 @@ static void sdpm_clk_device_remove(struct platform_device *pdev)
 		regulator_unregister_notifier(sdpm_clk->clk_data[idx].reg,
 					&sdpm_clk->clk_data[idx].reg_nb);
 	}
+
+	return 0;
 }
 
 static const struct of_device_id sdpm_clk_device_match[] = {

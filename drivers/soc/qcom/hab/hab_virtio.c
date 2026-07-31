@@ -29,13 +29,10 @@
 #define HAB_VIRTIO_DEVICE_ID_SOCCP	99
 #define HAB_VIRTIO_DEVICE_ID_DPRX	100
 #define HAB_VIRTIO_DEVICE_ID_EVA	101
-#define HAB_VIRTIO_DEVICE_ID_HSI2S	102
 
 /* all probed virtio_hab stored in this list */
 static struct list_head vhab_list = LIST_HEAD_INIT(vhab_list);
 static DEFINE_SPINLOCK(vh_lock);
-
-static DEFINE_MUTEX(virthab_init_lock);
 
 static struct virtio_device_tbl {
 	int32_t mmid;
@@ -56,7 +53,6 @@ static struct virtio_device_tbl {
 	{ MM_SOCCP_1, HAB_VIRTIO_DEVICE_ID_SOCCP, NULL },
 	{ MM_DPRX_1, HAB_VIRTIO_DEVICE_ID_DPRX, NULL },
 	{ MM_EVA_1, HAB_VIRTIO_DEVICE_ID_EVA, NULL },
-	{ MM_HSI2S_1, HAB_VIRTIO_DEVICE_ID_HSI2S, NULL },
 };
 
 enum pool_type_t {
@@ -142,7 +138,6 @@ struct hab_driver_ops virtio_ops = {
 	.habhyp_virq_rx_unregister = hgy_virq_rx_unregister,
 	.habhyp_get_virq_num_id = hgy_get_virq_num_id,
 	.habhyp_init_virt_irq = hgy_init_virt_irq,
-	.timer_get_sclk_ticks = __arch_counter_get_cntpct,
 };
 
 struct virtio_hab *get_vh(struct virtio_device *vdev)
@@ -765,7 +760,7 @@ static int virthab_probe(struct virtio_device *vdev)
 {
 	struct virtio_hab *vh = NULL;
 	int err = 0, ret = 0;
-	static int init_failed, init_done, dt_pchan_cnt, pchan_cnt;
+	static int init_once, dt_pchan_cnt, pchan_cnt;
 	int mmid_range = hab_driver.ndevices;
 	uint32_t mmid_start = hab_driver.devp[0].id;
 
@@ -774,39 +769,24 @@ static int virthab_probe(struct virtio_device *vdev)
 		return -ENODEV;
 	}
 
-	mutex_lock(&virthab_init_lock);
+	if (init_once == 0) {
+		init_once = 1;
+		dt_pchan_cnt = hab_count_pchan();
+		pr_info("Total pchannel in device tree %d\n", dt_pchan_cnt);
 
-	if (init_failed) {
-		mutex_unlock(&virthab_init_lock);
-		pr_err("abort virthab probe due to hab_driver_init failed in other threads\n");
-		return -ENODEV;
+		hab_ops_register(&virtio_ops);
+
+		/*
+		 * this function is called at the first probe call only
+		 * so char driver is created before any virtio probe.
+		 */
+		ret = hab_driver_init();
+		if (ret) {
+			pr_err("hab_driver_init failed, ret %d\n", ret);
+			return ret;
+		}
 	}
 
-	if (init_done) {
-		mutex_unlock(&virthab_init_lock);
-		goto INIT_DONE;
-	}
-
-	dt_pchan_cnt = hab_count_pchan();
-	pr_info("Total pchannel in device tree %d\n", dt_pchan_cnt);
-
-	hab_ops_register(&virtio_ops);
-
-	/*
-	 * this function is called at the first probe call only
-	 * so char driver is created before any virtio probe.
-	 */
-	ret = hab_driver_init();
-	if (ret) {
-		init_failed = 1;
-		mutex_unlock(&virthab_init_lock);
-		pr_err("hab_driver_init failed, ret %d\n", ret);
-		return ret;
-	}
-	init_done = 1;
-	mutex_unlock(&virthab_init_lock);
-
-INIT_DONE:
 	pr_info("virtio has feature %llX virtio devid %X vid %d empty %d\n",
 		vdev->features, vdev->id.device, vdev->id.vendor,
 		list_empty(&vhab_list));
@@ -871,10 +851,6 @@ INIT_DONE:
 		mmid_start = MM_EVA_1;
 		mmid_range = MM_EVA_END - MM_EVA_START - 1;
 		virthab_store_vdev(MM_EVA_1, vdev);
-	} else if (vdev->id.device == HAB_VIRTIO_DEVICE_ID_HSI2S) {
-		mmid_start = MM_HSI2S_1;
-		mmid_range = MM_HSI2S_END - MM_HSI2S_START - 1;
-		virthab_store_vdev(MM_HSI2S_1, vdev);
 	} else {
 		pr_err("unknown virtio device is detected %d\n",
 			vdev->id.device);
@@ -1005,7 +981,6 @@ static struct virtio_device_id id_table[] = {
 	{ HAB_VIRTIO_DEVICE_ID_SOCCP, VIRTIO_DEV_ANY_ID }, /* virtio soccp */
 	{ HAB_VIRTIO_DEVICE_ID_DPRX, VIRTIO_DEV_ANY_ID }, /* virtio dprx */
 	{ HAB_VIRTIO_DEVICE_ID_EVA, VIRTIO_DEV_ANY_ID }, /* virtio eva */
-	{ HAB_VIRTIO_DEVICE_ID_HSI2S, VIRTIO_DEV_ANY_ID }, /* virtio hsi2s */
 	{ 0 },
 };
 
@@ -1543,5 +1518,3 @@ int virtio_hab_hypervisor_register_post(void)
 	register_virtio_driver(&virtio_hab_driver);
 	return 0;
 }
-
-

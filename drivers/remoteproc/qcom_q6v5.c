@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Qualcomm Peripheral Image Loader for Q6V5
@@ -5,7 +10,7 @@
  * Copyright (C) 2016-2018 Linaro Ltd.
  * Copyright (C) 2014 Sony Mobile Communications AB
  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2024-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/glob.h>
 #include <linux/kernel.h>
@@ -19,12 +24,6 @@
 #include <linux/remoteproc.h>
 #include <linux/delay.h>
 #include <asm/timex.h>
-#include <linux/rbtree.h>
-#include <linux/kthread.h>
-#include <linux/fs.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-#include <linux/workqueue.h>
 
 #include "qcom_common.h"
 #include "qcom_q6v5.h"
@@ -32,22 +31,6 @@
 
 #define Q6V5_LOAD_STATE_MSG_LEN	64
 #define Q6V5_PANIC_DELAY_MS	200
-
-#define MAX_FW_FILE_SIZE (4 * 1024)
-#define NAME_LEN 64
-#define LINE_LEN 128
-#define UUID_LEN 36
-#define SMEM_BUFFER_LEN 4096
-
-#ifdef CONFIG_QCOM_CRASH_SYMBOL_MATCH
-struct symbol_entry {
-	struct rb_node node;
-	u32 addr;
-	const char *name;
-};
-
-static struct rb_root symbol_tree = RB_ROOT;
-#endif
 
 static int q6v5_load_state_toggle(struct qcom_q6v5 *q6v5, bool enable)
 {
@@ -182,171 +165,14 @@ static inline void qcom_q6v5_conditional_recovery(struct qcom_q6v5 *q6v5, const 
 	}
 }
 
-#ifdef CONFIG_QCOM_CRASH_SYMBOL_MATCH
-static char *read_symbol_file(struct qcom_q6v5 *q6v5, const char *path, size_t *size_out)
+void update_crash_reason(struct qcom_q6v5 *subsys,
+				char *smem_reason, int size)
 {
-	char *buf;
-	int ret;
-	const struct firmware *symtab = NULL;
-
-	ret = request_firmware(&symtab, path, q6v5->dev);
-	if (ret < 0) {
-		dev_err(q6v5->dev, "request_firmware failed: %s (%d)\n", path, ret);
-		return ERR_PTR(ret);
-	}
-	buf = kvzalloc(symtab->size + 1, GFP_KERNEL);
-	if (!buf) {
-		release_firmware(symtab);
-		return ERR_PTR(-ENOMEM);
-	}
-	if (symtab->data < 0) {
-		dev_err(q6v5->dev, "Firmware is empty or invalid: %s\n", symtab->data);
-		kvfree(buf);
-		release_firmware(symtab);
-		return ERR_PTR(-EINVAL);
-	}
-	memcpy(buf, symtab->data, symtab->size);
-	*size_out = symtab->size;
-	release_firmware(symtab);
-	return buf;
+	memcpy(subsys->crash_reason_buf, smem_reason,
+		min((size_t)size, sizeof(subsys->crash_reason_buf)));
+	subsys->data_ready = 1;
 }
-
-static int parse_symbols(struct qcom_q6v5 *q6v5, const char *buf, size_t size)
-{
-	const char *cur = buf;
-	const char *end = buf + size;
-	const char *line_start;
-	char line[LINE_LEN];
-	char name[NAME_LEN];
-	uint32_t addr;
-	int32_t len;
-	struct symbol_entry *entry, *this;
-	struct rb_node **new;
-	struct rb_node *parent;
-
-	while (cur < end) {
-		len = 0;
-		line_start = cur;
-
-		while (cur < end && *cur != '\n')
-			cur++;
-
-		len = min((int)(cur - line_start), (int)(sizeof(line) - 1));
-		memcpy(line, line_start, len);
-		line[len] = '\0';
-
-		if (cur < end)
-			cur++;
-
-		if (sscanf(line, "%x %63s", &addr, name) == 2) {
-			entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-			if (!entry)
-				return -ENOMEM;
-			entry->addr = addr;
-			entry->name = kstrdup(name, GFP_KERNEL);
-			if (!entry->name) {
-				kfree(entry);
-				return -ENOMEM;
-			}
-			new = &symbol_tree.rb_node;
-			parent = NULL;
-			while (*new) {
-				this = rb_entry(*new, struct symbol_entry, node);
-				parent = *new;
-				if (addr < this->addr)
-					new = &(*new)->rb_left;
-				else
-					new = &(*new)->rb_right;
-			}
-			rb_link_node(&entry->node, parent, new);
-			rb_insert_color(&entry->node, &symbol_tree);
-		}
-	}
-	return 0;
-}
-
-static const char *match_function(u32 addr)
-{
-	struct rb_node *node = symbol_tree.rb_node;
-	const char *closest = "none";
-
-	while (node) {
-		struct symbol_entry *entry = rb_entry(node, struct symbol_entry, node);
-
-		if (entry->addr == addr)
-			return entry->name;
-		else if (entry->addr < addr) {
-			closest = entry->name;
-			node = node->rb_right;
-		} else {
-			node = node->rb_left;
-		}
-	}
-	return closest;
-}
-
-static void symbol_loader_work(struct work_struct *work)
-{
-	size_t len;
-	char *buf, *cur, *msg, *end, *token, *callstack_entry, *addr_start;
-	const char *func;
-	char uuid[UUID_LEN + 1];
-	char path[LINE_LEN];
-	size_t size;
-	uint32_t addr;
-	int ret;
-	struct qcom_q6v5 *q6v5;
-
-	q6v5 = container_of(work, struct qcom_q6v5, symbol_loader);
-	msg = qcom_smem_get(q6v5->smem_host_id, q6v5->crash_stack, &len);
-	if (IS_ERR(msg) || len < UUID_LEN) {
-		dev_err(q6v5->dev, "Failed to get UUID from crash_stack\n");
-		return;
-	}
-
-	if (len < (UUID_LEN + 1)) {
-		dev_err(q6v5->dev, "Not enough data for UUID: %zu\n", len);
-		return;
-	}
-
-	memcpy(uuid, msg + (len - (UUID_LEN + 1)), UUID_LEN);
-	uuid[UUID_LEN] = '\0';
-
-	snprintf(path, sizeof(path), "%s_symtab.txt", uuid);
-	buf = read_symbol_file(q6v5, path, &size);
-	if (IS_ERR(buf))
-		return;
-	ret = parse_symbols(q6v5, buf, size);
-	kvfree(buf);
-	if (ret) {
-		dev_err(q6v5->dev, "Failed to parse symbols\n");
-		return;
-	}
-
-	if (q6v5->crash_stack) {
-		cur = msg;
-		end = msg + len;
-		token = strsep(&cur, "|");	/* do this once to get rid of the header */
-		dev_err(q6v5->dev, "Stack Trace:\n");
-		while (cur && cur < end) {
-			callstack_entry = strsep(&cur, "|");
-			if (!callstack_entry)
-				break;
-			addr_start = strpbrk(callstack_entry, ")");
-			if (!addr_start)
-				break;
-			token = addr_start + 1;
-			if (token[0] == '\0')
-				continue;
-
-			if (kstrtou32(token, 16, &addr) == 0) {
-				func = match_function(addr);
-				dev_err(q6v5->dev, "%s (0x%08x)\n", func, addr);
-			}
-		}
-	}
-}
-#endif
+EXPORT_SYMBOL(update_crash_reason);
 
 static irqreturn_t q6v5_wdog_interrupt(int irq, void *data)
 {
@@ -375,6 +201,7 @@ static irqreturn_t q6v5_wdog_interrupt(int irq, void *data)
 		qcom_q6v5_conditional_recovery(q6v5, msg);
 	} else
 		dev_err(q6v5->dev, "watchdog without message\n");
+	update_crash_reason(q6v5, msg, len);
 
 	if (q6v5->crash_stack) {
 		msg = qcom_smem_get(q6v5->smem_host_id, q6v5->crash_stack, &len);
@@ -423,20 +250,14 @@ static irqreturn_t q6v5_fatal_interrupt(int irq, void *data)
 	} else
 		dev_err(q6v5->dev, "fatal error without message\n");
 
+	update_crash_reason(q6v5, msg, len);
+
 	if (q6v5->crash_stack) {
 		msg = qcom_smem_get(q6v5->smem_host_id, q6v5->crash_stack, &len);
 		if (!IS_ERR(msg) && len > 0 && msg[0])
 			dev_err(q6v5->dev, "%s\n", msg);
 	}
 
-#ifdef CONFIG_QCOM_CRASH_SYMBOL_MATCH
-	if (queue_work(system_freezable_wq, &q6v5->symbol_loader)) {
-		dev_info(q6v5->dev, "Symbol loader work started\n");
-		flush_work(&q6v5->symbol_loader);
-	} else {
-		dev_err(q6v5->dev, "Failed to queue symbol loader work\n");
-	}
-#endif
 	q6v5->running = false;
 
 	trace_rproc_qcom_event(dev_name(q6v5->dev), "q6v5_fatal", msg);
@@ -794,9 +615,6 @@ int qcom_q6v5_init(struct qcom_q6v5 *q6v5, struct platform_device *pdev,
 
 	INIT_WORK(&q6v5->crash_handler, qcom_q6v5_crash_handler_work);
 
-#ifdef CONFIG_QCOM_CRASH_SYMBOL_MATCH
-	INIT_WORK(&q6v5->symbol_loader, symbol_loader_work);
-#endif
 	return 0;
 }
 EXPORT_SYMBOL_GPL(qcom_q6v5_init);

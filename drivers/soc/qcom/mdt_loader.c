@@ -5,7 +5,7 @@
  * Copyright (C) 2016 Linaro Ltd
  * Copyright (C) 2015 Sony Mobile Communications Inc
  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/cleanup.h>
@@ -256,8 +256,6 @@ int qcom_mdt_pas_init(struct device *dev, const struct firmware *fw,
 		goto out;
 	}
 
-	/* Store the memory address and size */
-	qcom_scm_pas_store_memoryinfo(pas_id, mem_phys, max_addr - min_addr);
 	if (relocate) {
 		ret = qcom_scm_pas_mem_setup(pas_id, mem_phys, max_addr - min_addr);
 		if (ret) {

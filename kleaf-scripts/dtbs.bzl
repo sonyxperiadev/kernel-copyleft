@@ -1,5 +1,5 @@
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
-load("//build:msm_kernel_extensions.bzl", "get_custom_dtbo_img_list", "get_dtb_list", "get_dtbo_list", "get_dtstree")
+load("//build:msm_kernel_extensions.bzl", "get_dtb_list", "get_dtbo_list", "get_dtstree")
 load("//build/kernel/kleaf:kernel.bzl", "kernel_build", "kernel_build_config")
 
 def define_qcom_dtb_setup():
@@ -64,7 +64,6 @@ def define_qcom_dtbs(
 
     dtb_list = get_dtb_list(target)
     dtbo_list = get_dtbo_list(target)
-    custom_dtbo_img_list = get_custom_dtbo_img_list(target)
 
     kernel_build(
         name = "{}_dtb_build".format(stem),
@@ -88,4 +87,4 @@ def define_qcom_dtbs(
         ],
         visibility = ["//visibility:public"],
     )
-    return [dtb_list, dtbo_list, custom_dtbo_img_list]
+    return [dtb_list, dtbo_list]

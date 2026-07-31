@@ -41,23 +41,4 @@ config LEDS_AW2016
 	  To compile this driver as a module, choose M here: the module
 	  will be called leds-aw2016.
 
-config LEDS_USER_AW21104
-	tristate "LED Support for AW21104"
-	depends on LEDS_CLASS && I2C
-	help
-	  this option enables support for the AW21104 RGBW LED connected
-	  through I2C facing user(wearer) . Say Y to enable support for the AW21104 LED.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called leds-user-aw21104.
-
-config LEDS_BYS_AW21104
-	tristate "LED Support for AW21104"
-	depends on LEDS_CLASS && I2C
-	help
-	  this option enables support for the AW21104 RGBW LED connected
-	  through I2C facing bystander. Say Y to enable support for the AW21104 LED.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called leds-bys-aw21104.
 endif # NEW_LEDS

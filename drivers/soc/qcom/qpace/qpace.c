@@ -95,8 +95,6 @@ static bool qpace_suspended;
 static struct icc_path *qpace_interconnect;
 static struct device *qpace_dev;
 static struct dev_pm_qos_request qos_req;
-DEFINE_STATIC_KEY_FALSE(qpace_drv_probed);
-EXPORT_SYMBOL_GPL(qpace_drv_probed);
 
 /*
  * =============================================================================
@@ -192,7 +190,6 @@ static inline u32 qpace_urgent_command_trigger(phys_addr_t input_addr,
 			       QPACE_URG_CMD_0_TD_DST_ADDR_L_CFG_CNTXT_OFFSET;
 	u64 urg_addr_field_lower, urg_addr_field_upper;
 	u32 stat_reg;
-	unsigned long ret;
 
 	urg_addr_field_lower = FIELD_PREP(URG_CMD_0_TD_DST_ADDR_L__CMD_CFG_CNTXT,
 					command);
@@ -208,12 +205,14 @@ static inline u32 qpace_urgent_command_trigger(phys_addr_t input_addr,
 	: : "r" (urg_addr_field_lower), "r" (urg_addr_field_upper), "r" (td_dst_src_reg)
 	: "memory");
 
-	ret = read_poll_timeout_atomic(QPACE_READ_URG_CMD_REG, stat_reg,
-		FIELD_GET(URG_CMD_0_ED_STAT_COMP_CODE, stat_reg) != OP_URG_ONGOING, 1,
-		100 * USEC_PER_MSEC, false, urg_reg_num, QPACE_URG_CMD_0_ED_STAT_OFFSET);
-	/* Return -ETIMEDOUT on timeout */
-	if (ret)
-		panic("QPace urgent cmd timeout\n");
+
+	stat_reg = QPACE_READ_URG_CMD_REG(urg_reg_num,
+					  QPACE_URG_CMD_0_ED_STAT_OFFSET);
+
+	/* Wait for operation to finish */
+	while (FIELD_GET(URG_CMD_0_ED_STAT_COMP_CODE, stat_reg) == OP_URG_ONGOING)
+		stat_reg = QPACE_READ_URG_CMD_REG(urg_reg_num,
+						  QPACE_URG_CMD_0_ED_STAT_OFFSET);
 
 	return stat_reg;
 }
@@ -1314,9 +1313,6 @@ static int qpace_probe(struct platform_device *pdev)
 		goto power_off;
 
 	qpace_dev = dev;
-	/*  initialization has been completed before other CPUs observe qpace_drv_probed */
-	smp_mb();
-	static_branch_enable(&qpace_drv_probed);
 
 	return ret;
 

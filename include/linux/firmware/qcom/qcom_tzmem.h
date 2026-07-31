@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2025 Sony Corporation,
+ * and licensed under the license of the file.
+ */
+/*
  * Copyright (C) 2023-2024 Linaro Ltd.
  */
 

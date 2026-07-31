@@ -13,13 +13,6 @@
 #include <linux/scatterlist.h>
 #include <linux/uuid.h>
 
-struct qtee_object_invoke;
-struct qtee_callback;
-
-/* Process callback buffer; used by doorbell. */
-void si_object_invoke(struct si_object_invoke_ctx *oic,
-		      struct qtee_callback *msg);
-
 /* QTEE object ID API. */
 
 enum si_object_type si_object_type(unsigned int object_id);
@@ -58,14 +51,15 @@ void __fetch__async_reqs(struct si_object_invoke_ctx *oic);
 
 /* FFA related API. */
 
-/* f2266662-48cb-5335-b3f2-a1942a5677aa */
+/* 571217bb-16d2-543f-917e-c4f04237a774 */
 #define QTEE_SP_FFA_UUID                                                    \
-	UUID_INIT(0xf2266662, 0x48cb, 0x5335, 0xb3, 0xf2, 0xa1, 0x94, 0x2a, 0x56, 0x77, 0xaa)
+	UUID_INIT(0x571217bb, 0x16d2, 0x543f, 0x91, 0x7e, 0xc4, 0xf0, 0x42, \
+		  0x37, 0xa7, 0x74)
 
 #ifdef CONFIG_QCOM_SI_CORE_MEM_FFA
 
-int qtee_ffa_mem_share(struct sg_table *sgt, uint64_t tag, u8 attrs, uint64_t *ffa_handle);
-int qtee_ffa_mem_lend(struct sg_table *sgt, uint64_t tag, u8 attrs, uint64_t *ffa_handle);
+int qtee_ffa_mem_share(struct sg_table *sgt, uint64_t tag, uint64_t *ffa_handle);
+int qtee_ffa_mem_lend(struct sg_table *sgt, uint64_t tag, uint64_t *ffa_handle);
 int qtee_ffa_mem_reclaim(uint64_t ffa_handle);
 
 int qtee_ffa_shm_alloc(size_t in_size, size_t out_size,
@@ -81,13 +75,13 @@ void si_core_ffa_driver_unregister(void);
 #else
 
 static inline int qtee_ffa_mem_share(struct sg_table *sgt,
-				     uint64_t tag, u8 attrs, uint64_t *ffa_handle)
+				     uint64_t tag, uint64_t *ffa_handle)
 {
 	return -EOPNOTSUPP;
 }
 
 static inline int qtee_ffa_mem_lend(struct sg_table *sgt,
-				    uint64_t tag, u8 attrs, uint64_t *ffa_handle)
+				    uint64_t tag, uint64_t *ffa_handle)
 {
 	return -EOPNOTSUPP;
 }
@@ -128,10 +122,6 @@ static inline void si_core_ffa_driver_unregister(void)
 #endif /* CONFIG_QCOM_SI_CORE_MEM_FFA */
 
 /* ''QTEE'' related definitions. */
-
-#define SMCINVOKE_MIN_ASYNC_VERSION 0x00010002U
-#define SMCINVOKE_ASYNC_VERSION_SHM 0x00010002U
-#define SMCINVOKE_ASYNC_VERSION_FFA 0x00010003U
 
 #define QTEE_RESULT_INBOUND_REQ_NEEDED 3
 

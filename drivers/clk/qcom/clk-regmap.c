@@ -12,7 +12,6 @@
 
 #include "clk-regmap.h"
 #include "clk-debug.h"
-#include "gdsc.h"
 
 static LIST_HEAD(clk_regmap_list);
 static DEFINE_SPINLOCK(clk_regmap_lock);
@@ -375,16 +374,3 @@ void clk_restore_critical_clocks(struct device *dev)
 					 cclks[i].mask);
 }
 EXPORT_SYMBOL_GPL(clk_restore_critical_clocks);
-
-void gdsc_genpd_pm_restore(struct device *dev)
-{
-	struct qcom_cc_desc *desc = dev_get_drvdata(dev);
-	int i;
-
-	if (!desc || !desc->gdscs || !desc->num_gdscs)
-		return;
-
-	for (i = 0; i < desc->num_gdscs; i++)
-		gdsc_pm_restore(desc->gdscs[i]);
-}
-EXPORT_SYMBOL_GPL(gdsc_genpd_pm_restore);

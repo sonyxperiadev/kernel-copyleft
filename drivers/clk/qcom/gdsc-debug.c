@@ -49,7 +49,6 @@ static int gdsc_genpd_hwctrl_set(void *data, u64 val)
 	}
 
 	regmap_update_bits(sc->regmap, sc->gdscr, HW_CONTROL_MASK, mask);
-	sc->hw_ctrl_mode = !!val;
 
 	if (sc->rsupply)
 		return regulator_disable(sc->rsupply);
@@ -130,37 +129,6 @@ static int gdsc_genpd_enable_set(void *data, u64 val)
 DEFINE_DEBUGFS_ATTRIBUTE(gdsc_genpd_debug_enable_fops, gdsc_genpd_enable_get,
 					gdsc_genpd_enable_set, "%lld\n");
 
-static int print_hw_show(struct seq_file *m, void *unused)
-{
-	struct gdsc *sc = m->private;
-	int ret;
-
-	if (sc->rsupply) {
-		ret = regulator_enable(sc->rsupply);
-		if (ret)
-			return ret;
-	}
-
-	gdsc_genpd_print_regs(m, sc);
-
-	if (sc->rsupply)
-		return regulator_disable(sc->rsupply);
-
-	return 0;
-}
-
-static int print_hw_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, print_hw_show, inode->i_private);
-}
-
-static const struct file_operations gdsc_print_hw_fops = {
-	.open		= print_hw_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release,
-};
-
 static int gdsc_genpd_debug_create_one(struct gdsc_debug *gdsc_debug,
 						struct dentry *pdentry)
 {
@@ -183,14 +151,6 @@ static int gdsc_genpd_debug_create_one(struct gdsc_debug *gdsc_debug,
 				&gdsc_genpd_debug_enable_fops);
 	if (IS_ERR_OR_NULL(tmp)) {
 		pr_err("Failed to create enable debugfs node for %s\n",
-			sc->pd.name);
-		return -ENOENT;
-	}
-
-	tmp = debugfs_create_file("gdsc_print_regs", 0444, root, sc,
-			    &gdsc_print_hw_fops);
-	if (IS_ERR_OR_NULL(tmp)) {
-		pr_err("Failed to create print_regs debugfs node for %s\n",
 			sc->pd.name);
 		return -ENOENT;
 	}

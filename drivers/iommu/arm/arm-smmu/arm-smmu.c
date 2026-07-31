@@ -1648,11 +1648,6 @@ static int arm_smmu_init_domain_context(struct arm_smmu_domain *smmu_domain,
 			goto out_clear_smmu;
 	}
 
-	if (IS_ENABLED(CONFIG_QCOM_SMMU_IRGN0_ERRATA)) {
-		if (of_property_read_bool(smmu->dev->of_node, "qcom,irgn0-errata"))
-			pgtbl_cfg->quirks |= IO_PGTABLE_QUIRK_QCOM_TCR_IRGN_NC;
-	}
-
 	if (smmu_domain->pgtbl_quirks)
 		pgtbl_cfg->quirks |= smmu_domain->pgtbl_quirks;
 
@@ -2203,7 +2198,6 @@ static int arm_smmu_setup_default_domain(struct device *dev,
 
 	if (!strcmp(str, "bypass")) {
 		smmu_domain->mapping_cfg.s1_bypass = 1;
-		smmu_domain->mapping_cfg.atomic = 1;
 	} else if (!strcmp(str, "fastmap")) {
 		/*
 		 * Fallback to the upstream dma-allocator if fastmap is not enabled.
@@ -4112,21 +4106,11 @@ static int __maybe_unused arm_smmu_pm_restore_early(struct device *dev)
 		smmu_domain->pgtbl_ops = pgtbl_ops;
 		arm_smmu_init_context_bank(smmu_domain, pgtbl_cfg);
 	}
-	/*
-	 * Power on transiently to reprogram SMMU registers cleared during
-	 * hibernation, then power off to restore the pre-hibernation state.
-	 * arm_smmu_device_reset() reprograms all context banks and global
-	 * registers that are cleared when secure memory is reclaimed.
-	 */
-	ret = arm_smmu_runtime_resume(dev);
+	ret = arm_smmu_pm_resume(dev);
 	if (ret) {
 		dev_err(dev, "Failed to resume\n");
 		return ret;
 	}
-
-	arm_smmu_device_reset(smmu);
-	arm_smmu_runtime_suspend(dev);
-
 	return 0;
 }
 
@@ -4137,13 +4121,7 @@ static int __maybe_unused arm_smmu_pm_freeze_late(struct device *dev)
 	struct arm_smmu_cb *cb;
 	int idx, ret;
 
-	/*
-	 * Power on unconditionally to access SMMU registers for freeing
-	 * secure page tables, regardless of the current runtime PM state.
-	 * arm_smmu_runtime_suspend() at the end will power off and leave
-	 * the device in a suspended state before hibernation.
-	 */
-	ret = arm_smmu_runtime_resume(dev);
+	ret = arm_smmu_power_on(smmu->pwr);
 	if (ret) {
 		dev_err(smmu->dev, "Couldn't power on the smmu during pm freeze: %d\n", ret);
 		return ret;
@@ -4164,6 +4142,7 @@ static int __maybe_unused arm_smmu_pm_freeze_late(struct device *dev)
 		dev_err(dev, "Failed to suspend\n");
 		return ret;
 	}
+	arm_smmu_power_off(smmu, smmu->pwr);
 	return 0;
 }
 

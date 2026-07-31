@@ -1479,7 +1479,6 @@ static int waltgov_start(struct cpufreq_policy *policy)
 	struct waltgov_policy *wg_policy = policy->governor_data;
 	unsigned int cpu;
 
-	policy->efficiencies_available = false;
 	wg_policy->up_rate_delay_ns =
 		wg_policy->tunables->up_rate_limit_us * NSEC_PER_USEC;
 	wg_policy->down_rate_delay_ns =

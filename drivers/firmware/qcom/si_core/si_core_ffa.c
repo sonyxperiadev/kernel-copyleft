@@ -6,35 +6,12 @@
 #define pr_fmt(fmt) "si-ffa: %s: " fmt, __func__
 
 #include <linux/dma-mapping.h>
-#include <linux/of.h>
 #include <linux/slab.h>
 #include <linux/genalloc.h>
 
 #include "si_core.h"
 
 #define DEFAULT_FFA_SHM_SIZE    SZ_4M   /*4M*/
-
-/* A list of currently shared memory regions with QTEE.
- * Since clients can attempt to share the same memory with
- * QTEE multiple times (due to legacy implementation) via
- * the MEM_SHARE ABI, we must enable a layer of ref-counting
- * ontop.
- */
-struct ffa_mem_share_list {
-	struct list_head head;
-	struct mutex lock;
-};
-
-struct ffa_mem_share_list_entry {
-	struct kref refcount;
-	struct list_head list;
-	bool is_dma_mem;
-	union {
-		phys_addr_t paddr;
-		dma_addr_t dma_addr;
-	};
-	uint64_t ffa_handle;
-};
 
 struct ffa_shm_pool {
 	phys_addr_t paddr;
@@ -43,106 +20,11 @@ struct ffa_shm_pool {
 	uint64_t ffa_handle;
 	struct gen_pool *genpool;
 };
-
-static struct ffa_mem_share_list ffa_mem_share_lst;
 static struct ffa_shm_pool ffa_pool;
+
 static struct ffa_device *qtee_ffa_dev;
 
-static uint64_t ffa_mem_share_dma_addr_query(dma_addr_t dma_addr)
-{
-	struct ffa_mem_share_list_entry *entry;
-	uint64_t handle = 0;
-
-	list_for_each_entry(entry, &ffa_mem_share_lst.head, list)
-		if (entry->is_dma_mem && entry->dma_addr == dma_addr) {
-			kref_get(&entry->refcount);
-			pr_info("DMA memory %llx already shared over FFA handle %llx.\n",
-				 entry->dma_addr, entry->ffa_handle);
-			handle = entry->ffa_handle;
-			break;
-		}
-
-	return handle;
-}
-
-static uint64_t ffa_mem_share_phys_addr_query(phys_addr_t paddr)
-{
-	struct ffa_mem_share_list_entry *entry;
-	uint64_t handle = 0;
-
-	list_for_each_entry(entry, &ffa_mem_share_lst.head, list)
-		if (!entry->is_dma_mem && entry->paddr == paddr) {
-			kref_get(&entry->refcount);
-			pr_info("PHY memory %llx already shared over FFA handle %llx.\n",
-				 entry->paddr, entry->ffa_handle);
-			handle = entry->ffa_handle;
-			break;
-		}
-
-	return handle;
-}
-
-static uint64_t ffa_mem_share_list_query(struct scatterlist *sgl)
-{
-	dma_addr_t dma_addr;
-	phys_addr_t paddr;
-
-	dma_addr = sg_dma_address(sgl);
-	if (dma_addr)
-		return ffa_mem_share_dma_addr_query(dma_addr);
-
-	/* Phys address stored in the first scatter item */
-	paddr = page_to_phys(sg_page(sgl));
-	return ffa_mem_share_phys_addr_query(paddr);
-}
-
-static void ffa_mem_share_list_free(struct kref *ref)
-{
-	struct ffa_mem_share_list_entry *entry = container_of(ref,
-							      struct ffa_mem_share_list_entry,
-							      refcount);
-
-	list_del(&entry->list);
-	kfree(entry);
-}
-
-static int ffa_mem_share_list_add(uint64_t ffa_handle, struct scatterlist *sgl)
-{
-	struct ffa_mem_share_list_entry *entry;
-
-	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-	if (!entry)
-		return -ENOMEM;
-
-	entry->ffa_handle = ffa_handle;
-	if (sg_dma_address(sgl)) {
-		entry->is_dma_mem = true;
-		entry->dma_addr = sg_dma_address(sgl);
-	} else {
-		entry->is_dma_mem = false;
-		entry->paddr = page_to_phys(sg_page(sgl));
-	}
-
-	kref_init(&entry->refcount);
-	list_add_tail(&entry->list, &ffa_mem_share_lst.head);
-	return 0;
-}
-
-static int ffa_mem_share_list_del(uint64_t ffa_handle)
-{
-	struct ffa_mem_share_list_entry *entry;
-	int rc = -1;
-
-	list_for_each_entry(entry, &ffa_mem_share_lst.head, list)
-		if (entry->ffa_handle == ffa_handle) {
-			rc = kref_put(&entry->refcount, ffa_mem_share_list_free);
-			break;
-		}
-
-	return rc;
-}
-
-int qtee_ffa_mem_share(struct sg_table *sgt, uint64_t tag, u8 attrs, uint64_t *ffa_handle)
+int qtee_ffa_mem_share(struct sg_table *sgt, uint64_t tag, uint64_t *ffa_handle)
 {
 	int rc = 0;
 
@@ -151,7 +33,7 @@ int qtee_ffa_mem_share(struct sg_table *sgt, uint64_t tag, u8 attrs, uint64_t *f
 
 	struct ffa_mem_region_attributes mem_attr = {
 		.receiver = qtee_ffa_dev->vm_id,
-		.attrs = attrs,
+		.attrs = FFA_MEM_RW,
 		.flag = 0,
 	};
 
@@ -164,33 +46,18 @@ int qtee_ffa_mem_share(struct sg_table *sgt, uint64_t tag, u8 attrs, uint64_t *f
 		.sg = sgt->sgl,
 	};
 
-	mutex_lock(&ffa_mem_share_lst.lock);
-	*ffa_handle = ffa_mem_share_list_query(sgt->sgl);
-	/* Early return if this memory is already shared over FFA. */
-	if (*ffa_handle)
-		goto exit;
-
 	rc = qtee_ffa_dev->ops->mem_ops->memory_share(&mem_args);
 	if (rc) {
-		pr_err("memory_share failed: %d, attrs: %x, tag: %llx\n", rc, attrs, tag);
-		goto exit;
-	}
-
-	rc = ffa_mem_share_list_add(mem_args.g_handle, sgt->sgl);
-	if (rc) {
-		pr_err("ffa_mem_share_list_add failed: %d\n", rc);
-		goto exit;
+		pr_err("memory_share failed: %d\n", rc);
+		return rc;
 	}
 
 	*ffa_handle = mem_args.g_handle;
-	pr_debug("mem_share success, ffa_handle: 0x%llx\n", *ffa_handle);
 
-exit:
-	mutex_unlock(&ffa_mem_share_lst.lock);
-	return rc;
+	return 0;
 }
 
-int qtee_ffa_mem_lend(struct sg_table *sgt, uint64_t tag, u8 attrs, uint64_t *ffa_handle)
+int qtee_ffa_mem_lend(struct sg_table *sgt, uint64_t tag, uint64_t *ffa_handle)
 {
 	int rc = 0;
 
@@ -199,7 +66,7 @@ int qtee_ffa_mem_lend(struct sg_table *sgt, uint64_t tag, u8 attrs, uint64_t *ff
 
 	struct ffa_mem_region_attributes mem_attr = {
 		.receiver = qtee_ffa_dev->vm_id,
-		.attrs = attrs,
+		.attrs = FFA_MEM_RW,
 		.flag = 0,
 	};
 
@@ -214,12 +81,11 @@ int qtee_ffa_mem_lend(struct sg_table *sgt, uint64_t tag, u8 attrs, uint64_t *ff
 
 	rc = qtee_ffa_dev->ops->mem_ops->memory_lend(&mem_args);
 	if (rc) {
-		pr_err("memory_lend failed: %d, attrs: %x, tag: %llx\n", rc, attrs, tag);
+		pr_err("memory_lend failed: %d\n", rc);
 		return rc;
 	}
 
 	*ffa_handle = mem_args.g_handle;
-	pr_debug("mem_lend success, ffa_handle: 0x%llx\n", *ffa_handle);
 
 	return 0;
 }
@@ -231,28 +97,16 @@ int qtee_ffa_mem_reclaim(uint64_t ffa_handle)
 	if (!qtee_ffa_dev)
 		return -ENODEV;
 
-	mutex_lock(&ffa_mem_share_lst.lock);
-	rc = ffa_mem_share_list_del(ffa_handle);
-	/* When reclaiming LENT memory, rc = -1.
-	 * When reclaiming SHARED memory with ref-count = 0, rc = 1.
-	 * When reclaiming SHARED memory with ref-count > 0, rc = 0
-	 */
-	if (rc == 0)
-		goto exit;
-
 	/* We assume that QTEE has already called MEM_RELINQUISH.
 	 * And so, we do not need to send a DIRECT_REQ message first.
 	 */
 	rc = qtee_ffa_dev->ops->mem_ops->memory_reclaim(ffa_handle, 0);
 	if (rc) {
 		pr_err("mem_reclaim failed: 0x%llx %d\n", ffa_handle, rc);
-		goto exit;
+		return rc;
 	}
-	pr_debug("mem_reclaim success, ffa_handle: 0x%llx\n", ffa_handle);
 
-exit:
-	mutex_unlock(&ffa_mem_share_lst.lock);
-	return rc;
+	return 0;
 }
 
 int qtee_ffa_shm_alloc(size_t in_size, size_t out_size,
@@ -329,7 +183,6 @@ void qtee_ffa_shm_free(struct ffa_shm shm)
 int qtee_ffa_shm_init(struct platform_device *pdev)
 {
 	int rc;
-	uint32_t custom_ffa_pool_size;
 	unsigned int order;
 	size_t nr_pages;
 	unsigned int i;
@@ -341,19 +194,7 @@ int qtee_ffa_shm_init(struct platform_device *pdev)
 		return 0;
 	}
 
-
-	mutex_init(&ffa_mem_share_lst.lock);
-	INIT_LIST_HEAD(&ffa_mem_share_lst.head);
-
-	rc = of_property_read_u32((&pdev->dev)->of_node,
-				  "qcom,ffa-pool-size", &custom_ffa_pool_size);
-	if (rc)
-		ffa_pool.size = DEFAULT_FFA_SHM_SIZE;
-	else
-		ffa_pool.size = custom_ffa_pool_size * PAGE_SIZE;
-
-	pr_info("Using FFA pool size = %zu\n", ffa_pool.size);
-
+	ffa_pool.size = DEFAULT_FFA_SHM_SIZE;
 	order = get_order(ffa_pool.size);
 	ffa_pool.vaddr = (void *)__get_free_pages(GFP_KERNEL|__GFP_COMP,
 						  order);
@@ -400,7 +241,7 @@ int qtee_ffa_shm_init(struct platform_device *pdev)
 	if (rc)
 		goto err_gen_pool_add_virt;
 
-	rc = qtee_ffa_mem_share(&sgt, 0, FFA_MEM_RW, &ffa_pool.ffa_handle);
+	rc = qtee_ffa_mem_share(&sgt, 0, &ffa_pool.ffa_handle);
 	sg_free_table(&sgt);
 	if (rc) {
 		pr_err("qtee_ffa_mem_share() failed, rc = %d\n", rc);

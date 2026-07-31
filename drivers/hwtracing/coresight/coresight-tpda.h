@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CORESIGHT_CORESIGHT_TPDA_H
@@ -13,7 +13,6 @@
 #define TPDA_SYNCR		(0x08C)
 #define TPDA_FLUSH_CR		(0x090)
 #define TPDA_FLUSH_SR		(0x094)
-#define TPDA_SPARE		(0xEFC)
 
 /* Cross trigger FREQ packets timestamp bit */
 #define TPDA_CR_FREQTS		BIT(2)
@@ -34,9 +33,6 @@
 #define TPDA_Pn_CR_DSBSIZE		BIT(8)
 /* Mode control bit */
 #define TPDA_MODE_CTRL			BIT(12)
-
-/* Legacy timestamp mode enable bit */
-#define TPDA_SPARE_LEGACY_TS_MODE_EN		BIT(0)
 
 #define TPDA_MAX_INPORTS	32
 
@@ -73,7 +69,6 @@ struct tpda_drvdata {
 	bool			freq_req;
 	bool			cmbchan_mode;
 	struct clk		*atclk;
-	bool			legacy_ts_mode_en;
 };
 
 #endif  /* _CORESIGHT_CORESIGHT_TPDA_H */

@@ -1274,149 +1274,6 @@ static const struct rpm_smd_clk_desc rpm_clk_monaco = {
 	.num_clks = ARRAY_SIZE(monaco_clks),
 };
 
-/* Malabar */
-static struct clk_hw *malabar_clks[] = {
-	[RPM_SMD_XO_CLK_SRC] = &holi_bi_tcxo.hw,
-	[RPM_SMD_XO_A_CLK_SRC] = &holi_bi_tcxo_ao.hw,
-	[RPM_SMD_SNOC_CLK] = &holi_snoc_clk.hw,
-	[RPM_SMD_SNOC_A_CLK] = &holi_snoc_a_clk.hw,
-	[RPM_SMD_BIMC_CLK] = &holi_bimc_clk.hw,
-	[RPM_SMD_BIMC_A_CLK] = &holi_bimc_a_clk.hw,
-	[RPM_SMD_QDSS_CLK] = &holi_qdss_clk.hw,
-	[RPM_SMD_QDSS_A_CLK] = &holi_qdss_a_clk.hw,
-	[RPM_SMD_LN_BB_CLK2] = &holi_ln_bb_clk2.hw,
-	[RPM_SMD_LN_BB_CLK2_A] = &holi_ln_bb_clk2_a.hw,
-	[RPM_SMD_LN_BB_CLK3] = &holi_ln_bb_clk3.hw,
-	[RPM_SMD_LN_BB_CLK3_A] = &holi_ln_bb_clk3_a.hw,
-	[RPM_SMD_RF_CLK1] = &msm8916_rf_clk1.hw,
-	[RPM_SMD_RF_CLK1_A] = &msm8916_rf_clk1_a.hw,
-	[RPM_SMD_RF_CLK5] = &holi_rf_clk5.hw,
-	[RPM_SMD_RF_CLK5_A] = &holi_rf_clk5_a.hw,
-	[RPM_SMD_CNOC_CLK] = &holi_cnoc_clk.hw,
-	[RPM_SMD_CNOC_A_CLK] = &holi_cnoc_a_clk.hw,
-	[RPM_SMD_IPA_CLK] = &holi_ipa_clk.hw,
-	[RPM_SMD_IPA_A_CLK] = &holi_ipa_a_clk.hw,
-	[RPM_SMD_QUP_CLK] = &holi_qup_clk.hw,
-	[RPM_SMD_QUP_A_CLK] = &holi_qup_a_clk.hw,
-	[RPM_SMD_MMRT_CLK] = &holi_mmrt_clk.hw,
-	[RPM_SMD_MMRT_A_CLK] = &holi_mmrt_a_clk.hw,
-	[RPM_SMD_MMNRT_CLK] = &holi_mmnrt_clk.hw,
-	[RPM_SMD_MMNRT_A_CLK] = &holi_mmnrt_a_clk.hw,
-	[RPM_SMD_SNOC_PERIPH_CLK] = &holi_snoc_periph_clk.hw,
-	[RPM_SMD_SNOC_PERIPH_A_CLK] = &holi_snoc_periph_a_clk.hw,
-	[RPM_SMD_SNOC_LPASS_CLK] = &holi_snoc_lpass_clk.hw,
-	[RPM_SMD_SNOC_LPASS_A_CLK] = &holi_snoc_lpass_a_clk.hw,
-	[RPM_SMD_CE1_CLK] = &holi_ce1_clk.hw,
-	[RPM_SMD_CE1_A_CLK] = &holi_ce1_a_clk.hw,
-	[RPM_SMD_BIMC_GPU_CLK] = &monaco_bimc_gpu_clk.hw,
-	[RPM_SMD_BIMC_GPU_A_CLK] = &monaco_bimc_gpu_a_clk.hw,
-	[RPM_SMD_CPUSS_GNOC_CLK] = &monaco_cpuss_gnoc_clk.hw,
-	[RPM_SMD_CPUSS_GNOC_A_CLK] = &monaco_cpuss_gnoc_a_clk.hw,
-};
-
-static const struct rpm_smd_clk_desc rpm_clk_malabar = {
-	.clks = malabar_clks,
-	.num_clks = ARRAY_SIZE(malabar_clks),
-};
-
-/* Shikra */
-static struct clk_hw *shikra_clks[] = {
-	[RPM_SMD_XO_CLK_SRC] = &holi_bi_tcxo.hw,
-	[RPM_SMD_XO_A_CLK_SRC] = &holi_bi_tcxo_ao.hw,
-	[RPM_SMD_SNOC_CLK] = &holi_snoc_clk.hw,
-	[RPM_SMD_SNOC_A_CLK] = &holi_snoc_a_clk.hw,
-	[RPM_SMD_BIMC_CLK] = &holi_bimc_clk.hw,
-	[RPM_SMD_BIMC_A_CLK] = &holi_bimc_a_clk.hw,
-	[RPM_SMD_QDSS_CLK] = &holi_qdss_clk.hw,
-	[RPM_SMD_QDSS_A_CLK] = &holi_qdss_a_clk.hw,
-	[RPM_SMD_LN_BB_CLK2] = &monaco_ln_bb_clk2.hw,
-	[RPM_SMD_LN_BB_CLK2_A] = &monaco_ln_bb_clk2_a.hw,
-	[RPM_SMD_RF_CLK1] = &msm8916_rf_clk1.hw,
-	[RPM_SMD_RF_CLK1_A] = &msm8916_rf_clk1_a.hw,
-	[RPM_SMD_RF_CLK2] = &monaco_rf_clk2.hw,
-	[RPM_SMD_RF_CLK2_A] = &monaco_rf_clk2_a.hw,
-	[RPM_SMD_RF_CLK3] = &monaco_rf_clk3.hw,
-	[RPM_SMD_RF_CLK3_A] = &monaco_rf_clk3_a.hw,
-	[RPM_SMD_CNOC_CLK] = &holi_cnoc_clk.hw,
-	[RPM_SMD_CNOC_A_CLK] = &holi_cnoc_a_clk.hw,
-	[RPM_SMD_IPA_CLK] = &holi_ipa_clk.hw,
-	[RPM_SMD_IPA_A_CLK] = &holi_ipa_a_clk.hw,
-	[RPM_SMD_QUP_CLK] = &holi_qup_clk.hw,
-	[RPM_SMD_QUP_A_CLK] = &holi_qup_a_clk.hw,
-	[RPM_SMD_MMRT_CLK] = &holi_mmrt_clk.hw,
-	[RPM_SMD_MMRT_A_CLK] = &holi_mmrt_a_clk.hw,
-	[RPM_SMD_MMNRT_CLK] = &holi_mmnrt_clk.hw,
-	[RPM_SMD_MMNRT_A_CLK] = &holi_mmnrt_a_clk.hw,
-	[RPM_SMD_SNOC_PERIPH_CLK] = &holi_snoc_periph_clk.hw,
-	[RPM_SMD_SNOC_PERIPH_A_CLK] = &holi_snoc_periph_a_clk.hw,
-	[RPM_SMD_SNOC_LPASS_CLK] = &holi_snoc_lpass_clk.hw,
-	[RPM_SMD_SNOC_LPASS_A_CLK] = &holi_snoc_lpass_a_clk.hw,
-	[RPM_SMD_CE1_CLK] = &holi_ce1_clk.hw,
-	[RPM_SMD_CE1_A_CLK] = &holi_ce1_a_clk.hw,
-	[RPM_SMD_QPIC_CLK] = &qcs404_qpic_clk.hw,
-	[RPM_SMD_QPIC_CLK_A] = &qcs404_qpic_a_clk.hw,
-	[RPM_SMD_HWKM_CLK] = &holi_hwkm_clk.hw,
-	[RPM_SMD_HWKM_A_CLK] = &holi_hwkm_a_clk.hw,
-	[RPM_SMD_PKA_CLK] = &holi_pka_clk.hw,
-	[RPM_SMD_PKA_A_CLK] = &holi_pka_a_clk.hw,
-	[RPM_SMD_BIMC_GPU_CLK] = &monaco_bimc_gpu_clk.hw,
-	[RPM_SMD_BIMC_GPU_A_CLK] = &monaco_bimc_gpu_a_clk.hw,
-	[RPM_SMD_CPUSS_GNOC_CLK] = &monaco_cpuss_gnoc_clk.hw,
-	[RPM_SMD_CPUSS_GNOC_A_CLK] = &monaco_cpuss_gnoc_a_clk.hw,
-};
-
-static const struct rpm_smd_clk_desc rpm_clk_shikra = {
-	.clks = shikra_clks,
-	.num_clks = ARRAY_SIZE(shikra_clks),
-};
-
-/* Scuba/QCM2290 */
-static struct clk_hw *qcm2290_clks[] = {
-	[RPM_SMD_XO_CLK_SRC] = &holi_bi_tcxo.hw,
-	[RPM_SMD_XO_A_CLK_SRC] = &holi_bi_tcxo_ao.hw,
-	[RPM_SMD_SNOC_CLK] = &holi_snoc_clk.hw,
-	[RPM_SMD_SNOC_A_CLK] = &holi_snoc_a_clk.hw,
-	[RPM_SMD_BIMC_CLK] = &holi_bimc_clk.hw,
-	[RPM_SMD_BIMC_A_CLK] = &holi_bimc_a_clk.hw,
-	[RPM_SMD_QDSS_CLK] = &holi_qdss_clk.hw,
-	[RPM_SMD_QDSS_A_CLK] = &holi_qdss_a_clk.hw,
-	[RPM_SMD_LN_BB_CLK2] = &monaco_ln_bb_clk2.hw,
-	[RPM_SMD_LN_BB_CLK2_A] = &monaco_ln_bb_clk2_a.hw,
-	[RPM_SMD_RF_CLK3] = &monaco_rf_clk3.hw,
-	[RPM_SMD_RF_CLK3_A] = &monaco_rf_clk3_a.hw,
-	[RPM_SMD_CNOC_CLK] = &holi_cnoc_clk.hw,
-	[RPM_SMD_CNOC_A_CLK] = &holi_cnoc_a_clk.hw,
-	[RPM_SMD_IPA_CLK] = &holi_ipa_clk.hw,
-	[RPM_SMD_IPA_A_CLK] = &holi_ipa_a_clk.hw,
-	[RPM_SMD_QUP_CLK] = &holi_qup_clk.hw,
-	[RPM_SMD_QUP_A_CLK] = &holi_qup_a_clk.hw,
-	[RPM_SMD_MMRT_CLK] = &holi_mmrt_clk.hw,
-	[RPM_SMD_MMRT_A_CLK] = &holi_mmrt_a_clk.hw,
-	[RPM_SMD_MMNRT_CLK] = &holi_mmnrt_clk.hw,
-	[RPM_SMD_MMNRT_A_CLK] = &holi_mmnrt_a_clk.hw,
-	[RPM_SMD_SNOC_PERIPH_CLK] = &holi_snoc_periph_clk.hw,
-	[RPM_SMD_SNOC_PERIPH_A_CLK] = &holi_snoc_periph_a_clk.hw,
-	[RPM_SMD_SNOC_LPASS_CLK] = &holi_snoc_lpass_clk.hw,
-	[RPM_SMD_SNOC_LPASS_A_CLK] = &holi_snoc_lpass_a_clk.hw,
-	[RPM_SMD_CE1_CLK] = &holi_ce1_clk.hw,
-	[RPM_SMD_CE1_A_CLK] = &holi_ce1_a_clk.hw,
-	[RPM_SMD_QPIC_CLK] = &qcs404_qpic_clk.hw,
-	[RPM_SMD_QPIC_CLK_A] = &qcs404_qpic_a_clk.hw,
-	[RPM_SMD_HWKM_CLK] = &holi_hwkm_clk.hw,
-	[RPM_SMD_HWKM_A_CLK] = &holi_hwkm_a_clk.hw,
-	[RPM_SMD_PKA_CLK] = &holi_pka_clk.hw,
-	[RPM_SMD_PKA_A_CLK] = &holi_pka_a_clk.hw,
-	[RPM_SMD_BIMC_GPU_CLK] = &monaco_bimc_gpu_clk.hw,
-	[RPM_SMD_BIMC_GPU_A_CLK] = &monaco_bimc_gpu_a_clk.hw,
-	[RPM_SMD_CPUSS_GNOC_CLK] = &monaco_cpuss_gnoc_clk.hw,
-	[RPM_SMD_CPUSS_GNOC_A_CLK] = &monaco_cpuss_gnoc_a_clk.hw,
-};
-
-static const struct rpm_smd_clk_desc rpm_clk_qcm2290 = {
-	.clks = qcm2290_clks,
-	.num_clks = ARRAY_SIZE(qcm2290_clks),
-};
-
 static const struct of_device_id rpm_smd_clk_match_table[] = {
 	{ .compatible = "qcom,rpmcc-mdm9607", .data = &rpm_clk_mdm9607 },
 	{ .compatible = "qcom,rpmcc-msm8226", .data = &rpm_clk_msm8974 },
@@ -1436,9 +1293,6 @@ static const struct of_device_id rpm_smd_clk_match_table[] = {
 	{ .compatible = "qcom,rpmcc-holi", .data = &rpm_clk_holi},
 	{ .compatible = "qcom,rpmcc-khaje", .data = &rpm_clk_khaje},
 	{ .compatible = "qcom,rpmcc-monaco", .data = &rpm_clk_monaco },
-	{ .compatible = "qcom,rpmcc-malabar", .data = &rpm_clk_malabar },
-	{ .compatible = "qcom,rpmcc-shikra", .data = &rpm_clk_shikra },
-	{ .compatible = "qcom,rpmcc-qcm2290", .data = &rpm_clk_qcm2290 },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, rpm_smd_clk_match_table);
@@ -1564,8 +1418,7 @@ static int rpm_smd_clk_probe(struct platform_device *pdev)
 {
 	struct clk_hw **hw_clks;
 	const struct rpm_smd_clk_desc *desc;
-	int ret, i, is_holi, is_khaje, hw_clk_handoff = false, is_monaco, is_malabar, is_shikra,
-		is_qcm2290;
+	int ret, i, is_holi, is_khaje, hw_clk_handoff = false, is_monaco;
 
 	desc = of_device_get_match_data(&pdev->dev);
 	if (!desc)
@@ -1580,16 +1433,7 @@ static int rpm_smd_clk_probe(struct platform_device *pdev)
 	is_monaco = of_device_is_compatible(pdev->dev.of_node,
 						"qcom,rpmcc-monaco");
 
-	is_malabar = of_device_is_compatible(pdev->dev.of_node,
-						"qcom,rpmcc-malabar");
-
-	is_shikra = of_device_is_compatible(pdev->dev.of_node,
-						"qcom,rpmcc-shikra");
-
-	is_qcm2290 = of_device_is_compatible(pdev->dev.of_node,
-						"qcom,rpmcc-qcm2290");
-
-	if (is_holi || is_khaje || is_monaco || is_malabar || is_shikra || is_qcm2290) {
+	if (is_holi || is_khaje || is_monaco) {
 		ret = clk_vote_bimc(&holi_bimc_clk.hw, INT_MAX);
 		if (ret < 0)
 			return ret;
@@ -1638,7 +1482,7 @@ static int rpm_smd_clk_probe(struct platform_device *pdev)
 	if (ret)
 		goto err;
 
-	if (is_holi || is_khaje || is_monaco || is_shikra || is_qcm2290 || is_malabar) {
+	if (is_holi || is_khaje || is_monaco) {
 		/*
 		 * Keep an active vote on CXO in case no other driver
 		 * votes for it.

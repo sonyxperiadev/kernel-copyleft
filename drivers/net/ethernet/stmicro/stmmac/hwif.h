@@ -397,7 +397,6 @@ struct stmmac_ops {
 	/* Safety Features */
 	int (*safety_feat_config)(void __iomem *ioaddr, unsigned int asp,
 				  struct stmmac_safety_feature_cfg *safety_cfg);
-	int (*safety_feat_disable)(void __iomem *ioaddr);
 	int (*safety_feat_irq_status)(struct net_device *ndev,
 			void __iomem *ioaddr, unsigned int asp,
 			struct stmmac_safety_stats *stats);
@@ -517,8 +516,6 @@ struct stmmac_ops {
 	stmmac_do_void_callback(__priv, mac, pcs_get_adv_lp, __args)
 #define stmmac_safety_feat_config(__priv, __args...) \
 	stmmac_do_callback(__priv, mac, safety_feat_config, __args)
-#define stmmac_safety_feat_disable(__priv, __args...) \
-	stmmac_do_callback(__priv, mac, safety_feat_disable, __args)
 #define stmmac_safety_feat_irq_status(__priv, __args...) \
 	stmmac_do_callback(__priv, mac, safety_feat_irq_status, __args)
 #define stmmac_safety_feat_dump(__priv, __args...) \

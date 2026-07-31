@@ -1395,29 +1395,23 @@ static int haptics_get_closeloop_lra_period(
 		dev_dbg(chip->dev, "tlra_ol = %#x, tlra_cl_err_sts = %#x, cal_tlra_cl_sts = %#x\n",
 				tlra_ol, tlra_cl_err_sts, cal_tlra_cl_sts);
 
-		if (cal_tlra_cl_sts == 0 || tlra_cl_err_sts == 0) {
-			dev_warn(chip->dev, "Calibration invalid (cal=%d,err=%d),using OpenLoop period\n",
-					cal_tlra_cl_sts, tlra_cl_err_sts);
-			config->cl_t_lra_us = config->t_lra_us;
-			config->rc_clk_cal_count = 0;
-		} else {
-			tmp = tlra_cl_err_sts * tlra_ol;
-			tmp *= TLRA_AUTO_RES_ERR_AUTO_CAL_STEP_PSEC;
-			tmp = div_u64(tmp, cal_tlra_cl_sts);
-			config->cl_t_lra_us = div_u64(tmp, 1000000);
-			/* calculate RC_CLK_CAL_COUNT */
-			if (!config->t_lra_us || !config->cl_t_lra_us)
-				return -EINVAL;
-			/*
-			 * RC_CLK_CAL_COUNT = SLEEP_CLK_CAL_DIVIDER * (CAL_TLRA_OL / TLRA_OL)
-			 *	* (SLEEP_CLK_CAL_DIVIDER / 586) * (CL_T_TLRA_US / OL_T_LRA_US)
-			 */
-			tmp = SLEEP_CLK_CAL_DIVIDER * SLEEP_CLK_CAL_DIVIDER;
-			tmp *= cal_tlra_cl_sts * config->cl_t_lra_us;
-			tmp = div_u64(tmp, tlra_ol);
-			tmp = div_u64(tmp, 586);
-			config->rc_clk_cal_count = div_u64(tmp, config->t_lra_us);
-		}
+		tmp = tlra_cl_err_sts * tlra_ol;
+		tmp *= TLRA_AUTO_RES_ERR_AUTO_CAL_STEP_PSEC;
+		tmp = div_u64(tmp, cal_tlra_cl_sts);
+		config->cl_t_lra_us = div_u64(tmp, 1000000);
+
+		/* calculate RC_CLK_CAL_COUNT */
+		if (!config->t_lra_us || !config->cl_t_lra_us)
+			return -EINVAL;
+		/*
+		 * RC_CLK_CAL_COUNT = SLEEP_CLK_CAL_DIVIDER * (CAL_TLRA_OL / TLRA_OL)
+		 *		* (SLEEP_CLK_CAL_DIVIDER / 586) * (CL_T_TLRA_US / OL_T_LRA_US)
+		 */
+		tmp = SLEEP_CLK_CAL_DIVIDER * SLEEP_CLK_CAL_DIVIDER;
+		tmp *= cal_tlra_cl_sts * config->cl_t_lra_us;
+		tmp = div_u64(tmp, tlra_ol);
+		tmp = div_u64(tmp, 586);
+		config->rc_clk_cal_count = div_u64(tmp, config->t_lra_us);
 	} else if (rc_clk_cal == CAL_RC_CLK_AUTO_VAL && auto_res_done) {
 		/*
 		 * CAL_TLRA_CL_STS_W_CAL = CAL_TLRA_CL_STS;

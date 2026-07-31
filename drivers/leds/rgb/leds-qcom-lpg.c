@@ -130,8 +130,6 @@ struct lpg {
 
 	struct lpg_channel *channels;
 	unsigned int num_channels;
-
-	bool avoid_hi_res_clk_rates;
 };
 
 /**
@@ -451,13 +449,8 @@ static int lpg_calc_freq(struct lpg_channel *chan, uint64_t period)
 	 */
 
 	if (chan->subtype == LPG_SUBTYPE_HI_RES_PWM) {
-		if (chan->lpg->avoid_hi_res_clk_rates) {
-			clk_rate_arr = lpg_clk_rates;
-			clk_len = ARRAY_SIZE(lpg_clk_rates);
-		} else {
-			clk_rate_arr = lpg_clk_rates_hi_res;
-			clk_len = ARRAY_SIZE(lpg_clk_rates_hi_res);
-		}
+		clk_rate_arr = lpg_clk_rates_hi_res;
+		clk_len = ARRAY_SIZE(lpg_clk_rates_hi_res);
 		pwm_resolution_arr = lpg_pwm_resolution_hi_res;
 		pwm_resolution_count = ARRAY_SIZE(lpg_pwm_resolution_hi_res);
 		max_res = LPG_RESOLUTION_15BIT;
@@ -1622,12 +1615,6 @@ static int lpg_probe(struct platform_device *pdev)
 	lpg->dev = &pdev->dev;
 	mutex_init(&lpg->lock);
 
-	lpg->avoid_hi_res_clk_rates =
-		of_property_read_bool(pdev->dev.of_node, "qcom,avoid-hi-res-clk-rates");
-
-	if (lpg->avoid_hi_res_clk_rates)
-		dev_info(&pdev->dev, "Use Max 19.2Mhz clock for PWM frequency generation\n");
-
 	lpg->map = dev_get_regmap(pdev->dev.parent, NULL);
 	if (!lpg->map)
 		return dev_err_probe(&pdev->dev, -ENXIO, "parent regmap unavailable\n");
@@ -1680,15 +1667,6 @@ static const struct lpg_data pm660l_lpg_data = {
 		{ .base = 0xb200, .triled_mask = BIT(6) },
 		{ .base = 0xb300, .triled_mask = BIT(7) },
 		{ .base = 0xb400 },
-	},
-};
-
-static const struct lpg_data pm4125_pwm_data = {
-	.num_channels = 3,
-	.channels = (const struct lpg_channel_data[]) {
-		{ .base = 0xbc00 },
-		{ .base = 0xbd00 },
-		{ .base = 0xbe00 },
 	},
 };
 
@@ -1762,15 +1740,6 @@ static const struct lpg_data pmi632_lpg_data = {
 		{ .base = 0xb500, .triled_mask = BIT(5), .sdam_offset = 0x64 },
 		{ .base = 0xb600 },
 		{ .base = 0xb700 },
-	},
-};
-
-static const struct lpg_data pm2250_pwm_data = {
-	.num_channels = 3,
-	.channels = (const struct lpg_channel_data[]) {
-		{ .base = 0xbc00 },
-		{ .base = 0xbd00 },
-		{ .base = 0xbe00 },
 	},
 };
 
@@ -1860,18 +1829,8 @@ static const struct lpg_data pmk8550_pwm_data = {
 	},
 };
 
-static const struct lpg_data pm6450_pwm_data = {
-	.num_channels = 1,
-	.channels = (const struct lpg_channel_data[]) {
-		{ .base = 0xe800 },
-	},
-};
-
 static const struct of_device_id lpg_of_table[] = {
-	{ .compatible = "qcom,pm2250-pwm", .data = &pm2250_pwm_data },
-	{ .compatible = "qcom,pm4125-pwm", .data = &pm4125_pwm_data },
 	{ .compatible = "qcom,pm6125-pwm", .data = &pm6125_pwm_data },
-	{ .compatible = "qcom,pm6450-pwm", .data = &pm6450_pwm_data },
 	{ .compatible = "qcom,pm660l-lpg", .data = &pm660l_lpg_data },
 	{ .compatible = "qcom,pm8150b-lpg", .data = &pm8150b_lpg_data },
 	{ .compatible = "qcom,pm8150l-lpg", .data = &pm8150l_lpg_data },

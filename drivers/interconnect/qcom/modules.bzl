@@ -89,26 +89,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/interconnect/qcom/qnoc-shikra",
-        out = "qnoc-shikra.ko",
-        config = "CONFIG_INTERCONNECT_QCOM_SHIKRA",
-        srcs = [
-            # do not sort
-            "drivers/interconnect/qcom/shikra.c",
-            "drivers/interconnect/qcom/icc-rpm.h",
-            "drivers/interconnect/qcom/rpm-ids.h",
-            "drivers/interconnect/qcom/qnoc-qos-rpm.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/interconnect/qcom/qnoc-qos-rpm",
-            "drivers/interconnect/qcom/icc-rpm",
-            "drivers/interconnect/qcom/icc-debug",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
         name = "drivers/interconnect/qcom/qnoc-canoe",
         out = "qnoc-canoe.ko",
         config = "CONFIG_INTERCONNECT_QCOM_CANOE",
@@ -165,10 +145,8 @@ def register_modules(registry):
         srcs = [
             # do not sort
             "drivers/interconnect/qcom/x1p42100.c",
-            "drivers/interconnect/qcom/x1p42100.h",
             "drivers/interconnect/qcom/icc-rpmh.h",
             "drivers/interconnect/qcom/qnoc-qos.h",
-            "drivers/interconnect/qcom/bcm-voter.h",
         ],
         deps = [
             # do not sort
@@ -233,56 +211,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/interconnect/qcom/qnoc-lahaina",
-        out = "qnoc-lahaina.ko",
-        config = "CONFIG_INTERCONNECT_QCOM_LAHAINA",
-        srcs = [
-            # do not sort
-            "drivers/interconnect/qcom/lahaina.c",
-            "drivers/interconnect/qcom/icc-rpmh.h",
-            "drivers/interconnect/qcom/qnoc-qos.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/interconnect/qcom/qnoc-qos",
-            "drivers/interconnect/qcom/icc-rpmh",
-            "drivers/soc/qcom/socinfo",
-            "drivers/interconnect/qcom/icc-debug",
-            "drivers/interconnect/qcom/icc-bcm-voter",
-            "drivers/soc/qcom/qcom_rpmh",
-            "drivers/soc/qcom/cmd-db",
-            "drivers/soc/qcom/smem",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/interconnect/qcom/qnoc-ravelin",
-        out = "qnoc-ravelin.ko",
-        config = "CONFIG_INTERCONNECT_QCOM_RAVELIN",
-        srcs = [
-            # do not sort
-            "drivers/interconnect/qcom/ravelin.c",
-            "drivers/interconnect/qcom/icc-rpmh.h",
-            "drivers/interconnect/qcom/qnoc-qos.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/interconnect/qcom/qnoc-qos",
-            "drivers/interconnect/qcom/icc-rpmh",
-            "drivers/soc/qcom/socinfo",
-            "drivers/interconnect/qcom/icc-debug",
-            "drivers/interconnect/qcom/icc-bcm-voter",
-            "drivers/soc/qcom/qcom_rpmh",
-            "drivers/soc/qcom/cmd-db",
-            "drivers/soc/qcom/smem",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
         name = "drivers/interconnect/qcom/qnoc-yupik",
         out = "qnoc-yupik.ko",
         config = "CONFIG_INTERCONNECT_QCOM_YUPIK",
@@ -338,28 +266,6 @@ def register_modules(registry):
         srcs = [
             # do not sort
             "drivers/interconnect/qcom/bengal.c",
-            "drivers/interconnect/qcom/icc-rpm.h",
-            "drivers/interconnect/qcom/rpm-ids.h",
-            "drivers/interconnect/qcom/qnoc-qos-rpm.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/interconnect/qcom/qnoc-qos-rpm",
-            "drivers/interconnect/qcom/icc-rpm",
-            "drivers/soc/qcom/socinfo",
-            "drivers/interconnect/qcom/icc-debug",
-            "drivers/soc/qcom/smem",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/interconnect/qcom/qnoc-scuba",
-        out = "qnoc-scuba.ko",
-        config = "CONFIG_INTERCONNECT_QCOM_SCUBA",
-        srcs = [
-            # do not sort
-            "drivers/interconnect/qcom/scuba.c",
             "drivers/interconnect/qcom/icc-rpm.h",
             "drivers/interconnect/qcom/rpm-ids.h",
             "drivers/interconnect/qcom/qnoc-qos-rpm.h",

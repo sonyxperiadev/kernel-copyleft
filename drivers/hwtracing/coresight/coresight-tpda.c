@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/amba/bus.h>
@@ -191,13 +191,6 @@ static void tpda_enable_pre_port(struct tpda_drvdata *drvdata)
 		val = val & ~TPDA_CR_CMBCHANMODE;
 	writel_relaxed(val, drvdata->base + TPDA_CR);
 
-	/* Enable legacy timestamp mode */
-	if (drvdata->legacy_ts_mode_en) {
-		val = readl_relaxed(drvdata->base + TPDA_SPARE);
-		val |= TPDA_SPARE_LEGACY_TS_MODE_EN;
-		writel_relaxed(val, drvdata->base + TPDA_SPARE);
-	}
-
 	/*
 	 * If FLRIE bit is set, set the master and channel
 	 * id as zero
@@ -256,10 +249,11 @@ static int __tpda_enable(struct tpda_drvdata *drvdata, int port)
 		tpda_enable_pre_port(drvdata);
 
 	ret = tpda_enable_port(drvdata, port);
+	CS_LOCK(drvdata->base);
 
 	if (!drvdata->csdev->refcnt)
 		tpda_enable_post_port(drvdata);
-	CS_LOCK(drvdata->base);
+
 	return ret;
 }
 
@@ -716,11 +710,6 @@ static int tpda_probe(struct amba_device *adev, const struct amba_id *id)
 	if (IS_ERR(base))
 		return PTR_ERR(base);
 	drvdata->base = base;
-
-	drvdata->legacy_ts_mode_en = of_property_read_bool(dev->of_node,
-						"qcom,legacy-timestamp-en");
-	if (drvdata->legacy_ts_mode_en)
-		dev_dbg(dev, "Enable legacy timestamp mode\n");
 
 	spin_lock_init(&drvdata->spinlock);
 

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2013, 2016-2018, 2020 The Linux Foundation. All rights reserved. */
-/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. */
+/* Copyright (c) 2022, 2025 Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #ifndef __QCOM_CLK_RCG_H__
 #define __QCOM_CLK_RCG_H__
@@ -188,7 +188,6 @@ struct clk_rcg2 {
 #define FORCE_ENABLE_RCG	BIT(0)
 #define HW_CLK_CTRL_MODE	BIT(1)
 #define DFS_SUPPORT		BIT(2)
-#define RCG_UPDATE_BEFORE_PLL	BIT(3)
 	bool			freq_populated;
 	bool			hw_clk_ctrl;
 	bool			is_enabled;

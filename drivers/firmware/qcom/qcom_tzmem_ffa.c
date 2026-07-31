@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2025 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
@@ -10,13 +15,14 @@
 #include <linux/dma-mapping.h>
 #include "qcom_tzmem.h"
 
+/* We can have only one QTEE Secure Partition with the given UUID */
 static struct ffa_device *qcom_tzmem_ffa_dev;
 static struct device *qcom_tzmem_dev;
 
 /* We can have only one QTEE Secure Partition with the given UUID */
-/* 6906b275-0690-52b5-8e88-1068bcbd6a48 */
-#define QCOM_TZMEM_FFA_UUID  \
-	UUID_INIT(0x6906b275, 0x0690, 0x52b5, 0x8e, 0x88, 0x10, 0x68, 0xbc, 0xbd, 0x6a, 0x48)
+#define QCOM_TZMEM_FFA_UUID						    \
+	UUID_INIT(0x571217bb, 0x16d2, 0x543f, 0x91, 0x7e, 0xc4, 0xf0, 0x42, \
+		  0x37, 0xa7, 0x74)
 
 static int qcom_tzmem_ffa_mem_share_internal(struct sg_table *sgt, uint64_t *ffa_handle)
 {

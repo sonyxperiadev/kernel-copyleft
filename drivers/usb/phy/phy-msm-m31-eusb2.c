@@ -795,7 +795,7 @@ static int msm_m31_eusb2_phy_probe(struct platform_device *pdev)
 		goto err_ret;
 	}
 
-	ur = devm_usb_get_optional_repeater_by_phandle(dev, "usb-repeater", 0);
+	ur = devm_usb_get_repeater_by_phandle(dev, "usb-repeater", 0);
 	if (IS_ERR(ur)) {
 		dev_dbg(dev, "Repeater not available!\n");
 		ret = PTR_ERR(ur);

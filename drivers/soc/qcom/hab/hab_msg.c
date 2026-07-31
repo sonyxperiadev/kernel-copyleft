@@ -188,12 +188,8 @@ hab_msg_dequeue(struct virtual_channel *vchan, struct hab_message **msg,
 			if (*rsize >= message->sizebytes) {
 				/* msg can be safely retrieved in full */
 				list_del(&message->node);
-				vchan->rx_pending_cnt--;
-				vchan->rx_pending_sz -= message->sizebytes;
-				atomic_sub(message->sizebytes, &vchan->pchan->rx_pending_sz);
-				atomic_dec(&vchan->pchan->rx_pending_cnt);
-				*rsize = message->sizebytes;
 				ret = 0;
+				*rsize = message->sizebytes;
 			} else {
 				pr_err("vcid %x rcv buf too small %d < %zd\n",
 					   vchan->id, *rsize,
@@ -235,48 +231,14 @@ static void hab_msg_queue(struct virtual_channel *vchan,
 					struct hab_message *message)
 {
 	int irqs_disabled = irqs_disabled();
-	int size;
-	bool need_stop = false;
 
 	hab_spin_lock(&vchan->rx_lock, irqs_disabled);
 	list_add_tail(&message->node, &vchan->rx_list);
-
-	/* msg accounting for vchan & pchan */
-	vchan->rx_pending_cnt++;
-	if (vchan->rx_pending_cnt > vchan->rx_pending_cnt_peak)
-		vchan->rx_pending_cnt_peak = vchan->rx_pending_cnt;
-	vchan->rx_pending_sz += message->sizebytes;
-	atomic_inc(&vchan->pchan->rx_pending_cnt);
-	size = atomic_add_return(message->sizebytes, &vchan->pchan->rx_pending_sz);
-
-	/* disconnect current vchan if hold too many msgs */
-	if (vchan->rx_pending_cnt > hab_driver.vchan_rx_pending_cnt_max)
-		need_stop = true;
 	hab_spin_unlock(&vchan->rx_lock, irqs_disabled);
 
-	if (size > vchan->pchan->rx_pending_sz_peak)
-		vchan->pchan->rx_pending_sz_peak = size;
-
 	trace_hab_pchan_recv_wakeup(vchan->pchan);
+
 	wake_up(&vchan->rx_queue);
-
-	if (need_stop) {
-		pr_err("Stop HAB channel %x due to more than %d msgs not received by client!\n",
-			vchan->id, hab_driver.vchan_rx_pending_cnt_max);
-		hab_vchan_stop_notify(vchan);
-	}
-
-	if (atomic_read(&vchan->pchan->rx_pending_sz) > vchan->pchan->rx_pending_sz_max) {
-		/*
-		 * Wake up hab oom killer to cleanup inactive pending messages.
-		 * Avoid spamming the serial console: printing warnings here may overflow
-		 * the log buffer when messages arrive too quickly. Detailed warnings are
-		 * handled asynchronously in the OOM workqueue instead.
-		 */
-		pr_debug("%d bytes msg not recv by client on pchan %s, triggered on vc %x\n",
-			atomic_read(&vchan->pchan->rx_pending_sz), vchan->pchan->name, vchan->id);
-		schedule_work(&vchan->pchan->oom_work);
-	}
 }
 
 static int hab_export_enqueue(struct virtual_channel *vchan,
@@ -558,12 +520,8 @@ static int hab_receive_export_desc(struct physical_channel *pchan,
 	size_t exp_desc_size_minimum = 0;
 	struct export_desc *export = NULL;
 	struct export_desc_super *exp_desc_super = NULL;
-	/*
-	 * Add 1 byte to the export desc size to avoid mismatch in size
-	 * coming from PVM/Host side, as to resolve error for payload[1]
-	 * in 6.12 kernel, as it is converted to payload[]
-	 */
-	exp_desc_size_minimum = sizeof(struct export_desc) + 1
+
+	exp_desc_size_minimum = sizeof(struct export_desc)
 							+ sizeof(struct lb_mem_info);
 	if (sizebytes > (size_t)(HAB_HEADER_SIZE_MAX) ||
 			sizebytes < exp_desc_size_minimum) {

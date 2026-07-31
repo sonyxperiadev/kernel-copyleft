@@ -334,20 +334,27 @@ static struct clk_branch lsr_cc_mvs0_clk = {
 	},
 };
 
-static struct clk_branch lsr_cc_mvs0_freerun_clk = {
-	.halt_reg = 0x8114,
-	.halt_check = BRANCH_HALT,
-	.clkr = {
-		.enable_reg = 0x8114,
-		.enable_mask = BIT(0),
-		.hw.init = &(const struct clk_init_data) {
-			.name = "lsr_cc_mvs0_freerun_clk",
-			.parent_hws = (const struct clk_hw*[]) {
-				&lsr_cc_mvs0_clk_src.clkr.hw,
+static struct clk_mem_branch lsr_cc_mvs0_freerun_clk = {
+	.mem_enable_reg = 0x8118,
+	.mem_ack_reg =  0x8118,
+	.mem_enable_mask = BIT(3),
+	.mem_enable_ack_mask = 0xc00,
+	.mem_enable_inverted = true,
+	.branch = {
+		.halt_reg = 0x8114,
+		.halt_check = BRANCH_HALT,
+		.clkr = {
+			.enable_reg = 0x8114,
+			.enable_mask = BIT(0),
+			.hw.init = &(const struct clk_init_data) {
+				.name = "lsr_cc_mvs0_freerun_clk",
+				.parent_hws = (const struct clk_hw*[]) {
+					&lsr_cc_mvs0_clk_src.clkr.hw,
+				},
+				.num_parents = 1,
+				.flags = CLK_SET_RATE_PARENT,
+				.ops = &clk_branch2_mem_ops,
 			},
-			.num_parents = 1,
-			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
 		},
 	},
 };
@@ -472,7 +479,7 @@ static struct clk_regmap *lsr_cc_seraph_clocks[] = {
 	[LSR_CC_AHB_CLK_SRC] = &lsr_cc_ahb_clk_src.clkr,
 	[LSR_CC_MVS0_CLK] = &lsr_cc_mvs0_clk.clkr,
 	[LSR_CC_MVS0_CLK_SRC] = &lsr_cc_mvs0_clk_src.clkr,
-	[LSR_CC_MVS0_FREERUN_CLK] = &lsr_cc_mvs0_freerun_clk.clkr,
+	[LSR_CC_MVS0_FREERUN_CLK] = &lsr_cc_mvs0_freerun_clk.branch.clkr,
 	[LSR_CC_MVS0_SHIFT_CLK] = &lsr_cc_mvs0_shift_clk.clkr,
 	[LSR_CC_MVS0C_CLK] = &lsr_cc_mvs0c_clk.clkr,
 	[LSR_CC_MVS0C_CLK_SRC] = &lsr_cc_mvs0c_clk_src.clkr,

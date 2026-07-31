@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/completion.h>
@@ -371,52 +371,44 @@ static int gh_tlmm_vm_populate_vm_info(struct platform_device *dev, struct gh_tl
 
 	master = of_property_read_bool(np, "qcom,master");
 	if (!master) {
-		/*
-		 * The VM does not track the individual GPIOs and their IO addresses. We expect
-		 * the master VM (owner VM) to share the GPIO iomem corresponding to the GPIOs
-		 * used by the VM. This information is passed to pinctrl device via standard
-		 * gpios property. The GPIOs passed through this property are only used by
-		 * the pinctrl/gpio framework during kernel boot which must be accessible from
-		 * VM during boot. Later the iomem can be lent on use case boundary.
-		 *
-		 * Essentially, the following should be in agreement.
-		 *
-		 * - gpios property of pinctrl device on VM
-		 * - tlmm-vm-gpio-list property of tlmm-vm-mem-access on the owner VM
-		 *
-		 */
-		return 0;
+		rc = gh_tlmm_vm_parse_gpio_list(dev, &tlmm_data->client_vm_info,
+						np);
+		if (rc)
+			goto vm_error;
+	} else {
+		INIT_LIST_HEAD(&tlmm_data->vm_info);
+		for_each_available_child_of_node(np, cn) {
+			vm_info = devm_kzalloc(&dev->dev,
+					       sizeof(struct gh_tlmm_vm_info),
+					       GFP_KERNEL);
+			if (!vm_info) {
+				rc = -ENOMEM;
+				goto free_child;
+			}
+			vm_info->tlmm_data = tlmm_data;
+			rc = of_property_read_u32(cn, "qcom,vmid", &vmid);
+			if (rc) {
+				dev_err(&dev->dev,
+					"Failed to find dest vmid:%d\n", rc);
+				goto free_child;
+			}
+			vm_info->vmid = vmid;
+			rc = of_property_read_u32(cn, "qcom,label", &label);
+			if (rc) {
+				dev_err(&dev->dev,
+					"Failed to find gunyah label:%d\n", rc);
+				goto free_child;
+			}
+			vm_info->label = label;
+			rc = gh_tlmm_vm_parse_gpio_list(dev, vm_info, cn);
+			if (rc)
+				goto free_child;
+			list_add(&vm_info->list, &tlmm_data->vm_info);
+		}
 	}
 
-	INIT_LIST_HEAD(&tlmm_data->vm_info);
-	for_each_available_child_of_node(np, cn) {
-		vm_info = devm_kzalloc(&dev->dev,
-				sizeof(struct gh_tlmm_vm_info),
-				GFP_KERNEL);
-		if (!vm_info) {
-			rc = -ENOMEM;
-			goto free_child;
-		}
-		vm_info->tlmm_data = tlmm_data;
-		rc = of_property_read_u32(cn, "qcom,vmid", &vmid);
-		if (rc) {
-			dev_err(&dev->dev,
-					"Failed to find dest vmid:%d\n", rc);
-			goto free_child;
-		}
-		vm_info->vmid = vmid;
-		rc = of_property_read_u32(cn, "qcom,label", &label);
-		if (rc) {
-			dev_err(&dev->dev,
-					"Failed to find gunyah label:%d\n", rc);
-			goto free_child;
-		}
-		vm_info->label = label;
-		rc = gh_tlmm_vm_parse_gpio_list(dev, vm_info, cn);
-		if (rc)
-			goto free_child;
-		list_add(&vm_info->list, &tlmm_data->vm_info);
-	}
+vm_error:
+	return rc;
 
 free_child:
 	of_node_put(cn);

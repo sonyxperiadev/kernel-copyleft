@@ -2,6 +2,10 @@
 #
 # Misc strange devices
 #
+# Copyright 2025 Sony Corporation
+# NOTE: This file has been modified by Sony Corporation
+# Modifications are licensed under the License.
+#
 
 menu "Misc devices"
 
@@ -23,15 +27,6 @@ config QSEECOM_PROXY
 	 These callback functions can be used to start, shutdown and
 	 send commands to the trusted apps.
 
-config BOOTMARKER_PROXY
-	tristate "To enable Bootmarker proxy driver for kernel client"
-	help
-	  Bootmarker proxy driver serves the kernel clients by providing
-	  required ops via call back functions with a minimal framework.
-	  These callback functions can be used to access the place marker.
-	  To compile this driver as a module, choose M here.
-	  If unsure, say N.
-
 config LKDTM
 	tristate "Linux Kernel Dump Test Tool Module"
 	depends on DEBUG_FS
@@ -45,28 +40,6 @@ config LKDTM
 	Documentation on how to use the module can be found in
 	Documentation/fault-injection/provoke-crashes.rst
 
-config ISL97900_LED
-	tristate "ISL97900_I2C_Driver"
-	select REGMAP_I2C
-	depends on I2C
-	help
-	  Support for ISL97900 LED driver IC, using this driver,
-	  user can set different values to control the LED current
-	  using I2C.
-
-	  Say Y if you want to enable ISL97900 driver.
-
-
-config QTI_FASTRPC
-	tristate "Qualcomm FastRPC"
-	depends on ARCH_QCOM || COMPILE_TEST
-	depends on RPMSG
-	select QCOM_SCM
-	select DMA_SHARED_BUFFER
-	help
-	  Provides a communication mechanism that allows for clients to
-	  make remote method invocations across processor boundary to
-	  applications DSP processor. Say M if you want to enable this
-	  module.
+source "$(KCONFIG_EXT_PREFIX)drivers/misc/hardware_info/Kconfig"
 
 endmenu

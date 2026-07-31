@@ -1,5 +1,5 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load("//soc-repo/arch/arm64/boot/dts/vendor:qcom/platform_map.bzl", _get_custom_dtbo_img_list = "get_custom_dtbo_img_list", _get_dtb_list = "get_dtb_list", _get_dtbo_list = "get_dtbo_list")
+load("//soc-repo/arch/arm64/boot/dts/vendor:qcom/platform_map.bzl", _get_dtb_list = "get_dtb_list", _get_dtbo_list = "get_dtbo_list")
 
 def define_top_level_rules():
     for skippable in ["abl", "dtc", "abi"]:
@@ -32,9 +32,6 @@ def get_dtb_list(target):
 
 def get_dtbo_list(target):
     return _get_dtbo_list(target)
-
-def get_custom_dtbo_img_list(target):
-    return _get_custom_dtbo_img_list(target)
 
 def get_dtstree(target):
     return "//soc-repo/arch/arm64/boot/dts/vendor:msm_dt"

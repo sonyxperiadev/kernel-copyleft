@@ -13,11 +13,9 @@
 #include <linux/usb/android_configfs_uevent.h>
 #include <linux/usb/dwc3-msm.h>
 #include <linux/usb/composite.h>
-#include <linux/usb/ch9.h>
 #include "drivers/usb/dwc3/core.h"
 #include "debug-ipc.h"
 #include "drivers/usb/dwc3/gadget.h"
-#include "drivers/usb/host/xhci.h"
 
 /* USB2 phy configuration quirk control bit */
 #define USB2PHYCFG_SUSPHY	BIT(0)
@@ -80,47 +78,6 @@ static int exit_dwc3_suspend_common(struct kretprobe_instance *ri,
 	return 0;
 }
 
-/**
- * is_uvc_function_active - Check if UVC function is present in USB composition
- * @dwc: pointer to dwc3 structure
- *
- * Returns true if UVC (USB Video Class) function is active in the current
- * USB gadget composition, false otherwise.
- */
-static bool is_uvc_function_active(struct dwc3 *dwc)
-{
-	struct usb_gadget *gadget;
-	struct usb_composite_dev *cdev;
-	struct usb_configuration *config;
-	struct usb_function *func;
-
-	if (!dwc || !dwc->gadget)
-		return false;
-
-	gadget = dwc->gadget;
-	if (!gadget->ep0 || !gadget->ep0->driver_data)
-		return false;
-
-	cdev = get_gadget_data(gadget);
-	if (!cdev)
-		return false;
-
-	/* Iterate through all configurations */
-	list_for_each_entry(config, &cdev->configs, list) {
-		/* Check each function in the configuration */
-		list_for_each_entry(func, &config->functions, list) {
-			/* Check if function name contains "uvc" */
-			if (func->name && strstr(func->name, "uvc")) {
-				dev_dbg(dwc->dev, "UVC function detected: %s\n",
-					func->name);
-				return true;
-			}
-		}
-	}
-
-	return false;
-}
-
 static int entry_usb_ep_set_maxpacket_limit(struct kretprobe_instance *ri,
 				struct pt_regs *regs)
 {
@@ -166,48 +123,21 @@ static int entry_dwc3_gadget_run_stop(struct kretprobe_instance *ri,
 		 * DWC3 gadget IRQ uses a threaded handler which normally runs
 		 * at SCHED_FIFO priority.  If it gets busy processing a high
 		 * volume of events (usually EP events due to heavy traffic) it
-		 * can potentially starve non-RT tasks from running and trigger
+		 * can potentially starve non-RT taks from running and trigger
 		 * RT throttling in the scheduler; on some build configs this
-		 * will panic.
-		 *
-		 * However, UVC (USB Video Class) requires real-time priority
-		 * to avoid frame drops and glitches. So we conditionally set
-		 * the scheduler policy based on whether UVC is in the composition:
-		 * - UVC present: Use SCHED_FIFO with highest priority
-		 * - UVC absent: Use SCHED_NORMAL to avoid RT throttling
+		 * will panic.  So lower the thread's priority to run as non-RT
+		 * (with a nice value equivalent to a high-priority workqueue).
+		 * It has been found to not have noticeable performance impact.
 		 */
 		struct irq_desc *irq_desc = irq_to_desc(dwc->irq_gadget);
 		struct irqaction *action = irq_desc ? irq_desc->action : NULL;
-		bool uvc_active;
 
 		dwc3_msm_notify_event(dwc, DWC3_GSI_EVT_BUF_SETUP, 0);
-
-		/* Check if UVC function is present in the composition */
-		uvc_active = is_uvc_function_active(dwc);
-
 		for ( ; action != NULL; action = action->next) {
 			if (action->thread) {
-				if (uvc_active) {
-					/*
-					 * UVC needs real-time priority to avoid frame drops.
-					 * Use sched_set_fifo() which sets SCHED_FIFO.
-					 */
-					sched_set_fifo(action->thread);
-					dev_info(dwc->dev,
-						"Set IRQ thread:%s pid:%d to SCHED_FIFO low priority (UVC active)\n",
-						action->thread->comm,
-						action->thread->pid);
-				} else {
-					/*
-					 * Non-UVC composition: use SCHED_NORMAL to avoid
-					 * RT throttling issues.
-					 */
-					sched_set_normal(action->thread, MIN_NICE);
-					dev_info(dwc->dev,
-						"Set IRQ thread:%s pid:%d to SCHED_NORMAL (no UVC)\n",
-						action->thread->comm,
-						action->thread->pid);
-				}
+				dev_info(dwc->dev, "Set IRQ thread:%s pid:%d to SCHED_NORMAL prio\n",
+					action->thread->comm, action->thread->pid);
+				sched_set_normal(action->thread, MIN_NICE);
 				break;
 			}
 		}
@@ -382,51 +312,6 @@ static int exit_dwc3_host_exit(struct kretprobe_instance *ri,
 	return 0;
 }
 
-static int entry_xhci_ring_alloc(struct kretprobe_instance *ri,
-				struct pt_regs *regs)
-{
-	enum xhci_ring_type type = (enum xhci_ring_type)regs->regs[2];
-
-	if (type == TYPE_EVENT)
-		regs->regs[1] = 1;
-	return 0;
-}
-
-static int entry_inc_deq(struct kretprobe_instance *ri,
-				struct pt_regs *regs)
-{
-	struct xhci_hcd *xhci = (struct xhci_hcd *)regs->regs[0];
-	struct xhci_ring *ring = (struct xhci_ring *)regs->regs[1];
-	union kprobe_data *data = (union kprobe_data *)ri->data;
-
-	data->xi0 = -EINVAL;
-
-	if (!xhci) {
-		data->xi0 = -EINVAL;
-		data->dwc = NULL;
-		return 0;
-	}
-
-	data->dwc = dev_get_drvdata(xhci->main_hcd->self.controller->parent);
-
-	if (ring->type == TYPE_EVENT)
-		data->xi0 = (int)ring->cycle_state;
-
-	return 0;
-}
-
-static int exit_inc_deq(struct kretprobe_instance *ri,
-			    struct pt_regs *regs)
-{
-	union kprobe_data *data = (union kprobe_data *)ri->data;
-	struct dwc3 *dwc = data->dwc;
-	int cycle = data->xi0;
-
-	if (cycle != -EINVAL && dwc)
-		dwc3_msm_notify_event(dwc, DWC3_QSRAM_WRITE, (u32)cycle);
-
-	return 0;
-}
 
 #define ENTRY_EXIT(name) {\
 	.handler = exit_##name,\
@@ -448,13 +333,11 @@ static struct kretprobe dwc3_msm_probes[] = {
 	ENTRY(dwc3_send_gadget_ep_cmd),
 	ENTRY(dwc3_gadget_reset_interrupt),
 	ENTRY(__dwc3_gadget_ep_enable),
-	ENTRY(xhci_ring_alloc),
 	ENTRY_EXIT(dwc3_host_exit),
 	ENTRY_EXIT(dwc3_gadget_pullup),
 	ENTRY_EXIT(android_work),
 	ENTRY_EXIT(usb_ep_set_maxpacket_limit),
 	ENTRY_EXIT(dwc3_suspend_common),
-	ENTRY_EXIT(inc_deq),
 	ENTRY(trace_event_raw_event_dwc3_log_request),
 	ENTRY(trace_event_raw_event_dwc3_log_gadget_ep_cmd),
 	ENTRY(trace_event_raw_event_dwc3_log_trb),
@@ -485,3 +368,4 @@ void dwc3_msm_kretprobe_exit(void)
 	for (i = 0; i < ARRAY_SIZE(dwc3_msm_probes); i++)
 		unregister_kretprobe(&dwc3_msm_probes[i]);
 }
+

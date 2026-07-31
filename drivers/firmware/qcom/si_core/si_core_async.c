@@ -162,7 +162,7 @@ static size_t async_release_provider(struct si_object_invoke_ctx *oic,
 	/* INITIALIZE the header and message. */
 
 	if (i) {
-		async_msg->header.version = SMCINVOKE_MIN_ASYNC_VERSION;
+		async_msg->header.version = 0x00010002U;
 		async_msg->header.op = ASYNC_OP_RELEASE;
 		async_msg->op_release.count = i;
 	}
@@ -288,9 +288,9 @@ static void call_prepare(struct si_object_invoke_ctx *oic,
 				}
 
 				async_msg->info.count = 1;
-				async_msg->header.version = SMCINVOKE_ASYNC_VERSION_SHM;
+				async_msg->header.version = 0x00010002U;
 				if (op == OBJECT_OP_AUTO_MAP_FFA)
-					async_msg->header.version = SMCINVOKE_ASYNC_VERSION_FFA;
+					async_msg->header.version = 0x00010003U;
 				async_msg->header.op = op;
 
 				/* Move forward. */

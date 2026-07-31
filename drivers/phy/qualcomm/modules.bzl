@@ -27,22 +27,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-kalama",
-        out = "phy-qcom-ufs-qmp-v4-kalama.ko",
-        config = "CONFIG_PHY_QCOM_UFS_V4_KALAMA",
-        srcs = [
-            # do not sort
-            "drivers/phy/qualcomm/phy-qcom-ufs-i.h",
-            "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-kalama.c",
-            "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-kalama.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/phy/qualcomm/phy-qcom-ufs",
-        ],
-    )
-
-    registry.register(
         name = "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-yupik",
         out = "phy-qcom-ufs-qmp-v4-yupik.ko",
         config = "CONFIG_PHY_QCOM_UFS_V4_YUPIK",
@@ -77,38 +61,6 @@ def register_modules(registry):
             "drivers/phy/qualcomm/phy-qcom-ufs-i.h",
             "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-khaje.c",
             "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-khaje.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/phy/qualcomm/phy-qcom-ufs",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-lahaina",
-        out = "phy-qcom-ufs-qmp-v4-lahaina.ko",
-        config = "CONFIG_PHY_QCOM_UFS_V4_LAHAINA",
-        srcs = [
-            # do not sort
-            "drivers/phy/qualcomm/phy-qcom-ufs-i.h",
-            "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-lahaina.c",
-            "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-lahaina.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/phy/qualcomm/phy-qcom-ufs",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v3-660",
-        out = "phy-qcom-ufs-qmp-v3-660.ko",
-        config = "CONFIG_PHY_QCOM_UFS_V3",
-        srcs = [
-            # do not sort
-            "drivers/phy/qualcomm/phy-qcom-ufs-i.h",
-            "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v3-660.c",
-            "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v3-660.h",
         ],
         deps = [
             # do not sort
@@ -233,88 +185,5 @@ def register_modules(registry):
         deps = [
             # do not sort
             "drivers/phy/qualcomm/phy-qcom-ufs",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-crow",
-        out = "phy-qcom-ufs-qmp-v4-crow.ko",
-        config = "CONFIG_PHY_QCOM_UFS_V4_CROW",
-        srcs = [
-            # do not sort
-            "drivers/phy/qualcomm/phy-qcom-ufs-i.h",
-            "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-crow.c",
-            "drivers/phy/qualcomm/phy-qcom-ufs-qmp-v4-crow.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/phy/qualcomm/phy-qcom-ufs",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/phy/qualcomm/phy-qcom-qmp-usb",
-        out = "phy-qcom-qmp-usb.ko",
-        config = "CONFIG_PHY_QCOM_QMP_USB",
-        srcs = [
-            # do not sort
-            "drivers/phy/qualcomm/phy-qcom-qmp-usb.c",
-            "drivers/phy/qualcomm/phy-qcom-qmp-common.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-misc-v3.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-misc-v4.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-usb-v4.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-usb-v5.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-usb-v6.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-usb-v7.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-aon-v6.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-dp-com-v3.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-dp-phy.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-dp-phy-v3.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-dp-phy-v4.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-dp-phy-v5.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-dp-phy-v6.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-com.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-com-v3.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v3.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-com-v4.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v4.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v4_20.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-com-v5.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v5.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v5_20.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v5_5nm.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-com-v6.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v6.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v6_20.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v6_n4.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-ln-shrd-v6.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-com-v7.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v7.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-pll.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-v2.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-v3.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-v4.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-v4_20.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-v5.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-v5_20.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-v6.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-v6-n4.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-v6_20.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-v7.h",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/phy/qualcomm/phy-qcom-sgmii-eth",
-        out = "phy-qcom-sgmii-eth.ko",
-        config = "CONFIG_PHY_QCOM_SGMII_ETH",
-        srcs = [
-            # do not sort
-            "drivers/phy/qualcomm/phy-qcom-sgmii-eth.c",
-            "drivers/phy/qualcomm/phy-qcom-qmp-pcs-sgmii.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-com-v5.h",
-            "drivers/phy/qualcomm/phy-qcom-qmp-qserdes-txrx-v5.h",
         ],
     )

@@ -780,6 +780,9 @@ static int msm_eusb2_repeater_reset_and_init(struct msm_eusb2_phy *phy)
 {
 	int ret;
 
+	if (phy->fw_managed_pwr)
+		return 0;
+
 	if (phy->ur)
 		phy->ur->flags = phy->phy.flags;
 
@@ -906,12 +909,6 @@ static int msm_eusb2_phy_set_suspend(struct usb_phy *uphy, int suspend)
 
 	if (phy->suspended && suspend) {
 		dev_dbg(uphy->dev, "USB PHY is already suspended\n");
-		return 0;
-	}
-
-	if (phy->fw_managed_pwr && suspend == PHY_FORCE_SUSPEND) {
-		pm_runtime_force_suspend(phy->pd_devs[UTXR]);
-		pm_runtime_force_suspend(phy->pd_devs[UCORE]);
 		return 0;
 	}
 

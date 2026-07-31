@@ -304,7 +304,6 @@ static void seb_notify_work(struct work_struct *work)
 	pr_debug("notifier call successful\n");
 }
 
-#if IS_ENABLED(CONFIG_MSM_SLATECOM_EVENT)
 static int seb_tx_msg(struct seb_priv *dev, void  *msg, size_t len, bool wait_for_resp)
 {
 	int rc = 0;
@@ -439,7 +438,6 @@ error_ret:
 	return rc;
 }
 EXPORT_SYMBOL_GPL(seb_send_event);
-#endif
 
 void seb_notify_glink_channel_state(bool state)
 {
@@ -491,7 +489,6 @@ done:
 	return seb_notif;
 }
 
-#if IS_ENABLED(CONFIG_MSM_SLATECOM_EVENT)
 void *seb_register_for_slate_event(
 			enum event_group_type event_group, struct notifier_block *nb)
 {
@@ -534,7 +531,6 @@ int seb_unregister_for_slate_event(void *seb_notif_handle,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(seb_unregister_for_slate_event);
-#endif
 
 void handle_rx_event(struct seb_priv *dev, void *rx_event_buf, int len)
 {

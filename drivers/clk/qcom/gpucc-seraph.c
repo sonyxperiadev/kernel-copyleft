@@ -506,7 +506,7 @@ static struct qcom_cc_desc gpu_cc_seraph_desc = {
 	.num_gdscs = ARRAY_SIZE(gpu_cc_seraph_gdscs),
 };
 
-static struct qcom_cc_desc gx_clkctl_seraph_desc = {
+static const struct qcom_cc_desc gx_clkctl_seraph_desc = {
 	.config = &gx_clkctl_seraph_regmap_config,
 	.gdscs = gx_clkctl_seraph_gdscs,
 	.num_gdscs = ARRAY_SIZE(gx_clkctl_seraph_gdscs),
@@ -569,10 +569,6 @@ static int gx_clkctl_seraph_probe(struct platform_device *pdev)
 		ret = PTR_ERR(regmap);
 		goto err;
 	}
-
-	ret = register_qcom_clks_pm(pdev, false, &gx_clkctl_seraph_desc);
-	if (ret)
-		dev_warn(&pdev->dev, "Failed to register for pm ops\n");
 
 	ret = qcom_cc_really_probe(&pdev->dev, &gx_clkctl_seraph_desc, regmap);
 	if (ret)

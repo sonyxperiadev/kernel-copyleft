@@ -174,32 +174,6 @@ static const char * const drv_names_x1e80100[][MAX_DRV_NAMES] = {
 			"TME", "MODEM", "WLAN RF", "WLAN BB", "CAM", "PCIE", ""},
 };
 
-static const char * const drv_names_chora[][MAX_DRV_NAMES] = {
-	[CXPC_DRV_NAME] = {"TZ", "L3", "HLOS", "HYP", "AUDIO", "AOP", "DEBUG", "GPU",
-			"DISPLAY", "TME_HW", "TME_SW", "MDM SW", "MDM HW", "WLAN RF",
-			 "WPSS", "DDR AUX", "ARC CPRF", ""},
-	[AOSS_DRV_NAME] = {"APPS", "AUDIO", "AOP", "DEBUG", "GPU", "DISPLAY", "TME",
-			"MODEM", "WLAN RF", "WPSS", ""},
-};
-
-static const char * const drv_names_seraph[][MAX_DRV_NAMES] = {
-	[CXPC_DRV_NAME] = {"TZ", "L3", "HLOS", "HYP", "RESERVED", "AUDIO", "AOP", "DEBUG",
-			"GPU", "DISPLAY", "COMPUTE_DSP", "TME_HW", "TME_SW", "RESERVED",
-			"WLAN RF", "WLAN BB", "WPSS", "PCIE0 CESTA", "PCIE1 CESTA", "SOCCP",
-			"DDR AUX", "ARC CPRF", ""},
-	[AOSS_DRV_NAME] = {"APPS", "RESERVED", "AUDIO", "AOP", "DEBUG", "GPU", "DISPLAY", "COMPUTE",
-			"TME", "RESERVED", "WLAN RF", "WLAN BB", "PCIE", "SOCCP", ""},
-};
-
-static const char * const drv_names_pikachu[][MAX_DRV_NAMES] = {
-	[CXPC_DRV_NAME] = {"TZ", "L3", "HLOS", "HYP", "RESERVED", "AUDIO", "AUDIO CESTA", "SMC",
-			"AOP", "DEBUG", "GPU", "DISPLAY0", "COMPUTE_DSP", "TME_HW", "TME_SW",
-			"DISPLAY1", "WLAN RF", "WLAN BB", "WPSS", "PCIE0 CESTA", "PCIE1 CESTA",
-			"SOCCP", "DDR AUX", "ARC CPRF", ""},
-	[AOSS_DRV_NAME] = {"APPS", "RESERVED", "AUDIO", "SMC", "AOP", "DEBUG", "GPU", "DISPLAY",
-			"COMPUTE", "TME", "RESERVED", "WLAN RF", "WLAN BB", "PCIE", "SOCCP", ""},
-};
-
 static ssize_t debug_time_ms_show(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
@@ -620,12 +594,6 @@ static const struct of_device_id drv_match_table[] = {
 	  .data = drv_names_alor },
 	{ .compatible = "qcom,sys-pm-x1e80100",
 	  .data = drv_names_x1e80100 },
-	{ .compatible = "qcom,sys-pm-chora",
-	  .data = drv_names_chora },
-	{ .compatible = "qcom,sys-pm-seraph",
-	  .data = drv_names_seraph },
-	{ .compatible = "qcom,sys-pm-pikachu",
-	  .data = drv_names_pikachu },
 	{ }
 };
 

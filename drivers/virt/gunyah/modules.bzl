@@ -139,15 +139,12 @@ def register_modules(registry):
             "drivers/virt/gunyah/gh_rm_core.c",
             "drivers/virt/gunyah/gh_rm_drv_private.h",
             "drivers/virt/gunyah/gh_rm_iface.c",
-            "drivers/virt/gunyah/gh_devices.c",
         ],
         deps = [
             # do not sort
             "drivers/virt/gunyah/gh_msgq",
             "drivers/virt/gunyah/gh_dbl",
             "arch/arm64/gunyah/gh_arm_drv",
-            "drivers/firmware/qcom/qcom-scm",
-            "drivers/soc/qcom/secure_buffer",
         ],
     )
 

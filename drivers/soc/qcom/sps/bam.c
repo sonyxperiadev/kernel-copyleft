@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2011-2019, 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 /* Bus-Access-Manager (BAM) Hardware manager. */
 
@@ -654,6 +654,7 @@ static u32 bam_regmap[][BAM_MAX_REGS] = {
 			[IRQ_SRCS_MSK_EE] = 0x3004,
 			[IRQ_SRCS_UNMASKED_EE] = 0x3008,
 			[PIPE_ATTR_EE] = 0x300c,
+#ifdef CONFIG_QCE_OPTIMIZED_BAM
 			[P_CTRL] = 0xC000,
 			[P_RST] = 0xC004,
 			[P_HALT] = 0xC008,
@@ -683,34 +684,7 @@ static u32 bam_regmap[][BAM_MAX_REGS] = {
 			[P_PSM_CNTXT_3_MSB] = 0xC904,
 			[P_PSM_CNTXT_4] = 0xC810,
 			[P_PSM_CNTXT_5] = 0xC814,
-			[P_TRUST_REG] = 0x2020,
-	},
-	{ /* 4K_V1_7 OFFSETs*/
-			[CTRL] = 0x0,
-			[REVISION] = 0x1000,
-			[SW_REVISION] = 0x1004,
-			[NUM_PIPES] = 0x1008,
-			[TIMER] = 0x40,
-			[TIMER_CTRL] = 0x44,
-			[DESC_CNT_TRSHLD] = 0x8,
-			[IRQ_SRCS] = 0x3010,
-			[IRQ_SRCS_MSK] = 0x3014,
-			[IRQ_SRCS_UNMASKED] = 0x3018,
-			[IRQ_STTS] = 0x14,
-			[IRQ_CLR] = 0x18,
-			[IRQ_EN] = 0x1c,
-			[AHB_MASTER_ERR_CTRLS] = 0x1024,
-			[AHB_MASTER_ERR_ADDR] = 0x1028,
-			[AHB_MASTER_ERR_ADDR_MSB] = 0x1104,
-			[AHB_MASTER_ERR_DATA] = 0x102c,
-			[TRUST_REG] = 0x2000,
-			[TEST_BUS_SEL] = 0x1010,
-			[TEST_BUS_REG] = 0x1014,
-			[CNFG_BITS] = 0x7c,
-			[IRQ_SRCS_EE] = 0x3000,
-			[IRQ_SRCS_MSK_EE] = 0x3004,
-			[IRQ_SRCS_UNMASKED_EE] = 0x3008,
-			[PIPE_ATTR_EE] = 0x300c,
+#else
 			[P_CTRL] = 0x13000,
 			[P_RST] = 0x13004,
 			[P_HALT] = 0x13008,
@@ -740,6 +714,7 @@ static u32 bam_regmap[][BAM_MAX_REGS] = {
 			[P_PSM_CNTXT_3_MSB] = 0x13904,
 			[P_PSM_CNTXT_4] = 0x13810,
 			[P_PSM_CNTXT_5] = 0x13814,
+#endif
 			[P_TRUST_REG] = 0x2020,
 	},
 };
@@ -766,8 +741,7 @@ static inline u32 bam_get_register_offset(void *base, enum bam_regs reg,
 	if (reg >= CTRL && reg < IRQ_SRCS_EE)
 		index = 0;
 	if (reg >= IRQ_SRCS_EE && reg < P_CTRL)
-		index = ((bam_type == SPS_BAM_NDP_4K) ||
-				(bam_type == SPS_BAM_NDP_V1_7_4K)) ? 0x1000 : 0x80;
+		index = (bam_type == SPS_BAM_NDP_4K) ? 0x1000 : 0x80;
 	if (reg >= P_CTRL && reg < P_TRUST_REG) {
 		if (bam_type == SPS_BAM_LEGACY) {
 			if (reg >= P_EVNT_DEST_ADDR)
@@ -780,8 +754,7 @@ static inline u32 bam_get_register_offset(void *base, enum bam_regs reg,
 		if (bam_type == SPS_BAM_LEGACY)
 			index = 0x80;
 		else
-			index = ((bam_type == SPS_BAM_NDP_4K) ||
-					(bam_type == SPS_BAM_NDP_V1_7_4K)) ? 0x4 : 0x1000;
+			index = (bam_type == SPS_BAM_NDP_4K) ? 0x4 : 0x1000;
 	}
 	if (index < 0) {
 		SPS_ERR(dev, "Failed to find register offset for %d\n", reg);
@@ -1694,7 +1667,7 @@ void print_bam_reg(void *virt_addr)
 		return;
 
 #ifdef CONFIG_SPS_SUPPORT_NDP_BAM
-	if (bam_type == SPS_BAM_NDP_4K || (bam_type == SPS_BAM_NDP_V1_7_4K)) {
+	if (bam_type == SPS_BAM_NDP_4K) {
 		ctrl = bam[0x0 / 4];
 		ver = bam[0x1000 / 4];
 		pipes = bam[0x1008 / 4];
@@ -1717,7 +1690,7 @@ void print_bam_reg(void *virt_addr)
 	SPS_DUMP("NUM_PIPES: 0x%x\n", pipes);
 
 #ifdef CONFIG_SPS_SUPPORT_NDP_BAM
-	if (bam_type == SPS_BAM_NDP_4K || (bam_type == SPS_BAM_NDP_V1_7_4K))
+	if (bam_type == SPS_BAM_NDP_4K)
 		offset = 0x301c;
 	else
 		offset = 0x80;
@@ -1731,7 +1704,7 @@ void print_bam_reg(void *virt_addr)
 			bam[(i / 4) + 2], bam[(i / 4) + 3]);
 
 #ifdef CONFIG_SPS_SUPPORT_NDP_BAM
-	if (bam_type == SPS_BAM_NDP_4K || (bam_type == SPS_BAM_NDP_V1_7_4K)) {
+	if (bam_type == SPS_BAM_NDP_4K) {
 		offset = 0x3000;
 		index = 0x1000;
 	} else {
@@ -1767,7 +1740,7 @@ void print_bam_pipe_reg(void *virt_addr, u32 pipe_index)
 	SPS_DUMP("%s", "-- Pipe Management Registers --\n");
 
 #ifdef CONFIG_SPS_SUPPORT_NDP_BAM
-	if (bam_type == SPS_BAM_NDP_4K || (bam_type == SPS_BAM_NDP_V1_7_4K))
+	if (bam_type == SPS_BAM_NDP_4K)
 		offset = 0x13000;
 	else
 		offset = 0x1000;
@@ -1785,7 +1758,7 @@ void print_bam_pipe_reg(void *virt_addr, u32 pipe_index)
 		"-- Pipe Configuration and Internal State Registers --\n");
 
 #ifdef CONFIG_SPS_SUPPORT_NDP_BAM
-	if (bam_type == SPS_BAM_NDP_4K || (bam_type == SPS_BAM_NDP_V1_7_4K))
+	if (bam_type == SPS_BAM_NDP_4K)
 		offset = 0x13800;
 	else
 		offset = 0x1800;

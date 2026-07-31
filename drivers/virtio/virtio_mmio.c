@@ -1186,4 +1186,3 @@ module_exit(virtio_mmio_exit);
 MODULE_AUTHOR("Pawel Moll <pawel.moll@arm.com>");
 MODULE_DESCRIPTION("Platform bus driver for memory mapped virtio devices");
 MODULE_LICENSE("GPL");
-MODULE_SOFTDEP("pre: virtio_block");

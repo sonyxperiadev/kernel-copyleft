@@ -35,7 +35,6 @@
 #include <asm/hardirq.h>
 #include <linux/suspend.h>
 #include <linux/notifier.h>
-#include <linux/kmsg_dump.h>
 
 #define MASK_SIZE        32
 
@@ -710,11 +709,6 @@ static irqreturn_t qcom_wdt_bark_handler(int irq, void *dev_id)
 
 	if (wdog_dd->freeze_in_progress)
 		dev_info(wdog_dd->dev, "Suspend in progress\n");
-
-#if defined(CONFIG_ARCH_QTI_VM) && !defined(MODULE)
-	/* Dump logs to shared memory for QTVM */
-	kmsg_dump(KMSG_DUMP_OOPS);
-#endif
 
 	md_dump_process();
 	qcom_wdt_trigger_bite();

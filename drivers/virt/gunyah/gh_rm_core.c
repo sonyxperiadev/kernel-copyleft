@@ -399,24 +399,10 @@ int gh_rm_get_vm_id_info(gh_vmid_t vmid)
 			ret = -EINVAL;
 		} else {
 			ret = gh_update_vm_prop_table(vm_name, &vm_prop);
-			if (ret == -EEXIST) {
+			if (ret == -EEXIST)
 				ret = 0;
-				goto free_info;
-			}
 		}
 	}
-
-	if (ret)
-		goto free_info;
-
-	kfree(id_entries);
-	return ret;
-
-free_info:
-	kfree(vm_prop.guid);
-	kfree(vm_prop.uri);
-	kfree(vm_prop.name);
-	kfree(vm_prop.sign_auth);
 
 	kfree(id_entries);
 	return ret;

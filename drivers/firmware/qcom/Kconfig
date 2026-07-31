@@ -78,30 +78,6 @@ config QCOM_QSEECOM_UEFISECAPP
 	  Select Y here to provide access to EFI variables on the aforementioned
 	  platforms.
 
-config QCOM_SCM_SMCI
-	tristate "Qualcomm SMC Invoke Support"
-	depends on QCOM_SCM
-	depends on QCOM_SI_CORE
-	help
-	  Various Qualcomm SoCs have a Trusted Execution Environment (TEE) running
-	  in the Trust Zone. This module provides an interface to that via the
-	  capability based object invocation, using SI-CORE.
-
-	  Enable SCM_SMCI driver which supports capability based secure
-	  communication between QTEE and VM. Using SCM_SMCI, kernel can
-	  issue calls to QTEE or TAs to request a service or exposes services
-	  to QTEE and TAs. The SCM_SMCI implements the necessary marshaling of
-	  messages with QTEE.
-
-config PKVM_SECURE_MEMORY_MANAGER
-	tristate "PKVM SecureMemory Manager"
-	help
-	  This driver implements secure memory management for protected KVM
-	  (pKVM) on Qualcomm platforms. It queries TrustZone for secure memory
-	  region descriptors and loads an EL2 module to unmap those secure
-	  regions from the Host stage-2 page tables, preventing host access to
-	  hypervisor-protected memory.
-
 source "$(KCONFIG_EXT_PREFIX)drivers/firmware/qcom/si_core/Kconfig"
 
 endmenu

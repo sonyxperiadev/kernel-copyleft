@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Description: CoreSight System Trace Macrocell driver
  *
@@ -1010,7 +1010,7 @@ static int stm_suspend(struct device *dev)
 	struct stm_device	*stm_dev;
 	struct list_head	*head, *p;
 
-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
+	if (pm_suspend_via_firmware()) {
 		coresight_disable_sysfs(drvdata->csdev);
 
 		stm_dev = drvdata->stm.stm;
@@ -1030,7 +1030,7 @@ static int stm_resume(struct device *dev)
 	struct stm_device	*stm_dev;
 	struct list_head	*head, *p;
 
-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
+	if (pm_suspend_via_firmware()) {
 		stm_dev = drvdata->stm.stm;
 		if (stm_dev) {
 			head = &stm_dev->link_list;

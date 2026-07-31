@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ *
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/io.h>
@@ -189,7 +190,8 @@ struct qmp_mbox {
  * @rx_irq_count:	Number of rx interrupts received
  * @ilc:		IPC logging context
  * @early_boot:		Early boot entry flag
- * @suspend_entry:	Flag indicating the system is in a suspended state
+ * @hibernate_entry:	Hibernate entry flag
+ * @ds_entry:		Deep sleep entry flag
  */
 struct qmp_device {
 	struct device *dev;
@@ -212,7 +214,8 @@ struct qmp_device {
 
 	void *ilc;
 	bool early_boot;
-	bool suspend_entry;
+	bool hibernate_entry;
+	bool ds_entry;
 };
 
 /**
@@ -393,7 +396,10 @@ static int qmp_send_data(struct mbox_chan *chan, void *data)
 
 	mdev = mbox->mdev;
 
-	if (mdev->suspend_entry)
+	if (mdev->hibernate_entry)
+		return -ENXIO;
+
+	if (mdev->ds_entry)
 		return -ENXIO;
 
 	spin_lock_irqsave(&mbox->tx_lock, flags);
@@ -540,7 +546,7 @@ static irqreturn_t qmp_irq_handler(int irq, void *priv)
 	 * By ignore the first interrupt after hibernate exit
 	 * this can be avoided.
 	 */
-	if (mdev->suspend_entry && mdev->early_boot)
+	if (mdev->hibernate_entry && mdev->early_boot)
 		return IRQ_NONE;
 
 	if (mdev->rx_reset_reg)
@@ -821,7 +827,10 @@ static int qmp_shim_send_data(struct mbox_chan *chan, void *data)
 	if (!mbox || !mbox->mdev || !data)
 		return -EINVAL;
 
-	if (mbox->mdev->suspend_entry)
+	if (mbox->mdev->hibernate_entry)
+		return -ENXIO;
+
+	if (mbox->mdev->ds_entry)
 		return -ENXIO;
 
 	if (pkt->size > SZ_4K)
@@ -922,7 +931,8 @@ static int qmp_mbox_init(struct device_node *n, struct qmp_device *mdev)
 	INIT_DELAYED_WORK(&mbox->dwork, qmp_notify_timeout);
 	mbox->suspend_flag = false;
 
-	mdev->suspend_entry = false;
+	mbox->mdev->hibernate_entry = false;
+	mdev->ds_entry = false;
 	mdev_add_mbox(mdev, mbox);
 	return 0;
 }
@@ -1014,7 +1024,8 @@ static int qmp_shim_init(struct platform_device *pdev, struct qmp_device *mdev)
 	mdev_add_mbox(mdev, mbox);
 	mdev->ilc = ipc_log_context_create(QMP_IPC_LOG_PAGE_CNT, mdev->name, 0);
 
-	mdev->suspend_entry = false;
+	mbox->mdev->hibernate_entry = false;
+	mdev->ds_entry = false;
 
 	return 0;
 }
@@ -1169,8 +1180,8 @@ static int qmp_mbox_freeze(struct device *dev)
 {
 	struct qmp_device *mdev = dev_get_drvdata(dev);
 
-	mdev->suspend_entry = true;
-	dev_info(dev, "QMP: Hibernate entry\n");
+	mdev->hibernate_entry = true;
+	dev_dbg(dev, "QMP: Hibernate entry\n");
 	return 0;
 }
 
@@ -1202,11 +1213,13 @@ static int qmp_mbox_restore(struct device *dev)
 	}
 
 end:
-	if (mdev->suspend_entry)
-		mdev->suspend_entry = false;
+	if (mdev->hibernate_entry)
+		mdev->hibernate_entry = false;
 
-	dev_info(dev, "QMP: Hibernate exit\n");
+	if (mdev->ds_entry)
+		mdev->ds_entry = false;
 
+	dev_dbg(dev, "QMP: Hibernate exit\n");
 	return 0;
 }
 
@@ -1215,8 +1228,8 @@ static int qmp_mbox_suspend_noirq(struct device *dev)
 	struct qmp_device *mdev = dev_get_drvdata(dev);
 
 	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
-		mdev->suspend_entry = true;
-		dev_info(dev, "QMP: Deep sleep entry\n");
+		mdev->ds_entry = true;
+		dev_dbg(dev, "QMP: Deep sleep entry\n");
 	}
 
 	return 0;

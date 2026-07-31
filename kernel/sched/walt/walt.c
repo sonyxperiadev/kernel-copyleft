@@ -3,6 +3,11 @@
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
+/*
+* Copyright 2025 Sony Corporation
+* NOTE: This file has been modified by Sony Corporation
+* Modifications are licensed under the License.
+*/
 
 #include <linux/syscore_ops.h>
 #include <linux/cpufreq.h>
@@ -614,6 +619,18 @@ int walt_giant_tasks(int cpu)
 	struct walt_rq *wrq = &per_cpu(walt_rq, cpu);
 
 	return wrq->walt_stats.nr_giant_tasks;
+}
+
+bool trailblazer_on_prime(void)
+{
+	int cpu;
+
+	for_each_cpu(cpu, &cpu_array[0][num_sched_clusters - 1]) {
+		if (walt_trailblazer_tasks(cpu))
+			return true;
+	}
+
+	return false;
 }
 
 static void clear_walt_request(int cpu)
@@ -4468,29 +4485,29 @@ static inline void __walt_irq_work_locked(bool is_migration, bool is_asym_migrat
 	 * not rolled over properly as mark_start > window_start.
 	 */
 	if (!is_migration) {
-		u64 effective_new_sched_ravg_window;
+		u64 temp_sched_ravg_window;
 		spin_lock_irqsave(&sched_ravg_window_lock, flags);
 		if (plenty_giant_tasks || walt_rotation_stop_hyst_start_ts)
-			effective_new_sched_ravg_window = mult_frac(2, NSEC_PER_SEC, HZ);
+			temp_sched_ravg_window = mult_frac(2, NSEC_PER_SEC, HZ);
 		else
-			effective_new_sched_ravg_window = new_sched_ravg_window;
+			temp_sched_ravg_window = new_sched_ravg_window;
 		wrq = &per_cpu(walt_rq, cpu_of(this_rq()));
-		if ((sched_ravg_window != effective_new_sched_ravg_window) &&
-		    (wc < wrq->window_start + effective_new_sched_ravg_window)) {
+		if ((sched_ravg_window != new_sched_ravg_window) &&
+		    (wc < wrq->window_start + new_sched_ravg_window)) {
 			sched_ravg_window_change_time = walt_sched_clock();
 			trace_sched_ravg_window_change(sched_ravg_window,
-					effective_new_sched_ravg_window,
+					temp_sched_ravg_window,
 					sched_ravg_window_change_time);
-			sched_ravg_window = effective_new_sched_ravg_window;
+			sched_ravg_window = temp_sched_ravg_window;
 			walt_tunables_fixup();
 		}
 		spin_unlock_irqrestore(&sched_ravg_window_lock, flags);
 	}
 
 	if (!is_migration)
-		last_rollover_irqwork_ts = wc;
-	else
 		last_migration_irqwork_ts = wc;
+	else
+		last_rollover_irqwork_ts = wc;
 }
 
 /**
@@ -5487,7 +5504,6 @@ DEFINE_PER_CPU(unsigned long, ipc_cnt);
 DEFINE_PER_CPU(u64, last_ipc_update);
 DEFINE_PER_CPU(u64, ipc_deactivate_ns);
 DEFINE_PER_CPU(bool, tickless_mode);
-
 static unsigned long calculate_ipc(int cpu)
 {
 	unsigned long amu_cnt, delta_cycl = 0, delta_intr = 0;
@@ -5657,8 +5673,9 @@ static void android_vh_scheduler_tick(void *unused, struct rq *rq)
 	cluster = cpu_cluster(cpu);
 	smart_freq_info = cluster->smart_freq_info;
 
-	if (smart_freq_init_done && cpu_has_amu_support
-			&& smart_freq_info->smart_freq_ipc_participation_mask & IPC_PARTICIPATION) {
+	if (smart_freq_init_done &&
+		smart_freq_info->smart_freq_ipc_participation_mask & IPC_PARTICIPATION
+		&& IS_ENABLED(CONFIG_ARM64_AMU_EXTN)) {
 		last_ipc_level = per_cpu(ipc_level, cpu);
 		last_deactivate_ns = per_cpu(ipc_deactivate_ns, cpu);
 		ipc = calculate_ipc(cpu);
@@ -6046,7 +6063,6 @@ static void register_walt_hooks(void)
 atomic64_t walt_irq_work_lastq_ws;
 bool walt_disabled = true;
 bool walt_quiet_state;
-bool cpu_has_amu_support;
 
 static int walt_init_stop_handler(void *data)
 {
@@ -6113,16 +6129,25 @@ static void walt_init_tg_pointers(void)
 	rcu_read_unlock();
 }
 
+static void walt_remove_cpufreq_efficiencies_available(void)
+{
+	struct cpufreq_policy *policy;
+	struct walt_sched_cluster *cluster;
+
+	for_each_sched_cluster(cluster) {
+		policy = cpufreq_cpu_get(cluster_first_cpu(cluster));
+		if (policy) {
+			policy->efficiencies_available = false;
+			cpufreq_cpu_put(policy);
+		}
+	}
+}
+
 static void walt_init(struct work_struct *work)
 {
 	static atomic_t already_inited = ATOMIC_INIT(0);
 	struct root_domain *rd = cpu_rq(cpumask_first(cpu_active_mask))->rd;
 	int i;
-
-	if (IS_ENABLED(CONFIG_ARM64_AMU_EXTN))
-		cpu_has_amu_support =
-			cpuid_feature_extract_unsigned_field(read_cpuid(ID_AA64PFR0_EL1),
-					ID_AA64PFR0_EL1_AMU_SHIFT) > 0;
 
 	might_sleep();
 
@@ -6155,6 +6180,8 @@ static void walt_init(struct work_struct *work)
 	}
 
 	walt_update_cluster_topology();
+        midpoint_init();
+	walt_remove_cpufreq_efficiencies_available();
 	walt_config();
 	walt_init_cycle_counter();
 

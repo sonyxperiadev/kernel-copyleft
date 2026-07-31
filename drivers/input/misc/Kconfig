@@ -2,6 +2,10 @@
 #
 # Input misc drivers configuration
 #
+# Copyright 2025 Sony Corporation
+# NOTE: This file has been modified by Sony Corporation
+# Modifications are licensed under the License.
+
 if INPUT_MISC
 
 config INPUT_PM8941_PWRKEY
@@ -38,5 +42,15 @@ config INPUT_QCOM_HV_HAPTICS
 	  drive voltage up to 10 V, and its 5 integrated pattern sources can be used
 	  for playing different vibration effects. To compile this driver as a module,
 	  choose M here: the module will be called qcom-hv-haptics.
+
+config INPUT_CS40L26
+	tristate "Cirrus Logic CS40L26 haptic amplifier support"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  Say Y here to enable support for CS40L26 boosted haptic amplifier.
+
+	  To compile the driver as a module choose M here: the module will be
+	  called cs40l26_core.
 
 endif

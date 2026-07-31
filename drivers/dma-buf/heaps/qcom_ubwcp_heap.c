@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-buf.h>
@@ -314,7 +314,7 @@ static struct dma_buf *ubwcp_allocate(struct dma_heap *heap,
 		goto free_buf_struct;
 
 	buffer->qcom_sg_buf.vmperm = mem_buf_vmperm_alloc(&buffer->qcom_sg_buf.sg_table,
-						qcom_sg_release, (void *)buffer->qcom_sg_buf);
+						qcom_sg_release, &buffer->qcom_sg_buf.kref);
 	if (IS_ERR(buffer->qcom_sg_buf.vmperm)) {
 		ret = PTR_ERR(buffer->qcom_sg_buf.vmperm);
 		goto free_sys_heap_mem;

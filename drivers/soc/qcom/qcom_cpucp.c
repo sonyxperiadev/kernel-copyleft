@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -37,7 +37,6 @@ struct qcom_cpucp_ipc {
 	void __iomem *rx_irq_base;
 	struct device *dev;
 	int irq;
-	u32 num_chans;
 	u32 rx_chans;
 };
 
@@ -53,9 +52,6 @@ struct qcom_cpucp_mbox_desc {
 	u32 num_chans;
 };
 
-/* Global lock for some shared RX regs on v2 mbox */
-static DEFINE_SPINLOCK(cpucp_v2_rx_lock);
-
 static irqreturn_t qcom_cpucp_rx_interrupt(int irq, void *p)
 {
 	struct qcom_cpucp_ipc *cpucp_ipc = p;
@@ -64,7 +60,7 @@ static irqreturn_t qcom_cpucp_rx_interrupt(int irq, void *p)
 	int i;
 	unsigned long flags;
 
-	for (i = 0; i < cpucp_ipc->num_chans; i++) {
+	for (i = 0; i < desc->num_chans; i++) {
 		val = readl(cpucp_ipc->rx_irq_base + desc->status_reg + (i * desc->chan_stride));
 		if (val & CPUCP_STATUS_IRQ_VAL) {
 			writel(CPUCP_CLEAR_IRQ_VAL,
@@ -90,10 +86,9 @@ static irqreturn_t qcom_cpucp_v2_mbox_rx_interrupt(int irq, void *p)
 	int i;
 	unsigned long flags;
 
-	/* cpucp_v2_rx_lock not used as it is assumed shared RX use same irq */
 	status = readq(cpucp_ipc->rx_irq_base + desc->status_reg);
 
-	for (i = 0; i < cpucp_ipc->num_chans; i++) {
+	for (i = 0; i < desc->num_chans; i++) {
 		if (cpucp_ipc->rx_chans && !(cpucp_ipc->rx_chans & BIT(i)))
 			continue;
 		if (status & ((u64)1 << i)) {
@@ -118,15 +113,12 @@ static int qcom_cpucp_mbox_startup(struct mbox_chan *chan)
 	struct qcom_cpucp_ipc *cpucp_ipc = container_of(chan->mbox, struct qcom_cpucp_ipc, mbox);
 	unsigned long chan_id = (unsigned long)chan->con_priv;
 	const struct qcom_cpucp_mbox_desc *desc = cpucp_ipc->desc;
-	unsigned long flags;
 	u64 val;
 
 	if (desc->v2_mbox) {
-		spin_lock_irqsave(&cpucp_v2_rx_lock, flags);
 		val = readq(cpucp_ipc->rx_irq_base + desc->enable_reg);
 		val |= ((u64)1 << chan_id);
 		writeq(val, cpucp_ipc->rx_irq_base + desc->enable_reg);
-		spin_unlock_irqrestore(&cpucp_v2_rx_lock, flags);
 	}
 
 	return 0;
@@ -141,11 +133,9 @@ static void qcom_cpucp_mbox_shutdown(struct mbox_chan *chan)
 	u64 val;
 
 	if (desc->v2_mbox) {
-		spin_lock_irqsave(&cpucp_v2_rx_lock, flags);
 		val = readq(cpucp_ipc->rx_irq_base + desc->enable_reg);
 		val &= ~((u64)1 << chan_id);
 		writeq(val, cpucp_ipc->rx_irq_base + desc->enable_reg);
-		spin_unlock_irqrestore(&cpucp_v2_rx_lock, flags);
 	}
 
 	spin_lock_irqsave(&cpucp_ipc->chans_locks[chan_id], flags);
@@ -204,12 +194,12 @@ static int qcom_cpucp_ipc_setup_mbox(struct qcom_cpucp_ipc *cpucp_ipc)
 	unsigned long i;
 
 	/* Initialize channel identifiers */
-	for (i = 0; i < cpucp_ipc->num_chans; i++)
+	for (i = 0; i < cpucp_ipc->desc->num_chans; i++)
 		cpucp_ipc->chans[i].con_priv = ERR_PTR(-EINVAL);
 
 	mbox = &cpucp_ipc->mbox;
 	mbox->dev = dev;
-	mbox->num_chans = cpucp_ipc->num_chans;
+	mbox->num_chans = cpucp_ipc->desc->num_chans;
 	mbox->chans = cpucp_ipc->chans;
 	mbox->ops = &cpucp_mbox_chan_ops;
 	mbox->of_xlate = qcom_cpucp_mbox_xlate;
@@ -264,22 +254,23 @@ static int qcom_cpucp_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	if (desc->v2_mbox)
-		cpucp_ipc->num_chans = desc->num_chans;
-	else
-		cpucp_ipc->num_chans = resource_size(res)/desc->chan_stride;
-
-	cpucp_ipc->chans = devm_kzalloc(&pdev->dev, cpucp_ipc->num_chans *
+	cpucp_ipc->chans = devm_kzalloc(&pdev->dev, desc->num_chans *
 					sizeof(struct mbox_chan), GFP_KERNEL);
 	if (!cpucp_ipc->chans)
 		return -ENOMEM;
 
-	cpucp_ipc->chans_locks = devm_kzalloc(&pdev->dev, cpucp_ipc->num_chans *
+	cpucp_ipc->chans_locks = devm_kzalloc(&pdev->dev, desc->num_chans *
 					sizeof(spinlock_t), GFP_KERNEL);
 	if (!cpucp_ipc->chans_locks)
 		return -ENOMEM;
-	for (i = 0; i < cpucp_ipc->num_chans; i++)
+	for (i = 0; i < desc->num_chans; i++)
 		spin_lock_init(&cpucp_ipc->chans_locks[i]);
+
+	if (desc->v2_mbox) {
+		writeq(0, cpucp_ipc->rx_irq_base + desc->enable_reg);
+		writeq(0, cpucp_ipc->rx_irq_base + desc->clear_reg);
+		writeq(0, cpucp_ipc->rx_irq_base + desc->map_reg);
+	}
 
 	cpucp_ipc->irq = platform_get_irq(pdev, 0);
 	if (cpucp_ipc->irq < 0) {

@@ -15,8 +15,6 @@
 struct eom_phy_ops {
 	int (*phy_read)(void *priv, u32 reg, u32 *val);
 	int (*phy_write)(void *priv, u32 reg, u32 val);
-	int (*phy_b_read)(void *priv, u32 reg, u32 *val);
-	int (*phy_b_write)(void *priv, u32 reg, u32 val);
 	int (*get_caps)(void *priv);
 };
 
@@ -40,9 +38,6 @@ void unregister_phy_device(struct eom_phy_ops *ops, u16 index, u8 type);
 struct eom_phy_device *get_eom_phy_device(u8 type, u16 index, u16 vendor_id, u16 device_id);
 int phy_read(struct eom_phy_device *phy, u32 reg, u32 *val);
 int phy_write(struct eom_phy_device *phy, u32 reg, u32 val);
-int phy_b_read(struct eom_phy_device *phy, u32 reg, u32 *val);
-int phy_b_write(struct eom_phy_device *phy, u32 reg, u32 val);
-bool phy_has_phy_b(struct eom_phy_device *phy);
 int phy_get_num_lanes(struct eom_phy_device *phy);
 void update_phy_device_nr_lanes(u16 index, u16 vendor_id, u16 device_id, u8 type, u8 lanes);
 void phy_core_exit(void);
@@ -58,12 +53,6 @@ static inline int phy_read(struct eom_phy_device *phy, u32 reg, u32 *val)
 { return 0; }
 static inline int phy_write(struct eom_phy_device *phy, u32 reg, u32 val)
 { return 0; }
-static inline int phy_b_read(struct eom_phy_device *phy, u32 reg, u32 *val)
-{ return -ENODEV; }
-static inline int phy_b_write(struct eom_phy_device *phy, u32 reg, u32 val)
-{ return -ENODEV; }
-static inline bool phy_has_phy_b(struct eom_phy_device *phy)
-{ return false; }
 static inline int phy_get_num_lanes(struct eom_phy_device *phy)
 { return 0; }
 static inline void update_phy_device_nr_lanes(u16 index, u16 vendor_id, u16 device_id, u8 type,

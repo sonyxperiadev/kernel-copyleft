@@ -45,7 +45,6 @@ struct hab_driver_ops shmem_ops = {
 	.habhyp_virq_rx_unregister = qvm_virq_rx_unregister,
 	.habhyp_get_virq_num_id = qvm_get_virq_num_id,
 	.habhyp_init_virt_irq = qvm_init_virt_irq,
-	.timer_get_sclk_ticks = __arch_counter_get_cntvct,
 };
 
 

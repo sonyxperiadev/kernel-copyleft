@@ -27,16 +27,3 @@ def register_modules(registry):
             "drivers/firmware/qcom/qcom-scm",
         ],
     )
-
-    registry.register(
-        name = "drivers/perf/dwc_pcie_pmu",
-        out = "dwc_pcie_pmu.ko",
-        config = "CONFIG_MSM_DWC_PCIE_PMU",
-        srcs = [
-            # do not sort
-            "drivers/perf/dwc_pcie_pmu.c",
-        ],
-        deps = [
-            # do not sort
-        ],
-    )

@@ -34,7 +34,6 @@ struct stmmac_resources {
 	int sfty_irq;
 	int sfty_ce_irq;
 	int sfty_ue_irq;
-	int tx_rx_irq[STMMAC_CH_MAX];
 	int rx_irq[MTL_MAX_RX_QUEUES];
 	int tx_irq[MTL_MAX_TX_QUEUES];
 };
@@ -58,15 +57,6 @@ struct stmmac_tx_info {
 
 #define STMMAC_TBS_AVAIL	BIT(0)
 #define STMMAC_TBS_EN		BIT(1)
-
-#define BOARD_UNKNOWN -1
-#define AIR_BOARD 1
-#define STAR_BOARD 2
-
-#define PHY_UNKNOWN -1
-#define PHY_1G 1
-#define PHY_25G 2
-#define SWITCH 3
 
 /* Frequently used values are kept adjacent for cache effect */
 struct stmmac_tx_queue {
@@ -356,7 +346,6 @@ struct stmmac_priv {
 	int sfty_irq;
 	int sfty_ce_irq;
 	int sfty_ue_irq;
-	int tx_rx_irq[STMMAC_CH_MAX];
 	int rx_irq[MTL_MAX_RX_QUEUES];
 	int tx_irq[MTL_MAX_TX_QUEUES];
 	/*irq name */
@@ -366,7 +355,6 @@ struct stmmac_priv {
 	char int_name_sfty[IFNAMSIZ + 10];
 	char int_name_sfty_ce[IFNAMSIZ + 10];
 	char int_name_sfty_ue[IFNAMSIZ + 10];
-	char int_name_tx_rx_irq[STMMAC_CH_MAX][IFNAMSIZ + 18];
 	char int_name_rx_irq[MTL_MAX_TX_QUEUES][IFNAMSIZ + 14];
 	char int_name_tx_irq[MTL_MAX_TX_QUEUES][IFNAMSIZ + 18];
 

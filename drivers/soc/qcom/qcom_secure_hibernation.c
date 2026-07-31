@@ -12,8 +12,6 @@
 #include <trace/hooks/bl_hib.h>
 #include <linux/reboot.h>
 #include <linux/vmalloc.h>
-#include <linux/qtee_shmbridge.h>
-#include <linux/firmware/qcom/si_object.h>
 
 #define AUTH_SIZE		16
 #define QSEECOM_ALIGN_SIZE      0x40
@@ -74,12 +72,12 @@ struct cmd_rsp {
 	uint32_t status;
 };
 
-static struct si_object_invoke_ctx oic;
 static struct qcom_crypto_params *params;
 static struct crypto_aead *tfm;
 static struct aead_request *req;
 static u8 iv_size;
 static u8 key[AES256_KEY_SIZE];
+static struct qseecom_handle *app_handle;
 static int first_encrypt;
 static void *temp_out_buf;
 static int pos;
@@ -112,152 +110,6 @@ static void skip_swap_map_write(void *data, bool *skip)
 	*skip = true;
 }
 
-int get_client_env(struct si_object_invoke_ctx *oic, struct si_object **client_env)
-{
-	int ret, result;
-	struct si_arg args[3] = { 0 };
-
-	args[0].o = NULL_SI_OBJECT;
-	args[0].type = SI_AT_IO;
-	args[1].type = SI_AT_OO;
-	args[2].type = SI_AT_END;
-
-	/* IClientEnv_OP_registerWithCredentials  is 5. */
-	ret = si_object_do_invoke(oic, ROOT_SI_OBJECT, ICLIENTENV_OP_REGISTER_WITH_CRED,
-					args, &result);
-	if (ret || result) {
-		pr_err("failed with result %d(ret = %d).\n", result, ret);
-		return -EINVAL;
-	}
-
-	if (args[1].o != NULL_SI_OBJECT)
-		*client_env = args[1].o;
-	else
-		return -EINVAL;
-
-	return 0;
-}
-
-int client_env_open(struct si_object_invoke_ctx *oic, struct si_object *client_env,
-		u32 uid_val, struct si_object **service)
-{
-	int ret, result;
-	struct si_arg args[3] = { 0 };
-
-	args[0].b = (struct si_buffer) { {&uid_val}, sizeof(uid_val) };
-	args[0].type = SI_AT_IB;
-	args[1].type = SI_AT_OO;
-	args[2].type = SI_AT_END;
-
-	/* IClientEnv_OP_open is 0. */
-
-	ret = si_object_do_invoke(oic, client_env, ICLIENTENV_OP_OPEN, args, &result);
-	if (ret || result) {
-		pr_err("failed with result %d(ret = %d).\n", result, ret);
-		return -EINVAL;
-	}
-
-	if (args[1].o != NULL_SI_OBJECT)
-		*service = args[1].o;
-	else
-		return -EINVAL;
-
-	return 0;
-}
-
-static int hibernate_tzdata_mgr_getkey(struct si_object_invoke_ctx *oic,
-	struct si_object *service, size_t key_len, uint8_t *key_ptr)
-{
-
-	int ret, result;
-	struct si_arg args[2] = { 0 };
-
-	args[0].b = (struct si_buffer) { {key_ptr}, key_len * sizeof(uint8_t) };
-	args[0].type = SI_AT_OB;
-	args[1].type = SI_AT_END;
-
-	/* IHibernateTzDataMgr_getKey is 4. */
-	ret = si_object_do_invoke(oic, service, IHIBERNATE_TZDATA_MGR_OP_GETKEY, args, &result);
-	if (ret || result || !key_ptr) {
-		pr_err("failed with result %d(ret = %d).\n", result, ret);
-		return -EINVAL;
-	}
-
-	memcpy(key, key_ptr, AES256_KEY_SIZE);
-
-	return 0;
-}
-
-static int hibernate_tzdata_mgr_savedata(struct si_object_invoke_ctx *oic,
-					struct si_object *service,
-					uint32_t client_ID_val,
-					size_t key_len, uint8_t *key_ptr)
-{
-
-	int ret, result;
-	struct si_arg args[3] = { 0 };
-
-	args[0].b = (struct si_buffer) { {&client_ID_val}, sizeof(uint32_t) };
-	args[0].type = SI_AT_IB;
-	args[1].b = (struct si_buffer) { {key_ptr}, key_len * sizeof(uint8_t) };
-	args[1].type = SI_AT_IB;
-	args[2].type = SI_AT_END;
-
-	/* IHibernateTzDataMgr_saveData is 2. */
-	ret = si_object_do_invoke(oic, service, IHIBERNATE_TZDATA_MGR_OP_SAVEDATA, args, &result);
-
-	if (ret || result) {
-		pr_err("failed with result %d(ret = %d).\n", result, ret);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static int get_key_from_tz(struct si_object_invoke_ctx *oic)
-{
-
-	int ret;
-	struct si_object *client_env, *service;
-	uint8_t key_ptr[AES256_KEY_SIZE];
-
-	memset(key_ptr, 0, sizeof(key_ptr));
-
-	ret = get_client_env(oic, &client_env);
-	if (ret) {
-		pr_err("%s: get_client_env failed (%d).\n", __func__, ret);
-		return ret;
-	}
-
-	/* CHibernateTzDataMgr_UID is 444. */
-	ret = client_env_open(oic, client_env, CHIBERNATE_TZDATA_MGR_UID, &service);
-	if (ret) {
-		pr_err("%s: client_env_open failed (%d).\n", __func__, ret);
-		put_si_object(client_env);
-		return ret;
-	}
-
-	ret = hibernate_tzdata_mgr_getkey(oic, service, AES256_KEY_SIZE, key_ptr);
-	if (ret) {
-		pr_err("%s: Failed to get key (%d).\n", __func__, ret);
-		goto out;
-	}
-
-	/* HLOS VM UID is 3 */
-	ret = hibernate_tzdata_mgr_savedata(oic, service, HLOS_VM_UID, AES256_KEY_SIZE, key_ptr);
-	if (ret) {
-		pr_err("%s: Failed to save key (%d).\n", __func__, ret);
-		goto out;
-	}
-
-out:
-	put_si_object(service);
-	put_si_object(client_env);
-	memset(key_ptr, 0, sizeof(key_ptr));
-
-	return ret;
-}
-
 static void increment_iv(unsigned char *iv, u8 size)
 {
 	int i;
@@ -280,7 +132,7 @@ static void encrypt_page(void *data, void *buf)
 	int ret = 0;
 
 	/* Allocate a request object */
-	req = aead_request_alloc(tfm, GFP_ATOMIC);
+	req = aead_request_alloc(tfm, GFP_KERNEL);
 	if (!req) {
 		ret = -ENOMEM;
 		goto err_aead;
@@ -387,11 +239,11 @@ static int hib_submit_io(blk_opf_t opf, int op_flags, pgoff_t page_off, void *ad
 
 	int error = 0;
 
-	bio = bio_alloc(hiber_bdev, 1, opf, GFP_NOIO | __GFP_HIGH);
+	bio = bio_alloc(file_bdev(hiber_bdev), 1, opf, GFP_NOIO | __GFP_HIGH);
 
 	bio->bi_iter.bi_sector = page_off * (PAGE_SIZE >> 9);
 
-	bio_set_dev(bio, hiber_bdev);
+	bio_set_dev(bio, file_bdev(hiber_bdev));
 	bio->bi_opf = REQ_OP_WRITE | op_flags;
 
 	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
@@ -569,6 +421,39 @@ static struct notifier_block poweroff_nb = {
 	.notifier_call = poweroff_notifier,
 };
 
+static int get_key_from_ta(void)
+{
+	int ret;
+	int req_len, rsp_len;
+
+	struct cmd_req *req = (struct cmd_req *)app_handle->sbuf;
+	struct cmd_rsp *rsp = NULL;
+
+	req_len = sizeof(struct cmd_req);
+	if (req_len & QSEECOM_ALIGN_MASK)
+		req_len = QSEECOM_ALIGN(req_len);
+
+	rsp = (struct cmd_rsp *)(app_handle->sbuf + req_len);
+	rsp_len = sizeof(struct cmd_rsp);
+	if (rsp_len & QSEECOM_ALIGN_MASK)
+		rsp_len = QSEECOM_ALIGN(rsp_len);
+
+	memset(req, 0, req_len);
+	memset(rsp, 0, rsp_len);
+
+	req->cmd = WRAP_KEY_CMD;
+	req->wrapkey_req.save_time.hour = 4;
+	rsp->wrapkey_rsp.wrapped_key_size = WRAPPED_KEY_SIZE;
+
+	ret = qseecom_send_command(app_handle, req, req_len, rsp, rsp_len);
+	if (!ret) {
+		memcpy(params->key_blob, rsp->wrapkey_rsp.wrapped_key_buffer,
+			WRAPPED_KEY_SIZE);
+		memcpy(key, rsp->wrapkey_rsp.key_buffer, AES256_KEY_SIZE);
+	}
+	return ret;
+}
+
 static int init_aead(void)
 {
 	if (!tfm) {
@@ -581,21 +466,39 @@ static int init_aead(void)
 	return 0;
 }
 
+static int init_ta_and_set_key(void)
+{
+	const uint32_t shared_buffer_len = 4096;
+	int ret;
+
+	ret = qseecom_start_app(&app_handle, "secs2d", shared_buffer_len);
+	if (ret) {
+		pr_err("qseecom_start_app failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = get_key_from_ta();
+	if (ret)
+		pr_err("set_key returned %d\n", ret);
+
+	ret = qseecom_shutdown_app(&app_handle);
+	if (ret)
+		pr_err("qseecom_shutdown_app failed: %d\n", ret);
+
+	return ret;
+}
+
 static int alloc_auth_memory(void)
 {
 	unsigned long total_auth_size;
-	unsigned long prealloc_size;
 
 	/* Number of Auth slots is equal to the number of image pages */
 	params->authslot_count = snapshot_get_image_size();
 	total_auth_size = params->authslot_count * AUTH_SIZE;
-	prealloc_size = ((totalram_pages() * PAGE_SIZE) / SZ_1G) * SZ_2M;
 
-	if (total_auth_size > prealloc_size) {
-		pr_err("%s: Insufficient preallocated memory for auth slots\n", __func__);
+	authslot_start = vmalloc(total_auth_size);
+	if (!authslot_start)
 		return -ENOMEM;
-	}
-
 	return 0;
 }
 
@@ -648,9 +551,9 @@ static int hibernate_pm_notifier(struct notifier_block *nb,
 			goto err_aead;
 		}
 
-		ret = get_key_from_tz(&oic);
+		ret = init_ta_and_set_key();
 		if (ret) {
-			pr_err("%s: Failed to get key from TZ: %d\n", __func__, ret);
+			pr_err("%s: Failed to init TA: %d\n", __func__, ret);
 			goto err_setkey;
 		}
 
@@ -660,34 +563,21 @@ static int hibernate_pm_notifier(struct notifier_block *nb,
 			ret = -1;
 			goto err_setkey;
 		}
-
-		authslot_start = vmalloc(((totalram_pages() * PAGE_SIZE) / SZ_1G) * SZ_2M);
-		if (!authslot_start) {
-			ret = -ENOMEM;
-			goto err_authslot;
-		}
-
 		init_completion(&write_done);
 		break;
 
 	case (PM_POST_HIBERNATION):
 		deinit_aes_encrypt();
 		cleanup_cmp_blk_array();
-		if (authslot_start) {
-			vfree(authslot_start);
-			authslot_start = NULL;
-		}
 		break;
 
 	default:
-		pr_debug("%s: Invalid PM Notifier\n", __func__);
+		WARN_ONCE(1, "Invalid PM Notifier\n");
 		break;
 	}
 
 	return NOTIFY_DONE;
 
-err_authslot:
-	free_pages((unsigned long)temp_out_buf, 1);
 err_setkey:
 	memset(params->key_blob, 0, WRAPPED_KEY_SIZE);
 	memset(key, 0, AES256_KEY_SIZE);

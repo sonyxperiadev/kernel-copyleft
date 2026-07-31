@@ -79,8 +79,8 @@ static struct clk_alpha_pll video_cc_pll0 = {
 			.vdd_class = &vdd_mx,
 			.num_rate_max = VDD_NUM,
 			.rate_max = (unsigned long[VDD_NUM]) {
-				[VDD_LOWER_D1] = 1100000000,
-				[VDD_LOW] = 1600000000,
+				[VDD_LOWER_D1] = 615000000,
+				[VDD_LOW] = 1100000000,
 				[VDD_LOW_L1] = 1600000000,
 				[VDD_NOMINAL] = 2000000000,
 				[VDD_HIGH_L1] = 2300000000},
@@ -319,7 +319,6 @@ static struct gdsc video_cc_mvs0c_gdsc = {
 	.pwrsts = PWRSTS_OFF_ON,
 	.flags = POLL_CFG_GDSCR | RETAIN_FF_ENABLE,
 	.supply = "vdd_cx",
-	.path_name = "mmnoc",
 };
 
 static struct gdsc video_cc_mvs0_gdsc = {
@@ -334,7 +333,6 @@ static struct gdsc video_cc_mvs0_gdsc = {
 	.parent = &video_cc_mvs0c_gdsc.pd,
 	.flags = HW_CTRL_TRIGGER | POLL_CFG_GDSCR | RETAIN_FF_ENABLE,
 	.supply = "vdd_cx",
-	.path_name = "mmnoc",
 };
 
 static struct clk_regmap *video_cc_chora_clocks[] = {

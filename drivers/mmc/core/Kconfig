@@ -1,0 +1,9 @@
+config MMC_ERROR_LOGGING
+	tristate "MMC error logging support"
+	depends on MMC_BLOCK
+	depends on FELS
+	default n
+	help
+	  This driver collects mmc errors by leveraging some tracepoints and
+	  vendor hooks and passes them to fels framework.
+

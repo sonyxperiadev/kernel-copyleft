@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/soc/qcom/qmi.h>
@@ -83,7 +83,7 @@ static struct qmi_elem_info apps_mem_info_v01_ei[] = {
 		.elem_size	= sizeof(struct mem_info_v01),
 		.array_type	= NO_ARRAY,
 		.tlv_type	= 0,
-		.offset		= offsetof(struct apps_mem_info_v01, pseudo_evt_ring),
+		.offset		= offsetof(struct apps_mem_info_v01, dcba),
 		.ei_array	= mem_info_v01_ei,
 	},
 	{

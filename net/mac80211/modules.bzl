@@ -106,13 +106,6 @@ def register_modules(registry):
                     "net/mac80211/pm.c",
                 ],
             },
-            "CONFIG_MAC80211_RC_MINSTREL": {
-                True: [
-                    # do not sort
-                    "net/mac80211/rc80211_minstrel_ht.c",
-                    "net/mac80211/rc80211_minstrel_ht.h",
-                ],
-            },
         },
         deps = [
             # do not sort

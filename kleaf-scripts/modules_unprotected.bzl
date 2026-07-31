@@ -60,16 +60,6 @@ _unprotected_modules_map = {
         "drivers/block/zram/zram.ko",
         "mm/zsmalloc.ko",
     ],
-    "seraph_consolidate": [
-        # keep sorted
-        "drivers/block/zram/zram.ko",
-        "mm/zsmalloc.ko",
-    ],
-    "seraph_perf": [
-        # keep sorted
-        "drivers/block/zram/zram.ko",
-        "mm/zsmalloc.ko",
-    ],
 }
 
 def get_unprotected_vendor_modules_list(msm_target = None):

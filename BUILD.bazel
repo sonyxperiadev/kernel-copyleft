@@ -21,29 +21,12 @@ load(
 )
 load(":kleaf-scripts/targets/canoe_vms.bzl", "define_canoe_vms")
 load(":kleaf-scripts/targets/hamoa.bzl", "define_hamoa")
-load(":kleaf-scripts/targets/hamoa_la.bzl", "define_hamoa_la")
 load(":kleaf-scripts/targets/lahaina.bzl", "define_lahaina")
-load(
-    ":kleaf-scripts/targets/malabar.bzl",
-    "define_malabar",
-    "define_malabar_oemvm",
-    "define_malabar_tuivm",
-)
-load(":kleaf-scripts/targets/malabar_vms.bzl", "define_malabar_vms")
+load(":kleaf-scripts/targets/malabar.bzl", "define_malabar")
 load(":kleaf-scripts/targets/monaco.bzl", "define_monaco")
-load(
-    ":kleaf-scripts/targets/seraph.bzl",
-    "define_seraph",
-    "define_seraph_tuivm",
-)
-load(":kleaf-scripts/targets/seraph_vms.bzl", "define_seraph_vms")
-load(
-    ":kleaf-scripts/targets/shikra.bzl",
-    "define_shikra",
-    "define_shikra_oemvm",
-    "define_shikra_tuivm",
-)
-load(":kleaf-scripts/targets/shikra_vms.bzl", "define_shikra_vms")
+load(":kleaf-scripts/targets/pikachu.bzl", "define_pikachu")
+load(":kleaf-scripts/targets/seraph.bzl", "define_seraph")
+load(":kleaf-scripts/targets/shikra.bzl", "define_shikra")
 load(
     ":kleaf-scripts/targets/sun.bzl",
     "define_sun",
@@ -179,6 +162,20 @@ ddk_headers(
     visibility = ["//visibility:public"],
 )
 
+ddk_headers(
+    name = "fels_headers",
+    hdrs = ["kernel/fels/include/fels.h"],
+    includes = ["kernel/fels/include"],
+    visibility = ["//visibility:public"],
+)
+
+ddk_headers(
+    name = "fels_uapi_headers",
+    hdrs = ["include/uapi/fels/fels_common_types.h"],
+    includes = ["include/uapi/fels"],
+    visibility = ["//visibility:public"],
+)
+
 ddk_uapi_headers(
     name = "msm_uapi_headers",
     srcs = glob(["include/uapi/**/*.h"]),
@@ -203,15 +200,6 @@ hermetic_genrule(
 filegroup(
     name = "unsafe_headers_qcom_group",
     srcs = [
-        "//common:arch/arm64/kvm/hyp/include/nvhe/alloc.h",
-        "//common:arch/arm64/kvm/hyp/include/nvhe/alloc_mgt.h",
-        "//common:arch/arm64/kvm/hyp/include/nvhe/gfp.h",
-        "//common:arch/arm64/kvm/hyp/include/nvhe/mem_protect.h",
-        "//common:arch/arm64/kvm/hyp/include/nvhe/memory.h",
-        "//common:arch/arm64/kvm/hyp/include/nvhe/mm.h",
-        "//common:arch/arm64/kvm/hyp/include/nvhe/pkvm.h",
-        "//common:arch/arm64/kvm/hyp/include/nvhe/refcount.h",
-        "//common:arch/arm64/kvm/hyp/include/nvhe/serial.h",
         "//common:drivers/android/binder_alloc.h",
         "//common:drivers/android/binder_internal.h",
         "//common:drivers/android/binder_trace.h",
@@ -343,10 +331,6 @@ define_sun_oemvm()
 
 define_seraph()
 
-define_seraph_tuivm()
-
-define_seraph_vms()
-
 define_sun_vms()
 
 define_canoe_tuivm()
@@ -354,6 +338,8 @@ define_canoe_tuivm()
 define_canoe_oemvm()
 
 define_canoe_vms()
+
+define_pikachu()
 
 define_vienna()
 
@@ -363,22 +349,8 @@ define_lahaina()
 
 define_hamoa()
 
-define_hamoa_la()
-
 define_malabar()
-
-define_malabar_oemvm()
-
-define_malabar_tuivm()
-
-define_malabar_vms()
 
 define_monaco()
 
 define_shikra()
-
-define_shikra_oemvm()
-
-define_shikra_tuivm()
-
-define_shikra_vms()

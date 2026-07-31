@@ -44,3 +44,19 @@ def register_modules(registry):
             "arch/arm64/gunyah/gh_arm_drv",
         ],
     )
+
+    registry.register(
+        name = "drivers/input/misc/cs40l26-core",
+        out = "cs40l26-core.ko",
+        config = "CONFIG_INPUT_CS40L26",
+        srcs = [
+            # do not sort
+            "drivers/input/misc/cs40l26.c",
+            "drivers/input/misc/cs40l26-tables.c",
+            "drivers/input/misc/cs40l26-sysfs.c",
+            "drivers/input/misc/cs40l26-debugfs.c",
+            "drivers/input/misc/cs40l26-i2c.c",
+            "drivers/firmware/cirrus/cl_dsp.c",
+            "drivers/firmware/cirrus/cl_dsp-debugfs.c",
+        ],
+    )

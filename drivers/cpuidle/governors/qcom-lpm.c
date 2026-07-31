@@ -35,9 +35,7 @@
 #define LPM_PRED_RESET				0
 #define LPM_PRED_RESIDENCY_PATTERN		1
 #define LPM_PRED_PREMATURE_EXITS		2
-#define LPM_PRED_PREMATURE_EXITS_EXTENDED	3
-#define LPM_PRED_IPI_PATTERN			4
-#define LPM_PRED_ACTIVE_TIME			5
+#define LPM_PRED_IPI_PATTERN			3
 
 #define LPM_SELECT_STATE_DISABLED		0
 #define LPM_SELECT_STATE_QOS_UNMET		1
@@ -49,21 +47,8 @@
 
 #define UPDATE_REASON(i, u)			(BIT(u) << (MAX_LPM_CPUS * i))
 
-u32 premature_resi_div_cpu = U32_MAX;
-u32 resi_fact = PRED_RESI_FACT;
-u32 pred_active_time = PRED_ACTIVE_TIME;
-u32 pred_timer_add = PRED_TIMER_ADD;
-u32 pred_premature_cnt = PRED_PREMATURE_CNT;
-u32 ipi_pred_ref_stddev = IPI_PRED_REF_STDDEV;
-u32 pred_ref_stddev = PRED_REF_STDDEV;
-
-bool optimized_resi;
-bool premature_ext_disabled;
-bool cluster_bias_disabled;
-bool bias_disabled;
 bool prediction_disabled;
 bool sleep_disabled = true;
-
 static bool suspend_in_progress;
 static bool traces_registered;
 static struct cluster_governor *cluster_gov_ops;
@@ -75,32 +60,24 @@ static inline bool check_cpu_isactive(int cpu)
 	return cpu_active(cpu);
 }
 
-static bool lpm_disallowed(int cpu)
+static bool lpm_disallowed(s64 sleep_ns, int cpu)
 {
-	struct lpm_cpu *cpu_gov = this_cpu_ptr(&lpm_cpu_data);
-	unsigned long flags;
 #if IS_ENABLED(CONFIG_SCHED_WALT)
+	struct lpm_cpu *cpu_gov = per_cpu_ptr(&lpm_cpu_data, cpu);
 	uint64_t bias_time = 0;
 #endif
 
 	if (suspend_in_progress)
 		return true;
 
-	spin_lock_irqsave(&cpu_gov->lock, flags);
-	if (cpu_gov->ipi_pending) {
-		spin_unlock_irqrestore(&cpu_gov->lock, flags);
-		return true;
-	}
-	spin_unlock_irqrestore(&cpu_gov->lock, flags);
-
 	if (!check_cpu_isactive(cpu))
 		return false;
 
-	if (sleep_disabled)
+	if ((sleep_disabled || sleep_ns < 0))
 		return true;
 
 #if IS_ENABLED(CONFIG_SCHED_WALT)
-	if (!bias_disabled && !sched_lpm_disallowed_time(cpu, &bias_time)) {
+	if (!sched_lpm_disallowed_time(cpu, &bias_time)) {
 		cpu_gov->last_idx = 0;
 		cpu_gov->bias = bias_time;
 		return true;
@@ -117,7 +94,7 @@ static enum hrtimer_restart histtimer_fn(struct hrtimer *h)
 {
 	struct lpm_cpu *cpu_gov = this_cpu_ptr(&lpm_cpu_data);
 
-	cpu_gov->history_invalid = true;
+	cpu_gov->history_invalid = 1;
 
 	return HRTIMER_NORESTART;
 }
@@ -126,13 +103,14 @@ static enum hrtimer_restart histtimer_fn(struct hrtimer *h)
  * histtimer_start()  - Program the hrtimer with given timer value
  * @time_ns:      Value to be program
  */
-static void histtimer_start(s64 time_ns)
+static void histtimer_start(uint32_t time_ns)
 {
+	ktime_t hist_ktime = ns_to_ktime(time_ns * NSEC_PER_USEC);
 	struct lpm_cpu *cpu_gov = this_cpu_ptr(&lpm_cpu_data);
 	struct hrtimer *cpu_histtimer = &cpu_gov->histtimer;
 
 	cpu_histtimer->function = histtimer_fn;
-	hrtimer_start(cpu_histtimer, time_ns, HRTIMER_MODE_REL_PINNED);
+	hrtimer_start(cpu_histtimer, hist_ktime, HRTIMER_MODE_REL_PINNED);
 }
 
 /**
@@ -148,7 +126,7 @@ static void histtimer_cancel(void)
 		return;
 
 	time_rem = hrtimer_get_remaining(cpu_histtimer);
-	if (time_rem <= 0)
+	if (ktime_to_us(time_rem) <= 0)
 		return;
 
 	hrtimer_try_to_cancel(cpu_histtimer);
@@ -165,7 +143,7 @@ static void biastimer_cancel(void)
 
 	cpu_gov->bias = 0;
 	time_rem = hrtimer_get_remaining(cpu_biastimer);
-	if (time_rem <= 0)
+	if (ktime_to_us(time_rem) <= 0)
 		return;
 
 	hrtimer_try_to_cancel(cpu_biastimer);
@@ -176,13 +154,14 @@ static enum hrtimer_restart biastimer_fn(struct hrtimer *h)
 	return HRTIMER_NORESTART;
 }
 
-static void biastimer_start(s64 time_ns)
+static void biastimer_start(uint32_t time_ns)
 {
+	ktime_t bias_ktime = ns_to_ktime(time_ns);
 	struct lpm_cpu *cpu_gov = this_cpu_ptr(&lpm_cpu_data);
 	struct hrtimer *cpu_biastimer = &cpu_gov->biastimer;
 
 	cpu_biastimer->function = biastimer_fn;
-	hrtimer_start(cpu_biastimer, time_ns, HRTIMER_MODE_REL_PINNED);
+	hrtimer_start(cpu_biastimer, bias_ktime, HRTIMER_MODE_REL_PINNED);
 }
 
 /**
@@ -192,74 +171,60 @@ static void biastimer_start(s64 time_ns)
  *		    threshold then use average of these past samples as
  *		    predicted value.
  * @cpu_gov:  targeted cpu's lpm data structure
- * @samples_history:  samples history for past residency or ipi arrival history
  * @duration_ns:  cpu's scheduler sleep length
- * @is_ipi:  samples history is for ipi arrival
  */
-static u64 find_deviation(struct lpm_cpu *cpu_gov, s64 *samples_history,
-			  s64 duration_ns, bool is_ipi)
+static uint64_t find_deviation(struct lpm_cpu *cpu_gov, int *samples_history,
+			       u64 duration_ns)
 {
-	s64 value, stddev_sqrt;
-	u64 stddev, max, min;
-	u64 max_thresh = U64_MAX;
-	u64 min_thresh = 0;
-	u64 avg, avg_sq;
+	uint64_t max, avg, stddev;
+	uint64_t thresh = LLONG_MAX;
 	struct cpuidle_driver *drv = cpu_gov->drv;
-	int divisor, i;
-	int last_level = drv->state_count - 1;
+	int divisor, i, last_level = drv->state_count - 1;
 	struct cpuidle_state *max_state = &drv->states[last_level];
-	u32 ref_stddev = pred_ref_stddev;
-
-	if (is_ipi)
-		ref_stddev = ipi_pred_ref_stddev;
 
 	do {
 		max = avg = divisor = stddev = 0;
-		min = S64_MAX;
 		for (i = 0; i < MAXSAMPLES; i++) {
-			value = samples_history[i];
-			value = ktime_to_us(value);
-			if (value <= min_thresh || value >= max_thresh)
-				continue;
+			int64_t value = samples_history[i];
 
-			divisor++;
-
-			avg += value;
-			stddev += value * value;
-			if (value > max)
-				max = value;
-			if (value < min)
-				min = value;
+			if (value <= thresh) {
+				avg += value;
+				divisor++;
+				if (value > max)
+					max = value;
+			}
 		}
-		if (!divisor || !max)
-			return 0;
-
 		do_div(avg, divisor);
-		do_div(stddev, divisor);
-		avg_sq = avg * avg;
-		stddev -= avg_sq;
-		stddev_sqrt = int_sqrt(stddev);
 
-		/*
-		 * If the deviation is less, return the average, else
-		 * ignore one maximum sample and retry
-		 */
-		if (((avg > stddev_sqrt * 6) && (divisor >= (MAXSAMPLES - 1)))
-					|| stddev_sqrt <= ref_stddev) {
-			if (avg * NSEC_PER_USEC >= duration_ns || avg > max_state->target_residency)
+		for (i = 0; i < MAXSAMPLES; i++) {
+			int64_t value = samples_history[i];
+
+			if (value <= thresh) {
+				int64_t diff = value - avg;
+
+				stddev += diff * diff;
+			}
+		}
+		do_div(stddev, divisor);
+		stddev = int_sqrt(stddev);
+
+	/*
+	 * If the deviation is less, return the average, else
+	 * ignore one maximum sample and retry
+	 */
+		if (((avg > stddev * 6) && (divisor >= (MAXSAMPLES - 1)))
+					|| stddev <= PRED_REF_STDDEV) {
+			do_div(duration_ns, NSEC_PER_USEC);
+			if (avg >= duration_ns ||
+				avg > max_state->target_residency)
 				return 0;
 
-			cpu_gov->next_pred_time = cpu_gov->now + (avg * NSEC_PER_USEC);
-			return avg * NSEC_PER_USEC;
+			cpu_gov->next_pred_time = ktime_to_us(cpu_gov->now) + avg;
+			return avg;
 		}
+		thresh = max - 1;
 
-		/* Update the thresholds for the next round. */
-		if (avg - min > max - avg)
-			min_thresh = min;
-		else
-			max_thresh = max;
-
-	} while (divisor > MAXSAMPLES - 1);
+	} while (divisor > (MAXSAMPLES - 1));
 
 	return 0;
 }
@@ -273,10 +238,10 @@ static void cpu_predict(struct lpm_cpu *cpu_gov, u64 duration_ns)
 {
 	int i, j;
 	struct cpuidle_driver *drv = cpu_gov->drv;
+	struct cpuidle_state *min_state = &drv->states[0];
 	struct history_lpm *lpm_history = &cpu_gov->lpm_history;
 	struct history_ipi *ipi_history = &cpu_gov->ipi_history;
 	unsigned long flags;
-	u32 min_residency_fact = 1;
 
 	if (prediction_disabled)
 		return;
@@ -288,44 +253,22 @@ static void cpu_predict(struct lpm_cpu *cpu_gov, u64 duration_ns)
 	if (cpu_gov->history_invalid) {
 		cpu_gov->history_invalid = false;
 		cpu_gov->htmr_wkup = true;
-
-		if (cpu_gov->pred_type == LPM_PRED_PREMATURE_EXITS ||
-		    cpu_gov->pred_type == LPM_PRED_PREMATURE_EXITS_EXTENDED) {
-			cpu_gov->timer_factor++;
-			goto skip_invalidate;
-		}
-
-		if (cpu_gov->pred_type == LPM_PRED_RESIDENCY_PATTERN) {
-			cpu_gov->timer_factor++;
-			goto skip_resi_pattern;
-		}
-
-		if (cpu_gov->pred_type == LPM_PRED_IPI_PATTERN)
-			return;
-
 		cpu_gov->next_pred_time = 0;
-		cpu_gov->timer_factor = 1;
-		cpu_gov->pred_type = LPM_PRED_RESET;
-		lpm_history->samples_idx = 0;
-		lpm_history->nsamp = 0;
-		for (i = 0; i < MAXSAMPLES; i++) {
-			lpm_history->resi[i]  = 0;
-			lpm_history->mode[i] = -1;
-		}
-
-		cpu_gov->predicted = find_deviation(cpu_gov, ipi_history->interval,
-						    duration_ns, true);
-		if (cpu_gov->predicted) {
-			cpu_gov->pred_type = LPM_PRED_IPI_PATTERN;
-			return;
-		}
+		return;
 	}
 
-	cpu_gov->timer_factor = 1;
-skip_invalidate:
-	/* Predict only when all the samples are collected */
-	if (lpm_history->nsamp < MAXSAMPLES)
+	/*
+	 * If the duration_ns itself is not sufficient for deeper
+	 * low power modes than clock gating do not predict
+	 */
+	if (min_state->target_residency_ns > duration_ns)
 		return;
+
+	/* Predict only when all the samples are collected */
+	if (lpm_history->nsamp < MAXSAMPLES) {
+		cpu_gov->next_pred_time = 0;
+		return;
+	}
 
 	/*
 	 * Check if the samples are not much deviated, if so use the
@@ -333,16 +276,11 @@ skip_invalidate:
 	 * specific mode has more premature exits return the index of
 	 * that mode.
 	 */
-
-	cpu_gov->predicted = find_deviation(cpu_gov, lpm_history->resi, duration_ns, false);
+	cpu_gov->predicted = find_deviation(cpu_gov, lpm_history->resi, duration_ns);
 	if (cpu_gov->predicted) {
 		cpu_gov->pred_type = LPM_PRED_RESIDENCY_PATTERN;
 		return;
 	}
-
-skip_resi_pattern:
-	if (cpu_gov->cpu == 0)
-		min_residency_fact = resi_fact;
 
 	/*
 	 * Find the number of premature exits for each of the mode,
@@ -351,14 +289,9 @@ skip_resi_pattern:
 	 */
 	for (j = 1; j < drv->state_count; j++) {
 		struct cpuidle_state *s = &drv->states[j];
-		s64 min_residency = s->target_residency_ns;
-		s64 avg_residency = 0;
-		s64 pred_avg_residency = 0;
-		u32 count = 0;
-		u32 pred_count = 0;
-		u32 premature_cnt = pred_premature_cnt;
-
-		min_residency *= min_residency_fact;
+		uint32_t min_residency = s->target_residency;
+		uint32_t count = 0;
+		uint64_t avg_residency = 0;
 
 		for (i = 0; i < MAXSAMPLES; i++) {
 			if ((lpm_history->mode[i] == j) &&
@@ -368,44 +301,12 @@ skip_resi_pattern:
 			}
 		}
 
-		if (count >= premature_cnt) {
+		if (count >= PRED_PREMATURE_CNT) {
 			do_div(avg_residency, count);
 			cpu_gov->predicted = avg_residency;
-			cpu_gov->next_pred_time = cpu_gov->now + cpu_gov->predicted;
+			cpu_gov->next_pred_time = ktime_to_us(cpu_gov->now)
+								+ cpu_gov->predicted;
 			cpu_gov->pred_type = LPM_PRED_PREMATURE_EXITS;
-			break;
-		}
-
-		if (premature_ext_disabled) {
-			if (cpu_gov->cpu != 0)
-				continue;
-			else
-				premature_cnt = MAXSAMPLES;
-		}
-
-		if (premature_resi_div_cpu == U32_MAX)
-			break;
-
-		if (cpu_gov->cpu > premature_resi_div_cpu)
-			do_div(min_residency, 2);
-
-		for (i = 0; i < MAXSAMPLES; i++) {
-			if (lpm_history->resi[i] < min_residency) {
-				pred_count++;
-				pred_avg_residency += lpm_history->resi[i];
-			}
-		}
-
-		if (pred_count >= premature_cnt) {
-			do_div(pred_avg_residency, pred_count);
-			cpu_gov->predicted = pred_avg_residency * cpu_gov->timer_factor;
-			if (cpu_gov->predicted > MIN_RESI_TIMES * min_residency_fact
-			    && cpu_gov->timer_factor > 1) {
-				cpu_gov->timer_factor--;
-				cpu_gov->predicted = pred_avg_residency * cpu_gov->timer_factor;
-			}
-			cpu_gov->next_pred_time = cpu_gov->now + cpu_gov->predicted;
-			cpu_gov->pred_type = LPM_PRED_PREMATURE_EXITS_EXTENDED;
 			break;
 		}
 	}
@@ -415,7 +316,7 @@ skip_resi_pattern:
 
 	spin_lock_irqsave(&cpu_gov->lock, flags);
 	cpu_gov->predicted = find_deviation(cpu_gov, ipi_history->interval,
-					    duration_ns, true);
+					    duration_ns);
 	if (cpu_gov->predicted)
 		cpu_gov->pred_type = LPM_PRED_IPI_PATTERN;
 	spin_unlock_irqrestore(&cpu_gov->lock, flags);
@@ -437,15 +338,13 @@ void clear_cpu_predict_history(void)
 	for_each_possible_cpu(cpu) {
 		cpu_gov = per_cpu_ptr(&lpm_cpu_data, cpu);
 		lpm_history = &cpu_gov->lpm_history;
-
-		cpu_gov->predicted = 0;
-		cpu_gov->next_pred_time = 0;
-		cpu_gov->pred_type = LPM_PRED_RESET;
-		lpm_history->samples_idx = 0;
-		lpm_history->nsamp = 0;
 		for (i = 0; i < MAXSAMPLES; i++) {
-			lpm_history->resi[i] = 0;
+			lpm_history->resi[i]  = 0;
 			lpm_history->mode[i] = -1;
+			lpm_history->samples_idx = 0;
+			lpm_history->nsamp = 0;
+			cpu_gov->next_pred_time = 0;
+			cpu_gov->pred_type = LPM_PRED_RESET;
 		}
 	}
 }
@@ -460,35 +359,32 @@ static void update_cpu_history(struct lpm_cpu *cpu_gov)
 	bool tmr = false;
 	int idx = cpu_gov->last_idx;
 	struct history_lpm *lpm_history = &cpu_gov->lpm_history;
-	s64 measured_ns = cpu_gov->dev->last_residency_ns;
+	u64 measured_us = ktime_to_us(cpu_gov->dev->last_residency_ns);
 	struct cpuidle_state *target;
 
 	if (sleep_disabled || prediction_disabled || idx < 0 ||
-	    idx > cpu_gov->drv->state_count - 1) {
-		cpu_gov->htmr_wkup = false;
+	    idx > cpu_gov->drv->state_count - 1)
 		return;
-	}
-
-	histtimer_cancel();
-	biastimer_cancel();
-
-	if (cpu_gov->dev->last_residency_ns == 0) {
-		cpu_gov->htmr_wkup = false;
-		return;
-	}
 
 	target = &cpu_gov->drv->states[idx];
 
-	if (measured_ns > target->exit_latency_ns)
-		measured_ns -= target->exit_latency_ns;
+	if (measured_us > target->exit_latency)
+		measured_us -= target->exit_latency;
 
 	if (cpu_gov->htmr_wkup) {
+		if (!lpm_history->samples_idx)
+			lpm_history->samples_idx = MAXSAMPLES - 1;
+		else
+			lpm_history->samples_idx--;
+
+		lpm_history->resi[lpm_history->samples_idx] += measured_us;
 		cpu_gov->htmr_wkup = false;
 		tmr = true;
-	}
+	} else
+		lpm_history->resi[lpm_history->samples_idx] = measured_us;
 
-	lpm_history->resi[lpm_history->samples_idx] = measured_ns;
 	lpm_history->mode[lpm_history->samples_idx] = idx;
+	cpu_gov->pred_type = LPM_PRED_RESET;
 
 	trace_gov_pred_hist(idx, lpm_history->resi[lpm_history->samples_idx],
 			    tmr);
@@ -506,7 +402,9 @@ void update_ipi_history(int cpu, ktime_t now)
 	struct lpm_cpu *cpu_gov = per_cpu_ptr(&lpm_cpu_data, cpu);
 	struct history_ipi *history = &cpu_gov->ipi_history;
 
-	history->interval[history->current_ptr] = ktime_sub(now, history->cpu_idle_resched_ts);
+	history->interval[history->current_ptr] =
+			ktime_to_us(ktime_sub(now,
+			history->cpu_idle_resched_ts));
 	(history->current_ptr)++;
 	if (history->current_ptr >= MAXSAMPLES)
 		history->current_ptr = 0;
@@ -646,10 +544,10 @@ s64 get_cpus_qos(const struct cpumask *mask)
  * @cpu_gov:  cpu's lpm data structure
  * @duration_us:  cpu's scheduled sleep length
  */
-static int start_prediction_timer(struct lpm_cpu *cpu_gov, s64 duration_ns)
+static int start_prediction_timer(struct lpm_cpu *cpu_gov, int duration_us)
 {
 	struct cpuidle_state *s;
-	s64 htime = 0, max_residency;
+	uint32_t htime = 0, max_residency;
 	uint32_t last_level = cpu_gov->drv->state_count - 1;
 
 	if (!cpu_gov->predicted || cpu_gov->last_idx >= last_level)
@@ -659,16 +557,13 @@ static int start_prediction_timer(struct lpm_cpu *cpu_gov, s64 duration_ns)
 		cpu_gov->next_wakeup = cpu_gov->next_pred_time;
 
 	s = &cpu_gov->drv->states[0];
-	max_residency  = s[cpu_gov->last_idx + 1].target_residency_ns - 1;
-	htime = cpu_gov->predicted + pred_timer_add * NSEC_PER_USEC;
+	max_residency  = s[cpu_gov->last_idx + 1].target_residency - 1;
+	htime = cpu_gov->predicted + PRED_TIMER_ADD;
 
-	if (htime > max_residency && cpu_gov->pred_type != LPM_PRED_PREMATURE_EXITS_EXTENDED) {
+	if (htime > max_residency)
 		htime = max_residency;
-		cpu_gov->next_wakeup = ktime_add_ns(cpu_gov->now, htime);
-	}
 
-	cpu_gov->dev->next_hrtimer = cpu_gov->next_wakeup;
-	if ((duration_ns > htime) && ((duration_ns - htime) > max_residency))
+	if ((duration_us > htime) && ((duration_us - htime) > max_residency))
 		histtimer_start(htime);
 
 	return htime;
@@ -694,12 +589,10 @@ static int lpm_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 		      bool *stop_tick)
 {
 	struct lpm_cpu *cpu_gov = this_cpu_ptr(&lpm_cpu_data);
-	s64 latency_req = PM_QOS_CPU_LATENCY_DEFAULT_VALUE;
-	struct cpuidle_state *s;
+	s64 latency_req = get_cpus_qos(cpumask_of(dev->cpu));
 	ktime_t delta_tick;
-	u64 htime = 0;
-	s64 duration_ns = 0;
-	unsigned long flags;
+	u64 reason = 0;
+	uint64_t duration_ns, htime = 0;
 	int i = 0;
 
 	if (!cpu_gov)
@@ -708,82 +601,52 @@ static int lpm_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 	if (cpu_gov->cpu_off_invoked)
 		return 0;
 
-	update_cpu_history(cpu_gov);
-
-	if (lpm_disallowed(dev->cpu))
-		goto done;
-
-	latency_req = get_cpus_qos(cpumask_of(dev->cpu));
+	do_div(latency_req, NSEC_PER_USEC);
 	cpu_gov->predicted = 0;
 	cpu_gov->predict_started = false;
 	cpu_gov->now = ktime_get();
-	cpu_gov->hist_reason = cpu_gov->select_reason;
-	cpu_gov->select_reason = 0;
-
 	duration_ns = tick_nohz_get_sleep_length(&delta_tick);
+	update_cpu_history(cpu_gov);
+
+	if (lpm_disallowed(duration_ns, dev->cpu))
+		goto done;
 
 	for (i = drv->state_count - 1; i > 0; i--) {
-		s = &drv->states[i];
+		struct cpuidle_state *s = &drv->states[i];
 
 		if (dev->states_usage[i].disable) {
-			cpu_gov->select_reason |= UPDATE_REASON(i, LPM_SELECT_STATE_DISABLED);
+			reason |= UPDATE_REASON(i, LPM_SELECT_STATE_DISABLED);
 			continue;
 		}
 
-		if (latency_req < s->exit_latency_ns) {
-			cpu_gov->select_reason |= UPDATE_REASON(i, LPM_SELECT_STATE_QOS_UNMET);
+		if (latency_req < s->exit_latency) {
+			reason |= UPDATE_REASON(i, LPM_SELECT_STATE_QOS_UNMET);
+			continue;
+		}
 
-			if (optimized_resi) {
-				if (!cpu_gov->history_invalid) {
-					cpu_gov->pred_type = LPM_PRED_ACTIVE_TIME;
-					cpu_gov->predicted = s->target_residency_ns;
-					cpu_gov->next_pred_time = cpu_gov->now + cpu_gov->predicted;
-					continue;
-				}
-				if (s->target_residency_ns * resi_fact < duration_ns) {
-					cpu_gov->history_invalid = false;
-					break;
-				}
-			}
+		if (s->target_residency_ns > duration_ns) {
+			reason |= UPDATE_REASON(i,
+					LPM_SELECT_STATE_RESIDENCY_UNMET);
 			continue;
 		}
 
 		if (check_cpu_isactive(dev->cpu) && !cpu_gov->predict_started) {
-			if (duration_ns <= 0 || resi_fact * s->target_residency_ns > duration_ns) {
-				cpu_gov->select_reason |= UPDATE_REASON(i,
-						LPM_SELECT_STATE_RESIDENCY_UNMET);
-				continue;
-			}
 			cpu_predict(cpu_gov, duration_ns);
 			cpu_gov->predict_started = true;
 		}
 
-		if (cpu_gov->predicted) {
-			if (cpu_gov->pred_type == LPM_PRED_PREMATURE_EXITS_EXTENDED ||
-				s->target_residency_ns > cpu_gov->predicted) {
-				cpu_gov->select_reason |= UPDATE_REASON(i, LPM_SELECT_STATE_PRED);
+		if (cpu_gov->predicted)
+			if (s->target_residency > cpu_gov->predicted) {
+				reason |= UPDATE_REASON(i,
+						LPM_SELECT_STATE_PRED);
 				continue;
-			}
 		}
 		break;
 	}
 
-	if (!cpu_gov->predicted)
-		cpu_gov->pred_type = LPM_PRED_RESET;
-
-	if (pred_active_time && i && !cpu_gov->htmr_wkup && cpu_gov->exit_time > 0) {
-		cpu_gov->active_time = cpu_gov->now - cpu_gov->exit_time;
-		if (cpu_gov->active_time > pred_active_time * NSEC_PER_USEC) {
-			i = 0;
-			cpu_gov->select_reason |= UPDATE_REASON(i, LPM_SELECT_STATE_PRED);
-			cpu_gov->pred_type = LPM_PRED_ACTIVE_TIME;
-			cpu_gov->predicted = drv->states[i].target_residency_ns;
-			cpu_gov->next_pred_time = cpu_gov->now + cpu_gov->predicted;
-		}
-	}
-
+	do_div(duration_ns, NSEC_PER_USEC);
 	cpu_gov->last_idx = i;
-	cpu_gov->next_wakeup = ktime_add_ns(cpu_gov->now, duration_ns);
+	cpu_gov->next_wakeup = ktime_add_us(cpu_gov->now, duration_ns);
 	htime = start_prediction_timer(cpu_gov, duration_ns);
 
 	/* update this cpu next_wakeup into its parent power domain device */
@@ -795,18 +658,10 @@ static int lpm_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 done:
 	if ((!cpu_gov->last_idx) && cpu_gov->bias) {
 		biastimer_start(cpu_gov->bias);
-		cpu_gov->select_reason |= UPDATE_REASON(i, LPM_SELECT_STATE_SCHED_BIAS);
+		reason |= UPDATE_REASON(i, LPM_SELECT_STATE_SCHED_BIAS);
 	}
 
-	spin_lock_irqsave(&cpu_gov->lock, flags);
-	if (cpu_gov->ipi_pending) {
-		i = 0;
-		*stop_tick = false;
-		cpu_gov->select_reason = UPDATE_REASON(i, LPM_SELECT_STATE_IPI_PENDING);
-	}
-	spin_unlock_irqrestore(&cpu_gov->lock, flags);
-
-	trace_lpm_gov_select(i, latency_req, duration_ns, cpu_gov->bias, cpu_gov->select_reason);
+	trace_lpm_gov_select(i, latency_req, duration_ns, reason);
 	trace_gov_pred_select(cpu_gov->pred_type, cpu_gov->predicted, htime);
 
 	return i;
@@ -820,9 +675,6 @@ done:
 static void lpm_reflect(struct cpuidle_device *dev, int state)
 {
 	struct lpm_cpu *cpu_gov = this_cpu_ptr(&lpm_cpu_data);
-
-	if (!cpu_gov->predicted)
-		cpu_gov->exit_time = ktime_get();
 
 	if (state && cluster_gov_ops && cluster_gov_ops->reflect)
 		cluster_gov_ops->reflect(cpu_gov);
@@ -840,22 +692,18 @@ static void lpm_idle_enter(void *unused, int *state, struct cpuidle_device *dev)
 	u64 reason = 0;
 	unsigned long flags;
 
+	if (*state == 0)
+		return;
+
 	if (!cpu_gov->enable)
 		return;
 
-	/* Bailout from CPUidle if there is an IPI pending on current CPU */
+	/* Restrict to WFI state if there is an IPI pending on current CPU */
 	spin_lock_irqsave(&cpu_gov->lock, flags);
 	if (cpu_gov->ipi_pending) {
 		reason = UPDATE_REASON(*state, LPM_SELECT_STATE_IPI_PENDING);
-		*state = -1;
-		dev->last_residency_ns = 0;
-		trace_lpm_gov_select(*state, 0xdeaffeed, 0xdeaffeed, cpu_gov->bias, reason);
-		spin_unlock_irqrestore(&cpu_gov->lock, flags);
-
-		histtimer_cancel();
-		biastimer_cancel();
-		local_irq_enable();
-		return;
+		*state = 0;
+		trace_lpm_gov_select(*state, 0xdeaffeed, 0xdeaffeed, reason);
 	}
 	spin_unlock_irqrestore(&cpu_gov->lock, flags);
 }
@@ -954,8 +802,6 @@ static int lpm_enable_device(struct cpuidle_driver *drv,
 	cpu_gov->drv = drv;
 	cpu_gov->dev = dev;
 	cpu_gov->last_idx = -1;
-	cpu_gov->timer_factor = 1;
-	cpu_gov->exit_time = 0;
 
 	return 0;
 }

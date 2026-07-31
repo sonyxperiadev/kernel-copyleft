@@ -3,7 +3,7 @@
  * Crypto virtual library for storage encryption.
  *
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -173,7 +173,6 @@ int crypto_qti_virt_program_key(const struct blk_crypto_key *key,
 	req.cmd = FBE_SET_KEY_V2;
 	req.virt_slot = slot;
 	req.key_size = key->size;
-	req.data_unit_size = key->crypto_cfg.data_unit_size;
 	memcpy(&(req.key[0]),  key->raw, key->size);
 	ret = send_fbe_req(&req, &response);
 

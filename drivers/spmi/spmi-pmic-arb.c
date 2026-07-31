@@ -1269,10 +1269,8 @@ static int pmic_arb_read_apid_map_v5(struct spmi_pmic_arb_bus *bus)
 			break;
 
 		regval = readl_relaxed(pmic_arb->core + offset);
-		if (!regval) {
-			apidd->irq_ee = INVALID_EE;
+		if (!regval)
 			continue;
-		}
 		ppid = (regval >> 8) & PMIC_ARB_PPID_MASK;
 		is_irq_ee = PMIC_ARB_CHAN_IS_IRQ_OWNER(regval);
 
@@ -1608,10 +1606,8 @@ static int pmic_arb_read_apid_map_v8(struct spmi_pmic_arb_bus *bus)
 	for (i = bus->base_apid; i < apid_max; i++, apidd++) {
 		offset = pmic_arb->ver_ops->apid_map_offset(i);
 		regval = readl_relaxed(pmic_arb->apid_map + offset);
-		if (!regval) {
-			apidd->irq_ee = INVALID_EE;
+		if (!regval)
 			continue;
-		}
 		ppid = regval & PMIC_ARB_V8_PPID_MASK;
 		is_irq_ee = PMIC_ARB_V8_CHAN_IS_IRQ_OWNER(regval);
 

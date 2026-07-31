@@ -151,7 +151,7 @@ def define_vm_build(
         vm_opts = vm_image_opts()
 
         #use only dtbs related to the variant for dtb image creation
-        if "canoe" in name or "malabar" in name or "seraph" in name or "shikra" in name:
+        if "canoe" in name:
             dtb_list = dtbo_list
 
         if "tuivm" in name:

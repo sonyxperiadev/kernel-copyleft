@@ -39,21 +39,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/pinctrl/qcom/pinctrl-scuba",
-        out = "pinctrl-scuba.ko",
-        config = "CONFIG_PINCTRL_SCUBA",
-        srcs = [
-            # do not sort
-            "drivers/pinctrl/qcom/pinctrl-msm.h",
-            "drivers/pinctrl/qcom/pinctrl-scuba.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/pinctrl/qcom/pinctrl-msm",
-        ],
-    )
-
-    registry.register(
         name = "drivers/pinctrl/qcom/pinctrl-spmi-gpio",
         out = "pinctrl-spmi-gpio.ko",
         config = "CONFIG_PINCTRL_QCOM_SPMI_PMIC",
@@ -70,47 +55,6 @@ def register_modules(registry):
         srcs = [
             # do not sort
             "drivers/pinctrl/qcom/pinctrl-spmi-mpp.c",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/pinctrl/qcom/pinctrl-ravelin",
-        out = "pinctrl-ravelin.ko",
-        config = "CONFIG_PINCTRL_RAVELIN",
-        srcs = [
-            # do not sort
-            "drivers/pinctrl/qcom/pinctrl-msm.h",
-            "drivers/pinctrl/qcom/pinctrl-ravelin.h",
-            "drivers/pinctrl/qcom/pinctrl-ravelin.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/pinctrl/qcom/pinctrl-msm",
-            "drivers/firmware/qcom/qcom-scm",
-            "drivers/virt/gunyah/gh_rm_drv",
-            "drivers/virt/gunyah/gh_msgq",
-            "drivers/virt/gunyah/gh_dbl",
-            "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/pinctrl/qcom/pinctrl-bourtzi",
-        out = "pinctrl-bourtzi.ko",
-        config = "CONFIG_PINCTRL_BOURTZI",
-        srcs = [
-            # do not sort
-            "drivers/pinctrl/qcom/pinctrl-msm.h",
-            "drivers/pinctrl/qcom/pinctrl-bourtzi.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/pinctrl/qcom/pinctrl-msm",
-            "drivers/firmware/qcom/qcom-scm",
-            "drivers/virt/gunyah/gh_rm_drv",
-            "drivers/virt/gunyah/gh_msgq",
-            "drivers/virt/gunyah/gh_dbl",
-            "arch/arm64/gunyah/gh_arm_drv",
         ],
     )
 
@@ -202,21 +146,6 @@ def register_modules(registry):
             # do not sort
             "drivers/pinctrl/qcom/pinctrl-msm.h",
             "drivers/pinctrl/qcom/pinctrl-yupik.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/pinctrl/qcom/pinctrl-msm",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/pinctrl/qcom/pinctrl-lahaina",
-        out = "pinctrl-lahaina.ko",
-        config = "CONFIG_PINCTRL_LAHAINA",
-        srcs = [
-            # do not sort
-            "drivers/pinctrl/qcom/pinctrl-msm.h",
-            "drivers/pinctrl/qcom/pinctrl-lahaina.c",
         ],
         deps = [
             # do not sort

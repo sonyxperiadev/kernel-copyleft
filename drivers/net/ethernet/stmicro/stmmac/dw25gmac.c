@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2024 Broadcom Corporation
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include "stmmac.h"
 #include "dwxgmac2.h"
@@ -102,13 +101,6 @@ void dw25gmac_dma_init(struct stmmac_priv *priv, void __iomem *ioaddr,
 		value |= FIELD_PREP(XXVGMAC_RXPBL, dma_cfg->pbl);
 		wr_dma_ch_ind(ioaddr, MODE_RXEXTCFG, i, value);
 	}
-
-	if (dma_cfg->multi_irq_en) {
-		value = readl(ioaddr + XGMAC_DMA_MODE);
-		value &= ~XGMAC_DMA_MODE_INTM_MASK;
-		value |= (XGMAC_DMA_MODE_INTM_MODE1 << XGMAC_DMA_MODE_INTM_SHIFT);
-		writel(value, ioaddr + XGMAC_DMA_MODE);
-	}
 }
 
 void dw25gmac_dma_init_tx_chan(struct stmmac_priv *priv,
@@ -117,17 +109,8 @@ void dw25gmac_dma_init_tx_chan(struct stmmac_priv *priv,
 			       dma_addr_t dma_addr, u32 chan)
 {
 	const struct dwxgmac_addrs *dwxgmac_addrs = priv->plat->dwxgmac_addrs;
-	u32 tc_pdma_map, tc_vdma_map, numtc;
+	u32 tc = (dma_cfg->tx_pdma_custom_map ? dma_cfg->tx_pdma_map[chan] : chan);
 	u32 value;
-
-	numtc = priv->dma_cap.numtc;
-	if (!numtc) {
-		dev_err(priv->device, "numtc is 0, cannot compute TC mapping\n");
-		return;
-	}
-
-	tc_pdma_map = (dma_cfg->tx_pdma_custom_map ? dma_cfg->tx_pdma_map[chan] : chan % numtc);
-	tc_vdma_map = (dma_cfg->tx_vdma_custom_map ? dma_cfg->tx_vdma_map[chan] : chan % numtc);
 
 	/* Descriptor cache size and prefetch threshold size */
 	value = rd_dma_ch_ind(ioaddr, MODE_TXDESCCTRL, chan);
@@ -141,7 +124,7 @@ void dw25gmac_dma_init_tx_chan(struct stmmac_priv *priv,
 	/* PDMA to TC mapping */
 	value = rd_dma_ch_ind(ioaddr, MODE_TXEXTCFG, chan);
 	value &= ~XXVGMAC_TP2TCMP;
-	value |= FIELD_PREP(XXVGMAC_TP2TCMP, tc_pdma_map);
+	value |= FIELD_PREP(XXVGMAC_TP2TCMP, tc);
 	if (dma_cfg->orrq)
 		value |= FIELD_PREP(XXVGMAC_ORRQ, dma_cfg->orrq);
 	wr_dma_ch_ind(ioaddr, MODE_TXEXTCFG, chan, value);
@@ -149,7 +132,7 @@ void dw25gmac_dma_init_tx_chan(struct stmmac_priv *priv,
 	/* VDMA to TC mapping */
 	value = readl(ioaddr + XGMAC_DMA_CH_TX_CONTROL(dwxgmac_addrs, chan));
 	value &= ~XXVGMAC_TVDMA2TCMP;
-	value |= FIELD_PREP(XXVGMAC_TVDMA2TCMP, tc_vdma_map);
+	value |= FIELD_PREP(XXVGMAC_TVDMA2TCMP, tc);
 	writel(value, ioaddr + XGMAC_DMA_CH_TX_CONTROL(dwxgmac_addrs, chan));
 
 	writel(upper_32_bits(dma_addr),
@@ -164,17 +147,8 @@ void dw25gmac_dma_init_rx_chan(struct stmmac_priv *priv,
 			       dma_addr_t dma_addr, u32 chan)
 {
 	const struct dwxgmac_addrs *dwxgmac_addrs = priv->plat->dwxgmac_addrs;
-	u32 tc_pdma_map, tc_vdma_map, numtc;
+	u32 tc = (dma_cfg->rx_pdma_custom_map ? dma_cfg->rx_pdma_map[chan] : chan);
 	u32 value;
-
-	numtc = priv->dma_cap.numtc;
-	if (!numtc) {
-		dev_err(priv->device, "numtc is 0, cannot compute TC mapping\n");
-		return;
-	}
-
-	tc_pdma_map = (dma_cfg->rx_pdma_custom_map ? dma_cfg->rx_pdma_map[chan] : chan % numtc);
-	tc_vdma_map = (dma_cfg->rx_vdma_custom_map ? dma_cfg->rx_vdma_map[chan] : chan % numtc);
 
 	/* Descriptor cache size and prefetch threshold size */
 	value = rd_dma_ch_ind(ioaddr, MODE_RXDESCCTRL, chan);
@@ -188,7 +162,7 @@ void dw25gmac_dma_init_rx_chan(struct stmmac_priv *priv,
 	/* PDMA to TC mapping */
 	value = rd_dma_ch_ind(ioaddr, MODE_RXEXTCFG, chan);
 	value &= ~XXVGMAC_RP2TCMP;
-	value |= FIELD_PREP(XXVGMAC_RP2TCMP, tc_pdma_map);
+	value |= FIELD_PREP(XXVGMAC_RP2TCMP, tc);
 	if (dma_cfg->owrq)
 		value |= FIELD_PREP(XXVGMAC_OWRQ, dma_cfg->owrq);
 	value |= XXVGMAC_RXPEN;
@@ -197,7 +171,7 @@ void dw25gmac_dma_init_rx_chan(struct stmmac_priv *priv,
 	/* VDMA to TC mapping */
 	value = readl(ioaddr + XGMAC_DMA_CH_RX_CONTROL(dwxgmac_addrs, chan));
 	value &= ~XXVGMAC_RVDMA2TCMP;
-	value |= FIELD_PREP(XXVGMAC_RVDMA2TCMP, tc_vdma_map);
+	value |= FIELD_PREP(XXVGMAC_RVDMA2TCMP, tc);
 	writel(value, ioaddr + XGMAC_DMA_CH_RX_CONTROL(dwxgmac_addrs, chan));
 
 	writel(upper_32_bits(dma_addr),
@@ -212,28 +186,19 @@ void dw25gmac_dma_map_tx_offline_chan(struct stmmac_priv *priv,
 				      u32 chan)
 {
 	const struct dwxgmac_addrs *dwxgmac_addrs = priv->plat->dwxgmac_addrs;
-	u32 tc_pdma_map, tc_vdma_map, numtc;
+	u32 tc = (dma_cfg->tx_pdma_custom_map ? dma_cfg->tx_pdma_map[chan] : chan);
 	u32 value;
-
-	numtc = priv->dma_cap.numtc;
-	if (!numtc) {
-		dev_err(priv->device, "numtc is 0, cannot compute TC mapping\n");
-		return;
-	}
-
-	tc_pdma_map = (dma_cfg->tx_pdma_custom_map ? dma_cfg->tx_pdma_map[chan] : chan % numtc);
-	tc_vdma_map = (dma_cfg->tx_vdma_custom_map ? dma_cfg->tx_vdma_map[chan] : chan % numtc);
 
 	/* PDMA to TC mapping for channels that are offline */
 	value = rd_dma_ch_ind(ioaddr, MODE_TXEXTCFG, chan);
 	value &= ~XXVGMAC_TP2TCMP;
-	value |= FIELD_PREP(XXVGMAC_TP2TCMP, tc_pdma_map);
+	value |= FIELD_PREP(XXVGMAC_TP2TCMP, tc);
 	wr_dma_ch_ind(ioaddr, MODE_TXEXTCFG, chan, value);
 
 	/* VDMA to TC mapping for channels that are offline */
 	value = readl(ioaddr + XGMAC_DMA_CH_TX_CONTROL(dwxgmac_addrs, chan));
 	value &= ~XXVGMAC_TVDMA2TCMP;
-	value |= FIELD_PREP(XXVGMAC_TVDMA2TCMP, tc_vdma_map);
+	value |= FIELD_PREP(XXVGMAC_TVDMA2TCMP, tc);
 	writel(value, ioaddr + XGMAC_DMA_CH_TX_CONTROL(dwxgmac_addrs, chan));
 }
 
@@ -243,28 +208,19 @@ void dw25gmac_dma_map_rx_offline_chan(struct stmmac_priv *priv,
 				      u32 chan)
 {
 	const struct dwxgmac_addrs *dwxgmac_addrs = priv->plat->dwxgmac_addrs;
-	u32 tc_pdma_map, tc_vdma_map, numtc;
+	u32 tc = (dma_cfg->rx_pdma_custom_map ? dma_cfg->rx_pdma_map[chan] : chan);
 	u32 value;
-
-	numtc = priv->dma_cap.numtc;
-	if (!numtc) {
-		dev_err(priv->device, "numtc is 0, cannot compute TC mapping\n");
-		return;
-	}
-
-	tc_pdma_map = (dma_cfg->rx_pdma_custom_map ? dma_cfg->rx_pdma_map[chan] : chan % numtc);
-	tc_vdma_map = (dma_cfg->rx_vdma_custom_map ? dma_cfg->rx_vdma_map[chan] : chan % numtc);
 
 	/* PDMA to TC mapping for channels that are offline */
 	value = rd_dma_ch_ind(ioaddr, MODE_RXEXTCFG, chan);
 	value &= ~XXVGMAC_RP2TCMP;
-	value |= FIELD_PREP(XXVGMAC_RP2TCMP, tc_pdma_map);
+	value |= FIELD_PREP(XXVGMAC_RP2TCMP, tc);
 	wr_dma_ch_ind(ioaddr, MODE_RXEXTCFG, chan, value);
 
 	/* VDMA to TC mapping for channels that are offline */
 	value = readl(ioaddr + XGMAC_DMA_CH_RX_CONTROL(dwxgmac_addrs, chan));
 	value &= ~XXVGMAC_RVDMA2TCMP;
-	value |= FIELD_PREP(XXVGMAC_RVDMA2TCMP, tc_vdma_map);
+	value |= FIELD_PREP(XXVGMAC_RVDMA2TCMP, tc);
 	writel(value, ioaddr + XGMAC_DMA_CH_RX_CONTROL(dwxgmac_addrs, chan));
 }
 

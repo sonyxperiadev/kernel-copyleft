@@ -1,9 +1,13 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2025 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Memory allocator for buffers shared with the TrustZone.
  *
  * Copyright (C) 2023-2024 Linaro Ltd.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #define pr_fmt(fmt) "qcom_tzmem: [%s][%d]: " fmt, __func__, __LINE__
@@ -62,9 +66,6 @@ bool qcom_tzmem_get_status(void)
 
 static int qcom_tzmem_init(void)
 {
-	dev_warn(qcom_tzmem_dev,
-		 "MODE_GENERIC active: SHM bridge *NOT* enabled. Enable QCOM_TZMEM_MODE_SHMBRIDGE for security.\n");
-
 	return 0;
 }
 
@@ -85,33 +86,6 @@ static void qcom_tzmem_cleanup_area(struct qcom_tzmem_area *area)
 
 #define QCOM_SHM_BRIDGE_NUM_VM_SHIFT 9
 #define QCOM_SHM_BRIDGE_SELF_OWNER_BIT 1
-#define QCOM_SHM_BRIDGE_PERM_BITS 3
-#define QCOM_SHM_BRIDGE_VM_BITS 16
-#define QCOM_SHM_BRIDGE_VM_MASK 0xFFFF
-#define QCOM_SHM_BRIDGE_PERM_MASK 0x7
-
-/* ns_vmids */
-#define UPDATE_NS_VMIDS(ns_vmids, id)	\
-			(((u64)(ns_vmids) << QCOM_SHM_BRIDGE_VM_BITS) \
-			| ((u64)(id) & QCOM_SHM_BRIDGE_VM_MASK))
-
-/* ns_perms */
-#define UPDATE_NS_PERMS(ns_perms, perm)	\
-			(((u64)(ns_perms) << QCOM_SHM_BRIDGE_PERM_BITS) \
-			| ((u64)(perm) & QCOM_SHM_BRIDGE_PERM_MASK))
-
-/* pfn_and_ns_perm_flags = paddr | ns_perms */
-#define UPDATE_PFN_AND_NS_PERM_FLAGS(paddr, ns_perms)	\
-			((u64)(paddr) | (ns_perms))
-
-
-/* ipfn_and_s_perm_flags = ipaddr | tz_perm */
-#define UPDATE_IPFN_AND_S_PERM_FLAGS(ipaddr, tz_perm)	\
-			((u64)(ipaddr) | (u64)(tz_perm))
-
-/* size_and_flags when dest_vm is not HYP */
-#define UPDATE_SIZE_AND_FLAGS(size, destnum)	\
-			((size) | (destnum) << QCOM_SHM_BRIDGE_NUM_VM_SHIFT)
 
 struct bridge_list {
 	struct list_head head;
@@ -121,11 +95,6 @@ struct bridge_list {
 struct bridge_list_entry {
 	struct list_head list;
 	phys_addr_t paddr;
-	uint64_t pfn_and_ns_perm;
-	uint64_t ipfn_and_s_perm;
-	uint64_t size_and_flags;
-	uint64_t vmid;
-	enum bridge_owner owner;
 	uint64_t handle;
 	int32_t ref_count;
 };
@@ -170,11 +139,6 @@ notsupp:
 }
 
 static int32_t qcom_tzmem_list_add_locked(phys_addr_t paddr,
-						uint64_t pfn_and_ns_perm,
-						uint64_t ipfn_and_s_perm,
-						uint64_t size_and_flags,
-						uint64_t vmid,
-						enum bridge_owner owner,
 						uint64_t handle)
 {
 	struct bridge_list_entry *entry;
@@ -184,11 +148,6 @@ static int32_t qcom_tzmem_list_add_locked(phys_addr_t paddr,
 		return -ENOMEM;
 	entry->handle = handle;
 	entry->paddr = paddr;
-	entry->pfn_and_ns_perm = pfn_and_ns_perm;
-	entry->ipfn_and_s_perm = ipfn_and_s_perm;
-	entry->size_and_flags = size_and_flags;
-	entry->vmid = vmid;
-	entry->owner = owner;
 	entry->ref_count = 0;
 
 	list_add_tail(&entry->list, &bridge_list_head.head);
@@ -287,24 +246,6 @@ static int32_t qcom_tzmem_list_inc_refcount_locked(phys_addr_t paddr, uint64_t *
 	return ret;
 }
 
-static void qcom_tzmem_restore_handles(void)
-{
-	mutex_lock(&bridge_list_head.lock);
-	struct bridge_list_entry *entry, *next;
-
-	list_for_each_entry_safe(entry, next, &bridge_list_head.head, list) {
-		if (entry->owner == SELF)
-			qcom_scm_shm_bridge_create(entry->pfn_and_ns_perm, entry->ipfn_and_s_perm,
-						entry->size_and_flags, entry->vmid,
-						&entry->handle);
-		else if (entry->owner == OTHERS) {
-			list_del(&entry->list);
-			kfree(entry);
-		}
-	}
-	mutex_unlock(&bridge_list_head.lock);
-}
-
 static int32_t qcom_tzmem_query_locked(phys_addr_t paddr)
 {
 	struct bridge_list_entry *entry;
@@ -340,12 +281,8 @@ EXPORT_SYMBOL_GPL(qcom_tzmem_query);
  * qcom_tzmem_shm_bridge_create_with_vmid() - Create a SHM bridge.
  * @paddr: Physical address of the memory to share.
  * @size: Size of the memory to share.
- * @ns_vmid_list: List of secondary VMs
- * @ns_vm_perm_list: List of individual permissions of secondary VMs
- * @ns_vmid_num: number of non-secure VMs
- * @tz_perm: QTEE permissions
- * @owner: Owner of memory.
  * @handle: Handle to the SHM bridge.
+ * @vmid: Register bridge with vmid passed as argument
  *
  * On platforms that support SHM bridge, this function creates a SHM bridge
  * for the given memory region with QTEE. The handle returned by this function
@@ -353,13 +290,10 @@ EXPORT_SYMBOL_GPL(qcom_tzmem_query);
  *
  * Return: On success, returns 0; on failure, returns < 0.
  */
-int qcom_tzmem_shm_bridge_create_with_vmid(phys_addr_t paddr, size_t size, u32 *ns_vmid_list,
-	u32 *ns_vm_perm_list, u32 ns_vmid_num, u32 tz_perm, enum bridge_owner owner, u64 *handle)
+int qcom_tzmem_shm_bridge_create_with_vmid(phys_addr_t paddr, size_t size, u32 vmid, u64 *handle)
 {
 	u64 pfn_and_ns_perm, ipfn_and_s_perm, size_and_flags;
-	u64 ns_perms = 0;
-	u64 ns_vmids = 0;
-	int ret, i;
+	int ret;
 
 	if (!qcom_tzmem_using_shm_bridge)
 		return 0;
@@ -377,25 +311,21 @@ int qcom_tzmem_shm_bridge_create_with_vmid(phys_addr_t paddr, size_t size, u32 *
 		goto bridge_exist;
 	}
 
-	for (i = 0; i < ns_vmid_num; i++) {
-		ns_perms = UPDATE_NS_PERMS(ns_perms, ns_vm_perm_list[i]);
-		ns_vmids = UPDATE_NS_VMIDS(ns_vmids, ns_vmid_list[i]);
+	pfn_and_ns_perm = paddr;
+	ipfn_and_s_perm = paddr | QCOM_SCM_PERM_RW;
+
+	if (vmid) {
+		size_and_flags = size | (1 << QCOM_SHM_BRIDGE_NUM_VM_SHIFT);
+		pfn_and_ns_perm |= QCOM_SCM_PERM_RW;
+	} else {
+		size_and_flags  = size  | (QCOM_SHM_BRIDGE_SELF_OWNER_BIT << 1)
+					| (QCOM_SCM_PERM_RW << 2);
 	}
 
-	pfn_and_ns_perm = UPDATE_PFN_AND_NS_PERM_FLAGS(paddr, ns_perms);
-	ipfn_and_s_perm = UPDATE_IPFN_AND_S_PERM_FLAGS(paddr, tz_perm);
-	size_and_flags = UPDATE_SIZE_AND_FLAGS(size, ns_vmid_num);
-
-
-	if (ns_vmid_num == 0) {
-		size_and_flags  |= (QCOM_SHM_BRIDGE_SELF_OWNER_BIT << 1)
-				| (QCOM_SCM_PERM_RW << 2);
-	}
-
-	pr_debug("PA|PERM: %#llx, IPA|PERM: %#llx, size: %#zx, size|flags: %#llx, ns_perms: %#llx, ns_vmids: %#llx\n",
-		pfn_and_ns_perm, ipfn_and_s_perm, size, size_and_flags, ns_perms, ns_vmids);
+	pr_debug("PA|PERM: %#llx, IPA|PERM: %#llx, size: %#zx, size|flags: %#llx, vmid: %#x\n",
+		 pfn_and_ns_perm, ipfn_and_s_perm, size, size_and_flags, vmid);
 	ret = qcom_scm_shm_bridge_create(pfn_and_ns_perm, ipfn_and_s_perm,
-					 size_and_flags, ns_vmids, handle);
+					 size_and_flags, vmid, handle);
 
 	if (ret) {
 		dev_err(qcom_tzmem_dev,
@@ -406,8 +336,7 @@ int qcom_tzmem_shm_bridge_create_with_vmid(phys_addr_t paddr, size_t size, u32 *
 		goto exit;
 	}
 
-	ret = qcom_tzmem_list_add_locked(paddr, pfn_and_ns_perm, ipfn_and_s_perm,
-					size_and_flags, ns_vmids, owner, *handle);
+	ret = qcom_tzmem_list_add_locked(paddr, *handle);
 bridge_exist:
 	ret = qcom_tzmem_list_inc_refcount_locked(paddr, handle);
 exit:
@@ -429,8 +358,7 @@ exit:
  */
 int qcom_tzmem_shm_bridge_create(phys_addr_t paddr, size_t size, u64 *handle)
 {
-	return qcom_tzmem_shm_bridge_create_with_vmid(paddr, size, NULL, NULL, 0,
-			QCOM_SCM_PERM_RW, SELF, handle);
+	return qcom_tzmem_shm_bridge_create_with_vmid(paddr, size, 0, handle);
 }
 EXPORT_SYMBOL_GPL(qcom_tzmem_shm_bridge_create);
 
@@ -484,46 +412,6 @@ static void qcom_tzmem_cleanup_area(struct qcom_tzmem_area *area)
 
 	qcom_tzmem_shm_bridge_delete(*handle);
 	kfree(handle);
-}
-
-int qcom_tzmem_pm_freeze(void)
-{
-	qcom_tzmem_using_shm_bridge = false;
-	return 0;
-}
-
-int qcom_tzmem_pm_restore(void)
-{
-	const char *const *platform;
-	int ret;
-
-	for (platform = qcom_tzmem_blacklist; *platform; platform++) {
-		if (of_machine_is_compatible(*platform))
-			return 0;
-	}
-
-	ret = qcom_scm_shm_bridge_enable();
-	if (ret) {
-		if (ret == -EOPNOTSUPP)
-			return 0;
-		return ret;
-	}
-	qcom_tzmem_restore_handles();
-	qcom_tzmem_using_shm_bridge = true;
-	return 0;
-}
-
-int qcom_tzmem_pm_thaw(void)
-{
-	const char *const *platform;
-
-	for (platform = qcom_tzmem_blacklist; *platform; platform++) {
-		if (of_machine_is_compatible(*platform))
-			return 0;
-	}
-
-	qcom_tzmem_using_shm_bridge = true;
-	return 0;
 }
 
 #endif /* CONFIG_QCOM_TZMEM_MODE_SHMBRIDGE */
@@ -874,14 +762,14 @@ EXPORT_SYMBOL_GPL(qcom_tzmem_to_phys);
 /* cache clean operation for buffer sub-allocated from pool */
 void qcom_tzmem_flush_shm_buf(phys_addr_t paddr, size_t size)
 {
-	dma_sync_single_for_device(qcom_tzmem_dev, paddr, size, DMA_TO_DEVICE);
+	dma_sync_single_for_cpu(qcom_tzmem_dev, paddr, size, DMA_FROM_DEVICE);
 }
 EXPORT_SYMBOL_GPL(qcom_tzmem_flush_shm_buf);
 
 /* cache invalidation operation for buffer sub-allocated from pool */
 void qcom_tzmem_inv_shm_buf(phys_addr_t paddr, size_t size)
 {
-	dma_sync_single_for_cpu(qcom_tzmem_dev, paddr, size, DMA_FROM_DEVICE);
+	dma_sync_single_for_device(qcom_tzmem_dev, paddr, size, DMA_TO_DEVICE);
 }
 EXPORT_SYMBOL_GPL(qcom_tzmem_inv_shm_buf);
 
@@ -907,6 +795,3 @@ EXPORT_SYMBOL_GPL(qcom_tzmem_enable);
 MODULE_DESCRIPTION("TrustZone memory allocator for Qualcomm firmware drivers");
 MODULE_AUTHOR("Bartosz Golaszewski <bartosz.golaszewski@linaro.org>");
 MODULE_LICENSE("GPL");
-#if IS_ENABLED(CONFIG_QCOM_TZMEM_FFA)
-MODULE_SOFTDEP("pre: arm_ffa arm_ffa_transport");
-#endif

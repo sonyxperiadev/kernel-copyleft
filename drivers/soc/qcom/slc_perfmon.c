@@ -33,22 +33,16 @@
 #define SCMI_PAYLOAD_SIZE		(5 * sizeof(struct filter_config))
 
 /* TRP offsets */
-#define TRP_CAP_COUNTERS_DUMP_CFG(v, b)	((v == VERSION_5 && b == BRANCH_1) ? (0x452A4) : (0x48100))
+#define TRP_CAP_COUNTERS_DUMP_CFG	(0x48100)
 #define TRP_SCID_n_STATUS(n)		(0x000004 + (0x1000 * (n)))
-#define TRP_SCID_n_STATUS1(n)		(0x00001C + (0x1000 * (n)))
 #define TRP_SCID_STATUS_CURRENT_CAP_SHIFT	(16)
 #define TRP_SCID_STATUS_CURRENT_CAP_MASK	GENMASK(TRP_SCID_STATUS_CURRENT_CAP_SHIFT + 15,\
 						TRP_SCID_STATUS_CURRENT_CAP_SHIFT)
-#define TRP_SCID_STATUS1_CURRENT_CAP_SHIFT	(0)
-#define TRP_SCID_STATUS1_CURRENT_CAP_MASK	GENMASK(TRP_SCID_STATUS1_CURRENT_CAP_SHIFT + 18,\
-						TRP_SCID_STATUS1_CURRENT_CAP_SHIFT)
 #define TRP_SCID_STATUS_ACTIVE_SHIFT	(0)
 #define TRP_SCID_STATUS_ACTIVE_MASK	GENMASK(TRP_SCID_STATUS_ACTIVE_SHIFT + 0,\
 						TRP_SCID_STATUS_ACTIVE_SHIFT)
 
-#define VERSION_5			5
 #define VERSION_6			6
-#define BRANCH_1			1
 #define FLTR_TYPE_LEN			70
 
 /**
@@ -906,7 +900,7 @@ static ssize_t perfmon_counter_dump_show(struct device *dev, struct device_attri
 	ssize_t cnt = 0;
 	int retry_cnt = 0, match_seq_cnt = 0;
 	u32 port, event, match_seq, num_cntr;
-	u64 current_time = 0, dump;
+	u64 current_time, dump;
 	struct platform_device *pdev = container_of(dev, struct platform_device, dev);
 	struct slc_perfmon_private *slc_priv = platform_get_drvdata(pdev);
 
@@ -971,38 +965,24 @@ static ssize_t perfmon_scid_status_show(struct device *dev, struct device_attrib
 	unsigned long total;
 	struct platform_device *pdev = container_of(dev, struct platform_device, dev);
 	struct slc_perfmon_private *slc_priv = platform_get_drvdata(pdev);
-	struct slc_version version = slc_priv->info_attr->version;
-	u32 dump_cfg_offset = TRP_CAP_COUNTERS_DUMP_CFG(version.major, version.branch);
 
 	max_scid = slc_priv->perf_info_attr->filter_max_match[SCID];
 	if (slc_priv->scid_status_trigger) {
-		regmap_read(slc_priv->slc_bcast_map, dump_cfg_offset, &snap_reg_val);
-		regmap_write(slc_priv->slc_bcast_map, dump_cfg_offset, 0);
-		regmap_write(slc_priv->slc_bcast_map, dump_cfg_offset, 1);
-		regmap_write(slc_priv->slc_bcast_map, dump_cfg_offset, 0);
+		regmap_read(slc_priv->slc_bcast_map, TRP_CAP_COUNTERS_DUMP_CFG, &snap_reg_val);
+		regmap_write(slc_priv->slc_bcast_map, TRP_CAP_COUNTERS_DUMP_CFG, 0);
+		regmap_write(slc_priv->slc_bcast_map, TRP_CAP_COUNTERS_DUMP_CFG, 1);
+		regmap_write(slc_priv->slc_bcast_map, TRP_CAP_COUNTERS_DUMP_CFG, 0);
 	}
 
 	for (i = 0; i < max_scid; i++) {
 		total = 0;
-		if (version.major == VERSION_5 && version.branch == BRANCH_1)
-			offset = TRP_SCID_n_STATUS1(i);
-		else
-			offset = TRP_SCID_n_STATUS(i);
-
+		offset = TRP_SCID_n_STATUS(i);
 		for (j = 0; j < slc_priv->info_attr->mc_ch.channels; j++) {
 			regmap_read(slc_priv->slc_maps[j], offset, &val);
-
-			if (version.major == VERSION_5 && version.branch == BRANCH_1)
-				val = (val & TRP_SCID_STATUS1_CURRENT_CAP_MASK) >>
-					TRP_SCID_STATUS1_CURRENT_CAP_SHIFT;
-			else
-				val = (val & TRP_SCID_STATUS_CURRENT_CAP_MASK) >>
-					TRP_SCID_STATUS_CURRENT_CAP_SHIFT;
-
+			val = (val & TRP_SCID_STATUS_CURRENT_CAP_MASK) >>
+				TRP_SCID_STATUS_CURRENT_CAP_SHIFT;
 			total += val;
 		}
-
-		offset = TRP_SCID_n_STATUS(i);
 
 		regmap_read(slc_priv->slc_bcast_map, offset, &val);
 		if (val & TRP_SCID_STATUS_ACTIVE_MASK)
@@ -1016,7 +996,7 @@ static ssize_t perfmon_scid_status_show(struct device *dev, struct device_attrib
 	}
 
 	if (slc_priv->scid_status_trigger)
-		regmap_write(slc_priv->slc_bcast_map, dump_cfg_offset, snap_reg_val);
+		regmap_write(slc_priv->slc_bcast_map, TRP_CAP_COUNTERS_DUMP_CFG, snap_reg_val);
 
 	return cnt;
 }

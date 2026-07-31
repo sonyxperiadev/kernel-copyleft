@@ -77,8 +77,6 @@ hab_vchan_free(struct kref *ref)
 		list_del(&message->node);
 		hab_msg_free(message);
 	}
-	atomic_sub(vchan->rx_pending_sz, &vchan->pchan->rx_pending_sz);
-	atomic_sub(vchan->rx_pending_cnt, &vchan->pchan->rx_pending_cnt);
 	hab_spin_unlock(&vchan->rx_lock, irqs_disabled);
 
 	/* release vchan from pchan. no more msg for this vchan */

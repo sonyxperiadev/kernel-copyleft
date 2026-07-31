@@ -43,15 +43,6 @@ config POWER_RESET_QCOM_REBOOT_REASON
 config REBOOT_MODE
 	tristate
 
-config POWER_RESET_QCOM
-        tristate "Qualcomm MSM power-off driver"
-        depends on ARCH_QCOM
-        help
-          Power off and restart support for Qualcomm boards.
-          If you have a Qualcomm board and need support for restart
-          driver, say Y.
-          If unsure, say N.
-
 config POWER_RESET_QCOM_VM
         tristate "Qualcomm Technologies, Inc. MSM VM power-off driver"
         depends on OF

@@ -29,7 +29,6 @@
 #define TM_PERSIST_CTRL			0x0148
 #define TM_PERSIST_MAX_STATUS		0x014c
 #define TM_PERSIST_MIN_STATUS		0x0150
-#define TM_COLD_INT_STATUS_OFF		0x00e0
 
 /* v2.x: 8996, 8998, sdm845 */
 
@@ -114,9 +113,6 @@ static const struct reg_field tsens_v2_regfields[MAX_REGFIELDS] = {
 	REG_FIELD_FOR_EACH_SENSOR16(CRITICAL_STATUS, TM_Sn_STATUS_OFF, 19,  19),
 	REG_FIELD_FOR_EACH_SENSOR16(MAX_STATUS,      TM_Sn_STATUS_OFF, 20,  20),
 
-	/* COLD INTERRUPT STATUS */
-	[COLD_STATUS] = REG_FIELD(TM_COLD_INT_STATUS_OFF, 0, 0),
-
 	/* TRDY: 1=ready, 0=in progress */
 	[TRDY] = REG_FIELD(TM_TRDY_OFF, 0, 0),
 };
@@ -124,7 +120,6 @@ static const struct reg_field tsens_v2_regfields[MAX_REGFIELDS] = {
 static const struct tsens_ops ops_generic_v2 = {
 	.init		= init_common,
 	.get_temp	= get_temp_tsens_valid,
-	.get_cold_status  = get_cold_int_status,
 	.suspend = tsens_v2_tsens_suspend,
 	.resume		= tsens_resume_common,
 	.freeze = tsens_v2_tsens_freeze,

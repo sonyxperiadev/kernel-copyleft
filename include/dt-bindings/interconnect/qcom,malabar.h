@@ -34,7 +34,6 @@
 #define MASTER_SDCC_2				25
 #define MASTER_UFS_MEM				26
 #define MASTER_USB3				27
-#define MASTER_QDSS_BAM				28
 #define SLAVE_EBI_CH0				512
 #define BIMC_SNOC_SLV				513
 #define SLAVE_QUP_CORE_0			514
@@ -50,7 +49,7 @@
 #define SLAVE_RBCPR_MX_CFG			524
 #define SLAVE_CRYPTO_0_CFG			525
 #define SLAVE_DDR_PHY_CFG			526
-#define SLAVE_DDR_SS_CFG			527
+#define SLAVE_DDR_SS_CFG			27
 #define SLAVE_DISPLAY_CFG			528
 #define SLAVE_DISPLAY_THROTTLE_CFG		529
 #define SLAVE_GPU_CFG				530

@@ -21,7 +21,6 @@ blocklist kheaders
 blocklist limits_stat
 blocklist lkdtm
 blocklist llcc_perfmon
-blocklist slc_perfmon
 blocklist locktorture
 blocklist m88rs6000t
 blocklist max2165

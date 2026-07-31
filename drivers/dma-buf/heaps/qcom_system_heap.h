@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _QCOM_SYSTEM_HEAP_H
@@ -24,8 +24,7 @@ void qcom_system_heap_free(struct qcom_sg_buffer *buffer);
 struct page *qcom_sys_heap_alloc_largest_available(struct dynamic_page_pool **pools,
 						   unsigned long size,
 						   unsigned int max_order,
-						   bool movable,
-						   bool alloc_reclaim);
+						   bool movable);
 int system_qcom_sg_buffer_alloc(struct dma_heap *heap,
 				struct qcom_sg_buffer *buffer,
 				unsigned long len,
@@ -47,8 +46,7 @@ static inline void qcom_system_heap_free(struct qcom_sg_buffer *buffer)
 static inline struct page *qcom_sys_heap_alloc_largest_available(struct dynamic_page_pool **pools,
 								 unsigned long size,
 								 unsigned int max_order,
-								 bool movable,
-								 bool alloc_reclaim)
+								 bool movable)
 {
 	return ERR_PTR(-EOPNOTSUPP);
 }

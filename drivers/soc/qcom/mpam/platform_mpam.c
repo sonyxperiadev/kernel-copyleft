@@ -48,13 +48,13 @@ static ssize_t platform_mpam_schemata_show(struct config_item *item,
 	size_t len = 0;
 	struct platform_mpam_item *pm_item = get_pm_item(item);
 
-	len = scnprintf(page, SZ_4K, "gear=%d\n",
+	len = scnprintf(page, PAGE_SIZE, "gear=%d\n",
 		pm_item->cfg->platform_mpam_gear);
 
 	if (pm_item->bw_cfg) {
 		qcom_mpam_get_bw_limit_rpmsg();
 		len -= 1;
-		len += scnprintf(page + len, SZ_4K - len,
+		len += scnprintf(page + len, PAGE_SIZE - len,
 			",limit_ratio=%d,limit_mbps=%d\n",
 			pm_item->bw_cfg->limit_ratio,
 			pm_item->bw_cfg->limit_ratio *
@@ -112,7 +112,7 @@ CONFIGFS_ATTR(platform_mpam_, schemata);
 static ssize_t platform_mpam_enable_monitor_show(struct config_item *item,
 		char *page)
 {
-	return scnprintf(page, SZ_4K, "%s\n",
+	return scnprintf(page, PAGE_SIZE, "%s\n",
 		(get_pm_item(item)->monitor_enabled) ? "enabled" : "disabled");
 }
 
@@ -178,12 +178,12 @@ static ssize_t platform_mpam_monitor_data_show(struct config_item *item,
 			(match_seq_cnt++ < MPAM_MAX_MATCH_SEQ_RETRY));
 
 		if (match_seq_cnt == MPAM_MAX_MATCH_SEQ_RETRY)
-			return scnprintf(page, SZ_4K, "get monitor data failed\n");
+			return scnprintf(page, PAGE_SIZE, "get monitor data failed\n");
 
-		return scnprintf(page, SZ_4K, "timestamp=%llu,byte_cnt=%llu\n",
+		return scnprintf(page, PAGE_SIZE, "timestamp=%llu,byte_cnt=%llu\n",
 			timestamp, byte_cnt);
 	} else
-		return scnprintf(page, SZ_4K, "monitor not enabled\n");
+		return scnprintf(page, PAGE_SIZE, "monitor not enabled\n");
 }
 CONFIGFS_ATTR_RO(platform_mpam_, monitor_data);
 
@@ -194,7 +194,7 @@ static ssize_t platform_mpam_available_gear_show(struct config_item *item,
 	size_t len = 0;
 
 	for (i = 0; i < support_gear_cnt; i++) {
-		len += scnprintf(page + len, SZ_4K - len,
+		len += scnprintf(page + len, PAGE_SIZE - len,
 			"%d - %s\n", support_gears[i].gear_id,
 			support_gears[i].gear_name);
 	}

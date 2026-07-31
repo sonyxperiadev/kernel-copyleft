@@ -82,7 +82,7 @@ static void cpu_mpam_partition_transfer(int old, int new)
 
 static ssize_t cpu_mpam_part_id_show(struct config_item *item, char *page)
 {
-	return scnprintf(page, SZ_4K, "%d\n", get_part_id(item));
+	return scnprintf(page, PAGE_SIZE, "%d\n", get_part_id(item));
 }
 CONFIGFS_ATTR_RO(cpu_mpam_, part_id);
 
@@ -177,12 +177,12 @@ static ssize_t cpu_mpam_schemata_show(struct config_item *item,
 		msc_id = mpam_mscs[i].msc_id;
 		mpam_val = &partition->val[msc_id];
 		if (can_monitor)
-			ret += scnprintf(page + ret, SZ_4K,
+			ret += scnprintf(page + ret, PAGE_SIZE,
 				"%s:cmax=%d,cpbm=0x%x,prio=%d,slc_partid=%d\n",
 				mpam_mscs[i].msc_name, mpam_val->capacity,
 				mpam_val->cpbm, mpam_val->dspri, mpam_val->slc_partition_id);
 		else
-			ret += scnprintf(page + ret, SZ_4K, "%s:cpbm=0x%x,slc_partid=%d\n",
+			ret += scnprintf(page + ret, PAGE_SIZE, "%s:cpbm=0x%x,slc_partid=%d\n",
 				mpam_mscs[i].msc_name, mpam_val->cpbm, mpam_val->slc_partition_id);
 	}
 
@@ -248,10 +248,10 @@ static ssize_t cpu_mpam_tasks_show(struct config_item *item, char *page)
 	for_each_process_thread(p, t) {
 		wts = (struct walt_task_struct *)android_task_vendor_data(t);
 		if (wts->mpam_part_id == part_id)
-			len += scnprintf(page + len, SZ_4K - len, "%d ", t->pid);
+			len += scnprintf(page + len, PAGE_SIZE - len, "%d ", t->pid);
 	}
 	rcu_read_unlock();
-	len += scnprintf(page + len, SZ_4K - len, "\n");
+	len += scnprintf(page + len, PAGE_SIZE - len, "\n");
 
 	return len;
 }
@@ -329,7 +329,7 @@ static ssize_t cpu_mpam_enable_monitor_show(struct config_item *item,
 	int monitor_id;
 
 	monitor_id = get_monitor_id(item);
-	return scnprintf(page, SZ_4K, "%s\n", (monitor_id == INT_MAX) ?
+	return scnprintf(page, PAGE_SIZE, "%s\n", (monitor_id == INT_MAX) ?
 		"disabled" : "enabled");
 }
 
@@ -399,14 +399,14 @@ static ssize_t cpu_mpam_monitor_data_show(struct config_item *item,
 				csu_value = mpam_mon_data->csu_mon_value[monitor_id];
 				mbw_value = mpam_mon_data->mbw_mon_value[monitor_id];
 			} while (capture_status != mpam_mon_data->capture_status);
-			len += scnprintf(page + len, SZ_4K - len,
+			len += scnprintf(page + len, PAGE_SIZE - len,
 				"%s:timestamp=%llu,csu=%u,mbwu=%llu\n",
 				mpam_mscs[i]. msc_name, timestamp,
 				csu_value, mbw_value);
 		}
 		return len;
 	} else
-		return scnprintf(page, SZ_4K, "monitor not enabled\n");
+		return scnprintf(page, PAGE_SIZE, "monitor not enabled\n");
 }
 CONFIGFS_ATTR_RO(cpu_mpam_, monitor_data);
 
@@ -438,7 +438,7 @@ static ssize_t cpu_mpam_monitors_data_show(struct config_item *item,
 	for (i = 0; i < mpam_msc_cnt; i++) {
 		mscid = mpam_mscs[i].msc_id;
 		mpam_mon_data = &mpam_mon_base[mscid];
-		len += scnprintf(page + len, SZ_4K - len, "%s:\n", mpam_mscs[i].msc_name);
+		len += scnprintf(page + len, PAGE_SIZE - len, "%s:\n", mpam_mscs[i].msc_name);
 		len_bak = len;
 		do {
 			while (unlikely((capture_status =
@@ -447,14 +447,14 @@ static ssize_t cpu_mpam_monitors_data_show(struct config_item *item,
 				retry_cnt++;
 			len = len_bak;
 			timestamp = mpam_mon_data->last_capture_time;
-			len += scnprintf(page + len, SZ_4K - len,
+			len += scnprintf(page + len, PAGE_SIZE - len,
 				"timestamp=%llu\n", timestamp);
 			for (j = 0; j < MONITOR_MAX; j++) {
 				if (monitor_enabled[j] == INT_MAX)
 					continue;
 				csu_value = mpam_mon_data->csu_mon_value[j];
 				mbw_value = mpam_mon_data->mbw_mon_value[j];
-				len += scnprintf(page + len, SZ_4K - len,
+				len += scnprintf(page + len, PAGE_SIZE - len,
 					"%d:csu=%u,mbwu=%llu\n",
 					monitor_enabled[j], csu_value, mbw_value);
 			}

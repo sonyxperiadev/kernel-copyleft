@@ -17,19 +17,11 @@
 #include <linux/panic_notifier.h>
 #include <linux/firmware/qcom/qcom_scm.h>
 #include <soc/qcom/minidump.h>
-#include <linux/regulator/consumer.h>
-#include <linux/of_device.h>
 
 enum qcom_download_dest {
 	QCOM_DOWNLOAD_DEST_UNKNOWN = -1,
 	QCOM_DOWNLOAD_DEST_QPST = 0,
 	QCOM_DOWNLOAD_DEST_EMMC = 2,
-};
-
-struct reg_info {
-	struct regulator *reg;
-	int uV;
-	int uA;
 };
 
 struct qcom_dload {
@@ -38,13 +30,7 @@ struct qcom_dload {
 	struct kobject kobj;
 
 	bool in_panic;
-	bool in_reboot_edl;
 	void __iomem *dload_dest_addr;
-
-	struct regulator *mmcx_supply;
-	struct reg_info *regs;
-	int reg_cnt;
-	struct device *dev;
 };
 
 #define to_qcom_dload(o) container_of(o, struct qcom_dload, kobj)
@@ -261,89 +247,6 @@ static struct attribute_group qcom_dload_attr_group = {
 	.attrs = qcom_dload_attrs,
 };
 
-static int poweroff_init_regulator(struct qcom_dload *poweroff)
-{
-	int len;
-	int i, rc;
-	char uv_ua[50];
-	u32 uv_ua_vals[2];
-	const char *reg_name;
-
-	poweroff->reg_cnt = of_property_count_strings(poweroff->dev->of_node,
-						  "reg-names");
-	if (poweroff->reg_cnt <= 0) {
-		pr_debug("poweroff: No regulators added!\n");
-		return 0;
-	}
-
-	poweroff->regs = devm_kzalloc(poweroff->dev,
-				  sizeof(struct reg_info) * poweroff->reg_cnt,
-				  GFP_KERNEL);
-	if (!poweroff->regs)
-		return -ENOMEM;
-
-	for (i = 0; i < poweroff->reg_cnt; i++) {
-		of_property_read_string_index(poweroff->dev->of_node, "reg-names",
-					      i, &reg_name);
-
-		poweroff->regs[i].reg = devm_regulator_get(poweroff->dev, reg_name);
-		if (IS_ERR(poweroff->regs[i].reg)) {
-			pr_err("poweroff: failed to get %s reg\n", reg_name);
-			return PTR_ERR(poweroff->regs[i].reg);
-		}
-
-		/* Read current(uA) and voltage(uV) value */
-		snprintf(uv_ua, sizeof(uv_ua), "%s-uV-uA", reg_name);
-		if (!of_find_property(poweroff->dev->of_node, uv_ua, &len))
-			continue;
-
-		rc = of_property_read_u32_array(poweroff->dev->of_node, uv_ua,
-						uv_ua_vals,
-						ARRAY_SIZE(uv_ua_vals));
-		if (rc) {
-			pr_err("poweroff: Failed to read uVuA value(rc:%d)\n", rc);
-			return rc;
-		}
-
-		if (uv_ua_vals[0] > 0)
-			poweroff->regs[i].uV = uv_ua_vals[0];
-		if (uv_ua_vals[1] > 0)
-			poweroff->regs[i].uA = uv_ua_vals[1];
-	}
-	return 0;
-}
-
-static void disable_regulators(struct qcom_dload *poweroff)
-{
-	int i;
-
-	for (i = (poweroff->reg_cnt - 1); i >= 0; i--) {
-		regulator_set_voltage(poweroff->regs[i].reg, 0, INT_MAX);
-		regulator_set_load(poweroff->regs[i].reg, 0);
-		regulator_disable(poweroff->regs[i].reg);
-	}
-}
-
-static int enable_regulators(struct qcom_dload *poweroff)
-{
-	int i, rc = 0;
-
-	for (i = 0; i < poweroff->reg_cnt; i++) {
-		regulator_set_voltage(poweroff->regs[i].reg, poweroff->regs[i].uV, INT_MAX);
-		regulator_set_load(poweroff->regs[i].reg, poweroff->regs[i].uA);
-		rc = regulator_enable(poweroff->regs[i].reg);
-		if (rc) {
-			pr_err("Regulator enable failed(rc:%d)\n", rc);
-			goto err_enable;
-		}
-	}
-	return rc;
-
-err_enable:
-	disable_regulators(poweroff);
-	return rc;
-}
-
 static int qcom_dload_panic(struct notifier_block *this, unsigned long event,
 			      void *ptr)
 {
@@ -361,21 +264,13 @@ static int qcom_dload_reboot(struct notifier_block *this, unsigned long event,
 	char *cmd = ptr;
 	struct qcom_dload *poweroff = container_of(this, struct qcom_dload,
 						     reboot_nb);
-	int ret;
+
 	/* Clean shutdown, disable dump mode to allow normal restart */
 	if (!poweroff->in_panic)
 		set_download_mode(QCOM_DOWNLOAD_NODUMP);
 
-	if (cmd && !strcmp(cmd, "edl")) {
-		poweroff->in_reboot_edl = true;
+	if (cmd && !strcmp(cmd, "edl"))
 		set_download_mode(QCOM_DOWNLOAD_EDL);
-		if (poweroff->in_reboot_edl) {
-			ret = enable_regulators(poweroff);
-			if (ret)
-				dev_err(poweroff->dev,
-					"Regulator enable failed(rc:%d)\n", ret);
-		}
-	}
 
 	if (current_download_mode != QCOM_DOWNLOAD_NODUMP)
 		reboot_mode = REBOOT_WARM;
@@ -411,7 +306,6 @@ static int qcom_dload_probe(struct platform_device *pdev)
 	if (!poweroff)
 		return -ENOMEM;
 
-	poweroff->dev = &pdev->dev;
 	ret = kobject_init_and_add(&poweroff->kobj, &qcom_dload_kobj_type,
 				   kernel_kobj, "dload");
 	if (ret) {
@@ -445,9 +339,6 @@ static int qcom_dload_probe(struct platform_device *pdev)
 	register_reboot_notifier(&poweroff->reboot_nb);
 
 	platform_set_drvdata(pdev, poweroff);
-	ret = poweroff_init_regulator(poweroff);
-	if (ret)
-		pr_err("poweroff_init_regulator failed.\n");
 
 	return 0;
 }
@@ -470,18 +361,11 @@ static const struct platform_device_id qcom_dload_id_match[] = {
 };
 MODULE_DEVICE_TABLE(platform, qcom_dload_id_match);
 
-static const struct of_device_id of_qcom_dload_match[] = {
-	{ .compatible = "qcom,dload-mode" },
-	{}
-};
-MODULE_DEVICE_TABLE(of, of_qcom_dload_match);
-
 static struct platform_driver qcom_dload_driver = {
 	.probe = qcom_dload_probe,
 	.remove = qcom_dload_remove,
 	.driver = {
 		.name = "qcom-dload-mode",
-		.of_match_table = of_match_ptr(of_qcom_dload_match),
 	},
 	.id_table = qcom_dload_id_match,
 };

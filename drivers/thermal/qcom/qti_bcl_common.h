@@ -91,11 +91,9 @@ struct bcl_device {
 	void				*ipc_log;
 	int				bcl_monitor_type;
 	bool				ibat_ccm_enabled;
-	bool				disable_vbat_lvl0_in_suspend;
 	bool				ibat_ccm_lando_enabled;
 	bool				ibat_use_qg_adc;
 	bool				no_bit_shift;
-	bool				vph_dynamic_thresh;
 	uint32_t			ibat_ext_range_factor;
 	struct mutex			stats_lock;
 	struct bcl_bpm_stats		bpm_stats;

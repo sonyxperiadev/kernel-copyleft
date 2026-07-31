@@ -98,15 +98,6 @@ config ARCH_YUPIK
 	  kernel that runs on this chipset or if you are unsure,
 	  say 'N' here.
 
-config ARCH_LAHAINA
-	bool "Enable Support for Qualcomm Technologies, Inc. LAHAINA"
-	depends on ARCH_QCOM
-	help
-	  This enables support for the Qualcomm Technologies,
-	  Inc.'s LAHAINA chipset. If you do not wish to build a
-	  kernel that runs on this chipset or if you are unsure,
-	  say 'N' here.
-
 config ARCH_BENGAL
 	bool "Enable Support for Qualcomm Technologies, Inc. BENGAL"
 	depends on ARCH_QCOM
@@ -186,33 +177,6 @@ config ARCH_PIKACHU
           chipset. If you do not wish to build a kernel that runs on this
           chipset or if you are unsure,
           say 'N' here.
-
-config ARCH_RAVELIN
-	bool "Enable Support for Qualcomm Technologies, Inc. RAVELIN"
-	depends on ARCH_QCOM
-	help
-	  This enables support for Qualcomm Technologies, Inc.'s
-	  RAVELIN chipset.
-	  If you do not wish to build a kernel that runs on this
-	  chipset or if you are unsure, say 'N' here.
-
-config ARCH_BOURTZI
-	bool "Enable Support for Qualcomm Technologies, Inc. BOURTZI"
-	depends on ARCH_QCOM
-	help
-	  This enables support for Qualcomm Technologies, Inc.'s
-	  BOURTZI chipset.
-	  If you do not wish to build a kernel that runs on this
-	  chipset or if you are unsure, say 'N' here.
-
-config ARCH_SCUBA
-	bool "Enable Support for Qualcomm Technologies, Inc. SCUBA"
-	depends on ARCH_QCOM
-	help
-	  This enables support for Qualcomm Technologies, Inc.'s
-	  SCUBA chipset.
-	  If you do not wish to build a kernel that runs on this
-	  chipset or if you are unsure, say 'N' here.
 
 config ARCH_SHIKRA
         bool "Enable support for Qualcomm Technologies, Inc. SHIKRA"

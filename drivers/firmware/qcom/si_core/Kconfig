@@ -10,19 +10,6 @@ config QCOM_SI_CORE
 	  to QTEE and TAs. The SI-CORE implements the necessary marshaling of
 	  messages with QTEE.
 
-config QCOM_SCM_INVOKE_LEGACY
-	bool "Use Legacy SCM Invoke Interface"
-	depends on QCOM_SI_CORE
-	default y if ARM && !ARM64
-	help
-	  Use legacy SCM invoke instead of default cache-coherent
-	  SCM invoke interface. Legacy SCM interface requires
-	  flushing and invalidating of in-out buffers
-	  before and after an SCM call is made.
-
-	  Enable this only for ARMv7 or platforms lacking cache-coherent
-	  SCM support.
-
 config QCOM_SI_CORE_WQ
 	bool "Use direct invocation for RELEASE requests"
 	depends on QCOM_SI_CORE

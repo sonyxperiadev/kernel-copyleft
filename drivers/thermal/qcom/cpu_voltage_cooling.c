@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #define pr_fmt(fmt) "%s:%s " fmt, KBUILD_MODNAME, __func__
 
@@ -461,7 +461,7 @@ static int cc_cooling_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static void cc_cooling_remove(struct platform_device *pdev)
+static int cc_cooling_remove(struct platform_device *pdev)
 {
 	struct cc_limits_data *cc_cdev, *cc_next;
 	int idx = 0;
@@ -475,6 +475,7 @@ static void cc_cooling_remove(struct platform_device *pdev)
 		kfree(cc_cdev);
 	}
 	mutex_unlock(&cc_list_lock);
+	return 0;
 }
 
 static const struct of_device_id cc_cooling_device_match[] = {

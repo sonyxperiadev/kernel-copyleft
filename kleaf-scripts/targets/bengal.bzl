@@ -14,8 +14,8 @@ def define_bengal():
         board_bootconfig_extras = []
         kernel_vendor_cmdline_extras = ["bootconfig"]
 
+        board_bootconfig_extras += ["androidboot.serialconsole=1"]
         if variant == "consolidate":
-            board_bootconfig_extras += ["androidboot.serialconsole=1"]
             board_kernel_cmdline_extras += [
                 # do not sort
                 "console=ttyMSM0,115200n8",

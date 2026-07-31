@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) __FILE__ ": " fmt
@@ -11,7 +11,6 @@
 #include <linux/spinlock.h>
 #include <soc/qcom/qseecom_scm.h>
 #include <linux/arm-smccc.h>
-#include <linux/list.h>
 
 #include "qcom_scm.h"
 
@@ -27,122 +26,44 @@ struct smc_params_s {
 	uint64_t args[MAX_SCM_ARGS];
 } __packed;
 
-struct hab_channel {
-	struct list_head node;
-	uint32_t handle;
-	bool occupied;
-};
+static u32 nonatomic_handle;
+static u32 atomic_handle;
+static bool opened;
 
-static uint32_t atomic_handle;
-static LIST_HEAD(nonatomic_handle_pool);
-static DEFINE_SPINLOCK(nonatomic_handle_lock);
-
-int scm_qcpe_hab_open_atomic(void)
+int scm_qcpe_hab_open(void)
 {
 	int ret;
 
-	if (atomic_handle != 0)
-		return 0;
-
-	ret = habmm_socket_open(&atomic_handle, MM_QCPE_VM1, 0, 0);
-
-	if (ret) {
-		pr_err("Failed to open atomic HAB channel, ret = %d\n", ret);
-		atomic_handle = 0;
-		return ret;
-	}
-
-	pr_info("Atomic HAB channel established\n");
-	return 0;
-}
-EXPORT_SYMBOL_GPL(scm_qcpe_hab_open_atomic);
-
-int scm_qcpe_hab_open_nonatomic(uint32_t nchan)
-{
-	int ret;
-	int handle;
-	struct hab_channel *channel = NULL;
-
-	/* Compatibility: fall back to single channel in case BE does not support WQ */
-	if (nchan == 0)
-		nchan = 1;
-
-	for (unsigned int i = 0; i < nchan; ++i) {
-		ret = habmm_socket_open(&handle, MM_QCPE_VM1, 0, 0);
+	if (!opened) {
+		ret = habmm_socket_open(&nonatomic_handle, MM_QCPE_VM1, 0, 0);
 		if (ret) {
-			pr_err("Failed to open non-atomic HAB channel, ret = %d\n", ret);
+			pr_err("habmm_socket_open failed for nonatomic with ret = %d\n", ret);
 			return ret;
 		}
-		channel = kzalloc(sizeof(*channel), GFP_KERNEL);
-		if (!channel)
-			return -ENOMEM;
-		channel->handle = handle;
-		channel->occupied = false;
-		spin_lock(&nonatomic_handle_lock);
-		list_add_tail(&channel->node, &nonatomic_handle_pool);
-		spin_unlock(&nonatomic_handle_lock);
+		ret = habmm_socket_open(&atomic_handle, MM_QCPE_VM1, 0, 0);
+		if (ret) {
+			pr_err("habmm_socket_open failed for atomic with ret = %d\n", ret);
+			habmm_socket_close(nonatomic_handle);
+			return ret;
+		}
+		opened = true;
+		pr_info("HAB channel established\n");
 	}
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(scm_qcpe_hab_open_nonatomic);
+EXPORT_SYMBOL_GPL(scm_qcpe_hab_open);
 
 void scm_qcpe_hab_close(void)
 {
-	struct list_head *entry, *n;
-	struct hab_channel *channel = NULL;
-
-	if (atomic_handle != 0) {
+	if (opened) {
+		habmm_socket_close(nonatomic_handle);
 		habmm_socket_close(atomic_handle);
-		atomic_handle = 0;
+		opened = false;
+		nonatomic_handle = atomic_handle = 0;
 	}
-	spin_lock(&nonatomic_handle_lock);
-	list_for_each_safe(entry, n, &nonatomic_handle_pool) {
-		channel = (struct hab_channel *) entry;
-		habmm_socket_close(channel->handle);
-		list_del(&channel->node);
-		kfree(channel);
-	}
-	spin_unlock(&nonatomic_handle_lock);
 }
-
 EXPORT_SYMBOL_GPL(scm_qcpe_hab_close);
-
-static uint32_t nonatomic_handle_acquire(void)
-{
-	struct list_head *entry;
-	struct hab_channel *channel = NULL;
-	uint32_t handle = 0;
-
-	spin_lock(&nonatomic_handle_lock);
-	list_for_each(entry, &nonatomic_handle_pool) {
-		channel = (struct hab_channel *) entry;
-		if (!channel->occupied) {
-			channel->occupied = true;
-			handle = channel->handle;
-			break;
-		}
-	}
-	spin_unlock(&nonatomic_handle_lock);
-
-	return handle;
-}
-
-static void nonatomic_handle_release(uint32_t handle)
-{
-	struct list_head *entry;
-	struct hab_channel *channel = NULL;
-
-	spin_lock(&nonatomic_handle_lock);
-	list_for_each(entry, &nonatomic_handle_pool) {
-		channel = (struct hab_channel *) entry;
-		if (channel->handle == handle && channel->occupied) {
-			channel->occupied = false;
-			break;
-		}
-	}
-	spin_unlock(&nonatomic_handle_lock);
-}
 
 /*
  * Send SMC over HAB, receive the response. Both operations are blocking.
@@ -153,15 +74,6 @@ static int scm_qcpe_hab_send_receive(struct smc_params_s *smc_params,
 {
 	int ret;
 	uint64_t fn = smc_params->fn_id;
-	uint32_t nonatomic_handle;
-
-	nonatomic_handle = nonatomic_handle_acquire();
-
-	if (nonatomic_handle == 0) {
-		/* This should not happen */
-		pr_err("Failed to acquire non-atomic handle\n");
-		return -EBUSY;
-	}
 
 	ret = habmm_socket_send(nonatomic_handle, smc_params, sizeof(*smc_params), 0);
 	if (ret) {
@@ -176,8 +88,6 @@ static int scm_qcpe_hab_send_receive(struct smc_params_s *smc_params,
 		ret = habmm_socket_recv(nonatomic_handle, smc_params, size_bytes, 0,
 					HABMM_SOCKET_RECV_FLAGS_UNINTERRUPTIBLE);
 	} while (-EAGAIN == ret);
-
-	nonatomic_handle_release(nonatomic_handle);
 
 	if (ret) {
 		pr_err("HAB recv failed for 0x%llx, nonatomic, ret= 0x%x\n",
@@ -235,11 +145,24 @@ int scm_call_qcpe(const struct arm_smccc_args *smc,
 	struct smc_params_s smc_params = {0,};
 	int ret;
 
+	if (!opened) {
+		if (!atomic) {
+			if (scm_qcpe_hab_open()) {
+				pr_err("HAB channel re-open failed\n");
+				return -ENODEV;
+			}
+		} else {
+			pr_err("HAB channel is not opened\n");
+			return -ENODEV;
+		}
+	}
+
 	smc_params.fn_id   = smc->args[0];
 	smc_params.arginfo = smc->args[1];
 	smc_params.args[0] = smc->args[2];
 	smc_params.args[1] = smc->args[3];
 	smc_params.args[2] = smc->args[4];
+
 	smc_params.args[3] = smc->args[5];
 	smc_params.args[4] = 0;
 
@@ -248,12 +171,14 @@ int scm_call_qcpe(const struct arm_smccc_args *smc,
 		if (ret) {
 			pr_err("send/receive failed, non-atomic, ret= 0x%x\n",
 				ret);
+			goto err_ret;
 		}
 	} else {
 		ret = scm_qcpe_hab_send_receive_atomic(&smc_params,
 							&size_bytes);
 		if (ret) {
 			pr_err("send/receive failed, ret= 0x%x\n", ret);
+			goto err_ret;
 		}
 	}
 
@@ -261,12 +186,7 @@ int scm_call_qcpe(const struct arm_smccc_args *smc,
 		pr_err("habmm_socket_recv expected size: %lu, actual=%u\n",
 			sizeof(smc_params), size_bytes);
 		ret = QCOM_SCM_ERROR;
-	}
-
-	if (ret) {
-		res->a1 = res->a2 = res->a3 = (unsigned long) -1;
-		res->a0 = ret;
-		return ret;
+		goto err_ret;
 	}
 
 	res->a1 = smc_params.args[1];
@@ -274,6 +194,20 @@ int scm_call_qcpe(const struct arm_smccc_args *smc,
 	res->a3 = smc_params.args[3];
 	res->a0 = smc_params.args[0];
 
+	goto no_err;
+
+err_ret:
+	if (!atomic) {
+		/* In case of an error, try to recover the hab connection
+		 * for next time. This can only be done if called in
+		 * non-atomic context.
+		 */
+		scm_qcpe_hab_close();
+		if (scm_qcpe_hab_open())
+			pr_err("scm_qcpe_hab_open failed\n");
+	}
+
+no_err:
 	return res->a0;
 }
 EXPORT_SYMBOL_GPL(scm_call_qcpe);

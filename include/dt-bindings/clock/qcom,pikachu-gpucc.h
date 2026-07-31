@@ -43,7 +43,5 @@
 #define GPU_CC_FF_BCR						3
 #define GPU_CC_GMU_BCR						4
 #define GPU_CC_XO_BCR						5
-#define GPU_CC_GX_BCR						6
-#define GPU_CC_GFX3D_AON_BCR					7
 
 #endif

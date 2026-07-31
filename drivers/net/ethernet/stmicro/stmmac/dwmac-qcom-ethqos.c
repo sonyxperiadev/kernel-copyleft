@@ -11,11 +11,6 @@
 #include <linux/pcs-xpcs-qcom.h>
 #include <linux/pm_opp.h>
 #include <linux/pm_domain.h>
-#include <linux/of_device.h>
-#include <linux/regulator/consumer.h>
-#include <linux/pinctrl/consumer.h>
-#include <linux/of_gpio.h>
-
 #include "stmmac.h"
 #include "stmmac_platform.h"
 
@@ -118,12 +113,6 @@
 
 #define SGMII_10M_RX_CLK_DVDR			0x31
 
-/* GDSC Regulators MACROS */
-#define EMAC_GDSC_NAME "gdsc_emac"
-#define EMAC_VREG_RGMII_NAME "vreg_rgmii"
-#define EMAC_VREG_EMAC_PHY_NAME "vreg_emac_phy"
-#define EMAC_VREG_RGMII_IO_PADS_NAME "vreg_rgmii_io_pads"
-
 enum domain_t {
 	POWER_CORE = 0,
 	POWER_CLK = 1,
@@ -143,12 +132,11 @@ struct ethqos_emac_driver_data {
 	bool rgmii_config_loopback_en;
 	bool has_emac_ge_3;
 	const char *link_clk_name;
-	u32 has_flags;
 	bool has_integrated_pcs;
 	u32 dma_addr_width;
 	unsigned int ptp_clk_rate;
-	unsigned int axi_clk_rate;
 	struct dwmac4_addrs dwmac4_addrs;
+	bool needs_serdes_reset;
 	bool needs_sgmii_loopback;
 	bool has_hdma;
 	struct dev_pm_domain_attach_data pd_data;
@@ -166,67 +154,17 @@ struct qcom_ethqos {
 	unsigned int speed;
 	int serdes_speed;
 	phy_interface_t phy_mode;
+	struct reset_control *serdes_reset;
 
-	int gpio_phy_intr_redirect;
-	u32 phy_intr;
-
-	struct regulator *gdsc_emac;
-	struct regulator *reg_rgmii;
-	struct regulator *reg_emac_phy;
-	struct regulator *reg_rgmii_io_pads;
 	const struct ethqos_emac_por *por;
 	unsigned int num_por;
+	bool needs_serdes_reset;
 	bool rgmii_config_loopback_en;
 	bool has_emac_ge_3;
 	bool needs_sgmii_loopback;
 	bool use_domains;
 	struct dev_pm_domain_list *pd_list;
 };
-
-static int phytype = BOARD_UNKNOWN;
-static int boardtype = PHY_UNKNOWN;
-
-#ifdef MODULE
-static char *board;
-module_param(board, charp, 0640);
-MODULE_PARM_DESC(board, "board type of the device");
-
-static char *enet;
-module_param(enet, charp, 0640);
-MODULE_PARM_DESC(enet, "enet value for the phy connection");
-#endif
-
-static int set_board_type(char *board_params)
-{
-	pr_info("qcom-ethqos: %s Board Param in command line: %s\n", __func__, board_params);
-	if (!strcmp(board_params, "Air"))
-		boardtype = AIR_BOARD;
-	else if (!strcmp(board_params, "Star"))
-		boardtype = STAR_BOARD;
-	else
-		return -EINVAL;
-	return 0;
-}
-
-static int set_phy_type(char *enet_params)
-{
-	pr_info("qcom-ethqos: %s Enet Param in command line: %s\n", __func__, enet_params);
-	if (!strcmp(enet_params, "1") || !strcmp(enet_params, "2"))
-		phytype = PHY_1G;
-	else if (!strcmp(enet_params, "3") || !strcmp(enet_params, "6"))
-		phytype = PHY_25G;
-	else if (!strcmp(enet_params, "4") || !strcmp(enet_params, "5"))
-		phytype = SWITCH;
-	else
-		return -EINVAL;
-	return 0;
-}
-
-#ifndef MODULE
-__setup("dwmac_qcom_eth.board=", set_board_type);
-
-__setup("dwmac_qcom_eth.enet=", set_phy_type);
-#endif
 
 static int rgmii_readl(struct qcom_ethqos *ethqos, unsigned int offset)
 {
@@ -301,249 +239,6 @@ ethqos_update_link_clk(struct qcom_ethqos *ethqos, unsigned int speed)
 	}
 
 	clk_set_rate(ethqos->link_clk, ethqos->link_clk_rate);
-}
-
-static int setup_gpio_input_common
-	(struct device *dev, const char *name, int *gpio)
-{
-	int ret = 0;
-
-	if (of_find_property(dev->of_node, name, NULL)) {
-		*gpio = ret = of_get_named_gpio(dev->of_node, name, 0);
-		if (ret >= 0) {
-			ret = gpio_request(*gpio, name);
-			if (ret) {
-				dev_dbg(dev, "Can't get GPIO %s, ret = %d\n",
-					name, *gpio);
-				*gpio = -1;
-				return ret;
-			}
-
-			ret = gpio_direction_input(*gpio);
-			if (ret) {
-				dev_dbg(dev, "failed GPIO %s direction ret=%d\n",
-					name, ret);
-				return ret;
-			}
-		} else {
-			if (ret == -EPROBE_DEFER)
-				dev_dbg(dev, "get EMAC_GPIO probe defer\n");
-			else
-				dev_dbg(dev, "can't get gpio %s ret %d\n", name,
-					ret);
-			return ret;
-		}
-	} else {
-		dev_dbg(dev, "can't find gpio %s\n", name);
-		ret = -EINVAL;
-	}
-
-	return ret;
-}
-
-void ethqos_disable_regulators(struct qcom_ethqos *ethqos)
-{
-	if (ethqos->reg_rgmii) {
-		regulator_disable(ethqos->reg_rgmii);
-		ethqos->reg_rgmii = NULL;
-	}
-
-	if (ethqos->reg_emac_phy) {
-		regulator_disable(ethqos->reg_emac_phy);
-		ethqos->reg_emac_phy = NULL;
-	}
-
-	if (ethqos->reg_rgmii_io_pads) {
-		regulator_disable(ethqos->reg_rgmii_io_pads);
-		ethqos->reg_rgmii_io_pads = NULL;
-	}
-
-	if (ethqos->gdsc_emac) {
-		regulator_disable(ethqos->gdsc_emac);
-		ethqos->gdsc_emac = NULL;
-	}
-}
-
-int ethqos_init_regulators(struct qcom_ethqos *ethqos)
-{
-	struct device *dev = &ethqos->pdev->dev;
-	int ret = 0;
-
-	if (of_property_read_bool(ethqos->pdev->dev.of_node,
-				  "gdsc_emac-supply")) {
-		ethqos->gdsc_emac =
-		devm_regulator_get(&ethqos->pdev->dev, EMAC_GDSC_NAME);
-		if (IS_ERR(ethqos->gdsc_emac)) {
-			dev_dbg(dev, "Can not get <%s>\n", EMAC_GDSC_NAME);
-			return PTR_ERR(ethqos->gdsc_emac);
-		}
-
-		ret = regulator_enable(ethqos->gdsc_emac);
-		if (ret) {
-			dev_dbg(dev, "Can not enable <%s>\n", EMAC_GDSC_NAME);
-			goto reg_error;
-		}
-
-		dev_info(dev, "Enabled <%s>\n", EMAC_GDSC_NAME);
-	}
-
-	if (of_property_read_bool(ethqos->pdev->dev.of_node,
-				  "vreg_rgmii-supply")) {
-		ethqos->reg_rgmii =
-		devm_regulator_get(&ethqos->pdev->dev, EMAC_VREG_RGMII_NAME);
-		if (IS_ERR(ethqos->reg_rgmii)) {
-			dev_dbg(dev, "Can not get <%s>\n", EMAC_VREG_RGMII_NAME);
-			return PTR_ERR(ethqos->reg_rgmii);
-		}
-
-		ret = regulator_enable(ethqos->reg_rgmii);
-		if (ret) {
-			dev_dbg(dev, "Can not enable <%s>\n",
-				EMAC_VREG_RGMII_NAME);
-			goto reg_error;
-		}
-
-		dev_info(dev, "Enabled <%s>\n", EMAC_VREG_RGMII_NAME);
-	}
-
-	if (of_property_read_bool(ethqos->pdev->dev.of_node,
-				  "vreg_emac_phy-supply")) {
-		ethqos->reg_emac_phy =
-		devm_regulator_get(&ethqos->pdev->dev, EMAC_VREG_EMAC_PHY_NAME);
-		if (IS_ERR(ethqos->reg_emac_phy)) {
-			dev_dbg(dev, "Can not get <%s>\n",
-				EMAC_VREG_EMAC_PHY_NAME);
-			return PTR_ERR(ethqos->reg_emac_phy);
-		}
-
-		ret = regulator_enable(ethqos->reg_emac_phy);
-		if (ret) {
-			dev_dbg(dev, "Can not enable <%s>\n",
-				EMAC_VREG_EMAC_PHY_NAME);
-			goto reg_error;
-		}
-
-		dev_info(dev, "Enabled <%s>\n", EMAC_VREG_EMAC_PHY_NAME);
-	}
-
-	if (of_property_read_bool(ethqos->pdev->dev.of_node,
-				  "vreg_rgmii_io_pads-supply")) {
-		ethqos->reg_rgmii_io_pads = devm_regulator_get
-		(&ethqos->pdev->dev, EMAC_VREG_RGMII_IO_PADS_NAME);
-		if (IS_ERR(ethqos->reg_rgmii_io_pads)) {
-			dev_dbg(dev, "Can not get <%s>\n",
-				EMAC_VREG_RGMII_IO_PADS_NAME);
-			return PTR_ERR(ethqos->reg_rgmii_io_pads);
-		}
-
-		ret = regulator_enable(ethqos->reg_rgmii_io_pads);
-		if (ret) {
-			dev_dbg(dev, "Can not enable <%s>\n",
-				EMAC_VREG_RGMII_IO_PADS_NAME);
-			goto reg_error;
-		}
-
-		dev_info(dev, "Enabled <%s>\n", EMAC_VREG_RGMII_IO_PADS_NAME);
-	}
-
-	return ret;
-
-reg_error:
-	dev_err(dev, "%s failed\n", __func__);
-	ethqos_disable_regulators(ethqos);
-	return ret;
-}
-
-void ethqos_free_gpios(struct qcom_ethqos *ethqos)
-{
-	if (gpio_is_valid(ethqos->gpio_phy_intr_redirect))
-		gpio_free(ethqos->gpio_phy_intr_redirect);
-	ethqos->gpio_phy_intr_redirect = -1;
-}
-
-int ethqos_init_pinctrl(struct device *dev)
-{
-	struct pinctrl *pinctrl;
-	struct pinctrl_state *pinctrl_state;
-	int i = 0;
-	int num_names;
-	const char *name;
-	int ret = 0;
-
-	pinctrl = devm_pinctrl_get(dev);
-	if (IS_ERR_OR_NULL(pinctrl)) {
-		ret = PTR_ERR(pinctrl);
-		dev_dbg(dev, "Failed to get pinctrl, err = %d\n", ret);
-		return ret;
-	}
-
-	num_names = of_property_count_strings(dev->of_node, "pinctrl-names");
-	if (num_names < 0) {
-		dev_dbg(dev, "Cannot parse pinctrl-names: %d\n", num_names);
-		return num_names;
-	}
-
-	for (i = 0; i < num_names; i++) {
-		ret = of_property_read_string_index(dev->of_node,
-						    "pinctrl-names",
-						    i, &name);
-
-		if (!strcmp(name, PINCTRL_STATE_DEFAULT))
-			continue;
-
-		pinctrl_state = pinctrl_lookup_state(pinctrl, name);
-		if (IS_ERR_OR_NULL(pinctrl_state)) {
-			ret = PTR_ERR(pinctrl_state);
-			dev_dbg(dev, "lookup_state %s failed %d\n", name, ret);
-			return ret;
-		}
-
-		dev_info(dev, "pinctrl_lookup_state %s succeeded\n", name);
-
-		ret = pinctrl_select_state(pinctrl, pinctrl_state);
-		if (ret) {
-			dev_dbg(dev, "select_state %s failed %d\n", name, ret);
-			return ret;
-		}
-
-		dev_info(dev, "pinctrl_select_state %s succeeded\n", name);
-	}
-
-	return ret;
-}
-
-int ethqos_init_gpio(struct qcom_ethqos *ethqos)
-{
-	struct device *dev = &ethqos->pdev->dev;
-	int ret = 0;
-
-	ethqos->gpio_phy_intr_redirect = -1;
-
-	ret = ethqos_init_pinctrl(dev);
-	if (ret) {
-		dev_dbg(dev, "ethqos_init_pinctrl failed");
-		return ret;
-	}
-
-	if (!of_property_present(dev->of_node, "qcom,phy-intr-redirect")) {
-		dev_dbg(dev, "gpio <qcom,phy-intr-redirect> not present so skipping it\n");
-		return ret; /* success, nothing to do */
-	}
-
-	ret = setup_gpio_input_common(&ethqos->pdev->dev, "qcom,phy-intr-redirect",
-				      &ethqos->gpio_phy_intr_redirect);
-
-	if (ret) {
-		dev_dbg(dev, "Failed to setup <%s> gpio\n",
-			"qcom,phy-intr-redirect");
-		goto gpio_error;
-	}
-
-	return ret;
-
-gpio_error:
-	ethqos_free_gpios(ethqos);
-	return ret;
 }
 
 static void
@@ -657,6 +352,7 @@ static const struct ethqos_emac_driver_data emac_v4_0_0_data = {
 	.link_clk_name = "phyaux",
 	.has_integrated_pcs = true,
 	.needs_sgmii_loopback = true,
+	.needs_serdes_reset = false,
 	.dma_addr_width = 36,
 	.dwmac4_addrs = {
 		.dma_chan = 0x00008100,
@@ -682,9 +378,8 @@ static const struct ethqos_emac_driver_data emac_v6_6_0_data = {
 	.rgmii_config_loopback_en = false,
 	.dma_addr_width = 40,
 	.link_clk_name = "phyaux",
-	.has_flags = STMMAC_FLAG_USE_THREADED_NAPI,
 	.has_hdma = true,
-	.axi_clk_rate = 380000000,
+	.needs_serdes_reset = true,
 	.ptp_clk_rate = 250000000,
 	.dwxgmac_addrs = {
 		.dma_even_chan_base  = 0x00008500,
@@ -771,6 +466,7 @@ static int qcom_ethqos_serdes_set_level(struct qcom_ethqos *ethqos)
 		dev = ethqos->pd_list->pd_devs[PERF_SERDES];
 	} else if (ethqos->phy_mode == PHY_INTERFACE_MODE_5GBASER) {
 		dev = ethqos->pd_list->pd_devs[PERF_5G_SERDES];
+		ethqos->speed = SPEED_5000;
 	} else {
 		dev = ethqos->pd_list->pd_devs[PERF_SERDES];
 	}
@@ -1314,6 +1010,41 @@ static void ethqos_safety_feature(struct stmmac_priv *priv, bool en)
 	}
 }
 
+static void ethqos_xpcs_validate_link_post_reset(struct qcom_ethqos *ethqos)
+{
+	struct net_device *dev = platform_get_drvdata(ethqos->pdev);
+	struct stmmac_priv *priv = netdev_priv(dev);
+	struct phylink_link_state state;
+	int err = 0;
+
+	/* Do serdes reset for group alignment */
+	if (ethqos->needs_serdes_reset && ethqos->serdes_reset) {
+		err = reset_control_assert(ethqos->serdes_reset);
+		if (err < 0) {
+			dev_err(&ethqos->pdev->dev, "assert failed (err=%d)\n", err);
+			return;
+		}
+		usleep_range(2000, 4000);
+
+		err = reset_control_deassert(ethqos->serdes_reset);
+		if (err < 0) {
+			dev_err(&ethqos->pdev->dev, "deassert failed (err=%d)\n", err);
+			return;
+		}
+		usleep_range(2000, 4000);
+
+		/* Check for PCS link status after Serdes soft reset */
+		if (priv->hw->phylink_pcs) {
+			state.interface = priv->plat->phy_interface;
+			priv->hw->phylink_pcs->ops->pcs_get_state(priv->hw->phylink_pcs, &state);
+			if (state.link)
+				dev_dbg(&ethqos->pdev->dev, "XPCS link is up\n");
+			else
+				dev_err(&ethqos->pdev->dev, "XPCS link failed\n");
+		}
+	}
+}
+
 static void ethqos_fix_mac_speed(void *priv_n, unsigned int speed, unsigned int mode)
 {
 	struct qcom_ethqos *ethqos = priv_n;
@@ -1324,10 +1055,13 @@ static void ethqos_fix_mac_speed(void *priv_n, unsigned int speed, unsigned int 
 	ethqos->speed = speed;
 	ethqos_update_link_clk(ethqos, speed);
 	ethqos_configure(ethqos);
-	if (priv->hw->phylink_pcs)
+
+	if (priv->hw->phylink_pcs) {
 		qcom_xpcs_link_up(priv->hw->phylink_pcs, mode,
 				  priv->plat->phy_interface, speed,
 				  DUPLEX_FULL);
+		ethqos_xpcs_validate_link_post_reset(ethqos);
+	}
 }
 
 static int qcom_ethqos_serdes_up(struct net_device *ndev, void *priv)
@@ -1419,7 +1153,9 @@ static void qcom_ethqos_exit(struct platform_device *pdev, void *prv)
 static int qcom_ethqos_init(struct platform_device *pdev, void *prv)
 {
 	struct qcom_ethqos *ethqos = prv;
+	int ret = 0;
 
+	ret = qcom_ethqos_domain_transition_d0d3(prv, true);
 	qcom_ethqos_serdes_set_level(ethqos);
 
 	/* Enable functional clock to prevent DMA reset to timeout due
@@ -1429,7 +1165,7 @@ static int qcom_ethqos_init(struct platform_device *pdev, void *prv)
 	 */
 	ethqos_set_func_clk_en(ethqos);
 
-	return 0;
+	return ret;
 }
 
 static int qcom_ethqos_serdes_powerup(struct net_device *ndev, void *priv)
@@ -1454,40 +1190,6 @@ static void qcom_ethqos_serdes_powerdown(struct net_device *ndev, void *priv)
 
 	phy_power_off(ethqos->serdes_phy);
 	phy_exit(ethqos->serdes_phy);
-}
-
-static int qcom_ethqos_suspend(struct device *dev, void *prv)
-{
-	struct net_device *ndev = dev_get_drvdata(dev);
-	struct stmmac_priv *priv = netdev_priv(ndev);
-	struct qcom_ethqos *ethqos = prv;
-
-	if (priv->dev->irq > 0)
-		disable_irq(priv->dev->irq);
-
-	set_bit(STMMAC_DOWN, &priv->state);
-
-	dev_dbg(&ethqos->pdev->dev, "Perf/power domain will turned off by SCMI framework.");
-
-	return 0;
-}
-
-static int qcom_ethqos_resume(struct device *dev, void *prv)
-{
-	struct net_device *ndev = dev_get_drvdata(dev);
-	struct stmmac_priv *priv = netdev_priv(ndev);
-	struct qcom_ethqos *ethqos = prv;
-	int ret = 0;
-
-	ret = qcom_ethqos_init(ethqos->pdev, prv);
-
-	if (priv->dev->irq > 0)
-		enable_irq(priv->dev->irq);
-
-	dev_dbg(&ethqos->pdev->dev, "Perf/power domain will turned on by SCMI framework.");
-
-	clear_bit(STMMAC_DOWN, &priv->state);
-	return ret;
 }
 
 static int ethqos_clks_config(void *priv, bool enabled)
@@ -1537,45 +1239,8 @@ static void ethqos_ptp_clk_freq_config(struct stmmac_priv *priv)
 	netdev_dbg(priv->dev, "PTP rate %d\n", plat_dat->clk_ptp_rate);
 }
 
-static void qcom_ethqos_get_queue_and_tc_from_vdma(struct stmmac_priv *priv,
-						   u32 vdma_ch,
-						   unsigned long *queue_mask,
-						   u32 *tc)
+static void qcom_ethqos_hdma_cfg(struct plat_stmmacenet_data *plat)
 {
-	u32 tx_queues_cnt = priv->plat->tx_queues_to_use;
-	int i;
-
-	*queue_mask = 0;
-
-	if (vdma_ch >= MTL_MAX_TX_QUEUES) {
-		netdev_err(priv->dev, "VDMA channel %u out of range\n", vdma_ch);
-		return;
-	}
-
-	/* Look up the TC this VDMA channel is mapped to */
-	*tc = priv->plat->dma_cfg->tx_vdma_map[vdma_ch];
-
-	/* Find all PDMA channels mapped to the same TC as the VDMA channel.
-	 * A TC can map to multiple PDMA channels (1:many). Since PDMA channels
-	 * and TX queues have a 1:1 correspondence, each matching PDMA channel
-	 * index is set as a bit in queue_mask.
-	 */
-	for (i = 0; i < tx_queues_cnt; i++) {
-		if (priv->plat->dma_cfg->tx_pdma_map[i] == *tc)
-			*queue_mask |= BIT(i);
-	}
-
-	if (!*queue_mask)
-		netdev_warn(priv->dev, "No PDMA channel found for VDMA %u (TC %u)\n",
-			    vdma_ch, *tc);
-}
-
-static int qcom_ethqos_hdma_cfg(struct platform_device *pdev, struct plat_stmmacenet_data *plat)
-{
-	struct device_node *np = pdev->dev.of_node;
-	u32 map[STMMAC_CH_MAX];
-	int count, i;
-
 	plat->dma_cfg->orrq = 15;
 	plat->dma_cfg->owrq = 15;
 	plat->dma_cfg->txdcsz = 4;
@@ -1583,51 +1248,33 @@ static int qcom_ethqos_hdma_cfg(struct platform_device *pdev, struct plat_stmmac
 	plat->dma_cfg->rxdcsz = 4;
 	plat->dma_cfg->rdps = 1;
 
-	count = of_property_count_u32_elems(np, "qcom,tx-pdma-map");
-	if (count > 0 && count <= STMMAC_CH_MAX &&
-	    !of_property_read_u32_array(np, "qcom,tx-pdma-map", map, count)) {
-		plat->dma_cfg->tx_pdma_custom_map = true;
-		for (i = 0; i < count; i++)
-			plat->dma_cfg->tx_pdma_map[i] = map[i];
-	} else {
-		dev_err(&pdev->dev, "Tx PDMA map not defined falling back to default config\n");
-		return -EINVAL;
-	}
+	plat->dma_cfg->tx_pdma_custom_map = true;
+	plat->dma_cfg->tx_pdma_map[0] = 0;
+	plat->dma_cfg->tx_pdma_map[1] = 1;
+	plat->dma_cfg->tx_pdma_map[2] = 2;
+	plat->dma_cfg->tx_pdma_map[3] = 3;
+	plat->dma_cfg->tx_pdma_map[4] = 4;
+	plat->dma_cfg->tx_pdma_map[5] = 5;
+	plat->dma_cfg->tx_pdma_map[6] = 5;
+	plat->dma_cfg->tx_pdma_map[7] = 6;
+	plat->dma_cfg->tx_pdma_map[8] = 6;
+	plat->dma_cfg->tx_pdma_map[9] = 6;
+	plat->dma_cfg->tx_pdma_map[10] = 7;
+	plat->dma_cfg->tx_pdma_map[11] = 7;
 
-	count = of_property_count_u32_elems(np, "qcom,rx-pdma-map");
-	if (count > 0 && count <= STMMAC_CH_MAX &&
-	    !of_property_read_u32_array(np, "qcom,rx-pdma-map", map, count)) {
-		plat->dma_cfg->rx_pdma_custom_map = true;
-		for (i = 0; i < count; i++)
-			plat->dma_cfg->rx_pdma_map[i] = map[i];
-	} else {
-		dev_err(&pdev->dev, "Rx PDMA map not defined falling back to default config\n");
-		return -EINVAL;
-	}
-
-	count = of_property_count_u32_elems(np, "qcom,tx-vdma-map");
-	if (count > 0 && count <= STMMAC_CH_MAX &&
-	    !of_property_read_u32_array(np, "qcom,tx-vdma-map", map, count)) {
-		plat->dma_cfg->tx_vdma_custom_map = true;
-		for (i = 0; i < count; i++)
-			plat->dma_cfg->tx_vdma_map[i] = map[i];
-	} else {
-		dev_err(&pdev->dev, "Tx VDMA map not defined falling back to default config\n");
-		return -EINVAL;
-	}
-
-	count = of_property_count_u32_elems(np, "qcom,rx-vdma-map");
-	if (count > 0 && count <= STMMAC_CH_MAX &&
-	    !of_property_read_u32_array(np, "qcom,rx-vdma-map", map, count)) {
-		plat->dma_cfg->rx_vdma_custom_map = true;
-		for (i = 0; i < count; i++)
-			plat->dma_cfg->rx_vdma_map[i] = map[i];
-	} else {
-		dev_err(&pdev->dev, "Rx VDMA map not defined falling back to default config\n");
-		return -EINVAL;
-	}
-
-	return 0;
+	plat->dma_cfg->rx_pdma_custom_map = true;
+	plat->dma_cfg->rx_pdma_map[0] = 0;
+	plat->dma_cfg->rx_pdma_map[1] = 1;
+	plat->dma_cfg->rx_pdma_map[2] = 2;
+	plat->dma_cfg->rx_pdma_map[3] = 3;
+	plat->dma_cfg->rx_pdma_map[4] = 4;
+	plat->dma_cfg->rx_pdma_map[5] = 5;
+	plat->dma_cfg->rx_pdma_map[6] = 5;
+	plat->dma_cfg->rx_pdma_map[7] = 6;
+	plat->dma_cfg->rx_pdma_map[8] = 6;
+	plat->dma_cfg->rx_pdma_map[9] = 6;
+	plat->dma_cfg->rx_pdma_map[10] = 7;
+	plat->dma_cfg->rx_pdma_map[11] = 7;
 }
 
 static struct phylink_pcs *ethqos_select_xpcs(struct stmmac_priv *priv,
@@ -1660,259 +1307,6 @@ static void ethqos_xpcs_safety_stats(struct stmmac_priv *priv, unsigned long *pt
 		qcom_xpcs_get_err_stats(priv->hw->phylink_pcs, ptr);
 }
 
-static int qcom_ethqos_update_dt_string(struct device_node *node, const char *name,
-					const char *value)
-{
-	struct property *prop;
-	int ret = 0;
-
-	prop = kzalloc(sizeof(*prop), GFP_KERNEL);
-	if (!prop)
-		return -ENOMEM;
-
-	prop->name = kstrdup(name, GFP_KERNEL);
-	if (!prop->name) {
-		ret = -ENOMEM;
-		goto err_name;
-	}
-
-	prop->value = kstrdup(value, GFP_KERNEL);
-	if (!prop->value) {
-		ret = -ENOMEM;
-		goto err_value;
-	}
-
-	prop->length = strlen(value) + 1;
-
-	if (of_update_property(node, prop)) {
-		ret = -ENOMEM;
-		goto err_update;
-	}
-
-	return ret;
-err_update:
-	kfree(prop->value);
-err_value:
-	kfree(prop->name);
-err_name:
-	kfree(prop);
-	return ret;
-}
-
-static int qcom_ethqos_set_fixed_link(struct platform_device *pdev,
-				      struct plat_stmmacenet_data *plat)
-{
-	struct device_node *fixed_link_node;
-	struct device *dev = &pdev->dev;
-	int ret = 0;
-
-	fixed_link_node = of_get_child_by_name(dev->of_node, "fixed-link");
-	if (!fixed_link_node)
-		return 0;
-
-	ret = qcom_ethqos_update_dt_string(fixed_link_node, "status", "okay");
-	if (ret == 0) {
-		dev_info(dev, "qcom-ethqos: %s Fixed-link forced to 'okay'\n", __func__);
-
-		/*
-		 * As we are using fixed-link there is no need of MDIO bus data.
-		 * must use devm_kfree because it was allocated with devm_kzalloc.
-		 */
-		if (plat->mdio_bus_data) {
-			devm_kfree(dev, plat->mdio_bus_data);
-			plat->mdio_bus_data = NULL;
-			dev_info(dev, "qcom-ethqos: %s mdio_bus_data freed\n", __func__);
-		}
-	} else {
-		dev_err(dev, "qcom-ethqos: Failed to update fixed-link status\n");
-	}
-
-	of_node_put(fixed_link_node);
-	return ret;
-}
-
-static int qcom_ethqos_check_mdio_and_fix_link(struct platform_device *pdev,
-					       struct plat_stmmacenet_data *plat)
-{
-	struct device *dev = &pdev->dev;
-	struct device_node *fixed_link_node;
-
-	plat->board_type = boardtype;
-	plat->phy_type = phytype;
-	plat->mdio_node = NULL;
-
-	if (phytype == SWITCH) {
-		dev_info(dev, "Switch detected, Enabling fixed-link\n");
-		return qcom_ethqos_set_fixed_link(pdev, plat);
-	}
-
-	fixed_link_node = of_get_child_by_name(dev->of_node, "fixed-link");
-	if (fixed_link_node) {
-		if (of_device_is_available(fixed_link_node)) {
-			dev_info(dev, "Fixed link already enabled, not using MDIO\n");
-
-			if (plat->mdio_bus_data) {
-				devm_kfree(dev, plat->mdio_bus_data);
-				plat->mdio_bus_data = NULL;
-			}
-			of_node_put(fixed_link_node);
-			return 0;
-		}
-
-		of_node_put(fixed_link_node);
-	}
-
-	/*
-	 * If we are here, we are in a PHY or UNKNOWN case without a fixed-link.
-	 * Ensure mdio_bus_data is allocated for MDIO bus registration.
-	 */
-	if (!plat->mdio_bus_data) {
-		plat->mdio_bus_data = devm_kzalloc(dev,
-						   sizeof(*plat->mdio_bus_data),
-						   GFP_KERNEL);
-		if (!plat->mdio_bus_data)
-			return -ENOMEM;
-
-		plat->mdio_bus_data->needs_reset = true;
-	}
-
-	return 0;
-}
-
-static int qcom_ethqos_hib_restore(struct device *dev)
-{
-	struct net_device *ndev = NULL;
-	struct qcom_ethqos *ethqos;
-	struct stmmac_priv *priv;
-	int ret = 0;
-
-	ethqos = get_stmmac_bsp_priv(dev);
-	if (!ethqos)
-		return -ENODEV;
-
-	ndev = dev_get_drvdata(dev);
-
-	if (!ndev)
-		return -EINVAL;
-
-	priv = netdev_priv(ndev);
-
-	mutex_lock(&priv->lock);
-
-	ret = ethqos_init_regulators(ethqos);
-	if (ret) {
-		dev_err(dev, "%s: Regulator init failed with ret = %d\n", __func__, ret);
-		goto err_restore;
-	}
-
-	ret = ethqos_init_gpio(ethqos);
-	if (ret) {
-		dev_err(dev, "%s: GPIO init failed with ret = %d\n", __func__, ret);
-		ethqos_disable_regulators(ethqos);
-		goto err_restore;
-	}
-
-	ret = stmmac_bus_clks_config(priv, true);
-	if (ret) {
-		dev_err(dev, "%s: Clock Enablement Failed\n", __func__);
-		goto err_restore;
-	}
-
-	ethqos_set_func_clk_en(ethqos);
-
-	/* issue netdev up to device */
-
-	if (!netif_running(ndev)) {
-		rtnl_lock();
-		dev_open(ndev, NULL);
-		rtnl_unlock();
-	}
-
-	mutex_unlock(&priv->lock);
-
-	return ret;
-err_restore:
-	mutex_unlock(&priv->lock);
-	return ret;
-}
-
-static int qcom_ethqos_hib_freeze(struct device *dev)
-{
-	struct net_device *ndev = NULL;
-	struct qcom_ethqos *ethqos;
-	struct stmmac_priv *priv;
-	int ret = 0;
-
-	ethqos = get_stmmac_bsp_priv(dev);
-	if (!ethqos)
-		return -ENODEV;
-
-	ndev = dev_get_drvdata(dev);
-
-	if (!ndev)
-		return -EINVAL;
-
-	priv = netdev_priv(ndev);
-	mutex_lock(&priv->lock);
-	if (netif_running(ndev)) {
-		rtnl_lock();
-		dev_close(ndev);
-		rtnl_unlock();
-	}
-
-	ret = stmmac_bus_clks_config(priv, false);
-	if (ret) {
-		dev_err(dev, "%s: Clock Disablement Failed\n", __func__);
-		goto err_freeze;
-	}
-
-	ethqos_disable_regulators(ethqos);
-	ethqos_free_gpios(ethqos);
-
-	priv->speed = SPEED_UNKNOWN;
-	mutex_unlock(&priv->lock);
-
-	return ret;
-err_freeze:
-	mutex_unlock(&priv->lock);
-	return ret;
-}
-
-static int qcom_ethqos_runtime_suspend(struct device *dev)
-{
-	struct net_device *ndev = dev_get_drvdata(dev);
-	struct stmmac_priv *priv;
-
-	if (!ndev)
-		return 0;
-
-	priv = netdev_priv(ndev);
-
-	return stmmac_bus_clks_config(priv, false);
-}
-
-static int qcom_ethqos_runtime_resume(struct device *dev)
-{
-	struct net_device *ndev = dev_get_drvdata(dev);
-	struct stmmac_priv *priv;
-
-	if (!ndev)
-		return 0;
-
-	priv = netdev_priv(ndev);
-	return stmmac_bus_clks_config(priv, true);
-}
-
-static const struct dev_pm_ops qcom_ethqos_pm_ops = {
-	.freeze = qcom_ethqos_hib_freeze,
-	.restore = qcom_ethqos_hib_restore,
-	.thaw = qcom_ethqos_hib_restore,
-	.suspend = qcom_ethqos_hib_freeze,
-	.resume = qcom_ethqos_hib_restore,
-	.runtime_suspend = qcom_ethqos_runtime_suspend,
-	.runtime_resume = qcom_ethqos_runtime_resume,
-};
-
 static int qcom_ethqos_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -1922,14 +1316,6 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct qcom_ethqos *ethqos;
 	int ret, i;
-
-#ifdef MODULE
-	if (enet)
-		ret = set_phy_type(enet);
-
-	if (board)
-		ret = set_board_type(board);
-#endif
 
 	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
 	if (ret)
@@ -1980,8 +1366,6 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 	ethqos->pdev = pdev;
 	ethqos->speed = SPEED_1000;
 
-	qcom_ethqos_check_mdio_and_fix_link(pdev, plat_dat);
-
 	ethqos->rgmii_base = devm_platform_ioremap_resource_byname(pdev, "rgmii");
 	if (IS_ERR(ethqos->rgmii_base))
 		return dev_err_probe(dev, PTR_ERR(ethqos->rgmii_base),
@@ -2001,8 +1385,6 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 		plat_dat->serdes_powerdown = qcom_ethqos_serdes_down;
 		plat_dat->exit = qcom_ethqos_exit;
 		plat_dat->init = qcom_ethqos_init;
-		plat_dat->suspend = qcom_ethqos_suspend;
-		plat_dat->resume = qcom_ethqos_resume;
 
 		qcom_ethqos_domain_transition_d0d3(ethqos, true);
 		qcom_ethqos_serdes_set_level(ethqos);
@@ -2021,35 +1403,22 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 	ethqos->rgmii_config_loopback_en = data->rgmii_config_loopback_en;
 	ethqos->has_emac_ge_3 = data->has_emac_ge_3;
 	ethqos->needs_sgmii_loopback = data->needs_sgmii_loopback;
+	ethqos->needs_serdes_reset = data->needs_serdes_reset;
 
 	if (!ethqos->use_domains) {
-		pdev->dev.driver->pm = &qcom_ethqos_pm_ops;
-		ret = ethqos_init_regulators(ethqos);
-
-		if (ret)
-			return dev_err_probe(dev, ret, "ethqos_init_regulators failed\n");
-
-		ret = ethqos_init_gpio(ethqos);
-
-		if (ret) {
-			ethqos_disable_regulators(ethqos);
-			return dev_err_probe(dev, ret, "%s: init_gpio failed with ret = %d\n",
-					     __func__, ret);
-		}
-
 		ethqos->link_clk = devm_clk_get(dev, data->link_clk_name ?: "rgmii");
 		if (IS_ERR(ethqos->link_clk))
 			return dev_err_probe(dev, PTR_ERR(ethqos->link_clk),
 						 "Failed to get link_clk\n");
-
-		ret = ethqos_clks_config(ethqos, true);
-		if (ret)
-			return ret;
-
-		ret = devm_add_action_or_reset(dev, ethqos_clks_disable, ethqos);
-		if (ret)
-			return ret;
 	}
+
+	ret = ethqos_clks_config(ethqos, true);
+	if (ret)
+		return ret;
+
+	ret = devm_add_action_or_reset(dev, ethqos_clks_disable, ethqos);
+	if (ret)
+		return ret;
 
 	ethqos->serdes_phy = devm_phy_optional_get(dev, "serdes");
 	if (IS_ERR(ethqos->serdes_phy))
@@ -2058,14 +1427,12 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 
 	ethqos->serdes_speed = SPEED_1000;
 	ethqos_update_link_clk(ethqos, SPEED_1000);
-	if (!ethqos->use_domains)
-		ethqos_set_func_clk_en(ethqos);
+	ethqos_set_func_clk_en(ethqos);
 
 	plat_dat->bsp_priv = ethqos;
 	plat_dat->fix_mac_speed = ethqos_fix_mac_speed;
 	plat_dat->dump_debug_regs = rgmii_dump;
 	plat_dat->ptp_clk_freq_config = ethqos_ptp_clk_freq_config;
-	plat_dat->clk_ref_rate = data->axi_clk_rate;
 	if (ethqos->use_domains)
 		plat_dat->clk_ptp_rate = data->ptp_clk_rate;
 	else
@@ -2079,12 +1446,15 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 		plat_dat->dwxgmac_addrs = &data->dwxgmac_addrs;
 		plat_dat->has_hdma = data->has_hdma;
 		plat_dat->insert_ts_pktid = true;
-		if (plat_dat->has_hdma) {
-			ret = qcom_ethqos_hdma_cfg(pdev, plat_dat);
-			if (ret)
-				return ret;
-			plat_dat->get_queue_and_tc_from_vdma =
-				qcom_ethqos_get_queue_and_tc_from_vdma;
+		if (plat_dat->has_hdma)
+			qcom_ethqos_hdma_cfg(plat_dat);
+
+		if (ethqos->needs_serdes_reset) {
+			ethqos->serdes_reset = devm_reset_control_get_optional(dev, "serdes_reset");
+			if (IS_ERR_OR_NULL(ethqos->serdes_reset)) {
+				dev_err(dev, "Serdes reset PM domain not found.\n");
+				ethqos->serdes_reset = NULL;
+			}
 		}
 	}
 	if (of_property_present(dev->of_node, "qcom-xpcs-handle")) {
@@ -2094,22 +1464,14 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 		plat_dat->safety_irq = ethqos_safety_feature;
 		plat_dat->safety_pcs_stats = ethqos_xpcs_safety_stats;
 	}
-	if (of_property_read_bool(np, "virtio-mdio"))
-		plat_dat->has_virtio_mdio = true;
 	if (of_property_read_bool(np, "snps,tso"))
 		plat_dat->flags |= STMMAC_FLAG_TSO_EN;
 	if (of_device_is_compatible(np, "qcom,qcs404-ethqos"))
 		plat_dat->flags |= STMMAC_FLAG_RX_CLK_RUNS_IN_LPI;
 	if (data->has_integrated_pcs)
 		plat_dat->flags |= STMMAC_FLAG_HAS_INTEGRATED_PCS;
-	if (data->has_flags)
-		plat_dat->flags |= data->has_flags;
 	if (data->dma_addr_width)
 		plat_dat->host_dma_width = data->dma_addr_width;
-
-	if (stmmac_res.tx_rx_irq[0] > 0 ||
-	    (stmmac_res.rx_irq[0] > 0 && stmmac_res.tx_irq[0] > 0))
-		plat_dat->flags |= STMMAC_FLAG_MULTI_IRQ_EN;
 
 	if (ethqos->serdes_phy) {
 		plat_dat->serdes_powerup = qcom_ethqos_serdes_powerup;
@@ -2120,14 +1482,7 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 	for (i = 1; i < plat_dat->tx_queues_to_use; i++)
 		plat_dat->tx_queues_cfg[i].tbs_en = 1;
 
-	ret =  devm_stmmac_pltfr_probe(pdev, plat_dat, &stmmac_res);
-	if (ret)
-		goto err_probe;
-
-	return ret;
-err_probe:
-	ethqos_disable_regulators(ethqos);
-	return ret;
+	return devm_stmmac_pltfr_probe(pdev, plat_dat, &stmmac_res);
 }
 
 static const struct of_device_id qcom_ethqos_match[] = {

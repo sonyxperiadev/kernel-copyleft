@@ -60,16 +60,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/thermal/qcom/lmh_cpu_vdd_cdev",
-        out = "lmh_cpu_vdd_cdev.ko",
-        config = "CONFIG_QTI_LMH_CPU_VDD_COOLING_DEVICE",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/lmh_cpu_vdd_cdev.c",
-        ],
-    )
-
-    registry.register(
         name = "drivers/thermal/qcom/max31760_fan",
         out = "max31760_fan.ko",
         config = "CONFIG_MAX31760_FAN_CONTROLLER",
@@ -128,16 +118,6 @@ def register_modules(registry):
         srcs = [
             # do not sort
             "drivers/thermal/qcom/qti_cpufreq_cdev.c",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/thermal/qcom/cx_ipeak_cdev",
-        out = "cx_ipeak_cdev.ko",
-        config = "CONFIG_QTI_CX_IPEAK_COOLING_DEVICE",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/cx_ipeak_cdev.c",
         ],
     )
 
@@ -206,16 +186,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/thermal/qcom/regulator_cdev",
-        out = "regulator_cdev.ko",
-        config = "CONFIG_REGULATOR_COOLING_DEVICE",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/regulator_cdev.c",
-        ],
-    )
-
-    registry.register(
         name = "drivers/thermal/qcom/thermal_pause",
         out = "thermal_pause.ko",
         config = "CONFIG_QTI_CPU_PAUSE_COOLING_DEVICE",
@@ -269,30 +239,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/thermal/qcom/rpm_smd_cooling_device",
-        out = "rpm_smd_cooling_device.ko",
-        config = "CONFIG_QTI_RPM_SMD_COOLING_DEVICE",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/rpm_smd_cooling_device.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/rpmsg/rpm-smd",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/thermal/qcom/msm_lmh_dcvs",
-        out = "msm_lmh_dcvs.ko",
-        config = "CONFIG_QTI_THERMAL_LIMITS_DCVS",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/msm_lmh_dcvs.c",
-        ],
-    )
-
-    registry.register(
         name = "drivers/thermal/qcom/lmh_stats",
         out = "lmh_stats.ko",
         config = "CONFIG_QTI_THERMAL_LMH_STATS",
@@ -315,94 +261,5 @@ def register_modules(registry):
             # do not sort
             "drivers/thermal/qcom/qcom-spmi-adc5",
             "drivers/iio/adc/qcom-vadc-common",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/thermal/qcom/msm-tsens-driver",
-        out = "msm-tsens-driver.ko",
-        config = "CONFIG_THERMAL_TSENS_LEGACY",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/thermal_zone_internal.h",
-            "drivers/thermal/qcom/tsens2xxx.c",
-            "drivers/thermal/qcom/tsens-dbg.c",
-            "drivers/thermal/qcom/tsens1xxx.c",
-            "drivers/thermal/qcom/tsens2xxx.h",
-            "drivers/thermal/qcom/msm-tsens.c",
-        ],
-        deps = [
-            # do not sort
-            "kernel/trace/qcom_ipc_logging",
-            "drivers/firmware/qcom/qcom-scm",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/thermal/qcom/bcl_off_cdev",
-        out = "bcl_off_cdev.ko",
-        config = "CONFIG_QTI_BCL_OFF_COOLING_DEVICE",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/bcl_off_cdev.c",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/thermal/qcom/qti_qmi_sensor",
-        out = "qti_qmi_sensor.ko",
-        config = "CONFIG_QTI_QMI_SENSOR",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/qmi_sensors.h",
-            "drivers/thermal/qcom/qmi_sensors.c",
-            "drivers/thermal/qcom/thermal_sensor_service_v01.c",
-            "drivers/thermal/qcom/thermal_sensor_service_v01.h",
-            "drivers/thermal/qcom/thermal_zone_internal.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/soc/qcom/qmi_helpers",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/thermal/qcom/cpu_voltage_cooling",
-        out = "cpu_voltage_cooling.ko",
-        config = "CONFIG_QTI_CPU_VOLTAGE_COOLING_DEVICE",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/cpu_voltage_cooling.c",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/thermal/qcom/sdpm_clk",
-        out = "sdpm_clk.ko",
-        config = "CONFIG_QTI_SDPM_CLOCK_MONITOR",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/sdpm_clk.c",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/thermal/qcom/policy_engine",
-        out = "policy_engine.ko",
-        config = "CONFIG_QTI_POLICY_ENGINE_SENSOR",
-        srcs = [
-            # do not sort
-            "drivers/thermal/qcom/policy_engine.c",
-            "drivers/thermal/qcom/thermal_zone_internal.h",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/thermal/thermal-generic-adc",
-        out = "thermal-generic-adc.ko",
-        config = "CONFIG_GENERIC_ADC_THERMAL",
-        srcs = [
-            # do not sort
-            "drivers/thermal/thermal-generic-adc.c",
         ],
     )

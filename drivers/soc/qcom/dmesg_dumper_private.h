@@ -108,9 +108,6 @@ struct qcom_dmesg_dumper {
 	bool is_static;
 	bool is_ready;
 	struct record_time *rec_time;
-#ifdef CONFIG_QCOM_VM_CRASH_DMESG_DUMP
-	struct notifier_block vm_crash_nb;
-#endif
 };
 
 #if IS_ENABLED(CONFIG_QCOM_VM_ALIVE_LOG_ENCRYPT)

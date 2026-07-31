@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __GH_RM_DRV_PRIVATE_H
@@ -131,16 +131,6 @@ struct gh_vm_property {
 #define GH_RM_RPC_MSG_ID_CALL_VM_IRQ_RECLAIM		0x56000053
 #define GH_RM_RPC_MSG_ID_CALL_VM_IRQ_NOTIFY		0x56000054
 #define GH_RM_RPC_MSG_ID_CALL_VM_IRQ_UNMAP		0x56000055
-
-/* Message IDs: Device Management */
-#define GH_RM_RPC_DEVICE_ACCEPT		0x56000060
-#define GH_RM_RPC_DEVICE_LEND		0x56000061
-#define GH_RM_RPC_DEVICE_RELEASE	0x56000062
-#define GH_RM_RPC_DEVICE_RECLAIM	0x56000063
-#define GH_RM_RPC_DEVICE_FIND_HANDLE	0x56000065
-#define GH_RM_RPC_DEVICE_GET_RESOURCES	0x56000066
-#define GH_RM_RPC_DEVICE_BUS_LOCKDOWN	0x56000067
-#define GH_RM_RPC_DEVICE_BUS_UNLOCK	0x56000068
 
 /* Message IDs: VM Services */
 #define GH_RM_RPC_MSG_ID_CALL_VM_SET_STATUS		0x56000080
@@ -615,64 +605,6 @@ struct gh_minidump_get_slot_resp_payload {
 	u16 slot_number;
 	u16 reserved;
 };
-
-struct gh_device_accept_req_payload {
-	__le32 dev_hdl;
-	u8 flags;
-	u8 reserved1;
-	__le16 reserved2;
-	__le32 bus_hdl;
-} __packed;
-
-struct gh_device_lend_req_payload {
-	__le16 vmid;
-	u8 flags;
-	u8 reserved;
-	__le32 dev_hdl;
-} __packed;
-
-struct gh_device_release_req_payload {
-	__le32 dev_hdl;
-	u8 flags;
-	u8 reserved1;
-	__le16 reserved2;
-} __packed;
-
-struct gh_device_reclaim_req_payload {
-	__le32 dev_hdl;
-	u8 flags;
-	u8 reserved1;
-	__le16 reserved2;
-} __packed;
-
-struct gh_device_find_handle_req_payload {
-	gh_dev_rsc_desc rsc_desc;
-} __packed;
-
-struct gh_device_find_handle_resp_payload {
-	__le32 dev_hdl;
-} __packed;
-
-struct gh_device_get_resources_req_payload {
-	__le32 dev_hdl;
-	u8 flags;
-	u8 reserved1;
-	__le16 reserved2;
-} __packed;
-
-struct gh_device_get_resources_resp_payload {
-	__le16 n_rsc;
-	__le16 reserved;
-	gh_dev_rsc_desc rsc_buf[];
-} __packed;
-
-struct gh_device_bus_lockdown_req_payload {
-	__le32 dev_hdl;
-} __packed;
-
-struct gh_device_bus_unlock_req_payload {
-	__le32 dev_hdl;
-} __packed;
 
 /* End Message ID headers */
 

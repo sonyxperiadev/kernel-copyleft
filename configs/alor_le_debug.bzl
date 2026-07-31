@@ -1,7 +1,6 @@
 alor_le_debug_config = {
     # keep sorted
     "CONFIG_ATOMIC64_SELFTEST": "m",
-    "CONFIG_BOOTTIME_TRACING": "y",
     "CONFIG_CMA_DEBUGFS": "y",
     "CONFIG_CORESIGHT_SOURCE_ETM4X": "m",
     "CONFIG_DEBUG_PAGEALLOC": "y",

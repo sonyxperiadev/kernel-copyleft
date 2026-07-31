@@ -4,11 +4,10 @@
   Header file for stmmac platform data
 
   Copyright (C) 2009  STMicroelectronics Ltd
-  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
 
   Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 *******************************************************************************/
-// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 
 #ifndef __STMMAC_PLATFORM_DATA
 #define __STMMAC_PLATFORM_DATA
@@ -105,17 +104,13 @@ struct stmmac_dma_cfg {
 	u32 rxdcsz;
 	bool aal;
 	bool eame;
-	bool multi_irq_en;
+	bool multi_msi_en;
 	bool dche;
 	bool atds;
 	bool tx_pdma_custom_map;
 	bool rx_pdma_custom_map;
 	u8 tx_pdma_map[MTL_MAX_TX_QUEUES];
 	u8 rx_pdma_map[MTL_MAX_RX_QUEUES];
-	bool tx_vdma_custom_map;
-	bool rx_vdma_custom_map;
-	u8 tx_vdma_map[MTL_MAX_TX_QUEUES];
-	u8 rx_vdma_map[MTL_MAX_RX_QUEUES];
 };
 
 #define AXI_BLEN	7
@@ -202,13 +197,12 @@ struct dwxgmac_addrs {
 #define STMMAC_FLAG_TSO_EN			BIT(4)
 #define STMMAC_FLAG_SERDES_UP_AFTER_PHY_LINKUP	BIT(5)
 #define STMMAC_FLAG_VLAN_FAIL_Q_EN		BIT(6)
-#define STMMAC_FLAG_MULTI_IRQ_EN		BIT(7)
+#define STMMAC_FLAG_MULTI_MSI_EN		BIT(7)
 #define STMMAC_FLAG_EXT_SNAPSHOT_EN		BIT(8)
 #define STMMAC_FLAG_INT_SNAPSHOT_EN		BIT(9)
 #define STMMAC_FLAG_RX_CLK_RUNS_IN_LPI		BIT(10)
 #define STMMAC_FLAG_EN_TX_LPI_CLOCKGATING	BIT(11)
 #define STMMAC_FLAG_HWTSTAMP_CORRECT_LATENCY	BIT(12)
-#define STMMAC_FLAG_USE_THREADED_NAPI		BIT(13)
 
 struct plat_stmmacenet_data {
 	u32 snps_id;
@@ -256,9 +250,6 @@ struct plat_stmmacenet_data {
 	u32 rx_queues_to_use;
 	u32 tx_queues_to_use;
 	bool has_hdma;
-	bool has_virtio_mdio;
-	int phy_type;
-	int board_type;
 	bool insert_ts_pktid;
 	u8 rx_sched_algorithm;
 	u8 tx_sched_algorithm;
@@ -272,12 +263,8 @@ struct plat_stmmacenet_data {
 	void (*ptp_clk_freq_config)(struct stmmac_priv *priv);
 	int (*init)(struct platform_device *pdev, void *priv);
 	void (*exit)(struct platform_device *pdev, void *priv);
-	int (*suspend)(struct device *dev, void *priv);
-	int (*resume)(struct device *dev, void *priv);
 	void (*safety_irq)(struct stmmac_priv *priv, bool en);
 	void (*safety_pcs_stats)(struct stmmac_priv *priv, unsigned long *ptr);
-	void (*get_queue_and_tc_from_vdma)(struct stmmac_priv *priv, u32 vdma_ch,
-					   unsigned long *queue_mask, u32 *tc);
 	struct mac_device_info *(*setup)(void *priv);
 	int (*clks_config)(void *priv, bool enabled);
 	int (*crosststamp)(ktime_t *device, struct system_counterval_t *system,

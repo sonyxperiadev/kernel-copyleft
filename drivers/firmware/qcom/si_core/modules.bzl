@@ -5,6 +5,7 @@ def register_modules(registry):
         config = "CONFIG_QCOM_SI_CORE",
         srcs = [
             # do not sort
+            "drivers/firmware/qcom/si_core/qcom_scm_invoke.c",
             "drivers/firmware/qcom/si_core/si_core.c",
             "drivers/firmware/qcom/si_core/si_core.h",
             "drivers/firmware/qcom/si_core/trace_si_core.h",
@@ -15,16 +16,6 @@ def register_modules(registry):
             "drivers/firmware/qcom/si_core/xts/mem-object.h",
         ],
         conditional_srcs = {
-            "CONFIG_QCOM_SCM_INVOKE_LEGACY": {
-                True: [
-                    # do not sort
-                    "drivers/firmware/qcom/si_core/qcom_scm_invoke_legacy.c",
-                ],
-                False: [
-                    # do not sort
-                    "drivers/firmware/qcom/si_core/qcom_scm_invoke.c",
-                ],
-            },
             "CONFIG_QCOM_SI_CORE_ADCI": {
                 True: [
                     # do not sort
@@ -46,8 +37,8 @@ def register_modules(registry):
             "CONFIG_QCOM_SI_CORE_DOORBELL": {
                 True: [
                     # do not sort
-                    "drivers/firmware/qcom/si_core/si_core_doorbell.c",
-                    "drivers/firmware/qcom/si_core/si_core_doorbell.h",
+                    "drivers/firmware/qcom/si_core/si_core_irq.c",
+                    "drivers/firmware/qcom/si_core/si_core_irq.h",
                 ],
             },
         },

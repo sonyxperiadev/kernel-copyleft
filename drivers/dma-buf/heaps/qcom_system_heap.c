@@ -37,7 +37,7 @@
  *	Andrew F. Davis <afd@ti.com>
  *
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-buf.h>
@@ -398,8 +398,7 @@ void qcom_system_heap_free(struct qcom_sg_buffer *buffer)
 struct page *qcom_sys_heap_alloc_largest_available(struct dynamic_page_pool **pools,
 						   unsigned long size,
 						   unsigned int max_order,
-						   bool movable,
-						   bool alloc_reclaim)
+						   bool movable)
 {
 	struct page *page = NULL;
 	int i;
@@ -423,8 +422,6 @@ struct page *qcom_sys_heap_alloc_largest_available(struct dynamic_page_pool **po
 			page = qcom_movable_heap_alloc_pages(pools[i]);
 		if (!page)
 			page = alloc_pages(pools[i]->gfp_mask, pools[i]->order);
-		if (!page && alloc_reclaim && i == 1)
-			page = alloc_pages(LOW_ORDER_GFP | __GFP_RETRY_MAYFAIL, pools[i]->order);
 		if (!page)
 			continue;
 
@@ -471,8 +468,7 @@ int system_qcom_sg_buffer_alloc(struct dma_heap *heap,
 		page = qcom_sys_heap_alloc_largest_available(sys_heap->pool_list,
 							     size_remaining,
 							     max_order,
-							     movable,
-							     false);
+							     movable);
 		if (!page)
 			goto free_mem;
 
@@ -536,7 +532,7 @@ static struct dma_buf *system_heap_allocate(struct dma_heap *heap,
 		goto free_buf_struct;
 
 	buffer->vmperm = mem_buf_vmperm_alloc(&buffer->sg_table,
-				qcom_sg_release, (void *)buffer);
+				qcom_sg_release, &buffer->kref);
 	if (IS_ERR(buffer->vmperm)) {
 		ret = PTR_ERR(buffer->vmperm);
 		goto free_sys_heap_mem;

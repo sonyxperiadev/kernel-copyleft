@@ -414,6 +414,7 @@ static int lpi_dbl_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to request interrupt: %d\n", ret);
 		return ret;
 	}
+	enable_irq(irq);
 
 	dbl->ssr_nb.notifier_call = qcom_dbl_ssr_notifier_cb;
 	dbl->ssr_notifier_handle = qcom_register_ssr_notifier("lpai", &dbl->ssr_nb);

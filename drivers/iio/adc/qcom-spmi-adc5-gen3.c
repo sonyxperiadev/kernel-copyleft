@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
+/*
+* Copyright 2025 Sony Corporation
+* NOTE: This file has been modified by Sony Corporation
+* Modifications are licensed under the License.
+*/
 
 #include <linux/bitops.h>
 #include <linux/completion.h>
@@ -1542,7 +1547,7 @@ static const struct adc5_channels adc5_chans_pmic[ADC5_MAX_CHANNEL] = {
 	[ADC5_GEN3_DIE_TEMP]		= ADC5_CHAN_TEMP("die_temp", 0,
 						SCALE_HW_CALIB_PMIC_THERM_PM7)
 	[ADC5_GEN3_TEMP_ALARM_LITE]	= ADC5_CHAN_TEMP("die_temp_lite", 0,
-						SCALE_HW_CALIB_PM5_GEN3_PMIC_THERM_LITE)
+						SCALE_HW_CALIB_PMIC_THERM_PM7)
 	[ADC5_GEN3_AMUX1_THM_100K_PU]	= ADC5_CHAN_TEMP("amux_thm1_pu2", 0,
 						SCALE_HW_CALIB_THERM_100K_PU_PM7)
 	[ADC5_GEN3_AMUX2_THM_100K_PU]	= ADC5_CHAN_TEMP("amux_thm2_pu2", 0,
@@ -1587,7 +1592,7 @@ static const struct adc5_channels adc5_gen4_chans_pmic[ADC5_MAX_CHANNEL] = {
 	[ADC5_GEN4_DIE_TEMP]		= ADC5_CHAN_TEMP("die_temp", 0,
 						SCALE_HW_CALIB_PMIC_THERM_PM7)
 	[ADC5_GEN4_TEMP_ALARM_LITE]	= ADC5_CHAN_TEMP("die_temp_lite", 0,
-						SCALE_HW_CALIB_PM5_GEN3_PMIC_THERM_LITE)
+						SCALE_HW_CALIB_PMIC_THERM_PM7)
 	[ADC5_GEN4_AMUX1_THM_100K_PU]	= ADC5_CHAN_TEMP("amux_thm1_pu2", 0,
 						SCALE_HW_CALIB_THERM_100K_PU_PM7)
 	[ADC5_GEN4_AMUX2_THM_100K_PU]	= ADC5_CHAN_TEMP("amux_thm2_pu2", 0,
@@ -1608,11 +1613,7 @@ static const struct adc5_channels adc5_gen4_chans_pmic[ADC5_MAX_CHANNEL] = {
 						SCALE_HW_CALIB_THERM_100K_PU_PM7)
 	[ADC5_GEN4_AMUX4_GPIO_100K_PU]	= ADC5_CHAN_TEMP("amux4_gpio_pu2", 0,
 						SCALE_HW_CALIB_THERM_100K_PU_PM7)
-	[ADC5_GEN4_AMUX5_GPIO_100K_PU]	= ADC5_CHAN_TEMP("amux5_gpio_pu2", 0,
-						SCALE_HW_CALIB_THERM_100K_PU_PM7)
-	[ADC5_GEN4_ATEST1]		= ADC5_CHAN_VOLT("atest1", 0,
-						SCALE_HW_CALIB_DEFAULT)
-	[ADC5_GEN4_ATEST2]		= ADC5_CHAN_VOLT("atest2", 0,
+	[ADC5_GEN4_AMUX5_GPIO_100K_PU]	= ADC5_CHAN_VOLT("amux5_gpio_pu2", 0,
 						SCALE_HW_CALIB_DEFAULT)
 };
 

@@ -537,9 +537,9 @@ static struct qcom_icc_qosbox qnm_pcie_qos = {
 	.num_ports = 1,
 	.offsets = { 0x277000 },
 	.config = &(struct qos_config) {
-		.prio = 0,
-		.urg_fwd = 1,
-		.prio_fwd_disable = 0,
+		.prio = 2,
+		.urg_fwd = 0,
+		.prio_fwd_disable = 1,
 	},
 };
 
@@ -732,9 +732,9 @@ static struct qcom_icc_qosbox qnm_eva_qos = {
 	.num_ports = 1,
 	.offsets = { 0x33000 },
 	.config = &(struct qos_config) {
-		.prio = 0,
-		.urg_fwd = 1,
-		.prio_fwd_disable = 0,
+		.prio = 4,
+		.urg_fwd = 0,
+		.prio_fwd_disable = 1,
 	},
 };
 
@@ -799,7 +799,7 @@ static struct qcom_icc_qosbox qnm_video_cv_cpu_qos = {
 	.offsets = { 0x32000 },
 	.config = &(struct qos_config) {
 		.prio = 4,
-		.urg_fwd = 0,
+		.urg_fwd = 1,
 		.prio_fwd_disable = 1,
 	},
 };
@@ -821,7 +821,7 @@ static struct qcom_icc_qosbox qnm_video_v_cpu_qos = {
 	.offsets = { 0x34000 },
 	.config = &(struct qos_config) {
 		.prio = 4,
-		.urg_fwd = 0,
+		.urg_fwd = 1,
 		.prio_fwd_disable = 1,
 	},
 };
@@ -2110,7 +2110,6 @@ static struct qcom_icc_bcm bcm_cn0 = {
 	.voter_idx = VOTER_IDX_HLOS,
 	.keepalive = true,
 	.num_nodes = 63,
-	.enable_mask = 0x1,
 	.nodes = { &qsm_cfg, &qhs_ahb2phy0,
 		   &qhs_ahb2phy1, &qhs_ahb2phy2,
 		   &qhs_av1_enc_cfg, &qhs_camera_cfg,
@@ -2155,7 +2154,6 @@ static struct qcom_icc_bcm bcm_cn1 = {
 static struct qcom_icc_bcm bcm_co0 = {
 	.name = "CO0",
 	.voter_idx = VOTER_IDX_HLOS,
-	.enable_mask = 0x1,
 	.num_nodes = 2,
 	.nodes = { &qxm_nsp, &qns_nsp_gemnoc },
 };
@@ -2185,7 +2183,6 @@ static struct qcom_icc_bcm bcm_mm0 = {
 static struct qcom_icc_bcm bcm_mm1 = {
 	.name = "MM1",
 	.voter_idx = VOTER_IDX_HLOS,
-	.enable_mask = 0x1,
 	.num_nodes = 10,
 	.nodes = { &qnm_av1_enc, &qnm_camnoc_hf,
 		   &qnm_camnoc_icp, &qnm_camnoc_sf,
@@ -2239,7 +2236,6 @@ static struct qcom_icc_bcm bcm_sh0 = {
 static struct qcom_icc_bcm bcm_sh1 = {
 	.name = "SH1",
 	.voter_idx = VOTER_IDX_HLOS,
-	.enable_mask = 0x1,
 	.num_nodes = 13,
 	.nodes = { &alm_gpu_tcu, &alm_pcie_tcu,
 		   &alm_sys_tcu, &chm_apps,

@@ -27,19 +27,4 @@ config SERIAL_QCOM_GENI_MSM
 	  This driver can also be built as a module.  If so, the module
 	  will be called qcom_geni_serial_msm.
 
-config SERIAL_PKVM_GENI
-	tristate "Protected KVM GENI UART"
-	depends on ARM64
-	depends on KVM
-	select SERIAL_CORE
-	help
-	  This driver provides UART support for protected KVM (pKVM) at EL2
-	  (Exception Level 2) on Qualcomm Technologies Inc. SoCs with GENI
-	  serial engines. It enables serial console output from the hypervisor
-	  running in protected mode, which is useful for debugging and logging
-	  purposes in virtualized environments.
-
-	  If you are using pKVM on Qualcomm platforms and need hypervisor-level
-	  UART functionality, say Y or M here.
-
 endmenu

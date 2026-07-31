@@ -84,7 +84,7 @@
 #define USB_HSPHY_3P3_HPM_LOAD			16000	/* uA */
 #define USB_HSPHY_3P3_VOL_FSHOST		3150000 /* uV */
 
-#define USB_HSPHY_1P8_VOL_MIN			1800000 /* uV */
+#define USB_HSPHY_1P8_VOL_MIN			1704000 /* uV */
 #define USB_HSPHY_1P8_VOL_MAX			1800000 /* uV */
 #define USB_HSPHY_1P8_HPM_LOAD			19000	/* uA */
 
@@ -1102,16 +1102,28 @@ static int msm_hsphy_probe(struct platform_device *pdev)
 	int ret = 0;
 
 	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
-	if (!phy)
-		return dev_err_probe(dev, -ENOMEM, "alloc hsphy failed\n");
+	if (!phy) {
+		ret = -ENOMEM;
+		goto err_ret;
+	}
 
 	driver_data = of_device_get_match_data(dev);
 	phy->phy_priv_data = driver_data;
 	phy->phy.dev = dev;
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+						"hsusb_phy_base");
+	if (!res) {
+		dev_err(dev, "missing memory base resource\n");
+		ret = -ENODEV;
+		goto err_ret;
+	}
 
-	phy->base = devm_platform_ioremap_resource_byname(pdev, "hsusb_phy_base");
-	if (IS_ERR(phy->base))
-		return dev_err_probe(dev, PTR_ERR(phy->base), "ioremap failed\n");
+	phy->base = devm_ioremap_resource(dev, res);
+	if (IS_ERR(phy->base)) {
+		dev_err(dev, "ioremap failed\n");
+		ret = -ENODEV;
+		goto err_ret;
+	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 							"phy_rcal_reg");
@@ -1256,13 +1268,10 @@ static int msm_hsphy_probe(struct platform_device *pdev)
 	 * kernel boot till USB phy driver is initialized based on cable status,
 	 * keep LDOs on here.
 	 */
-	if (phy->eud_enable_reg) {
+	if (phy->eud_enable_reg && readl_relaxed(phy->eud_enable_reg)) {
+		msm_hsphy_modeled_d3_to_d0(phy);
+		msm_hsphy_enable_power(phy, true);
 		msm_hsphy_enable_clocks(phy, true);
-		if (readl_relaxed(phy->eud_enable_reg)) {
-			msm_hsphy_modeled_d3_to_d0(phy);
-			msm_hsphy_enable_power(phy, true);
-		} else
-			msm_hsphy_enable_clocks(phy, false);
 	}
 
 	/* Placed at the end to ensure the probe is complete */

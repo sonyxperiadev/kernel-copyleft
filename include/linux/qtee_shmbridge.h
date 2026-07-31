@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __QTEE_SHMBRIDGE_H__
@@ -22,7 +22,6 @@ struct qtee_shm {
 	size_t size;
 };
 
-#ifdef CONFIG_QTEE_SHM_BRIDGE
 /**
  * Check whether shmbridge mechanism is enabled in HYP or not
  *
@@ -110,47 +109,5 @@ void qtee_shmbridge_flush_shm_buf(struct qtee_shm *shm);
  *
  */
 void qtee_shmbridge_inv_shm_buf(struct qtee_shm *shm);
-
-#else
-
-static inline int32_t qtee_shmbridge_register(
-		phys_addr_t paddr,
-		size_t size,
-		uint32_t *ns_vmid_list,
-		uint32_t *ns_vm_perm_list,
-		uint32_t ns_vmid_num,
-		uint32_t tz_perm,
-		uint64_t *handle)
-{
-	return -EINVAL;
-}
-
-static inline bool qtee_shmbridge_is_enabled(void)
-{
-	return false;
-}
-
-static inline int32_t qtee_shmbridge_allocate_shm(size_t size, struct qtee_shm *shm)
-{
-	return -EINVAL;
-}
-
-static inline void qtee_shmbridge_free_shm(struct qtee_shm *shm) {}
-
-static inline void qtee_shmbridge_flush_shm_buf(struct qtee_shm *shm) {}
-
-static inline void qtee_shmbridge_inv_shm_buf(struct qtee_shm *shm) {}
-
-static inline int32_t qtee_shmbridge_query(phys_addr_t paddr)
-{
-	return -EINVAL;
-}
-
-static inline int32_t qtee_shmbridge_deregister(uint64_t handle)
-{
-	return -EINVAL;
-}
-
-#endif
 
 #endif /*__QTEE_SHMBRIDGE_H__*/

@@ -172,26 +172,6 @@ static int hab_parse_dt(struct local_vmid *settings)
 	for (int i = 0 ; i < count ; i++)
 		pr_debug("virq-label is %d\n", virqsettings.label[i]);
 
-	if (of_find_property(hab_node, "PCHAN_RX_PENDING_SZ_MAX", NULL)) {
-		result = of_property_read_u32(hab_node, "RX_PENDING_SZ_MAX", &tmp);
-		if (result != 0) {
-			pr_err("error %d getting pending msg mem size limit\n", result);
-		} else {
-			hab_driver.pchan_rx_pending_sz_max = tmp;
-			pr_debug("setting pending msg mem limit to %d\n", tmp);
-		}
-	}
-
-	if (of_find_property(hab_node, "VCHAN_RX_PENDING_CNT_MAX", NULL)) {
-		result = of_property_read_u32(hab_node, "VCHAN_RX_PENDING_CNT_MAX", &tmp);
-		if (result != 0) {
-			pr_err("error %d getting pending msg cnt limit\n", result);
-		} else {
-			hab_driver.vchan_rx_pending_cnt_max = tmp;
-			pr_debug("setting pending msg cnt limit to %d\n", tmp);
-		}
-	}
-
 	for_each_child_of_node(hab_node, mmid_grp_node) {
 		/* read the group starting id */
 		result = of_property_read_u32(mmid_grp_node,

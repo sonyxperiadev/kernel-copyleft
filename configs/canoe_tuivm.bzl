@@ -24,7 +24,6 @@ canoe_tuivm_config = {
     "CONFIG_HVC_GUNYAH": "m",
     "CONFIG_HVC_GUNYAH_CONSOLE": "y",
     "CONFIG_I2C_MSM_GENI": "m",
-    "CONFIG_I3C_MASTER_MSM_GENI": "m",
     "CONFIG_INTERCONNECT_CLK": "m",
     "CONFIG_MSM_GPI_DMA": "y",
     "CONFIG_PINCTRL_ALOR": "m",

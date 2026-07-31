@@ -26,7 +26,6 @@
 #define QPT_S8_REG	0xb0
 #define QPT_S9_REG	0xb3
 #define QPT_S10_REG	0xb6
-#define QPT_S11_REG     0xb9
 #define QPT_BOB1_REG	0xe5
 #define QPT_BOB2_REG	0xe7
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #define pr_fmt(fmt) "qti_virtio_mem: %s: " fmt, __func__
 
@@ -465,26 +465,22 @@ int qti_virtio_mem_init(struct platform_device *pdev)
 	ret = sysfs_create_group(&dev->kobj, &dev_group);
 	if (ret < 0) {
 		dev_err(dev, "failed to create sysfs group\n");
-		goto err_sysfs_create;
+		goto err_dev_create;
 	}
 
 	ret = register_oom_notifier(&qvm_oom_nb);
 	if (ret < 0) {
 		dev_err(dev, "Failed to register to oom notifier\n");
-		goto err_oom_notifier;
+		goto err_dev_create;
 	}
 
 	ret = add_initial_blocks(&pdev->dev);
 	if (ret)
-		goto err_setup_movabale_zones;
+		goto err_oom_notifier;
 
 	return 0;
-err_setup_movabale_zones:
-	unregister_oom_notifier(&qvm_oom_nb);
 err_oom_notifier:
-	sysfs_remove_group(&dev->kobj, &dev_group);
-err_sysfs_create:
-	device_destroy(qvm_class, qvm_dev_no);
+	unregister_oom_notifier(&qvm_oom_nb);
 err_dev_create:
 	cdev_del(&qvm_char_dev);
 err_cdev_add:

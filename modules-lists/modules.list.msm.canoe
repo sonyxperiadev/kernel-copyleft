@@ -1,5 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+#
+# Copyright 2025 Sony Corporation
+# NOTE: This file has been modified by Sony Corporation
+# Modifications are licensed under the License.
+
 arm_smmu.ko
 gic_intr_routing.ko
 llcc-qcom.ko
@@ -22,15 +27,11 @@ qcom_soc_wdt.ko
 debug-regulator.ko
 debugcc-canoe.ko
 dispcc-canoe.ko
-dispcc-chora.ko
 evacc-canoe.ko
 gcc-alor.ko
 gcc-canoe.ko
 tcsrcc-chora.ko
 gcc-chora.ko
-gcc-sm4450.ko
-dispcc-sm4450.ko
-qcom-cpufreq-hw.ko
 gdsc-regulator.ko
 gpucc-canoe.ko
 tcsrcc-canoe.ko
@@ -59,7 +60,6 @@ regmap-spmi.ko
 qti-regmap-debugfs.ko
 qcom-spmi-pmic.ko
 nvmem_qcom-spmi-sdam.ko
-nvmem_qfprom.ko
 rtc-pm8xxx.ko
 pmic-pon-log.ko
 qcom-pdc.ko
@@ -71,10 +71,8 @@ qcom_logbuf_vendor_hooks.ko
 qcom_logbuf_boot_log.ko
 pinctrl-msm.ko
 pinctrl-alor.ko
-pinctrl-bourtzi.ko
 pinctrl-canoe.ko
 pinctrl-chora.ko
-pinctrl-ravelin.ko
 qcom_tsens.ko
 qcom-ipcc.ko
 qcom-reboot-reason.ko
@@ -87,7 +85,6 @@ qnoc-qos.ko
 qnoc-canoe.ko
 qnoc-chora.ko
 qnoc-alor.ko
-qnoc-ravelin.ko
 qcom_iommu_debug.ko
 qcom_ipc_logging.ko
 iommu-logger.ko
@@ -108,8 +105,6 @@ ufs-qcom.ko
 phy-qcom-ufs-qrbtc-sdm845.ko
 phy-qcom-ufs.ko
 phy-qcom-ufs-qmp-v4-canoe.ko
-phy-qcom-ufs-qmp-v4-waipio.ko
-phy-qcom-ufs-qmp-v4-crow.ko
 sg.ko
 gh_arm_drv.ko
 gh_dbl.ko
@@ -130,3 +125,5 @@ arm_smmu_pmu.ko
 deferred-free-helper.ko
 i2c-msm-geni.ko
 msm_gpi.ko
+fels.ko
+mmc_error_logging.ko

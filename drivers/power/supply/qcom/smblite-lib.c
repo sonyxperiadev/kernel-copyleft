@@ -2179,10 +2179,8 @@ inline int smblite_lib_get_usb_prop_typec_mode(struct smb_charger *chg,
 {
 	if (chg->connector_type == QTI_POWER_SUPPLY_CONNECTOR_MICRO_USB)
 		*val = QTI_POWER_SUPPLY_TYPEC_NONE;
-	else {
-		chg->typec_mode = smblite_lib_get_prop_typec_mode(chg);
+	else
 		*val = chg->typec_mode;
-	}
 
 	return 0;
 }

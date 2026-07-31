@@ -189,9 +189,6 @@
 #define GCC_VIDEO_AXI0_CLK					179
 #define GCC_VIDEO_AXI1_CLK					180
 #define GCC_VIDEO_XO_CLK					181
-#define GCC_AGGRE_UFS_PHY_AXI_CLK				182
-#define GCC_UFS_PHY_RX_SYMBOL_0_CLK_SRC				183
-#define GCC_UFS_PHY_TX_SYMBOL_0_CLK_SRC				184
 
 /* GCC power domains */
 #define GCC_PCIE_0_GDSC						0

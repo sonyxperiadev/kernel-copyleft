@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2016-2017, Linaro Ltd
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __QCOM_GLINK_NATIVE_H__
@@ -41,7 +40,6 @@ struct qcom_glink_pipe {
 		      const void *hdr, size_t hlen,
 		      const void *data, size_t dlen);
 	void (*kick)(struct qcom_glink_pipe *glink_pipe);
-	void (*reset)(struct qcom_glink_pipe *glink_pipe);
 };
 
 struct device;

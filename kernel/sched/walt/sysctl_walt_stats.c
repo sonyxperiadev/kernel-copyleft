@@ -131,14 +131,8 @@ static void cpufreq_timing_idle_enter(void *unused, int *state,
 {
 	unsigned long flags;
 	unsigned int cpu = dev->cpu;
-	struct cpufreq_policy *policy = cpufreq_cpu_get_raw(cpu);
-	unsigned int cur_freq;
+	unsigned int cur_freq = cpufreq_quick_get(cpu);
 	struct cpu_freq_time *freq_time;
-
-	if (!policy)
-		return;
-
-	cur_freq = policy->cur;
 
 	spin_lock_irqsave(CPUFREQ_LOCK(cpu), flags);
 
@@ -158,14 +152,8 @@ static void cpufreq_timing_idle_exit(void *unused, int state,
 {
 	unsigned long flags;
 	unsigned int cpu = dev->cpu;
-	struct cpufreq_policy *policy = cpufreq_cpu_get_raw(cpu);
-	unsigned int cur_freq;
+	unsigned int cur_freq = cpufreq_quick_get(cpu);
 	struct cpu_freq_time *freq_time;
-
-	if (!policy)
-		return;
-
-	cur_freq = policy->cur;
 
 	spin_lock_irqsave(CPUFREQ_LOCK(cpu), flags);
 
@@ -186,10 +174,10 @@ static void cpufreq_timing_transition(void *unused, struct cpufreq_policy *polic
 
 	int cpu;
 	unsigned long flags;
-	unsigned int new_freq = policy->cur;
 
 	for_each_cpu(cpu, policy->related_cpus) {
 		struct cpu_freq_time *freq_time_last, *freq_time_new;
+		unsigned int new_freq = cpufreq_quick_get(cpu);
 
 		freq_time_last = cpufreq_load(cpu, CUR_CPUFREQ(cpu));
 		freq_time_new = cpufreq_load(cpu, new_freq);
@@ -242,7 +230,7 @@ static void cpufreq_time_hook_unregister(void)
 static int cpufreq_time_table_init(struct cpufreq_policy *policy, int cpu)
 {
 	int ret;
-	unsigned int freq = policy->cur;
+	unsigned int freq;
 	struct cpufreq_frequency_table *freq_table;
 
 	cpufreq_for_each_valid_entry(freq_table, policy->freq_table) {
@@ -251,6 +239,7 @@ static int cpufreq_time_table_init(struct cpufreq_policy *policy, int cpu)
 			return ret;
 	}
 
+	freq = cpufreq_quick_get(cpu);
 	cpufreq_update(cpu, freq);
 
 	CUR_CPUFREQ(cpu) = freq;
@@ -341,13 +330,7 @@ static int cpufreq_time_statistic_dump_handler(const struct ctl_table *table,
 
 	for_each_possible_cpu(cpu) {
 		struct cpu_freq_time *freq_time = NULL;
-		struct cpufreq_policy *policy = cpufreq_cpu_get_raw(cpu);
 		unsigned long cpufreq;
-
-		if (!policy)
-			continue;
-
-		cpufreq = policy->cur;
 
 		rcu_read_lock();
 
@@ -355,6 +338,7 @@ static int cpufreq_time_statistic_dump_handler(const struct ctl_table *table,
 
 		rcu_read_unlock();
 
+		cpufreq = cpufreq_quick_get(cpu);
 		freq_time = cpufreq_load(cpu, cpufreq);
 
 		spin_lock_irqsave(CPUFREQ_LOCK(cpu), flags);

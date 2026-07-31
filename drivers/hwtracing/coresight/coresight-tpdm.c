@@ -1498,7 +1498,7 @@ static int tpdm_suspend(struct device *dev)
 {
 	struct tpdm_drvdata *drvdata = dev_get_drvdata(dev);
 
-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
+	if (pm_suspend_via_firmware())
 		coresight_disable_sysfs(drvdata->csdev);
 
 	return 0;

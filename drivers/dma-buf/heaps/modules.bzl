@@ -74,7 +74,6 @@ def register_modules(registry):
             # do not sort
             "drivers/iommu/msm_dma_iommu_mapping",
             "drivers/soc/qcom/mem_buf/mem_buf_dev",
-            "drivers/soc/qcom/sc_tcm",
             "drivers/soc/qcom/secure_buffer",
             "drivers/firmware/qcom/qcom-scm",
             "drivers/virt/gunyah/gh_rm_drv",

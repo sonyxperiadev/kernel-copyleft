@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -20,7 +20,7 @@
 #include "drivers/edac/edac_mc.h"
 #include "drivers/edac/edac_device.h"
 
-#if IS_ENABLED(CONFIG_EDAC_KRYO_ARM64_PANIC_ON_UE)
+#ifdef CONFIG_EDAC_KRYO_ARM64_PANIC_ON_UE
 #define ARM64_ERP_PANIC_ON_UE 1
 #else
 #define ARM64_ERP_PANIC_ON_UE 0
@@ -52,7 +52,6 @@
 
 #define KRYO_ERRXSTATUS_VALID(a)	((a >> 30) & 0x1)
 #define KRYO_ERRXSTATUS_UE(a)	((a >> 29) & 0x1)
-#define KRYO_ERRXSTATUS_DE(a)	((a >> 23) & 0x1)
 #define KRYO_ERRXSTATUS_SERR(a)	(a & 0xFF)
 
 #define KRYO_ERRXMISC_LVL(a)		((a >> 1) & 0x7)
@@ -103,44 +102,8 @@ static void kryo_edac_handle_ce(struct edac_device_ctl_info *edac_dev,
 				int inst_nr, int block_nr, const char *msg)
 {
 	edac_device_handle_ce(edac_dev, inst_nr, block_nr, msg);
-#if IS_ENABLED(CONFIG_EDAC_KRYO_ARM64_PANIC_ON_CE)
+#ifdef CONFIG_EDAC_KRYO_ARM64_PANIC_ON_CE
 	panic("EDAC %s CE: %s\n", edac_dev->ctl_name, msg);
-#endif
-}
-
-static void kryo_edac_handle_de(struct edac_device_ctl_info *edac_dev,
-				int inst_nr, int block_nr, const char *msg)
-{
-	struct edac_device_instance *instance;
-	struct edac_device_block *block = NULL;
-
-	if ((inst_nr >= edac_dev->nr_instances) || (inst_nr < 0)) {
-		edac_device_printk(
-			edac_dev, KERN_ERR,
-			"INTERNAL ERROR: 'instance' out of range (%d >= %d)\n",
-			inst_nr, edac_dev->nr_instances);
-		return;
-	}
-
-	instance = edac_dev->instances + inst_nr;
-
-	if ((block_nr >= instance->nr_blocks) || (block_nr < 0)) {
-		edac_device_printk(
-			edac_dev, KERN_ERR,
-			"INTERNAL ERROR: instance %d 'block' out of range (%d >= %d)\n",
-			inst_nr, block_nr, instance->nr_blocks);
-		return;
-	}
-
-	if (instance->nr_blocks > 0)
-		block = instance->blocks + block_nr;
-
-	edac_device_printk(edac_dev, KERN_WARNING,
-			   "DE: %s instance: %s block: %s '%s'\n",
-			   edac_dev->ctl_name, instance->name,
-			   block ? block->name : "N/A", msg);
-#if IS_ENABLED(CONFIG_EDAC_KRYO_ARM64_PANIC_ON_DE)
-	panic("EDAC %s DE: %s\n", edac_dev->ctl_name, msg);
 #endif
 }
 
@@ -150,32 +113,21 @@ struct errors_edac {
 			int inst_nr, int block_nr, const char *msg);
 };
 
-enum kryo_lx_sb_db_error {
-	/* L1 errors */
-	KRYO_L1_CE,
-	KRYO_L1_UE,
-	KRYO_L1_DE,
-	/* L2 errors */
-	KRYO_L2_CE,
-	KRYO_L2_UE,
-	KRYO_L2_DE,
-	/* L3 errors */
-	KRYO_L3_CE,
-	KRYO_L3_UE,
-	KRYO_L3_DE,
+static const struct errors_edac errors[] = {
+	{"Kryo L1 Correctable Error", kryo_edac_handle_ce },
+	{"Kryo L1 Uncorrectable Error", edac_device_handle_ue },
+	{"Kryo L2 Correctable Error", kryo_edac_handle_ce },
+	{"Kryo L2 Uncorrectable Error", edac_device_handle_ue },
+	{"L3 Correctable Error", kryo_edac_handle_ce },
+	{"L3 Uncorrectable Error", edac_device_handle_ue },
 };
 
-static const struct errors_edac errors[] = {
-	[KRYO_L1_CE] = {"Kryo L1 Correctable Error", kryo_edac_handle_ce },
-	[KRYO_L1_UE] = {"Kryo L1 Uncorrectable Error", edac_device_handle_ue },
-	[KRYO_L1_DE] = {"Kryo L1 Deferred Error", kryo_edac_handle_de },
-	[KRYO_L2_CE] = {"Kryo L2 Correctable Error", kryo_edac_handle_ce },
-	[KRYO_L2_UE] = {"Kryo L2 Uncorrectable Error", edac_device_handle_ue },
-	[KRYO_L2_DE] = {"Kryo L2 Deferred Error", kryo_edac_handle_de },
-	[KRYO_L3_CE] = {"L3 Correctable Error", kryo_edac_handle_ce },
-	[KRYO_L3_UE] = {"L3 Uncorrectable Error", edac_device_handle_ue },
-	[KRYO_L3_DE] = {"L3 Deferred Error", kryo_edac_handle_de },
-};
+#define KRYO_L1_CE 0
+#define KRYO_L1_UE 1
+#define KRYO_L2_CE 2
+#define KRYO_L2_UE 3
+#define KRYO_L3_CE 4
+#define KRYO_L3_UE 5
 
 #define DATA_BUF_ERR		0x2
 #define CACHE_DATA_ERR		0x6
@@ -302,10 +254,6 @@ static void dump_err_reg(int errorcode, int level, u64 errxstatus, u64 errxmisc,
 	case BUS_ERROR:
 		edac_printk(KERN_CRIT, EDAC_CPU, "Bus Error\n");
 		break;
-
-	default:
-		edac_printk(KERN_CRIT, EDAC_CPU, "Unknown Error\n");
-		break;
 	}
 
 	if (level == L3)
@@ -373,9 +321,6 @@ static void kryo_parse_l1_l2_cache_error(u64 errxstatus, u64 errxmisc,
 		if (KRYO_ERRXSTATUS_UE(errxstatus))
 			dump_err_reg(KRYO_L1_UE, level, errxstatus, errxmisc,
 					edev_ctl);
-		else if (KRYO_ERRXSTATUS_DE(errxstatus))
-			dump_err_reg(KRYO_L1_DE, level, errxstatus, errxmisc,
-					edev_ctl);
 		else
 			dump_err_reg(KRYO_L1_CE, level, errxstatus, errxmisc,
 					edev_ctl);
@@ -383,9 +328,6 @@ static void kryo_parse_l1_l2_cache_error(u64 errxstatus, u64 errxmisc,
 	case L2:
 		if (KRYO_ERRXSTATUS_UE(errxstatus))
 			dump_err_reg(KRYO_L2_UE, level, errxstatus, errxmisc,
-					edev_ctl);
-		else if (KRYO_ERRXSTATUS_DE(errxstatus))
-			dump_err_reg(KRYO_L2_DE, level, errxstatus, errxmisc,
 					edev_ctl);
 		else
 			dump_err_reg(KRYO_L2_CE, level, errxstatus, errxmisc,
@@ -456,10 +398,6 @@ static void kryo_check_l3_scu_error(struct edac_device_ctl_info *edev_ctl)
 			edac_printk(KERN_CRIT, EDAC_CPU, "Detected L3 uncorrectable error\n");
 			dump_err_reg(KRYO_L3_UE, L3, errxstatus, errxmisc,
 				edev_ctl);
-		} else if (KRYO_ERRXSTATUS_DE(errxstatus)) {
-			edac_printk(KERN_CRIT, EDAC_CPU, "Detected L3 Deferred error\n");
-			dump_err_reg(KRYO_L3_DE, L3, errxstatus, errxmisc,
-					edev_ctl);
 		} else {
 			edac_printk(KERN_CRIT, EDAC_CPU, "Detected L3 correctable error\n");
 			dump_err_reg(KRYO_L3_CE, L3, errxstatus, errxmisc,

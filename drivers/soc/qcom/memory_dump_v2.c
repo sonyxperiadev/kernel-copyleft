@@ -1574,21 +1574,19 @@ static int mem_dump_alloc_with_rmem(struct platform_device *pdev,
 
 		of_node_put(mem_buf_node);
 	}
-	if (qtee_shmbridge_is_enabled()) {
-		ret = qtee_shmbridge_register(phys_addr, used_size, ns_vmids,
-				ns_vm_perms, 1, PERM_READ|PERM_WRITE, &shm_bridge_handle);
-		if (ret) {
-			dev_err(&pdev->dev, "Failed to create shm bridge.ret=%d\n", ret);
-			return ret;
-		}
+
+	ret = qtee_shmbridge_register(phys_addr, used_size, ns_vmids,
+			ns_vm_perms, 1, PERM_READ|PERM_WRITE, &shm_bridge_handle);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to create shm bridge.ret=%d\n", ret);
+		return ret;
 	}
 
 	ret = qcom_scm_assign_dump_table_region(1, phys_addr, used_size);
 	if (ret) {
 		ret = init_memdump_imem_area(used_size);
 		if (ret) {
-			if (qtee_shmbridge_is_enabled())
-				qtee_shmbridge_deregister(shm_bridge_handle);
+			qtee_shmbridge_deregister(shm_bridge_handle);
 			return ret;
 		}
 	}
@@ -1686,20 +1684,17 @@ static int mem_dump_alloc_with_cma(struct platform_device *pdev,
 		of_node_put(mem_buf_node);
 	}
 
-	if (qtee_shmbridge_is_enabled()) {
-		ret = qtee_shmbridge_register(phys_addr, total_size, ns_vmids,
-				ns_vm_perms, 1, PERM_READ|PERM_WRITE, &shm_bridge_handle);
-		if (ret) {
-			dev_err(&pdev->dev, "Failed to create shm bridge.ret=%d\n", ret);
-			return ret;
-		}
+	ret = qtee_shmbridge_register(phys_addr, total_size, ns_vmids,
+			ns_vm_perms, 1, PERM_READ|PERM_WRITE, &shm_bridge_handle);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to create shm bridge.ret=%d\n", ret);
+		return ret;
 	}
 
 	ret = init_memory_dump(dump_vaddr, phys_addr);
 	if (ret) {
 		dev_err(&pdev->dev, "Memory Dump table set up is failed\n");
-		if (qtee_shmbridge_is_enabled())
-			qtee_shmbridge_deregister(shm_bridge_handle);
+		qtee_shmbridge_deregister(shm_bridge_handle);
 		return ret;
 	}
 
@@ -1707,8 +1702,7 @@ static int mem_dump_alloc_with_cma(struct platform_device *pdev,
 	if (ret) {
 		ret = init_memdump_imem_area(total_size);
 		if (ret) {
-			if (qtee_shmbridge_is_enabled())
-				qtee_shmbridge_deregister(shm_bridge_handle);
+			qtee_shmbridge_deregister(shm_bridge_handle);
 			return ret;
 		}
 	}

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2011-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 /**
  * Smart-Peripheral-Switch (SPS) internal API.
@@ -283,8 +283,7 @@ struct sps_mem_stats {
 enum sps_bam_type {
 	SPS_BAM_LEGACY,
 	SPS_BAM_NDP,
-	SPS_BAM_NDP_4K,
-	SPS_BAM_NDP_V1_7_4K
+	SPS_BAM_NDP_4K
 };
 
 #ifdef CONFIG_DEBUG_FS

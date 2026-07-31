@@ -751,32 +751,26 @@ static const struct clk_parent_data gcc_parent_data_11[] = {
 
 static const struct parent_map gcc_parent_map_12[] = {
 	{ P_UFS_PHY_RX_SYMBOL_0_CLK, 0 },
-	{ P_BI_TCXO, 2 },
 };
 
 static const struct clk_parent_data gcc_parent_data_12[] = {
 	{ .fw_name = "ufs_phy_rx_symbol_0_clk" },
-	{ .fw_name = "bi_tcxo" },
 };
 
 static const struct parent_map gcc_parent_map_13[] = {
 	{ P_UFS_PHY_RX_SYMBOL_1_CLK, 0 },
-	{ P_BI_TCXO, 2 },
 };
 
 static const struct clk_parent_data gcc_parent_data_13[] = {
 	{ .fw_name = "ufs_phy_rx_symbol_1_clk" },
-	{ .fw_name = "bi_tcxo" },
 };
 
 static const struct parent_map gcc_parent_map_14[] = {
 	{ P_UFS_PHY_TX_SYMBOL_0_CLK, 0 },
-	{ P_BI_TCXO, 2 },
 };
 
 static const struct clk_parent_data gcc_parent_data_14[] = {
 	{ .fw_name = "ufs_phy_tx_symbol_0_clk" },
-	{ .fw_name = "bi_tcxo" },
 };
 
 static const struct parent_map gcc_parent_map_15[] = {

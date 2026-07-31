@@ -284,113 +284,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/camcc-sm4450",
-        out = "camcc-sm4450.ko",
-        config = "CONFIG_SM_CAMCC_4450",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/camcc-sm4450.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/camcc-sm8350",
-        out = "camcc-sm8350.ko",
-        config = "CONFIG_SM_CAMCC_8350",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/camcc-sm8350.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/camcc-pikachu",
-        out = "camcc-pikachu.ko",
-        config = "CONFIG_SXR_CAMCC_PIKACHU",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/camcc-pikachu.c",
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-            "drivers/clk/qcom/gdsc.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-            "drivers/soc/qcom/minidump",
-            "drivers/soc/qcom/smem",
-            "drivers/soc/qcom/debug_symbol",
-            "drivers/dma-buf/heaps/qcom_dma_heaps",
-            "drivers/iommu/msm_dma_iommu_mapping",
-            "drivers/soc/qcom/mem_buf/mem_buf_dev",
-            "drivers/soc/qcom/secure_buffer",
-            "drivers/firmware/qcom/qcom-scm",
-            "drivers/virt/gunyah/gh_rm_drv",
-            "drivers/virt/gunyah/gh_msgq",
-            "drivers/virt/gunyah/gh_dbl",
-            "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/camcc-sun",
         out = "camcc-sun.ko",
         config = "CONFIG_SM_CAMCC_SUN",
@@ -794,23 +687,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/debugcc-chora",
-        out = "debugcc-chora.ko",
-        config = "CONFIG_SM_DEBUGCC_CHORA",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-debug.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/debugcc-chora.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-dummy",
-            "drivers/clk/qcom/clk-qcom",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/debugcc-khaje",
         out = "debugcc-khaje.ko",
         config = "CONFIG_SM_DEBUGCC_KHAJE",
@@ -833,23 +709,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/debugcc-malabar",
-        out = "debugcc-malabar.ko",
-        config = "CONFIG_SM_DEBUGCC_MALABAR",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-debug.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/debugcc-malabar.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-dummy",
-            "drivers/clk/qcom/clk-qcom",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/debugcc-monaco",
         out = "debugcc-monaco.ko",
         config = "CONFIG_SDW_DEBUGCC_MONACO",
@@ -858,62 +717,6 @@ def register_modules(registry):
             "drivers/clk/qcom/clk-debug.h",
             "drivers/clk/qcom/common.h",
             "drivers/clk/qcom/debugcc-monaco.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-dummy",
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/debugcc-pikachu",
-        out = "debugcc-pikachu.ko",
-        config = "CONFIG_SXR_DEBUGCC_PIKACHU",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-debug.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/debugcc-pikachu.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-dummy",
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-            "drivers/soc/qcom/minidump",
-            "drivers/soc/qcom/smem",
-            "drivers/soc/qcom/debug_symbol",
-            "drivers/dma-buf/heaps/qcom_dma_heaps",
-            "drivers/iommu/msm_dma_iommu_mapping",
-            "drivers/soc/qcom/mem_buf/mem_buf_dev",
-            "drivers/soc/qcom/secure_buffer",
-            "drivers/firmware/qcom/qcom-scm",
-            "drivers/virt/gunyah/gh_rm_drv",
-            "drivers/virt/gunyah/gh_msgq",
-            "drivers/virt/gunyah/gh_dbl",
-            "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/debugcc-qcm2290",
-        out = "debugcc-qcm2290.ko",
-        config = "CONFIG_QCM_DEBUGCC_2290",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-debug.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/debugcc-qcm2290.c",
         ],
         deps = [
             # do not sort
@@ -1028,101 +831,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/dispcc-malabar",
-        out = "dispcc-malabar.ko",
-        config = "CONFIG_SM_DISPCC_MALABAR",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-pm.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/dispcc-malabar.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-monaco.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/dispcc-qcm2290",
-        out = "dispcc-qcm2290.ko",
-        config = "CONFIG_QCM_DISPCC_2290",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/dispcc-qcm2290.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-qcm2290.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gcc-sm6115",
-        out = "gcc-sm6115.ko",
-        config = "CONFIG_SM_GCC_6115",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gcc-sm6115.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-bengal.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/dispcc-monaco",
         out = "dispcc-monaco.ko",
         config = "CONFIG_SDW_DISPCC_MONACO",
@@ -1152,131 +860,6 @@ def register_modules(registry):
             "drivers/regulator/proxy-consumer",
             "drivers/soc/qcom/crm-v2",
             "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gcc-sm4450",
-        out = "gcc-sm4450.ko",
-        config = "CONFIG_SM_GCC_4450",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gcc-sm4450.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gcc-sm8350",
-        out = "gcc-sm8350.ko",
-        config = "CONFIG_SM_GCC_8350",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gcc-sm8350.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/debugcc-sm4450",
-        out = "debugcc-sm4450.ko",
-        config = "CONFIG_SM_DEBUGCC_4450",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-debug.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/debugcc-sm4450.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-dummy",
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/debugcc-sm8350",
-        out = "debugcc-sm8350.ko",
-        config = "CONFIG_SM_DEBUGCC_8350",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-debug.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/debugcc-sm8350.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-dummy",
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/debugcc-shikra",
-        out = "debugcc-shikra.ko",
-        config = "CONFIG_CLK_SHIKRA_DEBUGCC",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-debug.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/debugcc-shikra.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-dummy",
-            "drivers/clk/qcom/clk-qcom",
         ],
     )
 
@@ -1371,28 +954,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/debugcc-sm6115",
-        out = "debugcc-sm6115.ko",
-        config = "CONFIG_SM_DEBUGCC_6115",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-debug.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/debugcc-sm6115.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-dummy",
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/dispcc-canoe",
         out = "dispcc-canoe.ko",
         config = "CONFIG_SM_DISPCC_CANOE",
@@ -1432,36 +993,6 @@ def register_modules(registry):
             "drivers/virt/gunyah/gh_msgq",
             "drivers/virt/gunyah/gh_dbl",
             "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/dispcc-chora",
-        out = "dispcc-chora.ko",
-        config = "CONFIG_SM_DISPCC_CHORA",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/dispcc-chora.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/minidump",
         ],
     )
 
@@ -1512,133 +1043,6 @@ def register_modules(registry):
             "drivers/clk/qcom/clk-regmap.h",
             "drivers/clk/qcom/common.h",
             "drivers/clk/qcom/dispcc-sc7280.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/dispcc-shikra",
-        out = "dispcc-shikra.ko",
-        config = "CONFIG_CLK_SHIKRA_DISPCC",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-pm.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/dispcc-shikra.c",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-monaco.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/dispcc-sm6115",
-        out = "dispcc-sm6115.ko",
-        config = "CONFIG_SM_DISPCC_6115",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/dispcc-sm6115.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-bengal.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/dispcc-sm4450",
-        out = "dispcc-sm4450.ko",
-        config = "CONFIG_SM_DISPCC_4450",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/dispcc-sm4450.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/dispcc-sm8350",
-        out = "dispcc-sm8350.ko",
-        config = "CONFIG_SM_DISPCC_8350",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/dispcc-sm8350.c",
             "drivers/clk/qcom/gdsc.h",
             "drivers/clk/qcom/clk-regmap-phy-mux.h",
             "drivers/clk/qcom/reset.h",
@@ -1757,49 +1161,6 @@ def register_modules(registry):
             "drivers/clk/qcom/clk-regmap.h",
             "drivers/clk/qcom/common.h",
             "drivers/clk/qcom/evacc-canoe.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-            "drivers/soc/qcom/minidump",
-            "drivers/soc/qcom/smem",
-            "drivers/soc/qcom/debug_symbol",
-            "drivers/dma-buf/heaps/qcom_dma_heaps",
-            "drivers/iommu/msm_dma_iommu_mapping",
-            "drivers/soc/qcom/mem_buf/mem_buf_dev",
-            "drivers/soc/qcom/secure_buffer",
-            "drivers/firmware/qcom/qcom-scm",
-            "drivers/virt/gunyah/gh_rm_drv",
-            "drivers/virt/gunyah/gh_msgq",
-            "drivers/virt/gunyah/gh_dbl",
-            "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/evacc-pikachu",
-        out = "evacc-pikachu.ko",
-        config = "CONFIG_SXR_EVACC_PIKACHU",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/evacc-pikachu.c",
             "drivers/clk/qcom/gdsc.h",
             "drivers/clk/qcom/reset.h",
             "drivers/clk/qcom/vdd-class.h",
@@ -2084,36 +1445,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/gcc-malabar",
-        out = "gcc-malabar.ko",
-        config = "CONFIG_SM_GCC_MALABAR",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gcc-malabar.c",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-monaco.h",
-            "drivers/clk/qcom/gdsc.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/gcc-monaco",
         out = "gcc-monaco.ko",
         config = "CONFIG_SDW_GCC_MONACO",
@@ -2134,81 +1465,6 @@ def register_modules(registry):
             "drivers/clk/qcom/reset.h",
             "drivers/clk/qcom/vdd-class.h",
             "drivers/clk/qcom/vdd-level-monaco.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gcc-pikachu",
-        out = "gcc-pikachu.ko",
-        config = "CONFIG_SXR_GCC_PIKACHU",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gcc-pikachu.c",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-            "drivers/clk/qcom/gdsc.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-            "drivers/soc/qcom/minidump",
-            "drivers/soc/qcom/smem",
-            "drivers/soc/qcom/debug_symbol",
-            "drivers/dma-buf/heaps/qcom_dma_heaps",
-            "drivers/iommu/msm_dma_iommu_mapping",
-            "drivers/soc/qcom/mem_buf/mem_buf_dev",
-            "drivers/soc/qcom/secure_buffer",
-            "drivers/firmware/qcom/qcom-scm",
-            "drivers/virt/gunyah/gh_rm_drv",
-            "drivers/virt/gunyah/gh_msgq",
-            "drivers/virt/gunyah/gh_dbl",
-            "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gcc-qcm2290",
-        out = "gcc-qcm2290.ko",
-        config = "CONFIG_QCM_GCC_2290",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gcc-qcm2290.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
         ],
         deps = [
             # do not sort
@@ -2437,60 +1693,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/audiocorecc-shikra",
-        out = "audiocorecc-shikra.ko",
-        config = "CONFIG_CLK_SHIKRA_AUDIOCORECC",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/audiocorecc-shikra.c",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-monaco.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gcc-shikra",
-        out = "gcc-shikra.ko",
-        config = "CONFIG_CLK_SHIKRA_GCC",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gcc-shikra.c",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-monaco.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/gdsc-regulator",
         out = "gdsc-regulator.ko",
         config = "CONFIG_QCOM_GDSC_REGULATOR",
@@ -2551,35 +1753,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/gpucc-chora",
-        out = "gpucc-chora.ko",
-        config = "CONFIG_SM_GPUCC_CHORA",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/gpucc-chora.c",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/gpucc-khaje",
         out = "gpucc-khaje.ko",
         config = "CONFIG_SM_GPUCC_KHAJE",
@@ -2612,37 +1785,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/gpucc-malabar",
-        out = "gpucc-malabar.ko",
-        config = "CONFIG_SM_GPUCC_MALABAR",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-pm.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gpucc-malabar.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-monaco.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/gpucc-monaco",
         out = "gpucc-monaco.ko",
         config = "CONFIG_SDW_GPUCC_MONACO",
@@ -2663,82 +1805,6 @@ def register_modules(registry):
             "drivers/clk/qcom/reset.h",
             "drivers/clk/qcom/vdd-class.h",
             "drivers/clk/qcom/vdd-level-monaco.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gpucc-pikachu",
-        out = "gpucc-pikachu.ko",
-        config = "CONFIG_SXR_GPUCC_PIKACHU",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-pm.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/gpucc-pikachu.c",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-            "drivers/soc/qcom/minidump",
-            "drivers/soc/qcom/smem",
-            "drivers/soc/qcom/debug_symbol",
-            "drivers/dma-buf/heaps/qcom_dma_heaps",
-            "drivers/iommu/msm_dma_iommu_mapping",
-            "drivers/soc/qcom/mem_buf/mem_buf_dev",
-            "drivers/soc/qcom/secure_buffer",
-            "drivers/firmware/qcom/qcom-scm",
-            "drivers/virt/gunyah/gh_rm_drv",
-            "drivers/virt/gunyah/gh_msgq",
-            "drivers/virt/gunyah/gh_dbl",
-            "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gpucc-qcm2290",
-        out = "gpucc-qcm2290.ko",
-        config = "CONFIG_QCM_GPUCC_2290",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/gpucc-qcm2290.c",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-qcm2290.h",
         ],
         deps = [
             # do not sort
@@ -2792,101 +1858,6 @@ def register_modules(registry):
             "drivers/virt/gunyah/gh_msgq",
             "drivers/virt/gunyah/gh_dbl",
             "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gpucc-shikra",
-        out = "gpucc-shikra.ko",
-        config = "CONFIG_CLK_SHIKRA_GPUCC",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-pm.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/gpucc-shikra.c",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-monaco.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gpucc-sm4450",
-        out = "gpucc-sm4450.ko",
-        config = "CONFIG_SM_GPUCC_4450",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gpucc-sm4450.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gpucc-sm8350",
-        out = "gpucc-sm8350.ko",
-        config = "CONFIG_SM_GPUCC_8350",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gpucc-sm8350.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
         ],
     )
 
@@ -2997,38 +1968,6 @@ def register_modules(registry):
             "drivers/clk/qcom/reset.h",
             "drivers/clk/qcom/vdd-class.h",
             "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/gpucc-sm6115",
-        out = "gpucc-sm6115.ko",
-        config = "CONFIG_SM_GPUCC_6115",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gpucc-sm6115.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-bengal.h",
         ],
         deps = [
             # do not sort
@@ -3192,70 +2131,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/lpassaoncc-sm6115",
-        out = "lpassaoncc-sm6115.ko",
-        config = "CONFIG_SM_LPASS_AUDIOCC_6115",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/lpassaoncc-sm6115.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-bengal.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/lpassaudiocc-sm6115",
-        out = "lpassaudiocc-sm6115.ko",
-        config = "CONFIG_SM_LPASS_AUDIOCC_6115",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/lpassaudiocc-sm6115.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level-bengal.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/tcsrcc-canoe",
         out = "tcsrcc-canoe.ko",
         config = "CONFIG_SM_TCSRCC_CANOE",
@@ -3322,48 +2197,6 @@ def register_modules(registry):
             "drivers/clk/qcom/gdsc-regulator",
             "drivers/regulator/debug-regulator",
             "drivers/regulator/proxy-consumer",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/tcsrcc-pikachu",
-        out = "tcsrcc-pikachu.ko",
-        config = "CONFIG_SXR_TCSRCC_PIKACHU",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/tcsrcc-pikachu.c",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-            "drivers/soc/qcom/minidump",
-            "drivers/soc/qcom/smem",
-            "drivers/soc/qcom/debug_symbol",
-            "drivers/dma-buf/heaps/qcom_dma_heaps",
-            "drivers/iommu/msm_dma_iommu_mapping",
-            "drivers/soc/qcom/mem_buf/mem_buf_dev",
-            "drivers/soc/qcom/secure_buffer",
-            "drivers/firmware/qcom/qcom-scm",
-            "drivers/virt/gunyah/gh_rm_drv",
-            "drivers/virt/gunyah/gh_msgq",
-            "drivers/virt/gunyah/gh_dbl",
-            "arch/arm64/gunyah/gh_arm_drv",
         ],
     )
 
@@ -3566,49 +2399,6 @@ def register_modules(registry):
     )
 
     registry.register(
-        name = "drivers/clk/qcom/videocc-pikachu",
-        out = "videocc-pikachu.ko",
-        config = "CONFIG_SXR_VIDEOCC_PIKACHU",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-            "drivers/clk/qcom/videocc-pikachu.c",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
-            "drivers/soc/qcom/minidump",
-            "drivers/soc/qcom/smem",
-            "drivers/soc/qcom/debug_symbol",
-            "drivers/dma-buf/heaps/qcom_dma_heaps",
-            "drivers/iommu/msm_dma_iommu_mapping",
-            "drivers/soc/qcom/mem_buf/mem_buf_dev",
-            "drivers/soc/qcom/secure_buffer",
-            "drivers/firmware/qcom/qcom-scm",
-            "drivers/virt/gunyah/gh_rm_drv",
-            "drivers/virt/gunyah/gh_msgq",
-            "drivers/virt/gunyah/gh_dbl",
-            "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
         name = "drivers/clk/qcom/videocc-seraph",
         out = "videocc-seraph.ko",
         config = "CONFIG_SXR_VIDEOCC_SERAPH",
@@ -3692,38 +2482,6 @@ def register_modules(registry):
             "drivers/virt/gunyah/gh_msgq",
             "drivers/virt/gunyah/gh_dbl",
             "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/videocc-sm8350",
-        out = "videocc-sm8350.ko",
-        config = "CONFIG_SM_VIDEOCC_8350",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-alpha-pll.h",
-            "drivers/clk/qcom/clk-branch.h",
-            "drivers/clk/qcom/clk-pll.h",
-            "drivers/clk/qcom/clk-rcg.h",
-            "drivers/clk/qcom/clk-regmap-divider.h",
-            "drivers/clk/qcom/clk-regmap-mux.h",
-            "drivers/clk/qcom/clk-regmap.h",
-            "drivers/clk/qcom/common.h",
-            "drivers/clk/qcom/videocc-sm8350.c",
-            "drivers/clk/qcom/gdsc.h",
-            "drivers/clk/qcom/clk-regmap-phy-mux.h",
-            "drivers/clk/qcom/reset.h",
-            "drivers/clk/qcom/vdd-class.h",
-            "drivers/clk/qcom/vdd-level.h",
-        ],
-        deps = [
-            # do not sort
-            "drivers/clk/qcom/clk-qcom",
-            "drivers/clk/qcom/gdsc-regulator",
-            "drivers/regulator/debug-regulator",
-            "drivers/regulator/proxy-consumer",
-            "drivers/soc/qcom/crm-v2",
-            "kernel/trace/qcom_ipc_logging",
         ],
     )
 
@@ -3892,18 +2650,5 @@ def register_modules(registry):
             "drivers/virt/gunyah/gh_msgq",
             "drivers/virt/gunyah/gh_dbl",
             "arch/arm64/gunyah/gh_arm_drv",
-        ],
-    )
-
-    registry.register(
-        name = "drivers/clk/qcom/clk-spmi-pmic-div",
-        out = "clk-spmi-pmic-div.ko",
-        config = "CONFIG_SPMI_PMIC_CLKDIV",
-        srcs = [
-            # do not sort
-            "drivers/clk/qcom/clk-spmi-pmic-div.c",
-        ],
-        deps = [
-            # do not sort
         ],
     )

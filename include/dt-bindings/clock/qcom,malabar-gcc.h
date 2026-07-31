@@ -186,7 +186,6 @@
 #define GCC_VIDEO_VENUS_CLK_SRC					176
 #define GCC_VIDEO_VENUS_CTL_CLK					177
 #define GCC_VIDEO_XO_CLK					178
-#define GCC_USB3_PRIM_CLKREF_EN					179
 
 /* GCC power domains */
 #define GCC_CAMSS_TOP_GDSC					0

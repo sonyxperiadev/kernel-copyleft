@@ -76,7 +76,6 @@ static struct subsystem_event_data event_data[] = {
 	{ "cdsp1", CDSP1_BEFORE_POWERDOWN, CDSP1_AFTER_POWERUP },
 	{ "gpdsp0", GPDSP0_BEFORE_POWERDOWN, GPDSP0_AFTER_POWERUP },
 	{ "gpdsp1", GPDSP1_BEFORE_POWERDOWN, GPDSP1_AFTER_POWERUP },
-	{ "soccp", SOCCP_BEFORE_POWERDOWN, SOCCP_AFTER_POWERUP },
 };
 
 struct subsystem_data {

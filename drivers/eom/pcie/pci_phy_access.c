@@ -18,8 +18,6 @@ struct pcie_phy_dev {
 	struct eom_phy_ops phy_ops;
 	/* Mapped PHY register base */
 	void __iomem *base;
-	/* Mapped PHY B register base (for bifurcated ports) */
-	void __iomem *base_b;
 	/* Root Complex index */
 	int rc_index;
 	int link_speed;
@@ -65,45 +63,13 @@ static int pcie_phy_read(void *priv, u32 offset, u32 *value)
 static int pcie_phy_write(void *priv, u32 offset, u32 value)
 {
 	struct pcie_phy_dev *pcie_phy = (struct pcie_phy_dev *)priv;
+	u32 temp;
 
 	if (pcie_phy_check_state(pcie_phy) < 0)
 		return -ENODEV;
 
 	writel(value, pcie_phy->base + offset);
-	(void)readl(pcie_phy->base + offset);
-
-	return 0;
-}
-
-/* Read from PCIe PHY B register */
-static int pcie_phy_b_read(void *priv, u32 offset, u32 *value)
-{
-	struct pcie_phy_dev *pcie_phy = (struct pcie_phy_dev *)priv;
-
-	if (!pcie_phy->base_b)
-		return -ENODEV;
-
-	if (pcie_phy_check_state(pcie_phy) < 0)
-		return -ENODEV;
-
-	*value = readl(pcie_phy->base_b + offset);
-
-	return 0;
-}
-
-/* Write to PCIe PHY B register */
-static int pcie_phy_b_write(void *priv, u32 offset, u32 value)
-{
-	struct pcie_phy_dev *pcie_phy = (struct pcie_phy_dev *)priv;
-
-	if (!pcie_phy->base_b)
-		return -ENODEV;
-
-	if (pcie_phy_check_state(pcie_phy) < 0)
-		return -ENODEV;
-
-	writel(value, pcie_phy->base_b + offset);
-	(void)readl(pcie_phy->base_b + offset);
+	temp = readl(pcie_phy->base + offset);
 
 	return 0;
 }
@@ -141,9 +107,9 @@ static int pcie_phy_get_caps(void *priv)
 static int __init pcie_phy_init(void)
 {
 	struct pcie_phy_dev *pcie_phy;
-	struct resource res_b, res;
 	int index, rc_index, ret;
 	struct device_node *np;
+	struct resource res;
 
 	/* Iterate through all PCIe RC nodes */
 	for_each_compatible_node(np, NULL, "qcom,pci-msm") {
@@ -153,7 +119,7 @@ static int __init pcie_phy_init(void)
 				np);
 			continue;
 		} else {
-			pr_debug("PCIe node %pOF is available; initializing\n",
+			pr_debug("PCIe node %pOF status is available, proceed with initialization\n",
 				np);
 		}
 
@@ -178,10 +144,8 @@ static int __init pcie_phy_init(void)
 
 		/* Allocate and initialize the PCIe PHY structure */
 		pcie_phy = kzalloc(sizeof(*pcie_phy), GFP_KERNEL);
-		if (!pcie_phy) {
-			of_node_put(np);
+		if (!pcie_phy)
 			return -ENOMEM;
-		}
 
 		/* Map the register base */
 		pcie_phy->base = ioremap(res.start, resource_size(&res));
@@ -191,34 +155,6 @@ static int __init pcie_phy_init(void)
 			continue;
 		}
 
-		/* Initialize base_b to NULL (will be set if phy_portb exists) */
-		pcie_phy->base_b = NULL;
-
-		/*
-		 * Check for PHY B (phy_portb) for bifurcated configurations.
-		 * If DT declares phy_portb but mapping fails, treat it as a
-		 * hard error and skip registering this PHY device.
-		 */
-		index = of_property_match_string(np, "reg-names", "phy_portb");
-		if (index >= 0) {
-			if (of_address_to_resource(np, index, &res_b)) {
-				pr_err("PCIe RC %d: PHY B DT resource not found; skipping\n",
-					rc_index);
-				goto err_cleanup;
-			}
-
-			pcie_phy->base_b = ioremap(res_b.start, resource_size(&res_b));
-			if (!pcie_phy->base_b) {
-				pr_err("PCIe RC %d: failed to map PHY B; skipping registration\n",
-				       rc_index);
-				goto err_cleanup;
-			}
-
-			pr_info("PCIe RC %d: PHY B mapped (base: 0x%llx, size: 0x%llx)\n",
-				rc_index, (unsigned long long)res_b.start,
-				(unsigned long long)resource_size(&res_b));
-		}
-
 		/* Set RC index and register PHY with the generic PHY interface */
 		pcie_phy->rc_index = rc_index;
 		/* set default nr lanes to '1' as we will have at least one lane */
@@ -226,10 +162,6 @@ static int __init pcie_phy_init(void)
 
 		pr_debug("PCIe PHY registration: for RC %d\n", rc_index);
 
-		if (pcie_phy->base_b) {
-			pcie_phy->phy_ops.phy_b_read = pcie_phy_b_read;
-			pcie_phy->phy_ops.phy_b_write = pcie_phy_b_write;
-		}
 		pcie_phy->phy_ops.phy_read = pcie_phy_read;
 		pcie_phy->phy_ops.phy_write = pcie_phy_write;
 		pcie_phy->phy_ops.get_caps = pcie_phy_get_caps;
@@ -237,7 +169,9 @@ static int __init pcie_phy_init(void)
 					  pcie_phy->nr_lanes);
 		if (ret) {
 			pr_err("PCIe PHY registration: for RC %d Failed\n", rc_index);
-			goto err_cleanup;
+			iounmap(pcie_phy->base);
+			kfree(pcie_phy);
+			continue;
 		}
 
 		/* Add to the global list of PCIe PHYs */
@@ -247,15 +181,6 @@ static int __init pcie_phy_init(void)
 		pr_debug("PCIe PHY registered (RC %d, base: 0x%llx, size: 0x%llx)\n",
 			  rc_index, (unsigned long long)res.start,
 			  (unsigned long long)resource_size(&res));
-
-		continue;
-
-err_cleanup:
-		if (pcie_phy->base_b)
-			iounmap(pcie_phy->base_b);
-		if (pcie_phy->base)
-			iounmap(pcie_phy->base);
-		kfree(pcie_phy);
 	}
 
 	return 0;
@@ -270,8 +195,6 @@ static void __exit pcie_phy_exit(void)
 	list_for_each_entry_safe(pcie_phy, tmp, &pcie_phy_list, list) {
 		unregister_phy_device(&pcie_phy->phy_ops, pcie_phy->rc_index, TYPE_PCIE);
 		iounmap(pcie_phy->base);
-		if (pcie_phy->base_b)
-			iounmap(pcie_phy->base_b);
 		list_del(&pcie_phy->list);
 		kfree(pcie_phy);
 	}

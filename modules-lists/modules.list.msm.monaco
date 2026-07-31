@@ -56,10 +56,8 @@ qcom_iommu_util.ko
 secure_buffer.ko
 mem_buf.ko
 mem_buf_dev.ko
-qseecom_proxy.ko
 msm_dma_iommu_mapping.ko
 qcom_dma_heaps.ko
-hwkm.ko
 qcom_ice.ko
 phy-qcom-ufs.ko
 sg.ko
@@ -89,3 +87,4 @@ qcom-cpufreq-hw.ko
 cqhci-crypto-qti.ko
 crypto-qti-common.ko
 crypto-qti-hwkm.ko
+hwkm_v1.ko

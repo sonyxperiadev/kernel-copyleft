@@ -24,15 +24,6 @@ config PHY_QCOM_UFS_V4
 	  This is required to enable UFS on QCOM chipset.
 	  To compile this driver as a module, choose M here.
 
-config PHY_QCOM_UFS_V4_CROW
-	tristate "Qualcomm Technologies, Inc. UFS Crow Phy Driver"
-	depends on PHY_QCOM_UFS
-	help
-	  This configuration option adds support for the UFS
-	  PHY present on QCOM Crow chipsets.
-	  This is required to enable UFS on crow, volcano, chora chipsets.
-	  To compile this driver as a module, choose M here.
-
 config PHY_QCOM_UFS_V4_GEN3AUTO
 	tristate "Qualcomm Technologies, Inc. UFS gen3auto Phy Driver"
 	depends on PHY_QCOM_UFS
@@ -49,13 +40,6 @@ config PHY_QCOM_UFS_QRBTC_SDM845
 	  The support is restricted to HS-G1 only on both Tx and Rx.
 	  No low power mode support is present.
 	  Doesn't restrict number of lanes.
-
-config PHY_QCOM_UFS_V4_KALAMA
-         tristate "Qualcomm Technologies, Inc. UFS Kalama Phy Driver"
-         help
-           Support for UFS phy present on QCOM kalama chipsets.
-           This is required to enable UFS on Kalama chipset.
-           To compile this driver as a module, choose M here.
 
 config PHY_QCOM_UFS_V4_SUN
 	tristate "Qualcomm Technologies, Inc. UFS Sun Phy Driver"
@@ -83,15 +67,6 @@ config PHY_QCOM_UFS_V4_YUPIK
 	  This is required to enable UFS on Yupik chipset.
 	  To compile this driver as a module, choose M here.
 
-config PHY_QCOM_UFS_V4_LAHAINA
-	tristate "Qualcomm Technologies, Inc. UFS Lahaina Phy Driver"
-	depends on PHY_QCOM_UFS
-	help
-	  This configuration option adds support for the UFS
-	  PHY present on QCOM Lahaina chipsets.
-	  This is required to enable UFS on Lahaina chipset.
-	  To compile this driver as a module, choose M here.
-
 config PHY_QCOM_UFS_V4_WAIPIO
 	tristate "Qualcomm Technologies, Inc. UFS Waipio Phy Driver"
 	depends on PHY_QCOM_UFS
@@ -113,16 +88,6 @@ config PHY_QCOM_SNPS_EUSB2
 	  SoCs. Enable this option if you are building for a Qualcomm
 	  platform that uses the SNPS eUSB2 PHY, or if you are performing
 	  compile testing for PHY drivers.
-
-config PHY_QCOM_UFS_V3
-	tristate "Qualcomm Technologies, Inc. UFS PHY V3 driver"
-	depends on PHY_QCOM_UFS
-	help
-	 Support for 11nm UFS QMP phy present on QCOM chipsets. This
-	 configuration option adds support for the UFS PHY present
-	 on QCOM Bengal chipsets.
-	 This is required to enable UFS on Bengal chipset.
-	 To compile this driver as a module, choose M here.
 
 config PHY_QCOM_UFS_V4_KHAJE
 	tristate "Qualcomm Technologies, Inc. UFS Khaje Phy Driver"
@@ -170,21 +135,3 @@ config PHY_QCOM_QMP_COMBO
 	  with USB3 and DisplayPort controllers on Qualcomm chips. This is
 	  required for the USB controller to communicate with the USB host
 	  in Super-Speed mode.
-
-config PHY_QCOM_SGMII_ETH
-	tristate "Qualcomm DWMAC SGMII SerDes/PHY driver"
-	depends on OF && (ARCH_QCOM || COMPILE_TEST)
-	depends on HAS_IOMEM
-	select GENERIC_PHY
-	help
-	  Enable this to support the Qualcomm SGMII SerDes/PHY used with the
-	  DesignWare MAC Ethernet controller on Qualcomm SoCs. This is required
-	  for proper SGMII link configuration between the MAC and external PHY.
-
-config PHY_QCOM_QMP_USB
-	tristate "Qualcomm QMP USB PHY Driver"
-	select GENERIC_PHY
-	default PHY_QCOM_QMP
-	help
-	  Enable this to support the QMP USB PHY transceiver that is used
-	  with USB3 controllers on Qualcomm chips.

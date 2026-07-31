@@ -598,9 +598,6 @@ static int smblite_usb_set_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
 		rc = smblite_lib_set_prop_current_max(chg, val);
 		break;
-	case POWER_SUPPLY_PROP_USB_TYPE:
-		rc = smblite_lib_set_prop_usb_type(chg, val->intval);
-		break;
 	default:
 		pr_err("usb set prop %d is not supported\n", psp);
 		rc = -EINVAL;

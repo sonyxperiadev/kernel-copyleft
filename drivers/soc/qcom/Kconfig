@@ -189,22 +189,6 @@ config QCOM_LLCC_HEURISTICS
 	  enablement from DTB itself. Also Provide the capability to disable,
 	  enable HERISTIC SCID functionality from SYSFS.
 
-config QCOM_LLCC_FORCE_CAPACITY_ON_MTE
-bool "Force staling-mode-capacity when kasan MTE is enabled"
-	help
-	  Force LLCC staling mode to LLCC_STALING_MODE_CAPACITY, when MTE
-	  is active. When enabled, the LLCC driver overrides the requested
-	  staling mode and uses capacity-based staling whenever hardware
-	  tag-based KASAN (MTE) is in use (kasan_hw_tags_enabled()).
-
-config QCOM_POWER_MODE
-	tristate "Power Mode driver support for Deep Sleep and S2R"
-	help
-	  This option enables Power Mode Driver which creates power mode
-          attribute to distinguish between Suspend-to-RAM (S2R) and Deep
-	  Sleep states and this attribute allows CPMS to write the current
-	  mode based on key events.
-
 config QCOM_SLC_PERFMON
 	tristate "Qualcomm Technologies, Inc. SLC PERFMON Driver"
 	help
@@ -454,6 +438,13 @@ config QCOM_STATS
 	  various SoC level low power modes statistics and export to debugfs
 	  interface.
 
+config QCOM_STATS_ON_SYSFS
+	bool "Enable SoC sleep stats I/F on SYSFS"
+	depends on QCOM_STATS && QCOM_SMEM
+	help
+	  Duplicate stats I/F virtual files to /sys/kernel/qcom_sleep_stats/
+	  derived from /sys/kernel/debug/qcom_stats/.
+
 config QCOM_LOGBUF_VENDOR_HOOKS
 	tristate "QTI Logbuf Vendor Hooks Support"
 	depends on ARCH_QCOM
@@ -483,15 +474,6 @@ config QCOM_WDT_CORE
 	   only enables the framework, an individual Qualcomm Technologies, Inc.
 	   watchdog module must be loaded along with this for watchdog
 	   functionality.
-
-config QCOM_CX_IPEAK
-	tristate "Common driver to handle Cx iPeak limitation"
-	help
-	  Cx ipeak HW module is used to limit the current drawn by various
-	  subsystem blocks on Cx power rail. Each client needs to set their
-	  bit in tcsr register if it is going to cross its own threshold.
-	  If all clients are going to cross their thresholds then Cx ipeak
-	  hw module will raise an interrupt to cDSP block to throttle cDSP fmax.
 
 config QCOM_SOC_WATCHDOG
 	tristate "Qualcomm Technologies, Inc. Soc Watchdog"
@@ -662,49 +644,6 @@ config MSM_SLATECOM_EVENT
          This event driver register for AON event bridge to receive sensor
          up and down and notifies upper layer HAL about sensor stataus
          through uevent via netlink socket.
-
-config MSM_SLATERSB
-        tristate "Provide support for rsb events on Slate"
-        help
-          SLATERSB communicates to SLATE over rpmsg driver for RSB configuration
-          and enable/disable on device power state change.Add slate rsb driver
-          which is use to configure rsb on slate.Slate rsb driver uses glink
-          to communicate with slate
-
-config MSM_SLATERSB_RPMSG
-        tristate "Provide support for slate events to RSB"
-        depends on MSM_SLATERSB
-        help
-          SLATERSB-RPMSG informs SLATERSB driver if GLINK channel has been
-          opened by remote processor. It doesn't maintain state machine
-          and is probed when SLATE opens channel and removed when the
-          channel is closed by remote processor.
-
-config MSM_SLATECOM
-        tristate "Provide APIs to communicate with Slate chipset"
-        help
-          SLATECOM is a thin layer above SPI. It is used within a SoC for
-          communication between G-Link/slate_com_dev and Slate processor over SPI.
-          This handle the interrupts raised by BG and notify the G-link with
-          interrupt event and event data.
-
-config MSM_SLATECOM_INTERFACE
-        tristate "Driver support for Slate Communication"
-        depends on MSM_SLATECOM
-        help
-          Create a slate_com_dev device node for user space communication.
-          Single user space client can open device node for communication
-          from hardware. Hardware will provide access to read
-          registers and read/write AHB memory in the device.
-
-config MSM_SLATECOM_RPMSG
-        tristate "Provide support for slate control GLINK channel"
-        depends on MSM_SLATECOM_INTERFACE
-        help
-          MSM_SLATECOM_RPMSG informs SLATECOM_INTERFACE driver if GLINK channel
-          has been opened by remote processor. It doesn't maintain state machine
-          and is probed when Slate opens channel and removed when the channel is
-          closed by remote processor.
 
 config QCOM_EUD
 	tristate "QTI Embedded USB Debugger (EUD)"
@@ -1336,64 +1275,4 @@ config QTI_HW_KEY_MANAGER_V1
 	 HWKM hardware to perform key operations from the kernel which will
 	 be used for storage encryption.
 
-config QCOM_DPD_PROXY
-	tristate "QCOM_DPD_PROXY TEE service"
-	help
-	  Converts legacy qcom_scm_assign_mem or hyp_assign calls into smcinvoke
-	  service messages. For clients with an iommu, the resulting smcinvoke
-	  memory object is preserved for future use by a smcinvoke-compatible
-	  iommu driver.
-
-	  If unsure, say N here.
-
-config MSM_BAM_DMUX
-	tristate "BAM Data Mux Driver"
-	depends on SPS
-	depends on QCOM_SMEM
-	depends on QCOM_SMSM
-	help
-	  Support Muxed Data Channels over BAM interface.
-	  BAM has a limited number of pipes.  This driver
-	  provides a means to support more logical channels
-	  via muxing than BAM could without muxing.
-
-config MSM_BAM_DMUX_DEBUG
-	bool "Enable BAM DMUX debug mode"
-	depends on MSM_BAM_DMUX
-	help
-	  Enable debug mode for BAM DMUX driver. This enables additional
-	  debug logging and statistics tracking. The debug information is
-	  logged via IPC logging infrastructure and can be viewed through
-	  debugfs.
-
-	  If unsure, say N.
-
-config QCOM_LLCC_DEBUG
-	tristate "Qualcomm Technologies,Inc. LLCC perf debug driver"
-	depends on DEBUG_FS
-	help
-	  This driver will expose debugfs nodes to show the status of
-	  PCB & configure sleep or wakeup as per ADR feature by reading
-	  the information through hardware. Debugfs interface is used to
-	  configure the PCBs in LLCC.
-
-config QCOM_SC_TCM_MEM
-	tristate "Add SC TCM memory management"
-	select GENERIC_ALLOCATOR
-	help
-	  Support management of Tightly Coupled Memory(TCM)
-	  in the System Cache(SC). This driver manages the
-	  registered SC TCM memory in granularity of the
-	  PAGE_SIZE bytes.
-
-          If not sure, say N.
-
-config QCOM_VM_CRASH_DMESG_DUMP
-	bool "Enable crash log access from VM to PVM"
-	depends on QCOM_VM_DMESG_DUMPER
-	help
-	  Enable support for accessing crash logs from VM to PVM.
-	  This is useful for debugging and post-mortem analysis of VM crashes.
-
-	  If not sure, say N.
 endmenu

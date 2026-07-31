@@ -118,36 +118,6 @@ int phy_write(struct eom_phy_device *phy, u32 reg, u32 val)
 }
 EXPORT_SYMBOL_GPL(phy_write);
 
-/* Read from PHY B register */
-int phy_b_read(struct eom_phy_device *phy, u32 reg, u32 *val)
-{
-	if (!phy || !phy->ops || !phy->ops->phy_b_read)
-		return -EINVAL;
-
-	return phy->ops->phy_b_read(phy->priv, reg, val);
-}
-EXPORT_SYMBOL_GPL(phy_b_read);
-
-/* Write to PHY B register */
-int phy_b_write(struct eom_phy_device *phy, u32 reg, u32 val)
-{
-	if (!phy || !phy->ops || !phy->ops->phy_b_write)
-		return -EINVAL;
-
-	return phy->ops->phy_b_write(phy->priv, reg, val);
-}
-EXPORT_SYMBOL_GPL(phy_b_write);
-
-/* Check if PHY B is available */
-bool phy_has_phy_b(struct eom_phy_device *phy)
-{
-	if (!phy || !phy->ops)
-		return false;
-
-	return (phy->ops->phy_b_read != NULL && phy->ops->phy_b_write != NULL);
-}
-EXPORT_SYMBOL_GPL(phy_has_phy_b);
-
 /* Get number of lanes for a PHY */
 int phy_get_num_lanes(struct eom_phy_device *phy)
 {

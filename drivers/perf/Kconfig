@@ -24,15 +24,4 @@ config ARM_SMMU_PMU
           Adds the SMMU PMU into the perf events subsystem for
           monitoring SMMU performance events.
 
-config MSM_DWC_PCIE_PMU
-	tristate "Synopsys DesignWare PCIe PMU"
-	depends on PCI
-	help
-	  Enable perf support for the Synopsys DesignWare PCIe Performance
-	  Monitoring Unit (PMU). This driver exposes per-Root-Port hardware
-	  counters for PCIe throughput and error metrics via the Linux perf
-	  subsystem. Supported on platforms using DesignWare PCIe IP,
-	  including the Alibaba Yitian 710 SoC. Say Y or M here to enable
-	  PCIe PMU event monitoring via perf stat/perf record.
-
 endmenu

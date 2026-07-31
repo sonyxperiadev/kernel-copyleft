@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
-
+// Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
 
 #include <linux/delay.h>
 #include <linux/device.h>
@@ -807,28 +806,27 @@ static void mhi_process_sfr(struct mhi_controller *mhi_cntrl,
 {
 	struct mhi_buf *mhi_buf = mhi_cntrl->rddm_image->mhi_buf;
 	struct device *dev = &mhi_cntrl->mhi_dev->dev;
-	u8 *sfr_buf, *sfr_buf_orig, *file_offset = info->file_offset;
+	u8 *sfr_buf, *file_offset = info->file_offset;
 	u32 file_size = info->file_size;
 	u32 rem_seg_len = info->rem_seg_len;
 	u32 seg_idx = info->seg_idx;
 
-	/* Allocate buffer with extra byte for null‑termination */
-	sfr_buf_orig = kzalloc(file_size + 1, GFP_KERNEL);
-	if (!sfr_buf_orig)
+	sfr_buf = kzalloc(file_size + 1, GFP_KERNEL);
+	if (!sfr_buf)
 		return;
-	sfr_buf = sfr_buf_orig;
 
 	while (file_size) {
-		/* Determine next segment if needed */
+		/* file offset starting from seg base */
 		if (!rem_seg_len) {
 			file_offset = mhi_buf[seg_idx].buf;
-			rem_seg_len = (file_size > mhi_buf[seg_idx].len) ?
-				      mhi_buf[seg_idx].len : file_size;
+			if (file_size > mhi_buf[seg_idx].len)
+				rem_seg_len = mhi_buf[seg_idx].len;
+			else
+				rem_seg_len = file_size;
 		}
 
 		if (file_size <= rem_seg_len) {
 			memcpy(sfr_buf, file_offset, file_size);
-			sfr_buf += file_size;
 			break;
 		}
 
@@ -842,13 +840,12 @@ static void mhi_process_sfr(struct mhi_controller *mhi_cntrl,
 			goto err;
 		}
 	}
-	/* Null‑terminate the string */
-	*sfr_buf = '\0';
+	sfr_buf[info->file_size] = '\0';
 
-	/* Log the SFR string */
-	MHI_ERR(dev, "%s\n", sfr_buf_orig);
+	/* force sfr string to log in kernel msg */
+	MHI_ERR(dev, "%s\n", sfr_buf);
 err:
-	kfree(sfr_buf_orig);
+	kfree(sfr_buf);
 }
 
 static int mhi_find_next_file_offset(struct mhi_controller *mhi_cntrl,

@@ -122,21 +122,11 @@ static void android_rvh_show_max_freq(void *unused, struct cpufreq_policy *polic
 static void android_rvh_cpu_capacity_show(void *unused,
 		unsigned long *capacity, int cpu)
 {
-	bool fake_capacity = false;
-
 	if (!soc_sched_lib_name_capacity)
 		return;
 
 	if ((is_sched_lib_based_app(current->pid) || is_sched_lib_task()) &&
-							(cpu < soc_sched_lib_name_capacity)) {
-		fake_capacity = true;
-
-		if ((sysctl_sched_heavy_nr || sysctl_sched_pipeline_util_thres) &&
-						cpumask_test_cpu(cpu, &cpus_for_pipeline))
-			fake_capacity = false;
-	}
-
-	if (fake_capacity)
+			cpu < soc_sched_lib_name_capacity)
 		*capacity = 100;
 }
 

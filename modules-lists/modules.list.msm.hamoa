@@ -2,12 +2,8 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 qcom-scm.ko
 arm_smmu.ko
-arm_smmu_v3.ko
-gic_intr_routing.ko
 smem.ko
 qcom_iommu_util.ko
-qcom_iommu_debug.ko
-iommu-logger.ko
 llcc-qcom.ko
 socinfo.ko
 qcom_tzmem.ko
@@ -38,8 +34,6 @@ gh_virt_wdt.ko
 nvmem_qfprom.ko
 debug_symbol.ko
 minidump.ko
-qcom_logbuf_vendor_hooks.ko
-qcom_logbuf_boot_log.ko
 qcom-dcvs.ko
 memory_dump_v2.ko
 dcc_v2.ko
@@ -63,8 +57,6 @@ spmi-pmic-arb.ko
 clk-dummy.ko
 clk-qcom.ko
 clk-rpmh.ko
-sched-walt.ko
-sched-walt-debug.ko
 gcc-x1p42100.ko
 gcc-x1e80100.ko
 tcsrcc-x1e80100.ko
@@ -79,11 +71,9 @@ nvmem_qcom-spmi-sdam.ko
 rtc-pm8xxx.ko
 pmic-pon-log.ko
 pinctrl-spmi-gpio.ko
-ps883x.ko
 phy-qcom-eusb2-repeater.ko
 phy-qcom-snps-eusb2.ko
 phy-qcom-qmp-combo.ko
-phy-nxp-ptn3222.ko
 phy-qcom-qmp-usb.ko
 dwc3-msm.ko
 videocc-sm8550.ko
@@ -95,15 +85,3 @@ msm_gpi.ko
 spi-msm-geni.ko
 arm_ffa.ko
 arm_ffa_transport.ko
-cpu_phys_log_map.ko
-qcom-pmu-lib.ko
-qcom_scmi_vendor.ko
-qcom_scmi_client.ko
-si_core_module.ko
-qcom_dpd_proxy.ko
-qcom_dpd_proxy_iommu.ko
-qcom_scm_smci.ko
-pkvm-geni.ko
-pkvm-smc-filter.ko
-wcd_usbss_i2c.ko
-pkvm-secure-memory-manager.ko

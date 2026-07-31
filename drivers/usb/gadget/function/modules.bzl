@@ -140,21 +140,3 @@ def register_modules(registry):
             "arch/arm64/gunyah/gh_arm_drv",
         ],
     )
-
-    registry.register(
-        name = "drivers/usb/gadget/function/usb_f_rmnet_bam",
-        out = "usb_f_rmnet_bam.ko",
-        config = "CONFIG_USB_F_RMNET_BAM",
-        srcs = [
-            # do not sort
-            "drivers/usb/gadget/function/f_rmnet.c",
-            "drivers/usb/gadget/function/u_ctrl_qti.c",
-            "drivers/usb/gadget/function/u_bam_dmux.c",
-        ],
-        hdrs = [
-            "drivers/usb/gadget/function/u_rmnet.h",
-            "drivers/usb/gadget/function/u_data_ipa.h",
-            "drivers/usb/gadget/function/f_qdss.h",
-            "drivers/soc/qcom/bam_dmux_private.h",
-        ],
-    )

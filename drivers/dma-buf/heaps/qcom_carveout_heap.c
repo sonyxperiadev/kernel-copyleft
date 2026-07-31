@@ -54,7 +54,6 @@ struct carveout_heap {
 	bool is_secure;
 	phys_addr_t base;
 	ssize_t size;
-	bool uncached;
 };
 
 struct secure_carveout_heap {
@@ -63,11 +62,6 @@ struct secure_carveout_heap {
 	struct carveout_heap carveout_heap;
 	struct list_head list;
 	atomic_long_t total_allocated;
-};
-
-struct sc_tcm_carveout_heap {
-	u32 token;
-	struct carveout_heap carveout_heap;
 };
 
 static void sc_heap_free(struct qcom_sg_buffer *buffer);
@@ -131,7 +125,7 @@ carveout_setup_vmperm(struct carveout_heap *carveout_heap,
 
 	if (!carveout_heap->is_secure) {
 		vmperm = mem_buf_vmperm_alloc(&buffer->sg_table, qcom_sg_release,
-				(void *)buffer);
+				&buffer->kref);
 		return vmperm;
 	}
 
@@ -144,7 +138,7 @@ carveout_setup_vmperm(struct carveout_heap *carveout_heap,
 		return ERR_PTR(ret);
 
 	vmperm = mem_buf_vmperm_alloc_staticvm(&buffer->sg_table, vmids, perms, nr,
-				qcom_sg_release, (void *)buffer);
+				qcom_sg_release, &buffer->kref);
 	kfree(vmids);
 	kfree(perms);
 
@@ -153,8 +147,8 @@ carveout_setup_vmperm(struct carveout_heap *carveout_heap,
 
 static struct dma_buf *__carveout_heap_allocate(struct carveout_heap *carveout_heap,
 						unsigned long len,
-						u32 fd_flags,
-						u64 heap_flags,
+						unsigned long fd_flags,
+						unsigned long heap_flags,
 						void (*buffer_free)(struct qcom_sg_buffer *))
 {
 	struct sg_table *table;
@@ -173,7 +167,7 @@ static struct dma_buf *__carveout_heap_allocate(struct carveout_heap *carveout_h
 	buffer->heap = carveout_heap->heap;
 	buffer->len = len;
 	buffer->free = buffer_free;
-	buffer->uncached = carveout_heap->uncached;
+	buffer->uncached = true;
 
 	table = &buffer->sg_table;
 	ret = sg_alloc_table(table, 1, GFP_KERNEL);
@@ -329,7 +323,6 @@ int qcom_carveout_heap_create(struct platform_heap *heap_data)
 		goto err;
 
 	carveout_heap->is_secure = false;
-	carveout_heap->uncached = true;
 
 	exp_info.name = heap_data->name;
 	exp_info.ops = &carveout_heap_ops;
@@ -485,7 +478,6 @@ int qcom_secure_carveout_heap_create(struct platform_heap *heap_data)
 
 	sc_heap->token = heap_data->token;
 	sc_heap->carveout_heap.is_secure = true;
-	sc_heap->carveout_heap.uncached = true;
 
 	exp_info.name = heap_data->name;
 	exp_info.ops = &sc_heap_ops;
@@ -507,96 +499,3 @@ err:
 
 	return ret;
 }
-
-#ifdef CONFIG_QCOM_DMABUF_HEAPS_SC_TCM
-static int sc_tcm_carveout_heap_init(struct platform_heap *heap_data,
-				struct carveout_heap *carveout_heap)
-{
-	void *base;
-
-	base = sc_tcm_mem_alloc(heap_data->size);
-	if (!base) {
-		pr_err("sc_tcm_carveout: unable to allocate memory of size %pa\n",
-				&heap_data->size);
-		return -ENOMEM;
-	}
-	heap_data->base = virt_to_phys(base);
-
-	return __carveout_heap_init(heap_data, carveout_heap, false);
-
-}
-
-static void sc_tcmc_heap_free(struct qcom_sg_buffer *buffer)
-{
-	struct sc_tcm_carveout_heap *sc_tcmc_heap;
-	struct carveout_heap *carveout_heap;
-	struct sg_table *table = &buffer->sg_table;
-	struct page *page = sg_page(table->sgl);
-	phys_addr_t paddr = page_to_phys(page);
-	struct device *dev;
-
-	sc_tcmc_heap = dma_heap_get_drvdata(buffer->heap);
-	carveout_heap = &sc_tcmc_heap->carveout_heap;
-	dev = carveout_heap->dev;
-
-	carveout_pages_zero(page, buffer->len);
-	carveout_free(carveout_heap, paddr, buffer->len);
-	sg_free_table(table);
-	kfree(buffer);
-}
-
-static struct dma_buf *sc_tcmc_heap_allocate(struct dma_heap *heap,
-						unsigned long len,
-						u32 fd_flags,
-						u64 heap_flags)
-{
-	struct sc_tcm_carveout_heap *sc_tcm_heap;
-
-	sc_tcm_heap = dma_heap_get_drvdata(heap);
-	return  __carveout_heap_allocate(&sc_tcm_heap->carveout_heap, len,
-						 fd_flags, heap_flags, sc_tcmc_heap_free);
-}
-
-static struct dma_heap_ops sc_tcmc_heap_ops = {
-	.allocate = sc_tcmc_heap_allocate,
-};
-
-int qcom_sc_tcm_carveout_heap_create(struct platform_heap *heap_data)
-{
-	struct dma_heap_export_info exp_info;
-	struct sc_tcm_carveout_heap *sc_tcm_heap;
-	int ret;
-
-	sc_tcm_heap = kzalloc(sizeof(*sc_tcm_heap), GFP_KERNEL);
-	if (!sc_tcm_heap)
-		return -ENOMEM;
-
-	/* size mentioned in token is in KB */
-	heap_data->size = heap_data->token;
-	ret = sc_tcm_carveout_heap_init(heap_data, &sc_tcm_heap->carveout_heap);
-	if (ret)
-		goto err;
-
-	sc_tcm_heap->carveout_heap.is_secure = false;
-	sc_tcm_heap->carveout_heap.uncached = false;
-
-	exp_info.name = heap_data->name;
-	exp_info.ops = &sc_tcmc_heap_ops;
-	exp_info.priv = sc_tcm_heap;
-
-	sc_tcm_heap->carveout_heap.heap = dma_heap_add(&exp_info);
-	if (IS_ERR(sc_tcm_heap->carveout_heap.heap)) {
-		ret = PTR_ERR(sc_tcm_heap->carveout_heap.heap);
-		goto destroy_heap;
-	}
-
-	return 0;
-
-destroy_heap:
-	sc_tcm_mem_free(phys_to_virt(heap_data->base), heap_data->size);
-	carveout_heap_destroy(&sc_tcm_heap->carveout_heap);
-err:
-	kfree(sc_tcm_heap);
-	return ret;
-}
-#endif

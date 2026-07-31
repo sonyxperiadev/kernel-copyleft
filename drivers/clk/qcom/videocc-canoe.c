@@ -50,6 +50,7 @@ static const struct pll_vco taycan_eko_t_vco[] = {
 /* 360.0 MHz Configuration */
 static struct alpha_pll_config video_cc_pll0_config = {
 	.l = 0x12,
+	.cal_l = 0x48,
 	.alpha = 0xc000,
 	.config_ctl_val = 0x25c400e7,
 	.config_ctl_hi_val = 0x0a8062e0,
@@ -88,6 +89,7 @@ static struct clk_alpha_pll video_cc_pll0 = {
 /* 480.0 MHz Configuration */
 static struct alpha_pll_config video_cc_pll1_config = {
 	.l = 0x19,
+	.cal_l = 0x48,
 	.alpha = 0x0,
 	.config_ctl_val = 0x25c400e7,
 	.config_ctl_hi_val = 0x0a8062e0,
@@ -126,6 +128,7 @@ static struct clk_alpha_pll video_cc_pll1 = {
 /* 480.0 MHz Configuration */
 static struct alpha_pll_config video_cc_pll2_config = {
 	.l = 0x19,
+	.cal_l = 0x48,
 	.alpha = 0x0,
 	.config_ctl_val = 0x25c400e7,
 	.config_ctl_hi_val = 0x0a8062e0,
@@ -164,6 +167,7 @@ static struct clk_alpha_pll video_cc_pll2 = {
 /* 480.0 MHz Configuration */
 static struct alpha_pll_config video_cc_pll3_config = {
 	.l = 0x19,
+	.cal_l = 0x48,
 	.alpha = 0x0,
 	.config_ctl_val = 0x25c400e7,
 	.config_ctl_hi_val = 0x0a8062e0,
@@ -977,13 +981,9 @@ static int video_cc_canoe_fixup(struct platform_device *pdev, struct regmap *reg
 
 	if (!strcmp(compat, "qcom,whale-videocc")) {
 		video_cc_pll0_config.config_ctl_hi_val = 0x0a8060e0;
-		video_cc_pll0_config.cal_l = 0x48;
 		video_cc_pll1_config.config_ctl_hi_val = 0x0a8060e0;
-		video_cc_pll1_config.cal_l = 0x48;
 		video_cc_pll2_config.config_ctl_hi_val = 0x0a8060e0;
-		video_cc_pll2_config.cal_l = 0x48;
 		video_cc_pll3_config.config_ctl_hi_val = 0x0a8060e0;
-		video_cc_pll3_config.cal_l = 0x48;
 	}
 
 	clk_taycan_eko_t_pll_configure(&video_cc_pll3, regmap, &video_cc_pll3_config);

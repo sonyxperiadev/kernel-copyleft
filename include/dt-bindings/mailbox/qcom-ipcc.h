@@ -42,8 +42,7 @@
 #define IPCC_CLIENT_APSS_NS1		33
 #define IPCC_CLIENT_SOCCP		46
 #define IPCC_CLIENT_CAM1		47
-#define IPCC_CLIENT_DCP                 57
-#define IPCC_CLIENT_LMCU                62
 #define IPCC_CLIENT_BROADCAST           0xF000
+#define IPCC_CLIENT_DCP                 57
 
 #endif

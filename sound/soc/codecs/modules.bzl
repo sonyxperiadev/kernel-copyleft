@@ -8,3 +8,17 @@ def register_modules(registry):
             "sound/soc/codecs/hdmi-codec.c",
         ],
     )
+
+    registry.register(
+        name = "sound/soc/codecs/snd-soc-cs40l26",
+        out = "snd-soc-cs40l26.ko",
+        config = "CONFIG_SND_SOC_CS40L26",
+        srcs = [
+            # do not sort
+            "sound/soc/codecs/cs40l26.c",
+        ],
+        deps = [
+            # do not sort
+            "drivers/input/misc/cs40l26-core",
+        ],
+    )

@@ -203,22 +203,6 @@ struct hab_header {
 /* 1 - enhanced memory sharing protocol with sync import and async unimport */
 #define HAB_VER_PROT 1
 
-/*
- * default up limit of maximum bytes of messages hold by HAB driver
- * in physical channel that not picked by HAB clients，100MB.
- * It is used to prevent from OOM where no / slow receiving in local but keep
- * sending on remote.
- */
-#define DEFAULT_PCHAN_RX_PENDING_SZ_MAX (100 * 1024 * 1024)
-
-/*
- * default up limit of maximum number of messages hold by HAB driver
- * in virtual channel that not picked by HAB clients，500.
- * It is used to detect unhealthy HAB client's communication where no / slow
- * receiving in local but keep sending on remote.
- */
-#define DEFAULT_VCHAN_RX_PENDING_CNT_MAX (500)
-
 struct physical_channel {
 	struct list_head node;
 	char name[MAX_VMID_NAME_SIZE];
@@ -251,14 +235,6 @@ struct physical_channel {
 	int vcnt;
 	rwlock_t vchans_lock;
 	int kernel_only;
-
-	/* accounting */
-	struct work_struct oom_work;
-	int rx_pending_sz_max;
-	int rx_pending_sz_peak;
-	atomic_t rx_pending_sz;
-	atomic_t rx_pending_cnt;
-
 	uint32_t mem_proto;
 };
 /* this payload has to be used together with type */
@@ -469,7 +445,6 @@ struct hab_driver_ops {
 	int (*habhyp_virq_rx_unregister)(struct hvirq_dbl *dbl);
 	int (*habhyp_get_virq_num_id)(void **virqdev, int label);
 	int (*habhyp_init_virt_irq)(void);
-	unsigned long long (*timer_get_sclk_ticks)(void);
 };
 
 struct hab_driver {
@@ -498,10 +473,6 @@ struct hab_driver {
 	struct list_head reclaim_list;
 	spinlock_t reclaim_lock;
 	struct work_struct reclaim_work;
-
-	/* accounting up limit, can be customized in DT */
-	int pchan_rx_pending_sz_max; /* default: DEFAULT_PCHAN_RX_PENDING_SZ_MAX */
-	int vchan_rx_pending_cnt_max; /* default: DEFAULT_VCHAN_RX_PENDING_CNT_MAX */
 
 	struct local_vmid settings; /* parser results */
 
@@ -546,9 +517,6 @@ struct virtual_channel {
 	/* stats */
 	atomic64_t tx_cnt; /* total succeeded tx */
 	atomic64_t rx_cnt; /* total succeeded rx */
-	int rx_pending_cnt; /* number of messages not received by client */
-	int rx_pending_cnt_peak; /* peak number of messages not received by client */
-	int rx_pending_sz; /* total size of messages not received by client */
 	int rx_inflight; /* rx in progress/blocking */
 };
 
@@ -882,11 +850,6 @@ static inline void hab_hypervisor_unregister(void)
 	hab_driver.ops->hab_hypervisor_unregister();
 }
 
-static inline unsigned long long msm_timer_get_sclk_ticks(void)
-{
-	return hab_driver.ops->timer_get_sclk_ticks();
-}
-
 int hab_hypervisor_register_os(void);
 int hab_hypervisor_unregister_os(void);
 void hab_hypervisor_unregister_common(void);
@@ -932,7 +895,6 @@ int hab_stat_show_ctx(struct hab_driver *drv, char *buf, int sz);
 int hab_stat_show_expimp(struct hab_driver *drv, int pid, char *buf, int sz);
 int hab_stat_show_reclaim(struct hab_driver *drv, char *buf, int sz);
 int hab_stat_show_virq(struct hab_driver *drv, char *buf, int sz);
-int hab_stat_store_rx_pending(const char *buf, int size);
 int hab_stat_init_sub(struct hab_driver *drv);
 int hab_stat_deinit_sub(struct hab_driver *drv);
 

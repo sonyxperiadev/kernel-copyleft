@@ -40,24 +40,6 @@ struct hib_bio_batch {
 	struct blk_plug		plug;
 };
 
-/* Opcodes for IClientEnv */
-enum client_env_opcode {
-	ICLIENTENV_OP_OPEN                   = 0,
-	ICLIENTENV_OP_REGISTER_WITH_CRED     = 5,
-};
-
-/* Opcodes for IHibernateTzDataMgr */
-enum hibernate_tzdata_mgr_opcode {
-	IHIBERNATE_TZDATA_MGR_OP_SAVEDATA    = 2,
-	IHIBERNATE_TZDATA_MGR_OP_GETKEY      = 4,
-};
-
-/* UIDs and client IDs */
-enum tz_uid_constants {
-	CHIBERNATE_TZDATA_MGR_UID            = 444,
-	HLOS_VM_UID                          = 3,
-};
-
-extern struct block_device *hiber_bdev;
+extern struct file *hiber_bdev;
 
 #endif /* __SOC_QCOM_HIBERNATION_H__ */

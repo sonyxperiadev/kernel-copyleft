@@ -2,7 +2,6 @@
 /*
  * Copyright (c) 2018 Synopsys, Inc. and/or its affiliates.
  * stmmac TC Handling (HW only)
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <net/pkt_cls.h>
@@ -336,9 +335,7 @@ static int tc_setup_cbs(struct stmmac_priv *priv,
 	u32 tx_queues_count = priv->plat->tx_queues_to_use;
 	s64 port_transmit_rate_kbps;
 	u32 queue = qopt->queue;
-	unsigned long queue_mask = BIT(queue);
 	u32 mode_to_use;
-	u32 tc = queue;
 	u64 value;
 	u32 ptr;
 	int ret;
@@ -348,16 +345,6 @@ static int tc_setup_cbs(struct stmmac_priv *priv,
 		return -EINVAL;
 	if (!priv->dma_cap.av)
 		return -EOPNOTSUPP;
-
-	/* With HDMA, the queue number from userspace identifies a VDMA channel,
-	 * not a physical queue. Resolve it to the corresponding hardware queue
-	 * mask and TC before applying the CBS configuration.
-	 */
-	if (priv->plat->has_hdma) {
-		priv->plat->get_queue_and_tc_from_vdma(priv, queue, &queue_mask, &tc);
-		if (!queue_mask)
-			return -EINVAL;
-	}
 
 	port_transmit_rate_kbps = qopt->idleslope - qopt->sendslope;
 
@@ -385,53 +372,47 @@ static int tc_setup_cbs(struct stmmac_priv *priv,
 		ptr = 0;
 	}
 
-	for_each_set_bit(queue, &queue_mask, tx_queues_count) {
-		mode_to_use = priv->plat->tx_queues_cfg[queue].mode_to_use;
-		if (mode_to_use == MTL_QUEUE_DCB && qopt->enable) {
-			ret = stmmac_dma_qmode(priv, priv->ioaddr, queue, MTL_QUEUE_AVB);
-			if (ret)
-				return ret;
-
-			priv->plat->tx_queues_cfg[queue].mode_to_use = MTL_QUEUE_AVB;
-		} else if (!qopt->enable) {
-			ret = stmmac_dma_qmode(priv, priv->ioaddr, queue,
-					       MTL_QUEUE_DCB);
-			if (ret)
-				return ret;
-
-			priv->plat->tx_queues_cfg[queue].mode_to_use = MTL_QUEUE_DCB;
-			continue;
-		}
-
-		/* Final adjustments for HW */
-		value = div_s64(qopt->idleslope * 1024ll * ptr, port_transmit_rate_kbps);
-		priv->plat->tx_queues_cfg[queue].idle_slope = value & GENMASK(31, 0);
-
-		value = div_s64(-qopt->sendslope * 1024ll * ptr, port_transmit_rate_kbps);
-		priv->plat->tx_queues_cfg[queue].send_slope = value & GENMASK(31, 0);
-
-		value = qopt->hicredit * 1024ll * 8;
-		priv->plat->tx_queues_cfg[queue].high_credit = value & GENMASK(31, 0);
-
-		value = qopt->locredit * 1024ll * 8;
-		priv->plat->tx_queues_cfg[queue].low_credit = value & GENMASK(31, 0);
-
-		ret = stmmac_config_cbs(priv, priv->hw,
-					priv->plat->tx_queues_cfg[queue].send_slope,
-					priv->plat->tx_queues_cfg[queue].idle_slope,
-					priv->plat->tx_queues_cfg[queue].high_credit,
-					priv->plat->tx_queues_cfg[queue].low_credit,
-					tc);
+	mode_to_use = priv->plat->tx_queues_cfg[queue].mode_to_use;
+	if (mode_to_use == MTL_QUEUE_DCB && qopt->enable) {
+		ret = stmmac_dma_qmode(priv, priv->ioaddr, queue, MTL_QUEUE_AVB);
 		if (ret)
 			return ret;
 
-		dev_info(priv->device, "CBS %s %d: send %d, idle %d, hi %d, lo %d\n",
-			 priv->plat->has_hdma ? "TC" : "queue",
-			 priv->plat->has_hdma ? tc : queue,
-			 qopt->sendslope, qopt->idleslope,
-			 qopt->hicredit, qopt->locredit);
+		priv->plat->tx_queues_cfg[queue].mode_to_use = MTL_QUEUE_AVB;
+	} else if (!qopt->enable) {
+		ret = stmmac_dma_qmode(priv, priv->ioaddr, queue,
+				       MTL_QUEUE_DCB);
+		if (ret)
+			return ret;
+
+		priv->plat->tx_queues_cfg[queue].mode_to_use = MTL_QUEUE_DCB;
 	}
 
+	/* Final adjustments for HW */
+	value = div_s64(qopt->idleslope * 1024ll * ptr, port_transmit_rate_kbps);
+	priv->plat->tx_queues_cfg[queue].idle_slope = value & GENMASK(31, 0);
+
+	value = div_s64(-qopt->sendslope * 1024ll * ptr, port_transmit_rate_kbps);
+	priv->plat->tx_queues_cfg[queue].send_slope = value & GENMASK(31, 0);
+
+	value = qopt->hicredit * 1024ll * 8;
+	priv->plat->tx_queues_cfg[queue].high_credit = value & GENMASK(31, 0);
+
+	value = qopt->locredit * 1024ll * 8;
+	priv->plat->tx_queues_cfg[queue].low_credit = value & GENMASK(31, 0);
+
+	ret = stmmac_config_cbs(priv, priv->hw,
+				priv->plat->tx_queues_cfg[queue].send_slope,
+				priv->plat->tx_queues_cfg[queue].idle_slope,
+				priv->plat->tx_queues_cfg[queue].high_credit,
+				priv->plat->tx_queues_cfg[queue].low_credit,
+				queue);
+	if (ret)
+		return ret;
+
+	dev_info(priv->device, "CBS queue %d: send %d, idle %d, hi %d, lo %d\n",
+			queue, qopt->sendslope, qopt->idleslope,
+			qopt->hicredit, qopt->locredit);
 	return 0;
 }
 

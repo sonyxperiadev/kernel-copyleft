@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2011 Google, Inc
  * Copyright (c) 2011-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/highmem.h>
@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/firmware/qcom/qcom_scm.h>
+#include <linux/gunyah/gh_rm_drv.h>
 #include <soc/qcom/secure_buffer.h>
 
 #define CREATE_TRACE_POINTS
@@ -30,8 +31,6 @@
 
 static struct device *qcom_secure_buffer_dev;
 static bool vmid_cp_camera_preview_ro;
-
-SRCU_NOTIFIER_HEAD_STATIC(hyp_assign_notifier);
 
 struct hyp_assign_debug_track {
 	depot_stack_handle_t hdl;
@@ -584,64 +583,20 @@ out_free_source:
 	return ret;
 }
 
-static int hyp_assign_table_notify(struct sg_table *table,
-		     u32 *source_vm_list, int source_nelems,
-		     int *dest_vmids, int *dest_perms,
-		     int dest_nelems)
-{
-	struct hyp_assign_notifier_data data = {
-		.table = table,
-		.source_vm_list = source_vm_list,
-		.source_nelems = source_nelems,
-		.dest_vmids = dest_vmids,
-		.dest_perms = dest_perms,
-		.dest_nelems = dest_nelems,
-	};
-
-	return srcu_notifier_call_chain(&hyp_assign_notifier, 0, &data);
-}
-
 int hyp_assign_table(struct sg_table *table,
 		     u32 *source_vm_list, int source_nelems,
 		     int *dest_vmids, int *dest_perms,
 		     int dest_nelems)
 {
-	int ret;
 
-	ret = hyp_assign_table_notify(table, source_vm_list, source_nelems,
-				      dest_vmids, dest_perms, dest_nelems);
-	/* If notifier handled it (NOTIFY_STOP) or returned an error, return early */
-	if (ret & NOTIFY_STOP_MASK)
-		return notifier_to_errno(ret);
+	if (!gh_rm_needs_hyp_assign(source_vm_list, source_nelems,
+				dest_vmids, dest_nelems))
+		return 0;
 
 	return _hyp_assign_table(table, table->nents, source_vm_list, source_nelems,
 				 dest_vmids, dest_perms, dest_nelems, true);
 }
 EXPORT_SYMBOL(hyp_assign_table);
-
-/**
- * hyp_assign_notifier_register() -
- * Register a handler for hyp_assign_table().
- * The values returned by this notifier have the following interpretation:
- * NOTIFY_STOP - Success. No fallback to arm 'smc' instruction.
- * NOTIFY_OK   - No error. Fallback to arm 'smc'.
- * values that notifier_to_errno() would consider errors -
- *               Stop. Do not call futher notifiers nor arm 'smc'.
- *
- * This notifier is intended to support a compatibility layer between
- * client-facing apis and different secure memory implemenations.
- */
-int hyp_assign_notifier_register(struct notifier_block *nb)
-{
-	return srcu_notifier_chain_register(&hyp_assign_notifier, nb);
-}
-EXPORT_SYMBOL_GPL(hyp_assign_notifier_register);
-
-int hyp_assign_notifier_unregister(struct notifier_block *nb)
-{
-	return srcu_notifier_chain_unregister(&hyp_assign_notifier, nb);
-}
-EXPORT_SYMBOL_GPL(hyp_assign_notifier_unregister);
 
 const char *msm_secure_vmid_to_string(int secure_vmid)
 {

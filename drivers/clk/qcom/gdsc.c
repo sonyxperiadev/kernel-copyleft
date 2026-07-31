@@ -99,7 +99,6 @@ static int gdsc_hwctrl(struct gdsc *sc, bool en)
 {
 	u32 val = en ? HW_CONTROL_MASK : 0;
 
-	sc->hw_ctrl_mode = en;
 	return regmap_update_bits(sc->regmap, sc->gdscr, HW_CONTROL_MASK, val);
 }
 
@@ -199,7 +198,7 @@ static int gdsc_toggle_logic(struct gdsc *sc, enum gdsc_status status,
 	}
 	WARN(ret, "%s status stuck at 'o%s'", sc->pd.name, status ? "ff" : "n");
 	if (ret)
-		gdsc_genpd_print_regs(NULL, sc);
+		gdsc_genpd_print_regs(sc);
 
 out:
 	if (!ret && status == GDSC_OFF) {
@@ -673,39 +672,3 @@ int gdsc_gx_do_nothing_enable(struct generic_pm_domain *domain)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(gdsc_gx_do_nothing_enable);
-
-void gdsc_pm_restore(struct gdsc *sc)
-{
-	u32 mask, val;
-	int ret;
-
-	if (!sc || !sc->regmap)
-		return;
-
-	mask = HW_CONTROL_MASK  | EN_REST_WAIT_MASK |
-	       EN_FEW_WAIT_MASK | CLK_DIS_WAIT_MASK;
-
-	val = sc->en_rest_wait_val << EN_REST_WAIT_SHIFT |
-	      sc->en_few_wait_val << EN_FEW_WAIT_SHIFT |
-	      sc->clk_dis_wait_val << CLK_DIS_WAIT_SHIFT;
-
-	if (sc->hw_ctrl_mode)
-		val |= HW_CONTROL_MASK;
-
-	if (sc->rsupply) {
-		ret = regulator_enable(sc->rsupply);
-		if (ret < 0) {
-			pr_err("%s: Failed to enable rsupply\n", sc->pd.name);
-			return;
-		}
-	}
-
-	regmap_update_bits(sc->regmap, sc->gdscr, mask, val);
-
-	if (sc->rsupply) {
-		ret = regulator_disable(sc->rsupply);
-		if (ret < 0)
-			pr_err("%s: Failed to disable rsupply\n", sc->pd.name);
-	}
-}
-EXPORT_SYMBOL_GPL(gdsc_pm_restore);

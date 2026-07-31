@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2013, 2015-2017, 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -99,11 +99,15 @@ do {									\
 #define CSR_MAX_ATID	128
 #define CSR_ATID_REG_SIZE	0xc
 
-#define CSR_U64_LO_MASK		0xFFFFFFFF
-#define CSR_U64_HI_SHIFT	32
-
 #define CSR_ARADDR_EXT_VAL	0x104
 #define CSR_AWADDR_EXT_VAL	0x104
+
+#define CSR_ATID_REG_OFFSET(atid, atid_offset) \
+		((atid / 32) * 4 + atid_offset)
+
+#define CSR_ATID_REG_BIT(atid)	(atid % 32)
+#define CSR_MAX_ATID	128
+#define CSR_ATID_REG_SIZE	0xc
 
 #define CSR_NAME_PROP		"coresight-csr"
 #define DEV_NAME_PROP		"device-name"
@@ -137,7 +141,6 @@ struct csr_drvdata {
 	bool			enable_flush;
 	bool			msr_support;
 	uint32_t		atid_offset;
-	bool			aodbg_csr_support;
 };
 
 DEFINE_CORESIGHT_DEVLIST(csr_devs, "csr");
@@ -504,7 +507,6 @@ static ssize_t timestamp_show(struct device *dev,
 	uint32_t val, time_val0, time_val1;
 	int ret;
 	unsigned long flags;
-	unsigned long csr_ts_offset = 0;
 
 	struct csr_drvdata *drvdata = dev_get_drvdata(dev->parent);
 
@@ -513,9 +515,6 @@ static ssize_t timestamp_show(struct device *dev,
 		return 0;
 	}
 
-	if (drvdata->aodbg_csr_support)
-		csr_ts_offset = 0x14;
-
 	ret = clk_prepare_enable(drvdata->clk);
 	if (ret)
 		return ret;
@@ -523,16 +522,16 @@ static ssize_t timestamp_show(struct device *dev,
 	spin_lock_irqsave(&drvdata->spin_lock, flags);
 	CSR_UNLOCK(drvdata);
 
-	val = csr_readl(drvdata, CSR_TIMESTAMPCTRL - csr_ts_offset);
+	val = csr_readl(drvdata, CSR_TIMESTAMPCTRL);
 
 	val  = val & ~BIT(0);
-	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL - csr_ts_offset);
+	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL);
 
 	val  = val | BIT(0);
-	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL - csr_ts_offset);
+	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL);
 
-	time_val0 = csr_readl(drvdata, CSR_QDSSTIMEVAL0 - csr_ts_offset);
-	time_val1 = csr_readl(drvdata, CSR_QDSSTIMEVAL1 - csr_ts_offset);
+	time_val0 = csr_readl(drvdata, CSR_QDSSTIMEVAL0);
+	time_val1 = csr_readl(drvdata, CSR_QDSSTIMEVAL1);
 
 	CSR_LOCK(drvdata);
 	spin_unlock_irqrestore(&drvdata->spin_lock, flags);
@@ -557,15 +556,11 @@ static ssize_t timestamp_ctrl_store(struct device *dev,
 	int ret;
 	unsigned long flags;
 	struct csr_drvdata *drvdata = dev_get_drvdata(dev->parent);
-	unsigned long csr_ts_offset = 0;
 
 	if (IS_ERR_OR_NULL(drvdata) || !drvdata->timestamp_support) {
 		dev_err(dev, "Invalid param\n");
 		return 0;
 	}
-
-	if (drvdata->aodbg_csr_support)
-		csr_ts_offset = 0x14;
 
 	ret = sscanf(buf, "%x", &val);
 	if (ret != 1)
@@ -577,7 +572,7 @@ static ssize_t timestamp_ctrl_store(struct device *dev,
 
 	spin_lock_irqsave(&drvdata->spin_lock, flags);
 	CSR_UNLOCK(drvdata);
-	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL - csr_ts_offset);
+	csr_writel(drvdata, val, CSR_TIMESTAMPCTRL);
 	CSR_LOCK(drvdata);
 	spin_unlock_irqrestore(&drvdata->spin_lock, flags);
 	clk_disable_unprepare(drvdata->clk);
@@ -728,41 +723,6 @@ out:
 
 static DEVICE_ATTR_RW(flushperiod);
 
-static ssize_t csr_hbeat_common_store(struct device *dev, const char *buf,
-				      size_t size, u64 *val_ptr,
-				      u32 reg_lo, u32 reg_hi)
-{
-	struct csr_drvdata *drvdata = dev_get_drvdata(dev->parent);
-	unsigned long val, flags;
-	u32 val_lo, val_hi;
-	unsigned long cs_hbeat_offset = 0;
-	int ret;
-
-	if (IS_ERR_OR_NULL(drvdata) || !drvdata->timestamp_support)
-		return -EINVAL;
-	if (kstrtoul(buf, 16, &val))
-		return -EINVAL;
-	ret = clk_prepare_enable(drvdata->clk);
-	if (ret)
-		return ret;
-
-	if (drvdata->aodbg_csr_support)
-		cs_hbeat_offset = 0x44;
-
-	spin_lock_irqsave(&drvdata->spin_lock, flags);
-	*val_ptr = val;
-	val_lo = val & CSR_U64_LO_MASK;
-	val_hi = val >> CSR_U64_HI_SHIFT;
-	CSR_UNLOCK(drvdata);
-	csr_writel(drvdata, val_lo, reg_lo - cs_hbeat_offset);
-	csr_writel(drvdata, val_hi, reg_hi - cs_hbeat_offset);
-	CSR_LOCK(drvdata);
-	spin_unlock_irqrestore(&drvdata->spin_lock, flags);
-	clk_disable_unprepare(drvdata->clk);
-
-	return size;
-}
-
 static ssize_t hbeat_val0_show(struct device *dev,
 				struct device_attribute *attr,
 				char *buf)
@@ -781,10 +741,33 @@ static ssize_t hbeat_val0_store(struct device *dev,
 				 size_t size)
 {
 	struct csr_drvdata *drvdata = dev_get_drvdata(dev->parent);
+	unsigned long val, flags;
+	u32 val_lo, val_hi;
+	int ret;
 
-	return csr_hbeat_common_store(dev, buf, size, &drvdata->hbeat_val0,
-				      CSR_TS_HBEAT_VAL0_LO,
-				      CSR_TS_HBEAT_VAL0_HI);
+	if (IS_ERR_OR_NULL(drvdata) || !drvdata->timestamp_support)
+		return -EINVAL;
+
+	if (kstrtoul(buf, 16, &val))
+		return -EINVAL;
+
+	ret = clk_prepare_enable(drvdata->clk);
+	if (ret)
+		return ret;
+
+	spin_lock_irqsave(&drvdata->spin_lock, flags);
+
+	drvdata->hbeat_val0 = val;
+	val_lo = val & 0xFFFFFFFF;
+	val_hi = val >> 32;
+
+	CSR_UNLOCK(drvdata);
+	csr_writel(drvdata, val_lo, CSR_TS_HBEAT_VAL0_LO);
+	csr_writel(drvdata, val_hi, CSR_TS_HBEAT_VAL0_HI);
+	CSR_LOCK(drvdata);
+	spin_unlock_irqrestore(&drvdata->spin_lock, flags);
+	clk_disable_unprepare(drvdata->clk);
+	return size;
 }
 static DEVICE_ATTR_RW(hbeat_val0);
 
@@ -806,10 +789,33 @@ static ssize_t hbeat_val1_store(struct device *dev,
 				 size_t size)
 {
 	struct csr_drvdata *drvdata = dev_get_drvdata(dev->parent);
+	unsigned long val, flags;
+	u32 val_lo, val_hi;
+	int ret;
 
-	return csr_hbeat_common_store(dev, buf, size, &drvdata->hbeat_val1,
-				      CSR_TS_HBEAT_VAL1_LO,
-				      CSR_TS_HBEAT_VAL1_HI);
+	if (IS_ERR_OR_NULL(drvdata) || !drvdata->timestamp_support)
+		return -EINVAL;
+
+	if (kstrtoul(buf, 16, &val))
+		return -EINVAL;
+
+	ret = clk_prepare_enable(drvdata->clk);
+	if (ret)
+		return ret;
+
+	spin_lock_irqsave(&drvdata->spin_lock, flags);
+
+	drvdata->hbeat_val1 = val;
+	val_lo = val & 0xFFFFFFFF;
+	val_hi = val >> 32;
+
+	CSR_UNLOCK(drvdata);
+	csr_writel(drvdata, val_lo, CSR_TS_HBEAT_VAL1_LO);
+	csr_writel(drvdata, val_hi, CSR_TS_HBEAT_VAL1_HI);
+	CSR_LOCK(drvdata);
+	spin_unlock_irqrestore(&drvdata->spin_lock, flags);
+	clk_disable_unprepare(drvdata->clk);
+	return size;
 }
 static DEVICE_ATTR_RW(hbeat_val1);
 
@@ -831,10 +837,33 @@ static ssize_t hbeat_mask0_store(struct device *dev,
 				 size_t size)
 {
 	struct csr_drvdata *drvdata = dev_get_drvdata(dev->parent);
+	unsigned long val, flags;
+	u32 val_lo, val_hi;
+	int ret;
 
-	return csr_hbeat_common_store(dev, buf, size, &drvdata->hbeat_mask0,
-				      CSR_TS_HBEAT_MASK0_LO,
-				      CSR_TS_HBEAT_MASK0_HI);
+	if (IS_ERR_OR_NULL(drvdata) || !drvdata->timestamp_support)
+		return -EINVAL;
+
+	if (kstrtoul(buf, 16, &val))
+		return -EINVAL;
+
+	ret = clk_prepare_enable(drvdata->clk);
+	if (ret)
+		return ret;
+
+	spin_lock_irqsave(&drvdata->spin_lock, flags);
+
+	drvdata->hbeat_mask0 = val;
+	val_lo = val & 0xFFFFFFFF;
+	val_hi = val >> 32;
+
+	CSR_UNLOCK(drvdata);
+	csr_writel(drvdata, val_lo, CSR_TS_HBEAT_MASK0_LO);
+	csr_writel(drvdata, val_hi, CSR_TS_HBEAT_MASK0_HI);
+	CSR_LOCK(drvdata);
+	spin_unlock_irqrestore(&drvdata->spin_lock, flags);
+	clk_disable_unprepare(drvdata->clk);
+	return size;
 }
 static DEVICE_ATTR_RW(hbeat_mask0);
 
@@ -856,10 +885,33 @@ static ssize_t hbeat_mask1_store(struct device *dev,
 				 size_t size)
 {
 	struct csr_drvdata *drvdata = dev_get_drvdata(dev->parent);
+	unsigned long val, flags;
+	u32 val_lo, val_hi;
+	int ret;
 
-	return csr_hbeat_common_store(dev, buf, size, &drvdata->hbeat_mask1,
-				      CSR_TS_HBEAT_MASK1_LO,
-				      CSR_TS_HBEAT_MASK1_HI);
+	if (IS_ERR_OR_NULL(drvdata) || !drvdata->timestamp_support)
+		return -EINVAL;
+
+	if (kstrtoul(buf, 16, &val))
+		return -EINVAL;
+
+	ret = clk_prepare_enable(drvdata->clk);
+	if (ret)
+		return ret;
+
+	spin_lock_irqsave(&drvdata->spin_lock, flags);
+
+	drvdata->hbeat_mask1 = val;
+	val_lo = val & 0xFFFFFFFF;
+	val_hi = val >> 32;
+
+	CSR_UNLOCK(drvdata);
+	csr_writel(drvdata, val_lo, CSR_TS_HBEAT_MASK1_LO);
+	csr_writel(drvdata, val_hi, CSR_TS_HBEAT_MASK1_HI);
+	CSR_LOCK(drvdata);
+	spin_unlock_irqrestore(&drvdata->spin_lock, flags);
+	clk_disable_unprepare(drvdata->clk);
+	return size;
 }
 static DEVICE_ATTR_RW(hbeat_mask1);
 
@@ -1106,13 +1158,6 @@ static int csr_probe(struct platform_device *pdev)
 		dev_dbg(dev, "timestamp_support handled by other subsystem\n");
 	else
 		dev_dbg(dev, "timestamp_support operation supported\n");
-
-	drvdata->aodbg_csr_support = of_property_read_bool(pdev->dev.of_node,
-						"qcom,aodbg-csr-support");
-	if (!drvdata->aodbg_csr_support)
-		dev_dbg(dev, "aodbg_csr_support operation not supported\n");
-	else
-		dev_dbg(dev, "aodbg_csr_support operation supported\n");
 
 	drvdata->perflsheot_set_support = of_property_read_bool(
 			pdev->dev.of_node, "qcom,perflsheot-set-support");

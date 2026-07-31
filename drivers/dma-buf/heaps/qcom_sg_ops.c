@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2026 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * mmap() algorithm taken from drivers/staging/android/ion/ion_heap.c as
@@ -14,7 +19,7 @@
  * https://lore.kernel.org/lkml/20201017013255.43568-2-john.stultz@linaro.org/
  *
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-buf.h>
@@ -565,46 +570,33 @@ void qcom_sg_buffer_init(struct qcom_sg_buffer *buffer)
 {
 	INIT_LIST_HEAD(&buffer->attachments);
 	mutex_init(&buffer->lock);
+	kref_init(&buffer->kref);
 }
 EXPORT_SYMBOL_GPL(qcom_sg_buffer_init);
 
 /* Releases memory associated with buffer */
-void qcom_sg_release(void *buffer)
+void qcom_sg_release(struct kref *kref)
 {
-	struct qcom_sg_buffer *buf = (struct qcom_sg_buffer *)buffer;
-	mem_buf_vmperm_free(buf->vmperm);
-	if (buf->free)
-		buf->free(buf);
+	struct qcom_sg_buffer *buffer;
+
+	buffer = container_of(kref, struct qcom_sg_buffer, kref);
+	mem_buf_vmperm_free(buffer->vmperm);
+	if (buffer->free)
+		buffer->free(buffer);
 }
 EXPORT_SYMBOL_GPL(qcom_sg_release);
 
 /*
  * Attempt return to the default security state, and
  * cleanup lazily-freed iommu mappings.
- *
- * This function is called when the dmabuf is closed (last fd closed).
- * It drops the initial reference that was taken during vmperm allocation.
+ * Drops the initial refcount from qcom_sg_buffer_init()
  */
 static void qcom_sg_exit(struct qcom_sg_buffer *buffer)
 {
-	struct mem_buf_vmperm *vmperm;
+	mem_buf_vmperm_try_reclaim(buffer->vmperm, false);
 
-	vmperm = buffer->vmperm;
 	msm_dma_buf_freed(buffer);
-	mem_buf_vmperm_try_reclaim(vmperm, false);
-
-	/*
-	 * Drop the initial reference from kref_init().
-	 *
-	 * If this is the last reference (e.g., no active memparcel, no active
-	 * notifiers), vmperm_kref_release() will be called which calls
-	 * qcom_sg_release().
-	 *
-	 * If there are still active references (e.g., memparcel not reclaimed,
-	 * or notifier holding a ref), the buffer will stay alive until those
-	 * refs are dropped.
-	 */
-	mem_buf_vmperm_put(buffer->vmperm);
+	kref_put(&buffer->kref, qcom_sg_release);
 }
 
 void qcom_sg_dmabuf_release(struct dma_buf *dmabuf)
@@ -652,4 +644,3 @@ int qti_smmu_proxy_register_callbacks(smmu_proxy_map_sgtable map_sgtable_fn_ptr,
 	return 0;
 }
 EXPORT_SYMBOL(qti_smmu_proxy_register_callbacks);
-

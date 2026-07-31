@@ -6,7 +6,6 @@ load("//build/kernel/kleaf:hermetic_tools.bzl", "hermetic_genrule")
 load(
     "//build/kernel/kleaf:kernel.bzl",
     "ddk_headers",
-    "dtbo",
     "kernel_build_config",
     "kernel_images",
     "merged_kernel_uapi_headers",
@@ -20,7 +19,6 @@ load(":kleaf-scripts/dtbs.bzl", "define_qcom_dtbs")
 load(":kleaf-scripts/modules_unprotected.bzl", "get_unprotected_vendor_modules_list")
 load(":kleaf-scripts/msm_dtc.bzl", "define_dtc_dist")
 load(":kleaf-scripts/techpack_modules.bzl", "define_techpack_modules")
-load(":qcom_libraries.bzl", "library_registry")
 load(":qcom_modules.bzl", "registry")
 
 def define_common_android_rules():
@@ -58,28 +56,6 @@ def define_single_android_build(
         implicit_config_fragment = None,
         config_path = None):
     stem = "{}_{}".format(name, variant)
-
-    library_targets = library_registry.define_libraries(
-        target_variant = stem,
-        config_fragment = config_fragment,
-        base_kernel = base_kernel,
-        ddk_config_deps = ddk_config_deps,
-        implicit_config_fragment = implicit_config_fragment,
-        config_path = config_path,
-    )
-
-    library_names = {}
-    for t in library_targets:
-        if t.startswith(stem + "_"):
-            logical = t[len(stem) + 1:]
-            library_names[logical] = t
-        else:
-            parts = t.split("/", 1)
-            if len(parts) > 1:
-                library_names[parts[1]] = t
-            else:
-                fail("Library target {} does not match stem {}_".format(t, stem))
-
     modules = registry.define_modules(
         stem,
         config_fragment,
@@ -87,7 +63,6 @@ def define_single_android_build(
         ddk_config_deps,
         implicit_config_fragment,
         config_path = config_path,
-        library_names = library_names,
     )
 
     hermetic_genrule(
@@ -103,7 +78,7 @@ def define_single_android_build(
     )
 
     if dtb_target:
-        dtb_list, dtbo_list, custom_dtbo_img_list = define_qcom_dtbs(
+        dtb_list, dtbo_list = define_qcom_dtbs(
             stem = stem,
             target = dtb_target,
             defconfig = "//common:arch/arm64/configs/gki_defconfig",
@@ -112,7 +87,6 @@ def define_single_android_build(
     else:
         dtb_list = None
         dtbo_list = None
-        custom_dtbo_img_list = []
 
     native.alias(
         name = "{}_abl".format(stem),
@@ -263,16 +237,6 @@ def define_single_android_build(
         """,
     )
 
-    for dtbo_img in custom_dtbo_img_list:
-        dtbo(
-            name = "{}_{}_dtbo_image".format(stem, dtbo_img["name"]),
-            srcs = [":{}_dtb_build/{}".format(stem, dtbo) for dtbo in dtbo_img["src"]] if dtbo_img["src"] else None,
-            out = "{}_{}_dtbo.img".format(dtbo_img["name"], variant),
-            config_file = dtbo_img["config_file"],
-            kernel_build = "{}_dtb_build".format(stem),
-            tool = "mkdtboimg",
-        )
-
     dist_data = [
         "{}_gki_artifacts".format(base_kernel),
         ":{}_modules_install".format(stem),
@@ -289,9 +253,6 @@ def define_single_android_build(
     ] + [
         ":{}/{}".format(stem, module)
         for module in modules
-    ] + [
-        ":{}_{}_dtbo_image".format(stem, dtbo_img["name"])
-        for dtbo_img in custom_dtbo_img_list
     ]
 
     vendor_dlkm_module_unprotected_list = get_unprotected_vendor_modules_list(stem)

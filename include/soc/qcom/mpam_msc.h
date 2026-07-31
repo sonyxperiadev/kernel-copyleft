@@ -77,8 +77,6 @@ int msc_system_mon_read_miss_info(uint32_t msc_id, void *arg1, void *arg2);
 int msc_system_mon_alloc_info(uint32_t msc_id, void *arg1, void *arg2);
 int msc_system_mon_fe_bw_info(uint32_t msc_id, void *arg1, void *arg2);
 int msc_system_mon_be_bw_info(uint32_t msc_id, void *arg1, void *arg2);
-int msc_system_mon_total_fe_bw_info(uint32_t msc_id, void *arg1, void *arg2);
-int msc_system_mon_total_be_bw_info(uint32_t msc_id, void *arg1, void *arg2);
 int msc_system_mon_stats_read(uint32_t msc_id, void *arg1, void *arg2);
 int msc_system_mon_read_all(uint32_t msc_id, void *arg1, void *arg2);
 int msc_system_mon_config(uint32_t msc_id, void *arg1, void *arg2);
@@ -132,16 +130,6 @@ static inline int msc_system_mon_fe_bw_info(uint32_t msc_id, void *arg1, void *a
 }
 
 static inline int msc_system_mon_be_bw_info(uint32_t msc_id, void *arg1, void *arg2)
-{
-	return -EINVAL;
-}
-
-static inline int msc_system_mon_total_fe_bw_info(uint32_t msc_id, void *arg1, void *arg2)
-{
-	return -EINVAL;
-}
-
-static inline int msc_system_mon_total_be_bw_info(uint32_t msc_id, void *arg1, void *arg2)
 {
 	return -EINVAL;
 }

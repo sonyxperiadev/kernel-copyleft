@@ -50,6 +50,7 @@ static const struct pll_vco taycan_eko_t_vco[] = {
 /* 950.0 MHz Configuration */
 static struct alpha_pll_config gpu_cc_pll0_config = {
 	.l = 0x31,
+	.cal_l = 0x48,
 	.alpha = 0x7aaa,
 	.config_ctl_val = 0x25c400e7,
 	.config_ctl_hi_val = 0x0a8062e0,
@@ -605,10 +606,8 @@ static int gpu_cc_canoe_fixup(struct platform_device *pdev, struct regmap *regma
 	if (!strcmp(compat, "qcom,alor-gpucc"))
 		gpu_cc_alor_fixup(regmap);
 
-	if (!strcmp(compat, "qcom,whale-gpucc")) {
+	if (!strcmp(compat, "qcom,whale-gpucc"))
 		gpu_cc_pll0_config.config_ctl_hi_val = 0x0a8060e0;
-		gpu_cc_pll0_config.cal_l = 0x48;
-	}
 
 	return 0;
 }

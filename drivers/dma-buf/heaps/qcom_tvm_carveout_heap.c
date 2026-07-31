@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "tvm_heap: %s: "  fmt, __func__
@@ -396,7 +396,7 @@ static struct dma_buf *tvm_heap_allocate(struct dma_heap *dma_heap,
 		goto err_sg_alloc_table;
 	sg_set_page(table->sgl, pfn_to_page(PFN_DOWN(paddr)), len, 0);
 
-	buffer->vmperm = mem_buf_vmperm_alloc(table, qcom_sg_release, (void *)buffer);
+	buffer->vmperm = mem_buf_vmperm_alloc(table, qcom_sg_release, &buffer->kref);
 	if (IS_ERR(buffer->vmperm)) {
 		ret = PTR_ERR(buffer->vmperm);
 		goto err_vmperm_alloc;

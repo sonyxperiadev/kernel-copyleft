@@ -165,17 +165,6 @@ config ARM_SMMU_SELFTEST
 
 	  If unsure, say N.
 
-config IOMMU_TLBSYNC_DEBUG
-	bool "TLB sync timeout debug"
-	depends on ARM_SMMU
-	help
-	  Collects the SMMU system state information after the
-	  first TLB sync timeout failure by calling BUG() from
-	  a workqueue thread. Note to use this only on debug
-	  builds.
-
-	  If unsure, say N here.
-
 config QCOM_LAZY_MAPPING
 	tristate "Reference counted iommu-mapping support"
 	depends on QCOM_DMABUF_HEAPS
@@ -187,85 +176,5 @@ config QCOM_LAZY_MAPPING
 	  map/unmaps of the same region.
 
 	  If unsure, say N here.
-config ARM_SMMU_V3
-        tristate "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
-        depends on ARM64
-        select IOMMU_API
-        select IOMMU_IO_PGTABLE_LPAE
-        select GENERIC_MSI_IRQ_DOMAIN
-        help
-          Support for implementations of the ARM System MMU architecture
-          version 3 providing translation support to a PCIe root complex.
 
-          Say Y here if your system includes an IOMMU device implementing
-          the ARM SMMUv3 architecture.
-
-config ARM_PARAVIRT_SMMU_V3
-        tristate "Paravirtualized ARM SMMU V3 driver support"
-        depends on ARM64
-        depends on QCOM_SCM
-        select IOMMU_API
-        select IOMMU_IO_PGTABLE_LPAE
-        select GENERIC_MSI_IRQ_DOMAIN
-        help
-          Support for a paravirtualized implementation of ARM SMMU V3
-          architecture.
-
-          Say Y here if your system has the corresponding backend
-          SMMU-v3 support available which runs at a higher exception
-          level.
-
-config ARM_SMMU_V3_SVA
-        bool "Shared Virtual Addressing support for the ARM SMMUv3"
-        depends on ARM_SMMU_V3
-        select IOMMU_SVA
-        select MMU_NOTIFIER
-        help
-          Support for sharing process address spaces with devices using the
-          SMMUv3.
-
-          Say Y here if your system supports SVA extensions such as PCIe PASID
-          and PRI.
-
-config ARM_SMMU_V3_QCOM_VIRTIO
-        bool "Virtio-Iommu ARM-SMMU-V3 acceleration"
-        depends on ARM_SMMU_V3 && VIRTIO_IOMMU
-        help
-          The virtio-iommu attach-table extension allows the VM to program
-          S1 pagetables directly, reducing the number of host-to-VM
-          transitions. Enable awareness of arm-smmu-v3 register settings,
-          pagetable formats, and tlb maintenance operations by virtio-iommu.
-          If unsure, say N here.
-
-config VIRTIO_IOMMU
-        tristate "Virtio IOMMU driver"
-        depends on VIRTIO
-        depends on (ARM64 || X86)
-        select IOMMU_API
-        select INTERVAL_TREE
-        select ACPI_VIOT if ACPI
-        help
-          Enable support for the Virtio IOMMU device, a paravirtualized IOMMU
-          that manages DMA from endpoints in virtualized environments. The device
-          can act as a proxy for physical IOMMUs (for assigned devices) or as a
-          purely virtual IOMMU for emulated/paravirtualized endpoints.
-
-          Say Y here if you intend to run this kernel as a guest.
-
-config QCOM_SMMU_IRGN0_ERRATA
-	bool "IRGN0 errata"
-	depends on QCOM_IOMMU_UTIL
-	depends on ARCH_SERAPH
-        help
-	  This option is used to apply a work around for
-	  an internal errata to adjust the irgn bit.
-
-	  Say N here if unsure.
-
-config ARM_SMMU_V3_PKVM_NESTED
-	tristate "ARM SMMUv3 nested support for protected Virtual Machines"
-	depends on KVM && ARM64 && ARM_SMMU_V3
-	help
-	  Enable a SMMUv3 driver in the KVM hypervisor, to protect VMs against
-	  memory accesses from devices owned by the host.
 endif # IOMMU_SUPPORT

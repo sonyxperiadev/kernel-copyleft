@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #define pr_fmt(fmt) "qcom-dcvs-fp: " fmt
 
@@ -47,7 +47,6 @@ enum ddrllcc_fp_idx {
 struct ddrllcc_fp_data {
 	struct device		*dev;
 	struct dcvs_path	*paths[NUM_FP_CMDS];
-	u32			fp_cnt;
 	struct bcm_data		bcms[NUM_FP_CMDS];
 	struct tcs_cmd		tcs_cmds[NUM_FP_CMDS];
 };
@@ -66,21 +65,20 @@ static int ddrllcc_fp_commit(struct dcvs_path *path, struct dcvs_freq *freqs,
 	u32 bcm_vote;
 	int i, ret = 0;
 
-	for (i = 0; i < fp_data->fp_cnt; i++) {
+	for (i = 0; i < NUM_FP_CMDS; i++) {
 		if (!(update_mask & BIT(i)))
 			continue;
 		bcm_vote = freqs[i].ib * bcms[i].width / bcms[i].unit;
 		tcs_cmds[i].data = BCM_TCS_CMD(1, 1, 0, bcm_vote);
 	}
 
-	ret = rpmh_update_fast_path(dev, tcs_cmds, fp_data->fp_cnt,
-					update_mask);
+	ret = rpmh_update_fast_path(dev, tcs_cmds, NUM_FP_CMDS, update_mask);
 	if (ret < 0) {
 		dev_err(dev, "Error updating RPMH fast path: %d\n", ret);
 		return ret;
 	}
 
-	for (i = 0; i < fp_data->fp_cnt; i++) {
+	for (i = 0; i < NUM_FP_CMDS; i++) {
 		if (!(update_mask & BIT(i)))
 			continue;
 		paths[i]->cur_freq.ib = freqs[i].ib;
@@ -160,7 +158,6 @@ static int qcom_dcvs_fp_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	int i, ret = 0;
 	struct ddrllcc_fp_data *fp_data;
-	const char *bcm_name;
 
 	mutex_lock(&ddrllcc_lock);
 	if (ddrllcc_data) {
@@ -175,53 +172,40 @@ static int qcom_dcvs_fp_probe(struct platform_device *pdev)
 	}
 
 	fp_data->dev = dev;
-	fp_data->fp_cnt = 0;
-
-	ret = of_property_read_string(dev->of_node, DDR_BCM_PROP, &bcm_name);
-	if (!ret) {
-		ret = populate_bcm_data(dev, &fp_data->bcms[DDR_IDX],
-			DDR_BCM_PROP);
-		if (ret < 0) {
-			dev_err(dev, "Error importing %s bcm data: %d\n",
-							DDR_BCM_PROP, ret);
-			goto out;
-		}
-		fp_data->fp_cnt++;
+	ret = populate_bcm_data(dev, &fp_data->bcms[DDR_IDX], DDR_BCM_PROP);
+	if (ret < 0) {
+		dev_err(dev, "Error importing %s bcm data: %d\n",
+						DDR_BCM_PROP, ret);
+		goto out;
+	}
+	ret = populate_bcm_data(dev, &fp_data->bcms[LLCC_IDX], LLCC_BCM_PROP);
+	if (ret < 0) {
+		dev_err(dev, "Error importing %s bcm data: %d\n",
+						LLCC_BCM_PROP, ret);
+		goto out;
 	}
 
-	ret = of_property_read_string(dev->of_node, LLCC_BCM_PROP, &bcm_name);
-	if (!ret) {
-		ret = populate_bcm_data(dev, &fp_data->bcms[LLCC_IDX],
-			LLCC_BCM_PROP);
-		if (ret < 0) {
-			dev_err(dev, "Error importing %s bcm data: %d\n",
-							LLCC_BCM_PROP, ret);
-			goto out;
-		}
-		fp_data->fp_cnt++;
-	}
-
-	for (i = 0; i < fp_data->fp_cnt; i++) {
+	for (i = 0; i < NUM_FP_CMDS; i++) {
 		fp_data->tcs_cmds[i].addr = fp_data->bcms[i].addr;
 		fp_data->tcs_cmds[i].data = BCM_TCS_CMD(1, 1, 0, 0);
 		fp_data->tcs_cmds[i].wait = 0;
 	}
 
-	ret = rpmh_init_fast_path(dev, fp_data->tcs_cmds, fp_data->fp_cnt);
+	ret = rpmh_init_fast_path(dev, fp_data->tcs_cmds, NUM_FP_CMDS);
 	if (ret < 0) {
 		dev_err(dev, "Error initializing rpmh fast path: %d\n", ret);
 		goto out;
 	}
 	ret = rpmh_write_async(dev, RPMH_SLEEP_STATE, fp_data->tcs_cmds,
-					fp_data->fp_cnt);
+								NUM_FP_CMDS);
 	if (ret < 0) {
 		dev_err(dev, "Error initing dcvs_fp sleep vote: %d\n", ret);
 		goto out;
 	}
-	for (i = 0; i < fp_data->fp_cnt; i++)
+	for (i = 0; i < NUM_FP_CMDS; i++)
 		fp_data->tcs_cmds[i].data = BCM_TCS_CMD(1, 1, 0, 1);
 	ret = rpmh_write_async(dev, RPMH_WAKE_ONLY_STATE, fp_data->tcs_cmds,
-					fp_data->fp_cnt);
+								NUM_FP_CMDS);
 	if (ret < 0) {
 		dev_err(dev, "Error initing dcvs_fp wake vote: %d\n", ret);
 		goto out;

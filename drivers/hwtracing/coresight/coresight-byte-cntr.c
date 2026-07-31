@@ -91,184 +91,90 @@ static long tmc_etr_flush_remaining_bytes(struct tmc_drvdata *tmcdrvdata, long o
 
 
 static ssize_t tmc_etr_byte_cntr_read(struct file *fp, char __user *data,
-				       size_t len, loff_t *ppos)
+			       size_t len, loff_t *ppos)
 {
 	struct byte_cntr *byte_cntr_data = fp->private_data;
 	struct tmc_drvdata *tmcdrvdata = byte_cntr_data->tmcdrvdata;
 	char *bufp = NULL;
-	long actual, rwp, avail, req_size;
-	int ret;
+	long actual;
+	int ret = 0;
+	long rwp_offset, req_size = 0;
 
 	if (!data)
 		return -EINVAL;
 
 	mutex_lock(&byte_cntr_data->byte_cntr_lock);
+	if (!byte_cntr_data->read_active) {
+		actual = tmc_etr_flush_remaining_bytes(tmcdrvdata,
+				byte_cntr_data->offset, len, &bufp);
+		if (actual > 0) {
+			len = actual;
+			goto copy;
+		} else {
+			ret = -EINVAL;
+			goto err0;
+		}
+	}
 
-	/*
-	 * ----------------------------------------------------------------
-	 * Phase 1: Tracing already stopped.
-	 * Drain any remaining data and signal EOF when done.
-	 * ----------------------------------------------------------------
-	 */
-	if (!byte_cntr_data->read_active)
-		goto flush_and_eof;
-
-	/*
-	 * ----------------------------------------------------------------
-	 * Phase 2: Tracing is active.
-	 * Loop until a block of data is ready, then deliver it.
-	 * The loop exits when:
-	 *   - data is available and copied to user space  (goto copy)
-	 *   - tracing stops                               (goto flush_and_eof)
-	 *   - the process receives a signal               (return -ERESTARTSYS)
-	 * ----------------------------------------------------------------
-	 */
-	while (byte_cntr_data->enable) {
-
-		/*
-		 * Step 2a - Wait for data when no IRQ has fired yet.
-		 *
-		 * If the ETR has already written more than one block since
-		 * the last read (req_size > block_size), skip the wait and
-		 * go straight to the phantom-IRQ guard in Step 2b.
-		 */
+	if (byte_cntr_data->enable) {
 		if (!atomic_read(&byte_cntr_data->irq_cnt)) {
-			rwp = tmc_get_rwp_offset(tmcdrvdata);
-			if (rwp < 0)
-				goto err;
-			req_size = ((rwp < byte_cntr_data->offset) ?
+			rwp_offset = tmc_get_rwp_offset(tmcdrvdata);
+			req_size = ((rwp_offset < byte_cntr_data->offset) ?
 				    tmcdrvdata->size : 0)
-				    + rwp - byte_cntr_data->offset;
-
-			if (req_size <= (long)byte_cntr_data->block_size) {
+				    + rwp_offset - byte_cntr_data->offset;
+			mutex_unlock(&byte_cntr_data->byte_cntr_lock);
+			ret = wait_event_interruptible_timeout(byte_cntr_data->wq,
+				atomic_read(&byte_cntr_data->irq_cnt) > 0
+				|| !byte_cntr_data->enable
+				|| (req_size > byte_cntr_data->block_size),
+				msecs_to_jiffies(5000));
+			mutex_lock(&byte_cntr_data->byte_cntr_lock);
+			if (!ret) {
+				dev_dbg(&tmcdrvdata->csdev->dev,
+					"timeout: irq_cnt: %d, req_size: 0x%lx, rwp offset %lx, offset %lx\n",
+					atomic_read(&byte_cntr_data->irq_cnt),
+					req_size, rwp_offset, byte_cntr_data->offset);
+				byte_cntr_data->rwp_offset = rwp_offset;
+				actual = tmc_etr_flush_remaining_bytes(tmcdrvdata,
+						byte_cntr_data->offset, len, &bufp);
+				if (actual > 0) {
+					len = actual;
+					goto copy;
+				} else {
+					ret = -EINVAL;
+					goto err0;
+				}
+			} else if (ret < 0) {
 				mutex_unlock(&byte_cntr_data->byte_cntr_lock);
-				/*
-				 * Wait for an IRQ (block_size bytes written) or
-				 * for tracing to stop.
-				 */
-				ret = wait_event_interruptible_timeout(
-					byte_cntr_data->wq,
-					atomic_read(&byte_cntr_data->irq_cnt) > 0
-					|| !byte_cntr_data->enable,
-					msecs_to_jiffies(5000));
-				mutex_lock(&byte_cntr_data->byte_cntr_lock);
-
-				if (ret < 0) {
-					/* Interrupted by a signal. */
-					mutex_unlock(&byte_cntr_data->byte_cntr_lock);
-					return -ERESTARTSYS;
+				return -ERESTARTSYS;
+			}
+			if (!byte_cntr_data->read_active) {
+				actual = tmc_etr_flush_remaining_bytes(tmcdrvdata,
+						byte_cntr_data->offset, len, &bufp);
+				if (actual > 0) {
+					len = actual;
+					goto copy;
+				} else {
+					ret = -EINVAL;
+					goto err0;
 				}
-
-				if (!ret) {
-					/*
-					 * 5-second timeout: flush whatever the
-					 * ETR has written since we last checked.
-					 */
-					dev_dbg(&tmcdrvdata->csdev->dev,
-						"timeout: irq_cnt: %d, req_size: 0x%lx, rwp offset %lx, offset %lx\n",
-						atomic_read(&byte_cntr_data->irq_cnt),
-						req_size, rwp,
-						byte_cntr_data->offset);
-					byte_cntr_data->rwp_offset =
-						tmc_get_rwp_offset(tmcdrvdata);
-					if (byte_cntr_data->rwp_offset < 0)
-						goto err;
-					actual = tmc_etr_flush_remaining_bytes(
-						tmcdrvdata,
-						byte_cntr_data->offset,
-						len, &bufp);
-					if (actual > 0) {
-						len = actual;
-						goto copy;
-					} else if (actual < 0) {
-						/* Error occurred during flush */
-						mutex_unlock(&byte_cntr_data->byte_cntr_lock);
-						return actual;
-					}
-					/* avail == 0: loop back and wait for new data. */
-					continue;
-				}
-
-				/* Woken by IRQ, stop event, or req_size. */
-				if (!byte_cntr_data->read_active)
-					goto flush_and_eof;
 			}
 		}
 
-		/*
-		 * Step 2b - Phantom-IRQ guard.
-		 *
-		 * When req_size > block_size caused the wait to return
-		 * immediately, we read one block below without consuming an
-		 * IRQ (irq_cnt stays 0).  The hardware IRQ fires shortly
-		 * after for that already-consumed block, making irq_cnt = 1.
-		 * On the next call we arrive here with irq_cnt > 0 but the
-		 * ETR may have written fewer than block_size bytes from the
-		 * new offset, so a blind tmc_etr_read_bytes() would include
-		 * stale wrap-around data.
-		 *
-		 * Re-read the hardware RWP.  If fewer than block_size bytes
-		 * are available the irq_cnt is stale: consume it and flush
-		 * only the genuine data.  If avail == 0 loop back to wait.
-		 */
-		rwp = tmc_get_rwp_offset(tmcdrvdata);
-		if (rwp < 0)
-			goto err;
-		avail = ((rwp < (long)byte_cntr_data->offset) ?
-			 (long)tmcdrvdata->size : 0)
-			 + rwp - (long)byte_cntr_data->offset;
-
-		if (avail < (long)byte_cntr_data->block_size) {
-			atomic_dec_if_positive(&byte_cntr_data->irq_cnt);
-			byte_cntr_data->rwp_offset = rwp;
-			actual = tmc_etr_flush_remaining_bytes(
-				tmcdrvdata, byte_cntr_data->offset,
-				len, &bufp);
-			if (actual > 0) {
-				len = actual;
-				goto copy;
-			} else if (actual < 0) {
-				/* Error occurred during flush */
-				mutex_unlock(&byte_cntr_data->byte_cntr_lock);
-				return actual;
-			}
-			/* avail == 0: loop back and wait for new data. */
-			continue;
-		}
-
-		/*
-		 * Step 2c - At least block_size bytes are available.
-		 * Read exactly one block and deliver it.
-		 */
 		tmc_etr_read_bytes(byte_cntr_data, byte_cntr_data->offset,
 				   byte_cntr_data->block_size, &len, &bufp);
-		goto copy;
-	}
 
-	/*
-	 * ----------------------------------------------------------------
-	 * Phase 3: enable == false (defensive path - normally unreachable).
-	 * Update rwp_offset defensively before falling through to flush_and_eof.
-	 * ----------------------------------------------------------------
-	 */
-	byte_cntr_data->rwp_offset = tmc_get_rwp_offset(tmcdrvdata);
-	if (byte_cntr_data->rwp_offset < 0)
-		goto err;
-
-flush_and_eof:
-	/*
-	 * Flush whatever data remains between the current offset and
-	 * rwp_offset (set by tmc_etr_byte_cntr_stop() or just above).
-	 * Return -EINVAL to signal EOF when nothing is left.
-	 */
-	actual = tmc_etr_flush_remaining_bytes(tmcdrvdata,
-			byte_cntr_data->offset, len, &bufp);
-	if (actual > 0) {
-		len = actual;
-		goto copy;
+	} else {
+		actual = tmc_etr_flush_remaining_bytes(tmcdrvdata,
+				byte_cntr_data->offset, len, &bufp);
+		if (actual > 0) {
+			len = actual;
+			goto copy;
+		} else {
+			ret = -EINVAL;
+			goto err0;
+		}
 	}
-	mutex_unlock(&byte_cntr_data->byte_cntr_lock);
-	return -EINVAL;
 
 copy:
 	if (copy_to_user(data, bufp, len)) {
@@ -279,17 +185,20 @@ copy:
 	}
 
 	byte_cntr_data->total_size += len;
+
 	if (byte_cntr_data->offset + len >= tmcdrvdata->size)
 		byte_cntr_data->offset = 0;
 	else
 		byte_cntr_data->offset += len;
 
+	goto out;
+
+err0:
+	mutex_unlock(&byte_cntr_data->byte_cntr_lock);
+	return ret;
+out:
 	mutex_unlock(&byte_cntr_data->byte_cntr_lock);
 	return len;
-
-err:
-	mutex_unlock(&byte_cntr_data->byte_cntr_lock);
-	return -EINVAL;
 }
 
 void tmc_etr_byte_cntr_start(struct byte_cntr *byte_cntr_data)

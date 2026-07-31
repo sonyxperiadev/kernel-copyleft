@@ -75,8 +75,6 @@ struct hab_driver hab_driver = {
 	.hab_init_success = 0,
 	.reclaim_list = LIST_HEAD_INIT(hab_driver.reclaim_list),
 	.reclaim_lock = __SPIN_LOCK_UNLOCKED(hab_driver.reclaim_lock),
-	.pchan_rx_pending_sz_max = DEFAULT_PCHAN_RX_PENDING_SZ_MAX,
-	.vchan_rx_pending_cnt_max = DEFAULT_VCHAN_RX_PENDING_CNT_MAX,
 };
 
 struct uhab_context *hab_ctx_alloc(int kernel)

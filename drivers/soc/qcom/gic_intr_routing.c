@@ -37,7 +37,6 @@
 #define GIC_INTERRUPT_ROUTING_MODE	BIT(31)
 #define GICD_ICLAR2	0xE008
 #define GICD_SETCLASSR	0x28
-#define GICD_IROUTER 0x6000
 #define GICD_TYPER_1_OF_N	BIT(25)
 #define GICR_CTLR_DPG1NS	BIT(25)
 #define MAX_IRQS	1020U
@@ -52,7 +51,6 @@ struct gic_intr_routing_data {
 	bool gic_is_virtual;
 	bool gic_supports_1_of_N;
 	bool gic_1_of_N_init_done;
-	bool runtime_cpu_class_en;
 	atomic_t abort_balancing;
 	atomic_t affinity_initialized;
 	void __iomem *rbase;
@@ -231,6 +229,11 @@ static int debugfs_init(struct platform_device *pdev)
 	return 0;
 }
 
+static void debugfs_exit(void)
+{
+	debugfs_remove_recursive(debugfs_dir);
+}
+
 static bool gicd_typer_1_of_N_supported(void __iomem *base)
 {
 	return !(readl_relaxed(base + GICD_TYPER) & GICD_TYPER_1_OF_N);
@@ -335,32 +338,19 @@ void gic_do_class_update_virtual(
 
 void gic_do_class_update_physical(
 		void __iomem *base, u32 irq,
-		bool is_class0, bool is_class1, u64 *affinity)
+		bool is_class0, bool is_class1)
 {
+	void __iomem *reg = base + GICD_ICLAR2 + (irq / 16) * 4;
 	int val, offset, class_bits_val = 0;
-	/* need enable IRM before set GICD_ICLARn register and affinity
-	 * already set BIT(31).
-	 */
-	void __iomem *reg = base + GICD_IROUTER + (irq + 32) * 8;
-
-	writel_relaxed(*affinity, reg);
-
-	/* set GICD_ICLARn register after enable IRM */
-	reg = base + GICD_ICLAR2 + (irq / 16) * 4;
 
 	if (is_class0)
 		class_bits_val = 0x2;
 	if (is_class1)
-		class_bits_val = 0x1;
-	if (is_class0 && is_class1)
-		class_bits_val = 0x0;
+		class_bits_val |= 0x1;
 
 	spin_lock(&gic_class_lock);
 	val = readl_relaxed(reg);
-	/* in ICLARn register, each interrupt is represented by exactly 2 bits,
-	 * and 16 interrupts are packed into one 32‑bit register.
-	 */
-	offset = (irq % 16) << 1;
+	offset = (irq % 16) << 2;
 	val &= ~(0x3 << offset);
 	val |= class_bits_val << offset;
 	writel_relaxed(val, reg);
@@ -370,14 +360,14 @@ void gic_do_class_update_physical(
 
 void gic_do_class_update(
 	void __iomem *base, u32 irq, bool is_class0,
-	bool is_class1, u64 *affinity)
+	bool is_class1)
 {
 	if (gic_routing_data.gic_is_virtual)
 		gic_do_class_update_virtual(base, irq + 32, is_class0,
 						 is_class1);
 	else
 		gic_do_class_update_physical(base, irq, is_class0,
-						  is_class1, affinity);
+						  is_class1);
 }
 
 /** IRQ Balancing Design
@@ -558,7 +548,7 @@ static void trace_gic_v3_set_affinity(void *unused, struct irq_data *d,
 	spin_unlock(&gic_class_lock);
 
 	if (need_class_update)
-		gic_do_class_update(base, irq, is_class0, is_class1, affinity);
+		gic_do_class_update(base, irq, is_class0, is_class1);
 
 	return;
 }
@@ -787,8 +777,15 @@ void gic_irq_handler_entry_notifer(void *ignore, int irq,
 static int gic_intr_routing_probe(struct platform_device *pdev)
 {
 	struct device_node *dev_phandle;
+	bool runtime_cpu_class_en;
 	int i, cpus_len, cpu;
 	int rc = 0;
+
+	rc = debugfs_init(pdev);
+	if (rc) {
+		pr_err("Failed to initialize debugfs\n");
+		return rc;
+	}
 
 	cpus_len = of_count_phandle_with_args(pdev->dev.of_node, "qcom,gic-class0-cpus", NULL);
 	if (cpus_len <= 0) {
@@ -796,7 +793,8 @@ static int gic_intr_routing_probe(struct platform_device *pdev)
 				__func__);
 		return -EINVAL;
 	}
-	gic_routing_data.runtime_cpu_class_en = of_property_read_bool(pdev->dev.of_node,
+
+	runtime_cpu_class_en = of_property_read_bool(pdev->dev.of_node,
 			"qcom,gic-runtime-cpu-class-en");
 
 	for (i = 0; i < cpus_len; i++) {
@@ -804,7 +802,7 @@ static int gic_intr_routing_probe(struct platform_device *pdev)
 		if (dev_phandle) {
 			cpu = of_cpu_node_to_id(dev_phandle);
 			if (cpu >= 0) {
-				if (gic_routing_data.runtime_cpu_class_en) {
+				if (runtime_cpu_class_en) {
 					rc = process_cpu_index(pdev->dev.of_node, cpu, 0);
 					if (rc < 0)
 						return rc;
@@ -828,7 +826,7 @@ static int gic_intr_routing_probe(struct platform_device *pdev)
 		if (dev_phandle) {
 			cpu = of_cpu_node_to_id(dev_phandle);
 			if (cpu >= 0) {
-				if (gic_routing_data.runtime_cpu_class_en) {
+				if (runtime_cpu_class_en) {
 					rc = process_cpu_index(pdev->dev.of_node, cpu, 1);
 					if (rc < 0)
 						return rc;
@@ -838,14 +836,6 @@ static int gic_intr_routing_probe(struct platform_device *pdev)
 			}
 		}
 		of_node_put(dev_phandle);
-	}
-
-	if (gic_routing_data.runtime_cpu_class_en) {
-		rc = debugfs_init(pdev);
-		if (rc) {
-			pr_err("Failed to initialize debugfs_init\n");
-			return rc;
-		}
 	}
 
 	register_trace_android_rvh_gic_v3_set_affinity(
@@ -870,8 +860,7 @@ static int gic_intr_routing_probe(struct platform_device *pdev)
 
 static void gic_intr_routing_remove(struct platform_device *pdev)
 {
-	if (gic_routing_data.runtime_cpu_class_en)
-		debugfs_remove_recursive(debugfs_dir);
+	debugfs_exit();
 }
 
 static const struct of_device_id gic_intr_routing_of_match[] = {

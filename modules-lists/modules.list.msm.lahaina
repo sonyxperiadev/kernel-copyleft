@@ -17,8 +17,6 @@ debug-regulator.ko
 gdsc-regulator.ko
 gcc-sc7280.ko
 dispcc-sc7280.ko
-gcc-sm8350.ko
-dispcc-sm8350.ko
 smem.ko
 debug_symbol.ko
 socinfo.ko
@@ -47,7 +45,6 @@ minidump.ko
 qcom-dload-mode.ko
 pinctrl-msm.ko
 pinctrl-yupik.ko
-pinctrl-lahaina.ko
 qcom_tsens.ko
 qcom-ipcc.ko
 qcom-reboot-reason.ko
@@ -57,7 +54,6 @@ qcom_aoss.ko
 qrtr.ko
 msm_qmp.ko
 qnoc-qos.ko
-qnoc-lahaina.ko
 qnoc-yupik.ko
 qcom_iommu_debug.ko
 qcom_ipc_logging.ko
@@ -73,7 +69,6 @@ ufshcd-crypto-qti.ko
 qcom_ice.ko
 ufs-qcom.ko
 phy-qcom-ufs-qmp-v4-yupik.ko
-phy-qcom-ufs-qmp-v4-lahaina.ko
 phy-qcom-ufs-qrbtc-sdm845.ko
 phy-qcom-ufs.ko
 sg.ko

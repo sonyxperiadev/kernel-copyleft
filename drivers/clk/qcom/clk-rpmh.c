@@ -419,7 +419,6 @@ DEFINE_CLK_RPMH_VRM(clk2, _a1, "clka2", 1);
 DEFINE_CLK_RPMH_VRM(clk3, _a1, "clka3", 1);
 DEFINE_CLK_RPMH_VRM(clk4, _a1, "clka4", 1);
 DEFINE_CLK_RPMH_VRM(clk5, _a1, "clka5", 1);
-DEFINE_CLK_RPMH_VRM(clk8, _a1, "clka8", 1);
 
 DEFINE_CLK_RPMH_VRM(clk3, _a2, "clka3", 2);
 DEFINE_CLK_RPMH_VRM(clk4, _a2, "clka4", 2);
@@ -435,15 +434,11 @@ DEFINE_CLK_RPMH_VRM(c1a_e0, _div2, "C1A_E0", 2);
 DEFINE_CLK_RPMH_VRM(c2a_e0, _div1, "C2A_E0", 1);
 DEFINE_CLK_RPMH_VRM(c3a_e0, _div2, "C3A_E0", 2);
 DEFINE_CLK_RPMH_VRM(c4a_e0, _div2, "C4A_E0", 2);
-DEFINE_CLK_RPMH_VRM(c5a_e0, _div1, "C5A_E0", 1);
 DEFINE_CLK_RPMH_VRM(c5a_e0, _div2, "C5A_E0", 2);
 DEFINE_CLK_RPMH_VRM(c6a_e0, _div1, "C6A_E0", 1);
 DEFINE_CLK_RPMH_VRM(c6a_e0, _div2, "C6A_E0", 2);
-DEFINE_CLK_RPMH_VRM(c7a_e0, _div1, "C7A_E0", 1);
 DEFINE_CLK_RPMH_VRM(c7a_e0, _div2, "C7A_E0", 2);
-DEFINE_CLK_RPMH_VRM(c7a_e0, _div4, "C7A_E0", 4);
 DEFINE_CLK_RPMH_VRM(c8a_e0, _div2, "C8A_E0", 2);
-DEFINE_CLK_RPMH_VRM(c8a_e0, _div4, "C8A_E0", 4);
 DEFINE_CLK_RPMH_VRM(c11a_e0, _div4, "C11A_E0", 4);
 
 DEFINE_CLK_RPMH_BCM(ce, "CE0");
@@ -619,8 +614,6 @@ static struct clk_hw *sm8350_rpmh_clocks[] = {
 	[RPMH_LN_BB_CLK2_A]	= &clk_rpmh_ln_bb_clk2_a2_ao.hw,
 	[RPMH_RF_CLK1]		= &clk_rpmh_rf_clk1_a.hw,
 	[RPMH_RF_CLK1_A]	= &clk_rpmh_rf_clk1_a_ao.hw,
-	[RPMH_RF_CLK2]		= &clk_rpmh_rf_clk2_a.hw,
-	[RPMH_RF_CLK2_A]	= &clk_rpmh_rf_clk2_a_ao.hw,
 	[RPMH_RF_CLK3]		= &clk_rpmh_rf_clk3_a.hw,
 	[RPMH_RF_CLK3_A]	= &clk_rpmh_rf_clk3_a_ao.hw,
 	[RPMH_RF_CLK4]		= &clk_rpmh_rf_clk4_a.hw,
@@ -845,8 +838,8 @@ static struct clk_hw *x1e80100_rpmh_clocks[] = {
 	[RPMH_LN_BB_CLK1_A]	= &clk_rpmh_clk6_a2_ao.hw,
 	[RPMH_LN_BB_CLK2]	= &clk_rpmh_clk7_a2.hw,
 	[RPMH_LN_BB_CLK2_A]	= &clk_rpmh_clk7_a2_ao.hw,
-	[RPMH_LN_BB_CLK3]	= &clk_rpmh_clk8_a1.hw,
-	[RPMH_LN_BB_CLK3_A]	= &clk_rpmh_clk8_a1_ao.hw,
+	[RPMH_LN_BB_CLK3]	= &clk_rpmh_clk8_a2.hw,
+	[RPMH_LN_BB_CLK3_A]	= &clk_rpmh_clk8_a2_ao.hw,
 	[RPMH_RF_CLK3]		= &clk_rpmh_clk3_a2.hw,
 	[RPMH_RF_CLK3_A]	= &clk_rpmh_clk3_a2_ao.hw,
 	[RPMH_RF_CLK4]		= &clk_rpmh_clk4_a2.hw,
@@ -1007,47 +1000,6 @@ static const struct clk_rpmh_desc clk_rpmh_seraph = {
 	.num_clks = ARRAY_SIZE(seraph_rpmh_clocks),
 };
 
-static struct clk_hw *chora_rpmh_clocks[] = {
-	[RPMH_CXO_PAD_CLK]	= &clk_rpmh_xo_pad_div2.hw,
-	[RPMH_CXO_PAD_CLK_A]	= &clk_rpmh_xo_pad_div2_ao.hw,
-	[RPMH_CXO_CLK]		= &pineapple_bi_tcxo.hw,
-	[RPMH_CXO_CLK_A]	= &pineapple_bi_tcxo_ao.hw,
-	[RPMH_LN_BB_CLK2]	= &clk_rpmh_c7a_e0_div4.hw,
-	[RPMH_LN_BB_CLK2_A]	= &clk_rpmh_c7a_e0_div4_ao.hw,
-	[RPMH_LN_BB_CLK3]	= &clk_rpmh_c8a_e0_div4.hw,
-	[RPMH_LN_BB_CLK3_A]	= &clk_rpmh_c8a_e0_div4_ao.hw,
-	[RPMH_RF_CLK1]		= &clk_rpmh_c1a_e0_div1.hw,
-	[RPMH_RF_CLK1_A]	= &clk_rpmh_c1a_e0_div1_ao.hw,
-	[RPMH_RF_CLK3]		= &clk_rpmh_c3a_e0_div2.hw,
-	[RPMH_RF_CLK3_A]	= &clk_rpmh_c3a_e0_div2_ao.hw,
-	[RPMH_IPA_CLK]		= &clk_rpmh_ipa.hw,
-	[RPMH_CE_CLK]		= &clk_rpmh_ce.hw,
-};
-
-static const struct clk_rpmh_desc clk_rpmh_chora = {
-	.clks = chora_rpmh_clocks,
-	.num_clks = ARRAY_SIZE(chora_rpmh_clocks),
-};
-
-static struct clk_hw *pikachu_rpmh_clocks[] = {
-	[RPMH_CXO_CLK]		= &clk_rpmh_bi_tcxo_div1.hw,
-	[RPMH_CXO_CLK_A]	= &clk_rpmh_bi_tcxo_div1_ao.hw,
-	[RPMH_RF_CLK1]		= &clk_rpmh_c1a_e0_div1.hw,
-	[RPMH_RF_CLK1_A]	= &clk_rpmh_c1a_e0_div1_ao.hw,
-	[RPMH_LN_BB_CLK1]	= &clk_rpmh_c6a_e0_div1.hw,
-	[RPMH_LN_BB_CLK1_A]	= &clk_rpmh_c6a_e0_div1_ao.hw,
-	[RPMH_LN_BB_CLK2]	= &clk_rpmh_c5a_e0_div1.hw,
-	[RPMH_LN_BB_CLK2_A]	= &clk_rpmh_c5a_e0_div1_ao.hw,
-	[RPMH_DIV_CLK1]		= &clk_rpmh_c7a_e0_div1.hw,
-	[RPMH_DIV_CLK1_A]	= &clk_rpmh_c7a_e0_div1_ao.hw,
-	[RPMH_IPA_CLK]		= &clk_rpmh_ipa.hw,
-};
-
-static const struct clk_rpmh_desc clk_rpmh_pikachu = {
-	.clks = pikachu_rpmh_clocks,
-	.num_clks = ARRAY_SIZE(pikachu_rpmh_clocks),
-};
-
 static int clk_rpmh_probe(struct platform_device *pdev)
 {
 	struct clk_hw **hw_clks;
@@ -1154,8 +1106,6 @@ static const struct of_device_id clk_rpmh_match_table[] = {
 	{ .compatible = "qcom,vienna-rpmh-clk", .data = &clk_rpmh_vienna},
 	{ .compatible = "qcom,alor-rpmh-clk", .data = &clk_rpmh_alor},
 	{ .compatible = "qcom,seraph-rpmh-clk", .data = &clk_rpmh_seraph},
-	{ .compatible = "qcom,chora-rpmh-clk", .data = &clk_rpmh_chora},
-	{ .compatible = "qcom,pikachu-rpmh-clk", .data = &clk_rpmh_pikachu},
 	{ }
 };
 MODULE_DEVICE_TABLE(of, clk_rpmh_match_table);

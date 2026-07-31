@@ -195,3 +195,17 @@ def register_modules(registry):
             # do not sort
         ],
     )
+
+    registry.register(
+        name = "drivers/regulator/wl28681c-regulator",
+        out = "wl28681c-regulator.ko",
+        config = "CONFIG_REGULATOR_WL28681C",
+        srcs = [
+            # do not sort
+            "drivers/regulator/wl28681c-regulator.c",
+            "drivers/regulator/wl28681c-regulator.h",
+        ],
+        deps = [
+            # do not sort
+        ],
+    )

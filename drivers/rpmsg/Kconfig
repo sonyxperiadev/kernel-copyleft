@@ -78,11 +78,4 @@ config MSM_RPM_SMD
 	  the MSM_MPM config that programs the MPM module to monitor interrupts
 	  during sleep modes.
 
-config RPMSG_GLINK_DS_QB
-	tristate "DS QB handling enablement"
-	depends on RPMSG_QCOM_GLINK_CMA
-	help
-	  Say y here to enable DS/QB handling logic in virtio glink driver which
-	  is used in glink passthrough feature. This will register driver's pm
-	  ops for suspend/resume callbacks to be triggered during DS/QB.
 endmenu

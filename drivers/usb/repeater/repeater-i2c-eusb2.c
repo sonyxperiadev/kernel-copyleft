@@ -274,9 +274,6 @@ static int eusb2_repeater_i2c_probe(struct i2c_client *client)
 
 	er->dev = dev;
 	match = of_match_node(eusb2_repeater_id_table, dev->of_node);
-	if (!match)
-		return -ENODEV;
-
 	er->chip = match->data;
 
 	er->regmap = devm_regmap_init_i2c(client, &eusb2_i2c_regmap);

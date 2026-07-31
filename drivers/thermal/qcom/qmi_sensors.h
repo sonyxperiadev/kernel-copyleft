@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __QMI_SENSORS_H__
@@ -90,13 +90,6 @@ enum qmi_ts_sensor {
 	QMI_SYS_THERM4,
 	QMI_SYS_THERM5,
 	QMI_SYS_THERM6,
-	QMI_TS_RF_CAL,
-	QMI_TS_MODEM_CFG,
-	QMI_TS_LTE_CC,
-	QMI_TS_MCG_FR1_CC,
-	QMI_TS_MCG_FR2_CC,
-	QMI_TS_SCG_FR1_CC,
-	QMI_TS_SCG_FR2_CC,
 	QMI_BEAMER_N_THERM,
 	QMI_BEAMER_E_THERM,
 	QMI_BEAMER_W_THERM,
@@ -184,13 +177,6 @@ static char sensor_clients[QMI_TS_MAX_NR][QMI_CLIENT_NAME_LENGTH] = {
 	{"sys_therm4"},
 	{"sys_therm5"},
 	{"sys_therm6"},
-	{"rf_cal"},
-	{"modem_cfg"},
-	{"lte_cc"},
-	{"mcg_fr1_cc"},
-	{"mcg_fr2_cc"},
-	{"scg_fr1_cc"},
-	{"scg_fr2_cc"},
 	{"beamer_n_therm"},
 	{"beamer_e_therm"},
 	{"beamer_w_therm"},

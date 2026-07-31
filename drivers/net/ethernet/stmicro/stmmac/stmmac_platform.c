@@ -717,10 +717,6 @@ EXPORT_SYMBOL_GPL(devm_stmmac_probe_config_dt);
 int stmmac_get_platform_resources(struct platform_device *pdev,
 				  struct stmmac_resources *stmmac_res)
 {
-	char irq_name[16];
-	int i;
-	int irq;
-
 	memset(stmmac_res, 0, sizeof(*stmmac_res));
 
 	/* Get IRQ information early to have an ability to ask for deferred
@@ -760,42 +756,6 @@ int stmmac_get_platform_resources(struct platform_device *pdev,
 		if (stmmac_res->sfty_irq == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
 		dev_info(&pdev->dev, "IRQ sfty not found\n");
-	}
-
-	/* For RX and TX Channel */
-	for (i = 0; i < STMMAC_CH_MAX; i++) {
-		snprintf(irq_name, sizeof(irq_name), "dma_tx_rx%i", i);
-		irq = platform_get_irq_byname_optional(pdev, irq_name);
-		if (irq == -EPROBE_DEFER)
-			return irq;
-		else if (irq < 0)
-			continue;
-
-		stmmac_res->tx_rx_irq[i] = irq;
-	}
-
-	/* For RX Channel */
-	for (i = 0; i < MTL_MAX_RX_QUEUES; i++) {
-		snprintf(irq_name, sizeof(irq_name), "dma_rx%i", i);
-		irq = platform_get_irq_byname_optional(pdev, irq_name);
-		if (irq == -EPROBE_DEFER)
-			return irq;
-		else if (irq < 0)
-			break;
-
-		stmmac_res->rx_irq[i] = irq;
-	}
-
-	/* For TX Channel */
-	for (i = 0; i < MTL_MAX_TX_QUEUES; i++) {
-		snprintf(irq_name, sizeof(irq_name), "dma_tx%i", i);
-		irq = platform_get_irq_byname_optional(pdev, irq_name);
-		if (irq == -EPROBE_DEFER)
-			return irq;
-		else if (irq < 0)
-			break;
-
-		stmmac_res->tx_irq[i] = irq;
 	}
 
 	stmmac_res->addr = devm_platform_ioremap_resource(pdev, 0);
@@ -925,9 +885,7 @@ static int __maybe_unused stmmac_pltfr_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 
 	ret = stmmac_suspend(dev);
-
-	if (!priv->plat->suspend)
-		stmmac_pltfr_exit(pdev, priv->plat);
+	stmmac_pltfr_exit(pdev, priv->plat);
 
 	return ret;
 }
@@ -946,11 +904,9 @@ static int __maybe_unused stmmac_pltfr_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	int ret;
 
-	if (!priv->plat->resume) {
-		ret = stmmac_pltfr_init(pdev, priv->plat);
-		if (ret)
-			return ret;
-	}
+	ret = stmmac_pltfr_init(pdev, priv->plat);
+	if (ret)
+		return ret;
 
 	return stmmac_resume(dev);
 }

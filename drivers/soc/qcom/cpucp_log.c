@@ -54,7 +54,6 @@ enum cpucp_log_type {
 	CPUCP,
 	PDP0,
 	PDP1,
-	PDP2,
 	NUM_CPUCP_LOG_TYPES
 };
 
@@ -62,7 +61,6 @@ static const char * const cpucp_log_names[NUM_CPUCP_LOG_TYPES] = {
 	[CPUCP]		= "cpucp",
 	[PDP0]		= "pdp0",
 	[PDP1]		= "pdp1",
-	[PDP2]		= "pdp2",
 };
 
 struct remote_mem {
@@ -333,9 +331,6 @@ static inline void print_to_trace(enum cpucp_log_type type, char *str)
 	case PDP1:
 		trace_pdp1_log(str);
 		break;
-	case PDP2:
-		trace_pdp2_log(str);
-		break;
 	default:
 		break;
 	}
@@ -466,7 +461,6 @@ static void cpucp_log_rx(struct mbox_client *client, void *msg)
 		break;
 	case PDP0:
 	case PDP1:
-	case PDP2:
 		if (!data) {
 			dev_err(dev, "pdp_log error: mbox data is NULL\n");
 			return;
@@ -623,7 +617,7 @@ scmi_out:
 		}
 	}
 #endif
-	if (info->type == PDP0 || info->type == PDP1 || info->type == PDP2) {
+	if (info->type == PDP0 || info->type == PDP1) {
 		if (pdp_log_create_fs_entries(info)) {
 			dev_err(dev, "Failed to create pdp debugfs entries\n");
 			return -ENOENT;

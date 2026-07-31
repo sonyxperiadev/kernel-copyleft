@@ -587,7 +587,7 @@ static struct clk_rcg2 gcc_pcie_0_phy_aux_clk_src = {
 	.mnd_width = 16,
 	.hid_width = 5,
 	.parent_map = gcc_parent_map_1,
-	.freq_tbl = ftbl_gcc_pcie_0_aux_clk_src,
+	.freq_tbl = NULL,
 	.enable_safe_config = true,
 	.flags = HW_CLK_CTRL_MODE,
 	.clkr.hw.init = &(const struct clk_init_data) {
@@ -3343,12 +3343,6 @@ static int gcc_chora_probe(struct platform_device *pdev)
 	regmap_update_bits(regmap, 0x71004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x32004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x3202c, BIT(0), BIT(0));
-
-	/*
-	 * Set IGNORE_RPMH for camera hf/sf axi clocks to keep these ungated.
-	 */
-	regmap_update_bits(regmap, 0x26010, BIT(20), BIT(20));
-	regmap_update_bits(regmap, 0x26018, BIT(20), BIT(20));
 
 	ret = qcom_cc_really_probe(&pdev->dev, &gcc_chora_desc, regmap);
 	if (ret) {

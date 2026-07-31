@@ -42,16 +42,6 @@
 /* EBC TRB parameters */
 #define EBC_TRB_SIZE			16384
 
-/* Force suspend phy */
-#define PHY_FORCE_SUSPEND			2
-
-/* QSRAM registers*/
-#define QSRAM_BASE_OFFSET  0x000FC000
-
-struct qsram_xhci {
-	__le32 data[64];
-};
-
 enum dp_lane {
 	DP_NONE = 1,
 	DP_2_LANE = 2,
@@ -103,7 +93,6 @@ enum dwc3_notify_event {
 	DWC3_GSI_EVT_BUF_FREE,
 	DWC3_CONTROLLER_NOTIFY_CLEAR_DB,
 	DWC3_IMEM_UPDATE_PID,
-	DWC3_QSRAM_WRITE,
 };
 
 /*
@@ -292,7 +281,6 @@ static inline void usb_gadget_autopm_put_no_suspend(struct usb_gadget *gadget)
 }
 
 #if IS_ENABLED(CONFIG_USB_DWC3_MSM)
-struct qsram_xhci __iomem *dwc3_msm_get_qsram(struct device *dev);
 void dwc3_msm_notify_event(struct dwc3 *dwc,
 		enum dwc3_notify_event event, unsigned int value);
 int usb_gsi_ep_op(struct usb_ep *ep, void *op_data, enum gsi_ep_op op);
@@ -302,10 +290,8 @@ void dwc3_tx_fifo_resize_request(struct usb_ep *ep, bool qdss_enable);
 int msm_data_fifo_config(struct usb_ep *ep, unsigned long addr, u32 size,
 	u8 dst_pipe_idx);
 int msm_dwc3_reset_dbm_ep(struct usb_ep *ep);
-int dwc3_msm_set_dp_mode(struct device *dev, bool dp_connected, int lanes, int orientation,
-					u16 svid, int pin_assign, int hpd_state, int hpd_irq);
-int dwc3_msm_release_ss_lane(struct device *dev, bool dp_connected, int lanes, int orientation,
-					u16 svid, int pin_assign, int hpd_state, int hpd_irq);
+int dwc3_msm_set_dp_mode(struct device *dev, bool connected, int lanes);
+int dwc3_msm_release_ss_lane(struct device *dev);
 int msm_ep_update_ops(struct usb_ep *ep);
 int msm_ep_clear_ops(struct usb_ep *ep);
 int msm_ep_set_mode(struct usb_ep *ep, enum usb_hw_ep_mode mode);
@@ -330,11 +316,9 @@ static inline void dwc3_tx_fifo_resize_request(struct usb_ep *ep,
 { }
 static inline bool msm_dwc3_reset_ep_after_lpm(struct usb_gadget *gadget)
 { return false; }
-static inline int dwc3_msm_set_dp_mode(struct device *dev, bool dp_connected, int lanes,
-			int orientation, u16 svid, int pin_assign, int hpd_state, int hpd_irq)
+static inline int dwc3_msm_set_dp_mode(struct device *dev, bool connected, int lanes)
 { return -ENODEV; }
-static inline int dwc3_msm_release_ss_lane(struct device *dev, bool dp_connected, int lanes,
-			int orientation, u16 svid, int pin_assign, int hpd_state, int hpd_irq)
+static inline int dwc3_msm_release_ss_lane(struct device *dev)
 { return -ENODEV; }
 int msm_ep_update_ops(struct usb_ep *ep)
 { return -ENODEV; }
@@ -344,8 +328,6 @@ int msm_ep_set_mode(struct usb_ep *ep, enum usb_hw_ep_mode mode)
 { return -ENODEV; }
 inline int dwc3_core_stop_hw_active_transfers(struct dwc3 *dwc)
 { return 0; }
-static inline struct qsram_xhci __iomem *dwc3_msm_get_qsram(struct device *dev)
-{ return NULL; }
 #endif
 
 #ifdef CONFIG_ARM64

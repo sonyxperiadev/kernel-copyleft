@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+qcom-scm.ko
+pinctrl-msm.ko
+pinctrl-pikachu.ko
+qcom_hwspinlock.ko
+clk-qcom.ko
+clk-rpmh.ko
+clk-dummy.ko
+smem.ko
+socinfo.ko
+qcom_tzmem.ko
+qnoc-pikachu.ko
+qnoc-qos.ko
+icc-debug.ko
+icc-bcm-voter.ko
+icc-rpmh.ko
+icc-clk.ko
+stub-regulator.ko
+arm_smmu.ko
+qcom_iommu_debug.ko
+iommu-logger.ko
+qcom_iommu_util.ko
+secure_buffer.ko
+mem-prot.ko
+mem_buf.ko
+mem_buf_dev.ko
+msm_dma_iommu_mapping.ko
+arm_smmu_pmu.ko

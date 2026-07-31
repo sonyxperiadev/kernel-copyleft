@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Misc strange devices
+#
+
+menu "Misc devices"
+
+config HARDWAREINFO
+    tristate "Hardware info support"
+    default m
+    help
+     test
+
+endmenu

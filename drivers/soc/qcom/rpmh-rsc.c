@@ -25,7 +25,6 @@
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <linux/suspend.h>
 #include <linux/wait.h>
 
 #include <clocksource/arm_arch_timer.h>
@@ -826,17 +825,21 @@ int rpmh_rsc_send_data(struct rsc_drv *drv, const struct tcs_request *msg, int c
 	write_tcs_reg_sync(drv, drv->regs[RSC_DRV_CMD_ENABLE], tcs_id, 0);
 	write_tcs_reg_sync(drv, drv->regs[RSC_DRV_CMD_WAIT_FOR_CMPL], tcs_id, 0);
 
-	__tcs_buffer_write(drv, tcs_id, 0, msg);
-
-	/* Clear stale IRQs if any */
-	writel_relaxed(BIT(tcs_id), drv->tcs_base + drv->regs[RSC_DRV_IRQ_CLEAR]);
-
 	if (msg->wait_for_compl || (msg->state == RPMH_ACTIVE_ONLY_STATE &&
 	    tcs->type != ACTIVE_TCS))
 		enable_tcs_irq(drv, tcs_id, true);
 	else
 		enable_tcs_irq(drv, tcs_id, false);
 
+	/*
+	 * These two can be done after the lock is released because:
+	 * - We marked "tcs_in_use" under lock.
+	 * - Once "tcs_in_use" has been marked nobody else could be writing
+	 *   to these registers until the interrupt goes off.
+	 * - The interrupt can't go off until we trigger w/ the last line
+	 *   of __tcs_set_trigger() below.
+	 */
+	__tcs_buffer_write(drv, tcs_id, 0, msg);
 	__tcs_set_trigger(drv, tcs_id, true);
 #if IS_ENABLED(CONFIG_IPC_LOGGING)
 	ipc_log_string(drv->ipc_log_ctx, "TCS trigger: m=%d wait_for_compl=%u",
@@ -1532,16 +1535,6 @@ static int rpmh_rsc_restore_noirq(struct device *dev)
 	return 0;
 }
 
-#ifdef CONFIG_DEEPSLEEP
-static int rpmh_rsc_restore_noirq_wrapper(struct device *dev)
-{
-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
-		return rpmh_rsc_restore_noirq(dev);
-
-	return 0;
-}
-#endif
-
 static struct rsc_drv_top *rpmh_rsc_get_top_device(const char *name)
 {
 	struct rsc_drv_top *rsc_top;
@@ -1913,10 +1906,6 @@ static int rpmh_rsc_probe(struct platform_device *pdev)
 static const struct dev_pm_ops rpmh_rsc_dev_pm_ops = {
 	.poweroff_noirq = rpmh_rsc_poweroff_noirq,
 	.restore_noirq = rpmh_rsc_restore_noirq,
-#ifdef CONFIG_DEEPSLEEP
-	.suspend_noirq = rpmh_rsc_poweroff_noirq,
-	.resume_noirq = rpmh_rsc_restore_noirq_wrapper,
-#endif
 };
 
 static const struct of_device_id rpmh_drv_match[] = {

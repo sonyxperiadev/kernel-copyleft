@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "hvc_gunyah: " fmt
@@ -265,12 +265,6 @@ static int gh_hvc_vm_state(struct notifier_block *this,
 		if (gh_hvc_data[vm_name].hvc)
 			return NOTIFY_DONE;
 
-		ret = hvc_instantiate(gh_vm_name_to_vtermno(vm_name), vm_name, &gh_hv_ops);
-		if (ret) {
-			pr_err("failed to re-instantiate hvc for vm_name=%d vmid=%u with ret=%d\n",
-					vm_name, vmid, ret);
-			return NOTIFY_DONE;
-		}
 		prv = &gh_hvc_data[vm_name];
 		prv->hvc = hvc_alloc(gh_vm_name_to_vtermno(vm_name), vm_name, &gh_hv_ops,
 				     256);

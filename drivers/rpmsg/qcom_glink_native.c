@@ -439,15 +439,6 @@ static void qcom_glink_tx_kick(struct qcom_glink *glink)
 	glink->tx_pipe->kick(glink->tx_pipe);
 }
 
-static void qcom_glink_pipe_reset(struct qcom_glink *glink)
-{
-	if (glink->tx_pipe->reset)
-		glink->tx_pipe->reset(glink->tx_pipe);
-
-	if (glink->rx_pipe->reset)
-		glink->rx_pipe->reset(glink->rx_pipe);
-}
-
 static void qcom_glink_send_read_notify(struct qcom_glink *glink)
 {
 	struct glink_msg msg;
@@ -2614,7 +2605,6 @@ void qcom_glink_native_remove(struct qcom_glink *glink)
 
 	kthread_flush_worker(&glink->kworker);
 	kthread_stop(glink->task);
-	qcom_glink_pipe_reset(glink);
 }
 EXPORT_SYMBOL_GPL(qcom_glink_native_remove);
 

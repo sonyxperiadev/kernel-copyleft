@@ -460,8 +460,6 @@ static const char *const gcc_debug_mux_parent_names[] = {
 	"gcc_qmip_video_cvp_ahb_clk",
 	"gcc_qmip_video_v_cpu_ahb_clk",
 	"gcc_qmip_video_vcodec_ahb_clk",
-	"gcc_qspi_cnoc_periph_ahb_clk",
-	"gcc_qspi_core_clk",
 	"gcc_qupv3_wrap0_core_2x_clk",
 	"gcc_qupv3_wrap0_core_clk",
 	"gcc_qupv3_wrap0_qspi_s2_clk",
@@ -714,8 +712,6 @@ static int gcc_debug_mux_sels[] = {
 	0xA9,		/* gcc_qmip_video_cvp_ahb_clk */
 	0xAB,		/* gcc_qmip_video_v_cpu_ahb_clk */
 	0xAA,		/* gcc_qmip_video_vcodec_ahb_clk */
-	0x26D,		/* gcc_qspi_cnoc_periph_ahb_clk */
-	0x26E,		/* gcc_qspi_core_clk */
 	0x163,		/* gcc_qupv3_wrap0_core_2x_clk */
 	0x162,		/* gcc_qupv3_wrap0_core_clk */
 	0x167,		/* gcc_qupv3_wrap0_qspi_s2_clk */

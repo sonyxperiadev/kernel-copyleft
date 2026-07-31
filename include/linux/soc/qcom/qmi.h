@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  * Copyright (c) 2017, Linaro Ltd.
@@ -233,8 +233,6 @@ struct qmi_handle {
 	struct mutex txn_lock;
 
 	const struct qmi_msg_handler *handlers;
-
-	unsigned int svc_id;
 };
 
 int qmi_add_lookup(struct qmi_handle *qmi, unsigned int service,

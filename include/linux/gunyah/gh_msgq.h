@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  */
 
@@ -63,7 +63,6 @@ int gh_msgq_populate_cap_info(int label, u64 cap_id,
 				int direction, int irq);
 int gh_msgq_probe(struct platform_device *pdev, int label);
 int gh_msgq_reset_cap_info(enum gh_msgq_label label, int direction, int *irq);
-void gh_msgq_vm_exit_notify(gh_vmid_t vmid, int vm_exit_type);
 #else
 static inline void *gh_msgq_register(int label)
 {
@@ -110,10 +109,6 @@ int gh_msgq_reset_cap_info(enum gh_msgq_label label, int direction, int *irq)
 static inline int gh_msgq_probe(struct platform_device *pdev, int label)
 {
 	return -ENODEV;
-}
-
-static inline void gh_msgq_vm_exit_notify(gh_vmid_t vmid, int vm_exit_type)
-{
 }
 #endif
 #endif

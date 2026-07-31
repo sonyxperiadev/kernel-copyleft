@@ -3,6 +3,11 @@
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
+/*
+* Copyright 2025 Sony Corporation
+* NOTE: This file has been modified by Sony Corporation
+* Modifications are licensed under the License.
+*/
 
 #ifndef _WALT_H
 #define _WALT_H
@@ -183,7 +188,6 @@ enum smart_freq_ipc_reason {
 };
 #define IPC_PARTICIPATION	(BIT(IPC_A) | BIT(IPC_B) | BIT(IPC_C) | BIT(IPC_D) | BIT(IPC_E))
 
-extern bool cpu_has_amu_support;
 DECLARE_PER_CPU(unsigned int, ipc_level);
 DECLARE_PER_CPU(unsigned long, ipc_cnt);
 DECLARE_PER_CPU(unsigned long, intr_cnt);
@@ -594,7 +598,6 @@ extern unsigned int sysctl_sched_sbt_delay_windows;
 
 extern cpumask_t cpus_for_pipeline;
 extern unsigned int pipeline_swap_util_th;
-extern bool single_cluster_pipeline;
 
 /* WALT cpufreq interface */
 #define WALT_CPUFREQ_ROLLOVER_BIT		BIT(0)
@@ -1124,9 +1127,6 @@ static bool check_for_higher_capacity(int cpu1, int cpu2)
 	return capacity_orig_of(cpu1) > capacity_orig_of(cpu2);
 }
 
-extern void pipeline_demand(struct walt_task_struct *wts, u64 *scaled_gold_demand,
-		     u64 *scaled_prime_demand);
-
 static inline bool task_fits_capacity(struct task_struct *p,
 					int dst_cpu)
 {
@@ -1137,8 +1137,6 @@ static inline bool task_fits_capacity(struct task_struct *p,
 	unsigned long capacity = capacity_orig_of(dst_cpu);
 	bool down = check_for_higher_capacity(task_cpu(p), dst_cpu);
 	int id, cgroup_type = 0;
-	unsigned long util = 0;
-	u64 demand, other_demand;
 
 	rcu_read_lock();
 	css = task_css(p, cpu_cgrp_id);
@@ -1169,15 +1167,7 @@ finish:
 			margin = max(margin, sched_capacity_margin_up[ANDROID_CGROUP_TOPAPP][id]);
 	}
 
-	demand = task_util_est(p);
-
-	if (walt_pipeline_low_latency_task(p))
-		pipeline_demand(((struct walt_task_struct *)android_task_vendor_data(p)),
-				&demand, &other_demand);
-
-	util = clamp(demand, uclamp_eff_value(p, UCLAMP_MIN), uclamp_eff_value(p, UCLAMP_MAX));
-
-	return capacity * 1024 > util * margin;
+	return capacity * 1024 > uclamp_task_util(p) * margin;
 }
 
 extern int pipeline_fits_smaller_cpus(struct task_struct *p);
@@ -1747,10 +1737,12 @@ DECLARE_PER_CPU(unsigned int, walt_yield_to_sleep);
 extern unsigned int walt_sched_yield_counter;
 extern unsigned int sysctl_force_frequent_yielder;
 void account_yields(u64 window_start);
+extern void pipeline_demand(struct walt_task_struct *wts, u64 *scaled_gold_demand,
+		     u64 *scaled_prime_demand);
 extern unsigned int sysctl_pipeline_force_config;
 extern unsigned long walt_cpu_energy(int cpu,
 				     unsigned long max_util, unsigned long sum_util);
-extern unsigned int pipeline_lower_cluster_id, pipeline_higher_cluster_id;
+extern unsigned int gold_cluster_id, prime_cluster_id;
 extern unsigned int soc_cluster_freq_table_size[MAX_CLUSTERS];
 extern unsigned int soc_cluster_freq_table[MAX_CLUSTERS][MAX_FREQ_TABLE_ENTRIES];
 struct waltgov_policy;
@@ -1759,8 +1751,15 @@ extern unsigned long walt_map_util_freq(unsigned long util,
 extern void early_walt_config(void);
 extern unsigned int sysctl_topapp_weight_pct;
 extern u64 trailblazer_boost_state_ns;
-extern unsigned int trailblazer_boost_thresh_ipc;
 extern u64 oscillate_ts_ns;
+
+#if IS_ENABLED(CONFIG_SCHED_WALT_MIDPOINT)
+extern void midpoint_init(void);
+#else
+static inline void midpoint_init(void)
+{
+}
+#endif
 
 /*
  * Multiply the pct value by 10 so that division by 100 can be converted

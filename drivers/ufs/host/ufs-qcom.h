@@ -543,12 +543,11 @@ struct ufs_qcom_host {
 	bool disable_lpm;
 
 	bool vdd_hba_pc;
-	bool ufs_gen_type;
 	struct notifier_block vdd_hba_reg_nb;
 
 	struct ufs_vreg *vddp_ref_clk;
-	struct ufs_vreg *parent_vreg;
-	struct ufs_vreg *proxy_client;
+	struct ufs_vreg *vccq_parent;
+	struct ufs_vreg *vccq_proxy_client;
 	bool work_pending;
 	bool bypass_g4_cfgready;
 	bool is_dt_pm_level_read;
@@ -599,7 +598,6 @@ struct ufs_qcom_host {
 	bool esi_enabled;
 	bool enforce_high_irq_cpus;
 	bool cap_hs_gear_limit;
-	bool phy_retention;
 
 	bool bypass_pbl_rst_wa;
 	atomic_t cqhp_update_pending;

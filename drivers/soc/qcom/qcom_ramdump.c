@@ -30,7 +30,6 @@ static inline size_t sizeof_elf_##__xhdr(unsigned char class) \
 
 SIZEOF_ELF_STRUCT(phdr)
 SIZEOF_ELF_STRUCT(hdr)
-SIZEOF_ELF_STRUCT(shdr)
 
 #define set_xhdr_property(__xhdr, arg, class, member, value) \
 do { \
@@ -44,8 +43,6 @@ do { \
 	set_xhdr_property(hdr, arg, class, member, value)
 #define set_phdr_property(arg, class, member, value) \
 	set_xhdr_property(phdr, arg, class, member, value)
-#define set_shdr_property(arg, class, member, value) \
-	set_xhdr_property(shdr, arg, class, member, value)
 
 #define RAMDUMP_NUM_DEVICES	256
 #define RAMDUMP_NAME		"ramdump"
@@ -200,13 +197,9 @@ int qcom_dump(struct list_head *segs, struct device *dev)
 	void __iomem *ptr;
 	size_t data_size = 0;
 	size_t offset = 0;
-	int ret;
 
 	if (!segs || list_empty(segs))
 		return -EINVAL;
-
-	if (!dump_enabled())
-		return 0;
 
 	list_for_each_entry(segment, segs, node) {
 		pr_info("Got segment size %zd\n", segment->size);
@@ -221,26 +214,20 @@ int qcom_dump(struct list_head *segs, struct device *dev)
 		if (segment->va)
 			memcpy(data + offset, segment->va, segment->size);
 		else {
-			ptr = ioremap(segment->da, segment->size);
+			ptr = devm_ioremap(dev, segment->da, segment->size);
 			if (!ptr) {
 				dev_err(dev,
 					"invalid coredump segment (%pad, %zu)\n",
 					&segment->da, segment->size);
 				memset(data + offset, 0xff, segment->size);
-			} else {
+			} else
 				memcpy_fromio(data + offset, ptr,
 					      segment->size);
-				iounmap(ptr);
-			}
 		}
 		offset += segment->size;
 	}
 
-	ret = qcom_devcd_dump(dev, data, data_size, GFP_KERNEL);
-	if (ret)
-		vfree(data);
-
-	return ret;
+	return qcom_devcd_dump(dev, data, data_size, GFP_KERNEL);
 }
 EXPORT_SYMBOL(qcom_dump);
 
@@ -266,13 +253,10 @@ int qcom_elf_dump(struct list_head *segs, struct device *dev, unsigned char clas
 	int phnum = 0;
 	void *data;
 	void __iomem *ptr;
-	int ret;
+
 
 	if (!segs || list_empty(segs))
 		return -EINVAL;
-
-	if (!dump_enabled())
-		return 0;
 
 	if (class == ELFCLASSNONE) {
 		dev_err(dev, "ELF class is not set\n");
@@ -318,204 +302,24 @@ int qcom_elf_dump(struct list_head *segs, struct device *dev, unsigned char clas
 		if (segment->va)
 			memcpy(data + offset, segment->va, segment->size);
 		else {
-			ptr = ioremap(segment->da, segment->size);
+			ptr = devm_ioremap(dev, segment->da, segment->size);
 			if (!ptr) {
 				dev_err(dev,
 					"invalid coredump segment (%pad, %zu)\n",
 					&segment->da, segment->size);
 				memset(data + offset, 0xff, segment->size);
-			} else {
+			} else
 				memcpy_fromio(data + offset, ptr,
 					      segment->size);
-				iounmap(ptr);
-			}
 		}
 
 		offset += segment->size;
 		phdr += sizeof_elf_phdr(class);
 	}
 
-	ret = qcom_devcd_dump(dev, data, data_size, GFP_KERNEL);
-	if (ret)
-		vfree(data);
-
-	return ret;
+	return qcom_devcd_dump(dev, data, data_size, GFP_KERNEL);
 }
 EXPORT_SYMBOL(qcom_elf_dump);
-
-#define MAX_SEGMENT_NAME_LEN	64
-
-static unsigned int elf_strtbl_add(const char *name, char *strtab,
-				   size_t strtab_size, size_t *index)
-{
-	size_t ret = *index;
-	ssize_t len;
-
-	len = strscpy(strtab + ret, name, strtab_size - ret);
-	if (len < 0)
-		len = strtab_size - ret - 1;
-	*index += len + 1;
-	return ret;
-}
-
-/**
- * qcom_elf_dump_using_section() - create an ELF coredump using section headers
- * @segs:	list of struct qcom_dump_segment entries
- * @dev:	device for devm_ioremap and dev_coredumpm
- * @class:	ELFCLASS32 or ELFCLASS64
- *
- * Builds an ELF image with a section header table instead of a program header
- * table. Each segment is represented as a named SHT_PROGBITS section. A
- * .shstrtab string table section holds the section names.
- *
- * ELF layout:
- *   [ ELF header                  ]
- *   [ SHT_NULL shdr (index 0)     ]
- *   [ SHT_STRTAB shdr (.shstrtab) ]  index 1, pointed to by e_shstrndx
- *   [ SHT_PROGBITS shdr 2..N+1    ]  one per qcom_dump_segment
- *   [ .shstrtab data              ]  section name string table
- *   [ section data 2..N+1         ]  one blob per qcom_dump_segment
- *
- * Return: 0 on success, negative errno on failure.
- */
-int qcom_elf_dump_using_section(struct list_head *segs, struct device *dev,
-			  unsigned char class)
-{
-	struct qcom_dump_segment *segment;
-	size_t data_size, strtbl_size, strtbl_index;
-	size_t offset, strtbl_offset;
-	int shnum = 2;
-	void *data, *shdr, *ehdr;
-	void __iomem *ptr;
-	char *strtab;
-	char *str_tbl = ".shstrtab";
-	int ret;
-
-	if (!segs || list_empty(segs))
-		return -EINVAL;
-
-	if (!dump_enabled())
-		return 0;
-
-	if (class == ELFCLASSNONE) {
-		dev_err(dev, "ELF class is not set\n");
-		return -EINVAL;
-	}
-
-	/*
-	 * We allocate two extra section headers: index 0 (SHT_NULL) and
-	 * index 1 (SHT_STRTAB for .shstrtab). Space is also allocated for
-	 * the string table itself.
-	 * The extra byte accounts for the NUL at index 0 of the string table.
-	 */
-	strtbl_size = strlen(str_tbl) + 2;
-
-	list_for_each_entry(segment, segs, node) {
-		const char *name = segment->name ? segment->name : ".unknown";
-
-		strtbl_size += strnlen(name, MAX_SEGMENT_NAME_LEN) + 1;
-		shnum++;
-	}
-
-	/*
-	 * Total buffer:
-	 *   elf header + section header table + .shstrtab + segment data
-	 */
-	data_size = sizeof_elf_hdr(class) + sizeof_elf_shdr(class) * shnum +
-		    strtbl_size;
-	list_for_each_entry(segment, segs, node)
-		data_size += segment->size;
-
-	data = vmalloc(data_size);
-	if (!data)
-		return -ENOMEM;
-
-	/* --- ELF header --- */
-	ehdr = data;
-	memset(ehdr, 0, sizeof_elf_hdr(class));
-	init_elf_identification(ehdr, class);
-	set_ehdr_property(ehdr, class, e_type,      ET_CORE);
-	set_ehdr_property(ehdr, class, e_machine,   EM_NONE);
-	set_ehdr_property(ehdr, class, e_version,   EV_CURRENT);
-	set_ehdr_property(ehdr, class, e_shoff,     sizeof_elf_hdr(class));
-	set_ehdr_property(ehdr, class, e_ehsize,    sizeof_elf_hdr(class));
-	set_ehdr_property(ehdr, class, e_shentsize, sizeof_elf_shdr(class));
-	set_ehdr_property(ehdr, class, e_shnum,     shnum);
-	/* .shstrtab shdr is at index 1 */
-	set_ehdr_property(ehdr, class, e_shstrndx,  1);
-
-	/* --- Section header table starts right after ELF header --- */
-	shdr = data + sizeof_elf_hdr(class);
-
-	/* shdr[0]: SHT_NULL */
-	memset(shdr, 0, sizeof_elf_shdr(class));
-	shdr += sizeof_elf_shdr(class);
-
-	/*
-	 * strtbl_offset points past all shdrs; .shstrtab data goes here.
-	 * offset advances past the strtab into segment data.
-	 */
-	strtbl_offset = sizeof_elf_hdr(class) + sizeof_elf_shdr(class) * shnum;
-	offset = strtbl_offset + strtbl_size;
-
-	/* Initialize the string table area to zero */
-	memset(data + strtbl_offset, 0, strtbl_size);
-	strtab = data + strtbl_offset;
-	strtbl_index = 1;
-
-	/* shdr[1]: SHT_STRTAB for .shstrtab */
-	memset(shdr, 0, sizeof_elf_shdr(class));
-	set_shdr_property(shdr, class, sh_type,    SHT_STRTAB);
-	set_shdr_property(shdr, class, sh_offset,  strtbl_offset);
-	set_shdr_property(shdr, class, sh_size,    strtbl_size);
-	set_shdr_property(shdr, class, sh_entsize, 0);
-	set_shdr_property(shdr, class, sh_flags,   0);
-	set_shdr_property(shdr, class, sh_name,
-			  elf_strtbl_add(str_tbl, strtab, strtbl_size, &strtbl_index));
-	shdr += sizeof_elf_shdr(class);
-
-	/* shdr[2..N+1]: one SHT_PROGBITS per segment */
-	list_for_each_entry(segment, segs, node) {
-		const char *name = segment->name ? segment->name : ".unknown";
-
-		memset(shdr, 0, sizeof_elf_shdr(class));
-		set_shdr_property(shdr, class, sh_type,    SHT_PROGBITS);
-		set_shdr_property(shdr, class, sh_offset,  offset);
-		set_shdr_property(shdr, class, sh_addr,    segment->da);
-		set_shdr_property(shdr, class, sh_size,    segment->size);
-		set_shdr_property(shdr, class, sh_entsize, 0);
-		set_shdr_property(shdr, class, sh_flags,   SHF_WRITE);
-		set_shdr_property(shdr, class, sh_name,
-				  elf_strtbl_add(name, strtab, strtbl_size, &strtbl_index));
-
-		if (segment->va) {
-			memcpy(data + offset, segment->va, segment->size);
-		} else {
-			ptr = ioremap(segment->da, segment->size);
-			if (!ptr) {
-				dev_err(dev,
-					"invalid coredump segment (%pad, %zu)\n",
-					&segment->da, segment->size);
-				memset(data + offset, 0xff, segment->size);
-			} else {
-				memcpy_fromio(data + offset, ptr, segment->size);
-				iounmap(ptr);
-			}
-		}
-
-		offset += segment->size;
-		shdr += sizeof_elf_shdr(class);
-	}
-
-	dev_dbg(dev, "Creating section-based elf with size %zd\n", data_size);
-
-	ret = qcom_devcd_dump(dev, data, data_size, GFP_KERNEL);
-	if (ret)
-		vfree(data);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(qcom_elf_dump_using_section);
 
 int qcom_fw_elf_dump(struct firmware *fw, struct device *dev)
 {

@@ -1,13 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _QCOM_TVM_HEAP_H
 #define _QCOM_TVM_HEAP_H
 
 #include <linux/mem-buf.h>
-#include <linux/dma-heap.h>
 
 struct platform_heap;
 

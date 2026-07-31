@@ -170,25 +170,12 @@ static int bcl_read_soc(struct thermal_zone_device *tz, int *val)
 		bcl_perph->batt_psy = power_supply_get_by_name("battery");
 	if (bcl_perph->batt_psy) {
 		err = power_supply_get_property(bcl_perph->batt_psy,
-				POWER_SUPPLY_PROP_PRESENT, &ret);
-		if (err < 0) {
-			pr_err("battery presence read error:%d\n", err);
-			return err;
-		}
-
-		if (ret.intval != 1) {
-			pr_debug("battery is not present, defaulting into 0\n");
-			return 0;
-		}
-
-		err = power_supply_get_property(bcl_perph->batt_psy,
 				POWER_SUPPLY_PROP_CAPACITY, &ret);
 		if (err < 0) {
 			pr_err("battery percentage read error:%d\n",
 				err);
 			return err;
 		}
-
 		*val = 100 - ret.intval;
 	}
 	pr_debug("soc:%d\n", *val);

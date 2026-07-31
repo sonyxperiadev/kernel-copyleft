@@ -76,8 +76,6 @@ enum ring_vals {
 
 typedef void (*process_ed_fn)(struct qpace_event_descriptor *ed, int ed_index);
 
-DECLARE_STATIC_KEY_FALSE(qpace_drv_probed);
-
 #if IS_ENABLED(CONFIG_QTI_PAGE_COMPRESSION_ENGINE)
 
 /*

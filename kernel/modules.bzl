@@ -1,13 +1,17 @@
+load(":kernel/fels/modules.bzl", register_fels = "register_modules")
 load(":kernel/locking/modules.bzl", register_locking = "register_modules")
 load(":kernel/rcu/modules.bzl", register_rcu = "register_modules")
 load(":kernel/sched/walt/modules.bzl", register_sched_walt = "register_modules")
 load(":kernel/trace/modules.bzl", register_trace = "register_modules")
+load(":kernel/power_irq/modules.bzl", register_power_irq = "register_modules")
 
 def register_modules(registry):
+    register_fels(registry)
     register_locking(registry)
     register_rcu(registry)
     register_sched_walt(registry)
     register_trace(registry)
+    register_power_irq(registry)
 
     registry.register(
         name = "kernel/msm_sysstats",
