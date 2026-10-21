@@ -1,3 +1,8 @@
+/*
+ * NOTE: This file has been modified by Sony Corporation.
+ * Modifications are Copyright 2021 Sony Corporation,
+ * and licensed under the license of the file.
+ */
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019,2020, The Linux Foundation. All rights reserved.
@@ -1617,7 +1622,7 @@ static const struct msm_pingroup lagoon_groups[] = {
 };
 
 static const int lagoon_reserved_gpios[] = {
-	13, 14, 15, 16, 45, 46, 56, 57, -1
+	13, 14, 15, 16, -1
 };
 
 static struct msm_dir_conn lagoon_dir_conn[] = {

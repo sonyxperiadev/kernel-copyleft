@@ -22,6 +22,7 @@
 #include "diag_ipc_logging.h"
 
 #define PERI_RPMSG rpmsg_info->peripheral
+#define RX_LIST_MAX_PKT_CNT	10
 
 struct diag_rpmsg_read_work {
 	struct work_struct work;
@@ -56,7 +57,7 @@ struct diag_rpmsg_info rpmsg_data[NUM_PERIPHERALS] = {
 		.peripheral = PERIPHERAL_LPASS,
 		.type = TYPE_DATA,
 		.edge = "lpass",
-		.name = "DIAG_DATA",
+		.name = "DIAG",
 		.buf1 = NULL,
 		.buf2 = NULL,
 		.hdl = NULL
@@ -122,7 +123,7 @@ struct diag_rpmsg_info rpmsg_cntl[NUM_PERIPHERALS] = {
 		.peripheral = PERIPHERAL_LPASS,
 		.type = TYPE_CNTL,
 		.edge = "lpass",
-		.name = "DIAG_CTRL",
+		.name = "DIAG_CNTL",
 		.buf1 = NULL,
 		.buf2 = NULL,
 		.hdl = NULL
@@ -651,6 +652,7 @@ static void diag_rpmsg_notify_rx_work_fn(struct work_struct *work)
 	struct diagfwd_info *fwd_info;
 	void *buf = NULL;
 	unsigned long flags;
+	int err_flag = 0;
 
 	spin_lock_irqsave(&read_work_struct->rx_lock, flags);
 	if (!list_empty(&read_work_struct->rx_list_head)) {
@@ -658,24 +660,29 @@ static void diag_rpmsg_notify_rx_work_fn(struct work_struct *work)
 		rx_item = list_last_entry(&read_work_struct->rx_list_head,
 						struct rx_buff_list, list);
 
-		spin_unlock_irqrestore(&read_work_struct->rx_lock, flags);
-
-		if (!rx_item)
-			return;
+		if (!rx_item) {
+			err_flag = 1;
+			goto err_handling;
+		}
 
 		rpmsg_info = rx_item->rpmsg_info;
-		if (!rpmsg_info)
-			return;
+		if (!rpmsg_info) {
+			err_flag = 1;
+			goto err_handling;
+		}
 
 		fwd_info = rpmsg_info->fwd_ctxt;
-		if (!fwd_info)
-			return;
+		if (!fwd_info) {
+			err_flag = 1;
+			goto err_handling;
+		}
 
 		if (!rpmsg_info->buf1 && !rpmsg_info->buf2) {
 			DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-					"dropping data for %s len %d\n",
+					"retry data send for %s len %d\n",
 					rpmsg_info->name, rx_item->rx_buf_size);
-			return;
+			err_flag = 1;
+			goto err_handling;
 		}
 
 		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
@@ -698,28 +705,48 @@ static void diag_rpmsg_notify_rx_work_fn(struct work_struct *work)
 				"Both the rpmsg buffers are busy\n");
 			buf = NULL;
 		}
-		if (!buf)
-			return;
+		if (!buf) {
+			err_flag = 1;
+			goto err_handling;
+		}
 
-		memcpy(buf, rx_item->rpmsg_rx_buf, rx_item->rx_buf_size);
+err_handling:
+		if (!err_flag) {
+			memcpy(buf, rx_item->rpmsg_rx_buf,
+						rx_item->rx_buf_size);
+			list_del(&rx_item->list);
+			spin_unlock_irqrestore(&read_work_struct->rx_lock,
+								flags);
+		} else {
+			rpmsg_info->list_pkt_cnt += 1;
+			if (rpmsg_info->list_pkt_cnt > RX_LIST_MAX_PKT_CNT)
+				list_del(&rx_item->list);
+			spin_unlock_irqrestore(&read_work_struct->rx_lock,
+								flags);
+			if (rpmsg_info->list_pkt_cnt > RX_LIST_MAX_PKT_CNT) {
+				kfree(rx_item->rpmsg_rx_buf);
+				kfree(rx_item);
+			}
+			goto end;
+		}
+
 		mutex_lock(&driver->diagfwd_channel_mutex[PERI_RPMSG]);
 
 		diagfwd_channel_read_done(rpmsg_info->fwd_ctxt,
 				(unsigned char *)(buf), rx_item->rx_buf_size);
 
 		mutex_unlock(&driver->diagfwd_channel_mutex[PERI_RPMSG]);
-
-		list_del(&rx_item->list);
 		kfree(rx_item->rpmsg_rx_buf);
 		kfree(rx_item);
+
 	} else {
 		spin_unlock_irqrestore(&read_work_struct->rx_lock, flags);
 	}
-
+end:
 	return;
 }
 
-static struct diag_rpmsg_info *get_info_ptr(int type, int peripheral)
+struct diag_rpmsg_info *diag_get_rpmsg_info_ptr(int type, int peripheral)
 {
 	if (type == TYPE_CMD)
 		return &rpmsg_cmd[peripheral];
@@ -739,12 +766,20 @@ void rpmsg_mark_buffers_free(uint8_t peripheral, uint8_t type, int buf_num)
 {
 	struct diag_rpmsg_info *rpmsg_info;
 
-	if ((peripheral != PERIPHERAL_WDSP) &&
-		(peripheral != PERIPHERAL_WCNSS) &&
-			(peripheral != PERIPHERAL_MODEM))
+	switch (peripheral) {
+	case PERIPHERAL_WDSP:
+		break;
+	case PERIPHERAL_WCNSS:
+		break;
+	case PERIPHERAL_MODEM:
+		break;
+	case PERIPHERAL_LPASS:
+		break;
+	default:
 		return;
+	}
 
-	rpmsg_info =  get_info_ptr(type, peripheral);
+	rpmsg_info =  diag_get_rpmsg_info_ptr(type, peripheral);
 	if (!rpmsg_info)
 		return;
 
@@ -755,6 +790,9 @@ void rpmsg_mark_buffers_free(uint8_t peripheral, uint8_t type, int buf_num)
 		rpmsg_info->buf2 = NULL;
 		DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "marked buf2 NULL");
 	}
+
+	if (rpmsg_info->list_pkt_cnt > 0)
+		rpmsg_info->list_pkt_cnt -= 1;
 }
 
 static void rpmsg_late_init(struct diag_rpmsg_info *rpmsg_info)
@@ -822,6 +860,8 @@ static void __diag_rpmsg_init(struct diag_rpmsg_info *rpmsg_info)
 	mutex_lock(&driver->rpmsginfo_mutex[PERI_RPMSG]);
 	rpmsg_info->hdl = NULL;
 	rpmsg_info->fwd_ctxt = NULL;
+	rpmsg_info->probed = 0;
+	rpmsg_info->list_pkt_cnt = 0;
 	atomic_set(&rpmsg_info->opened, 0);
 	atomic_set(&rpmsg_info->diag_state, 0);
 	DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
@@ -848,10 +888,19 @@ int diag_rpmsg_init(void)
 	struct diag_rpmsg_info *rpmsg_info = NULL;
 
 	for (peripheral = 0; peripheral < NUM_PERIPHERALS; peripheral++) {
-		if ((peripheral != PERIPHERAL_WDSP) &&
-			(peripheral != PERIPHERAL_WCNSS) &&
-				(peripheral != PERIPHERAL_MODEM))
+		switch (peripheral) {
+		case PERIPHERAL_WDSP:
+			break;
+		case PERIPHERAL_WCNSS:
+			break;
+		case PERIPHERAL_MODEM:
+			break;
+		case PERIPHERAL_LPASS:
+			break;
+		default:
 			continue;
+		}
+
 		rpmsg_info = &rpmsg_cntl[peripheral];
 		__diag_rpmsg_init(rpmsg_info);
 		diagfwd_cntl_register(TRANSPORT_RPMSG, rpmsg_info->peripheral,
@@ -906,10 +955,19 @@ void diag_rpmsg_early_exit(void)
 	int peripheral = 0;
 
 	for (peripheral = 0; peripheral < NUM_PERIPHERALS; peripheral++) {
-		if ((peripheral != PERIPHERAL_WDSP) &&
-			(peripheral != PERIPHERAL_WCNSS) &&
-				(peripheral != PERIPHERAL_MODEM))
+		switch (peripheral) {
+		case PERIPHERAL_WDSP:
+			break;
+		case PERIPHERAL_WCNSS:
+			break;
+		case PERIPHERAL_MODEM:
+			break;
+		case PERIPHERAL_LPASS:
+			break;
+		default:
 			continue;
+		}
+
 		mutex_lock(&driver->rpmsginfo_mutex[peripheral]);
 		__diag_rpmsg_exit(&rpmsg_cntl[peripheral]);
 		mutex_unlock(&driver->rpmsginfo_mutex[peripheral]);
@@ -967,6 +1025,13 @@ static struct diag_rpmsg_info *diag_get_rpmsg_ptr(char *name, int pid)
 			return &rpmsg_dci[PERIPHERAL_MODEM];
 		else
 			return NULL;
+	} else if (pid == PERIPHERAL_LPASS) {
+		if (!strcmp(name, "DIAG"))
+			return &rpmsg_data[PERIPHERAL_LPASS];
+		else if (!strcmp(name, "DIAG_CNTL"))
+			return &rpmsg_cntl[PERIPHERAL_LPASS];
+		else
+			return NULL;
 	}
 	return NULL;
 }
@@ -985,6 +1050,8 @@ static int diag_rpmsg_probe(struct rpmsg_device *rpdev)
 		peripheral = PERIPHERAL_WCNSS;
 	else if (!strcmp(rpdev->dev.parent->of_node->name, "modem"))
 		peripheral = PERIPHERAL_MODEM;
+	else if (!strcmp(rpdev->dev.parent->of_node->name, "adsp"))
+		peripheral = PERIPHERAL_LPASS;
 
 	rpmsg_info = diag_get_rpmsg_ptr(rpdev->id.name, peripheral);
 	if (rpmsg_info) {
@@ -992,6 +1059,7 @@ static int diag_rpmsg_probe(struct rpmsg_device *rpdev)
 		rpmsg_info->hdl = rpdev;
 		atomic_set(&rpmsg_info->opened, 1);
 		mutex_unlock(&driver->rpmsginfo_mutex[PERI_RPMSG]);
+		rpmsg_info->probed = 1;
 		dev_set_drvdata(&rpdev->dev, rpmsg_info);
 		diagfwd_channel_read(rpmsg_info->fwd_ctxt);
 		queue_work(rpmsg_info->wq, &rpmsg_info->open_work);
@@ -1013,12 +1081,15 @@ static void diag_rpmsg_remove(struct rpmsg_device *rpdev)
 		peripheral = PERIPHERAL_WCNSS;
 	else if (!strcmp(rpdev->dev.parent->of_node->name, "modem"))
 		peripheral = PERIPHERAL_MODEM;
+	else if (!strcmp(rpdev->dev.parent->of_node->name, "adsp"))
+		peripheral = PERIPHERAL_LPASS;
 
 	rpmsg_info = diag_get_rpmsg_ptr(rpdev->id.name, peripheral);
 	if (rpmsg_info) {
 		mutex_lock(&driver->rpmsginfo_mutex[PERI_RPMSG]);
 		atomic_set(&rpmsg_info->opened, 0);
 		mutex_unlock(&driver->rpmsginfo_mutex[PERI_RPMSG]);
+		rpmsg_info->probed = 0;
 		queue_work(rpmsg_info->wq, &rpmsg_info->close_work);
 	}
 }

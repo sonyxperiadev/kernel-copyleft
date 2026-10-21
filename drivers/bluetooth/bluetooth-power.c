@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
 /*
@@ -388,6 +388,7 @@ static int bt_configure_gpios(int on)
 		if (rc) {
 			BT_PWR_ERR("%s:bt_enable_bt_reset_gpios_safely failed",
 				__func__);
+			return rc;
 		}
 
 		msleep(50);
@@ -447,10 +448,6 @@ static void bt_free_gpios(void)
 {
 	if (bt_power_pdata->bt_gpio_sys_rst > 0)
 		gpio_free(bt_power_pdata->bt_gpio_sys_rst);
-	if (bt_power_pdata->wl_gpio_sys_rst > 0)
-		gpio_free(bt_power_pdata->wl_gpio_sys_rst);
-	if  (bt_power_pdata->bt_gpio_sw_ctrl  >  0)
-		gpio_free(bt_power_pdata->bt_gpio_sw_ctrl);
 	if  (bt_power_pdata->bt_gpio_debug  >  0)
 		gpio_free(bt_power_pdata->bt_gpio_debug);
 }
@@ -1152,7 +1149,9 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			soc_id = chipset_version;
 			if (soc_id == QCA_HSP_SOC_ID_0100 ||
 				soc_id == QCA_HSP_SOC_ID_0110 ||
-				soc_id == QCA_HSP_SOC_ID_0200) {
+				soc_id == QCA_HSP_SOC_ID_0200 ||
+				soc_id == QCA_HSP_SOC_ID_0210 ||
+				soc_id == QCA_HSP_SOC_ID_1211) {
 				ret = bt_disable_asd();
 			}
 		} else {

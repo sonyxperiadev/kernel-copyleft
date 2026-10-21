@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2017-2018, 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _SDE_DRM_H_
@@ -53,6 +54,8 @@
  *                                  alpha pre-multiplied. Apply
  *                                  pre-multiplication. If fg plane alpha is
  *                                  less than 0xff, apply modulation as well.
+ * @SDE_DRM_BLEND_OP_LAYER_COLOR:   Blend_op type for layer color component,
+ *                                  apply a constant blend operation.
  * @SDE_DRM_BLEND_OP_MAX:           Used to track maximum blend operation
  *                                  possible by mdp.
  */
@@ -60,7 +63,8 @@
 #define SDE_DRM_BLEND_OP_OPAQUE         1
 #define SDE_DRM_BLEND_OP_PREMULTIPLIED  2
 #define SDE_DRM_BLEND_OP_COVERAGE       3
-#define SDE_DRM_BLEND_OP_MAX            4
+#define SDE_DRM_BLEND_OP_LAYER_COLOR    4
+#define SDE_DRM_BLEND_OP_MAX            5
 
 /**
  * Bit masks for "src_config" property
@@ -489,4 +493,12 @@ struct sde_drm_roi_v1 {
 #define SDE_RECOVERY_CAPTURE		1
 #define SDE_RECOVERY_HARD_RESET		2
 
+/* display format modifiers */
+/*
+ * QTI planar fsc Tile Format
+ *
+ * Refers to a tile variant of the planar format.
+ * Implementation may be platform and base-format specific.
+ */
+#define DRM_FORMAT_MOD_QCOM_FSC_TILE       fourcc_mod_code(QCOM, 0x10)
 #endif /* _SDE_DRM_H_ */

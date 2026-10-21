@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "smcinvoke: %s: " fmt, __func__
@@ -590,15 +591,13 @@ static uint16_t get_server_id(int cb_server_fd)
 	struct smcinvoke_file_data *svr_cxt = NULL;
 	struct file *tmp_filp = fget(cb_server_fd);
 
-	if (!tmp_filp)
+	if (!tmp_filp || !FILE_IS_REMOTE_OBJ(tmp_filp))
 		return server_id;
 
 	svr_cxt = tmp_filp->private_data;
 	if (svr_cxt && svr_cxt->context_type ==  SMCINVOKE_OBJ_TYPE_SERVER)
 		server_id = svr_cxt->server_id;
-
-	if (tmp_filp)
-		fput(tmp_filp);
+	fput(tmp_filp);
 
 	return server_id;
 }
@@ -1152,7 +1151,8 @@ static int prepare_send_scm_msg(const uint8_t *in_buf, phys_addr_t in_paddr,
 		    desc.ret[0] == QSEOS_RESULT_BLOCKED_ON_LISTENER) {
 			ret = qseecom_process_listener_from_smcinvoke(&desc);
 			req->result = (int32_t)desc.ret[1];
-			if (!req->result) {
+			if (!req->result &&
+			  desc.ret[0] != SMCINVOKE_RESULT_INBOUND_REQ_NEEDED) {
 				dmac_inv_range(in_buf, in_buf + in_buf_len);
 				ret = marshal_out_invoke_req(in_buf,
 						in_buf_len, req, args_buf);

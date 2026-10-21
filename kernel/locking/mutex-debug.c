@@ -29,7 +29,7 @@
  */
 void debug_mutex_lock_common(struct mutex *lock, struct mutex_waiter *waiter)
 {
-	memset(waiter, MUTEX_DEBUG_INIT, sizeof(*waiter));
+	memset(waiter, MUTEX_WAITER_DEBUG_INIT, sizeof(*waiter));
 	waiter->magic = waiter;
 	INIT_LIST_HEAD(&waiter->list);
 }
@@ -45,7 +45,7 @@ void debug_mutex_wake_waiter(struct mutex *lock, struct mutex_waiter *waiter)
 void debug_mutex_free_waiter(struct mutex_waiter *waiter)
 {
 	DEBUG_LOCKS_WARN_ON(!list_empty(&waiter->list));
-	memset(waiter, MUTEX_DEBUG_FREE, sizeof(*waiter));
+	memset(waiter, MUTEX_WAITER_DEBUG_FREE, sizeof(*waiter));
 }
 
 void debug_mutex_add_waiter(struct mutex *lock, struct mutex_waiter *waiter,

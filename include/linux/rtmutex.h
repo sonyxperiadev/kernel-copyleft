@@ -100,7 +100,7 @@ do { \
  */
 static inline int rt_mutex_is_locked(struct rt_mutex *lock)
 {
-	return lock->owner != NULL;
+	return READ_ONCE(lock->owner) != NULL;
 }
 
 extern void __rt_mutex_init(struct rt_mutex *lock, const char *name, struct lock_class_key *key);

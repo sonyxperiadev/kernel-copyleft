@@ -17,7 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/err.h>
 #include <linux/delay.h>
-#include <dt-bindings/clock/mdss-28nm-pll-clk.h>
+#include <dt-bindings/clock/mdss-28nm-pll-clk-legacy.h>
 
 #include "mdss-pll.h"
 #include "mdss-dsi-pll.h"
@@ -211,7 +211,7 @@ static struct dsi_pll_vco_clk dsi0pll_vco_clk = {
 	.lpfr_lut = lpfr_lut_struct,
 	.hw.init = &(struct clk_init_data){
 			.name = "dsi0pll_vco_clk",
-			.parent_names = (const char *[]){"cxo"},
+			.parent_names = (const char *[]){"bi_tcxo"},
 			.num_parents = 1,
 			.ops = &clk_ops_vco_28lpm,
 			.flags = CLK_GET_RATE_NOCACHE,
@@ -236,7 +236,7 @@ static struct dsi_pll_vco_clk dsi1pll_vco_clk = {
 	.lpfr_lut = lpfr_lut_struct,
 	.hw.init = &(struct clk_init_data){
 			.name = "dsi1pll_vco_clk",
-			.parent_names = (const char *[]){"cxo"},
+			.parent_names = (const char *[]){"bi_tcxo"},
 			.num_parents = 1,
 			.ops = &clk_ops_vco_28lpm,
 			.flags = CLK_GET_RATE_NOCACHE,
@@ -335,7 +335,7 @@ static struct clk_fixed_factor dsi0pll_byteclk_src = {
 	.div = 4,
 	.mult = 1,
 	.hw.init = &(struct clk_init_data){
-		.name = "dsi0pll_byteclk_src",
+		.name = "dsi0_phy_pll_out_byteclk",
 		.parent_names = (const char *[]){
 				"dsi0pll_byteclk_src_mux"},
 		.num_parents = 1,
@@ -348,7 +348,7 @@ static struct clk_fixed_factor dsi1pll_byteclk_src = {
 	.div = 4,
 	.mult = 1,
 	.hw.init = &(struct clk_init_data){
-		.name = "dsi1pll_byteclk_src",
+		.name = "dsi1_phy_pll_out_byteclk",
 		.parent_names = (const char *[]){
 				"dsi1pll_byteclk_src_mux"},
 		.num_parents = 1,
@@ -363,7 +363,7 @@ static struct clk_regmap_div dsi0pll_pclk_src = {
 	.width = 8,
 	.clkr = {
 		.hw.init = &(struct clk_init_data){
-			.name = "dsi0pll_pclk_src",
+			.name = "dsi0_phy_pll_out_dsiclk",
 			.parent_names = (const char *[]){"dsi0pll_vco_clk"},
 			.num_parents = 1,
 			.flags = CLK_GET_RATE_NOCACHE,
@@ -378,7 +378,7 @@ static struct clk_regmap_div dsi1pll_pclk_src = {
 	.width = 8,
 	.clkr = {
 		.hw.init = &(struct clk_init_data){
-			.name = "dsi1pll_pclk_src",
+			.name = "dsi1_phy_pll_out_dsiclk",
 			.parent_names = (const char *[]){"dsi1pll_vco_clk"},
 			.num_parents = 1,
 			.flags = CLK_GET_RATE_NOCACHE,
@@ -388,13 +388,13 @@ static struct clk_regmap_div dsi1pll_pclk_src = {
 };
 
 static struct clk_hw *mdss_dsi_pllcc_28lpm[] = {
-	[VCO_CLK_0] = &dsi0pll_vco_clk.hw,
+	[VCOCLK_0] = &dsi0pll_vco_clk.hw,
 	[ANALOG_POSTDIV_0_CLK] = &dsi0pll_analog_postdiv.clkr.hw,
 	[INDIRECT_PATH_SRC_0_CLK] = &dsi0pll_indirect_path_src.hw,
 	[BYTECLK_SRC_MUX_0_CLK] = &dsi0pll_byteclk_src_mux.clkr.hw,
 	[BYTECLK_SRC_0_CLK] = &dsi0pll_byteclk_src.hw,
 	[PCLK_SRC_0_CLK] = &dsi0pll_pclk_src.clkr.hw,
-	[VCO_CLK_1] = &dsi1pll_vco_clk.hw,
+	[VCOCLK_1] = &dsi1pll_vco_clk.hw,
 	[ANALOG_POSTDIV_1_CLK] = &dsi1pll_analog_postdiv.clkr.hw,
 	[INDIRECT_PATH_SRC_1_CLK] = &dsi1pll_indirect_path_src.hw,
 	[BYTECLK_SRC_MUX_1_CLK] = &dsi1pll_byteclk_src_mux.clkr.hw,
@@ -486,7 +486,7 @@ int dsi_pll_clock_register_28lpm(struct platform_device *pdev,
 		dsi0pll_pclk_src.clkr.regmap = rmap;
 
 		dsi0pll_vco_clk.priv = pll_res;
-		for (i = VCO_CLK_0; i <= PCLK_SRC_0_CLK; i++) {
+		for (i = VCOCLK_0; i <= PCLK_SRC_0_CLK; i++) {
 			clk = devm_clk_register(&pdev->dev,
 						mdss_dsi_pllcc_28lpm[i]);
 			if (IS_ERR(clk)) {
@@ -531,7 +531,7 @@ int dsi_pll_clock_register_28lpm(struct platform_device *pdev,
 		dsi1pll_pclk_src.clkr.regmap = rmap;
 
 		dsi1pll_vco_clk.priv = pll_res;
-		for (i = VCO_CLK_1; i <= PCLK_SRC_1_CLK; i++) {
+		for (i = VCOCLK_1; i <= PCLK_SRC_1_CLK; i++) {
 			clk = devm_clk_register(&pdev->dev,
 						mdss_dsi_pllcc_28lpm[i]);
 			if (IS_ERR(clk)) {

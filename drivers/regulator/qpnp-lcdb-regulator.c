@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
 #define pr_fmt(fmt)	"LCDB: %s: " fmt, __func__
@@ -1509,7 +1509,7 @@ static struct regulator_ops qpnp_lcdb_ncp_ops = {
 
 static int qpnp_lcdb_regulator_register(struct qpnp_lcdb *lcdb, u8 type)
 {
-	int rc = 0, off_on_delay = 0;
+	int rc = 0, off_on_delay = 0, voltage_step = VOLTAGE_STEP_50_MV;
 	struct regulator_init_data *init_data;
 	struct regulator_config cfg = {};
 	struct regulator_desc *rdesc;
@@ -1524,12 +1524,16 @@ static int qpnp_lcdb_regulator_register(struct qpnp_lcdb *lcdb, u8 type)
 		rdesc			= &lcdb->ldo.rdesc;
 		rdesc->ops		= &qpnp_lcdb_ldo_ops;
 		rdesc->off_on_delay	= off_on_delay;
+		rdesc->n_voltages = ((MAX_VOLTAGE_MV - MIN_VOLTAGE_MV)
+					/ voltage_step) + 1;
 		rdev			= lcdb->ldo.rdev;
 	} else if (type == NCP) {
 		node			= lcdb->ncp.node;
 		rdesc			= &lcdb->ncp.rdesc;
 		rdesc->ops		= &qpnp_lcdb_ncp_ops;
 		rdesc->off_on_delay	= off_on_delay;
+		rdesc->n_voltages = ((MAX_VOLTAGE_MV - MIN_VOLTAGE_MV)
+					/ voltage_step) + 1;
 		rdev			= lcdb->ncp.rdev;
 	} else {
 		pr_err("Invalid regulator type %d\n", type);
@@ -2093,7 +2097,12 @@ static void qpnp_lcdb_pmic_config(struct qpnp_lcdb *lcdb)
 			lcdb->wa_flags |= NCP_SCP_DISABLE_WA;
 		break;
 	case PMI632_SUBTYPE:
-	case PM6150L_SUBTYPE:
+		lcdb->wa_flags |= FORCE_PD_ENABLE_WA;
+		break;
+	case PM8150L_SUBTYPE:
+		if (lcdb->pmic_rev_id->rev4 >= PM8150L_V3P0_REV4)
+			lcdb->voltage_step_ramp = false;
+
 		lcdb->wa_flags |= FORCE_PD_ENABLE_WA;
 		break;
 	default:

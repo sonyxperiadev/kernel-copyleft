@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2020, Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021, Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -39,6 +39,7 @@ static struct cqhci_host_crypto_variant_ops cqhci_crypto_qti_variant_ops = {
 	.debug = cqhci_crypto_qti_debug,
 	.reset = cqhci_crypto_qti_reset,
 	.prepare_crypto_desc = cqhci_crypto_qti_prep_desc,
+	.recovery_finish = cqhci_crypto_qti_recovery_finish,
 };
 
 static atomic_t keycache;
@@ -290,7 +291,8 @@ int cqhci_crypto_qti_init_crypto(struct cqhci_host *host,
 	if (!cqhci_ice_memres) {
 		pr_debug("%s ICE not supported\n", __func__);
 		host->icemmio = NULL;
-		return PTR_ERR(cqhci_ice_memres);
+		host->caps &= ~CQHCI_CAP_CRYPTO_SUPPORT;
+		return err;
 	}
 
 	host->icemmio = devm_ioremap(&msm_host->pdev->dev,
@@ -370,6 +372,9 @@ int cqhci_crypto_qti_prep_desc(struct cqhci_host *host, struct mmc_request *mrq,
 	if (!(atomic_read(&keycache) & (1 << bc->bc_keyslot))) {
 		if (bc->is_ext4)
 			cmdq_use_default_du_size = true;
+		else
+			cmdq_use_default_du_size = false;
+
 		ret = cqhci_crypto_qti_keyslot_program(host->ksm, bc->bc_key,
 						       bc->bc_keyslot);
 		if (ret) {
@@ -406,4 +411,10 @@ void cqhci_crypto_qti_set_vops(struct cqhci_host *host)
 int cqhci_crypto_qti_resume(struct cqhci_host *host)
 {
 	return crypto_qti_resume(host->crypto_vops->priv);
+}
+
+int cqhci_crypto_qti_recovery_finish(struct cqhci_host *host)
+{
+	keyslot_manager_reprogram_all_keys(host->ksm);
+	return 0;
 }

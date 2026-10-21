@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -484,8 +484,11 @@ static int ipa3_qmi_send_req_wait(struct qmi_handle *client_handle,
 		req_desc->ei_array,
 		req);
 
-	if (unlikely(!ipa_q6_clnt))
+	if (unlikely(!ipa_q6_clnt)) {
+		mutex_unlock(&ipa3_qmi_lock);
 		return -EINVAL;
+	}
+
 	mutex_unlock(&ipa3_qmi_lock);
 
 	if (ret < 0) {
@@ -930,7 +933,10 @@ int ipa3_qmi_add_offload_request_send(
 	}
 
 	/* check if the filter rules from IPACM is valid */
-	if (req->filter_spec_ex2_list_len == 0) {
+	if (req->filter_spec_ex2_list_len < 0) {
+		IPAWANERR("IPACM pass invalid num of rules\n");
+		return -EINVAL;
+	} else if (req->filter_spec_ex2_list_len == 0) {
 		IPAWANDBG("IPACM pass zero rules to Q6\n");
 	} else {
 		IPAWANDBG("IPACM pass %u rules to Q6\n",
@@ -938,9 +944,10 @@ int ipa3_qmi_add_offload_request_send(
 	}
 
 	/* currently set total max to 64 */
-	if (req->filter_spec_ex2_list_len +
-		ipa3_qmi_ctx->num_ipa_offload_connection
-		>= QMI_IPA_MAX_FILTERS_V01) {
+	if ((ipa3_qmi_ctx->num_ipa_offload_connection < 0) ||
+		(req->filter_spec_ex2_list_len >=
+		(QMI_IPA_MAX_FILTERS_V01 -
+			ipa3_qmi_ctx->num_ipa_offload_connection))) {
 		IPAWANDBG(
 		"cur(%d), req(%d), exceed limit (%d)\n",
 			ipa3_qmi_ctx->num_ipa_offload_connection,
@@ -1594,6 +1601,7 @@ static void ipa3_q6_clnt_svc_arrive(struct work_struct *work)
 			return;
 		}
 		IPAWANERR("Exit from service arrive fun\n");
+		return;
 	}
 
 	if (rc != 0) {

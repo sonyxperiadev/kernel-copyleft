@@ -64,7 +64,7 @@ extern unsigned int uvc_gadget_trace_param;
  * Driver specific constants
  */
 
-#define UVC_NUM_REQUESTS			16
+#define UVC_NUM_REQUESTS			64
 #define UVC_MAX_REQUEST_SIZE			64
 #define UVC_MAX_EVENTS				4
 
@@ -133,6 +133,9 @@ struct uvc_device {
 	/* Events */
 	unsigned int event_length;
 	unsigned int event_setup_out : 1;
+
+	bool wait_for_close;
+	struct completion unbind_ok;
 };
 
 static inline struct uvc_device *to_uvc(struct usb_function *f)
