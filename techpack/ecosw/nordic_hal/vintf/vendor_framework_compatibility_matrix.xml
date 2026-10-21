@@ -1,0 +1,11 @@
+<compatibility-matrix version="1.0" type="framework">
+    <hal format="hidl" optional="true">
+        <name>vendor.shadowcreator.hardware.nordic</name>
+        <impl level="generic"></impl>
+        <version>1.0</version>
+        <interface>
+            <name>INordic</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+</compatibility-matrix>

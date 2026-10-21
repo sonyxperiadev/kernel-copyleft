@@ -1,0 +1,67 @@
+cc_binary {
+    name: "ipa-kernel-tests",
+
+    cflags: ["-Wno-missing-field-initializers"] + ["-Wno-int-to-pointer-cast"] + ["-Wno-int-conversion"],
+
+    header_libs: ["device_kernel_headers"]+["qti_kernel_headers"]+["qti_ipa_test_kernel_headers"],
+
+    srcs: [
+        "DataPathTestFixture.cpp",
+        "DataPathTests.cpp",
+        "ExceptionsTestFixture.cpp",
+        "ExceptionsTests.cpp",
+        "ExceptionTests.cpp",
+        "Feature.cpp",
+        "Filtering.cpp",
+        "FilteringEthernetBridgingTestFixture.cpp",
+        "FilteringEthernetBridgingTests.cpp",
+        "FilteringTest.cpp",
+        "HeaderInsertion.cpp",
+        "HeaderInsertionTests.cpp",
+        "HeaderProcessingContextTestFixture.cpp",
+        "HeaderProcessingContextTests.cpp",
+        "HeaderRemovalTestFixture.cpp",
+        "HeaderRemovalTests.cpp",
+        "InterfaceAbstraction.cpp",
+        "IPAFilteringTable.cpp",
+        "IPAInterruptsTestFixture.cpp",
+        "IPAInterruptsTests.cpp",
+        "IPv4Packet.cpp",
+        "IPv6CTTest.cpp",
+        "Logger.cpp",
+        "main.cpp",
+        "MBIMAggregationTestFixtureConf11.cpp",
+        "MBIMAggregationTests.cpp",
+        "NatTest.cpp",
+        "Pipe.cpp",
+        "PipeTestFixture.cpp",
+        "PipeTests.cpp",
+        "RNDISAggregationTestFixture.cpp",
+        "RNDISAggregationTests.cpp",
+        "RoutingDriverWrapper.cpp",
+        "RoutingTests.cpp",
+        "TestBase.cpp",
+        "TestManager.cpp",
+        "TestsUtils.cpp",
+        "TLPAggregationTestFixture.cpp",
+        "TLPAggregationTests.cpp",
+    ],
+
+    clang: true,
+    vendor: true,
+    rtti: true,
+
+    shared_libs:
+        ["libc++",
+        "libipanat"],
+
+    relative_install_path: "ipa-kernel-tests",
+
+
+}
+
+IPA_KERNEL_TESTS_FILE_LIST = [
+    "README.txt",
+    "run.sh",
+]
+

@@ -1,0 +1,10 @@
+LOCAL_PATH := $(call my-dir)
+include $(CLEAR_VARS)
+
+DLKM_DIR   := $(TOP)/device/qcom/common/dlkm
+LOCAL_MODULE              := fpc1145_platform.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+ifneq ($(call is-board-platform-in-list, kalama),true)
+    include $(DLKM_DIR)/AndroidKernelModule.mk
+endif

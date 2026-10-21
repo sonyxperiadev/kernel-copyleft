@@ -1,0 +1,5 @@
+cc_library_headers {
+    name: "smcinvoke_kernel_headers",
+    vendor_available: true,
+    export_include_dirs: ["."],
+}

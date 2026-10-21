@@ -35,8 +35,10 @@
 #include "sdhci-pltfm.h"
 #include "cqhci.h"
 #include "../core/core.h"
+#include "../core/card.h"
 #include <linux/qtee_shmbridge.h>
 #include <linux/crypto-qti-common.h>
+#include <trace/hooks/mmc.h>
 
 #define CORE_MCI_VERSION		0x50
 #define CORE_VERSION_MAJOR_SHIFT	28
@@ -151,7 +153,6 @@
 #define BIAS_OK_SIGNAL			BIT(29)
 #define DLL_CONFIG_3_POR_VAL		0x10
 
-#define DLL_CONFIG_POR_VAL		0x6007642C
 
 #define INVALID_TUNING_PHASE	-1
 #define SDHCI_MSM_MIN_CLOCK	400000
@@ -1018,14 +1019,16 @@ static int msm_init_cm_dll(struct sdhci_host *host,
 		udelay(5);
 	}
 
-	/* Config DLL_CONFIG with HSR values */
-	if (msm_host->dll_hsr && msm_host->dll_hsr->dll_config)
-		writel_relaxed(msm_host->dll_hsr->dll_config |
-			CORE_DLL_RST | CORE_DLL_PDN, host->ioaddr +
-			msm_offset->core_dll_config);
-	else
-		writel_relaxed(DLL_CONFIG_POR_VAL, host->ioaddr +
-			msm_offset->core_dll_config);
+	/*
+	 * Step 10 - Update the lower two bytes of DLL_CONFIG only with
+	 * HSR values. Since these are the static settings.
+	 */
+	if (msm_host->dll_hsr) {
+		writel_relaxed((readl_relaxed(host->ioaddr +
+			msm_offset->core_dll_config) |
+			(msm_host->dll_hsr->dll_config & 0xffff)),
+			host->ioaddr + msm_offset->core_dll_config);
+	}
 
 	/*
 	 * Configure DLL user control register to enable DLL status.
@@ -1084,22 +1087,27 @@ static int msm_init_cm_dll(struct sdhci_host *host,
 				msm_offset->core_dll_config_2);
 	}
 
+	/* Step 16 - Set DLL_EN bit to 1. */
+	writel_relaxed((readl_relaxed(host->ioaddr +
+			msm_offset->core_dll_config) | CORE_DLL_EN),
+			host->ioaddr + msm_offset->core_dll_config);
+
 	/*
-	 * Step 16 - Wait for 8000 input clock. Here we calculate the
+	 * Step 17 - Wait for 8000 input clock. Here we calculate the
 	 * delay from fixed clock freq 192MHz, which turns out 42us.
 	 */
 	spin_unlock_irqrestore(&host->lock, flags);
 	usleep_range(45, 50);
 	spin_lock_irqsave(&host->lock, flags);
 
-	/* Step 17 - Set CK_OUT_EN bit to 1. */
+	/* Step 18 - Set CK_OUT_EN bit to 1. */
 	writel_relaxed((readl_relaxed(host->ioaddr +
 			msm_offset->core_dll_config)
 			| CORE_CK_OUT_EN), host->ioaddr +
 			msm_offset->core_dll_config);
 
 	/*
-	 * Step 18 - Wait until DLL_LOCK bit of DLL_STATUS register
+	 * Step 19 - Wait until DLL_LOCK bit of DLL_STATUS register
 	 * becomes '1'.
 	 */
 	while (!(readl_relaxed(host->ioaddr + msm_offset->core_dll_status) &
@@ -1117,7 +1125,7 @@ static int msm_init_cm_dll(struct sdhci_host *host,
 
 out:
 	if (core_vendor_spec & CORE_CLK_PWRSAVE) {
-		/* Step 19 - Reenable PWRSAVE as needed */
+		/* Step 20 - Reenable PWRSAVE as needed */
 		writel_relaxed((readl_relaxed(host->ioaddr +
 			msm_offset->core_vendor_spec)
 			| CORE_CLK_PWRSAVE), host->ioaddr +
@@ -1411,7 +1419,7 @@ static int sdhci_msm_cm_dll_sdc4_calibration(struct sdhci_host *host)
 	else
 		ddr_cfg_offset = msm_offset->core_ddr_config_old;
 
-	if (msm_host->dll_hsr && msm_host->dll_hsr->ddr_config)
+	if (msm_host->dll_hsr->ddr_config)
 		config = msm_host->dll_hsr->ddr_config;
 	else
 		config = DDR_CONFIG_POR_VAL;
@@ -1852,6 +1860,7 @@ static int sdhci_msm_dt_parse_vreg_info(struct device *dev,
 	snprintf(prop_name, MAX_PROP_SIZE, "%s-supply", vreg_name);
 	if (!of_parse_phandle(np, prop_name, 0)) {
 		dev_info(dev, "No vreg data found for %s\n", vreg_name);
+		ret = -ENOENT;
 		return ret;
 	}
 
@@ -2479,7 +2488,8 @@ static int sdhci_msm_setup_vreg(struct sdhci_msm_host *msm_host,
 
 	/* Disable always_on regulator during reboot/shutdown */
 	if (mmc->card &&
-		mmc->card->ext_csd.power_off_notification == EXT_CSD_NO_POWER_NOTIFICATION)
+		mmc->card->ext_csd.power_off_notification == EXT_CSD_NO_POWER_NOTIFICATION
+		&& mmc->caps & MMC_CAP_NONREMOVABLE)
 		return ret;
 
 	if (!enable && !(mmc->caps & MMC_CAP_NONREMOVABLE)) {
@@ -4650,7 +4660,7 @@ static void sdhci_msm_qos_init(struct sdhci_msm_host *msm_host)
 					err);
 			continue;
 		}
-		qcg->mask.bits[0] = mask;
+		qcg->mask.bits[0] = mask & cpu_possible_mask->bits[0];
 		if (!cpumask_subset(&qcg->mask, cpu_possible_mask)) {
 			dev_err(&pdev->dev, "Invalid group mask\n");
 			goto out_vote_err;
@@ -4921,6 +4931,36 @@ static int sdhci_qcom_read_boot_config(struct platform_device *pdev)
 static void sdhci_msm_set_sdio_pm_flag(void *unused, struct mmc_host *host)
 {
 	host->pm_flags &= ~MMC_PM_WAKE_SDIO_IRQ;
+}
+
+static void sdhci_msm_gpio_irqt(void *unused, struct mmc_host *host, bool *allow)
+{
+	host->android_oem_data1 = 0;
+}
+
+static void sdhci_msm_get_cd(void *unused, struct sdhci_host *host, bool *allow)
+{
+	if (host->mmc && host->mmc->android_oem_data1)
+		*allow = false;
+}
+
+static void sdhci_msm_remove_card(void *unused, struct mmc_card *card)
+{
+	if (mmc_card_sd(card)) {
+		pr_info("%s: Removing card\n", mmc_hostname(card->host));
+		mmc_card_set_removed(card);
+		card->host->android_oem_data1 = 1;
+		mmc_detect_change(card->host, msecs_to_jiffies(200));
+	}
+}
+
+static void sdhci_msm_disable_scr_cmd48_support(void *unused, struct mmc_card *card)
+{
+	if (card && mmc_card_sd(card) &&
+			(card->scr.cmds & SD_SCR_CMD48_SUPPORT)) {
+		pr_info("%s: disabling SD_SCR_CMD48_SUPPORT\n", mmc_hostname(card->host));
+		card->scr.cmds &= ~SD_SCR_CMD48_SUPPORT;
+	}
 }
 
 static int sdhci_msm_probe(struct platform_device *pdev)
@@ -5264,6 +5304,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	/* Initialize sysfs entries */
 	sdhci_msm_init_sysfs_gating_qos(dev);
 
+	register_trace_android_vh_sd_update_bus_speed_mode(
+			sdhci_msm_disable_scr_cmd48_support, NULL);
+
 	if (of_property_read_bool(node, "supports-cqe"))
 		ret = sdhci_msm_cqe_add_host(host, pdev);
 	else
@@ -5291,6 +5334,33 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	if (msm_host->mmc->card && mmc_card_sdio(msm_host->mmc->card))
 		register_trace_android_vh_mmc_sdio_pm_flag_set(sdhci_msm_set_sdio_pm_flag, NULL);
 
+	ret = register_trace_android_vh_mmc_blk_mq_rw_recovery(
+			sdhci_msm_remove_card, NULL);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to register vendor hook (%d)\n", ret);
+		goto exit_vh;
+	}
+
+	ret = register_trace_android_vh_sdhci_get_cd(
+			sdhci_msm_get_cd, NULL);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to register vendor hook (%d)\n", ret);
+		unregister_trace_android_vh_mmc_blk_mq_rw_recovery(
+                        sdhci_msm_remove_card, NULL);
+		goto exit_vh;
+	}
+
+	ret = register_trace_android_vh_mmc_gpio_cd_irqt(
+			sdhci_msm_gpio_irqt, NULL);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to register recovery hook (%d)\n", ret);
+		unregister_trace_android_vh_mmc_blk_mq_rw_recovery(
+                        sdhci_msm_remove_card, NULL);
+		unregister_trace_android_vh_sdhci_get_cd(
+                        sdhci_msm_get_cd, NULL);
+	}
+
+exit_vh:
 	return 0;
 
 pm_runtime_disable:
@@ -5343,6 +5413,13 @@ static int sdhci_msm_remove(struct platform_device *pdev)
 	dead = (readl_relaxed(host->ioaddr + SDHCI_INT_STATUS) ==
 		    0xffffffff);
 
+	unregister_trace_android_vh_mmc_blk_mq_rw_recovery(
+                        sdhci_msm_remove_card, NULL);
+	unregister_trace_android_vh_sdhci_get_cd(
+                        sdhci_msm_get_cd, NULL);
+	unregister_trace_android_vh_mmc_gpio_cd_irqt(
+                        sdhci_msm_gpio_irqt, NULL);
+
 	sdhci_remove_host(host, dead);
 
 	sdhci_msm_vreg_init(&pdev->dev, msm_host, false);
@@ -5375,6 +5452,9 @@ skip_removing_qos:
 		sdhci_msm_bus_get_and_set_vote(host, 0);
 		sdhci_msm_bus_unregister(&pdev->dev, msm_host);
 	}
+	unregister_trace_android_vh_sd_update_bus_speed_mode(
+			sdhci_msm_disable_scr_cmd48_support, NULL);
+
 	sdhci_pltfm_free(pdev);
 	return 0;
 }

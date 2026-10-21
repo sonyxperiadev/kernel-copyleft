@@ -1,0 +1,7 @@
+prebuilt_etc_xml {
+    name: "manifest_vendor.shadowcreator.hardware.nordic.xml",
+    src: "manifest_vendor.shadowcreator.hardware.nordic.xml",
+    vendor: true,
+    installable: true,
+    sub_dir: "vintf/manifest",
+}

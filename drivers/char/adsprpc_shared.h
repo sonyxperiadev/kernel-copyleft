@@ -673,9 +673,14 @@ enum fastrpc_buf_type {
 
 /* Types of RPC calls to DSP */
 enum fastrpc_msg_type {
+	/* 64 bit user application invoke message */
 	USER_MSG = 0,
+	/* kernel invoke message with zero pid */
 	KERNEL_MSG_WITH_ZERO_PID,
+	/* kernel invoke message with non zero pid to kill the PD in DSP */
 	KERNEL_MSG_WITH_NONZERO_PID,
+	/* 32 bit user application invoke message */
+	COMPAT_MSG,
 };
 
 #define DSPSIGNAL_TIMEOUT_NONE 0xffffffff
@@ -970,9 +975,11 @@ struct fastrpc_mmap {
 	bool in_use;				/* Indicates if persistent map is in use*/
 	struct timespec64 map_start_time;
 	struct timespec64 map_end_time;
-	/* Mapping for fastrpc shell */
-	bool is_filemap;
+	bool is_filemap;			/*flag to indicate map used in process init*/
 	char *servloc_name;			/* Indicate which daemon mapped this */
+	unsigned int ctx_refs; /* Indicates reference count for context map */
+	/* Map in use for dma handle */
+	unsigned int dma_handle_refs;
 };
 
 enum fastrpc_perfkeys {
@@ -1082,8 +1089,6 @@ struct fastrpc_file {
 	/* Flag to indicate dynamic process creation status*/
 	enum fastrpc_process_create_state dsp_process_state;
 	bool is_unsigned_pd;
-	/* Flag to indicate 32 bit driver*/
-	bool is_compat;
 	/* Completion objects and state for dspsignals */
 	struct fastrpc_dspsignal *signal_groups[DSPSIGNAL_NUM_SIGNALS / DSPSIGNAL_GROUP_SIZE];
 	spinlock_t dspsignals_lock;
@@ -1116,7 +1121,7 @@ int fastrpc_internal_invoke(struct fastrpc_file *fl, uint32_t mode,
 				   struct fastrpc_ioctl_invoke_async *inv);
 
 int fastrpc_internal_invoke2(struct fastrpc_file *fl,
-				struct fastrpc_ioctl_invoke2 *inv2);
+				struct fastrpc_ioctl_invoke2 *inv2, bool is_compat);
 
 int fastrpc_internal_munmap(struct fastrpc_file *fl,
 				   struct fastrpc_ioctl_munmap *ud);

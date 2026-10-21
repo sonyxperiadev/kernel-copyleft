@@ -1,0 +1,41 @@
+ENABLE_SECUREMSM_DLKM := false
+
+ifeq ($(TARGET_KERNEL_DLKM_DISABLE), true)
+ifeq ($(TARGET_KERNEL_DLKM_SECURE_MSM_OVERRIDE), true)
+ENABLE_SECUREMSM_DLKM := true
+endif
+else
+ENABLE_SECUREMSM_DLKM := true
+endif
+
+# Enable secure msm DLKM modules for target board auto
+ifeq ($(TARGET_BOARD_AUTO), true)
+ifeq ($(ENABLE_HYP), true)
+ENABLE_SECUREMSM_DLKM := true
+endif
+endif #TARGET_BOARD_AUTO
+
+ifeq ($(ENABLE_SECUREMSM_DLKM), true)
+BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/tz_log_dlkm.ko \
+      $(KERNEL_MODULES_OUT)/qcedev-mod_dlkm.ko \
+      $(KERNEL_MODULES_OUT)/qcrypto-msm_dlkm.ko \
+      $(KERNEL_MODULES_OUT)/qce50_dlkm.ko \
+      $(KERNEL_MODULES_OUT)/hdcp_qseecom_dlkm.ko \
+      $(KERNEL_MODULES_OUT)/qrng_dlkm.ko \
+
+BOARD_VENDOR_RAMDISK_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/tz_log_dlkm.ko \
+      $(KERNEL_MODULES_OUT)/hdcp_qseecom_dlkm.ko \
+
+BOARD_VENDOR_RAMDISK_RECOVERY_KERNEL_MODULES_LOAD += $(KERNEL_MODULES_OUT)/hdcp_qseecom_dlkm.ko
+
+BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/smcinvoke_dlkm.ko
+BOARD_VENDOR_RAMDISK_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/smcinvoke_dlkm.ko
+BOARD_VENDOR_RAMDISK_RECOVERY_KERNEL_MODULES_LOAD += $(KERNEL_MODULES_OUT)/smcinvoke_dlkm.ko
+
+#Enable Qseecom if TARGET_ENABLE_QSEECOM or TARGET_BOARD_AUTO is set to true
+ifneq (, $(filter true, $(TARGET_ENABLE_QSEECOM) $(TARGET_BOARD_AUTO)))
+BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/qseecom_dlkm.ko
+BOARD_VENDOR_RAMDISK_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/qseecom_dlkm.ko
+BOARD_VENDOR_RAMDISK_RECOVERY_KERNEL_MODULES_LOAD += $(KERNEL_MODULES_OUT)/qseecom_dlkm.ko
+endif #TARGET_ENABLE_QSEECOM OR TARGET_BOARD_AUTO
+endif #ENABLE_SECUREMSM_DLKM

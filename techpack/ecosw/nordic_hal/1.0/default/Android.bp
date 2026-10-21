@@ -1,0 +1,68 @@
+// FIXME: your file license if you have one
+
+cc_library_shared {
+    // FIXME: this should only be -impl for a passthrough hal.
+    // In most cases, to convert this to a binderized implementation, you should:
+    // - change '-impl' to '-service' here and make it a cc_binary instead of a
+    //   cc_library_shared.
+    // - add a *.rc file for this module.
+    // - delete HIDL_FETCH_I* functions.
+    // - call configureRpcThreadpool and registerAsService on the instance.
+    // You may also want to append '-impl/-service' with a specific identifier like
+    // '-vendor' or '-<hardware identifier>' etc to distinguish it.
+    name: "vendor.shadowcreator.hardware.nordic@1.0-impl",
+    relative_install_path: "hw",
+    // FIXME: this should be 'vendor: true' for modules that will eventually be
+    // on AOSP.
+    vendor: true,
+    header_libs: [
+        "jni_headers",
+    ],
+    srcs: [
+        "Nordic.cpp",
+    ],
+    shared_libs: [
+        "libhidlbase",
+        "libutils",
+        "libcutils",
+        "liblog",
+        "libdl",
+        "libc++",
+        "vendor.shadowcreator.hardware.nordic@1.0",
+        "android.hidl.memory@1.0",
+        "libhidlmemory",
+        "android.hidl.allocator@1.0",
+    ],
+    cflags: [
+        "-Wno-unused-parameter",
+        "-Wno-unused-variable",
+        "-Wno-format",
+        "-DIMU16BIT",
+    ],
+    export_include_dirs: ["."],
+}
+
+cc_binary {
+    name: "vendor.shadowcreator.hardware.nordic@1.0-service",
+    defaults: ["hidl_defaults"],
+    vendor: true,
+    relative_install_path: "hw",
+    srcs: ["service.cpp"],
+    init_rc: ["vendor.shadowcreator.hardware.nordic@1.0-service.rc"],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+    shared_libs: [
+        "libhidlbase",
+        "libhidltransport",
+        "libutils",
+        "liblog",
+        "vendor.shadowcreator.hardware.nordic@1.0",
+        "vendor.shadowcreator.hardware.nordic@1.0-impl",
+        "libhwbinder",
+        "android.hidl.memory@1.0",
+        "android.hidl.allocator@1.0",
+        "libhidlmemory",
+    ],
+}

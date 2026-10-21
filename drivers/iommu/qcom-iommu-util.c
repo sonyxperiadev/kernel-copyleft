@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-mapping-fast.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/qcom-iommu-util.h>
+#include <linux/qcom-io-pgtable.h>
 #include "qcom-dma-iommu-generic.h"
-#include "qcom-io-pgtable.h"
 #include "qcom-io-pgtable-alloc.h"
 
 struct qcom_iommu_range_prop_cb_data {
@@ -337,6 +338,24 @@ int qcom_iommu_get_fault_ids(struct iommu_domain *domain,
 	return ops->get_fault_ids(domain, f_ids);
 }
 EXPORT_SYMBOL(qcom_iommu_get_fault_ids);
+
+int qcom_skip_tlb_management(struct device *dev, bool skip)
+{
+	struct qcom_iommu_ops *ops;
+	struct iommu_domain *domain;
+
+	domain = iommu_get_domain_for_dev(dev);
+	if (!domain)
+		return -EINVAL;
+
+	ops = to_qcom_iommu_ops(domain->ops);
+	if (unlikely(ops->skip_tlb_management == NULL))
+		return -EINVAL;
+
+	ops->skip_tlb_management(domain, skip);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(qcom_skip_tlb_management);
 
 int qcom_iommu_get_msi_size(struct device *dev, u32 *msi_size)
 {

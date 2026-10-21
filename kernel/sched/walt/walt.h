@@ -121,8 +121,6 @@ struct walt_rq {
 	int			curr_top;
 	bool			notif_pending;
 	bool			high_irqload;
-	u64			last_cc_update;
-	u64			cycles;
 	u64			util;
 	struct list_head	mvp_tasks;
 	int                     num_mvp_tasks;
@@ -282,7 +280,8 @@ static inline u64 irq_time_read(int cpu) { return 0; }
 #define WINDOW_STATS_MAX		1
 #define WINDOW_STATS_MAX_RECENT_AVG	2
 #define WINDOW_STATS_AVG		3
-#define WINDOW_STATS_INVALID_POLICY	4
+#define WINDOW_STATS_EWMA		4
+#define WINDOW_STATS_INVALID_POLICY	5
 
 extern unsigned int __read_mostly sysctl_sched_coloc_downmigrate_ns;
 extern unsigned int __read_mostly sysctl_sched_group_downmigrate_pct;

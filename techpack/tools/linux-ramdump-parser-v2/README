@@ -1,0 +1,113 @@
+Python Linux Ramdump Parser
+
+What does this tool do?
+----------------------------------
+This tool takes as its input a vmlinux symbol file, and files representing
+memory from devices that run Linux. It proceeds to dump useful information
+such as process stacks, IRQ and workqueue information.
+
+What does this tool need?
+----------------------------------
+1) Python. This tool has been tested with Python 2.6.5 on both Linux and Windows
+1) a set of RAM dumps. Ideally, the load location of each dump as well.
+2) The corresponding vmlinux file
+
+How is this tool invoked?
+----------------------------------
+python ramparse.py invokes the parser. Options:
+
+--ram-file <file path> <start> <end> : Add this ram file to be parsed.
+At least one of --ram-file and --auto-dump required
+
+--vmlinux <path> : path for vmlinux to use. This is required
+
+--auto-dump <path to folder> : Automatically find files for a RAM dump and
+detect useful informaton.
+
+--gdb-path <path> : path for the GNU gdb debugger. If no path is given, the
+path will be used from local_settings.py
+
+--gdb-path <path> : path for the nm tool. If no path is given, the
+path will be used from local_settings.py
+
+--outdir <path> : Output directory to store any files written. If no path is
+given, the ramfile directory will be used if given, else the current directory
+will be used.
+
+--out-file <path> : File to write all output to. If no path is given,
+linux-parser-output.txt is used
+
+--stdout : Write to stdout instead of the out-file. This overrides any
+--out-file given.
+
+--qtf : Use QTF tool to parse and save QDSS trace data
+
+--qtf-path <path> : QTF tool executable
+
+--timeout <timeout valye in secs>: each parser will be terminated within given time limit value
+
+The list of features parsed is constantly growing. Please use --help option
+to see the full list of features that can be parsed.
+
+System requirements
+-------------------------------
+Python 2.7 is required to run this tool. It can be downloaded and
+installed from https://www.python.org/ or through your system's
+software package manager.
+
+If you already have python2.7 installed but it's not the default
+python2 interpreter on your system (e.g. if python2 points to
+python2.6) then you'll need to invoke the script with python2.7
+explicitly, for example:
+
+    $ python2.7 $(which ramparse.py) ...
+
+instead of:
+
+    $ ramparse.py ...
+
+Setting up the toolchains
+-------------------------------
+The parser relies on having access to gdb and nm to work. You will need to
+specify the paths to these tools. This can be done in three ways
+
+1) Using --gdb-path and --nm-path to specify the absolute path
+2) Using CROSS_COMPILE to specify the prefix
+3) Using local_settings.py as described below
+4) Install this library from https://github.com/eliben/pyelftools
+    - Download the code from avobe github link. Download the zip file.
+    - After download the zip file, you will find a folder pyelftools-master.
+    - Inside this folder you will find another folder named "elftools"
+	- copy that entire folder and paste it in below directory <installed Python path>\Lib\site-packages
+5) for --timeout option please do 'pip install func_timeout'
+    https://pypi.org/project/func-timeout/
+
+Just having gdb/nm on the path is not supported as there are too many
+variations on names to invoke.
+
+local_settings.py
+-------------------------------
+The parser attempts to figure out most of the settings automatically but there
+are some settings that are unique to the environment of the running system.
+These must be specified in local_settings.py. The current format for the file
+is
+
+<setting name> = <string identifying the feaure>
+
+Currently supported features:
+gdb_path - absolute path to the gdb tool for the ramdumps
+nm_path - absolute path to the gdb tool for the ramdumps
+gdb64_path - absolute path to the 64-bit gdb tool for the ramdumps
+nm64_path - absolute path to the 64-bit nm tool for the ramdumps
+qtf_path - absolute path to qtf tool executable
+scandump_parser_path - absolute path to scandump parser for the ramdumps
+crashtool - absolute path to the 'crash' tool that is able to provide
+	    gdb like debugging and also host an extension that extracts
+	    ftrace
+trace_ext - shared library extension that allows the 'crash' tool to read
+	    raw ftrace data from a ramdump and dump it into a binary format
+tracecmdtool - absolute path to the trace-cmd tool that converts the binary
+	       trace format created by trace_ext to human readable ftrace
+
+Note that local_settings.py is just a python file so the file may take advantage
+of python features.

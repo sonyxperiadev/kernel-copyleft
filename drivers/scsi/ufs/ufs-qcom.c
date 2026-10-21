@@ -2737,6 +2737,117 @@ out:
 	return err;
 }
 
+static int ufshcd_write_buffer(struct ufs_hba *hba, void __user *buffer,
+				struct scsi_device *sdev)
+{
+	int err = 0;
+	unsigned char cmd[11] = {WRITE_BUFFER, 0x0E, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	struct ufs_ioctl_write_buffer_data *ioctl_data = NULL;
+	struct ufs_ioctl_write_buffer_data *fw_data = NULL;
+	unsigned char sense[SCSI_SENSE_BUFFERSIZE];
+	struct scsi_sense_hdr sshdr;
+	unsigned char *data = NULL;
+	u32 buf_size;
+	u32 buf_len;
+	u32 offset = 0;
+
+	ioctl_data = kmalloc(sizeof(struct ufs_ioctl_write_buffer_data),
+			GFP_KERNEL);
+	if (!ioctl_data) {
+		dev_err(hba->dev, "%s: Failed allocating ioctl_data\n",
+			__func__);
+		err = -ENOMEM;
+		goto out;
+	}
+
+	err = copy_from_user(ioctl_data, buffer,
+			sizeof(struct ufs_ioctl_write_buffer_data));
+	if (err) {
+		dev_err(hba->dev, "%s: Failed copying from user, err %d\n",
+			__func__, err);
+		goto out;
+	}
+
+	fw_data = kmalloc(sizeof(struct ufs_ioctl_write_buffer_data) +
+			ioctl_data->buf_size, GFP_KERNEL);
+	if (!fw_data) {
+		dev_err(hba->dev, "%s: Failed allocating fw_data\n", __func__);
+		err = -ENOMEM;
+		goto out;
+	}
+
+	err = copy_from_user(fw_data, buffer, sizeof(struct
+			ufs_ioctl_write_buffer_data) + ioctl_data->buf_size);
+	if (err) {
+		dev_err(hba->dev, "%s: Failed copying from user, err %d\n",
+			__func__, err);
+		goto out;
+	}
+
+	buf_size = ioctl_data->buf_size;
+	if (buf_size > (queue_max_hw_sectors(sdev->request_queue) << 9))
+		buf_len = (queue_max_hw_sectors(sdev->request_queue) << 9);
+	else
+		buf_len = ioctl_data->buf_size;
+
+	data = kzalloc(buf_size, GFP_KERNEL);
+	if (!data) {
+		dev_err(hba->dev, "%s: Failed allocating fw_data\n", __func__);
+		err = -ENOMEM;
+		goto out;
+	}
+
+	err = scsi_device_get(sdev);
+	if (err) {
+		dev_err(hba->dev, "%s: Failed scsi device get %d\n",
+			__func__, err);
+		goto out;
+	}
+
+	while (buf_size) {
+		if (buf_len > buf_size)
+			buf_len = buf_size;
+
+		memcpy(data, fw_data->buffer + offset, buf_len);
+
+		cmd[3] = (offset >> 16) & 0xff;
+		cmd[4] = (offset >> 8) & 0xff;
+		cmd[5] = offset & 0xff;
+		cmd[6] = (buf_len >> 16) & 0xff;
+		cmd[7] = (buf_len >> 8) & 0xff;
+		cmd[8] = buf_len & 0xff;
+
+		err = scsi_execute(sdev, cmd, DMA_TO_DEVICE, data,
+				   buf_len, sense, &sshdr, 10000, 1,
+				   REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT |
+				   REQ_FAILFAST_DRIVER, 0, NULL);
+		if (err) {
+			dev_err(hba->dev, "%s: Failed write buffer %d\n",
+				__func__, err);
+			goto out1;
+		}
+
+		if (scsi_normalize_sense(sense, SCSI_SENSE_BUFFERSIZE, &sshdr)) {
+			dev_err(hba->dev, "%s: print sense hdr\n", __func__);
+			__scsi_print_sense(sdev, "ffu", sense,
+                                           SCSI_SENSE_BUFFERSIZE);
+		}
+
+		offset += buf_len;
+		buf_size -= buf_len;
+	}
+
+out1:
+	if (sdev)
+		scsi_device_put(sdev);
+out:
+	kfree(data);
+	kfree(fw_data);
+	kfree(ioctl_data);
+
+	return err;
+}
+
 /**
  * ufs_qcom_ioctl - ufs ioctl callback registered in scsi_host
  * @dev: scsi device required for per LUN queries
@@ -2765,6 +2876,11 @@ ufs_qcom_ioctl(struct scsi_device *dev, unsigned int cmd, void __user *buffer)
 					   ufshcd_scsi_to_upiu_lun(dev->lun),
 					   buffer);
 		ufshcd_rpm_put_sync(hba);
+		break;
+	case UFS_IOCTL_WRITE_BUFFER:
+		pm_runtime_get_sync(hba->dev);
+		err = ufshcd_write_buffer(hba, buffer, dev);
+		pm_runtime_put_sync(hba->dev);
 		break;
 	default:
 		err = -ENOIOCTLCMD;
@@ -2982,7 +3098,8 @@ static void ufs_qcom_qos_init(struct ufs_hba *hba)
 	qr->qcg = qcg;
 	for_each_available_child_of_node(np, group_node) {
 		of_property_read_u32(group_node, "mask", &mask);
-		qcg->mask.bits[0] = mask;
+		/* assign only populated cpu mask to qcg mask */
+		qcg->mask.bits[0] = mask & cpu_possible_mask->bits[0];
 		if (!cpumask_subset(&qcg->mask, cpu_possible_mask)) {
 			ufs_qcom_msg(ERR, dev, "Invalid group mask\n");
 			goto out_err;
@@ -3034,14 +3151,16 @@ static void ufs_qcom_parse_irq_affinity(struct ufs_hba *hba)
 
 	if (np) {
 		of_property_read_u32(np, "qcom,prime-mask", &mask);
-		host->perf_mask.bits[0] = mask;
+		/* assign only populated cpu mask to perf mask  */
+		host->perf_mask.bits[0] = mask & cpu_possible_mask->bits[0];
 		if (!cpumask_subset(&host->perf_mask, cpu_possible_mask)) {
 			ufs_qcom_msg(ERR, dev, "Invalid group prime mask\n");
 			host->perf_mask.bits[0] = UFS_QCOM_IRQ_PRIME_MASK;
 		}
 		mask = 0;
 		of_property_read_u32(np, "qcom,silver-mask", &mask);
-		host->def_mask.bits[0] = mask;
+		/* assign only populated cpu mask to silver mask */
+		host->def_mask.bits[0] = mask & cpu_possible_mask->bits[0];
 		if (!cpumask_subset(&host->def_mask, cpu_possible_mask)) {
 			ufs_qcom_msg(ERR, dev, "Invalid group silver mask\n");
 			host->def_mask.bits[0] = UFS_QCOM_IRQ_SLVR_MASK;
@@ -3807,12 +3926,25 @@ static int ufs_qcom_clk_scale_down_post_change(struct ufs_hba *hba)
 	return err;
 }
 
+/**
+ * Check controller status
+ * Returns true if controller is active, false otherwise
+ */
+static bool is_hba_active(struct ufs_hba *hba)
+{
+	return !!(ufshcd_readl(hba, REG_CONTROLLER_ENABLE) & CONTROLLER_ENABLE);
+}
+
 static int ufs_qcom_clk_scale_notify(struct ufs_hba *hba,
 		bool scale_up, enum ufs_notify_change_status status)
 {
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 	struct ufs_pa_layer_attr *dev_req_params = &host->dev_req_params;
 	int err = 0;
+
+	/* Check if controller is active to send commands, else commands will timeout */
+	if (!is_hba_active(hba))
+		goto out;
 
 	if (status == PRE_CHANGE) {
 		err = ufshcd_uic_hibern8_enter(hba);
@@ -4836,13 +4968,11 @@ static void ufs_qcom_shutdown(struct platform_device *pdev)
 	ufs_qcom_log_str(host, "0xdead\n");
 	if (host->dbg_en)
 		trace_ufs_qcom_shutdown(dev_name(hba->dev));
-	ufshcd_pltfrm_shutdown(pdev);
 
-	/* UFS_RESET TLMM register cannot reset to POR value '1' after warm
-	 * reset, so deassert ufs device reset line after UFS device shutdown
-	 * to ensure the UFS_RESET TLMM register value is POR value
-	 */
-	ufs_qcom_device_reset_ctrl(hba, false);
+	/* Workaround for PMIC OCP during ufs suspend */
+	hba->is_powered = false;
+
+	ufshcd_pltfrm_shutdown(pdev);
 }
 
 static int ufs_qcom_system_suspend(struct device *dev)

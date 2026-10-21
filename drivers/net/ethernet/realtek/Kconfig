@@ -113,4 +113,19 @@ config R8169
 	  To compile this driver as a module, choose M here: the module
 	  will be called r8169.  This is recommended.
 
+config R8168
+	tristate "Realtek 8119/8168 ethernet support"
+	depends on PCI
+	select CRC32
+	select PHYLIB
+	select REALTEK_PHY
+	help
+	  Say Y here if you have a Realtek Ethernet adapter belonging to
+	  the following families:
+	  RTL8119 Gigabit Ethernet
+	  RTL8168 Gigabit Ethernet
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called r8168.  This is recommended.
+
 endif # NET_VENDOR_REALTEK

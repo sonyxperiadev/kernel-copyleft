@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config MSM_BT_POWER
+	tristate "MSM Bluetooth Power Control"
+	depends on ARCH_QCOM
+	select CNSS_UTILS
+	help
+		MSM Bluetooth Power control driver.
+		This provides a parameter to switch on/off power from PMIC
+		to Bluetooth device. This will control LDOs/Clock/GPIOs to
+		control Bluetooth Chipset based on power on/off sequence.
+
+		Say Y here to compile support for Bluetooth Power driver
+		into the kernel or say M to compile as a module.

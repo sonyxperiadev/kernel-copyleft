@@ -57,6 +57,8 @@ static bool walt_clock_suspended;
 static bool use_cycle_counter;
 static DEFINE_MUTEX(cluster_lock);
 static u64 walt_load_reported_window;
+static DEFINE_PER_CPU(atomic64_t, cycles) = ATOMIC64_INIT(0);
+static DEFINE_PER_CPU(atomic64_t, last_cc_update) = ATOMIC64_INIT(0);
 
 static struct irq_work walt_cpufreq_irq_work;
 struct irq_work walt_migration_irq_work;
@@ -439,20 +441,19 @@ update_window_start(struct rq *rq, u64 wallclock, int event)
 	return old_window_start;
 }
 
-/*
- * Assumes rq_lock is held and wallclock was recorded in the same critical
- * section as this function's invocation.
- */
+#define THRESH_CC_UPDATE (2 * NSEC_PER_USEC)
 static inline u64 read_cycle_counter(int cpu, u64 wallclock)
 {
-	struct walt_rq *wrq = (struct walt_rq *) cpu_rq(cpu)->android_vendor_data1;
+	u64 delta;
 
-	if (wrq->last_cc_update != wallclock) {
-		wrq->cycles = qcom_cpufreq_get_cpu_cycle_counter(cpu);
-		wrq->last_cc_update = wallclock;
+	delta = wallclock - atomic64_read(&per_cpu(last_cc_update, cpu));
+	if (delta > THRESH_CC_UPDATE) {
+		atomic64_set(&per_cpu(cycles, cpu),
+				qcom_cpufreq_get_cpu_cycle_counter(cpu));
+		atomic64_set(&per_cpu(last_cc_update, cpu), wallclock);
 	}
 
-	return wrq->cycles;
+	return atomic64_read(&per_cpu(cycles, cpu));
 }
 
 static void update_task_cpu_cycles(struct task_struct *p, int cpu,
@@ -1983,7 +1984,7 @@ static void update_history(struct rq *rq, struct task_struct *p,
 	u16 *hist_util = &wts->sum_history_util[0];
 	int i;
 	u32 max = 0, avg, demand;
-	u64 sum = 0;
+	u64 sum = 0, ewma = 0, ewma_weight;
 	u16 demand_scaled, pred_demand_scaled, runtime_scaled;
 
 	struct walt_rq *wrq = (struct walt_rq *) rq->android_vendor_data1;
@@ -1997,11 +1998,15 @@ static void update_history(struct rq *rq, struct task_struct *p,
 	for (; samples > 0; samples--) {
 		hist[wts->cidx] = runtime;
 		hist_util[wts->cidx] = runtime_scaled;
+		ewma_weight = RAVG_HIST_SIZE - wts->cidx - 1;
 		wts->cidx = ++(wts->cidx) % RAVG_HIST_SIZE;
 	}
 
 	for (i = 0; i < RAVG_HIST_SIZE; i++) {
 		sum += hist[i];
+		ewma += hist[i] << ewma_weight;
+		ewma_weight = (ewma_weight + 1) % RAVG_HIST_SIZE;
+
 		if (hist[i] > max)
 			max = hist[i];
 	}
@@ -2012,6 +2017,27 @@ static void update_history(struct rq *rq, struct task_struct *p,
 		demand = runtime;
 	} else if (sysctl_sched_window_stats_policy == WINDOW_STATS_MAX) {
 		demand = max;
+	} else if (sysctl_sched_window_stats_policy == WINDOW_STATS_EWMA) {
+		/*
+		 * WMA stands for weighted moving average. It helps to
+		 * smooth load curve and react faster while ramping down
+		 * comparing with basic average policy. When ramping up
+		 * it prevents from a spurious big "recent" sample that
+		 * may lead to overshooting if it is bigger then AVG of
+		 * history demand.
+		 *
+		 * See below example (4 HS):
+		 *
+		 * WMA = (P0 * 4 + P1 * 3 + P2 * 2 + P3 * 1) / (4 + 3 + 2 + 1)
+		 *
+		 * This is done for power saving. Means when load disappears
+		 * or becomes low, this algorithm caches a real bottom load
+		 * faster (because of weights) then taking AVG values.
+		 *
+		 * EWMA is an exponential version of the WMA algorithm.
+		 */
+		ewma = div64_u64(ewma, (1 << RAVG_HIST_SIZE) - 1);
+		demand = (u32) ewma;
 	} else {
 		avg = div64_u64(sum, RAVG_HIST_SIZE);
 		if (sysctl_sched_window_stats_policy == WINDOW_STATS_AVG)
@@ -2248,6 +2274,26 @@ update_task_rq_cpu_cycles(struct task_struct *p, struct rq *rq, int event,
 					 p->pid, rq->cpu, wallclock, wallclock,
 					 wts->mark_start, wts->mark_start, event, irqtime);
 			WALT_PANIC((s64)time_delta < 0);
+		}
+
+		/*
+		 * It can happen when a time between two updates
+		 * (for example TASK_UPDATE) is very short. The reason
+		 * is a read_cycle_counter function now can return
+		 * a previous/same CC value if a last read was within
+		 * a THRESH_CC_UPDATE threshold.
+		 *
+		 * In that particular scenario use current CPU OPP
+		 * to scale such task's delta contributions which
+		 * are smaller than THRESH_CC_UPDATE interval.
+		 *
+		 * The aim of using a current frequency is because:
+		 *   - an estimated one can be zero;
+		 *   - we do not want to lose samples due to that.
+		 */
+		if (unlikely(!cycles_delta)) {
+			cycles_delta = sched_cpu_legacy_freq(cpu);
+			time_delta = 1;
 		}
 
 		wrq->task_exec_scale = DIV64_U64_ROUNDUP(cycles_delta *
@@ -3963,8 +4009,6 @@ static void walt_sched_init_rq(struct rq *rq)
 	wrq->curr_table = 0;
 	wrq->prev_top = 0;
 	wrq->curr_top = 0;
-	wrq->last_cc_update = 0;
-	wrq->cycles = 0;
 	for (j = 0; j < NUM_TRACKED_WINDOWS; j++) {
 		memset(&wrq->load_subs[j], 0,
 				sizeof(struct load_subtractions));

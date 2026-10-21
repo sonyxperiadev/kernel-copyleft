@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1677,9 +1677,18 @@ static int glink_slatecom_rx_data(struct glink_slatecom *glink,
 
 	if (intent->size - intent->offset < chunk_size) {
 		dev_err(glink->dev, "Insufficient space in intent\n");
+		glink_slatecom_free_intent(channel, intent);
 		mutex_unlock(&channel->intent_lock);
 
 		/* The packet header lied, drop payload */
+		return msglen;
+	}
+
+	if (chunk_size % WORD_SIZE) {
+		dev_err(glink->dev, "For chunk_size %d use short packet\n",
+					chunk_size);
+		glink_slatecom_free_intent(channel, intent);
+		mutex_unlock(&channel->intent_lock);
 		return msglen;
 	}
 
@@ -2223,7 +2232,6 @@ int glink_slatecom_probe(struct platform_device *pdev)
 	dev = glink->dev;
 	dev->of_node = pdev->dev.of_node;
 	dev->release = glink_slatecom_release;
-	dev_set_name(dev, "%s", dev->of_node->name);
 	dev_set_drvdata(dev, glink);
 
 	ret = of_property_read_string(dev->of_node, "label", &glink->name);

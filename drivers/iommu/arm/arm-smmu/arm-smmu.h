@@ -5,6 +5,8 @@
  * Copyright (C) 2013 ARM Limited
  *
  * Author: Will Deacon <will.deacon@arm.com>
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _ARM_SMMU_H
@@ -23,8 +25,7 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 #include <linux/qcom-iommu-util.h>
-
-#include "../../qcom-io-pgtable.h"
+#include <linux/qcom-io-pgtable.h>
 
 /* Configuration registers */
 #define ARM_SMMU_GR0_sCR0		0x0
@@ -518,6 +519,8 @@ struct arm_smmu_domain {
 	enum io_pgtable_fmt		pgtbl_fmt;
 	/* mapping_cfg.atomic indicates that runtime power management should be disabled. */
 	bool				rpm_always_on;
+	/* skip tlb management. */
+	bool skip_tlb_management;
 
 #ifdef CONFIG_ARM_SMMU_CONTEXT_FAULT_RETRY
 	u64				prev_fault_address;

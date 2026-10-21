@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+on boot
+    # add for nordic52832 joystick
+    chown system system /sys/devices/platform/soc/894000.spi/spi_master/spi0/spi0.0/jsrequest
+    chown system system /sys/devices/platform/soc/894000.spi/spi_master/spi0/spi0.0/jsmem

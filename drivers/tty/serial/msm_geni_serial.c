@@ -1654,6 +1654,12 @@ static void msm_geni_uart_rx_queue_dma_tre(int index, struct uart_port *uport)
 	msm_port->gsi->rx_desc->callback_param = &msm_port->gsi->rx_cb;
 
 	rx_cookie = dmaengine_submit(msm_port->gsi->rx_desc);
+	if (dma_submit_error(rx_cookie)) {
+		pr_err("%s: dmaengine_submit failed (%d)\n", __func__, rx_cookie);
+		dmaengine_terminate_all(msm_port->gsi->rx_c);
+		return;
+	}
+
 	dma_async_issue_pending(msm_port->gsi->rx_c);
 	UART_LOG_DBG(msm_port->ipc_log_misc, uport->dev,
 		     "%s: End\n", __func__);
@@ -1841,6 +1847,11 @@ static void msm_geni_uart_gsi_xfer_tx(struct work_struct *work)
 	msm_port->gsi->tx_desc->callback = msm_geni_uart_gsi_tx_cb;
 	msm_port->gsi->tx_desc->callback_param = &msm_port->gsi->tx_cb;
 	tx_cookie = dmaengine_submit(msm_port->gsi->tx_desc);
+	if (dma_submit_error(tx_cookie)) {
+		pr_err("%s: dmaengine_submit failed (%d)\n", __func__, tx_cookie);
+		dmaengine_terminate_all(msm_port->gsi->tx_c);
+		return;
+	}
 	reinit_completion(&msm_port->tx_xfer);
 	dma_async_issue_pending(msm_port->gsi->tx_c);
 
@@ -1872,7 +1883,8 @@ static void msm_geni_uart_gsi_cancel_rx(struct work_struct *work)
 			     "%s: gsi_rx not yet done\n", __func__);
 		return;
 	}
-	dmaengine_terminate_all(msm_port->gsi->rx_c);
+	if (msm_port->gsi->rx_c)
+		dmaengine_terminate_all(msm_port->gsi->rx_c);
 	complete(&msm_port->xfer);
 	msm_port->gsi_rx_done = false;
 	atomic_set(&msm_port->stop_rx_inprogress, 0);
@@ -1949,6 +1961,11 @@ static int msm_geni_uart_gsi_xfer_rx(struct uart_port *uport)
 	msm_port->gsi->rx_desc->callback = msm_geni_uart_gsi_rx_cb;
 	msm_port->gsi->rx_desc->callback_param = &msm_port->gsi->rx_cb;
 	rx_cookie = dmaengine_submit(msm_port->gsi->rx_desc);
+	if (dma_submit_error(rx_cookie)) {
+		pr_err("%s: dmaengine_submit failed (%d)\n", __func__, rx_cookie);
+		dmaengine_terminate_all(msm_port->gsi->rx_c);
+		return -EINVAL;
+	}
 	dma_async_issue_pending(msm_port->gsi->rx_c);
 	msm_port->gsi_rx_done = true;
 
@@ -3292,7 +3309,6 @@ static void msm_geni_serial_shutdown(struct uart_port *uport)
 			 */
 			UART_LOG_DBG(msm_port->ipc_log_misc, uport->dev,
 					"%s: Stop Rx Engine\n", __func__);
-			dmaengine_terminate_all(msm_port->gsi->rx_c);
 			timeout = wait_for_completion_timeout
 				(&msm_port->xfer,
 				msecs_to_jiffies(POLL_WAIT_TIMEOUT_MSEC));
@@ -4591,8 +4607,10 @@ static int msm_geni_serial_remove(struct platform_device *pdev)
 	 */
 	if (port->is_console && !con_enabled)
 		return 0;
-	if (!uart_console(&port->uport))
+	if (!uart_console(&port->uport)) {
 		wakeup_source_unregister(port->geni_wake);
+		port->geni_wake = NULL;
+	}
 	if (port->pm_auto_suspend_disable)
 		pm_runtime_allow(&pdev->dev);
 	uart_remove_one_port(drv, &port->uport);

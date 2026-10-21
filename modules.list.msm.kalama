@@ -58,6 +58,7 @@ phy-qcom-ufs.ko
 phy-qcom-ufs-qmp-v4-kalama.ko
 phy-qcom-ufs-qrbtc-sdm845.ko
 pinctrl-msm.ko
+pinctrl-somc.ko
 proxy-consumer.ko
 qcom-dcvs.ko
 qcom-dload-mode.ko
